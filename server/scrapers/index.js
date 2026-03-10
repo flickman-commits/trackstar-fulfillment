@@ -12,6 +12,7 @@ import { NYRRScraper } from './platforms/NYRRScraper.js'
 import { MyRaceAiScraper } from './platforms/MyRaceAiScraper.js'
 import { MikaTimingScraper } from './platforms/MikaTimingScraper.js'
 import { RaceRosterScraper } from './platforms/RaceRosterScraper.js'
+import { XacteScraper } from './platforms/XacteScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -23,6 +24,7 @@ import nycConfig from './configs/nyc.js'
 import cimConfig from './configs/cim.js'
 import chicagoConfig from './configs/chicago.js'
 import twinCitiesConfig from './configs/twinCities.js'
+import losAngelesConfig from './configs/losAngeles.js'
 
 /**
  * Map platform identifier -> platform scraper class
@@ -35,6 +37,7 @@ const PLATFORM_MAP = {
   myrace: MyRaceAiScraper,
   mika: MikaTimingScraper,
   raceroster: RaceRosterScraper,
+  xacte: XacteScraper,
 }
 
 /**
@@ -50,6 +53,7 @@ const ALL_CONFIGS = [
   cimConfig,
   chicagoConfig,
   twinCitiesConfig,
+  losAngelesConfig,
 ]
 
 /**
