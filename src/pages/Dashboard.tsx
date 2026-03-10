@@ -980,9 +980,9 @@ export default function Dashboard() {
       o.status === 'flagged' || o.status === 'ready' || o.status === 'pending' || o.status === 'missing_year'
     )
     return fulfillOrders.sort((a, b) => {
-      const numA = parseInt(a.displayOrderNumber) || parseInt(a.orderNumber) || 0
-      const numB = parseInt(b.displayOrderNumber) || parseInt(b.orderNumber) || 0
-      return numB - numA
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return dateB - dateA
     })
   }, [orders, activeView])
 
