@@ -1116,7 +1116,8 @@ Thank you!`
     const nameParts = runnerName.trim().split(/\s+/)
     const lastName = nameParts[nameParts.length - 1]
 
-    return `${displayOrderNumber}_${raceShort}_${lastName}.pdf`
+    const suffix = order.trackstarOrderType === 'custom' ? '_Custom' : ''
+    return `${displayOrderNumber}_${raceShort}_${lastName}${suffix}.pdf`
   }
 
   return (
