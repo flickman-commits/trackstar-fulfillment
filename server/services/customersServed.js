@@ -2,20 +2,16 @@
  * customersServed.js - Track and sync "customers served" count
  *
  * Stores a counter in SystemConfig DB table, increments when new orders
- * are imported, and pushes the formatted count to a Shopify shop-level
- * metafield (namespace: trackstar, key: customers_served) via REST Admin API.
+ * are imported, and pushes the formatted count to a Shopify metaobject
+ * (type: business_stats, field: total_customers_served) via GraphQL Admin API.
  *
  * The count is stored as a raw integer in the DB and formatted with
  * commas (e.g., "1,333") when synced to Shopify for display.
- *
- * Theme reference: {{ shop.metafields.trackstar.customers_served.value }}
  */
 
-import { shopifyFetch } from './shopifyAuth.js'
+import { getShopifyToken } from './shopifyAuth.js'
 
 const SYSTEM_CONFIG_KEY = 'customers_served_count'
-const SHOPIFY_METAFIELD_NAMESPACE = 'trackstar'
-const SHOPIFY_METAFIELD_KEY = 'customers_served'
 const INITIAL_COUNT = 1333
 
 /**
@@ -23,6 +19,37 @@ const INITIAL_COUNT = 1333
  */
 function formatWithCommas(num) {
   return num.toLocaleString('en-US')
+}
+
+/**
+ * Make a GraphQL request to Shopify Admin API
+ * (Metaobjects are only available via GraphQL, not REST)
+ */
+async function shopifyGraphQL(query, variables = {}) {
+  const token = await getShopifyToken()
+  const store = process.env.SHOPIFY_STORE
+
+  const response = await fetch(`https://${store}/admin/api/2024-01/graphql.json`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': token
+    },
+    body: JSON.stringify({ query, variables })
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Shopify GraphQL error (${response.status}): ${errorText}`)
+  }
+
+  const result = await response.json()
+
+  if (result.errors?.length > 0) {
+    throw new Error(`Shopify GraphQL error: ${result.errors.map(e => e.message).join(', ')}`)
+  }
+
+  return result.data
 }
 
 /**
@@ -69,33 +96,95 @@ export async function incrementCustomersServed(prisma, incrementBy) {
 }
 
 /**
- * Push the current customers served count to Shopify as a shop-level metafield.
+ * Push the current customers served count to the Shopify metaobject.
  *
- * Uses POST /metafields.json which creates or updates (upsert behavior when
- * namespace+key already exists on the same owner).
- *
- * The metafield is accessible in Liquid as:
- *   {{ shop.metafields.trackstar.customers_served.value }}
+ * Uses GraphQL Admin API:
+ * 1. Query metaobjects of type "business_stats" to find the entry GID
+ * 2. Discover the field key for "total customers served"
+ * 3. Mutate to update that field with the formatted count
  */
 export async function syncCustomersServedToShopify(prisma) {
   try {
     const count = await getCustomersServedCount(prisma)
     const formattedCount = formatWithCommas(count)
 
-    // Upsert the shop-level metafield
-    const result = await shopifyFetch('/metafields.json', {
-      method: 'POST',
-      body: JSON.stringify({
-        metafield: {
-          namespace: SHOPIFY_METAFIELD_NAMESPACE,
-          key: SHOPIFY_METAFIELD_KEY,
-          value: formattedCount,
-          type: 'single_line_text_field'
+    // Step 1: Find the business_stats metaobject entry
+    const queryResult = await shopifyGraphQL(`
+      {
+        metaobjects(type: "business_stats", first: 1) {
+          edges {
+            node {
+              id
+              fields {
+                key
+                value
+              }
+            }
+          }
         }
-      })
+      }
+    `)
+
+    const edges = queryResult.metaobjects?.edges || []
+    if (edges.length === 0) {
+      console.error('[customersServed] No business_stats metaobject entries found in Shopify')
+      return false
+    }
+
+    const entry = edges[0].node
+    const metaobjectGid = entry.id
+
+    // Step 2: Discover the field key (find whichever field has "customer" in the key)
+    let fieldKey = 'total_customers_served'
+    if (entry.fields && Array.isArray(entry.fields)) {
+      const matchingField = entry.fields.find(f =>
+        f.key === 'total_customers_served' ||
+        f.key === 'total customers served' ||
+        f.key?.toLowerCase().includes('customer')
+      )
+      if (matchingField) {
+        fieldKey = matchingField.key
+      }
+    }
+
+    console.log(`[customersServed] Found metaobject ${metaobjectGid}, field key: "${fieldKey}", updating to: ${formattedCount}`)
+
+    // Step 3: Update the metaobject
+    const mutationResult = await shopifyGraphQL(`
+      mutation metaobjectUpdate($id: ID!, $metaobject: MetaobjectUpdateInput!) {
+        metaobjectUpdate(id: $id, metaobject: $metaobject) {
+          metaobject {
+            id
+            fields {
+              key
+              value
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `, {
+      id: metaobjectGid,
+      metaobject: {
+        fields: [
+          {
+            key: fieldKey,
+            value: formattedCount
+          }
+        ]
+      }
     })
 
-    console.log(`[customersServed] ✅ Synced to Shopify metafield: ${formattedCount} (id: ${result.metafield?.id})`)
+    const userErrors = mutationResult.metaobjectUpdate?.userErrors || []
+    if (userErrors.length > 0) {
+      console.error('[customersServed] Shopify mutation errors:', userErrors)
+      return false
+    }
+
+    console.log(`[customersServed] ✅ Synced to Shopify metaobject: ${formattedCount}`)
     return true
   } catch (error) {
     // Don't let Shopify sync failure break the import flow
