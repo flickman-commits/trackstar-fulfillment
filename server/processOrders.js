@@ -19,6 +19,7 @@ import { etsyFetch } from './services/etsyAuth.js'
 import { parseEtsyRaceName, parseEtsyPersonalization } from './services/etsyPersonalization.js'
 import { researchService } from './services/ResearchService.js'
 import { hasScraperForRace } from './scrapers/index.js'
+import { incrementCustomersServed, syncCustomersServedToShopify } from './services/customersServed.js'
 
 // Artelo API configuration
 const ARTELO_API_URL = 'https://www.artelo.io/api/open/orders/get'
@@ -803,7 +804,24 @@ export async function processOrders(options = {}) {
       }
     }
 
-    // 4. Summary
+    // 4. Update "customers served" counter if new orders were imported
+    if (results.imported > 0) {
+      try {
+        const newCount = await incrementCustomersServed(prisma, results.imported)
+        log(`[processOrders] 📊 Customers served: ${newCount.toLocaleString('en-US')}`)
+
+        // Push updated count to Shopify metaobject
+        const synced = await syncCustomersServedToShopify(prisma)
+        if (synced) {
+          log('[processOrders] ✅ Shopify metaobject updated')
+        }
+      } catch (counterError) {
+        // Don't fail the import if counter update fails
+        console.error('[processOrders] ⚠️ Counter update failed (non-fatal):', counterError.message)
+      }
+    }
+
+    // 5. Summary
     log('\n[processOrders] === SUMMARY ===')
     log(`  Total orders: ${results.total}`)
     log(`  Imported: ${results.imported}`)

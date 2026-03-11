@@ -10,9 +10,13 @@
  *   - clear-research: Delete runner research records
  *   - complete: Mark an order as completed
  *   - design-status: Update design status of a custom order
+ *   - customers-served-info: Get current customers served count
+ *   - customers-served-sync: Force sync count to Shopify
+ *   - customers-served-set: Manually set the count (for corrections)
  */
 
 import { PrismaClient } from '@prisma/client'
+import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
 
 const prisma = new PrismaClient()
 
@@ -44,6 +48,12 @@ export default async function handler(req, res) {
         return await handleComplete(body, res)
       case 'design-status':
         return await handleDesignStatus(body, res)
+      case 'customers-served-info':
+        return await handleCustomersServedInfo(res)
+      case 'customers-served-sync':
+        return await handleCustomersServedSync(res)
+      case 'customers-served-set':
+        return await handleCustomersServedSet(body, res)
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` })
     }
@@ -186,4 +196,39 @@ async function handleDesignStatus({ orderNumber, designStatus }, res) {
 
   console.log(`[actions/design-status] Order ${orderNumber} design status → ${designStatus}`)
   return res.status(200).json({ success: true, order })
+}
+
+// --- customers-served-info ---
+async function handleCustomersServedInfo(res) {
+  const info = await getCustomersServedInfo(prisma)
+  return res.status(200).json({ success: true, ...info })
+}
+
+// --- customers-served-sync ---
+async function handleCustomersServedSync(res) {
+  const info = await getCustomersServedInfo(prisma)
+  const synced = await syncCustomersServedToShopify(prisma)
+  return res.status(200).json({ success: synced, ...info, syncedToShopify: synced })
+}
+
+// --- customers-served-set ---
+async function handleCustomersServedSet({ count }, res) {
+  if (count === undefined || count === null) {
+    return res.status(400).json({ error: 'count is required' })
+  }
+  const parsedCount = parseInt(count, 10)
+  if (isNaN(parsedCount) || parsedCount < 0) {
+    return res.status(400).json({ error: 'count must be a non-negative integer' })
+  }
+
+  await setCustomersServedCount(prisma, parsedCount)
+  const synced = await syncCustomersServedToShopify(prisma)
+
+  console.log(`[actions/customers-served-set] Count set to ${parsedCount.toLocaleString('en-US')} and synced: ${synced}`)
+  return res.status(200).json({
+    success: true,
+    count: parsedCount,
+    formatted: parsedCount.toLocaleString('en-US'),
+    syncedToShopify: synced
+  })
 }
