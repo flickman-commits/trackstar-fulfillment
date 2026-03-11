@@ -392,6 +392,33 @@ export async function processOrders(options = {}) {
     const data = await response.json()
     const allOrders = Array.isArray(data) ? data : (data.orders || [])
 
+    // Count ALL new Artelo orders (regardless of status) for the "customers served" counter.
+    // This catches manual orders that go straight to "received"/"in production" and never
+    // enter the actionable import path. We check every unique parentOrderNumber against the DB.
+    let allNewOrderCount = 0
+    if (allOrders.length > 0) {
+      const uniqueParentOrderIds = [...new Set(allOrders.map(o => o.orderId))]
+      const existingOrders = await prisma.order.findMany({
+        where: { parentOrderNumber: { in: uniqueParentOrderIds } },
+        select: { parentOrderNumber: true },
+        distinct: ['parentOrderNumber']
+      })
+      const existingParentIds = new Set(existingOrders.map(o => o.parentOrderNumber))
+
+      // Count orders whose parentOrderNumber doesn't exist in DB at all
+      // For each new parent order, count its line items (each is a "customer served")
+      for (const order of allOrders) {
+        if (!existingParentIds.has(order.orderId)) {
+          const numItems = order.orderItems?.length || 1
+          allNewOrderCount += numItems
+        }
+      }
+
+      if (allNewOrderCount > 0) {
+        log(`[processOrders] 📊 Found ${allNewOrderCount} total new order line items across all statuses (for customers served counter)`)
+      }
+    }
+
     // Separate actionable orders from completed ones
     const actionableOrders = allOrders.filter(order =>
       ACTIONABLE_STATUSES.includes(order.status)
@@ -804,11 +831,13 @@ export async function processOrders(options = {}) {
       }
     }
 
-    // 4. Update "customers served" counter if new orders were imported
-    if (results.imported > 0) {
+    // 4. Update "customers served" counter for ALL new Artelo orders (any status)
+    //    This uses allNewOrderCount (computed before the actionable/completed split)
+    //    so manual orders that skip the actionable path still get counted.
+    if (allNewOrderCount > 0) {
       try {
-        const newCount = await incrementCustomersServed(prisma, results.imported)
-        log(`[processOrders] 📊 Customers served: ${newCount.toLocaleString('en-US')}`)
+        const newCount = await incrementCustomersServed(prisma, allNewOrderCount)
+        log(`[processOrders] 📊 Customers served: ${newCount.toLocaleString('en-US')} (+${allNewOrderCount} from all new orders)`)
 
         // Push updated count to Shopify metaobject
         const synced = await syncCustomersServedToShopify(prisma)
