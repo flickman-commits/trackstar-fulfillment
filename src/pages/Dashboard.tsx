@@ -182,6 +182,7 @@ export default function Dashboard() {
   const [showCompleted, setShowCompleted] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [isResearching, setIsResearching] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -893,9 +894,14 @@ export default function Dashboard() {
   }
 
   // Fetch orders on mount and when view changes
+  // Only show full loading spinner on initial load; show subtle refresh indicator on view switch
   useEffect(() => {
-    setIsLoading(true)
-    fetchOrders()
+    if (orders.length === 0) {
+      setIsLoading(true)
+    } else {
+      setIsRefreshing(true)
+    }
+    fetchOrders().finally(() => setIsRefreshing(false))
   }, [fetchOrders])
 
   // Update design status for custom orders
@@ -1194,6 +1200,7 @@ Thank you!`
               <span className="px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
                 {ordersToFulfill.length}
               </span>
+              {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
             </div>
             {/* View Switcher */}
             <div className="flex gap-2">
