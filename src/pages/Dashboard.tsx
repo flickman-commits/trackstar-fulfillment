@@ -952,12 +952,13 @@ export default function Dashboard() {
   // Generate mailto link for custom order email
   const generateEmailLink = (order: Order): string => {
     const customerName = order.customerName || 'there'
-    const runnerName = order.effectiveRunnerName || order.runnerName || 'your runner'
-    const subject = encodeURIComponent(`Your Trackstar Order (Action Required)`)
+    const displayOrderNumber = order.displayOrderNumber || order.orderNumber
+    const subject = encodeURIComponent(`Your Trackstar Order #${displayOrderNumber} (Action Required)`)
     const body = encodeURIComponent(
-      `Hey ${customerName},\n\nSuper pumped to show you your custom Trackstar print(s) for ${runnerName}! Let me know which of these designs you prefer or if there are any tweaks you want us to make!\n\n`
+      `Hey ${customerName},\n\nSuper pumped to show you your custom Trackstar print! Let us know which of these designs you prefer or if there are any tweaks you want us to make before sending it to production!\n\n`
     )
-    return `mailto:${order.customerEmail || ''}?subject=${subject}&body=${body}`
+    const cc = encodeURIComponent('danielkeith.currie@gmail.com')
+    return `mailto:${order.customerEmail || ''}?cc=${cc}&subject=${subject}&body=${body}`
   }
 
   // Designs to be personalized
