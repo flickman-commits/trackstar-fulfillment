@@ -19,7 +19,7 @@ import { etsyFetch } from './services/etsyAuth.js'
 import { parseEtsyRaceName, parseEtsyPersonalization } from './services/etsyPersonalization.js'
 import { researchService } from './services/ResearchService.js'
 import { hasScraperForRace } from './scrapers/index.js'
-import { incrementCustomersServed, syncCustomersServedToShopify } from './services/customersServed.js'
+import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrderIds, saveCountedOrderIds } from './services/customersServed.js'
 
 // Artelo API configuration
 const ARTELO_API_URL = 'https://www.artelo.io/api/open/orders/get'
@@ -394,10 +394,20 @@ export async function processOrders(options = {}) {
 
     // Count ALL new Artelo orders (regardless of status) for the "customers served" counter.
     // This catches manual orders that go straight to "received"/"in production" and never
-    // enter the actionable import path. We check every unique parentOrderNumber against the DB.
+    // enter the actionable import path.
+    //
+    // We check two sources to determine if an order is "new":
+    //  1. The DB (orders table) — catches actionable orders we've imported
+    //  2. A separate "counted IDs" set in SystemConfig — catches non-actionable orders
+    //     that were counted but never imported to the DB
     let allNewOrderCount = 0
+    let countedOrderIds = new Set()
+    const allArteloIds = new Set(allOrders.map(o => o.orderId))
+
     if (allOrders.length > 0) {
       const uniqueParentOrderIds = [...new Set(allOrders.map(o => o.orderId))]
+
+      // Check 1: Which orders already exist in the DB?
       const existingOrders = await prisma.order.findMany({
         where: { parentOrderNumber: { in: uniqueParentOrderIds } },
         select: { parentOrderNumber: true },
@@ -405,12 +415,16 @@ export async function processOrders(options = {}) {
       })
       const existingParentIds = new Set(existingOrders.map(o => o.parentOrderNumber))
 
-      // Count orders whose parentOrderNumber doesn't exist in DB at all
-      // For each new parent order, count its line items (each is a "customer served")
+      // Check 2: Which orders have we already counted (but may not be in DB)?
+      countedOrderIds = await getCountedOrderIds(prisma)
+
+      // An order is new only if it's NOT in the DB AND NOT already counted
       for (const order of allOrders) {
-        if (!existingParentIds.has(order.orderId)) {
+        if (!existingParentIds.has(order.orderId) && !countedOrderIds.has(order.orderId)) {
           const numItems = order.orderItems?.length || 1
           allNewOrderCount += numItems
+          // Mark as counted so we don't recount on next import
+          countedOrderIds.add(order.orderId)
         }
       }
 
@@ -834,10 +848,14 @@ export async function processOrders(options = {}) {
     // 4. Update "customers served" counter for ALL new Artelo orders (any status)
     //    This uses allNewOrderCount (computed before the actionable/completed split)
     //    so manual orders that skip the actionable path still get counted.
+    //    Also persists the "counted IDs" set to prevent double-counting on next run.
     if (allNewOrderCount > 0) {
       try {
         const newCount = await incrementCustomersServed(prisma, allNewOrderCount)
         log(`[processOrders] 📊 Customers served: ${newCount.toLocaleString('en-US')} (+${allNewOrderCount} from all new orders)`)
+
+        // Save counted IDs (pruned to current Artelo window) to prevent double-counting
+        await saveCountedOrderIds(prisma, countedOrderIds, allArteloIds)
 
         // Push updated count to Shopify metaobject
         const synced = await syncCustomersServedToShopify(prisma)
@@ -847,6 +865,13 @@ export async function processOrders(options = {}) {
       } catch (counterError) {
         // Don't fail the import if counter update fails
         console.error('[processOrders] ⚠️ Counter update failed (non-fatal):', counterError.message)
+      }
+    } else if (allArteloIds.size > 0 && countedOrderIds.size > 0) {
+      // Even if no new orders, prune the counted IDs set on each run
+      try {
+        await saveCountedOrderIds(prisma, countedOrderIds, allArteloIds)
+      } catch (err) {
+        // Non-fatal
       }
     }
 

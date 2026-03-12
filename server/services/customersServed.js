@@ -12,6 +12,7 @@
 import { getShopifyToken } from './shopifyAuth.js'
 
 const SYSTEM_CONFIG_KEY = 'customers_served_count'
+const COUNTED_IDS_KEY = 'customers_served_counted_ids'
 const INITIAL_COUNT = 1333
 
 /**
@@ -202,6 +203,47 @@ export async function getCustomersServedInfo(prisma) {
     count,
     formatted: formatWithCommas(count)
   }
+}
+
+/**
+ * Get the set of Artelo order IDs we've already counted for the customers served counter.
+ * This prevents double-counting orders that are never imported to the DB
+ * (e.g. manual orders with non-actionable statuses).
+ *
+ * Stored as a JSON array in SystemConfig.
+ */
+export async function getCountedOrderIds(prisma) {
+  const config = await prisma.systemConfig.findUnique({
+    where: { key: COUNTED_IDS_KEY }
+  })
+
+  if (!config) return new Set()
+
+  try {
+    const ids = JSON.parse(config.value)
+    return new Set(Array.isArray(ids) ? ids : [])
+  } catch {
+    return new Set()
+  }
+}
+
+/**
+ * Save the set of counted order IDs.
+ * To prevent unbounded growth, only keep IDs that are still in the
+ * current Artelo response window (passed as currentArteloIds).
+ */
+export async function saveCountedOrderIds(prisma, countedIds, currentArteloIds) {
+  // Prune: only keep IDs that are still in the current Artelo response
+  // (once an order falls out of the 100-order window, no need to track it)
+  const prunedIds = [...countedIds].filter(id => currentArteloIds.has(id))
+
+  await prisma.systemConfig.upsert({
+    where: { key: COUNTED_IDS_KEY },
+    update: { value: JSON.stringify(prunedIds) },
+    create: { key: COUNTED_IDS_KEY, value: JSON.stringify(prunedIds) }
+  })
+
+  console.log(`[customersServed] Saved ${prunedIds.length} counted order IDs`)
 }
 
 /**
