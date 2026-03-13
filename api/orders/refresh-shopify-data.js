@@ -214,14 +214,19 @@ function extractShopifyData(lineItems) {
       const name = (prop.name || '').trim()
       const value = (prop.value || '').trim()
 
-      if (name === 'Runner Name (First & Last)' ||
+      // "No time" checkbox property
+      if (name === 'No time' || name === 'no time' || name === 'no_time') {
+        result.hadNoTime = true
+      }
+      else if (name === 'Runner Name (First & Last)' ||
           name === 'Runner Name' ||
           name === 'runner name' ||
           name === 'runner_name') {
         result.rawRunnerName = value
         const cleaned = cleanRunnerName(value)
         result.runnerName = cleaned.cleaned
-        result.hadNoTime = cleaned.hadNoTime
+        // Legacy: also detect "no time" typed into the name field
+        if (cleaned.hadNoTime) result.hadNoTime = true
       }
       else if (name === 'Race Year' || name === 'race year' || name === 'race_year') {
         result.rawRaceYear = value

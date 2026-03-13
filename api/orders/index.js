@@ -141,6 +141,12 @@ export default async function handler(req, res) {
                           order.raceNameOverride !== null ||
                           order.runnerNameOverride !== null
 
+      // Detect customer-provided time in runner name (e.g., "John Smith 4:32:15")
+      // This catches cases where the time hasn't been stripped yet (existing orders)
+      const nameToCheck = effectiveRunnerName || ''
+      const timeInNameMatch = nameToCheck.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/)
+      const timeFromName = timeInNameMatch ? timeInNameMatch[1] : null
+
       return {
         ...order,
         // Effective values (what to display and use for research)
@@ -148,6 +154,8 @@ export default async function handler(req, res) {
         effectiveRaceName,
         effectiveRunnerName,
         hasOverrides,
+        // Alert flags for runner name field
+        timeFromName,
         // Runner research data (Tier 2) - formatted for display
         bibNumber: research?.bibNumber || null,
         officialTime: formatTime(research?.officialTime),

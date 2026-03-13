@@ -88,14 +88,15 @@ function parseRaceName(productTitle) {
 }
 
 /**
- * Clean runner name by removing invalid entries like "no time"
- * Returns { cleaned, hadNoTime }
- * e.g., "Jennifer Samp no time" → { cleaned: "Jennifer Samp", hadNoTime: true }
- * e.g., "no time" → { cleaned: null, hadNoTime: true }
- * e.g., "Jennifer Samp" → { cleaned: "Jennifer Samp", hadNoTime: false }
+ * Clean runner name by removing invalid entries like "no time" and customer-provided times
+ * Returns { cleaned, hadNoTime, customerTime }
+ * e.g., "Jennifer Samp no time" → { cleaned: "Jennifer Samp", hadNoTime: true, customerTime: null }
+ * e.g., "no time" → { cleaned: null, hadNoTime: true, customerTime: null }
+ * e.g., "Jennifer Samp 4:32:15" → { cleaned: "Jennifer Samp", hadNoTime: false, customerTime: "4:32:15" }
+ * e.g., "Jennifer Samp" → { cleaned: "Jennifer Samp", hadNoTime: false, customerTime: null }
  */
 function cleanRunnerName(runnerName) {
-  if (!runnerName) return { cleaned: null, hadNoTime: false }
+  if (!runnerName) return { cleaned: null, hadNoTime: false, customerTime: null }
 
   let cleaned = runnerName.trim()
 
@@ -105,15 +106,24 @@ function cleanRunnerName(runnerName) {
   // Remove "no time" (case-insensitive)
   cleaned = cleaned.replace(/\bno\s+time\b/gi, '')
 
+  // Detect customer-provided time patterns (e.g., "4:32:15", "04:32:15", "3:45", "12:34")
+  // Match H:MM:SS, HH:MM:SS, M:MM, MM:SS patterns — but not years like "2024"
+  let customerTime = null
+  const timeMatch = cleaned.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/)
+  if (timeMatch) {
+    customerTime = timeMatch[1]
+    cleaned = cleaned.replace(timeMatch[0], '')
+  }
+
   // Clean up multiple spaces and trim
   cleaned = cleaned.replace(/\s+/g, ' ').trim()
 
   // If nothing left after cleaning, return null
   if (!cleaned || cleaned.length === 0) {
-    return { cleaned: null, hadNoTime }
+    return { cleaned: null, hadNoTime, customerTime }
   }
 
-  return { cleaned, hadNoTime }
+  return { cleaned, hadNoTime, customerTime }
 }
 
 /**
@@ -147,6 +157,7 @@ function extractShopifyPersonalization(lineItem) {
     runnerName: null,
     raceYear: null,
     hadNoTime: false,  // Flag to indicate "no time" was present
+    customerTime: null, // Time extracted from runner name field (customer-provided)
     needsAttention: false,
     // Custom order fields
     bibNumberCustomer: null,
@@ -172,16 +183,22 @@ function extractShopifyPersonalization(lineItem) {
       const name = (prop.name || '').trim()
       const value = (prop.value || '').trim()
 
+      // "No time" checkbox — Shopify passes this as a property when checked
+      if (name === 'No time' || name === 'no time' || name === 'no_time') {
+        result.hadNoTime = true
+      }
       // Standardized property name: "Runner Name" (works for both normal and custom orders)
       // Matches: "Runner Name (First & Last)", "Runner Name", "runner name", "runner_name"
-      if (name === 'Runner Name (First & Last)' ||
+      else if (name === 'Runner Name (First & Last)' ||
           name === 'Runner Name' ||
           name === 'runner name' ||
           name === 'runner_name') {
-        // Clean the runner name (remove "no time" if present)
+        // Clean the runner name (detect customer-provided times, legacy "no time" in name)
         const cleaned = cleanRunnerName(value)
         result.runnerName = cleaned.cleaned
-        result.hadNoTime = cleaned.hadNoTime
+        // Set hadNoTime from name parsing too (legacy orders that typed "no time" in the name)
+        if (cleaned.hadNoTime) result.hadNoTime = true
+        result.customerTime = cleaned.customerTime
       }
       // Race year
       else if (name === 'Race Year' || name === 'race year' || name === 'race_year') {
@@ -301,6 +318,8 @@ function extractEtsyPersonalization(transaction) {
     raceName: null,
     runnerName: null,
     raceYear: null,
+    hadNoTime: false,
+    customerTime: null,
     needsAttention: false,
     rawPersonalization: null
   }
@@ -323,9 +342,15 @@ function extractEtsyPersonalization(transaction) {
   if (personalization?.formatted_value) {
     result.rawPersonalization = personalization.formatted_value
     const parsed = parseEtsyPersonalization(personalization.formatted_value)
-    result.runnerName = parsed.runnerName
     result.raceYear = parsed.raceYear
     result.needsAttention = parsed.needsAttention
+    // Clean the runner name (detect "no time" and customer-provided times)
+    if (parsed.runnerName) {
+      const cleaned = cleanRunnerName(parsed.runnerName)
+      result.runnerName = cleaned.cleaned
+      result.hadNoTime = cleaned.hadNoTime
+      result.customerTime = cleaned.customerTime
+    }
   } else {
     result.needsAttention = true
   }
@@ -740,6 +765,7 @@ export async function processOrders(options = {}) {
                   raceName = extracted.raceName || raceName
                   runnerName = extracted.runnerName || runnerName
                   raceYear = extracted.raceYear || raceYear
+                  hadNoTime = extracted.hadNoTime || false
                   lineItemEtsyData = etsyReceipt
 
                   // Classify custom orders (e.g. "Any Race - Custom Trackstar Print")

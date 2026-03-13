@@ -22,6 +22,7 @@ interface Order {
   productSize: string
   notes?: string
   hadNoTime?: boolean         // Flag: customer entered "no time"
+  timeFromName?: string | null // Time extracted from runner name (customer-provided)
   status: 'pending' | 'ready' | 'flagged' | 'completed' | 'missing_year'
   flagReason?: string
   completedAt?: string
@@ -268,7 +269,10 @@ export default function Dashboard() {
           bibNumberCustomer: order.bibNumberCustomer as string | undefined,
           timeCustomer: order.timeCustomer as string | undefined,
           creativeDirection: order.creativeDirection as string | undefined,
-          isGift: order.isGift as boolean | undefined
+          isGift: order.isGift as boolean | undefined,
+          // Alert flags
+          hadNoTime: order.hadNoTime as boolean | undefined,
+          timeFromName: order.timeFromName as string | null | undefined
         }
       })
 
@@ -598,7 +602,9 @@ export default function Dashboard() {
             bibNumberCustomer: order.bibNumberCustomer as string | undefined,
             timeCustomer: order.timeCustomer as string | undefined,
             creativeDirection: order.creativeDirection as string | undefined,
-            isGift: order.isGift as boolean | undefined
+            isGift: order.isGift as boolean | undefined,
+            hadNoTime: order.hadNoTime as boolean | undefined,
+            timeFromName: order.timeFromName as string | null | undefined
           }
         })
 
@@ -703,7 +709,9 @@ export default function Dashboard() {
             bibNumberCustomer: order.bibNumberCustomer as string | undefined,
             timeCustomer: order.timeCustomer as string | undefined,
             creativeDirection: order.creativeDirection as string | undefined,
-            isGift: order.isGift as boolean | undefined
+            isGift: order.isGift as boolean | undefined,
+            hadNoTime: order.hadNoTime as boolean | undefined,
+            timeFromName: order.timeFromName as string | null | undefined
           }
         })
         setOrders(freshOrders)
@@ -1002,17 +1010,27 @@ export default function Dashboard() {
     return typeFiltered.filter(o => o.status === 'completed')
   }, [orders, activeView])
 
+  const matchesSearch = useCallback((o: Order, query: string) =>
+    o.orderNumber.toLowerCase().includes(query) ||
+    o.displayOrderNumber.toLowerCase().includes(query) ||
+    o.parentOrderNumber.toLowerCase().includes(query) ||
+    (o.raceName || '').toLowerCase().includes(query) ||
+    (o.effectiveRaceName || '').toLowerCase().includes(query) ||
+    (o.runnerName || '').toLowerCase().includes(query) ||
+    (o.effectiveRunnerName || '').toLowerCase().includes(query)
+  , [])
+
   const filteredOrders = useMemo(() => {
     if (!searchQuery) return ordersToFulfill
     const query = searchQuery.toLowerCase()
-    return ordersToFulfill.filter(o =>
-      o.orderNumber.toLowerCase().includes(query) ||
-      o.displayOrderNumber.toLowerCase().includes(query) ||
-      o.parentOrderNumber.toLowerCase().includes(query) ||
-      o.raceName.toLowerCase().includes(query) ||
-      o.runnerName.toLowerCase().includes(query)
-    )
-  }, [ordersToFulfill, searchQuery])
+    return ordersToFulfill.filter(o => matchesSearch(o, query))
+  }, [ordersToFulfill, searchQuery, matchesSearch])
+
+  const filteredCompletedOrders = useMemo(() => {
+    if (!searchQuery) return completedOrders
+    const query = searchQuery.toLowerCase()
+    return completedOrders.filter(o => matchesSearch(o, query))
+  }, [completedOrders, searchQuery, matchesSearch])
 
   // Helper to check if an order has multiple items
   const getOrderItemCount = useCallback((parentOrderNumber: string) => {
@@ -1252,9 +1270,9 @@ Thank you!`
                     <thead className="bg-subtle-gray border-b border-border-gray sticky top-0 z-10">
                       <tr>
                         <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-12">Src</th>
-                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Order #</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Order #</th>
                         <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20">Status</th>
-                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Runner</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Runner</th>
                         <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Race</th>
                       </tr>
                     </thead>
@@ -1297,6 +1315,12 @@ Thank you!`
                                 {order.hasOverrides && (
                                   <span className="px-1 py-0.5 bg-blue-100 text-blue-600 text-[9px] rounded">edited</span>
                                 )}
+                                {order.hadNoTime && (
+                                  <span className="px-1 py-0.5 bg-warning-amber/10 text-warning-amber text-[9px] rounded border border-warning-amber/20" title='Customer entered "no time"'>NO TIME</span>
+                                )}
+                                {order.timeFromName && (
+                                  <span className="px-1 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] rounded border border-blue-500/20" title={`Customer time: ${order.timeFromName}`}>⏱ {order.timeFromName}</span>
+                                )}
                               </div>
                               {order.status === 'flagged' && order.flagReason && (
                                 <p className="text-xs text-warning-amber mt-1 leading-tight">{order.flagReason}</p>
@@ -1320,6 +1344,54 @@ Thank you!`
                           </tr>
                         )
                       })}
+                      {/* Completed orders inline when searching (standard view) */}
+                      {searchQuery && filteredCompletedOrders.length > 0 && (
+                        <>
+                          <tr className="bg-subtle-gray/50">
+                            <td colSpan={5} className="px-6 py-3">
+                              <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
+                            </td>
+                          </tr>
+                          {filteredCompletedOrders.map((order, index) => {
+                            const itemCount = getOrderItemCount(order.parentOrderNumber)
+                            return (
+                              <tr
+                                key={order.id}
+                                onClick={() => setSelectedOrder(order)}
+                                className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
+                              >
+                                <td className="pl-6 pr-2 py-5 text-center">
+                                  <img
+                                    src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
+                                    alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
+                                    title={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
+                                    className="w-5 h-5 inline-block"
+                                  />
+                                </td>
+                                <td className="px-3 py-5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
+                                    {itemCount > 1 && (
+                                      <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
+                                        Item {order.lineItemIndex + 1} of {itemCount}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-5 text-center">
+                                  <span className="text-lg">✅</span>
+                                </td>
+                                <td className="px-3 py-5">
+                                  <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
+                                </td>
+                                <td className="px-3 pr-6 py-5 text-sm text-off-black/60 hidden md:table-cell">
+                                  {order.effectiveRaceName || order.raceName} {order.effectiveRaceYear || order.raceYear}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </>
+                      )}
                     </tbody>
                   </>
                 ) : (
@@ -1391,9 +1463,16 @@ Thank you!`
                 )}
               </table>
 
-              {filteredOrders.length === 0 && (
+              {filteredOrders.length === 0 && !searchQuery && (
                 <div className="text-center py-16 text-off-black/40 text-sm">
-                  {searchQuery ? 'No matching orders found' : activeView === 'standard' ? 'No orders to personalize' : 'No custom designs'}
+                  {activeView === 'standard' ? 'No orders to personalize' : 'No custom designs'}
+                </div>
+              )}
+
+
+              {searchQuery && filteredOrders.length === 0 && filteredCompletedOrders.length === 0 && (
+                <div className="text-center py-16 text-off-black/40 text-sm">
+                  No matching orders found
                 </div>
               )}
             </div>
@@ -1459,7 +1538,7 @@ Thank you!`
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-gray">
-                    {completedOrders.map((order, index) => (
+                    {filteredCompletedOrders.map((order, index) => (
                       <tr
                         key={order.id}
                         onClick={() => setSelectedOrder(order)}
@@ -1490,9 +1569,9 @@ Thank you!`
                   </tbody>
                 </table>
 
-                {completedOrders.length === 0 && (
+                {filteredCompletedOrders.length === 0 && (
                   <div className="text-center py-16 text-off-black/40 text-sm">
-                    No completed orders yet
+                    {searchQuery ? 'No matching completed orders' : 'No completed orders yet'}
                   </div>
                 )}
               </div>
@@ -2244,16 +2323,7 @@ Thank you!`
                     </div>
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                       {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
-                          </div>
-                          {selectedOrder.hadNoTime && (
-                            <span className="text-xs px-2 py-1 bg-warning-yellow/10 text-warning-yellow border border-warning-yellow/20 rounded" title='Customer entered "no time"'>
-                              ⚠️ No Time
-                            </span>
-                          )}
-                        </div>
+                        <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
                       ) : (
                         <PendingField label="Name" />
                       )}
@@ -2266,6 +2336,20 @@ Thank you!`
                       )}
                       {selectedOrder.officialTime ? (
                         <CopyableField label="Time" value={selectedOrder.officialTime} />
+                      ) : selectedOrder.hadNoTime ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-off-black/40 w-16">Time</span>
+                          <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
+                            ⚠️ No Time
+                          </span>
+                        </div>
+                      ) : selectedOrder.timeFromName ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-off-black/40 w-16">Time</span>
+                          <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">
+                            ⏱ {selectedOrder.timeFromName}
+                          </span>
+                        </div>
                       ) : selectedOrder.hasScraperAvailable ? (
                         <PendingField label="Time" />
                       ) : (
