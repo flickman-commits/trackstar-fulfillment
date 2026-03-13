@@ -924,6 +924,13 @@ export default function Dashboard() {
 
   // Update design status for custom orders
   const updateDesignStatus = async (orderNumber: string, designStatus: DesignStatus) => {
+    // Optimistically update UI immediately before the API call
+    const previousStatus = selectedOrder?.designStatus
+    if (selectedOrder?.orderNumber === orderNumber) {
+      setSelectedOrder(prev => prev ? { ...prev, designStatus } : null)
+    }
+    setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, designStatus } : o))
+
     try {
       const response = await fetch('/api/orders/actions', {
         method: 'POST',
@@ -936,16 +943,15 @@ export default function Dashboard() {
         throw new Error(errorData.error || 'Failed to update design status')
       }
 
-      // Optimistically update the selected order and orders list immediately
-      if (selectedOrder?.orderNumber === orderNumber) {
-        setSelectedOrder(prev => prev ? { ...prev, designStatus } : null)
-      }
-      setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, designStatus } : o))
-
       setToast({ message: `Design status updated to ${(DESIGN_STATUS_CONFIG[designStatus] || DESIGN_STATUS_CONFIG.not_started).label}`, type: 'success' })
-      fetchOrders() // Refresh in background, don't await
+      fetchOrders() // Refresh in background
     } catch (error) {
       console.error('Error updating design status:', error)
+      // Roll back optimistic update on failure
+      if (selectedOrder?.orderNumber === orderNumber && previousStatus) {
+        setSelectedOrder(prev => prev ? { ...prev, designStatus: previousStatus } : null)
+      }
+      setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, designStatus: previousStatus || o.designStatus } : o))
       const message = error instanceof Error ? error.message : 'Failed to update design status'
       setToast({ message, type: 'error' })
     }
