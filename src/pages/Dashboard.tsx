@@ -936,13 +936,14 @@ export default function Dashboard() {
         throw new Error(errorData.error || 'Failed to update design status')
       }
 
-      setToast({ message: `Design status updated to ${(DESIGN_STATUS_CONFIG[designStatus] || DESIGN_STATUS_CONFIG.not_started).label}`, type: 'success' })
-      await fetchOrders()
-
-      // Update selected order if it's the one we just changed
+      // Optimistically update the selected order and orders list immediately
       if (selectedOrder?.orderNumber === orderNumber) {
         setSelectedOrder(prev => prev ? { ...prev, designStatus } : null)
       }
+      setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, designStatus } : o))
+
+      setToast({ message: `Design status updated to ${(DESIGN_STATUS_CONFIG[designStatus] || DESIGN_STATUS_CONFIG.not_started).label}`, type: 'success' })
+      fetchOrders() // Refresh in background, don't await
     } catch (error) {
       console.error('Error updating design status:', error)
       const message = error instanceof Error ? error.message : 'Failed to update design status'
@@ -2203,7 +2204,32 @@ Thank you!`
                   {selectedOrder.trackstarOrderType === 'custom' ? (
                     <>
                       {/* === MOBILE COMPACT SUMMARY (Custom) === */}
-                      <div className="md:hidden">
+                      <div className="md:hidden space-y-3">
+                        {/* Design Status Dropdown */}
+                        <div className="relative">
+                          <select
+                            value={DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] ? selectedOrder.designStatus : 'not_started'}
+                            onChange={(e) => updateDesignStatus(selectedOrder.orderNumber, e.target.value as DesignStatus)}
+                            className={`w-full appearance-none px-4 py-3 pr-8 rounded-md text-sm font-medium border transition-colors cursor-pointer ${
+                              (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).bgColor
+                            } ${
+                              (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).color
+                            } border-border-gray focus:outline-none focus:ring-2 focus:ring-off-black/20`}
+                          >
+                            {(Object.entries(DESIGN_STATUS_CONFIG) as [DesignStatus, typeof DESIGN_STATUS_CONFIG[DesignStatus]][]).map(([status, config]) => (
+                              <option key={status} value={status}>
+                                {config.icon} {config.label}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                            <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
+
+                        {/* Order details card */}
                         <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                           <div className="flex justify-between items-center">
                             <span className="text-body-sm text-off-black/60">Runner</span>
@@ -2216,10 +2242,6 @@ Thank you!`
                           <div className="flex justify-between items-center">
                             <span className="text-body-sm text-off-black/60">Year</span>
                             <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Size</span>
-                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.productSize}</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-body-sm text-off-black/60">Due Date</span>
@@ -2245,24 +2267,16 @@ Thank you!`
                               <span className="text-body-sm font-medium text-pink-600">🎁 Yes</span>
                             </div>
                           )}
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Status</span>
-                            <span className={`text-body-sm font-medium ${(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).color}`}>
-                              {(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).icon}{' '}
-                              {(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).label}
-                            </span>
-                          </div>
                         </div>
                         {selectedOrder.creativeDirection && (
-                          <div className="mt-3">
+                          <div>
                             <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Creative Direction</h4>
                             <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
                               <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
                             </div>
                           </div>
                         )}
-                        <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                        <div className="pt-3">
+                        <div className="pt-1">
                           <button
                             onClick={closeModal}
                             className="w-full px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
