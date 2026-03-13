@@ -118,6 +118,10 @@ export default {
             'border-image-source': 'linear-gradient(225deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000)',
             'border-image-slice': '1'
           }
+        },
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(-8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
         }
       },
       backgroundImage: {

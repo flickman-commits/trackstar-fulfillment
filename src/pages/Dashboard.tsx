@@ -528,6 +528,16 @@ export default function Dashboard() {
       const data = await response.json()
 
       if (data.found) {
+        // Optimistically update the selected order so the modal shows results immediately
+        setSelectedOrder(prev => prev ? {
+          ...prev,
+          bibNumber: data.results.bibNumber,
+          officialTime: data.results.officialTime,
+          officialPace: data.results.officialPace,
+          eventType: data.results.eventType,
+          researchStatus: 'found' as const,
+          hadNoTime: !data.results.officialTime,
+        } : prev)
         setToast({
           message: `Found! Bib: ${data.results.bibNumber}, Time: ${data.results.officialTime}`,
           type: 'success'
@@ -1147,19 +1157,22 @@ Thank you!`
 
   return (
     <div className="h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
-      <div className="max-w-5xl mx-auto px-6 md:px-8 lg:px-12 w-full flex flex-col h-full">
-        {/* Header - Left-aligned with compact vertical space */}
-        <div className="pt-6 md:pt-8 lg:pt-10 pb-4 md:pb-6 flex items-end justify-between gap-6 flex-shrink-0">
+      <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 w-full flex flex-col h-full">
+        {/* Header - Compact bar on mobile, full greeting on desktop */}
+        <div className="pt-4 md:pt-8 lg:pt-10 pb-3 md:pb-6 flex items-center md:items-end justify-between gap-3 md:gap-6 flex-shrink-0">
           {/* Left side: logo, greeting, and summary */}
           <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <img
                 src="/trackstar-logo.png"
                 alt="Trackstar"
-                className="h-10 md:h-11"
+                className="h-8 md:h-11"
               />
+              <span className="md:hidden px-2 py-0.5 bg-off-black/10 text-off-black/60 text-xs font-medium rounded">
+                {ordersToFulfill.length} orders
+              </span>
             </div>
-            <div>
+            <div className="hidden md:block">
               <h1 className="text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1">
                 {getGreeting(activeView === 'custom' ? 'America/New_York' : 'America/Costa_Rica')}, {activeView === 'custom' ? 'Dan' : 'Elí'}
               </h1>
@@ -1175,14 +1188,15 @@ Thank you!`
               <button
                 onClick={importOrders}
                 disabled={isImporting}
-                className="inline-flex items-center gap-2 px-3 md:px-6 py-2.5 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isImporting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Upload className="w-4 h-4" />
                 )}
-                {isImporting ? 'Importing…' : 'Import New Orders'}
+                <span className="md:hidden">{isImporting ? 'Importing…' : 'Import'}</span>
+                <span className="hidden md:inline">{isImporting ? 'Importing…' : 'Import New Orders'}</span>
               </button>
             </div>
             <div className="hidden md:flex flex-col items-end gap-1">
@@ -1210,18 +1224,42 @@ Thank you!`
         {!isLoading && (
         <section className="flex-1 flex flex-col min-h-0 pb-4">
           {/* Section Header */}
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-off-black uppercase tracking-tight">
-                {activeView === 'standard' ? 'Designs to be Personalized' : 'Custom Designs'}
+              <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
+                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : 'Custom Designs'}</span>
+                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : 'Custom Designs'}</span>
               </h2>
-              <span className="px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
+              <span className="hidden md:inline px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
                 {ordersToFulfill.length}
               </span>
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
             </div>
-            {/* View Switcher */}
-            <div className="flex gap-2">
+            {/* View Switcher - Mobile (compact) */}
+            <div className="flex gap-1.5 md:hidden">
+              <button
+                onClick={() => { setActiveView('standard'); setSearchQuery('') }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
+                  activeView === 'standard'
+                    ? 'bg-off-black text-white border-off-black'
+                    : 'bg-white text-off-black border-border-gray'
+                }`}
+              >
+                Standard
+              </button>
+              <button
+                onClick={() => { setActiveView('custom'); setSearchQuery('') }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
+                  activeView === 'custom'
+                    ? 'bg-off-black text-white border-off-black'
+                    : 'bg-white text-off-black border-border-gray'
+                }`}
+              >
+                Custom
+              </button>
+            </div>
+            {/* View Switcher - Desktop */}
+            <div className="hidden md:flex gap-2">
               <button
                 onClick={() => { setActiveView('standard'); setSearchQuery('') }}
                 className={`px-5 py-2 text-sm font-medium rounded-full transition-colors border ${
@@ -1248,22 +1286,192 @@ Thank you!`
           {/* Content Card */}
           <div className="bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
             {/* Search inside card */}
-            <div className="p-4 border-b border-border-gray flex-shrink-0">
+            <div className="p-3 md:p-4 border-b border-border-gray flex-shrink-0">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
+                <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
                 <input
                   type="text"
-                  placeholder={activeView === 'standard' ? "Search by order #, race, or runner..." : "Search custom designs..."}
+                  placeholder={activeView === 'standard' ? "Search orders..." : "Search designs..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
+                  className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
                 />
               </div>
             </div>
 
-            {/* Scrollable Table Container */}
+            {/* Scrollable Container */}
             <div className="flex-1 overflow-y-auto min-h-0">
-              <table className="w-full">
+
+              {/* ===== MOBILE CARD LIST ===== */}
+              <div className="md:hidden divide-y divide-border-gray">
+                {activeView === 'standard' ? (
+                  <>
+                    {filteredOrders.map((order) => {
+                      const statusDisplay = getStatusDisplay(order)
+                      const itemCount = getOrderItemCount(order.parentOrderNumber)
+                      return (
+                        <div
+                          key={order.id}
+                          onClick={() => setSelectedOrder(order)}
+                          className="px-4 py-3 active:bg-subtle-gray cursor-pointer"
+                        >
+                          {/* Row 1: Source + Order# + Badges ... Status */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <img
+                                src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
+                                alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
+                                className="w-4 h-4 flex-shrink-0"
+                              />
+                              <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
+                              {itemCount > 1 && (
+                                <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
+                                  {order.lineItemIndex + 1}/{itemCount}
+                                </span>
+                              )}
+                              {order.hadNoTime && (
+                                <span className="px-1 py-0.5 bg-warning-amber/10 text-warning-amber text-[9px] rounded border border-warning-amber/20">NO TIME</span>
+                              )}
+                              {order.timeFromName && (
+                                <span className="px-1 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] rounded border border-blue-500/20">⏱ {order.timeFromName}</span>
+                              )}
+                            </div>
+                            <span className="text-base flex-shrink-0" title={statusDisplay.label}>{statusDisplay.icon}</span>
+                          </div>
+                          {/* Row 2: Runner name */}
+                          <div className="mt-1">
+                            <span className="text-sm text-off-black">
+                              {order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}
+                            </span>
+                            {order.hasOverrides && (
+                              <span className="ml-1.5 px-1 py-0.5 bg-blue-100 text-blue-600 text-[9px] rounded">edited</span>
+                            )}
+                          </div>
+                          {/* Row 3: Status subtitle + Race */}
+                          <div className="mt-0.5 flex items-center justify-between gap-2">
+                            <span className="text-xs text-off-black/40">
+                              {order.status === 'flagged' && order.flagReason ? order.flagReason
+                                : order.status === 'missing_year' && !order.yearOverride ? 'Year Missing'
+                                : order.status === 'ready' && order.bibNumber ? `Bib: ${order.bibNumber} · ${order.officialTime}`
+                                : order.status === 'pending' && order.hasScraperAvailable && (order.effectiveRaceYear || order.raceYear) ? 'Ready to research'
+                                : order.status === 'pending' && !order.hasScraperAvailable ? 'Manual research needed'
+                                : statusDisplay.label}
+                            </span>
+                            <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
+                              {order.effectiveRaceName || order.raceName}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {/* Completed orders in search (mobile) */}
+                    {searchQuery && filteredCompletedOrders.length > 0 && (
+                      <>
+                        <div className="px-4 py-2.5 bg-subtle-gray/50">
+                          <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
+                        </div>
+                        {filteredCompletedOrders.map((order) => {
+                          const itemCount = getOrderItemCount(order.parentOrderNumber)
+                          return (
+                            <div
+                              key={order.id}
+                              onClick={() => setSelectedOrder(order)}
+                              className="px-4 py-3 active:bg-subtle-gray cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <img
+                                    src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
+                                    alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
+                                    className="w-4 h-4 flex-shrink-0"
+                                  />
+                                  <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
+                                  {itemCount > 1 && (
+                                    <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
+                                      {order.lineItemIndex + 1}/{itemCount}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-base flex-shrink-0">✅</span>
+                              </div>
+                              <div className="mt-1">
+                                <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
+                              </div>
+                              <div className="mt-0.5 flex items-center justify-between gap-2">
+                                <span className="text-xs text-off-black/40">Completed</span>
+                                <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
+                                  {order.effectiveRaceName || order.raceName}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  /* Custom Designs - Mobile Cards */
+                  <>
+                    {filteredOrders.map((order) => {
+                      const designConfig = DESIGN_STATUS_CONFIG[order.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started
+                      const itemCount = getOrderItemCount(order.parentOrderNumber)
+                      return (
+                        <div
+                          key={order.id}
+                          onClick={() => setSelectedOrder(order)}
+                          className="px-4 py-3 active:bg-subtle-gray cursor-pointer"
+                        >
+                          {/* Row 1: Design status + Order# + badges */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${designConfig.bgColor} ${designConfig.color}`}>
+                                <span>{designConfig.icon}</span>
+                                {designConfig.label}
+                              </span>
+                              <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
+                              {itemCount > 1 && (
+                                <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
+                                  {order.lineItemIndex + 1}/{itemCount}
+                                </span>
+                              )}
+                              {order.isGift && (
+                                <span className="text-xs">🎁</span>
+                              )}
+                            </div>
+                          </div>
+                          {/* Row 2: Runner name */}
+                          <div className="mt-1">
+                            <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
+                          </div>
+                          {/* Row 3: Due date + Race */}
+                          <div className="mt-0.5 flex items-center justify-between gap-2">
+                            <span className={`text-xs ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black/40'}`}>
+                              Due: {formatDueDate(order.dueDate)}
+                            </span>
+                            <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
+                              {order.effectiveRaceName || order.raceName || '—'}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </>
+                )}
+
+                {filteredOrders.length === 0 && !searchQuery && (
+                  <div className="text-center py-12 text-off-black/40 text-sm">
+                    {activeView === 'standard' ? 'No orders to personalize' : 'No custom designs'}
+                  </div>
+                )}
+                {searchQuery && filteredOrders.length === 0 && filteredCompletedOrders.length === 0 && (
+                  <div className="text-center py-12 text-off-black/40 text-sm">
+                    No matching orders found
+                  </div>
+                )}
+              </div>
+
+              {/* ===== DESKTOP TABLE ===== */}
+              <table className="w-full hidden md:table">
                 {activeView === 'standard' ? (
                   <>
                     {/* Standard Orders Table */}
@@ -1464,14 +1672,13 @@ Thank you!`
               </table>
 
               {filteredOrders.length === 0 && !searchQuery && (
-                <div className="text-center py-16 text-off-black/40 text-sm">
+                <div className="hidden md:block text-center py-16 text-off-black/40 text-sm">
                   {activeView === 'standard' ? 'No orders to personalize' : 'No custom designs'}
                 </div>
               )}
 
-
               {searchQuery && filteredOrders.length === 0 && filteredCompletedOrders.length === 0 && (
-                <div className="text-center py-16 text-off-black/40 text-sm">
+                <div className="hidden md:block text-center py-16 text-off-black/40 text-sm">
                   No matching orders found
                 </div>
               )}
@@ -1482,7 +1689,7 @@ Thank you!`
 
         {/* Bottom bar: Completed Orders Toggle + Settings */}
         {!isLoading && (
-          <div className="flex-shrink-0 py-4 mt-2 mb-8 border-t border-border-gray/50">
+          <div className="flex-shrink-0 py-3 md:py-4 mt-2 mb-4 md:mb-8 border-t border-border-gray/50">
             <div className="flex items-center justify-center gap-3">
               {completedOrders.length > 0 && (
                 <button
@@ -1516,9 +1723,9 @@ Thank you!`
               }
             }}
           >
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-none md:rounded-lg max-w-4xl w-full h-[90vh] md:h-auto md:max-h-[80vh] overflow-hidden shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-4 border-b border-border-gray">
-                <h2 className="text-lg font-semibold text-off-black">Completed Orders</h2>
+                <h2 className="text-base md:text-lg font-semibold text-off-black">Completed Orders</h2>
                 <button
                   onClick={() => setShowCompleted(false)}
                   className="text-off-black/40 hover:text-off-black text-2xl leading-none transition-colors"
@@ -1527,14 +1734,44 @@ Thank you!`
                 </button>
               </div>
               <div className="overflow-y-auto flex-1">
-                <table className="w-full">
+                {/* Mobile cards for completed orders modal */}
+                <div className="md:hidden divide-y divide-border-gray">
+                  {filteredCompletedOrders.map((order) => (
+                    <div
+                      key={order.id}
+                      onClick={() => setSelectedOrder(order)}
+                      className="px-4 py-3 active:bg-subtle-gray cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
+                            alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
+                        </div>
+                        <span className="text-base">✅</span>
+                      </div>
+                      <div className="mt-1">
+                        <span className="text-sm text-off-black">{order.runnerName}</span>
+                      </div>
+                      <div className="mt-0.5">
+                        <span className="text-xs text-off-black/40">{order.raceName} {order.raceYear}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop table for completed orders modal */}
+                <table className="w-full hidden md:table">
                   <thead className="bg-subtle-gray border-b border-border-gray sticky top-0">
                     <tr>
                       <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-12">Src</th>
                       <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Order #</th>
                       <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20">Status</th>
                       <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Runner</th>
-                      <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Race</th>
+                      <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Race</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-gray">
@@ -1561,7 +1798,7 @@ Thank you!`
                         <td className="px-3 py-5 text-sm text-off-black">
                           {order.runnerName}
                         </td>
-                        <td className="px-3 pr-6 py-5 text-sm text-off-black/60 hidden md:table-cell">
+                        <td className="px-3 pr-6 py-5 text-sm text-off-black/60">
                           {order.raceName} {order.raceYear}
                         </td>
                       </tr>
@@ -1924,8 +2161,8 @@ Thank you!`
               }
             }}
           >
-            <div className="bg-white rounded-md max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6">
+            <div className="bg-white rounded-none md:rounded-md max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
@@ -1965,6 +2202,78 @@ Thank you!`
                   {/* ========== CUSTOM ORDER DETAIL VIEW ========== */}
                   {selectedOrder.trackstarOrderType === 'custom' ? (
                     <>
+                      {/* === MOBILE COMPACT SUMMARY (Custom) === */}
+                      <div className="md:hidden">
+                        <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Runner</span>
+                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Race</span>
+                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Year</span>
+                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Size</span>
+                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.productSize}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Due Date</span>
+                            <span className={`text-body-sm font-medium ${isDueDateUrgent(selectedOrder.dueDate) ? 'text-red-600' : 'text-off-black'}`}>
+                              {formatDueDate(selectedOrder.dueDate)}
+                            </span>
+                          </div>
+                          {selectedOrder.bibNumberCustomer && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-off-black/60">Bib</span>
+                              <span className="text-body-sm font-medium text-off-black">{selectedOrder.bibNumberCustomer}</span>
+                            </div>
+                          )}
+                          {selectedOrder.timeCustomer && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-off-black/60">Time</span>
+                              <span className="text-body-sm font-medium text-off-black">{selectedOrder.timeCustomer}</span>
+                            </div>
+                          )}
+                          {selectedOrder.isGift && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-off-black/60">Gift Order</span>
+                              <span className="text-body-sm font-medium text-pink-600">🎁 Yes</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Status</span>
+                            <span className={`text-body-sm font-medium ${(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).color}`}>
+                              {(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).icon}{' '}
+                              {(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).label}
+                            </span>
+                          </div>
+                        </div>
+                        {selectedOrder.creativeDirection && (
+                          <div className="mt-3">
+                            <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Creative Direction</h4>
+                            <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
+                              <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
+                            </div>
+                          </div>
+                        )}
+                        <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
+                        <div className="pt-3">
+                          <button
+                            onClick={closeModal}
+                            className="w-full px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* === DESKTOP FULL DETAIL VIEW (Custom) === */}
+                      <div className="hidden md:block space-y-5">
                       {/* Design Status Dropdown */}
                       <div>
                         <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Design Status</h4>
@@ -2089,12 +2398,140 @@ Thank you!`
                           Close
                         </button>
                       </div>
+                      </div>{/* end hidden md:block wrapper (Custom) */}
                     </>
                   ) : (
                     <>
                   {/* ========== STANDARD ORDER DETAIL VIEW ========== */}
+
+                  {/* === MOBILE COMPACT SUMMARY === */}
+                  <div className="md:hidden space-y-3">
+                    {/* Key details card */}
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-body-sm text-off-black/60">Runner</span>
+                        <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRunnerName || selectedOrder.runnerName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-body-sm text-off-black/60">Race</span>
+                        <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceName || selectedOrder.raceName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-body-sm text-off-black/60">Year</span>
+                        <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceYear || selectedOrder.raceYear || <span className="text-warning-amber">Missing</span>}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-body-sm text-off-black/60">Size</span>
+                        <span className="text-body-sm font-medium text-off-black">{selectedOrder.productSize}</span>
+                      </div>
+                    </div>
+
+                    {/* Research section — button, loading state, or results */}
+                    {selectedOrder.hasScraperAvailable &&
+                     (selectedOrder.effectiveRaceYear || selectedOrder.raceYear) &&
+                     selectedOrder.status !== 'completed' ? (
+                      selectedOrder.researchStatus === 'found' || selectedOrder.bibNumber || selectedOrder.officialTime || selectedOrder.officialPace ? (
+                        /* Results found — show with success styling */
+                        <div className="bg-green-50 border border-green-200 rounded-md p-4 space-y-3 animate-[fadeIn_0.4s_ease-out]">
+                          <div className="flex items-center gap-2">
+                            <span className="text-green-600 text-sm">✓</span>
+                            <h4 className="text-xs font-semibold text-green-700 uppercase tracking-tight">Research Results</h4>
+                          </div>
+                          {selectedOrder.bibNumber && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-green-800/60">Bib</span>
+                              <span className="text-body-sm font-medium text-green-900">{selectedOrder.bibNumber}</span>
+                            </div>
+                          )}
+                          {selectedOrder.officialTime ? (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-green-800/60">Time</span>
+                              <span className="text-body-sm font-medium text-green-900">{selectedOrder.officialTime}</span>
+                            </div>
+                          ) : selectedOrder.hadNoTime ? (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-green-800/60">Time</span>
+                              <span className="text-xs px-2 py-0.5 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">No Time</span>
+                            </div>
+                          ) : selectedOrder.timeFromName ? (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-green-800/60">Time</span>
+                              <span className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">⏱ {selectedOrder.timeFromName}</span>
+                            </div>
+                          ) : null}
+                          {selectedOrder.officialPace && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-green-800/60">Pace</span>
+                              <span className="text-body-sm font-medium text-green-900">{selectedOrder.officialPace}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : isResearching ? (
+                        /* Researching — inline loading state */
+                        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                          <div className="flex items-center justify-center gap-3">
+                            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                            <span className="text-sm font-medium text-blue-700">Researching runner...</span>
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            <div className="h-3 bg-blue-100 rounded animate-pulse" />
+                            <div className="h-3 bg-blue-100 rounded animate-pulse w-2/3" />
+                          </div>
+                        </div>
+                      ) : (
+                        /* Ready to research — show button */
+                        <button
+                          onClick={() => researchOrder(selectedOrder.orderNumber)}
+                          className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+                        >
+                          <FlaskConical className="w-4 h-4" />
+                          Research Runner
+                        </button>
+                      )
+                    ) : (selectedOrder.bibNumber || selectedOrder.officialTime || selectedOrder.officialPace) ? (
+                      /* Results exist but no scraper (e.g. manually entered) */
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Race Results</h4>
+                        {selectedOrder.bibNumber && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Bib</span>
+                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.bibNumber}</span>
+                          </div>
+                        )}
+                        {selectedOrder.officialTime && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Time</span>
+                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.officialTime}</span>
+                          </div>
+                        )}
+                        {selectedOrder.officialPace && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Pace</span>
+                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.officialPace}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+
+                    {/* Flag reason */}
+                    {selectedOrder.status === 'flagged' && selectedOrder.flagReason && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                        <p className="text-xs text-amber-800">{selectedOrder.flagReason}</p>
+                      </div>
+                    )}
+
+                    {/* Close button */}
+                    <button
+                      onClick={closeModal}
+                      className="w-full px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  {/* === DESKTOP FULL DETAIL VIEW === */}
                   {/* Product Info */}
-                  <div>
+                  <div className="hidden md:block">
                     <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Product Info</h4>
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                       <StaticField label="Size" value={selectedOrder.productSize} />
@@ -2103,7 +2540,7 @@ Thank you!`
                   </div>
 
                   {/* Editable Order Info */}
-                  <div>
+                  <div className="hidden md:block">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Order Details</h4>
                       {!isEditing && selectedOrder.status !== 'completed' && (
@@ -2219,8 +2656,8 @@ Thank you!`
                     </div>
                   </div>
 
-                  {/* Race Info, Research, Notes */}
-                  <>
+                  {/* Race Info, Research, Notes — desktop only */}
+                  <div className="hidden md:block space-y-5">
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Race Data</h4>
@@ -2441,9 +2878,10 @@ Thank you!`
                       </div>
                     </div>
                   )}
-                  </>
+                  </div>{/* end hidden md:block wrapper */}
 
-                  {/* Scraper Not Available Warning */}
+                  {/* Scraper Not Available Warning — desktop only */}
+                  <div className="hidden md:block">
                   {!selectedOrder.hasScraperAvailable && selectedOrder.status !== 'completed' && (
                     <div>
                       <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Manual Research Required</h4>
@@ -2510,6 +2948,7 @@ Thank you!`
                       </button>
                     )}
                   </div>
+                  </div>{/* end hidden md:block wrapper */}
                     </>
                   )}
                 </div>
