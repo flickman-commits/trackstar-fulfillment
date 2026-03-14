@@ -1498,7 +1498,7 @@ Thank you!`
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               <span className="text-base" title={statusDisplay.label}>{statusDisplay.icon}</span>
-                              {(order.notes || (order.commentCount && order.commentCount > 0)) && (
+                              {(order.notes || (order.commentCount ?? 0) > 0) && (
                                 <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
                               )}
                             </div>
@@ -1602,7 +1602,7 @@ Thank you!`
                               {order.isGift && (
                                 <span className="text-xs">🎁</span>
                               )}
-                              {(order.notes || (order.commentCount && order.commentCount > 0)) && (
+                              {(order.notes || (order.commentCount ?? 0) > 0) && (
                                 <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
                               )}
                             </div>
@@ -1685,7 +1685,7 @@ Thank you!`
                                 <span className="text-lg" title={statusDisplay.label}>
                                   {statusDisplay.icon}
                                 </span>
-                                {(order.notes || (order.commentCount && order.commentCount > 0)) && (
+                                {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
                                 )}
                               </div>
@@ -1823,7 +1823,7 @@ Thank you!`
                                 {order.isGift && (
                                   <span className="px-1.5 py-0.5 bg-pink-50 text-pink-600 text-[10px] font-medium rounded">🎁 Gift</span>
                                 )}
-                                {(order.notes || (order.commentCount && order.commentCount > 0)) && (
+                                {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
                                 )}
                               </div>
@@ -2364,7 +2364,7 @@ Thank you!`
                         edited
                       </span>
                     )}
-                    {(selectedOrder.notes || (selectedOrder.commentCount && selectedOrder.commentCount > 0)) && (
+                    {(selectedOrder.notes || (selectedOrder.commentCount ?? 0) > 0) && (
                       <span title="Has notes/comments"><MessageSquareText className="w-4 h-4 text-amber-500" /></span>
                     )}
                   </div>
