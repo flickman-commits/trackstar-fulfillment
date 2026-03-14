@@ -120,7 +120,8 @@ export default async function handler(req, res) {
             race: true  // Include race data (date, weather, etc.)
           },
           orderBy: { createdAt: 'desc' }  // Get most recent first
-        }
+        },
+        _count: { select: { comments: true } }
       }
     })
 
@@ -183,8 +184,11 @@ export default async function handler(req, res) {
         timeCustomer: order.timeCustomer,
         creativeDirection: order.creativeDirection,
         isGift: order.isGift,
+        // Comment count for notes indicator
+        commentCount: order._count?.comments || 0,
         // Clean up - don't send nested objects to frontend
-        runnerResearch: undefined
+        runnerResearch: undefined,
+        _count: undefined
       }
     })
 

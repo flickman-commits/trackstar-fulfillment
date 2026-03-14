@@ -1,6 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, Mail, ChevronRight } from 'lucide-react'
-
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, Mail, ChevronRight, ImagePlus, MessageSquareText } from 'lucide-react'
 // API calls now go to /api/* serverless functions (same origin)
 
 type DesignStatus = 'not_started' | 'in_progress' | 'concepts_done' | 'in_revision' | 'approved_by_customer' | 'sent_to_production'
@@ -58,6 +57,15 @@ interface Order {
   timeCustomer?: string
   creativeDirection?: string
   isGift?: boolean
+  commentCount?: number
+}
+
+interface OrderComment {
+  id: string
+  orderId: string
+  text: string | null
+  imageUrl: string | null
+  createdAt: string
 }
 
 // Design status display config
@@ -206,6 +214,14 @@ export default function Dashboard() {
   const [showScraperStatus, setShowScraperStatus] = useState(false)
   // Tab switcher: standard vs custom order view
   const [activeView, setActiveView] = useState<'standard' | 'custom'>('standard')
+  // Comments state for custom orders
+  const [orderComments, setOrderComments] = useState<OrderComment[]>([])
+  const [isLoadingComments, setIsLoadingComments] = useState(false)
+  const [newCommentText, setNewCommentText] = useState('')
+  const [commentImageFile, setCommentImageFile] = useState<File | null>(null)
+  const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const commentFileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch orders from database (filtered by activeView type)
   const fetchOrders = useCallback(async () => {
@@ -957,6 +973,143 @@ export default function Dashboard() {
     }
   }
 
+  // ====== COMMENTS FUNCTIONS ======
+
+  const fetchComments = useCallback(async (orderId: string) => {
+    setIsLoadingComments(true)
+    try {
+      const response = await fetch(`/api/orders/comments?orderId=${orderId}`)
+      if (!response.ok) throw new Error('Failed to fetch comments')
+      const data = await response.json()
+      setOrderComments(data.comments || [])
+    } catch (error) {
+      console.error('Error fetching comments:', error)
+      setOrderComments([])
+    } finally {
+      setIsLoadingComments(false)
+    }
+  }, [])
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result as string
+        // Strip the data:image/xxx;base64, prefix
+        resolve(result.split(',')[1])
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const submitComment = async () => {
+    if (!selectedOrder || (!newCommentText.trim() && !commentImageFile)) return
+    setIsSubmittingComment(true)
+    try {
+      let imageData: string | null = null
+      let imageName: string | null = null
+      if (commentImageFile) {
+        imageData = await fileToBase64(commentImageFile)
+        imageName = commentImageFile.name
+      }
+
+      const response = await fetch('/api/orders/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: selectedOrder.id,
+          text: newCommentText.trim() || null,
+          imageData,
+          imageName
+        })
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to add comment')
+      }
+      const data = await response.json()
+      setOrderComments(prev => [data.comment, ...prev])
+      setNewCommentText('')
+      setCommentImageFile(null)
+      if (commentImagePreview) URL.revokeObjectURL(commentImagePreview)
+      setCommentImagePreview(null)
+      // Update commentCount on the order in the list so the icon shows
+      setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, commentCount: (o.commentCount || 0) + 1 } : o))
+      setSelectedOrder(prev => prev ? { ...prev, commentCount: (prev.commentCount || 0) + 1 } : prev)
+      setToast({ message: 'Comment added', type: 'success' })
+    } catch (error) {
+      console.error('Error adding comment:', error)
+      setToast({ message: error instanceof Error ? error.message : 'Failed to add comment', type: 'error' })
+    } finally {
+      setIsSubmittingComment(false)
+    }
+  }
+
+  const deleteComment = async (commentId: string) => {
+    try {
+      const response = await fetch('/api/orders/comments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId })
+      })
+      if (!response.ok) throw new Error('Failed to delete comment')
+      setOrderComments(prev => prev.filter(c => c.id !== commentId))
+      // Update commentCount on the order in the list
+      if (selectedOrder) {
+        setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, commentCount: Math.max((o.commentCount || 0) - 1, 0) } : o))
+        setSelectedOrder(prev => prev ? { ...prev, commentCount: Math.max((prev.commentCount || 0) - 1, 0) } : prev)
+      }
+      setToast({ message: 'Comment deleted', type: 'success' })
+    } catch (error) {
+      console.error('Error deleting comment:', error)
+      setToast({ message: 'Failed to delete comment', type: 'error' })
+    }
+  }
+
+  const handleCommentPaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        const file = item.getAsFile()
+        if (file) {
+          setCommentImageFile(file)
+          setCommentImagePreview(URL.createObjectURL(file))
+        }
+        break
+      }
+    }
+  }
+
+  const handleCommentFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setCommentImageFile(file)
+      setCommentImagePreview(URL.createObjectURL(file))
+    }
+  }
+
+  const clearCommentImage = () => {
+    setCommentImageFile(null)
+    if (commentImagePreview) URL.revokeObjectURL(commentImagePreview)
+    setCommentImagePreview(null)
+    if (commentFileInputRef.current) commentFileInputRef.current.value = ''
+  }
+
+  // Load comments when custom order modal opens
+  useEffect(() => {
+    if (selectedOrder?.trackstarOrderType === 'custom' && selectedOrder.id) {
+      fetchComments(selectedOrder.id)
+      setNewCommentText('')
+      setCommentImageFile(null)
+      setCommentImagePreview(null)
+    } else {
+      setOrderComments([])
+    }
+  }, [selectedOrder?.id, selectedOrder?.trackstarOrderType, fetchComments])
+
   // Format due date for display
   const formatDueDate = (dateStr?: string): string => {
     if (!dateStr) return 'N/A'
@@ -1343,7 +1496,12 @@ Thank you!`
                                 <span className="px-1 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] rounded border border-blue-500/20">⏱ {order.timeFromName}</span>
                               )}
                             </div>
-                            <span className="text-base flex-shrink-0" title={statusDisplay.label}>{statusDisplay.icon}</span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <span className="text-base" title={statusDisplay.label}>{statusDisplay.icon}</span>
+                              {(order.notes || (order.commentCount && order.commentCount > 0)) && (
+                                <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
+                              )}
+                            </div>
                           </div>
                           {/* Row 2: Runner name */}
                           <div className="mt-1">
@@ -1444,6 +1602,9 @@ Thank you!`
                               {order.isGift && (
                                 <span className="text-xs">🎁</span>
                               )}
+                              {(order.notes || (order.commentCount && order.commentCount > 0)) && (
+                                <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
+                              )}
                             </div>
                           </div>
                           {/* Row 2: Runner name */}
@@ -1520,9 +1681,14 @@ Thank you!`
                               </div>
                             </td>
                             <td className="px-3 py-5 text-center">
-                              <span className="text-lg" title={statusDisplay.label}>
-                                {statusDisplay.icon}
-                              </span>
+                              <div className="flex items-center justify-center gap-1">
+                                <span className="text-lg" title={statusDisplay.label}>
+                                  {statusDisplay.icon}
+                                </span>
+                                {(order.notes || (order.commentCount && order.commentCount > 0)) && (
+                                  <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-5">
                               <div className="flex items-center gap-1.5">
@@ -1656,6 +1822,9 @@ Thank you!`
                                 )}
                                 {order.isGift && (
                                   <span className="px-1.5 py-0.5 bg-pink-50 text-pink-600 text-[10px] font-medium rounded">🎁 Gift</span>
+                                )}
+                                {(order.notes || (order.commentCount && order.commentCount > 0)) && (
+                                  <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
                                 )}
                               </div>
                             </td>
@@ -2195,6 +2364,9 @@ Thank you!`
                         edited
                       </span>
                     )}
+                    {(selectedOrder.notes || (selectedOrder.commentCount && selectedOrder.commentCount > 0)) && (
+                      <span title="Has notes/comments"><MessageSquareText className="w-4 h-4 text-amber-500" /></span>
+                    )}
                   </div>
                   <button
                     onClick={closeModal}
@@ -2282,6 +2454,71 @@ Thank you!`
                             </div>
                           </div>
                         )}
+
+                        {/* Comments (Mobile) */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">
+                            Comments {orderComments.length > 0 && `(${orderComments.length})`}
+                          </h4>
+                          <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-2">
+                            <textarea
+                              value={newCommentText}
+                              onChange={(e) => setNewCommentText(e.target.value)}
+                              onPaste={handleCommentPaste}
+                              placeholder="Add a comment or paste an image..."
+                              className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
+                              rows={2}
+                            />
+                            {commentImagePreview && (
+                              <div className="relative inline-block">
+                                <img src={commentImagePreview} alt="Preview" className="max-h-24 rounded-md border border-border-gray" />
+                                <button onClick={clearCommentImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
+                                <ImagePlus className="w-3 h-3 inline mr-1" />
+                                Image
+                                <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
+                              </label>
+                              <span className="text-xs text-off-black/40 flex-1">or paste</span>
+                              <button
+                                onClick={submitComment}
+                                disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
+                                className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                              >
+                                {isSubmittingComment ? 'Adding...' : 'Add'}
+                              </button>
+                            </div>
+                          </div>
+                          {isLoadingComments ? (
+                            <div className="text-center py-3"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
+                          ) : orderComments.length === 0 ? (
+                            <p className="text-xs text-off-black/40 text-center py-2">No comments yet</p>
+                          ) : (
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                              {orderComments.map(comment => (
+                                <div key={comment.id} className="bg-white border border-border-gray rounded-md p-2.5">
+                                  {comment.imageUrl && (
+                                    <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
+                                      <img src={comment.imageUrl} alt="Attachment" className="max-h-32 rounded-md mb-1.5 border border-border-gray hover:opacity-90" />
+                                    </a>
+                                  )}
+                                  {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
+                                  <div className="flex items-center justify-between mt-1.5">
+                                    <span className="text-xs text-off-black/40">
+                                      {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                    </span>
+                                    <button onClick={() => deleteComment(comment.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
                         <div className="pt-1">
                           <button
                             onClick={closeModal}
@@ -2383,6 +2620,82 @@ Thank you!`
                           </div>
                         </div>
                       )}
+
+                      {/* Comments */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">
+                          Comments {orderComments.length > 0 && `(${orderComments.length})`}
+                        </h4>
+
+                        {/* Add Comment Form */}
+                        <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3 mb-3">
+                          <textarea
+                            value={newCommentText}
+                            onChange={(e) => setNewCommentText(e.target.value)}
+                            onPaste={handleCommentPaste}
+                            placeholder="Add a comment or paste an image..."
+                            className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
+                            rows={2}
+                          />
+                          {commentImagePreview && (
+                            <div className="relative inline-block">
+                              <img src={commentImagePreview} alt="Upload preview" className="max-h-32 rounded-md border border-border-gray" />
+                              <button
+                                onClick={clearCommentImage}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
+                              <ImagePlus className="w-3 h-3 inline mr-1" />
+                              Image
+                              <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
+                            </label>
+                            <span className="text-xs text-off-black/40 flex-1">or paste from clipboard</span>
+                            <button
+                              onClick={submitComment}
+                              disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
+                              className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                            >
+                              {isSubmittingComment ? 'Adding...' : 'Add'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Comment List */}
+                        {isLoadingComments ? (
+                          <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
+                        ) : orderComments.length === 0 ? (
+                          <p className="text-xs text-off-black/40 text-center py-3">No comments yet</p>
+                        ) : (
+                          <div className="space-y-3 max-h-64 overflow-y-auto">
+                            {orderComments.map(comment => (
+                              <div key={comment.id} className="bg-white border border-border-gray rounded-md p-3 group">
+                                {comment.imageUrl && (
+                                  <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
+                                    <img src={comment.imageUrl} alt="Attachment" className="max-h-48 rounded-md mb-2 border border-border-gray hover:opacity-90 cursor-pointer" />
+                                  </a>
+                                )}
+                                {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
+                                <div className="flex items-center justify-between mt-2">
+                                  <span className="text-xs text-off-black/40">
+                                    {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                  </span>
+                                  <button
+                                    onClick={() => deleteComment(comment.id)}
+                                    className="text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
                       {/* Actions for Custom Designs */}
                       <div className="flex gap-3 pt-3">

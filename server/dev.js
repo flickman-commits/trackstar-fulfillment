@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const app = express()
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
 
 // Map each API route to its Vercel handler
 const routes = [
@@ -26,6 +26,9 @@ const routes = [
   { method: 'get',  path: '/api/orders/test-scrapers',      handler: '../api/orders/test-scrapers.js' },
   { method: 'post', path: '/api/orders/test-scrapers',      handler: '../api/orders/test-scrapers.js' },
   { method: 'post', path: '/api/orders/refresh-etsy-data',  handler: '../api/orders/refresh-etsy-data.js' },
+  { method: 'get',  path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
+  { method: 'post', path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
+  { method: 'delete', path: '/api/orders/comments',          handler: '../api/orders/comments.js' },
   { method: 'get',  path: '/api/etsy/auth',                 handler: '../api/etsy/auth.js' },
 ]
 

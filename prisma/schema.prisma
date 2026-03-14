@@ -51,6 +51,7 @@ model Order {
 
   // Relations
   runnerResearch   RunnerResearch[]
+  comments         OrderComment[]
 
   @@unique([parentOrderNumber, lineItemIndex]) // Each line item is unique within an order
   @@index([orderNumber])
@@ -104,6 +105,18 @@ model RunnerResearch {
   @@index([orderId])
   @@index([raceId])
   @@index([researchStatus])
+}
+
+model OrderComment {
+  id        String   @id @default(cuid())
+  orderId   String
+  text      String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
 
 model SystemConfig {
