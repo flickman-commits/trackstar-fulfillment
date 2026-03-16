@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, Mail, ChevronRight, ImagePlus, MessageSquareText } from 'lucide-react'
 // API calls now go to /api/* serverless functions (same origin)
 
-type DesignStatus = 'not_started' | 'in_progress' | 'concepts_done' | 'in_revision' | 'approved_by_customer' | 'sent_to_production'
+type DesignStatus = 'not_started' | 'in_progress' | 'concepts_done' | 'in_revision' | 'approved_by_customer' | 'final_pdf_uploaded' | 'sent_to_production'
 
 interface Order {
   id: string
@@ -75,6 +75,7 @@ const DESIGN_STATUS_CONFIG: Record<DesignStatus, { icon: string; label: string; 
   concepts_done: { icon: '🟡', label: 'Concepts Done', color: 'text-amber-700', bgColor: 'bg-amber-50' },
   in_revision: { icon: '🟠', label: 'In Revision', color: 'text-orange-700', bgColor: 'bg-orange-50' },
   approved_by_customer: { icon: '🟣', label: 'Approved by Customer', color: 'text-purple-700', bgColor: 'bg-purple-50' },
+  final_pdf_uploaded: { icon: '🟤', label: 'Final PDF Uploaded', color: 'text-amber-800', bgColor: 'bg-amber-50' },
   sent_to_production: { icon: '🟢', label: 'Sent to Production', color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
 }
 

@@ -163,7 +163,7 @@ async function handleComplete({ orderNumber }, res) {
 }
 
 // --- design-status ---
-const VALID_DESIGN_STATUSES = ['not_started', 'in_progress', 'concepts_done', 'in_revision', 'approved_by_customer', 'sent_to_production']
+const VALID_DESIGN_STATUSES = ['not_started', 'in_progress', 'concepts_done', 'in_revision', 'approved_by_customer', 'final_pdf_uploaded', 'sent_to_production']
 
 async function handleDesignStatus({ orderNumber, designStatus }, res) {
   if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
