@@ -197,6 +197,9 @@ export default function Dashboard() {
   const [isResearching, setIsResearching] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
+  const [customersServedCount, setCustomersServedCount] = useState<number | null>(null)
+  const [customersServedInput, setCustomersServedInput] = useState('')
+  const [isLoadingCounter, setIsLoadingCounter] = useState(false)
   const [scraperResults, setScraperResults] = useState<{ raceName: string; status: 'untested' | 'pass' | 'fail'; raceInfoStatus?: string; runnerSearchStatus?: string; durationMs?: number; error?: string; runnerSearchError?: string; testRunnerName?: string }[]>([])
   const [isTestingScrapers, setIsTestingScrapers] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
@@ -366,6 +369,49 @@ export default function Dashboard() {
     } finally {
       setSettingsAction(null)
       setShowSettings(false)
+    }
+  }
+
+  // Fetch current customers served count
+  const fetchCustomersServedCount = async () => {
+    try {
+      const response = await fetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'customers-served-info' })
+      })
+      if (!response.ok) throw new Error('Failed to fetch count')
+      const data = await response.json()
+      setCustomersServedCount(data.count)
+      setCustomersServedInput(String(data.count))
+    } catch (error) {
+      console.error('Failed to fetch customers served count:', error)
+    }
+  }
+
+  // Save customers served count and sync to Shopify
+  const saveCustomersServedCount = async () => {
+    const parsed = parseInt(customersServedInput, 10)
+    if (isNaN(parsed) || parsed < 0) {
+      setToast({ message: 'Enter a valid number', type: 'error' })
+      return
+    }
+    setIsLoadingCounter(true)
+    try {
+      const response = await fetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'customers-served-set', count: parsed })
+      })
+      if (!response.ok) throw new Error('Failed to update count')
+      const data = await response.json()
+      setCustomersServedCount(data.count)
+      setCustomersServedInput(String(data.count))
+      setToast({ message: `Counter updated to ${data.formatted} and synced to Shopify`, type: 'success' })
+    } catch (error) {
+      setToast({ message: error instanceof Error ? error.message : 'Failed to update', type: 'error' })
+    } finally {
+      setIsLoadingCounter(false)
     }
   }
 
@@ -1880,7 +1926,7 @@ Thank you!`
                 </button>
               )}
               <button
-                onClick={() => setShowSettings(true)}
+                onClick={() => { setShowSettings(true); fetchCustomersServedCount() }}
                 title="Settings & cache management"
                 className="p-2 text-off-black/30 hover:text-off-black/60 transition-colors rounded-full hover:bg-off-black/5"
               >
@@ -2038,6 +2084,32 @@ Thank you!`
                     </div>
                   </div>
                 </button>
+              </div>
+
+              {/* Customers Served Counter */}
+              <div className="border-t border-border-gray p-6">
+                <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
+                  <p className="text-sm font-medium text-off-black">Customers Served Counter</p>
+                  <p className="text-xs mt-0.5 text-off-black/50 mb-3">Adjust the counter displayed on the Shopify storefront. Saves to DB and syncs to Shopify.</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={customersServedInput}
+                      onChange={(e) => setCustomersServedInput(e.target.value)}
+                      placeholder={customersServedCount !== null ? String(customersServedCount) : 'Loading...'}
+                      className="flex-1 rounded-md border border-border-gray px-3 py-1.5 text-sm text-off-black bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                    />
+                    <button
+                      onClick={saveCustomersServedCount}
+                      disabled={isLoadingCounter || customersServedInput === String(customersServedCount)}
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                    >
+                      {isLoadingCounter && <Loader2 className="w-3 h-3 animate-spin" />}
+                      {isLoadingCounter ? 'Saving…' : 'Update & Sync'}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Danger zone */}
