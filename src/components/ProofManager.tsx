@@ -137,27 +137,17 @@ export default function ProofManager({ orderId }: ProofManagerProps) {
 
     try {
       for (const file of selectedFiles) {
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            const result = e.target?.result as string
-            resolve(result.split(',')[1])
-          }
-          reader.readAsDataURL(file)
-        })
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('orderId', orderId)
 
         const res = await fetch(`${API_BASE}/api/proofs`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId,
-            imageData: base64,
-            imageName: file.name
-          })
+          body: formData
         })
 
         if (!res.ok) {
-          const data = await res.json()
+          const data = await res.json().catch(() => ({ error: 'Upload failed' }))
           toast.error(`Failed to upload ${file.name}: ${data.error}`)
           continue
         }

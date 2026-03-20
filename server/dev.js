@@ -12,7 +12,12 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const app = express()
-app.use(express.json({ limit: '10mb' }))
+// Skip JSON parsing for multipart requests (proof uploads use formidable)
+app.use((req, res, next) => {
+  const ct = req.headers['content-type'] || ''
+  if (ct.includes('multipart/form-data')) return next()
+  express.json({ limit: '10mb' })(req, res, next)
+})
 
 // Map each API route to its Vercel handler
 const routes = [

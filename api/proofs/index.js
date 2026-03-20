@@ -18,8 +18,44 @@
 import { PrismaClient } from '@prisma/client'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import formidable from 'formidable'
+import fs from 'fs'
 
 const prisma = new PrismaClient()
+
+// Disable Vercel's default body parser for multipart support
+export const config = { api: { bodyParser: false } }
+
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    const contentType = req.headers['content-type'] || ''
+    if (contentType.includes('multipart/form-data')) {
+      const form = formidable({ maxFileSize: 20 * 1024 * 1024 })
+      form.parse(req, (err, fields, files) => {
+        if (err) return reject(err)
+        // formidable v3 returns arrays for fields
+        const flat = {}
+        for (const [k, v] of Object.entries(fields)) {
+          flat[k] = Array.isArray(v) ? v[0] : v
+        }
+        const file = files.file ? (Array.isArray(files.file) ? files.file[0] : files.file) : null
+        resolve({ fields: flat, file })
+      })
+    } else {
+      // JSON body — read manually since we disabled bodyParser
+      let data = ''
+      req.on('data', chunk => { data += chunk })
+      req.on('end', () => {
+        try {
+          resolve({ fields: data ? JSON.parse(data) : {}, file: null })
+        } catch {
+          resolve({ fields: {}, file: null })
+        }
+      })
+      req.on('error', reject)
+    }
+  })
+}
 
 function buildApprovalUrl(req, token) {
   const origin = req.headers?.origin || (() => {
@@ -37,12 +73,20 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end()
 
-  const action = req.query.action || (req.method !== 'GET' ? (typeof req.body === 'string' ? JSON.parse(req.body) : req.body)?.action : null)
-
   try {
+    // Parse body for non-GET requests
+    let body = {}
+    let uploadedFile = null
+    if (req.method !== 'GET') {
+      const parsed = await parseBody(req)
+      body = parsed.fields
+      uploadedFile = parsed.file
+    }
+
+    const action = req.query.action || body.action || null
     // ─── Customer Approval (public, token-based) ───
     if (action === 'approve') {
-      const token = req.query.token || (typeof req.body === 'string' ? JSON.parse(req.body) : req.body)?.token
+      const token = req.query.token || body.token
       if (!token) return res.status(400).json({ error: 'Token is required' })
 
       const approvalToken = await prisma.approvalToken.findUnique({
@@ -82,7 +126,6 @@ export default async function handler(req, res) {
       }
 
       if (req.method === 'POST') {
-        const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
         const { proofId, approval, feedback } = body
 
         if (!proofId) return res.status(400).json({ error: 'proofId is required' })
@@ -130,7 +173,6 @@ export default async function handler(req, res) {
       }
 
       if (req.method === 'POST') {
-        const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
         const { orderId } = body
         if (!orderId) return res.status(400).json({ error: 'orderId is required' })
 
@@ -169,11 +211,9 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
-      const { orderId, imageData, imageName } = body
+      const { orderId, imageData, imageUrl, imageName } = body
 
       if (!orderId) return res.status(400).json({ error: 'orderId is required' })
-      if (!imageData) return res.status(400).json({ error: 'imageData is required' })
 
       const order = await prisma.order.findUnique({ where: { id: orderId } })
       if (!order) return res.status(404).json({ error: 'Order not found' })
@@ -184,32 +224,63 @@ export default async function handler(req, res) {
       })
       const version = (lastProof?.version || 0) + 1
 
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-      const ext = (imageName || 'proof.png').split('.').pop()?.toLowerCase() || 'png'
-      const timestamp = Date.now()
-      const filePath = `${orderId}/v${version}-${timestamp}.${ext}`
+      const supabaseClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+      let publicUrl = imageUrl || null
 
-      const mimeTypes = {
-        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-        gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
-        pdf: 'application/pdf'
+      // File upload via FormData (preferred — no size limit issues)
+      if (uploadedFile) {
+        const ext = (uploadedFile.originalFilename || 'proof.png').split('.').pop()?.toLowerCase() || 'png'
+        const timestamp = Date.now()
+        const filePath = `${orderId}/v${version}-${timestamp}.${ext}`
+        const fileBuffer = fs.readFileSync(uploadedFile.filepath)
+
+        const { error: uploadErr } = await supabaseClient.storage
+          .from('order-proofs')
+          .upload(filePath, fileBuffer, { contentType: uploadedFile.mimetype || 'application/octet-stream', upsert: false })
+
+        // Clean up temp file
+        try { fs.unlinkSync(uploadedFile.filepath) } catch {}
+
+        if (uploadErr) {
+          console.error('[proofs] File upload failed:', uploadErr.message)
+          return res.status(500).json({ error: `File upload failed: ${uploadErr.message}` })
+        }
+
+        publicUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(filePath).data.publicUrl
       }
-      const contentType = mimeTypes[ext] || `image/${ext}`
+      // Base64 upload (legacy fallback)
+      else if (imageData && !imageUrl) {
+        const ext = (imageName || 'proof.png').split('.').pop()?.toLowerCase() || 'png'
+        const timestamp = Date.now()
+        const filePath = `${orderId}/v${version}-${timestamp}.${ext}`
 
-      const buffer = Buffer.from(imageData, 'base64')
-      const { error: uploadErr } = await supabase.storage
-        .from('order-proofs')
-        .upload(filePath, buffer, { contentType, upsert: false })
+        const mimeTypes = {
+          png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+          gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+          pdf: 'application/pdf'
+        }
+        const contentType = mimeTypes[ext] || `image/${ext}`
 
-      if (uploadErr) {
-        console.error('[proofs] Image upload failed:', uploadErr.message)
-        return res.status(500).json({ error: `Image upload failed: ${uploadErr.message}` })
+        const buffer = Buffer.from(imageData, 'base64')
+        const { error: uploadErr } = await supabaseClient.storage
+          .from('order-proofs')
+          .upload(filePath, buffer, { contentType, upsert: false })
+
+        if (uploadErr) {
+          console.error('[proofs] Image upload failed:', uploadErr.message)
+          return res.status(500).json({ error: `Image upload failed: ${uploadErr.message}` })
+        }
+
+        publicUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(filePath).data.publicUrl
       }
 
-      const { data: { publicUrl } } = supabase.storage.from('order-proofs').getPublicUrl(filePath)
+      if (!publicUrl) {
+        return res.status(400).json({ error: 'No file or image data provided' })
+      }
 
+      const fileName = uploadedFile?.originalFilename || imageName || null
       const proof = await prisma.proof.create({
-        data: { orderId, version, imageUrl: publicUrl, fileName: imageName || null, status: 'pending' }
+        data: { orderId, version, imageUrl: publicUrl, fileName, status: 'pending' }
       })
 
       let approvalToken = await prisma.approvalToken.findUnique({ where: { orderId } })
@@ -225,7 +296,6 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
       const { proofId } = body
 
       if (!proofId) return res.status(400).json({ error: 'proofId is required' })
