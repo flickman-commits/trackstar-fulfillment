@@ -31,6 +31,7 @@
     "framer-motion": "^12.5.0",
     "lucide-react": "^0.303.0",
     "openai": "^4.78.1",
+    "pdfjs-dist": "^5.5.207",
     "prisma": "^6.3.0",
     "puppeteer": "^24.36.0",
     "puppeteer-core": "^24.37.3",

@@ -1,0 +1,446 @@
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
+import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X } from 'lucide-react'
+
+const PdfViewer = lazy(() => import('@/components/PdfViewer'))
+import { toast } from 'sonner'
+
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
+interface Proof {
+  id: string
+  orderId: string
+  version: number
+  imageUrl: string
+  fileName: string | null
+  status: 'pending' | 'approved' | 'revision_requested'
+  customerFeedback: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+interface ApprovalToken {
+  id: string
+  orderId: string
+  token: string
+  expiresAt: string
+  createdAt: string
+}
+
+interface ProofManagerProps {
+  orderId: string
+  orderNumber: string
+  displayOrderNumber: string
+}
+
+export default function ProofManager({ orderId }: ProofManagerProps) {
+  const [proofs, setProofs] = useState<Proof[]>([])
+  const [approvalToken, setApprovalToken] = useState<ApprovalToken | null>(null)
+  const [approvalUrl, setApprovalUrl] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isUploading, setIsUploading] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [filePreviews, setFilePreviews] = useState<{ name: string; preview: string }[]>([])
+  const [copied, setCopied] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [proofsRes, tokenRes] = await Promise.all([
+        fetch(`${API_BASE}/api/proofs?orderId=${orderId}`),
+        fetch(`${API_BASE}/api/approval-token?orderId=${orderId}`)
+      ])
+
+      if (proofsRes.ok) {
+        const data = await proofsRes.json()
+        setProofs(data.proofs)
+      }
+
+      if (tokenRes.ok) {
+        const data = await tokenRes.json()
+        setApprovalToken(data.approvalToken)
+        // Build URL client-side to always use the correct frontend origin
+        setApprovalUrl(`${window.location.origin}/approve/${data.approvalToken.token}`)
+      }
+    } catch (err) {
+      console.error('[ProofManager] Fetch error:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [orderId])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const addFiles = (files: File[]) => {
+    const remaining = 7 - selectedFiles.length
+    const toAdd = files.slice(0, remaining)
+    if (toAdd.length === 0) {
+      toast.error('Maximum 7 files')
+      return
+    }
+
+    setSelectedFiles(prev => [...prev, ...toAdd])
+
+    toAdd.forEach(file => {
+      const isPdfFile = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+      if (isPdfFile) {
+        setFilePreviews(prev => [...prev, { name: file.name, preview: 'pdf' }])
+      } else {
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+          setFilePreviews(prev => [...prev, { name: file.name, preview: ev.target?.result as string }])
+        }
+        reader.readAsDataURL(file)
+      }
+    })
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    addFiles(files)
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        const file = item.getAsFile()
+        if (file) addFiles([file])
+        break
+      }
+    }
+  }
+
+  const removeFile = (idx: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== idx))
+    setFilePreviews(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const clearFiles = () => {
+    setSelectedFiles([])
+    setFilePreviews([])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const uploadProofs = async () => {
+    if (selectedFiles.length === 0) return
+    setIsUploading(true)
+
+    let uploaded = 0
+    let lastToken: typeof approvalToken = null
+    let lastUrl: string | null = null
+
+    try {
+      for (const file of selectedFiles) {
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            const result = e.target?.result as string
+            resolve(result.split(',')[1])
+          }
+          reader.readAsDataURL(file)
+        })
+
+        const res = await fetch(`${API_BASE}/api/proofs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId,
+            imageData: base64,
+            imageName: file.name
+          })
+        })
+
+        if (!res.ok) {
+          const data = await res.json()
+          toast.error(`Failed to upload ${file.name}: ${data.error}`)
+          continue
+        }
+
+        const data = await res.json()
+        setProofs(prev => [...prev, data.proof])
+        if (data.approvalToken) {
+          lastToken = data.approvalToken
+          lastUrl = `${window.location.origin}/approve/${data.approvalToken.token}`
+        }
+        uploaded++
+      }
+
+      if (lastToken) {
+        setApprovalToken(lastToken)
+        setApprovalUrl(lastUrl)
+      }
+      clearFiles()
+      toast.success(`${uploaded} proof${uploaded !== 1 ? 's' : ''} uploaded`)
+    } catch {
+      toast.error('Upload failed')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const deleteProof = async (proofId: string) => {
+    setDeletingId(proofId)
+    try {
+      const res = await fetch(`${API_BASE}/api/proofs`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proofId })
+      })
+      if (res.ok) {
+        setProofs(prev => prev.filter(p => p.id !== proofId))
+        toast.success('Proof deleted')
+      }
+    } catch {
+      toast.error('Delete failed')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const generateToken = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/approval-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setApprovalToken(data.approvalToken)
+        setApprovalUrl(`${window.location.origin}/approve/${data.approvalToken.token}`)
+        toast.success('Approval link generated')
+      }
+    } catch {
+      toast.error('Failed to generate link')
+    }
+  }
+
+  const copyLink = async () => {
+    if (!approvalUrl) return
+    try {
+      await navigator.clipboard.writeText(approvalUrl)
+    } catch {
+      // Fallback for HTTP / insecure contexts where clipboard API fails
+      const textarea = document.createElement('textarea')
+      textarea.value = approvalUrl
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    setCopied(true)
+    toast.success('Approval link copied')
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const statusBadge = (status: Proof['status']) => {
+    switch (status) {
+      case 'approved':
+        return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-2.5 h-2.5" />Approved</span>
+      case 'revision_requested':
+        return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700"><AlertTriangle className="w-2.5 h-2.5" />Revision</span>
+      default:
+        return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">Pending</span>
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3" onPaste={handlePaste}>
+      {/* Approval Link */}
+      {approvalUrl ? (
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-semibold text-blue-700 uppercase tracking-wider flex items-center gap-1">
+              <Link2 className="w-3 h-3" /> Customer Approval Link
+            </span>
+            <button
+              onClick={generateToken}
+              className="text-[10px] text-blue-500 hover:text-blue-700 flex items-center gap-0.5 transition-colors"
+              title="Regenerate link (old link will stop working)"
+            >
+              <RefreshCw className="w-2.5 h-2.5" /> Regenerate
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={approvalUrl}
+              className="flex-1 text-xs bg-white border border-blue-200 rounded px-2 py-1.5 text-blue-800 font-mono truncate"
+            />
+            <button
+              onClick={copyLink}
+              className="px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors flex items-center gap-1"
+            >
+              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          {approvalToken && (
+            <p className="text-[10px] text-blue-500 mt-1.5">
+              Expires {new Date(approvalToken.expiresAt).toLocaleDateString()}
+            </p>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={generateToken}
+          className="w-full px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors flex items-center justify-center gap-1.5"
+        >
+          <Link2 className="w-3.5 h-3.5" />
+          Generate Approval Link
+        </button>
+      )}
+
+      {/* Upload Proofs */}
+      <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+        {filePreviews.length > 0 ? (
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              {filePreviews.map((fp, idx) => (
+                <div key={idx} className="relative">
+                  {fp.preview === 'pdf' ? (
+                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border-gray bg-white">
+                      <span className="text-lg">📄</span>
+                      <p className="text-[10px] font-medium text-off-black truncate max-w-[120px]">{fp.name}</p>
+                    </div>
+                  ) : (
+                    <img src={fp.preview} alt={fp.name} className="h-16 w-16 object-cover rounded-md border border-border-gray" />
+                  )}
+                  <button
+                    onClick={() => removeFile(idx)}
+                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center hover:bg-red-600"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              ))}
+              {selectedFiles.length < 7 && (
+                <label className="cursor-pointer flex items-center justify-center h-16 w-16 rounded-md border-2 border-dashed border-border-gray hover:border-off-black/30 transition-colors">
+                  <ImagePlus className="w-4 h-4 text-off-black/30" />
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={uploadProofs}
+                disabled={isUploading}
+                className="flex-1 px-3 py-2 text-xs font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isUploading ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}...</>
+                ) : (
+                  <><Upload className="w-3.5 h-3.5" /> Upload {selectedFiles.length} proof{selectedFiles.length !== 1 ? 's' : ''}</>
+                )}
+              </button>
+              <button
+                onClick={clearFiles}
+                className="px-3 py-2 text-xs text-off-black/40 hover:text-off-black/60 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label className="cursor-pointer flex items-center justify-center gap-2 py-3 text-xs text-off-black/50 hover:text-off-black/70 transition-colors">
+            <ImagePlus className="w-4 h-4" />
+            <span>Choose proof files (up to 7) or paste from clipboard</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.pdf"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </label>
+        )}
+      </div>
+
+      {/* Proof History */}
+      {proofs.length > 0 && (
+        <div className="space-y-2">
+          {[...proofs].reverse().map((proof) => (
+            <div key={proof.id} className="bg-white border border-border-gray rounded-md overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-off-black text-white text-[10px] font-bold shrink-0">
+                  {proof.version}
+                </span>
+                <span className="text-xs text-off-black/50 flex-1 truncate">
+                  {proof.fileName || `Proof v${proof.version}`}
+                </span>
+                {statusBadge(proof.status)}
+                <button
+                  onClick={() => deleteProof(proof.id)}
+                  disabled={deletingId === proof.id}
+                  className="text-off-black/20 hover:text-red-500 transition-colors p-0.5"
+                  title="Delete proof"
+                >
+                  {deletingId === proof.id ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3 h-3" />
+                  )}
+                </button>
+              </div>
+
+              {/* Thumbnail / PDF preview */}
+              <div className="border-t border-border-gray">
+                {proof.imageUrl.toLowerCase().includes('.pdf') ? (
+                  <Suspense fallback={<div className="flex items-center justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-off-black/30" /></div>}>
+                    <PdfViewer url={proof.imageUrl} maxHeight={200} />
+                  </Suspense>
+                ) : (
+                  <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+                    <img
+                      src={proof.imageUrl}
+                      alt={`Proof v${proof.version}`}
+                      className="w-full max-h-40 object-cover hover:opacity-90 transition-opacity"
+                    />
+                  </a>
+                )}
+              </div>
+
+              {/* Customer feedback */}
+              {proof.customerFeedback && (
+                <div className="px-3 py-2 border-t border-border-gray bg-amber-50">
+                  <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-0.5">Customer Feedback</p>
+                  <p className="text-xs text-amber-900">{proof.customerFeedback}</p>
+                </div>
+              )}
+
+              <div className="px-3 py-1.5 border-t border-border-gray">
+                <span className="text-[10px] text-off-black/30">
+                  {new Date(proof.createdAt).toLocaleDateString()} {new Date(proof.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

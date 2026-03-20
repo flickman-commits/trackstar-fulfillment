@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { useState, useEffect } from 'react'
 import Dashboard from '@/pages/Dashboard'
 import OrderDetails from '@/pages/OrderDetails'
+import ApprovalPortal from '@/pages/ApprovalPortal'
 
 const PASSWORD = 'runfast'
 
@@ -71,12 +72,20 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <PasswordGate>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/orders/:orderId" element={<OrderDetails />} />
-        </Routes>
-      </PasswordGate>
+      <Routes>
+        {/* Public route — no password gate */}
+        <Route path="/approve/:token" element={<ApprovalPortal />} />
+
+        {/* Protected routes */}
+        <Route path="/*" element={
+          <PasswordGate>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/orders/:orderId" element={<OrderDetails />} />
+            </Routes>
+          </PasswordGate>
+        } />
+      </Routes>
       <Toaster
         position="bottom-center"
         toastOptions={{

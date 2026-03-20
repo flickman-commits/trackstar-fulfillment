@@ -30,6 +30,14 @@ const routes = [
   { method: 'post', path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
   { method: 'delete', path: '/api/orders/comments',          handler: '../api/orders/comments.js' },
   { method: 'get',  path: '/api/etsy/auth',                 handler: '../api/etsy/auth.js' },
+  // Proofs & Approval
+  { method: 'get',    path: '/api/proofs',                 handler: '../api/proofs/index.js' },
+  { method: 'post',   path: '/api/proofs',                 handler: '../api/proofs/index.js' },
+  { method: 'delete', path: '/api/proofs',                 handler: '../api/proofs/index.js' },
+  { method: 'get',    path: '/api/approval-token',         handler: '../api/approval-token/index.js' },
+  { method: 'post',   path: '/api/approval-token',         handler: '../api/approval-token/index.js' },
+  { method: 'get',    path: '/api/approve/:token',         handler: '../api/approve/[token].js', paramAdapter: true },
+  { method: 'post',   path: '/api/approve/:token',         handler: '../api/approve/[token].js', paramAdapter: true },
 ]
 
 // Load all handlers and register routes
@@ -38,7 +46,12 @@ for (const route of routes) {
   const handler = mod.default
 
   // Register for the specific method, plus OPTIONS for CORS preflight
-  app[route.method](route.path, handler)
+  // For dynamic routes (e.g. /api/approve/:token), copy Express params to query
+  // so the handler works identically in both Express and Vercel
+  const middleware = route.paramAdapter
+    ? [(req, res, next) => { Object.assign(req.query, req.params); next() }, handler]
+    : [handler]
+  app[route.method](route.path, ...middleware)
   app.options(route.path, (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')

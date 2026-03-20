@@ -113,7 +113,7 @@ export default async function handler(req, res) {
     // Fetch orders with their research data and race info
     const orders = await prisma.order.findMany({
       where: whereClause,
-      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }],
       include: {
         runnerResearch: {
           include: {
@@ -121,7 +121,7 @@ export default async function handler(req, res) {
           },
           orderBy: { createdAt: 'desc' }  // Get most recent first
         },
-        _count: { select: { comments: true } }
+        _count: { select: { comments: true, proofs: true } }
       }
     })
 
@@ -186,11 +186,30 @@ export default async function handler(req, res) {
         isGift: order.isGift,
         // Comment count for notes indicator
         commentCount: order._count?.comments || 0,
+        // Proof count for proof indicator
+        proofCount: order._count?.proofs || 0,
+        // Shopify display order number (e.g. "2855") and order date for sorting
+        displayOrderNumber: order.shopifyOrderData?.name
+          ? String(order.shopifyOrderData.name).replace('#', '')
+          : order.parentOrderNumber,
+        shopifyCreatedAt: order.shopifyOrderData?.created_at || null,
         // Clean up - don't send nested objects to frontend
         runnerResearch: undefined,
-        _count: undefined
+        _count: undefined,
+        shopifyOrderData: undefined
       }
     })
+
+    // Sort by Shopify order date (when customer placed the order), not DB import time
+    // Standard = newest first, Custom = oldest first (longest-waiting need attention)
+    const getOrderDate = (o) => {
+      return new Date(o.shopifyCreatedAt || o.createdAt).getTime()
+    }
+    if (type === 'custom') {
+      transformedOrders.sort((a, b) => getOrderDate(a) - getOrderDate(b))
+    } else {
+      transformedOrders.sort((a, b) => getOrderDate(b) - getOrderDate(a))
+    }
 
     return res.status(200).json({ orders: transformedOrders })
   } catch (error) {

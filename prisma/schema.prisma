@@ -52,6 +52,8 @@ model Order {
   // Relations
   runnerResearch   RunnerResearch[]
   comments         OrderComment[]
+  approvalToken    ApprovalToken?
+  proofs           Proof[]
 
   @@unique([parentOrderNumber, lineItemIndex]) // Each line item is unique within an order
   @@index([orderNumber])
@@ -115,6 +117,32 @@ model OrderComment {
   createdAt DateTime @default(now())
 
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model ApprovalToken {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Proof {
+  id               String   @id @default(cuid())
+  orderId          String
+  version          Int
+  imageUrl         String
+  fileName         String?
+  status           String   @default("pending") // "pending" | "approved" | "revision_requested"
+  customerFeedback String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
 }
