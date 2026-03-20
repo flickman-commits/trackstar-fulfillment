@@ -163,7 +163,7 @@ export default async function handler(req, res) {
             ? `approved Option ${proof.version}`
             : `requested revisions on Option ${proof.version}`
           const slackMsg = {
-            text: `${emoji} *${customerName}* ${action_text} for order *${displayNum}*${feedback ? `\n> _"${feedback}"_` : ''}`
+            text: `${emoji} <@U04KBDJH5C3> *${customerName}* ${action_text} for order *${displayNum}*${feedback ? `\n> _"${feedback}"_` : ''}`
           }
           fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
             method: 'POST',
