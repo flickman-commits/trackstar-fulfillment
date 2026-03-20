@@ -151,6 +151,27 @@ export default async function handler(req, res) {
         })
 
         console.log(`[approve] Customer ${approval} proof v${proof.version} for order ${approvalToken.order.orderNumber}`)
+
+        // Send Slack notification (fire and forget)
+        if (process.env.SLACK_PROOF_WEBHOOK_URL) {
+          const shopifyData = approvalToken.order.shopifyOrderData
+          const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
+            ? String(shopifyData.name) : `#${approvalToken.order.parentOrderNumber}`
+          const customerName = approvalToken.order.customerName || 'Customer'
+          const emoji = approval === 'approve' ? '✅' : '🔄'
+          const action_text = approval === 'approve'
+            ? `approved Option ${proof.version}`
+            : `requested revisions on Option ${proof.version}`
+          const slackMsg = {
+            text: `${emoji} *${customerName}* ${action_text} for order *${displayNum}*${feedback ? `\n> _"${feedback}"_` : ''}`
+          }
+          fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(slackMsg)
+          }).catch(e => console.warn('[approve] Slack notification failed:', e.message))
+        }
+
         return res.status(200).json({ success: true, proof: updatedProof })
       }
 

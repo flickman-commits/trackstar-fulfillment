@@ -231,11 +231,16 @@ export default function ApprovalPortal() {
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-border-gray">
+      <div style={{ backgroundColor: '#F0F0F0' }} className="border-b border-border-gray">
         <div className="max-w-3xl mx-auto px-4 py-5">
           <div className="flex items-center justify-between">
             <img src="/trackstar-logo.png" alt="Trackstar" className="h-8" />
-            <span className="text-body-sm text-off-black/40">Order #{order?.displayOrderNumber || order?.parentOrderNumber}</span>
+            <div className="text-right">
+              {order?.customerName && (
+                <p className="text-body-sm font-medium text-off-black">{order.customerName}</p>
+              )}
+              <span className="text-body-sm text-off-black/40">Order #{order?.displayOrderNumber || order?.parentOrderNumber}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -518,7 +523,7 @@ export default function ApprovalPortal() {
         {/* Footer */}
         <div className="mt-12 pt-6 border-t border-border-gray text-center">
           <p className="text-xs text-off-black/30">
-            Powered by <span className="font-medium">Trackstar</span>
+            Powered by <a href="https://www.trackstar.art" target="_blank" rel="noopener noreferrer" className="font-medium hover:text-off-black/50 transition-colors">Trackstar</a>
           </p>
         </div>
       </div>
