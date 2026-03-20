@@ -1,5 +1,28 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, Mail, ChevronRight, ImagePlus, MessageSquareText } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, Mail, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText } from 'lucide-react'
+import ProofManager from '@/components/ProofManager'
+
+/** Collapsible section with header + chevron toggle */
+function CollapsibleSection({ title, defaultOpen = true, children, badge }: {
+  title: string; defaultOpen?: boolean; children: React.ReactNode; badge?: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between mb-2 group"
+      >
+        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight flex items-center gap-2">
+          {title}
+          {badge}
+        </h4>
+        <ChevronDownIcon className={`w-3.5 h-3.5 text-off-black/30 group-hover:text-off-black/50 transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+      {open && children}
+    </div>
+  )
+}
 // API calls now go to /api/* serverless functions (same origin)
 
 type DesignStatus = 'not_started' | 'in_progress' | 'concepts_done' | 'in_revision' | 'approved_by_customer' | 'final_pdf_uploaded' | 'sent_to_production'
@@ -58,6 +81,8 @@ interface Order {
   creativeDirection?: string
   isGift?: boolean
   commentCount?: number
+  proofCount?: number
+  shopifyCreatedAt?: string | null
 }
 
 interface OrderComment {
@@ -236,16 +261,12 @@ export default function Dashboard() {
 
       // Transform database orders to match our Order interface
       const transformedOrders: Order[] = (data.orders || []).map((order: Record<string, unknown>) => {
-        // Extract display order number from shopifyOrderData if available
-        const shopifyData = order.shopifyOrderData as Record<string, unknown> | null
-        const displayNum = shopifyData?.name as string | undefined
-
         return {
           id: order.id as string,
           orderNumber: order.orderNumber as string,
           parentOrderNumber: order.parentOrderNumber as string,
           lineItemIndex: order.lineItemIndex as number,
-          displayOrderNumber: displayNum || (order.parentOrderNumber as string),
+          displayOrderNumber: (order.displayOrderNumber as string) || (order.parentOrderNumber as string),
           source: order.source as 'shopify' | 'etsy',
           raceName: order.raceName as string,
           raceYear: order.raceYear as number | null,
@@ -292,7 +313,9 @@ export default function Dashboard() {
           isGift: order.isGift as boolean | undefined,
           // Alert flags
           hadNoTime: order.hadNoTime as boolean | undefined,
-          timeFromName: order.timeFromName as string | null | undefined
+          timeFromName: order.timeFromName as string | null | undefined,
+          // Shopify order date for sorting
+          shopifyCreatedAt: order.shopifyCreatedAt as string | null | undefined
         }
       })
 
@@ -631,14 +654,12 @@ export default function Dashboard() {
       if (freshResponse.ok) {
         const freshData = await freshResponse.json()
         const freshOrders: Order[] = (freshData.orders || []).map((order: Record<string, unknown>) => {
-          const shopifyData = order.shopifyOrderData as Record<string, unknown> | null
-          const displayNum = shopifyData?.name as string | undefined
           return {
             id: order.id as string,
             orderNumber: order.orderNumber as string,
             parentOrderNumber: order.parentOrderNumber as string,
             lineItemIndex: order.lineItemIndex as number,
-            displayOrderNumber: displayNum || (order.parentOrderNumber as string),
+            displayOrderNumber: (order.displayOrderNumber as string) || (order.parentOrderNumber as string),
             source: order.source as 'shopify' | 'etsy',
             raceName: order.raceName as string,
             raceYear: order.raceYear as number | null,
@@ -738,14 +759,12 @@ export default function Dashboard() {
       if (freshResponse.ok) {
         const freshData = await freshResponse.json()
         const freshOrders: Order[] = (freshData.orders || []).map((order: Record<string, unknown>) => {
-          const shopifyData = order.shopifyOrderData as Record<string, unknown> | null
-          const displayNum = shopifyData?.name as string | undefined
           return {
             id: order.id as string,
             orderNumber: order.orderNumber as string,
             parentOrderNumber: order.parentOrderNumber as string,
             lineItemIndex: order.lineItemIndex as number,
-            displayOrderNumber: displayNum || (order.parentOrderNumber as string),
+            displayOrderNumber: (order.displayOrderNumber as string) || (order.parentOrderNumber as string),
             source: order.source as 'shopify' | 'etsy',
             raceName: order.raceName as string,
             raceYear: order.raceYear as number | null,
@@ -895,11 +914,10 @@ export default function Dashboard() {
       const updatedOrders = await fetch(`/api/orders?type=${activeView}`).then(r => r.json())
       const updated = updatedOrders.orders?.find((o: { orderNumber: string }) => o.orderNumber === order.orderNumber)
       if (updated) {
-        const shopifyData = updated.shopifyOrderData as Record<string, unknown> | null
         setSelectedOrder({
           ...selectedOrder!,
           ...updated,
-          displayOrderNumber: (shopifyData?.name as string) || updated.orderNumber
+          displayOrderNumber: updated.displayOrderNumber || updated.orderNumber
         })
       }
     } catch (error) {
@@ -952,11 +970,10 @@ export default function Dashboard() {
       const updatedOrders = await fetch(`/api/orders`).then(r => r.json())
       const updated = updatedOrders.orders?.find((o: { orderNumber: string }) => o.orderNumber === orderNumber)
       if (updated) {
-        const shopifyData = updated.shopifyOrderData as Record<string, unknown> | null
         setSelectedOrder({
           ...selectedOrder!,
           ...updated,
-          displayOrderNumber: (shopifyData?.name as string) || updated.orderNumber
+          displayOrderNumber: updated.displayOrderNumber || updated.orderNumber
         })
       }
     } catch (error) {
@@ -1207,13 +1224,13 @@ export default function Dashboard() {
         return dateA - dateB
       })
     }
-    // Standard view: filter by status, newest first
+    // Standard view: filter by status, newest Shopify order first
     const fulfillOrders = typeFiltered.filter(o =>
       o.status === 'flagged' || o.status === 'ready' || o.status === 'pending' || o.status === 'missing_year'
     )
     return fulfillOrders.sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      const dateA = new Date(a.shopifyCreatedAt || a.createdAt).getTime()
+      const dateB = new Date(b.shopifyCreatedAt || b.createdAt).getTime()
       return dateB - dateA
     })
   }, [orders, activeView])
@@ -2528,6 +2545,16 @@ Thank you!`
                           </div>
                         )}
 
+                        {/* Proofs & Approval (Mobile) */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Proofs & Approval</h4>
+                          <ProofManager
+                            orderId={selectedOrder.id}
+                            orderNumber={selectedOrder.orderNumber}
+                            displayOrderNumber={selectedOrder.displayOrderNumber}
+                          />
+                        </div>
+
                         {/* Comments (Mobile) */}
                         <div>
                           <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">
@@ -2603,18 +2630,25 @@ Thank you!`
                       </div>
 
                       {/* === DESKTOP FULL DETAIL VIEW (Custom) === */}
-                      <div className="hidden md:block space-y-5">
-                      {/* Design Status Dropdown */}
+                      {(() => {
+                        // Stage-based collapse logic
+                        const ds = selectedOrder.designStatus as DesignStatus
+                        const isDesigning = ['not_started', 'in_progress'].includes(ds)
+                        const isProofStage = ['concepts_done', 'in_revision', 'approved_by_customer'].includes(ds)
+                        const isProductionStage = ['final_pdf_uploaded', 'sent_to_production'].includes(ds)
+
+                        return (
+                      <div className="hidden md:block space-y-4">
+                      {/* Design Status Dropdown — always visible */}
                       <div>
-                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Design Status</h4>
                         <div className="relative">
                           <select
-                            value={DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] ? selectedOrder.designStatus : 'not_started'}
+                            value={DESIGN_STATUS_CONFIG[ds] ? ds : 'not_started'}
                             onChange={(e) => updateDesignStatus(selectedOrder.orderNumber, e.target.value as DesignStatus)}
                             className={`w-full appearance-none px-3 py-2.5 pr-8 rounded-md text-sm font-medium border transition-colors cursor-pointer ${
-                              (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).bgColor
+                              (DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).bgColor
                             } ${
-                              (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).color
+                              (DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).color
                             } border-border-gray focus:outline-none focus:ring-2 focus:ring-off-black/20`}
                           >
                             {(Object.entries(DESIGN_STATUS_CONFIG) as [DesignStatus, typeof DESIGN_STATUS_CONFIG[DesignStatus]][]).map(([status, config]) => (
@@ -2631,36 +2665,17 @@ Thank you!`
                         </div>
                       </div>
 
-                      {/* Due Date & Product Info */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Order Info</h4>
-                        <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Due Date</span>
-                            <span className={`text-body-sm font-medium ${isDueDateUrgent(selectedOrder.dueDate) ? 'text-red-600' : 'text-off-black'}`}>
-                              {formatDueDate(selectedOrder.dueDate)}
-                            </span>
-                          </div>
-                          <StaticField label="Size" value={selectedOrder.productSize} />
-                          <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                          {selectedOrder.isGift && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-off-black/60">Gift Order</span>
-                              <span className="text-body-sm font-medium text-pink-600">🎁 Yes</span>
-                            </div>
-                          )}
-                          {selectedOrder.customerEmail && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-off-black/60">Customer Email</span>
-                              <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
-                            </div>
-                          )}
+                      {/* Due date — compact inline, always visible */}
+                      <div className="flex items-center justify-between text-xs px-1">
+                        <span className="text-off-black/40">Due {formatDueDate(selectedOrder.dueDate)}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-off-black/40">{selectedOrder.productSize}</span>
+                          {selectedOrder.isGift && <span className="text-pink-600">🎁 Gift</span>}
                         </div>
                       </div>
 
-                      {/* Customer-Provided Data */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Customer Details</h4>
+                      {/* Customer Details — expanded when designing, collapsed after */}
+                      <CollapsibleSection title="Design Info" defaultOpen={isDesigning}>
                         <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                           <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
                           <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
@@ -2671,36 +2686,50 @@ Thank you!`
                           {selectedOrder.timeCustomer && (
                             <CopyableField label="Time" value={selectedOrder.timeCustomer} />
                           )}
+                          <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
+                          {selectedOrder.customerEmail && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-off-black/60">Email</span>
+                              <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
+                            </div>
+                          )}
                         </div>
-                      </div>
-
-                      {/* Creative Direction */}
-                      {selectedOrder.creativeDirection && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Creative Direction</h4>
-                          <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
+                        {selectedOrder.creativeDirection && (
+                          <div className="bg-purple-50 border border-purple-200 rounded-md p-4 mt-2">
+                            <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Creative Direction</p>
                             <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </CollapsibleSection>
 
-                      {/* Notes */}
+                      {/* Proofs & Approval — expanded at proof stage, collapsed when designing */}
+                      <CollapsibleSection
+                        title="Proofs & Approval"
+                        defaultOpen={isProofStage || isProductionStage}
+                        badge={selectedOrder.proofCount ? <span className="text-[10px] font-medium text-off-black/30">({selectedOrder.proofCount})</span> : undefined}
+                      >
+                        <ProofManager
+                          orderId={selectedOrder.id}
+                          orderNumber={selectedOrder.orderNumber}
+                          displayOrderNumber={selectedOrder.displayOrderNumber}
+                        />
+                      </CollapsibleSection>
+
+                      {/* Notes — only if present */}
                       {selectedOrder.notes && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Notes</h4>
+                        <CollapsibleSection title="Notes" defaultOpen={false}>
                           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                             <p className="text-body-sm text-blue-800 whitespace-pre-wrap">{selectedOrder.notes}</p>
                           </div>
-                        </div>
+                        </CollapsibleSection>
                       )}
 
-                      {/* Comments */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">
-                          Comments {orderComments.length > 0 && `(${orderComments.length})`}
-                        </h4>
-
-                        {/* Add Comment Form */}
+                      {/* Comments — collapsed by default */}
+                      <CollapsibleSection
+                        title="Comments"
+                        defaultOpen={false}
+                        badge={orderComments.length > 0 ? <span className="text-[10px] font-medium text-off-black/30">({orderComments.length})</span> : undefined}
+                      >
                         <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3 mb-3">
                           <textarea
                             value={newCommentText}
@@ -2727,7 +2756,7 @@ Thank you!`
                               Image
                               <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
                             </label>
-                            <span className="text-xs text-off-black/40 flex-1">or paste from clipboard</span>
+                            <span className="text-xs text-off-black/40 flex-1">or paste</span>
                             <button
                               onClick={submitComment}
                               disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
@@ -2737,8 +2766,6 @@ Thank you!`
                             </button>
                           </div>
                         </div>
-
-                        {/* Comment List */}
                         {isLoadingComments ? (
                           <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
                         ) : orderComments.length === 0 ? (
@@ -2768,11 +2795,10 @@ Thank you!`
                             ))}
                           </div>
                         )}
-                      </div>
+                      </CollapsibleSection>
 
-                      {/* Actions for Custom Designs */}
-                      <div className="flex gap-3 pt-3">
-                        {/* Email Customer button - show when production files are made */}
+                      {/* Actions — always at bottom */}
+                      <div className="flex gap-3 pt-2">
                         {selectedOrder.designStatus === 'concepts_done' && selectedOrder.customerEmail && (
                           <a
                             href={generateEmailLink(selectedOrder)}
@@ -2804,7 +2830,9 @@ Thank you!`
                           Close
                         </button>
                       </div>
-                      </div>{/* end hidden md:block wrapper (Custom) */}
+                      </div>
+                        )
+                      })()}{/* end hidden md:block wrapper (Custom) */}
                     </>
                   ) : (
                     <>
