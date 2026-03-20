@@ -34,10 +34,6 @@ const routes = [
   { method: 'get',    path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'post',   path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'delete', path: '/api/proofs',                 handler: '../api/proofs/index.js' },
-  { method: 'get',    path: '/api/approval-token',         handler: '../api/approval-token/index.js' },
-  { method: 'post',   path: '/api/approval-token',         handler: '../api/approval-token/index.js' },
-  { method: 'get',    path: '/api/approve/:token',         handler: '../api/approve/[token].js', paramAdapter: true },
-  { method: 'post',   path: '/api/approve/:token',         handler: '../api/approve/[token].js', paramAdapter: true },
 ]
 
 // Load all handlers and register routes

@@ -53,7 +53,7 @@ export default function ApprovalPortal() {
   const fetchData = useCallback(async () => {
     if (!token) return
     try {
-      const res = await fetch(`${API_BASE}/api/approve/${token}`)
+      const res = await fetch(`${API_BASE}/api/proofs?action=approve&token=${token}`)
       if (res.status === 410) {
         setState('expired')
         return
@@ -89,10 +89,10 @@ export default function ApprovalPortal() {
     if (!token || !selectedProofId) return
     setSubmitting(true)
     try {
-      const res = await fetch(`${API_BASE}/api/approve/${token}`, {
+      const res = await fetch(`${API_BASE}/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proofId: selectedProofId, action: 'approve' })
+        body: JSON.stringify({ action: 'approve', token, proofId: selectedProofId, approval: 'approve' })
       })
       if (!res.ok) {
         const data = await res.json()
@@ -116,12 +116,14 @@ export default function ApprovalPortal() {
 
     setSubmitting(true)
     try {
-      const res = await fetch(`${API_BASE}/api/approve/${token}`, {
+      const res = await fetch(`${API_BASE}/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'approve',
+          token,
           proofId: targetProof.id,
-          action: 'request_revision',
+          approval: 'request_revision',
           feedback: feedback.trim()
         })
       })

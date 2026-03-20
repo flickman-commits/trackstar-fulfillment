@@ -48,7 +48,7 @@ export default function ProofManager({ orderId }: ProofManagerProps) {
     try {
       const [proofsRes, tokenRes] = await Promise.all([
         fetch(`${API_BASE}/api/proofs?orderId=${orderId}`),
-        fetch(`${API_BASE}/api/approval-token?orderId=${orderId}`)
+        fetch(`${API_BASE}/api/proofs?action=token&orderId=${orderId}`)
       ])
 
       if (proofsRes.ok) {
@@ -205,10 +205,10 @@ export default function ProofManager({ orderId }: ProofManagerProps) {
 
   const generateToken = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/approval-token`, {
+      const res = await fetch(`${API_BASE}/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId })
+        body: JSON.stringify({ action: 'generate-token', orderId })
       })
       if (res.ok) {
         const data = await res.json()
