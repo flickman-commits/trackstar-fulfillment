@@ -84,6 +84,7 @@ interface Order {
   commentCount?: number
   proofCount?: number
   shopifyCreatedAt?: string | null
+  orderPlacedAt?: string | null
 }
 
 interface OrderComment {
@@ -316,8 +317,9 @@ export default function Dashboard() {
           // Alert flags
           hadNoTime: order.hadNoTime as boolean | undefined,
           timeFromName: order.timeFromName as string | null | undefined,
-          // Shopify order date for sorting
-          shopifyCreatedAt: order.shopifyCreatedAt as string | null | undefined
+          // Marketplace order date for sorting
+          shopifyCreatedAt: order.shopifyCreatedAt as string | null | undefined,
+          orderPlacedAt: order.orderPlacedAt as string | null | undefined
         }
       })
 
@@ -1237,8 +1239,8 @@ export default function Dashboard() {
       o.status === 'flagged' || o.status === 'ready' || o.status === 'pending' || o.status === 'missing_year'
     )
     return fulfillOrders.sort((a, b) => {
-      const dateA = new Date(a.shopifyCreatedAt || a.createdAt).getTime()
-      const dateB = new Date(b.shopifyCreatedAt || b.createdAt).getTime()
+      const dateA = new Date(a.orderPlacedAt || a.shopifyCreatedAt || a.createdAt).getTime()
+      const dateB = new Date(b.orderPlacedAt || b.shopifyCreatedAt || b.createdAt).getTime()
       return dateB - dateA
     })
   }, [orders, activeView])

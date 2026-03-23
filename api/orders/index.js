@@ -192,18 +192,28 @@ export default async function handler(req, res) {
         displayOrderNumber: order.shopifyOrderData?.name
           ? String(order.shopifyOrderData.name).replace('#', '')
           : order.parentOrderNumber,
+        // Original order date from marketplace (for sorting by when customer placed order)
+        orderPlacedAt: order.shopifyOrderData?.created_at
+          || (order.etsyOrderData?.create_timestamp
+            ? new Date(order.etsyOrderData.create_timestamp * 1000).toISOString()
+            : null)
+          || order.arteloOrderData?.createdAt
+          || null,
+        // Keep legacy field for backward compat
         shopifyCreatedAt: order.shopifyOrderData?.created_at || null,
         // Clean up - don't send nested objects to frontend
         runnerResearch: undefined,
         _count: undefined,
-        shopifyOrderData: undefined
+        shopifyOrderData: undefined,
+        etsyOrderData: undefined,
+        arteloOrderData: undefined
       }
     })
 
-    // Sort by Shopify order date (when customer placed the order), not DB import time
+    // Sort by marketplace order date (when customer placed the order), not DB import time
     // Standard = newest first, Custom = oldest first (longest-waiting need attention)
     const getOrderDate = (o) => {
-      return new Date(o.shopifyCreatedAt || o.createdAt).getTime()
+      return new Date(o.orderPlacedAt || o.createdAt).getTime()
     }
     if (type === 'custom') {
       transformedOrders.sort((a, b) => getOrderDate(a) - getOrderDate(b))
