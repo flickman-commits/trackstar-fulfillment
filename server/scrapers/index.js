@@ -28,6 +28,7 @@ import twinCitiesConfig from './configs/twinCities.js'
 import losAngelesConfig from './configs/losAngeles.js'
 import buffaloConfig from './configs/buffalo.js'
 import oaklandConfig from './configs/oakland.js'
+import marinecorps1775kConfig from './configs/marinecorps1775k.js'
 
 /**
  * Map platform identifier -> platform scraper class
@@ -60,6 +61,7 @@ const ALL_CONFIGS = [
   losAngelesConfig,
   buffaloConfig,
   oaklandConfig,
+  marinecorps1775kConfig,
 ]
 
 /**
