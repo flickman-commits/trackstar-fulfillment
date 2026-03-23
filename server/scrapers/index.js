@@ -14,6 +14,7 @@ import { MikaTimingScraper } from './platforms/MikaTimingScraper.js'
 import { RaceRosterScraper } from './platforms/RaceRosterScraper.js'
 import { XacteScraper } from './platforms/XacteScraper.js'
 import { ScoreThisScraper } from './platforms/ScoreThisScraper.js'
+import { BrookseeScraper } from './platforms/BrookseeScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -29,6 +30,8 @@ import losAngelesConfig from './configs/losAngeles.js'
 import buffaloConfig from './configs/buffalo.js'
 import oaklandConfig from './configs/oakland.js'
 import marinecorps1775kConfig from './configs/marinecorps1775k.js'
+import cowtownConfig from './configs/cowtown.js'
+import mesaConfig from './configs/mesa.js'
 
 /**
  * Map platform identifier -> platform scraper class
@@ -43,6 +46,7 @@ const PLATFORM_MAP = {
   raceroster: RaceRosterScraper,
   xacte: XacteScraper,
   scorethis: ScoreThisScraper,
+  brooksee: BrookseeScraper,
 }
 
 /**
@@ -62,6 +66,8 @@ const ALL_CONFIGS = [
   buffaloConfig,
   oaklandConfig,
   marinecorps1775kConfig,
+  cowtownConfig,
+  mesaConfig,
 ]
 
 /**
