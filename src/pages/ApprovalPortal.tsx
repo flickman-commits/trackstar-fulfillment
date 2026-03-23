@@ -68,7 +68,6 @@ export default function ApprovalPortal() {
       setOrder(data.order)
       setProofs(data.proofs)
 
-      // Check if any proof is approved
       if (data.proofs.length > 0 && data.proofs.some((p: Proof) => p.status === 'approved')) {
         setState('all_approved')
       } else {
@@ -84,7 +83,6 @@ export default function ApprovalPortal() {
     fetchData()
   }, [fetchData])
 
-  // Approve the selected proof
   const handleApprove = async () => {
     if (!token || !selectedProofId) return
     setSubmitting(true)
@@ -107,7 +105,6 @@ export default function ApprovalPortal() {
     }
   }
 
-  // Request revision — picks the latest pending proof to attach feedback to
   const handleRequestRevision = async () => {
     if (!token || !feedback.trim()) return
     const pendingProofs = proofs.filter(p => p.status === 'pending')
@@ -142,87 +139,90 @@ export default function ApprovalPortal() {
     }
   }
 
-  // Loading state
+  // ═══ LOADING ═══
   if (state === 'loading') {
     return (
-      <div className="min-h-screen bg-off-white flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-off-black/40 mx-auto mb-4" />
-          <p className="text-body-sm text-off-black/60">Loading your proofs...</p>
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" style={{ color: '#666666' }} />
+          <p style={{ color: '#666666', fontSize: '14px' }}>Loading your design...</p>
         </div>
       </div>
     )
   }
 
-  // Error state
+  // ═══ ERROR ═══
   if (state === 'error') {
     return (
-      <div className="min-h-screen bg-off-white flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <div className="text-center max-w-sm">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-10 mx-auto mb-6" />
-          <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h1 className="text-heading-md text-off-black mb-2">Something went wrong</h1>
-          <p className="text-body-sm text-off-black/60">{errorMessage}</p>
+          <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
+          <XCircle className="w-12 h-12 mx-auto mb-4" style={{ color: '#4600D6' }} />
+          <h1 style={{ color: '#1A1A1A', fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Something went wrong</h1>
+          <p style={{ color: '#666666', fontSize: '14px' }}>{errorMessage}</p>
         </div>
       </div>
     )
   }
 
-  // Expired state
+  // ═══ EXPIRED ═══
   if (state === 'expired') {
     return (
-      <div className="min-h-screen bg-off-white flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <div className="text-center max-w-sm">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-10 mx-auto mb-6" />
-          <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-          <h1 className="text-heading-md text-off-black mb-2">Link Expired</h1>
-          <p className="text-body-sm text-off-black/60">This approval link has expired. Please reach out to us and we'll send you a new one.</p>
+          <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
+          <AlertTriangle className="w-12 h-12 mx-auto mb-4" style={{ color: '#4600D6' }} />
+          <h1 style={{ color: '#1A1A1A', fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Link expired</h1>
+          <p style={{ color: '#666666', fontSize: '14px' }}>This approval link has expired. Reach out to us and we'll send a fresh one.</p>
         </div>
       </div>
     )
   }
 
-  // Approved state
+  // ═══ APPROVED ═══
   if (state === 'all_approved') {
     const approvedProof = proofs.find(p => p.status === 'approved')
     return (
-      <div className="min-h-screen bg-off-white flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <div className="text-center max-w-sm">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-10 mx-auto mb-6" />
-          <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h1 className="text-heading-md text-off-black mb-2">Design Approved!</h1>
-          <p className="text-body-sm text-off-black/60 mb-2">
-            Thanks{order?.customerName ? `, ${order.customerName}` : ''}! {approvedProof ? `You selected Option ${approvedProof.version}. ` : ''}We'll get it into production soon.
+          <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
+          <CheckCircle2 className="w-16 h-16 mx-auto mb-4" style={{ color: '#4600D6' }} />
+          <h1 style={{ color: '#1A1A1A', fontSize: '24px', fontWeight: 700, marginBottom: '12px', letterSpacing: '0.01em' }}>
+            Design approved.
+          </h1>
+          <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6, marginBottom: '8px' }}>
+            {approvedProof ? `You selected Option ${approvedProof.version}. ` : ''}We'll get it into production.
           </p>
-          <p className="text-body-sm text-off-black/40">Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
+          <p style={{ color: '#999999', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
         </div>
       </div>
     )
   }
 
-  // Ready state — batch selection flow
+  // ═══ READY — proof selection flow ═══
   const pendingProofs = proofs.filter(p => p.status === 'pending')
   const pastProofs = proofs.filter(p => p.status !== 'pending')
   const hasPendingProofs = pendingProofs.length > 0
 
   return (
-    <div className="min-h-screen bg-off-white">
+    <div className="min-h-screen" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       {/* Lightbox */}
       {lightboxUrl && (
         <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-pointer"
           onClick={() => setLightboxUrl(null)}
         >
           <button
             onClick={() => setLightboxUrl(null)}
-            className="absolute top-4 right-4 text-white hover:text-white/80 transition-colors"
+            className="absolute top-4 right-4 transition-colors"
+            style={{ color: '#999999' }}
           >
             <X className="w-8 h-8" />
           </button>
           <img
             src={lightboxUrl}
             alt="Proof preview"
-            className="max-w-full max-h-[90vh] object-contain rounded-md select-none"
+            className="max-w-full max-h-[90vh] object-contain select-none"
             onClick={e => e.stopPropagation()}
             draggable={false}
             onContextMenu={e => e.preventDefault()}
@@ -230,16 +230,16 @@ export default function ApprovalPortal() {
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ backgroundColor: '#F0F0F0' }} className="border-b border-border-gray">
+      {/* Header — light bar */}
+      <div style={{ backgroundColor: '#F0F0F0', borderBottom: '1px solid #E0E0E0' }}>
         <div className="max-w-3xl mx-auto px-4 py-5">
           <div className="flex items-center justify-between">
-            <img src="/trackstar-logo.png" alt="Trackstar" className="h-8" />
+            <img src="/trackstar-logo.png" alt="Trackstar" className="h-7" />
             <div className="text-right">
               {order?.customerName && (
-                <p className="text-body-sm font-medium text-off-black">{order.customerName}</p>
+                <p style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>{order.customerName}</p>
               )}
-              <span className="text-body-sm text-off-black/40">Order #{order?.displayOrderNumber || order?.parentOrderNumber}</span>
+              <span style={{ color: '#666666', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</span>
             </div>
           </div>
         </div>
@@ -248,26 +248,26 @@ export default function ApprovalPortal() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-heading-lg text-off-black mb-1">
-            Hey{order?.customerName ? ` ${order.customerName}` : ''}!
+          <h1 style={{ color: '#1A1A1A', fontSize: '28px', fontWeight: 700, marginBottom: '8px', letterSpacing: '-0.01em' }}>
+            {order?.customerName ? `Hey ${order.customerName}.` : 'Your design is ready.'}
           </h1>
           {hasPendingProofs ? (
-            <p className="text-body text-off-black/60">
+            <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>
               {pendingProofs.length === 1
-                ? "Here's your custom design. Take a look and let us know what you think!"
-                : `We've prepared ${pendingProofs.length} design options for you. Browse them and select your favorite!`
+                ? "Take a look and let us know what you think."
+                : `We've prepared ${pendingProofs.length} options. Pick your favorite.`
               }
             </p>
           ) : (
-            <p className="text-body text-off-black/60">
-              We're working on your revisions. Check back soon for updated designs!
+            <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>
+              We're working on your revisions. Check back soon.
             </p>
           )}
         </div>
 
         {proofs.length === 0 ? (
-          <div className="bg-white border border-border-gray rounded-md p-8 text-center">
-            <p className="text-body-sm text-off-black/50">No proofs have been uploaded yet. Check back soon!</p>
+          <div className="p-8 text-center" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
+            <p style={{ color: '#666666', fontSize: '14px' }}>No designs uploaded yet. Check back soon.</p>
           </div>
         ) : (
           <>
@@ -275,12 +275,10 @@ export default function ApprovalPortal() {
             {hasPendingProofs && (
               <>
                 <div className="mb-6">
-                  {/* Carousel container */}
                   <div className="relative">
-                    {/* Scroll container */}
                     <div
                       ref={carouselRef}
-                      className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-2"
+                      className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-2"
                       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
                       onScroll={() => {
                         const el = carouselRef.current
@@ -295,42 +293,44 @@ export default function ApprovalPortal() {
                         const optionNum = idx + 1
 
                         return (
-                          <div
-                            key={proof.id}
-                            className="snap-center shrink-0 w-full"
-                          >
+                          <div key={proof.id} className="snap-center shrink-0 w-full">
                             <div
-                              className={`bg-white border-2 rounded-md overflow-hidden transition-all cursor-pointer mx-1 ${
-                                isSelected
-                                  ? 'border-green-500 ring-2 ring-green-500/20'
-                                  : 'border-border-gray hover:border-off-black/30'
-                              }`}
+                              className="overflow-hidden transition-all cursor-pointer mx-1"
+                              style={{
+                                backgroundColor: '#FFFFFF',
+                                border: isSelected ? '2px solid #4600D6' : '2px solid #E0E0E0',
+                                boxShadow: isSelected ? '0 0 0 3px rgba(70, 0, 214, 0.15)' : '0 1px 3px rgba(0,0,0,0.06)'
+                              }}
                               onClick={() => setSelectedProofId(isSelected ? null : proof.id)}
                             >
                               {/* Option header */}
-                              <div className={`flex items-center justify-between px-4 py-3 ${isSelected ? 'bg-green-50' : 'bg-subtle-gray'}`}>
+                              <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: isSelected ? 'rgba(70, 0, 214, 0.04)' : '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
                                 <div className="flex items-center gap-3">
-                                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
-                                    isSelected ? 'bg-green-600 text-white' : 'bg-off-black/10 text-off-black'
-                                  }`}>
+                                  <span
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold"
+                                    style={{
+                                      backgroundColor: isSelected ? '#4600D6' : '#E0E0E0',
+                                      color: isSelected ? '#FFFFFF' : '#666666'
+                                    }}
+                                  >
                                     {pendingProofs.length === 1 ? '✓' : optionNum}
                                   </span>
-                                  <span className="text-body-sm font-medium text-off-black">
+                                  <span style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>
                                     {pendingProofs.length === 1 ? 'Your Design' : `Option ${optionNum} of ${pendingProofs.length}`}
                                   </span>
                                 </div>
                                 {isSelected && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(70, 0, 214, 0.1)', color: '#4600D6' }}>
                                     <CheckCircle2 className="w-3 h-3" /> Selected
                                   </span>
                                 )}
                               </div>
 
-                              {/* Proof display — fit entire image in viewport, centered */}
-                              <div className="border-t border-border-gray bg-gray-50 p-3" style={{ height: '50vh' }}>
+                              {/* Proof display */}
+                              <div className="p-3" style={{ height: '50vh', backgroundColor: '#F5F5F5' }}>
                                 {isPdf(proof.imageUrl) ? (
                                   <div onClick={e => e.stopPropagation()} className="w-full h-full flex items-center justify-center">
-                                    <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin text-off-black/30" /></div>}>
+                                    <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin" style={{ color: '#666666' }} /></div>}>
                                       <PdfViewer url={proof.imageUrl} maxHeight={Math.round(window.innerHeight * 0.48)} />
                                     </Suspense>
                                   </div>
@@ -350,10 +350,10 @@ export default function ApprovalPortal() {
                                 )}
                               </div>
 
-                              {/* Selection hint / selected state */}
-                              <div className={`px-4 py-2.5 border-t text-center ${isSelected ? 'border-green-200 bg-green-50' : 'border-border-gray'}`}>
-                                <p className={`text-xs font-medium ${isSelected ? 'text-green-700' : 'text-off-black/30'}`}>
-                                  {isSelected ? '✓ This design is selected' : 'Tap to select this design'}
+                              {/* Selection hint */}
+                              <div className="px-4 py-2.5 text-center" style={{ borderTop: '1px solid #E0E0E0' }}>
+                                <p className="text-xs font-medium" style={{ color: isSelected ? '#4600D6' : '#999999' }}>
+                                  {isSelected ? '✓ Selected' : 'Tap to select'}
                                 </p>
                               </div>
                             </div>
@@ -362,7 +362,7 @@ export default function ApprovalPortal() {
                       })}
                     </div>
 
-                    {/* Arrow buttons (desktop only, hide on single proof) */}
+                    {/* Arrow buttons (desktop only) */}
                     {pendingProofs.length > 1 && (
                       <>
                         <button
@@ -371,9 +371,10 @@ export default function ApprovalPortal() {
                             if (!el) return
                             el.scrollTo({ left: el.scrollLeft - el.offsetWidth, behavior: 'smooth' })
                           }}
-                          className={`hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-9 h-9 items-center justify-center rounded-full bg-white border border-border-gray shadow-md hover:bg-gray-50 transition-colors ${activeSlide === 0 ? 'opacity-30 pointer-events-none' : ''}`}
+                          className={`hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-9 h-9 items-center justify-center rounded-full transition-colors ${activeSlide === 0 ? 'opacity-30 pointer-events-none' : ''}`}
+                          style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
                         >
-                          <ChevronLeft className="w-5 h-5 text-off-black" />
+                          <ChevronLeft className="w-5 h-5" style={{ color: '#1A1A1A' }} />
                         </button>
                         <button
                           onClick={() => {
@@ -381,15 +382,16 @@ export default function ApprovalPortal() {
                             if (!el) return
                             el.scrollTo({ left: el.scrollLeft + el.offsetWidth, behavior: 'smooth' })
                           }}
-                          className={`hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-9 h-9 items-center justify-center rounded-full bg-white border border-border-gray shadow-md hover:bg-gray-50 transition-colors ${activeSlide >= pendingProofs.length - 1 ? 'opacity-30 pointer-events-none' : ''}`}
+                          className={`hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-9 h-9 items-center justify-center rounded-full transition-colors ${activeSlide >= pendingProofs.length - 1 ? 'opacity-30 pointer-events-none' : ''}`}
+                          style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
                         >
-                          <ChevronRight className="w-5 h-5 text-off-black" />
+                          <ChevronRight className="w-5 h-5" style={{ color: '#1A1A1A' }} />
                         </button>
                       </>
                     )}
                   </div>
 
-                  {/* Dot indicators + counter */}
+                  {/* Dot indicators */}
                   {pendingProofs.length > 1 && (
                     <div className="flex items-center justify-center gap-1.5 mt-4">
                       {pendingProofs.map((_, idx) => (
@@ -398,11 +400,12 @@ export default function ApprovalPortal() {
                           onClick={() => {
                             carouselRef.current?.scrollTo({ left: idx * (carouselRef.current?.offsetWidth || 0), behavior: 'smooth' })
                           }}
-                          className={`rounded-full transition-all ${
-                            idx === activeSlide
-                              ? 'w-6 h-2 bg-off-black'
-                              : 'w-2 h-2 bg-off-black/20 hover:bg-off-black/40'
-                          }`}
+                          className="rounded-full transition-all"
+                          style={{
+                            width: idx === activeSlide ? '24px' : '8px',
+                            height: '8px',
+                            backgroundColor: idx === activeSlide ? '#1A1A1A' : '#E0E0E0'
+                          }}
                         />
                       ))}
                     </div>
@@ -410,23 +413,21 @@ export default function ApprovalPortal() {
                 </div>
 
                 {/* Sticky action bar */}
-                <div className="sticky bottom-0 bg-off-white/95 backdrop-blur-sm border-t border-border-gray -mx-4 px-4 py-4">
+                <div className="sticky bottom-0 backdrop-blur-sm -mx-4 px-4 py-4" style={{ backgroundColor: 'rgba(247, 245, 240, 0.95)', borderTop: '1px solid #E0E0E0' }}>
                   {showRevisionForm ? (
                     <div className="space-y-3 max-w-2xl mx-auto">
                       <div className="flex items-center justify-between">
-                        <label className="text-body-sm font-medium text-off-black">What changes would you like?</label>
-                        <button
-                          onClick={() => setShowRevisionForm(false)}
-                          className="text-off-black/40 hover:text-off-black/60"
-                        >
+                        <label style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>What changes would you like?</label>
+                        <button onClick={() => setShowRevisionForm(false)} style={{ color: '#999999' }}>
                           <X className="w-4 h-4" />
                         </button>
                       </div>
                       <textarea
                         value={feedback}
                         onChange={(e) => setFeedback(e.target.value)}
-                        placeholder="e.g., I like Option 2 but change the bib number to 1234 and make the text larger..."
-                        className="w-full px-3 py-2 text-body-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none"
+                        placeholder="e.g., Change the bib number to 1234 and make the text larger..."
+                        className="w-full px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-300"
+                        style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', color: '#1A1A1A' }}
                         rows={3}
                         autoFocus
                       />
@@ -434,17 +435,15 @@ export default function ApprovalPortal() {
                         <button
                           onClick={handleRequestRevision}
                           disabled={submitting || !feedback.trim()}
-                          className="flex-1 px-4 py-3 text-body-sm font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-md transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                          className="flex-1 px-4 py-3 text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                          style={{ backgroundColor: '#1A1A1A', color: '#FFFFFF' }}
                         >
-                          {submitting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            'Submit Revision Request'
-                          )}
+                          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Revision Request'}
                         </button>
                         <button
                           onClick={() => setShowRevisionForm(false)}
-                          className="px-4 py-3 text-body-sm text-off-black/50 hover:text-off-black/70 transition-colors"
+                          className="px-4 py-3 text-sm transition-colors"
+                          style={{ color: '#666666' }}
                         >
                           Cancel
                         </button>
@@ -455,7 +454,8 @@ export default function ApprovalPortal() {
                       <button
                         onClick={handleApprove}
                         disabled={!selectedProofId || submitting}
-                        className="flex-1 px-4 py-3 text-body-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                        className="flex-1 px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
+                        style={{ backgroundColor: '#4600D6', color: '#FFFFFF' }}
                       >
                         {submitting ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -468,7 +468,8 @@ export default function ApprovalPortal() {
                       </button>
                       <button
                         onClick={() => { setShowRevisionForm(true); setSelectedProofId(null) }}
-                        className="px-4 py-3 text-body-sm font-medium text-off-black/70 bg-white hover:bg-gray-50 border border-border-gray rounded-md transition-colors flex items-center justify-center gap-2"
+                        className="px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', color: '#666666' }}
                       >
                         Request Changes
                       </button>
@@ -478,13 +479,14 @@ export default function ApprovalPortal() {
               </>
             )}
 
-            {/* Past proofs (already actioned) */}
+            {/* Past proofs */}
             {pastProofs.length > 0 && (
               <div className={hasPendingProofs ? 'mt-4' : ''}>
                 {hasPendingProofs && (
                   <button
                     onClick={() => setShowEarlierVersions(!showEarlierVersions)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-body-sm text-off-black/40 hover:text-off-black/60 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm transition-colors"
+                    style={{ color: '#999999' }}
                   >
                     {showEarlierVersions ? (
                       <><ChevronUp className="w-4 h-4" /> Hide earlier versions</>
@@ -496,19 +498,23 @@ export default function ApprovalPortal() {
                 {(showEarlierVersions || !hasPendingProofs) && (
                   <div className="space-y-4 mt-2">
                     {pastProofs.map(proof => (
-                      <div key={proof.id} className="bg-white border border-border-gray/60 rounded-md overflow-hidden opacity-70">
-                        <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
-                          <span className="text-body-sm text-off-black/60">Option {proof.version}</span>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            proof.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
-                          }`}>
+                      <div key={proof.id} className="overflow-hidden opacity-60" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
+                        <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
+                          <span style={{ color: '#666666', fontSize: '14px' }}>Option {proof.version}</span>
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                            style={{
+                              backgroundColor: proof.status === 'approved' ? 'rgba(70, 0, 214, 0.1)' : 'rgba(0,0,0,0.05)',
+                              color: proof.status === 'approved' ? '#4600D6' : '#666666'
+                            }}
+                          >
                             {proof.status === 'approved' ? <><CheckCircle2 className="w-3 h-3" /> Approved</> : <><AlertTriangle className="w-3 h-3" /> Revision Requested</>}
                           </span>
                         </div>
                         {proof.customerFeedback && (
-                          <div className="px-4 py-3 border-t border-border-gray bg-amber-50">
-                            <p className="text-xs font-medium text-amber-700 mb-1">Your feedback:</p>
-                            <p className="text-body-sm text-amber-900">{proof.customerFeedback}</p>
+                          <div className="px-4 py-3" style={{ borderTop: '1px solid #E0E0E0', backgroundColor: '#FAFAFA' }}>
+                            <p className="text-xs font-medium mb-1" style={{ color: '#4600D6' }}>Your feedback:</p>
+                            <p className="text-sm" style={{ color: '#666666' }}>{proof.customerFeedback}</p>
                           </div>
                         )}
                       </div>
@@ -521,9 +527,9 @@ export default function ApprovalPortal() {
         )}
 
         {/* Footer */}
-        <div className="mt-12 pt-6 border-t border-border-gray text-center">
-          <p className="text-xs text-off-black/30">
-            Powered by <a href="https://www.trackstar.art" target="_blank" rel="noopener noreferrer" className="font-medium hover:text-off-black/50 transition-colors">Trackstar</a>
+        <div className="mt-12 pt-6 text-center" style={{ borderTop: '1px solid #E0E0E0' }}>
+          <p style={{ fontSize: '11px', color: '#999999', letterSpacing: '0.05em' }}>
+            TRACKSTAR &mdash; Celebrating athletic achievement.
           </p>
         </div>
       </div>

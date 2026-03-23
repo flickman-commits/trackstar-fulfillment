@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, Mail, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText } from 'lucide-react'
 import ProofManager from '@/components/ProofManager'
+import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 
 /** Collapsible section with header + chevron toggle */
 function CollapsibleSection({ title, defaultOpen = true, children, badge }: {
@@ -25,7 +26,7 @@ function CollapsibleSection({ title, defaultOpen = true, children, badge }: {
 }
 // API calls now go to /api/* serverless functions (same origin)
 
-type DesignStatus = 'not_started' | 'in_progress' | 'concepts_done' | 'in_revision' | 'approved_by_customer' | 'final_pdf_uploaded' | 'sent_to_production'
+type DesignStatus = 'not_started' | 'in_progress' | 'awaiting_review' | 'in_revision' | 'approved_by_customer' | 'final_pdf_uploaded' | 'sent_to_production'
 
 interface Order {
   id: string
@@ -97,7 +98,7 @@ interface OrderComment {
 const DESIGN_STATUS_CONFIG: Record<DesignStatus, { icon: string; label: string; color: string; bgColor: string }> = {
   not_started: { icon: '⚪', label: 'Not Started', color: 'text-off-black/50', bgColor: 'bg-off-black/5' },
   in_progress: { icon: '🔵', label: 'In Progress', color: 'text-blue-700', bgColor: 'bg-blue-50' },
-  concepts_done: { icon: '🟡', label: 'Concepts Done', color: 'text-amber-700', bgColor: 'bg-amber-50' },
+  awaiting_review: { icon: '🔶', label: 'Awaiting Review', color: 'text-amber-600', bgColor: 'bg-amber-50' },
   in_revision: { icon: '🟠', label: 'In Revision', color: 'text-orange-700', bgColor: 'bg-orange-50' },
   approved_by_customer: { icon: '🟣', label: 'Approved by Customer', color: 'text-purple-700', bgColor: 'bg-purple-50' },
   final_pdf_uploaded: { icon: '🟤', label: 'Final PDF Uploaded', color: 'text-amber-800', bgColor: 'bg-amber-50' },
@@ -250,6 +251,7 @@ export default function Dashboard() {
   const [commentImageFile, setCommentImageFile] = useState<File | null>(null)
   const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [latestFeedback, setLatestFeedback] = useState<string | null>(null)
   const commentFileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch orders from database (filtered by activeView type)
@@ -321,6 +323,18 @@ export default function Dashboard() {
 
       setOrders(transformedOrders)
       setLastUpdated(new Date())
+
+      // Sync selectedOrder with fresh data if the detail panel is open
+      setSelectedOrder(prev => {
+        if (!prev) return null
+        const fresh = transformedOrders.find(o => o.id === prev.id)
+        if (!fresh) return prev
+        // Only update if something changed to avoid unnecessary re-renders
+        if (fresh.designStatus !== prev.designStatus || fresh.status !== prev.status) {
+          return { ...prev, ...fresh }
+        }
+        return prev
+      })
     } catch (error) {
       console.error('Error fetching orders:', error)
       setToast({ message: 'Failed to fetch orders', type: 'error' })
@@ -1000,6 +1014,12 @@ export default function Dashboard() {
       setIsRefreshing(true)
     }
     fetchOrders().finally(() => setIsRefreshing(false))
+
+    // Auto-poll every 30s to pick up external changes (customer approvals, etc.)
+    const poll = setInterval(() => {
+      fetchOrders()
+    }, 30_000)
+    return () => clearInterval(poll)
   }, [fetchOrders])
 
   // Update design status for custom orders
@@ -1195,18 +1215,6 @@ export default function Dashboard() {
     const now = new Date()
     const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     return diffDays <= 3
-  }
-
-  // Generate mailto link for custom order email
-  const generateEmailLink = (order: Order): string => {
-    const customerName = order.customerName || 'there'
-    const displayOrderNumber = order.displayOrderNumber || order.orderNumber
-    const subject = encodeURIComponent(`Your Trackstar Order #${displayOrderNumber} (Action Required)`)
-    const body = encodeURIComponent(
-      `Hey ${customerName},\n\nSuper pumped to show you your custom Trackstar print! Let us know which of these designs you prefer or if there are any tweaks you want us to make before sending it to production!\n\n`
-    )
-    const cc = encodeURIComponent('danielkeith.currie@gmail.com')
-    return `mailto:${order.customerEmail || ''}?cc=${cc}&subject=${subject}&body=${body}`
   }
 
   // Designs to be personalized
@@ -2473,6 +2481,37 @@ Thank you!`
                     <>
                       {/* === MOBILE COMPACT SUMMARY (Custom) === */}
                       <div className="md:hidden space-y-3">
+                        {/* Stage Progress Indicator (Mobile) */}
+                        {(() => {
+                          const mds = selectedOrder.designStatus as DesignStatus
+                          const mDesigning = ['not_started', 'in_progress'].includes(mds)
+                          const mProof = ['awaiting_review', 'in_revision', 'approved_by_customer'].includes(mds)
+                          const mProd = ['final_pdf_uploaded', 'sent_to_production'].includes(mds)
+                          const mSteps = [
+                            { label: 'Design', active: mDesigning || mProof || mProd },
+                            { label: 'Review', active: ['awaiting_review', 'in_revision', 'approved_by_customer'].includes(mds) || mProd },
+                            { label: 'Approved', active: mds === 'approved_by_customer' || mProd },
+                            { label: 'Production', active: mProd },
+                          ]
+                          return (
+                            <div className="flex items-center gap-1 px-1">
+                              {mSteps.map((step, i) => (
+                                <div key={step.label} className="flex items-center gap-1 flex-1">
+                                  <div className={`flex items-center gap-1.5 ${i < mSteps.length - 1 ? 'flex-1' : ''}`}>
+                                    <div className={`w-2 h-2 rounded-full shrink-0 ${step.active ? 'bg-off-black' : 'bg-off-black/15'}`} />
+                                    <span className={`text-[10px] font-medium whitespace-nowrap ${step.active ? 'text-off-black' : 'text-off-black/30'}`}>
+                                      {step.label}
+                                    </span>
+                                  </div>
+                                  {i < mSteps.length - 1 && (
+                                    <div className={`flex-1 h-px ${step.active && mSteps[i + 1].active ? 'bg-off-black/30' : 'bg-off-black/10'}`} />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })()}
+
                         {/* Design Status Dropdown */}
                         <div className="relative">
                           <select
@@ -2545,6 +2584,35 @@ Thank you!`
                           </div>
                         )}
 
+                        {/* Customer Feedback Banner (Mobile) */}
+                        {selectedOrder.designStatus === 'in_revision' && latestFeedback && (
+                          <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                            <p className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mb-1">Customer Feedback</p>
+                            <p className="text-body-sm text-orange-800 whitespace-pre-wrap">{latestFeedback}</p>
+                          </div>
+                        )}
+
+                        {selectedOrder.designStatus === 'awaiting_review' && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
+                            <span className="text-lg">⏳</span>
+                            <div>
+                              <p className="text-xs font-medium text-amber-800">Waiting for customer response</p>
+                              <p className="text-[10px] text-amber-600">You'll get a Slack notification when they respond.</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Post-Approval Checklist (Mobile) */}
+                        {(selectedOrder.designStatus === 'approved_by_customer' || selectedOrder.designStatus === 'final_pdf_uploaded') && (
+                          <PostApprovalChecklist
+                            orderId={selectedOrder.id}
+                            orderNumber={selectedOrder.orderNumber}
+                            displayOrderNumber={selectedOrder.displayOrderNumber}
+                            designStatus={selectedOrder.designStatus}
+                            onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
+                          />
+                        )}
+
                         {/* Proofs & Approval (Mobile) */}
                         <div>
                           <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Proofs & Approval</h4>
@@ -2552,6 +2620,10 @@ Thank you!`
                             orderId={selectedOrder.id}
                             orderNumber={selectedOrder.orderNumber}
                             displayOrderNumber={selectedOrder.displayOrderNumber}
+                            designStatus={selectedOrder.designStatus}
+                            customerEmail={selectedOrder.customerEmail}
+                            onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
+                            onLatestFeedback={setLatestFeedback}
                           />
                         </div>
 
@@ -2634,11 +2706,36 @@ Thank you!`
                         // Stage-based collapse logic
                         const ds = selectedOrder.designStatus as DesignStatus
                         const isDesigning = ['not_started', 'in_progress'].includes(ds)
-                        const isProofStage = ['concepts_done', 'in_revision', 'approved_by_customer'].includes(ds)
+                        const isProofStage = ['awaiting_review', 'in_revision', 'approved_by_customer'].includes(ds)
                         const isProductionStage = ['final_pdf_uploaded', 'sent_to_production'].includes(ds)
+
+                        // Progress indicator step
+                        const progressSteps = [
+                          { label: 'Design', active: isDesigning || isProofStage || isProductionStage },
+                          { label: 'Review', active: ['awaiting_review', 'in_revision', 'approved_by_customer'].includes(ds) || isProductionStage },
+                          { label: 'Approved', active: ds === 'approved_by_customer' || isProductionStage },
+                          { label: 'Production', active: isProductionStage },
+                        ]
 
                         return (
                       <div className="hidden md:block space-y-4">
+                      {/* Stage Progress Indicator */}
+                      <div className="flex items-center gap-1 px-1">
+                        {progressSteps.map((step, i) => (
+                          <div key={step.label} className="flex items-center gap-1 flex-1">
+                            <div className={`flex items-center gap-1.5 ${i < progressSteps.length - 1 ? 'flex-1' : ''}`}>
+                              <div className={`w-2 h-2 rounded-full shrink-0 ${step.active ? 'bg-off-black' : 'bg-off-black/15'}`} />
+                              <span className={`text-[10px] font-medium whitespace-nowrap ${step.active ? 'text-off-black' : 'text-off-black/30'}`}>
+                                {step.label}
+                              </span>
+                            </div>
+                            {i < progressSteps.length - 1 && (
+                              <div className={`flex-1 h-px ${step.active && progressSteps[i + 1].active ? 'bg-off-black/30' : 'bg-off-black/10'}`} />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
                       {/* Design Status Dropdown — always visible */}
                       <div>
                         <div className="relative">
@@ -2674,49 +2771,102 @@ Thank you!`
                         </div>
                       </div>
 
-                      {/* Customer Details — expanded when designing, collapsed after */}
-                      <CollapsibleSection title="Design Info" defaultOpen={isDesigning}>
-                        <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
-                          <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
-                          <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
-                          <StaticField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
-                          {selectedOrder.bibNumberCustomer && (
-                            <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
-                          )}
-                          {selectedOrder.timeCustomer && (
-                            <CopyableField label="Time" value={selectedOrder.timeCustomer} />
-                          )}
-                          <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                          {selectedOrder.customerEmail && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-off-black/60">Email</span>
-                              <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
-                            </div>
-                          )}
-                        </div>
-                        {selectedOrder.creativeDirection && (
-                          <div className="bg-purple-50 border border-purple-200 rounded-md p-4 mt-2">
-                            <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Creative Direction</p>
-                            <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
-                          </div>
-                        )}
-                      </CollapsibleSection>
+                      {/* ═══ STAGE-SPECIFIC PRIMARY ACTION — always at the top ═══ */}
 
-                      {/* Proofs & Approval — expanded at proof stage, collapsed when designing */}
-                      <CollapsibleSection
-                        title="Proofs & Approval"
-                        defaultOpen={isProofStage || isProductionStage}
-                        badge={selectedOrder.proofCount ? <span className="text-[10px] font-medium text-off-black/30">({selectedOrder.proofCount})</span> : undefined}
-                      >
-                        <ProofManager
+                      {/* Customer approved → upload PDF & notify Eli */}
+                      {(ds === 'approved_by_customer' || ds === 'final_pdf_uploaded') && (
+                        <PostApprovalChecklist
                           orderId={selectedOrder.id}
                           orderNumber={selectedOrder.orderNumber}
                           displayOrderNumber={selectedOrder.displayOrderNumber}
+                          designStatus={ds}
+                          onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
                         />
-                      </CollapsibleSection>
+                      )}
 
-                      {/* Notes — only if present */}
-                      {selectedOrder.notes && (
+                      {/* Customer Feedback Banner — when in revision */}
+                      {ds === 'in_revision' && latestFeedback && (
+                        <div className="bg-orange-50 border border-orange-200 rounded-md p-4">
+                          <p className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mb-1">Customer Feedback</p>
+                          <p className="text-body-sm text-orange-800 whitespace-pre-wrap">{latestFeedback}</p>
+                        </div>
+                      )}
+
+                      {/* Awaiting Review Info */}
+                      {ds === 'awaiting_review' && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
+                          <span className="text-lg">⏳</span>
+                          <div>
+                            <p className="text-xs font-medium text-amber-800">Waiting for customer response</p>
+                            <p className="text-[10px] text-amber-600">Proofs have been emailed. You'll get a Slack notification when they respond.</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sent to production — done state */}
+                      {ds === 'sent_to_production' && (
+                        <PostApprovalChecklist
+                          orderId={selectedOrder.id}
+                          orderNumber={selectedOrder.orderNumber}
+                          displayOrderNumber={selectedOrder.displayOrderNumber}
+                          designStatus={ds}
+                          onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
+                        />
+                      )}
+
+                      {/* ═══ DETAIL SECTIONS — only show what's relevant ═══ */}
+
+                      {/* Design Info — only show when designing or in revision */}
+                      {(isDesigning || ds === 'in_revision') && (
+                        <CollapsibleSection title="Design Info" defaultOpen={isDesigning}>
+                          <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                            <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
+                            <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
+                            <StaticField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
+                            {selectedOrder.bibNumberCustomer && (
+                              <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
+                            )}
+                            {selectedOrder.timeCustomer && (
+                              <CopyableField label="Time" value={selectedOrder.timeCustomer} />
+                            )}
+                            <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
+                            {selectedOrder.customerEmail && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Email</span>
+                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
+                              </div>
+                            )}
+                          </div>
+                          {selectedOrder.creativeDirection && (
+                            <div className="bg-purple-50 border border-purple-200 rounded-md p-4 mt-2">
+                              <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Creative Direction</p>
+                              <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
+                            </div>
+                          )}
+                        </CollapsibleSection>
+                      )}
+
+                      {/* Proofs & Approval — hide when sent to production */}
+                      {ds !== 'sent_to_production' && (
+                        <CollapsibleSection
+                          title="Proofs & Approval"
+                          defaultOpen={isProofStage}
+                          badge={selectedOrder.proofCount ? <span className="text-[10px] font-medium text-off-black/30">({selectedOrder.proofCount})</span> : undefined}
+                        >
+                          <ProofManager
+                            orderId={selectedOrder.id}
+                            orderNumber={selectedOrder.orderNumber}
+                            displayOrderNumber={selectedOrder.displayOrderNumber}
+                            designStatus={selectedOrder.designStatus}
+                            customerEmail={selectedOrder.customerEmail}
+                            onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
+                            onLatestFeedback={setLatestFeedback}
+                          />
+                        </CollapsibleSection>
+                      )}
+
+                      {/* Notes — only if present, hide at production */}
+                      {selectedOrder.notes && !isProductionStage && (
                         <CollapsibleSection title="Notes" defaultOpen={false}>
                           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                             <p className="text-body-sm text-blue-800 whitespace-pre-wrap">{selectedOrder.notes}</p>
@@ -2724,108 +2874,94 @@ Thank you!`
                         </CollapsibleSection>
                       )}
 
-                      {/* Comments — collapsed by default */}
-                      <CollapsibleSection
-                        title="Comments"
-                        defaultOpen={false}
-                        badge={orderComments.length > 0 ? <span className="text-[10px] font-medium text-off-black/30">({orderComments.length})</span> : undefined}
-                      >
-                        <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3 mb-3">
-                          <textarea
-                            value={newCommentText}
-                            onChange={(e) => setNewCommentText(e.target.value)}
-                            onPaste={handleCommentPaste}
-                            placeholder="Add a comment or paste an image..."
-                            className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
-                            rows={2}
-                          />
-                          {commentImagePreview && (
-                            <div className="relative inline-block">
-                              <img src={commentImagePreview} alt="Upload preview" className="max-h-32 rounded-md border border-border-gray" />
+                      {/* Comments — hide at production */}
+                      {!isProductionStage && (
+                        <CollapsibleSection
+                          title="Comments"
+                          defaultOpen={false}
+                          badge={orderComments.length > 0 ? <span className="text-[10px] font-medium text-off-black/30">({orderComments.length})</span> : undefined}
+                        >
+                          <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3 mb-3">
+                            <textarea
+                              value={newCommentText}
+                              onChange={(e) => setNewCommentText(e.target.value)}
+                              onPaste={handleCommentPaste}
+                              placeholder="Add a comment or paste an image..."
+                              className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
+                              rows={2}
+                            />
+                            {commentImagePreview && (
+                              <div className="relative inline-block">
+                                <img src={commentImagePreview} alt="Upload preview" className="max-h-32 rounded-md border border-border-gray" />
+                                <button
+                                  onClick={clearCommentImage}
+                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
+                                <ImagePlus className="w-3 h-3 inline mr-1" />
+                                Image
+                                <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
+                              </label>
+                              <span className="text-xs text-off-black/40 flex-1">or paste</span>
                               <button
-                                onClick={clearCommentImage}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                                onClick={submitComment}
+                                disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
+                                className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
                               >
-                                <X className="w-3 h-3" />
+                                {isSubmittingComment ? 'Adding...' : 'Add'}
                               </button>
                             </div>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
-                              <ImagePlus className="w-3 h-3 inline mr-1" />
-                              Image
-                              <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
-                            </label>
-                            <span className="text-xs text-off-black/40 flex-1">or paste</span>
-                            <button
-                              onClick={submitComment}
-                              disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
-                              className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
-                            >
-                              {isSubmittingComment ? 'Adding...' : 'Add'}
-                            </button>
                           </div>
-                        </div>
-                        {isLoadingComments ? (
-                          <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
-                        ) : orderComments.length === 0 ? (
-                          <p className="text-xs text-off-black/40 text-center py-3">No comments yet</p>
-                        ) : (
-                          <div className="space-y-3 max-h-64 overflow-y-auto">
-                            {orderComments.map(comment => (
-                              <div key={comment.id} className="bg-white border border-border-gray rounded-md p-3 group">
-                                {comment.imageUrl && (
-                                  <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
-                                    <img src={comment.imageUrl} alt="Attachment" className="max-h-48 rounded-md mb-2 border border-border-gray hover:opacity-90 cursor-pointer" />
-                                  </a>
-                                )}
-                                {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
-                                <div className="flex items-center justify-between mt-2">
-                                  <span className="text-xs text-off-black/40">
-                                    {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                                  </span>
-                                  <button
-                                    onClick={() => deleteComment(comment.id)}
-                                    className="text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    Delete
-                                  </button>
+                          {isLoadingComments ? (
+                            <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
+                          ) : orderComments.length === 0 ? (
+                            <p className="text-xs text-off-black/40 text-center py-3">No comments yet</p>
+                          ) : (
+                            <div className="space-y-3 max-h-64 overflow-y-auto">
+                              {orderComments.map(comment => (
+                                <div key={comment.id} className="bg-white border border-border-gray rounded-md p-3 group">
+                                  {comment.imageUrl && (
+                                    <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
+                                      <img src={comment.imageUrl} alt="Attachment" className="max-h-48 rounded-md mb-2 border border-border-gray hover:opacity-90 cursor-pointer" />
+                                    </a>
+                                  )}
+                                  {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
+                                  <div className="flex items-center justify-between mt-2">
+                                    <span className="text-xs text-off-black/40">
+                                      {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                    </span>
+                                    <button
+                                      onClick={() => deleteComment(comment.id)}
+                                      className="text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CollapsibleSection>
+                              ))}
+                            </div>
+                          )}
+                        </CollapsibleSection>
+                      )}
 
-                      {/* Actions — always at bottom */}
+                      {/* Bottom actions */}
                       <div className="flex gap-3 pt-2">
-                        {selectedOrder.designStatus === 'concepts_done' && selectedOrder.customerEmail && (
-                          <a
-                            href={generateEmailLink(selectedOrder)}
-                            className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors font-medium"
-                          >
-                            <Mail className="w-4 h-4" />
-                            Email Customer
-                          </a>
-                        )}
-                        {selectedOrder.designStatus !== 'sent_to_production' ? (
-                          <button
-                            onClick={() => updateDesignStatus(selectedOrder.orderNumber, 'sent_to_production')}
-                            className="flex-1 px-5 py-3 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium"
-                          >
-                            Send to Production
-                          </button>
-                        ) : (
+                        {ds === 'sent_to_production' && (
                           <button
                             onClick={() => updateDesignStatus(selectedOrder.orderNumber, 'not_started')}
                             className="flex-1 px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
                           >
-                            Mark as Not Started
+                            Reopen Order
                           </button>
                         )}
                         <button
                           onClick={closeModal}
-                          className="px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors"
+                          className="flex-1 px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
                         >
                           Close
                         </button>

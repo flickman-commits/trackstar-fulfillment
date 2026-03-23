@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
-import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X } from 'lucide-react'
+import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw } from 'lucide-react'
 
 const PdfViewer = lazy(() => import('@/components/PdfViewer'))
 import { toast } from 'sonner'
@@ -30,9 +30,13 @@ interface ProofManagerProps {
   orderId: string
   orderNumber: string
   displayOrderNumber: string
+  designStatus?: string
+  customerEmail?: string | null
+  onDesignStatusChange?: (newStatus: string) => void
+  onLatestFeedback?: (feedback: string | null) => void
 }
 
-export default function ProofManager({ orderId }: ProofManagerProps) {
+export default function ProofManager({ orderId, designStatus, customerEmail, onDesignStatusChange, onLatestFeedback }: ProofManagerProps) {
   const [proofs, setProofs] = useState<Proof[]>([])
   const [approvalToken, setApprovalToken] = useState<ApprovalToken | null>(null)
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null)
@@ -42,7 +46,11 @@ export default function ProofManager({ orderId }: ProofManagerProps) {
   const [filePreviews, setFilePreviews] = useState<{ name: string; preview: string }[]>([])
   const [copied, setCopied] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isSending, setIsSending] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Compact mode: after approval, just show thumbnails — no upload UI, no big approval link
+  const isCompact = ['approved_by_customer', 'final_pdf_uploaded', 'sent_to_production'].includes(designStatus || '')
 
   const fetchData = useCallback(async () => {
     try {
@@ -54,6 +62,9 @@ export default function ProofManager({ orderId }: ProofManagerProps) {
       if (proofsRes.ok) {
         const data = await proofsRes.json()
         setProofs(data.proofs)
+        // Expose latest customer feedback for revision banner
+        const revisionProof = [...data.proofs].reverse().find((p: Proof) => p.status === 'revision_requested' && p.customerFeedback)
+        onLatestFeedback?.(revisionProof?.customerFeedback || null)
       }
 
       if (tokenRes.ok) {
@@ -167,6 +178,11 @@ export default function ProofManager({ orderId }: ProofManagerProps) {
       }
       clearFiles()
       toast.success(`${uploaded} proof${uploaded !== 1 ? 's' : ''} uploaded`)
+
+      // Auto-advance from not_started → in_progress on first upload
+      if (designStatus === 'not_started' && uploaded > 0) {
+        onDesignStatusChange?.('in_progress')
+      }
     } catch {
       toast.error('Upload failed')
     } finally {
@@ -231,6 +247,40 @@ export default function ProofManager({ orderId }: ProofManagerProps) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const sendToCustomer = async () => {
+    if (!customerEmail) {
+      toast.error('No customer email on this order')
+      return
+    }
+    setIsSending(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/proofs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send-to-customer', orderId })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to send')
+        return
+      }
+      if (data.approvalUrl) {
+        setApprovalUrl(data.approvalUrl)
+      }
+      onDesignStatusChange?.('awaiting_review')
+      toast.success(`Proofs emailed to ${customerEmail}`)
+    } catch {
+      toast.error('Failed to send email')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const canSend = proofs.some(p => p.status === 'pending') && customerEmail
+  const showSendButton = canSend && ['in_progress', 'in_revision'].includes(designStatus || '')
+  const showResendButton = canSend && designStatus === 'awaiting_review'
+  const isRevision = designStatus === 'in_revision'
+
   const statusBadge = (status: Proof['status']) => {
     switch (status) {
       case 'approved':
@@ -250,50 +300,80 @@ export default function ProofManager({ orderId }: ProofManagerProps) {
     )
   }
 
+  // ═══ COMPACT MODE: just thumbnails for reference ═══
+  if (isCompact && proofs.length > 0) {
+    return (
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {[...proofs].reverse().map((proof) => (
+            <div key={proof.id} className="relative group">
+              {proof.imageUrl.toLowerCase().includes('.pdf') ? (
+                <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-2.5 py-2 rounded-md border border-border-gray bg-white hover:bg-gray-50 transition-colors">
+                  <span className="text-sm">📄</span>
+                  <span className="text-[10px] text-off-black/50 max-w-[80px] truncate">{proof.fileName || `v${proof.version}`}</span>
+                </a>
+              ) : (
+                <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+                  <img
+                    src={proof.imageUrl}
+                    alt={`Proof v${proof.version}`}
+                    className="h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity"
+                  />
+                </a>
+              )}
+              <div className="absolute -top-1 -right-1">
+                {statusBadge(proof.status)}
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Minimal approval link — just a copy button */}
+        {approvalUrl && (
+          <button
+            onClick={copyLink}
+            className="text-[10px] text-off-black/30 hover:text-off-black/50 flex items-center gap-1 transition-colors"
+          >
+            {copied ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
+            {copied ? 'Copied approval link' : 'Copy approval link'}
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // ═══ FULL MODE: upload UI, approval link, proof history ═══
   return (
     <div className="space-y-3" onPaste={handlePaste}>
-      {/* Approval Link */}
+      {/* Approval Link — compact inline */}
       {approvalUrl ? (
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-semibold text-blue-700 uppercase tracking-wider flex items-center gap-1">
-              <Link2 className="w-3 h-3" /> Customer Approval Link
-            </span>
-            <button
-              onClick={generateToken}
-              className="text-[10px] text-blue-500 hover:text-blue-700 flex items-center gap-0.5 transition-colors"
-              title="Regenerate link (old link will stop working)"
-            >
-              <RefreshCw className="w-2.5 h-2.5" /> Regenerate
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              readOnly
-              value={approvalUrl}
-              className="flex-1 text-xs bg-white border border-blue-200 rounded px-2 py-1.5 text-blue-800 font-mono truncate"
-            />
-            <button
-              onClick={copyLink}
-              className="px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors flex items-center gap-1"
-            >
-              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          {approvalToken && (
-            <p className="text-[10px] text-blue-500 mt-1.5">
-              Expires {new Date(approvalToken.expiresAt).toLocaleDateString()}
-            </p>
-          )}
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            readOnly
+            value={approvalUrl}
+            className="flex-1 text-[10px] bg-blue-50 border border-blue-200 rounded px-2 py-1.5 text-blue-800 font-mono truncate"
+          />
+          <button
+            onClick={copyLink}
+            className="px-2 py-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 rounded transition-colors flex items-center gap-1"
+          >
+            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+          <button
+            onClick={generateToken}
+            className="text-[10px] text-off-black/30 hover:text-off-black/50 transition-colors"
+            title="Regenerate link"
+          >
+            <RefreshCw className="w-3 h-3" />
+          </button>
         </div>
       ) : (
         <button
           onClick={generateToken}
-          className="w-full px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors flex items-center justify-center gap-1.5"
+          className="w-full px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors flex items-center justify-center gap-1.5"
         >
-          <Link2 className="w-3.5 h-3.5" />
+          <Link2 className="w-3 h-3" />
           Generate Approval Link
         </button>
       )}
@@ -369,6 +449,35 @@ export default function ProofManager({ orderId }: ProofManagerProps) {
           </label>
         )}
       </div>
+
+      {/* Send to Customer */}
+      {showSendButton && (
+        <button
+          onClick={sendToCustomer}
+          disabled={isSending}
+          className="w-full px-3 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {isSending ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+          ) : (
+            <><Send className="w-4 h-4" /> {isRevision ? 'Send Updated Proofs' : 'Send Proofs to Customer'}</>
+          )}
+        </button>
+      )}
+
+      {showResendButton && (
+        <button
+          onClick={sendToCustomer}
+          disabled={isSending}
+          className="w-full px-3 py-1.5 text-xs text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+        >
+          {isSending ? (
+            <><Loader2 className="w-3 h-3 animate-spin" /> Resending...</>
+          ) : (
+            <><RotateCcw className="w-3 h-3" /> Re-send Email to Customer</>
+          )}
+        </button>
+      )}
 
       {/* Proof History */}
       {proofs.length > 0 && (

@@ -17,6 +17,7 @@
 
 import { PrismaClient } from '@prisma/client'
 import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
 import crypto from 'crypto'
 import formidable from 'formidable'
 import fs from 'fs'
@@ -30,19 +31,34 @@ function parseBody(req) {
   return new Promise((resolve, reject) => {
     const contentType = req.headers['content-type'] || ''
     if (contentType.includes('multipart/form-data')) {
+      // If Express already consumed the body, fall back to req.body
+      if (req._body || req.readable === false) {
+        console.log('[parseBody] Express already consumed body, using req.body')
+        resolve({ fields: req.body || {}, file: null })
+        return
+      }
       const form = formidable({ maxFileSize: 20 * 1024 * 1024 })
       form.parse(req, (err, fields, files) => {
-        if (err) return reject(err)
+        if (err) {
+          console.error('[parseBody] formidable error:', err.message)
+          return reject(err)
+        }
         // formidable v3 returns arrays for fields
         const flat = {}
         for (const [k, v] of Object.entries(fields)) {
           flat[k] = Array.isArray(v) ? v[0] : v
         }
         const file = files.file ? (Array.isArray(files.file) ? files.file[0] : files.file) : null
+        console.log('[parseBody] multipart parsed, fields:', Object.keys(flat), 'file:', !!file)
         resolve({ fields: flat, file })
       })
     } else {
       // JSON body — read manually since we disabled bodyParser
+      // In Express dev server, body may already be parsed by express.json()
+      if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+        resolve({ fields: req.body, file: null })
+        return
+      }
       let data = ''
       req.on('data', chunk => { data += chunk })
       req.on('end', () => {
@@ -58,10 +74,16 @@ function parseBody(req) {
 }
 
 function buildApprovalUrl(req, token) {
+  // Use VERCEL_PROJECT_PRODUCTION_URL in prod, or origin header, or fallback
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}/approve/${token}`
+  }
   const origin = req.headers?.origin || (() => {
     const host = req.headers?.host || 'trackstar-fulfillment.vercel.app'
     const protocol = host.includes('localhost') ? 'http' : 'https'
-    return `${protocol}://${host}`
+    // In dev, API runs on :3001 but frontend is on :3000
+    const frontendHost = host.replace(':3001', ':3000')
+    return `${protocol}://${frontendHost}`
   })()
   return `${origin}/approve/${token}`
 }
@@ -159,11 +181,15 @@ export default async function handler(req, res) {
             ? String(shopifyData.name) : `#${approvalToken.order.parentOrderNumber}`
           const customerName = approvalToken.order.customerName || 'Customer'
           const emoji = approval === 'approve' ? '✅' : '🔄'
+          const mentions = approval === 'approve'
+            ? '<@U04KBDJH5C3> <@U09UVEP1N3Y>'  // Dan + Eli on approval
+            : '<@U04KBDJH5C3>'                    // Dan only on revision
           const action_text = approval === 'approve'
             ? `approved Option ${proof.version}`
             : `requested revisions on Option ${proof.version}`
+          const suffix = approval === 'approve' ? ' — Dan, export the final PDF!' : ''
           const slackMsg = {
-            text: `${emoji} <@U04KBDJH5C3> *${customerName}* ${action_text} for order *${displayNum}*${feedback ? `\n> _"${feedback}"_` : ''}`
+            text: `${emoji} ${mentions} *${customerName}* ${action_text} for order *${displayNum}*${suffix}${feedback ? `\n> _"${feedback}"_` : ''}`
           }
           fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
             method: 'POST',
@@ -217,6 +243,123 @@ export default async function handler(req, res) {
       }
 
       return res.status(405).json({ error: 'Method not allowed' })
+    }
+
+    // ─── Send Proofs to Customer via Email ───
+    if (action === 'send-to-customer') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+      const { orderId } = body
+      if (!orderId) return res.status(400).json({ error: 'orderId is required' })
+
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { proofs: { orderBy: { version: 'asc' } } }
+      })
+      if (!order) return res.status(404).json({ error: 'Order not found' })
+      if (!order.customerEmail) return res.status(400).json({ error: 'Order has no customer email' })
+
+      // Upsert approval token
+      const newToken = crypto.randomUUID()
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      const approvalToken = await prisma.approvalToken.upsert({
+        where: { orderId },
+        create: { orderId, token: newToken, expiresAt },
+        update: { token: newToken, expiresAt }
+      })
+      const approvalUrl = buildApprovalUrl(req, approvalToken.token)
+
+      // Detect if this is a revision re-send
+      const hasRevisions = order.proofs.some(p => p.status === 'revision_requested')
+      const proofCount = order.proofs.filter(p => p.status === 'pending').length
+
+      const shopifyData = order.shopifyOrderData
+      const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
+        ? String(shopifyData.name) : `#${order.parentOrderNumber}`
+      const customerName = order.customerName || 'there'
+
+      // Build email — on-brand: dark bg, purple CTA, square buttons, Helvetica Neue, restrained voice
+      const subject = hasRevisions
+        ? `Your updated design is ready`
+        : `Your custom race print is ready for review`
+
+      const headline = hasRevisions
+        ? `Updated based on your feedback.`
+        : `Your design${proofCount > 1 ? ' options are' : ' is'} ready.`
+
+      const bodyText = hasRevisions
+        ? `We've revised your design. Take a look and let us know what you think.`
+        : `We've put together ${proofCount > 1 ? `${proofCount} options` : 'a custom design'} for your order ${displayNum}. Review below and pick your favorite.`
+
+      const emailHtml = `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#1A1A1A;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#1A1A1A;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+        <!-- Logo -->
+        <tr><td style="padding:0 0 32px;text-align:center;">
+          <img src="https://www.trackstar.art/cdn/shop/files/TRACKSTAR_SOCIAL_SHARE_SQUARE.png" alt="Trackstar" height="40" style="height:40px;" />
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="padding:32px;background-color:#242424;">
+          <h1 style="margin:0 0 16px;font-size:22px;color:#F7F5F0;font-weight:700;letter-spacing:0.02em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">${headline}</h1>
+          <p style="margin:0 0 8px;font-size:15px;color:#999999;line-height:1.6;">Hi ${customerName},</p>
+          <p style="margin:0 0 32px;font-size:15px;color:#999999;line-height:1.6;">${bodyText}</p>
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+            <a href="${approvalUrl}" style="display:inline-block;background-color:#4600D6;color:#FFFFFF;font-size:14px;font-weight:700;padding:14px 40px;border-radius:0px;text-decoration:none;letter-spacing:0.5px;text-transform:uppercase;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+              REVIEW YOUR DESIGN${proofCount > 1 ? 'S' : ''}
+            </a>
+          </td></tr></table>
+          <p style="margin:28px 0 0;font-size:12px;color:#666666;text-align:center;">This link expires in 30 days.</p>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="padding:24px 0 0;text-align:center;">
+          <p style="margin:0;font-size:11px;color:#666666;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">TRACKSTAR &mdash; Celebrating athletic achievement.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+
+      // Send email via Resend
+      if (!process.env.RESEND_API_KEY) {
+        return res.status(500).json({ error: 'Email service not configured (RESEND_API_KEY missing)' })
+      }
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Trackstar <proofs@orders.trackstar.art>'
+
+      try {
+        await resend.emails.send({
+          from: fromEmail,
+          to: [order.customerEmail],
+          subject,
+          html: emailHtml
+        })
+      } catch (emailErr) {
+        console.error('[send-to-customer] Email send failed:', emailErr)
+        return res.status(500).json({ error: 'Failed to send email. Please try again.' })
+      }
+
+      // Update design status to awaiting_review
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { designStatus: 'awaiting_review' }
+      })
+
+      console.log(`[send-to-customer] Proofs emailed to ${order.customerEmail} for order ${order.orderNumber}`)
+
+      // Slack notification (fire and forget)
+      if (process.env.SLACK_PROOF_WEBHOOK_URL) {
+        fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: `📧 Proofs sent to *${order.customerName || 'customer'}* for order *${displayNum}*` })
+        }).catch(e => console.warn('[send-to-customer] Slack failed:', e.message))
+      }
+
+      return res.status(200).json({ success: true, approvalUrl })
     }
 
     // ─── Proof CRUD (merchant) ───

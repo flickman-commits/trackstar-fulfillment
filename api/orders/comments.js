@@ -75,6 +75,22 @@ export default async function handler(req, res) {
       })
 
       console.log(`[comments] Added to order ${order.orderNumber}: ${text ? 'text' : ''}${imageUrl ? ' +image' : ''}`)
+
+      // Slack notification to Dan when a comment is added (fire and forget)
+      if (process.env.SLACK_PROOF_WEBHOOK_URL && text && order.trackstarOrderType === 'custom') {
+        const shopifyData = order.shopifyOrderData
+        const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
+          ? String(shopifyData.name) : `#${order.parentOrderNumber}`
+        const truncated = text.length > 200 ? text.substring(0, 200) + '...' : text
+        fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: `💬 <@U04KBDJH5C3> New comment on order *${displayNum}*:\n> _"${truncated}"_`
+          })
+        }).catch(e => console.warn('[comments] Slack failed:', e.message))
+      }
+
       return res.status(201).json({ success: true, comment })
     }
 

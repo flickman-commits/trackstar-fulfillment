@@ -163,7 +163,7 @@ async function handleComplete({ orderNumber }, res) {
 }
 
 // --- design-status ---
-const VALID_DESIGN_STATUSES = ['not_started', 'in_progress', 'concepts_done', 'in_revision', 'approved_by_customer', 'final_pdf_uploaded', 'sent_to_production']
+const VALID_DESIGN_STATUSES = ['not_started', 'in_progress', 'awaiting_review', 'in_revision', 'approved_by_customer', 'final_pdf_uploaded', 'sent_to_production']
 
 async function handleDesignStatus({ orderNumber, designStatus }, res) {
   if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
@@ -195,6 +195,21 @@ async function handleDesignStatus({ orderNumber, designStatus }, res) {
   })
 
   console.log(`[actions/design-status] Order ${orderNumber} design status → ${designStatus}`)
+
+  // Slack notification when sent to production
+  if (designStatus === 'sent_to_production' && process.env.SLACK_PROOF_WEBHOOK_URL) {
+    const shopifyData = existing.shopifyOrderData
+    const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
+      ? String(shopifyData.name) : `#${existing.parentOrderNumber}`
+    fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: `🖨️ <@U09UVEP1N3Y> Final PDF ready for order *${displayNum}* — ready for production!`
+      })
+    }).catch(e => console.warn('[actions] Slack failed:', e.message))
+  }
+
   return res.status(200).json({ success: true, order })
 }
 
