@@ -529,7 +529,7 @@ export default function ApprovalPortal() {
         {/* Footer */}
         <div className="mt-12 pt-6 text-center" style={{ borderTop: '1px solid #E0E0E0' }}>
           <p style={{ fontSize: '11px', color: '#999999', letterSpacing: '0.05em' }}>
-            TRACKSTAR &mdash; Celebrating athletic achievement.
+            Trackstar - Celebrating athletic achievement.
           </p>
         </div>
       </div>

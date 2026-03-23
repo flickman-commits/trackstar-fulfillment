@@ -281,7 +281,7 @@ export default async function handler(req, res) {
       // Build email — on-brand: dark bg, purple CTA, square buttons, Helvetica Neue, restrained voice
       const subject = hasRevisions
         ? `Your updated design is ready`
-        : `Your custom race print is ready for review`
+        : `Your Trackstar Order ${displayNum} (Action Required)`
 
       const headline = hasRevisions
         ? `Updated based on your feedback.`
@@ -316,7 +316,7 @@ export default async function handler(req, res) {
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:24px 0 0;text-align:center;">
-          <p style="margin:0;font-size:11px;color:#666666;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">TRACKSTAR &mdash; Celebrating athletic achievement.</p>
+          <p style="margin:0;font-size:11px;color:#666666;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">Trackstar - Celebrating athletic achievement.</p>
         </td></tr>
       </table>
     </td></tr>
