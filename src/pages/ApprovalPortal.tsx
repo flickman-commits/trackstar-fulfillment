@@ -29,7 +29,7 @@ interface OrderInfo {
   designStatus: string
 }
 
-type PortalState = 'loading' | 'ready' | 'expired' | 'error' | 'all_approved'
+type PortalState = 'loading' | 'ready' | 'expired' | 'error' | 'all_approved' | 'revision_submitted'
 
 function isPdf(url: string) {
   return url.toLowerCase().includes('.pdf')
@@ -105,11 +105,18 @@ export default function ApprovalPortal() {
     }
   }
 
+  const [revisionOptionNum, setRevisionOptionNum] = useState<number | null>(null)
+
   const handleRequestRevision = async () => {
     if (!token || !feedback.trim()) return
     const pendingProofs = proofs.filter(p => p.status === 'pending')
-    const targetProof = pendingProofs[pendingProofs.length - 1]
+    // Use selected proof if one is selected, otherwise use the first pending
+    const targetProof = selectedProofId
+      ? pendingProofs.find(p => p.id === selectedProofId) || pendingProofs[0]
+      : pendingProofs[0]
     if (!targetProof) return
+
+    const optionIdx = pendingProofs.indexOf(targetProof)
 
     setSubmitting(true)
     try {
@@ -131,7 +138,8 @@ export default function ApprovalPortal() {
       }
       setFeedback('')
       setShowRevisionForm(false)
-      await fetchData()
+      setRevisionOptionNum(optionIdx + 1)
+      setState('revision_submitted')
     } catch {
       alert('Unable to submit. Please try again.')
     } finally {
@@ -192,6 +200,27 @@ export default function ApprovalPortal() {
           </h1>
           <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6, marginBottom: '8px' }}>
             {approvedProof ? `You selected Option ${approvedProof.version}. ` : ''}We'll get it into production.
+          </p>
+          <p style={{ color: '#999999', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ═══ REVISION SUBMITTED — success state ═══
+  if (state === 'revision_submitted') {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+        <div className="text-center max-w-sm">
+          <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(200, 85, 61, 0.1)' }}>
+            <CheckCircle2 className="w-10 h-10" style={{ color: '#C8553D' }} />
+          </div>
+          <h1 style={{ color: '#1A1A1A', fontSize: '24px', fontWeight: 700, marginBottom: '12px', letterSpacing: '0.01em' }}>
+            Revision request received.
+          </h1>
+          <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6, marginBottom: '8px' }}>
+            {revisionOptionNum ? `You requested changes to Option ${revisionOptionNum}. ` : ''}We'll update your design and send a new version for review.
           </p>
           <p style={{ color: '#999999', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
         </div>

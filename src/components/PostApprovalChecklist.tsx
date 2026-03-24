@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import { CheckCircle2, ExternalLink, Loader2, Send } from 'lucide-react'
+import { CheckCircle2, Loader2, Send, Square, CheckSquare } from 'lucide-react'
 import { toast } from 'sonner'
-
-const GOOGLE_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/1hvHh3F9Wdo8cpLPziSbIC1SUHe6Tq1OI'
 
 interface PostApprovalChecklistProps {
   orderId: string
@@ -17,6 +15,7 @@ export default function PostApprovalChecklist({
   onDesignStatusChange,
 }: PostApprovalChecklistProps) {
   const [isSending, setIsSending] = useState(false)
+  const [uploaded, setUploaded] = useState(false)
 
   const isSentToProduction = designStatus === 'sent_to_production'
 
@@ -42,16 +41,22 @@ export default function PostApprovalChecklist({
 
   return (
     <div className="space-y-2">
-      {/* Step 1: Export & upload to Google Drive */}
-      <a
-        href={GOOGLE_DRIVE_FOLDER}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-md transition-colors"
+      {/* Step 1: Checkbox reminder to export & upload */}
+      <button
+        onClick={() => setUploaded(!uploaded)}
+        className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-md border transition-colors text-left ${
+          uploaded
+            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+            : 'text-off-black/60 bg-subtle-gray border-border-gray hover:bg-white'
+        }`}
       >
-        <ExternalLink className="w-4 h-4" />
-        Open Google Drive to Upload PDF
-      </a>
+        {uploaded ? (
+          <CheckSquare className="w-4 h-4 shrink-0 text-emerald-600" />
+        ) : (
+          <Square className="w-4 h-4 shrink-0 text-off-black/30" />
+        )}
+        Exported and uploaded to Google Drive
+      </button>
 
       {/* Step 2: Mark sent to production */}
       <button

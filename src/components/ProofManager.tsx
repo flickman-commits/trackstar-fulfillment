@@ -406,7 +406,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                   <ImagePlus className="w-4 h-4 text-off-black/30" />
                   <input
                     type="file"
-                    accept="image/*,.pdf"
+                    accept="image/*"
                     multiple
                     onChange={handleFileSelect}
                     className="hidden"
@@ -437,11 +437,11 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         ) : (
           <label className="cursor-pointer flex items-center justify-center gap-2 py-3 text-xs text-off-black/50 hover:text-off-black/70 transition-colors">
             <ImagePlus className="w-4 h-4" />
-            <span>Choose proof files (up to 7) or paste from clipboard</span>
+            <span>Choose proof images (up to 7) or paste from clipboard</span>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,.pdf"
+              accept="image/*"
               multiple
               onChange={handleFileSelect}
               className="hidden"

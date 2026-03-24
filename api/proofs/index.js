@@ -163,10 +163,27 @@ export default async function handler(req, res) {
         const newStatus = approval === 'approve' ? 'approved' : 'revision_requested'
         const newDesignStatus = approval === 'approve' ? 'approved_by_customer' : 'in_revision'
 
-        const updatedProof = await prisma.proof.update({
-          where: { id: proofId },
-          data: { status: newStatus, customerFeedback: feedback || null }
-        })
+        // For revisions: mark ALL pending proofs as revision_requested (the whole batch is done)
+        // Store feedback only on the selected proof
+        if (approval === 'request_revision') {
+          await prisma.proof.updateMany({
+            where: { orderId: approvalToken.orderId, status: 'pending' },
+            data: { status: 'revision_requested' }
+          })
+          // Store feedback on the specific proof the customer commented on
+          await prisma.proof.update({
+            where: { id: proofId },
+            data: { customerFeedback: feedback || null }
+          })
+        }
+
+        const updatedProof = approval === 'approve'
+          ? await prisma.proof.update({
+              where: { id: proofId },
+              data: { status: newStatus, customerFeedback: feedback || null }
+            })
+          : await prisma.proof.findUnique({ where: { id: proofId } })
+
         await prisma.order.update({
           where: { id: approvalToken.orderId },
           data: { designStatus: newDesignStatus }
@@ -187,7 +204,7 @@ export default async function handler(req, res) {
           const action_text = approval === 'approve'
             ? `approved Option ${proof.version}`
             : `requested revisions on Option ${proof.version}`
-          const suffix = approval === 'approve' ? ' — Dan, export the final PDF!' : ''
+          const suffix = approval === 'approve' ? ' — Eli, the file is ready to upload to Artelo!' : ''
           const slackMsg = {
             text: `${emoji} ${mentions} *${customerName}* ${action_text} for order *${displayNum}*${suffix}${feedback ? `\n> _"${feedback}"_` : ''}`
           }
@@ -271,6 +288,11 @@ export default async function handler(req, res) {
 
       // Detect if this is a revision re-send
       const hasRevisions = order.proofs.some(p => p.status === 'revision_requested')
+
+      // When re-sending after revision, archive any old pending proofs that weren't part of the new batch
+      // (New proofs uploaded after revision will be the only pending ones)
+      // This is handled by the revision flow marking all pending as revision_requested
+
       const proofCount = order.proofs.filter(p => p.status === 'pending').length
 
       const shopifyData = order.shopifyOrderData
@@ -294,29 +316,29 @@ export default async function handler(req, res) {
       const emailHtml = `
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#1A1A1A;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#1A1A1A;padding:40px 20px;">
+<body style="margin:0;padding:0;background-color:#F7F5F0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F5F0;padding:40px 20px;">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
         <!-- Logo -->
         <tr><td style="padding:0 0 32px;text-align:center;">
-          <img src="https://www.trackstar.art/cdn/shop/files/TRACKSTAR_SOCIAL_SHARE_SQUARE.png" alt="Trackstar" height="40" style="height:40px;" />
+          <img src="https://www.trackstar.art/cdn/shop/files/Trackstar_Logo_H_Dark.png" alt="Trackstar" height="28" style="height:28px;" />
         </td></tr>
         <!-- Body -->
-        <tr><td style="padding:32px;background-color:#242424;">
-          <h1 style="margin:0 0 16px;font-size:22px;color:#F7F5F0;font-weight:700;letter-spacing:0.02em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">${headline}</h1>
-          <p style="margin:0 0 8px;font-size:15px;color:#999999;line-height:1.6;">Hi ${customerName},</p>
-          <p style="margin:0 0 32px;font-size:15px;color:#999999;line-height:1.6;">${bodyText}</p>
+        <tr><td style="padding:32px;background-color:#FFFFFF;border:1px solid #E8E6E1;">
+          <h1 style="margin:0 0 16px;font-size:22px;color:#1A1A1A;font-weight:700;letter-spacing:0.02em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">${headline}</h1>
+          <p style="margin:0 0 8px;font-size:15px;color:#666666;line-height:1.6;">Hi ${customerName},</p>
+          <p style="margin:0 0 32px;font-size:15px;color:#666666;line-height:1.6;">${bodyText}</p>
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-            <a href="${approvalUrl}" style="display:inline-block;background-color:#4600D6;color:#FFFFFF;font-size:14px;font-weight:700;padding:14px 40px;border-radius:0px;text-decoration:none;letter-spacing:0.5px;text-transform:uppercase;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+            <a href="${approvalUrl}" style="display:inline-block;background-color:#C8553D;color:#FFFFFF;font-size:14px;font-weight:700;padding:14px 40px;border-radius:0px;text-decoration:none;letter-spacing:0.5px;text-transform:uppercase;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
               REVIEW YOUR DESIGN${proofCount > 1 ? 'S' : ''}
             </a>
           </td></tr></table>
-          <p style="margin:28px 0 0;font-size:12px;color:#666666;text-align:center;">This link expires in 30 days.</p>
+          <p style="margin:28px 0 0;font-size:12px;color:#999999;text-align:center;">This link expires in 30 days.</p>
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:24px 0 0;text-align:center;">
-          <p style="margin:0;font-size:11px;color:#666666;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">Trackstar - Celebrating athletic achievement.</p>
+          <p style="margin:0;font-size:11px;color:#999999;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">Trackstar — Celebrating athletic achievement.</p>
         </td></tr>
       </table>
     </td></tr>
@@ -342,10 +364,10 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to send email. Please try again.' })
       }
 
-      // Update design status to awaiting_review
+      // Update design status to awaiting_review and record when proofs were sent
       await prisma.order.update({
         where: { id: orderId },
-        data: { designStatus: 'awaiting_review' }
+        data: { designStatus: 'awaiting_review', proofSentAt: new Date() }
       })
 
       console.log(`[send-to-customer] Proofs emailed to ${order.customerEmail} for order ${order.orderNumber}`)

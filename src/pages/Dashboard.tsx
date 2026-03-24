@@ -83,6 +83,7 @@ interface Order {
   isGift?: boolean
   commentCount?: number
   proofCount?: number
+  proofSentAt?: string | null
   shopifyCreatedAt?: string | null
   orderPlacedAt?: string | null
 }
@@ -2594,15 +2595,29 @@ Thank you!`
                           </div>
                         )}
 
-                        {selectedOrder.designStatus === 'awaiting_review' && (
-                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
-                            <span className="text-lg">⏳</span>
-                            <div>
-                              <p className="text-xs font-medium text-amber-800">Waiting for customer response</p>
-                              <p className="text-[10px] text-amber-600">You'll get a Slack notification when they respond.</p>
+                        {selectedOrder.designStatus === 'awaiting_review' && (() => {
+                          const daysSinceSent = selectedOrder.proofSentAt
+                            ? Math.floor((Date.now() - new Date(selectedOrder.proofSentAt).getTime()) / (1000 * 60 * 60 * 24))
+                            : null
+                          const needsFollowUp = daysSinceSent !== null && daysSinceSent >= 3
+                          return needsFollowUp ? (
+                            <div className="bg-red-50 border border-red-200 rounded-md p-3 flex items-center gap-2">
+                              <span className="text-lg">🔔</span>
+                              <div>
+                                <p className="text-xs font-medium text-red-800">Follow up needed — no response in {daysSinceSent} day{daysSinceSent !== 1 ? 's' : ''}</p>
+                                <p className="text-[10px] text-red-600">Consider re-sending proofs or reaching out.</p>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          ) : (
+                            <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
+                              <span className="text-lg">⏳</span>
+                              <div>
+                                <p className="text-xs font-medium text-amber-800">Waiting for customer response</p>
+                                <p className="text-[10px] text-amber-600">You'll get a Slack notification when they respond.</p>
+                              </div>
+                            </div>
+                          )
+                        })()}
 
                         {/* Post-Approval Checklist (Mobile) */}
                         {(selectedOrder.designStatus === 'approved_by_customer' || selectedOrder.designStatus === 'final_pdf_uploaded') && (
@@ -2795,15 +2810,29 @@ Thank you!`
                       )}
 
                       {/* Awaiting Review Info */}
-                      {ds === 'awaiting_review' && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
-                          <span className="text-lg">⏳</span>
-                          <div>
-                            <p className="text-xs font-medium text-amber-800">Waiting for customer response</p>
-                            <p className="text-[10px] text-amber-600">Proofs have been emailed. You'll get a Slack notification when they respond.</p>
+                      {ds === 'awaiting_review' && (() => {
+                        const daysSinceSent = selectedOrder.proofSentAt
+                          ? Math.floor((Date.now() - new Date(selectedOrder.proofSentAt).getTime()) / (1000 * 60 * 60 * 24))
+                          : null
+                        const needsFollowUp = daysSinceSent !== null && daysSinceSent >= 3
+                        return needsFollowUp ? (
+                          <div className="bg-red-50 border border-red-200 rounded-md p-3 flex items-center gap-2">
+                            <span className="text-lg">🔔</span>
+                            <div>
+                              <p className="text-xs font-medium text-red-800">Follow up needed — no response in {daysSinceSent} day{daysSinceSent !== 1 ? 's' : ''}</p>
+                              <p className="text-[10px] text-red-600">Consider re-sending proofs or reaching out to the customer.</p>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
+                            <span className="text-lg">⏳</span>
+                            <div>
+                              <p className="text-xs font-medium text-amber-800">Waiting for customer response</p>
+                              <p className="text-[10px] text-amber-600">Proofs have been emailed{daysSinceSent !== null ? ` ${daysSinceSent} day${daysSinceSent !== 1 ? 's' : ''} ago` : ''}. You'll get a Slack notification when they respond.</p>
+                            </div>
+                          </div>
+                        )
+                      })()}
 
                       {/* Sent to production — done state */}
                       {ds === 'sent_to_production' && (
@@ -2818,9 +2847,25 @@ Thank you!`
 
                       {/* ═══ DETAIL SECTIONS — only show what's relevant ═══ */}
 
-                      {/* Design Info — only show when designing or in revision */}
-                      {(isDesigning || ds === 'in_revision') && (
-                        <CollapsibleSection title="Design Info" defaultOpen={isDesigning}>
+                      {/* Proofs & Upload — front and center when in_progress */}
+                      {ds === 'in_progress' && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Proofs & Approval</h4>
+                          <ProofManager
+                            orderId={selectedOrder.id}
+                            orderNumber={selectedOrder.orderNumber}
+                            displayOrderNumber={selectedOrder.displayOrderNumber}
+                            designStatus={selectedOrder.designStatus}
+                            customerEmail={selectedOrder.customerEmail}
+                            onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
+                            onLatestFeedback={setLatestFeedback}
+                          />
+                        </div>
+                      )}
+
+                      {/* Design Info — only show when designing (not_started / in_progress) */}
+                      {isDesigning && (
+                        <CollapsibleSection title="Design Info" defaultOpen={ds === 'not_started'}>
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                             <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
                             <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
@@ -2848,8 +2893,8 @@ Thank you!`
                         </CollapsibleSection>
                       )}
 
-                      {/* Proofs & Approval — hide when sent to production */}
-                      {ds !== 'sent_to_production' && (
+                      {/* Proofs & Approval — for non-in_progress states, hide when sent to production */}
+                      {ds !== 'in_progress' && ds !== 'sent_to_production' && (
                         <CollapsibleSection
                           title="Proofs & Approval"
                           defaultOpen={isProofStage}

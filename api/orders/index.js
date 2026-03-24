@@ -188,6 +188,8 @@ export default async function handler(req, res) {
         commentCount: order._count?.comments || 0,
         // Proof count for proof indicator
         proofCount: order._count?.proofs || 0,
+        // When proofs were last sent (for follow-up tracking)
+        proofSentAt: order.proofSentAt,
         // Shopify display order number (e.g. "2855") and order date for sorting
         displayOrderNumber: order.shopifyOrderData?.name
           ? String(order.shopifyOrderData.name).replace('#', '')
