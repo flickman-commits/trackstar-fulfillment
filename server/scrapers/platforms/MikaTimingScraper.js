@@ -33,7 +33,7 @@ export class MikaTimingScraper extends BaseScraper {
 
     // Try to scrape the actual race date from the results page
     try {
-      const resultsUrl = `${this.baseUrl}/?pid=list`
+      const resultsUrl = `${this.baseUrl}/?pid=list&event_main_group=${this.year}`
       const response = await fetch(resultsUrl, {
         headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' }
       })
@@ -57,7 +57,7 @@ export class MikaTimingScraper extends BaseScraper {
       raceDate,
       location: this.config.location,
       eventTypes: this.config.eventTypes || ['Marathon'],
-      resultsUrl: `${this.baseUrl}/?pid=list`,
+      resultsUrl: `${this.baseUrl}/?pid=list&event_main_group=${this.year}`,
       resultsSiteType: 'mika',
     }
   }
@@ -74,6 +74,7 @@ export class MikaTimingScraper extends BaseScraper {
 
       const searchParams = new URLSearchParams({
         pid: 'list',
+        event_main_group: String(this.year),
         'search[name]': lastName,
         'search[firstname]': firstName,
         event: this.config.eventCode || 'MAR',
@@ -96,6 +97,17 @@ export class MikaTimingScraper extends BaseScraper {
       if (!response.ok) return this.notFoundResult()
 
       const html = await response.text()
+
+      // Safety check: verify the results page is showing the correct year
+      const yearMismatch = this._checkYearMismatch(html)
+      if (yearMismatch) {
+        console.error(`[${this.tag}] YEAR MISMATCH: Expected ${this.year}, got ${yearMismatch}`)
+        return {
+          ...this.notFoundResult(),
+          researchNotes: `Year mismatch: requested ${this.year} but results page shows ${yearMismatch}. Results may have been moved or the site structure changed.`
+        }
+      }
+
       const results = this._parseResultsHtml(html)
 
       console.log(`[${this.tag}] Found ${results.length} results in HTML`)
@@ -247,6 +259,24 @@ export class MikaTimingScraper extends BaseScraper {
         division: runner.division
       }
     }
+  }
+
+  /**
+   * Check if the results page is showing a different year than requested.
+   * Returns the mismatched year string if found, or null if OK.
+   */
+  _checkYearMismatch(html) {
+    const $ = cheerio.load(html)
+    // Mika Timing pages show "Results: YYYY / All" in the heading
+    const headingText = $('h3, h2, .page-heading, .results-heading').text()
+    const match = headingText.match(/Results:\s*(\d{4})\s*\//)
+    if (match) {
+      const pageYear = parseInt(match[1], 10)
+      if (pageYear !== this.year) {
+        return match[1]
+      }
+    }
+    return null
   }
 
   /**
