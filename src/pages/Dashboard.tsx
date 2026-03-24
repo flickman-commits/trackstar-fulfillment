@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText, Send } from 'lucide-react'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 
@@ -254,6 +254,7 @@ export default function Dashboard() {
   const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [latestFeedback, setLatestFeedback] = useState<string | null>(null)
+  const [isSendingFollowUp, setIsSendingFollowUp] = useState(false)
   const commentFileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch orders from database (filtered by activeView type)
@@ -1152,6 +1153,29 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error deleting comment:', error)
       setToast({ message: 'Failed to delete comment', type: 'error' })
+    }
+  }
+
+  const sendFollowUp = async (orderId: string) => {
+    setIsSendingFollowUp(true)
+    try {
+      const res = await fetch(`/api/proofs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send-to-customer', orderId })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setToast({ message: data.error || 'Failed to send follow-up', type: 'error' })
+        return
+      }
+      setToast({ message: 'Follow-up email sent', type: 'success' })
+      // Update proofSentAt locally
+      setSelectedOrder(prev => prev ? { ...prev, proofSentAt: new Date().toISOString() } : prev)
+    } catch {
+      setToast({ message: 'Failed to send follow-up', type: 'error' })
+    } finally {
+      setIsSendingFollowUp(false)
     }
   }
 
@@ -2600,20 +2624,36 @@ Thank you!`
                             ? Math.floor((Date.now() - new Date(selectedOrder.proofSentAt).getTime()) / (1000 * 60 * 60 * 24))
                             : null
                           const needsFollowUp = daysSinceSent !== null && daysSinceSent >= 3
+                          const daysText = daysSinceSent !== null
+                            ? `${daysSinceSent} day${daysSinceSent !== 1 ? 's' : ''} ago`
+                            : ''
                           return needsFollowUp ? (
-                            <div className="bg-red-50 border border-red-200 rounded-md p-3 flex items-center gap-2">
-                              <span className="text-lg">🔔</span>
-                              <div>
-                                <p className="text-xs font-medium text-red-800">Follow up needed — no response in {daysSinceSent} day{daysSinceSent !== 1 ? 's' : ''}</p>
-                                <p className="text-[10px] text-red-600">Consider re-sending proofs or reaching out.</p>
+                            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">🔔</span>
+                                <div className="flex-1">
+                                  <p className="text-xs font-medium text-red-800">No response in {daysSinceSent} day{daysSinceSent !== 1 ? 's' : ''}</p>
+                                  <p className="text-[10px] text-red-600">Proofs were sent {daysText}.</p>
+                                </div>
                               </div>
+                              <button
+                                onClick={() => sendFollowUp(selectedOrder.id)}
+                                disabled={isSendingFollowUp}
+                                className="w-full mt-2 px-3 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                              >
+                                {isSendingFollowUp ? (
+                                  <><Loader2 className="w-3 h-3 animate-spin" /> Sending...</>
+                                ) : (
+                                  <><Send className="w-3 h-3" /> Send Follow Up</>
+                                )}
+                              </button>
                             </div>
                           ) : (
                             <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
                               <span className="text-lg">⏳</span>
                               <div>
                                 <p className="text-xs font-medium text-amber-800">Waiting for customer response</p>
-                                <p className="text-[10px] text-amber-600">You'll get a Slack notification when they respond.</p>
+                                <p className="text-[10px] text-amber-600">Proofs sent {daysText || 'today'}. You'll get a Slack notification when they respond.</p>
                               </div>
                             </div>
                           )
@@ -2815,20 +2855,36 @@ Thank you!`
                           ? Math.floor((Date.now() - new Date(selectedOrder.proofSentAt).getTime()) / (1000 * 60 * 60 * 24))
                           : null
                         const needsFollowUp = daysSinceSent !== null && daysSinceSent >= 3
+                        const daysText = daysSinceSent !== null
+                          ? `${daysSinceSent} day${daysSinceSent !== 1 ? 's' : ''} ago`
+                          : ''
                         return needsFollowUp ? (
-                          <div className="bg-red-50 border border-red-200 rounded-md p-3 flex items-center gap-2">
-                            <span className="text-lg">🔔</span>
-                            <div>
-                              <p className="text-xs font-medium text-red-800">Follow up needed — no response in {daysSinceSent} day{daysSinceSent !== 1 ? 's' : ''}</p>
-                              <p className="text-[10px] text-red-600">Consider re-sending proofs or reaching out to the customer.</p>
+                          <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">🔔</span>
+                              <div className="flex-1">
+                                <p className="text-xs font-medium text-red-800">No response in {daysSinceSent} day{daysSinceSent !== 1 ? 's' : ''}</p>
+                                <p className="text-[10px] text-red-600">Proofs were sent {daysText}.</p>
+                              </div>
                             </div>
+                            <button
+                              onClick={() => sendFollowUp(selectedOrder.id)}
+                              disabled={isSendingFollowUp}
+                              className="w-full mt-2 px-3 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                            >
+                              {isSendingFollowUp ? (
+                                <><Loader2 className="w-3 h-3 animate-spin" /> Sending...</>
+                              ) : (
+                                <><Send className="w-3 h-3" /> Send Follow Up</>
+                              )}
+                            </button>
                           </div>
                         ) : (
                           <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
                             <span className="text-lg">⏳</span>
                             <div>
                               <p className="text-xs font-medium text-amber-800">Waiting for customer response</p>
-                              <p className="text-[10px] text-amber-600">Proofs have been emailed{daysSinceSent !== null ? ` ${daysSinceSent} day${daysSinceSent !== 1 ? 's' : ''} ago` : ''}. You'll get a Slack notification when they respond.</p>
+                              <p className="text-[10px] text-amber-600">Proofs sent {daysText || 'today'}. You'll get a Slack notification when they respond.</p>
                             </div>
                           </div>
                         )
