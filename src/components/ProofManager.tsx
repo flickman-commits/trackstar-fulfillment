@@ -277,8 +277,11 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
     }
   }
 
-  const canSend = proofs.some(p => p.status === 'pending') && customerEmail
+  const hasPendingProofs = proofs.some(p => p.status === 'pending')
+  const canSend = hasPendingProofs && customerEmail
   const showSendButton = canSend && ['in_progress', 'in_revision'].includes(designStatus || '')
+  // Show note field when there are pending proofs to send, OR when files are selected (about to upload)
+  const showNoteField = (showSendButton || selectedFiles.length > 0) && ['in_progress', 'in_revision'].includes(designStatus || '')
   const showResendButton = canSend && designStatus === 'awaiting_review'
   const isRevision = designStatus === 'in_revision'
 
@@ -477,16 +480,20 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         )}
       </div>
 
+      {/* Note for customer — visible when uploading or ready to send */}
+      {showNoteField && (
+        <textarea
+          value={sendNote}
+          onChange={(e) => setSendNote(e.target.value)}
+          placeholder="Add a note for the customer (optional)..."
+          className="w-full px-3 py-2 border border-border-gray rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
+          rows={2}
+        />
+      )}
+
       {/* Send to Customer */}
       {showSendButton && (
-        <div className="space-y-2">
-          <textarea
-            value={sendNote}
-            onChange={(e) => setSendNote(e.target.value)}
-            placeholder="Add a note for the customer (optional)..."
-            className="w-full px-3 py-2 border border-border-gray rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
-            rows={2}
-          />
+        <div>
           <button
             onClick={sendToCustomer}
             disabled={isSending}
