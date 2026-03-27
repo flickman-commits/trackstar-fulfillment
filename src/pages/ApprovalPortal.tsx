@@ -310,7 +310,7 @@ export default function ApprovalPortal() {
             {/* Current batch of pending proofs — horizontal carousel */}
             {hasPendingProofs && (
               <>
-                <div className="mb-4">
+                <div className="mb-4 max-w-lg mx-auto">
                   <div className="relative">
                     <div
                       ref={carouselRef}
