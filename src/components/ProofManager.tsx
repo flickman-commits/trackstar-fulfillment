@@ -1,7 +1,5 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw } from 'lucide-react'
-
-const PdfViewer = lazy(() => import('@/components/PdfViewer'))
 import { toast } from 'sonner'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -490,84 +488,72 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         </button>
       )}
 
-      {/* Proof History — grouped by batch */}
+      {/* Proof History — thumbnail grid grouped by batch */}
       {(() => {
         const currentBatch = proofs.filter(p => p.status === 'pending')
         const previousBatch = proofs.filter(p => p.status !== 'pending')
 
-        const renderProofCard = (proof: Proof) => (
-          <div key={proof.id} className="bg-white border border-border-gray rounded-md overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-off-black text-white text-[10px] font-bold shrink-0">
-                {proof.version}
-              </span>
-              <span className="text-xs text-off-black/50 flex-1 truncate">
-                {proof.fileName || `Proof v${proof.version}`}
-              </span>
-              {statusBadge(proof.status)}
-              <button
-                onClick={() => deleteProof(proof.id)}
-                disabled={deletingId === proof.id}
-                className="text-off-black/20 hover:text-red-500 transition-colors p-0.5"
-                title="Delete proof"
-              >
-                {deletingId === proof.id ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Trash2 className="w-3 h-3" />
-                )}
-              </button>
-            </div>
-
-            {/* Thumbnail / PDF preview */}
-            <div className="border-t border-border-gray">
-              {proof.imageUrl.toLowerCase().includes('.pdf') ? (
-                <Suspense fallback={<div className="flex items-center justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-off-black/30" /></div>}>
-                  <PdfViewer url={proof.imageUrl} maxHeight={200} />
-                </Suspense>
-              ) : (
-                <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
-                  <img
-                    src={proof.imageUrl}
-                    alt={`Proof v${proof.version}`}
-                    className="w-full max-h-40 object-cover hover:opacity-90 transition-opacity"
-                  />
-                </a>
-              )}
-            </div>
-
-            {/* Customer feedback */}
-            {proof.customerFeedback && (
-              <div className="px-3 py-2 border-t border-border-gray bg-amber-50">
-                <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-0.5">Customer Feedback</p>
-                <p className="text-xs text-amber-900">{proof.customerFeedback}</p>
-              </div>
+        const renderThumbnail = (proof: Proof) => (
+          <div key={proof.id} className="relative group">
+            {proof.imageUrl.toLowerCase().includes('.pdf') ? (
+              <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-2.5 py-2 rounded-md border border-border-gray bg-white hover:bg-gray-50 transition-colors">
+                <span className="text-sm">📄</span>
+                <span className="text-[10px] text-off-black/50 max-w-[80px] truncate">{proof.fileName || `v${proof.version}`}</span>
+              </a>
+            ) : (
+              <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+                <img
+                  src={proof.imageUrl}
+                  alt={`Proof v${proof.version}`}
+                  className="h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity"
+                />
+              </a>
             )}
-
-            <div className="px-3 py-1.5 border-t border-border-gray">
-              <span className="text-[10px] text-off-black/30">
-                {new Date(proof.createdAt).toLocaleDateString()} {new Date(proof.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
+            <div className="absolute -top-1 -right-1">
+              {statusBadge(proof.status)}
             </div>
+            <button
+              onClick={() => deleteProof(proof.id)}
+              disabled={deletingId === proof.id}
+              className="absolute -bottom-1 -right-1 bg-white border border-border-gray rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+              title="Delete"
+            >
+              {deletingId === proof.id ? (
+                <Loader2 className="w-2.5 h-2.5 animate-spin text-off-black/30" />
+              ) : (
+                <Trash2 className="w-2.5 h-2.5 text-red-400" />
+              )}
+            </button>
           </div>
         )
+
+        // Find the latest customer feedback from previous batch
+        const latestFeedback = [...previousBatch].reverse().find(p => p.customerFeedback)
 
         return (
           <>
             {/* Current batch */}
             {currentBatch.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Current batch ({currentBatch.length})</p>
-                {[...currentBatch].reverse().map(renderProofCard)}
+              <div>
+                <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Current batch ({currentBatch.length})</p>
+                <div className="flex flex-wrap gap-2">
+                  {[...currentBatch].reverse().map(renderThumbnail)}
+                </div>
               </div>
             )}
 
             {/* Previous batches */}
             {previousBatch.length > 0 && (
-              <div className="space-y-2 mt-3">
-                <p className="text-[10px] font-semibold text-off-black/30 uppercase tracking-wider">Previous ({previousBatch.length})</p>
-                <div className="space-y-2 opacity-60">
-                  {[...previousBatch].reverse().map(renderProofCard)}
+              <div className="mt-3">
+                <p className="text-[10px] font-semibold text-off-black/30 uppercase tracking-wider mb-1.5">Previous ({previousBatch.length})</p>
+                {latestFeedback && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2">
+                    <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-0.5">Customer Feedback</p>
+                    <p className="text-xs text-amber-900">{latestFeedback.customerFeedback}</p>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2 opacity-60">
+                  {[...previousBatch].reverse().map(renderThumbnail)}
                 </div>
               </div>
             )}
