@@ -164,25 +164,25 @@ export default async function handler(req, res) {
         const newStatus = approval === 'approve' ? 'approved' : 'revision_requested'
         const newDesignStatus = approval === 'approve' ? 'approved_by_customer' : 'in_revision'
 
-        // For revisions: mark ALL pending proofs as revision_requested (the whole batch is done)
-        // Store feedback only on the selected proof
+        // For revisions: mark the selected proof as revision_requested, reject all others
         if (approval === 'request_revision') {
+          // Reject all other pending proofs in the batch
           await prisma.proof.updateMany({
-            where: { orderId: approvalToken.orderId, status: 'pending' },
-            data: { status: 'revision_requested' }
+            where: { orderId: approvalToken.orderId, status: 'pending', id: { not: proofId } },
+            data: { status: 'rejected' }
           })
-          // Store feedback on the specific proof the customer commented on
+          // Mark the selected proof as revision_requested with feedback
           await prisma.proof.update({
             where: { id: proofId },
-            data: { customerFeedback: feedback || null }
+            data: { status: 'revision_requested', customerFeedback: feedback || null }
           })
         }
 
-        // For approvals: mark the chosen proof as approved, reject all others in the batch
+        // For approvals: mark the chosen proof as approved, reject all others
         if (approval === 'approve') {
           await prisma.proof.updateMany({
             where: { orderId: approvalToken.orderId, status: 'pending', id: { not: proofId } },
-            data: { status: 'revision_requested' }
+            data: { status: 'rejected' }
           })
         }
 

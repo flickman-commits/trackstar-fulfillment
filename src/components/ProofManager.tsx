@@ -10,7 +10,7 @@ interface Proof {
   version: number
   imageUrl: string
   fileName: string | null
-  status: 'pending' | 'approved' | 'revision_requested'
+  status: 'pending' | 'approved' | 'revision_requested' | 'rejected'
   customerFeedback: string | null
   createdAt: string
   updatedAt: string
@@ -287,10 +287,9 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
       return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-2.5 h-2.5" />Approved</span>
     }
     if (proof.status === 'revision_requested') {
-      // Show "Revision" (yellow) if this proof has feedback, otherwise "Not Selected" (red)
-      if (proof.customerFeedback) {
-        return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700"><AlertTriangle className="w-2.5 h-2.5" />Revision</span>
-      }
+      return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700"><AlertTriangle className="w-2.5 h-2.5" />Revision</span>
+    }
+    if (proof.status === 'rejected') {
       return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-600">Rejected</span>
     }
     return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">Pending</span>
