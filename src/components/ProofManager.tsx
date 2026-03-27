@@ -258,7 +258,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
       const res = await fetch(`${API_BASE}/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send-to-customer', orderId, note: sendNote.trim() || undefined })
+        body: JSON.stringify({ action: 'send-to-customer', orderId, note: sendNote.trim() || null })
       })
       const data = await res.json()
       if (!res.ok) {
@@ -490,67 +490,90 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         </button>
       )}
 
-      {/* Proof History */}
-      {proofs.length > 0 && (
-        <div className="space-y-2">
-          {[...proofs].reverse().map((proof) => (
-            <div key={proof.id} className="bg-white border border-border-gray rounded-md overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-off-black text-white text-[10px] font-bold shrink-0">
-                  {proof.version}
-                </span>
-                <span className="text-xs text-off-black/50 flex-1 truncate">
-                  {proof.fileName || `Proof v${proof.version}`}
-                </span>
-                {statusBadge(proof.status)}
-                <button
-                  onClick={() => deleteProof(proof.id)}
-                  disabled={deletingId === proof.id}
-                  className="text-off-black/20 hover:text-red-500 transition-colors p-0.5"
-                  title="Delete proof"
-                >
-                  {deletingId === proof.id ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-3 h-3" />
-                  )}
-                </button>
-              </div>
+      {/* Proof History — grouped by batch */}
+      {(() => {
+        const currentBatch = proofs.filter(p => p.status === 'pending')
+        const previousBatch = proofs.filter(p => p.status !== 'pending')
 
-              {/* Thumbnail / PDF preview */}
-              <div className="border-t border-border-gray">
-                {proof.imageUrl.toLowerCase().includes('.pdf') ? (
-                  <Suspense fallback={<div className="flex items-center justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-off-black/30" /></div>}>
-                    <PdfViewer url={proof.imageUrl} maxHeight={200} />
-                  </Suspense>
+        const renderProofCard = (proof: Proof) => (
+          <div key={proof.id} className="bg-white border border-border-gray rounded-md overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-off-black text-white text-[10px] font-bold shrink-0">
+                {proof.version}
+              </span>
+              <span className="text-xs text-off-black/50 flex-1 truncate">
+                {proof.fileName || `Proof v${proof.version}`}
+              </span>
+              {statusBadge(proof.status)}
+              <button
+                onClick={() => deleteProof(proof.id)}
+                disabled={deletingId === proof.id}
+                className="text-off-black/20 hover:text-red-500 transition-colors p-0.5"
+                title="Delete proof"
+              >
+                {deletingId === proof.id ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
-                  <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
-                    <img
-                      src={proof.imageUrl}
-                      alt={`Proof v${proof.version}`}
-                      className="w-full max-h-40 object-cover hover:opacity-90 transition-opacity"
-                    />
-                  </a>
+                  <Trash2 className="w-3 h-3" />
                 )}
-              </div>
-
-              {/* Customer feedback */}
-              {proof.customerFeedback && (
-                <div className="px-3 py-2 border-t border-border-gray bg-amber-50">
-                  <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-0.5">Customer Feedback</p>
-                  <p className="text-xs text-amber-900">{proof.customerFeedback}</p>
-                </div>
-              )}
-
-              <div className="px-3 py-1.5 border-t border-border-gray">
-                <span className="text-[10px] text-off-black/30">
-                  {new Date(proof.createdAt).toLocaleDateString()} {new Date(proof.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
+              </button>
             </div>
-          ))}
-        </div>
-      )}
+
+            {/* Thumbnail / PDF preview */}
+            <div className="border-t border-border-gray">
+              {proof.imageUrl.toLowerCase().includes('.pdf') ? (
+                <Suspense fallback={<div className="flex items-center justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-off-black/30" /></div>}>
+                  <PdfViewer url={proof.imageUrl} maxHeight={200} />
+                </Suspense>
+              ) : (
+                <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+                  <img
+                    src={proof.imageUrl}
+                    alt={`Proof v${proof.version}`}
+                    className="w-full max-h-40 object-cover hover:opacity-90 transition-opacity"
+                  />
+                </a>
+              )}
+            </div>
+
+            {/* Customer feedback */}
+            {proof.customerFeedback && (
+              <div className="px-3 py-2 border-t border-border-gray bg-amber-50">
+                <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-0.5">Customer Feedback</p>
+                <p className="text-xs text-amber-900">{proof.customerFeedback}</p>
+              </div>
+            )}
+
+            <div className="px-3 py-1.5 border-t border-border-gray">
+              <span className="text-[10px] text-off-black/30">
+                {new Date(proof.createdAt).toLocaleDateString()} {new Date(proof.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          </div>
+        )
+
+        return (
+          <>
+            {/* Current batch */}
+            {currentBatch.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Current batch ({currentBatch.length})</p>
+                {[...currentBatch].reverse().map(renderProofCard)}
+              </div>
+            )}
+
+            {/* Previous batches */}
+            {previousBatch.length > 0 && (
+              <div className="space-y-2 mt-3">
+                <p className="text-[10px] font-semibold text-off-black/30 uppercase tracking-wider">Previous ({previousBatch.length})</p>
+                <div className="space-y-2 opacity-60">
+                  {[...previousBatch].reverse().map(renderProofCard)}
+                </div>
+              </div>
+            )}
+          </>
+        )
+      })()}
     </div>
   )
 }
