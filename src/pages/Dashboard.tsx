@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText, Send } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText, Send, Star } from 'lucide-react'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 
@@ -214,6 +214,32 @@ function formatLastUpdated(date: Date): string {
 // Date: MM.DD.YY (e.g., "11.02.25")
 // Pace: X:XX / mi (e.g., "7:15 / mi")
 
+// Yotpo review request links per product
+const REVIEW_PRODUCTS: { name: string; link: string }[] = [
+  { name: 'Air Force Marathon', link: 'https://yotpo.com/go/eLj6ln1g' },
+  { name: 'Austin Marathon', link: 'https://yotpo.com/go/eLj6ln1g' },
+  { name: 'Baltimore Marathon', link: 'https://yotpo.com/go/eLj6ln1g' },
+  { name: 'Berlin Marathon', link: 'https://yotpo.com/go/llWZcm1S' },
+  { name: 'Chicago Marathon', link: 'https://yotpo.com/go/mgtsCHbm' },
+  { name: 'CIM (California International Marathon)', link: 'https://yotpo.com/go/llWZcm1S' },
+  { name: 'Cowtown Marathon', link: 'https://yotpo.com/go/llWZcm1S' },
+  { name: 'Custom', link: 'https://yotpo.com/go/nHef7FVS' },
+  { name: 'Dallas Marathon', link: 'https://yotpo.com/go/ajHf1AG9' },
+  { name: "Grandma's Marathon", link: 'https://yotpo.com/go/naDPT01J' },
+  { name: 'Illinois Marathon', link: 'https://yotpo.com/go/cXM5yNtH' },
+  { name: 'Jersey City Marathon', link: 'https://yotpo.com/go/eDoEWm89' },
+  { name: 'Los Angeles Marathon', link: 'https://yotpo.com/go/iBKm90pS' },
+  { name: 'Marine Corps Marathon', link: 'https://yotpo.com/go/y3xVMKmD' },
+  { name: 'New York City Marathon', link: 'https://yotpo.com/go/oRVzQUez' },
+  { name: 'Oakland Marathon', link: 'https://yotpo.com/go/8IZybQzV' },
+  { name: 'Orange County Marathon', link: 'https://yotpo.com/go/7lr2btIj' },
+  { name: 'Philadelphia Marathon', link: 'https://yotpo.com/go/luOGA59H' },
+  { name: 'San Francisco Marathon', link: 'https://yotpo.com/go/9Yq2KlYT' },
+  { name: 'Sydney Marathon', link: 'https://yotpo.com/go/g2IWTHnl' },
+  { name: 'Tokyo Marathon', link: 'https://yotpo.com/go/aj2ABnX7' },
+  { name: 'Twin Cities Marathon', link: 'https://yotpo.com/go/A3v2ZhPB' },
+]
+
 export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -225,6 +251,8 @@ export default function Dashboard() {
   const [isResearching, setIsResearching] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
+  const [showReviewRequest, setShowReviewRequest] = useState(false)
+  const [reviewCopied, setReviewCopied] = useState<string | null>(null)
   const [customersServedCount, setCustomersServedCount] = useState<number | null>(null)
   const [customersServedInput, setCustomersServedInput] = useState('')
   const [isLoadingCounter, setIsLoadingCounter] = useState(false)
@@ -2095,94 +2123,161 @@ Thank you!`
         {showSettings && (
           <div
             className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowSettings(false) }}
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) } }}
           >
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-y-auto">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray">
-                <h2 className="text-base font-semibold text-off-black">Settings</h2>
-                <button onClick={() => setShowSettings(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
-              </div>
-
-              {/* Navigation cards */}
-              <div className="p-6 space-y-3">
-                <button
-                  onClick={() => setShowRaceDatabase(true)}
-                  className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-off-black">Race Database</p>
-                      <p className="text-xs mt-0.5 text-off-black/50">Manage race dates, locations, and weather</p>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden">
+              {showReviewRequest ? (
+                /* Review Request panel */
+                <div className="flex flex-col h-full max-h-[85vh]" style={{ animation: 'slideInRight 200ms ease-out' }}>
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setShowReviewRequest(false); setReviewCopied(null) }}
+                        className="text-off-black/40 hover:text-off-black/70 transition-colors"
+                      >
+                        <ChevronRight className="w-4 h-4 rotate-180" />
+                      </button>
+                      <h2 className="text-base font-semibold text-off-black">Which product?</h2>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs text-off-black/30">{races.length} {races.length === 1 ? 'race' : 'races'}</span>
-                      <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
-                    </div>
+                    <button onClick={() => { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) }} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
                   </div>
-                </button>
-
-                <button
-                  onClick={() => setShowScraperStatus(true)}
-                  className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-off-black">Scraper Status</p>
-                      <p className="text-xs mt-0.5 text-off-black/50">Test and monitor race result scrapers</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs text-off-black/30">{scraperResults.length} {scraperResults.length === 1 ? 'scraper' : 'scrapers'}</span>
-                      <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
-                    </div>
-                  </div>
-                </button>
-              </div>
-
-              {/* Customers Served Counter */}
-              <div className="border-t border-border-gray p-6">
-                <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
-                  <p className="text-sm font-medium text-off-black">Customers Served Counter</p>
-                  <p className="text-xs mt-0.5 text-off-black/50 mb-3">Adjust the counter displayed on the Shopify storefront. Saves to DB and syncs to Shopify.</p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      value={customersServedInput}
-                      onChange={(e) => setCustomersServedInput(e.target.value)}
-                      placeholder={customersServedCount !== null ? String(customersServedCount) : 'Loading...'}
-                      className="flex-1 rounded-md border border-border-gray px-3 py-1.5 text-sm text-off-black bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                    />
-                    <button
-                      onClick={saveCustomersServedCount}
-                      disabled={isLoadingCounter || customersServedInput === String(customersServedCount)}
-                      className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
-                    >
-                      {isLoadingCounter && <Loader2 className="w-3 h-3 animate-spin" />}
-                      {isLoadingCounter ? 'Saving…' : 'Update & Sync'}
-                    </button>
+                  <div className="p-3 flex-1 overflow-y-auto">
+                    {REVIEW_PRODUCTS.map((product) => (
+                      <button
+                        key={product.name}
+                        onClick={() => {
+                          const msg = `If you have 2-seconds would you mind leaving us a review? It really helps us as a young brand. Link here: ${product.link}`
+                          const ta = document.createElement('textarea')
+                          ta.value = msg
+                          ta.style.position = 'fixed'
+                          ta.style.opacity = '0'
+                          document.body.appendChild(ta)
+                          ta.select()
+                          document.execCommand('copy')
+                          document.body.removeChild(ta)
+                          setReviewCopied(product.name)
+                          setTimeout(() => setReviewCopied(null), 2000)
+                        }}
+                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-subtle-gray transition-colors flex items-center justify-between group"
+                      >
+                        <span className="text-sm text-off-black">{product.name}</span>
+                        <span className="text-xs text-off-black/30 group-hover:text-off-black/50 flex items-center gap-1">
+                          {reviewCopied === product.name ? (
+                            <><Check className="w-3.5 h-3.5 text-green-600" /><span className="text-green-600">Copied!</span></>
+                          ) : (
+                            <><Copy className="w-3.5 h-3.5" /> Copy</>
+                          )}
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </div>
+              ) : (
+                /* Settings main content */
+                <div className="overflow-y-auto">
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray">
+                    <h2 className="text-base font-semibold text-off-black">Settings</h2>
+                    <button onClick={() => { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) }} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
+                  </div>
 
-              {/* Danger zone */}
-              <div className="border-t border-border-gray p-6">
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-red-700">Clear Runner Research</p>
-                      <p className="text-xs mt-0.5 text-red-500">Deletes all cached bib, time, and pace data. All orders go back to &quot;Ready to research&quot;. Use after fixing a scraper bug.</p>
-                    </div>
+                  {/* Navigation cards */}
+                  <div className="p-6 space-y-3">
                     <button
-                      onClick={() => runSettingsAction('clear-research')}
-                      disabled={settingsAction !== null}
-                      className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700"
+                      onClick={() => setShowRaceDatabase(true)}
+                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
                     >
-                      {settingsAction === 'clear-research' && <Loader2 className="w-3 h-3 animate-spin" />}
-                      {settingsAction === 'clear-research' ? 'Running…' : 'Run'}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-off-black">Race Database</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Manage race dates, locations, and weather</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs text-off-black/30">{races.length} {races.length === 1 ? 'race' : 'races'}</span>
+                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => setShowScraperStatus(true)}
+                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-off-black">Scraper Status</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Test and monitor race result scrapers</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs text-off-black/30">{scraperResults.length} {scraperResults.length === 1 ? 'scraper' : 'scrapers'}</span>
+                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => setShowReviewRequest(true)}
+                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-off-black">Request Reviews</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Copy a review request message for any product</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Star className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
+                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
+                        </div>
+                      </div>
                     </button>
                   </div>
+
+                  {/* Customers Served Counter */}
+                  <div className="border-t border-border-gray p-6">
+                    <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
+                      <p className="text-sm font-medium text-off-black">Customers Served Counter</p>
+                      <p className="text-xs mt-0.5 text-off-black/50 mb-3">Adjust the counter displayed on the Shopify storefront. Saves to DB and syncs to Shopify.</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={customersServedInput}
+                          onChange={(e) => setCustomersServedInput(e.target.value)}
+                          placeholder={customersServedCount !== null ? String(customersServedCount) : 'Loading...'}
+                          className="flex-1 min-w-0 rounded-md border border-border-gray px-3 py-1.5 text-sm text-off-black bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                        />
+                        <button
+                          onClick={saveCustomersServedCount}
+                          disabled={isLoadingCounter || customersServedInput === String(customersServedCount)}
+                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                        >
+                          {isLoadingCounter && <Loader2 className="w-3 h-3 animate-spin" />}
+                          {isLoadingCounter ? 'Saving…' : 'Update & Sync'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Danger zone */}
+                  <div className="border-t border-border-gray p-6">
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-red-700">Clear Runner Research</p>
+                          <p className="text-xs mt-0.5 text-red-500">Deletes all cached bib, time, and pace data. All orders go back to &quot;Ready to research&quot;. Use after fixing a scraper bug.</p>
+                        </div>
+                        <button
+                          onClick={() => runSettingsAction('clear-research')}
+                          disabled={settingsAction !== null}
+                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700"
+                        >
+                          {settingsAction === 'clear-research' && <Loader2 className="w-3 h-3 animate-spin" />}
+                          {settingsAction === 'clear-research' ? 'Running…' : 'Run'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
