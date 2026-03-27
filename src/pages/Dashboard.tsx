@@ -2901,12 +2901,15 @@ Thank you!`
                         />
                       )}
 
-                      {/* ═══ DETAIL SECTIONS — only show what's relevant ═══ */}
+                      {/* ═══ DETAIL SECTIONS ═══ */}
 
-                      {/* Proofs & Upload — front and center when in_progress */}
-                      {ds === 'in_progress' && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Proofs & Approval</h4>
+                      {/* Proofs & Approval — always at top (except sent_to_production) */}
+                      {ds !== 'sent_to_production' && (
+                        <CollapsibleSection
+                          title="Proofs & Approval"
+                          defaultOpen={true}
+                          badge={selectedOrder.proofCount ? <span className="text-[10px] font-medium text-off-black/30">({selectedOrder.proofCount})</span> : undefined}
+                        >
                           <ProofManager
                             orderId={selectedOrder.id}
                             orderNumber={selectedOrder.orderNumber}
@@ -2916,11 +2919,11 @@ Thank you!`
                             onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
                             onLatestFeedback={setLatestFeedback}
                           />
-                        </div>
+                        </CollapsibleSection>
                       )}
 
                       {/* Design Info — always visible, Dan needs filename at every stage */}
-                        <CollapsibleSection title="Design Info" defaultOpen={true}>
+                        <CollapsibleSection title="Design Info" defaultOpen={ds === 'not_started' || ds === 'in_progress'}>
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                             <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
                             <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
@@ -2946,25 +2949,6 @@ Thank you!`
                             </div>
                           )}
                         </CollapsibleSection>
-
-                      {/* Proofs & Approval — for non-in_progress states, hide when sent to production */}
-                      {ds !== 'in_progress' && ds !== 'sent_to_production' && (
-                        <CollapsibleSection
-                          title="Proofs & Approval"
-                          defaultOpen={isProofStage}
-                          badge={selectedOrder.proofCount ? <span className="text-[10px] font-medium text-off-black/30">({selectedOrder.proofCount})</span> : undefined}
-                        >
-                          <ProofManager
-                            orderId={selectedOrder.id}
-                            orderNumber={selectedOrder.orderNumber}
-                            displayOrderNumber={selectedOrder.displayOrderNumber}
-                            designStatus={selectedOrder.designStatus}
-                            customerEmail={selectedOrder.customerEmail}
-                            onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
-                            onLatestFeedback={setLatestFeedback}
-                          />
-                        </CollapsibleSection>
-                      )}
 
                       {/* Notes — only if present, hide at production */}
                       {selectedOrder.notes && !isProductionStage && (
