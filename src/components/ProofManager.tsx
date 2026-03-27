@@ -46,6 +46,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [sendNote, setSendNote] = useState('')
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Compact mode: after approval, just show thumbnails — no upload UI, no big approval link
@@ -281,15 +282,18 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   const showResendButton = canSend && designStatus === 'awaiting_review'
   const isRevision = designStatus === 'in_revision'
 
-  const statusBadge = (status: Proof['status']) => {
-    switch (status) {
-      case 'approved':
-        return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-2.5 h-2.5" />Approved</span>
-      case 'revision_requested':
-        return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700"><AlertTriangle className="w-2.5 h-2.5" />Revision</span>
-      default:
-        return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">Pending</span>
+  const statusBadge = (proof: Proof) => {
+    if (proof.status === 'approved') {
+      return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-2.5 h-2.5" />Approved</span>
     }
+    if (proof.status === 'revision_requested') {
+      // Show "Revision" (yellow) if this proof has feedback, otherwise "Not Selected" (red)
+      if (proof.customerFeedback) {
+        return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700"><AlertTriangle className="w-2.5 h-2.5" />Revision</span>
+      }
+      return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-600">Rejected</span>
+    }
+    return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">Pending</span>
   }
 
   if (isLoading) {
@@ -300,10 +304,33 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
     )
   }
 
+  // Lightbox overlay for full-screen proof viewing
+  const lightbox = lightboxUrl && (
+    <div
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] cursor-pointer"
+      onClick={() => setLightboxUrl(null)}
+    >
+      <button
+        onClick={() => setLightboxUrl(null)}
+        className="absolute top-4 right-4 text-white/70 hover:text-white z-10"
+      >
+        <X className="w-8 h-8" />
+      </button>
+      <img
+        src={lightboxUrl}
+        alt="Proof preview"
+        className="max-w-[90vw] max-h-[90vh] object-contain select-none"
+        onClick={e => e.stopPropagation()}
+        draggable={false}
+      />
+    </div>
+  )
+
   // ═══ COMPACT MODE: just thumbnails for reference ═══
   if (isCompact && proofs.length > 0) {
     return (
       <div className="space-y-2">
+        {lightbox}
         <div className="flex flex-wrap gap-2">
           {[...proofs].reverse().map((proof) => (
             <div key={proof.id} className="relative group">
@@ -313,16 +340,16 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                   <span className="text-[10px] text-off-black/50 max-w-[80px] truncate">{proof.fileName || `v${proof.version}`}</span>
                 </a>
               ) : (
-                <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+                <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
                   <img
                     src={proof.imageUrl}
                     alt={`Proof v${proof.version}`}
-                    className="h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity"
+                    className="h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity cursor-pointer"
                   />
-                </a>
+                </button>
               )}
               <div className="absolute -top-1 -right-1">
-                {statusBadge(proof.status)}
+                {statusBadge(proof)}
               </div>
             </div>
           ))}
@@ -344,6 +371,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   // ═══ FULL MODE: upload UI, approval link, proof history ═══
   return (
     <div className="space-y-3" onPaste={handlePaste}>
+      {lightbox}
       {/* Approval Link — compact inline */}
       {approvalUrl ? (
         <div className="flex items-center gap-2">
@@ -501,16 +529,16 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                 <span className="text-[10px] text-off-black/50 max-w-[80px] truncate">{proof.fileName || `v${proof.version}`}</span>
               </a>
             ) : (
-              <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+              <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
                 <img
                   src={proof.imageUrl}
                   alt={`Proof v${proof.version}`}
-                  className="h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity"
+                  className="h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity cursor-pointer"
                 />
-              </a>
+              </button>
             )}
             <div className="absolute -top-1 -right-1">
-              {statusBadge(proof.status)}
+              {statusBadge(proof)}
             </div>
             <button
               onClick={() => deleteProof(proof.id)}

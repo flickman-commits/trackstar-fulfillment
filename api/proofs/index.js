@@ -178,6 +178,14 @@ export default async function handler(req, res) {
           })
         }
 
+        // For approvals: mark the chosen proof as approved, reject all others in the batch
+        if (approval === 'approve') {
+          await prisma.proof.updateMany({
+            where: { orderId: approvalToken.orderId, status: 'pending', id: { not: proofId } },
+            data: { status: 'revision_requested' }
+          })
+        }
+
         const updatedProof = approval === 'approve'
           ? await prisma.proof.update({
               where: { id: proofId },
