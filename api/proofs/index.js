@@ -198,15 +198,12 @@ export default async function handler(req, res) {
             ? String(shopifyData.name) : `#${approvalToken.order.parentOrderNumber}`
           const customerName = approvalToken.order.customerName || 'Customer'
           const emoji = approval === 'approve' ? '✅' : '🔄'
-          const mentions = approval === 'approve'
-            ? '<@U04KBDJH5C3> <@U09UVEP1N3Y>'  // Dan + Eli on approval
-            : '<@U04KBDJH5C3>'                    // Dan only on revision
           const action_text = approval === 'approve'
             ? `approved Option ${proof.version}`
             : `requested revisions on Option ${proof.version}`
-          const suffix = approval === 'approve' ? ' — Eli, the file is ready to upload to Artelo!' : ''
+          const suffix = approval === 'approve' ? ' — the file is ready to upload to orders.' : ''
           const slackMsg = {
-            text: `${emoji} ${mentions} *${customerName}* ${action_text} for order *${displayNum}*${suffix}${feedback ? `\n> _"${feedback}"_` : ''}`
+            text: `${emoji} <@U04KBDJH5C3> *${customerName}* ${action_text} for order *${displayNum}*${suffix}${feedback ? `\n> _"${feedback}"_` : ''}`
           }
           fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
             method: 'POST',
@@ -266,7 +263,7 @@ export default async function handler(req, res) {
     if (action === 'send-to-customer') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-      const { orderId } = body
+      const { orderId, note } = body
       if (!orderId) return res.status(400).json({ error: 'orderId is required' })
 
       const order = await prisma.order.findUnique({
@@ -328,9 +325,10 @@ export default async function handler(req, res) {
         <tr><td style="padding:32px;background-color:#FFFFFF;border:1px solid #E8E6E1;">
           <h1 style="margin:0 0 16px;font-size:22px;color:#1A1A1A;font-weight:700;letter-spacing:0.02em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">${headline}</h1>
           <p style="margin:0 0 8px;font-size:15px;color:#666666;line-height:1.6;">Hi ${customerName},</p>
-          <p style="margin:0 0 32px;font-size:15px;color:#666666;line-height:1.6;">${bodyText}</p>
+          <p style="margin:0 0 ${note ? '16px' : '32px'};font-size:15px;color:#666666;line-height:1.6;">${bodyText}</p>${note ? `
+          <p style="margin:0 0 32px;font-size:14px;color:#1A1A1A;line-height:1.6;padding:12px 16px;background-color:#F7F5F0;border-left:3px solid #4600D6;font-style:italic;">${note.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>` : ''}
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-            <a href="${approvalUrl}" style="display:inline-block;background-color:#C8553D;color:#FFFFFF;font-size:14px;font-weight:700;padding:14px 40px;border-radius:0px;text-decoration:none;letter-spacing:0.5px;text-transform:uppercase;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+            <a href="${approvalUrl}" style="display:inline-block;background-color:#4600D6;color:#FFFFFF;font-size:14px;font-weight:700;padding:14px 40px;border-radius:0px;text-decoration:none;letter-spacing:0.5px;text-transform:uppercase;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
               REVIEW YOUR DESIGN${proofCount > 1 ? 'S' : ''}
             </a>
           </td></tr></table>
@@ -383,6 +381,36 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ success: true, approvalUrl })
+    }
+
+    // ─── Notify Eli: PDF uploaded and ready for production ───
+    if (action === 'notify-production') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+      const { orderId } = body
+      if (!orderId) return res.status(400).json({ error: 'orderId is required' })
+
+      const order = await prisma.order.findUnique({ where: { id: orderId } })
+      if (!order) return res.status(404).json({ error: 'Order not found' })
+
+      const shopifyData = order.shopifyOrderData
+      const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
+        ? String(shopifyData.name) : `#${order.parentOrderNumber}`
+
+      // Send Slack notification to Eli
+      if (process.env.SLACK_PROOF_WEBHOOK_URL) {
+        const slackMsg = {
+          text: `📋 <@U09UVEP1N3Y> Final PDF uploaded for order *${displayNum}* — ready for production.`
+        }
+        fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(slackMsg)
+        }).catch(e => console.warn('[notify-production] Slack failed:', e.message))
+      }
+
+      console.log(`[notify-production] Eli notified for order ${order.orderNumber}`)
+      return res.status(200).json({ success: true })
     }
 
     // ─── Proof CRUD (merchant) ───

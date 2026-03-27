@@ -2921,7 +2921,7 @@ Thank you!`
 
                       {/* Design Info — only show when designing (not_started / in_progress) */}
                       {isDesigning && (
-                        <CollapsibleSection title="Design Info" defaultOpen={ds === 'not_started'}>
+                        <CollapsibleSection title="Design Info" defaultOpen={true}>
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                             <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
                             <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />

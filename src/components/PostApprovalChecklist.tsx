@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { CheckCircle2, Loader2, Send, Square, CheckSquare } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Loader2, Send, Square, CheckSquare } from 'lucide-react'
 import { toast } from 'sonner'
+
+const API_BASE = import.meta.env.VITE_API_URL || ''
+const GOOGLE_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/1hvHh3F9Wdo8cpLPziSbIC1SUHe6Tq1OI'
 
 interface PostApprovalChecklistProps {
   orderId: string
@@ -11,6 +14,7 @@ interface PostApprovalChecklistProps {
 }
 
 export default function PostApprovalChecklist({
+  orderId,
   designStatus,
   onDesignStatusChange,
 }: PostApprovalChecklistProps) {
@@ -19,11 +23,20 @@ export default function PostApprovalChecklist({
 
   const isSentToProduction = designStatus === 'sent_to_production'
 
-  const sendToProduction = async () => {
+  const notifyEliAndSendToProduction = async () => {
     setIsSending(true)
     try {
+      // Send Slack notification to Eli
+      await fetch(`${API_BASE}/api/proofs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'notify-production', orderId })
+      })
+      // Update design status
       onDesignStatusChange('sent_to_production')
-      toast.success('Sent to production! Eli has been notified.')
+      toast.success('Eli has been notified — sent to production!')
+    } catch {
+      toast.error('Failed to notify Eli')
     } finally {
       setIsSending(false)
     }
@@ -41,7 +54,18 @@ export default function PostApprovalChecklist({
 
   return (
     <div className="space-y-2">
-      {/* Step 1: Checkbox reminder to export & upload */}
+      {/* Step 1: Open Google Drive to upload */}
+      <a
+        href={GOOGLE_DRIVE_FOLDER}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-md transition-colors"
+      >
+        <ExternalLink className="w-4 h-4" />
+        Open Google Drive to Upload PDF
+      </a>
+
+      {/* Step 2: Checkbox — I've uploaded */}
       <button
         onClick={() => setUploaded(!uploaded)}
         className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-md border transition-colors text-left ${
@@ -55,19 +79,19 @@ export default function PostApprovalChecklist({
         ) : (
           <Square className="w-4 h-4 shrink-0 text-off-black/30" />
         )}
-        Exported and uploaded to Google Drive
+        PDF exported and uploaded to Google Drive
       </button>
 
-      {/* Step 2: Mark sent to production */}
+      {/* Step 3: Notify Eli */}
       <button
-        onClick={sendToProduction}
+        onClick={notifyEliAndSendToProduction}
         disabled={isSending}
         className="w-full px-4 py-3 text-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
       >
         {isSending ? (
-          <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+          <><Loader2 className="w-4 h-4 animate-spin" /> Notifying Eli...</>
         ) : (
-          <><Send className="w-4 h-4" /> PDF Uploaded — Notify Eli</>
+          <><Send className="w-4 h-4" /> Files Uploaded — Notify Eli</>
         )}
       </button>
     </div>

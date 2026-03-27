@@ -47,6 +47,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   const [copied, setCopied] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
+  const [sendNote, setSendNote] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Compact mode: after approval, just show thumbnails — no upload UI, no big approval link
@@ -257,7 +258,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
       const res = await fetch(`${API_BASE}/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send-to-customer', orderId })
+        body: JSON.stringify({ action: 'send-to-customer', orderId, note: sendNote.trim() || undefined })
       })
       const data = await res.json()
       if (!res.ok) {
@@ -268,6 +269,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         setApprovalUrl(data.approvalUrl)
       }
       onDesignStatusChange?.('awaiting_review')
+      setSendNote('')
       toast.success(`Proofs emailed to ${customerEmail}`)
     } catch {
       toast.error('Failed to send email')
@@ -452,17 +454,26 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
 
       {/* Send to Customer */}
       {showSendButton && (
-        <button
-          onClick={sendToCustomer}
-          disabled={isSending}
-          className="w-full px-3 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          {isSending ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
-          ) : (
-            <><Send className="w-4 h-4" /> {isRevision ? 'Send Updated Proofs' : 'Send Proofs to Customer'}</>
-          )}
-        </button>
+        <div className="space-y-2">
+          <textarea
+            value={sendNote}
+            onChange={(e) => setSendNote(e.target.value)}
+            placeholder="Add a note for the customer (optional)..."
+            className="w-full px-3 py-2 border border-border-gray rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
+            rows={2}
+          />
+          <button
+            onClick={sendToCustomer}
+            disabled={isSending}
+            className="w-full px-3 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isSending ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+            ) : (
+              <><Send className="w-4 h-4" /> {isRevision ? 'Send Updated Proofs' : 'Send Proofs to Customer'}</>
+            )}
+          </button>
+        </div>
       )}
 
       {showResendButton && (
