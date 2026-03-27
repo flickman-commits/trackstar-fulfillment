@@ -310,7 +310,7 @@ export default function ApprovalPortal() {
             {/* Current batch of pending proofs — horizontal carousel */}
             {hasPendingProofs && (
               <>
-                <div className="mb-4 max-w-lg mx-auto">
+                <div className="mb-4 mx-auto" style={{ maxWidth: 'min(512px, 100%)' }}>
                   <div className="relative">
                     <div
                       ref={carouselRef}
@@ -362,10 +362,10 @@ export default function ApprovalPortal() {
                                 )}
                               </div>
 
-                              {/* Proof display — edge-to-edge, 1:1 aspect */}
-                              <div style={{ backgroundColor: '#F5F5F5' }}>
+                              {/* Proof display — fits viewport, 1:1 max */}
+                              <div style={{ backgroundColor: '#F5F5F5', maxHeight: 'calc(100vh - 280px)' }} className="flex items-center justify-center overflow-hidden">
                                 {isPdf(proof.imageUrl) ? (
-                                  <div onClick={e => e.stopPropagation()} className="w-full h-full flex items-center justify-center">
+                                  <div onClick={e => e.stopPropagation()} className="w-full flex items-center justify-center" style={{ maxHeight: 'calc(100vh - 280px)' }}>
                                     <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin" style={{ color: '#666666' }} /></div>}>
                                       <PdfViewer url={proof.imageUrl} maxHeight={Math.round(window.innerHeight * 0.48)} />
                                     </Suspense>
@@ -373,12 +373,14 @@ export default function ApprovalPortal() {
                                 ) : (
                                   <div
                                     onClick={e => { e.stopPropagation(); setLightboxUrl(proof.imageUrl) }}
-                                    className="w-full aspect-square"
+                                    className="w-full flex items-center justify-center"
+                                    style={{ maxHeight: 'calc(100vh - 280px)' }}
                                   >
                                     <img
                                       src={proof.imageUrl}
                                       alt={`Option ${optionNum}`}
-                                      className="w-full h-full object-cover hover:opacity-95 transition-opacity"
+                                      className="w-full h-auto object-contain hover:opacity-95 transition-opacity"
+                                      style={{ maxHeight: 'calc(100vh - 280px)' }}
                                       draggable={false}
                                       onContextMenu={e => e.preventDefault()}
                                     />
