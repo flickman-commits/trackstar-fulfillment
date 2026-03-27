@@ -2919,8 +2919,7 @@ Thank you!`
                         </div>
                       )}
 
-                      {/* Design Info — only show when designing (not_started / in_progress) */}
-                      {isDesigning && (
+                      {/* Design Info — always visible, Dan needs filename at every stage */}
                         <CollapsibleSection title="Design Info" defaultOpen={true}>
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                             <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
@@ -2947,7 +2946,6 @@ Thank you!`
                             </div>
                           )}
                         </CollapsibleSection>
-                      )}
 
                       {/* Proofs & Approval — for non-in_progress states, hide when sent to production */}
                       {ds !== 'in_progress' && ds !== 'sent_to_production' && (
