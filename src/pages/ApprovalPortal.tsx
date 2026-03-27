@@ -27,6 +27,7 @@ interface OrderInfo {
   customerEmail: string | null
   raceName: string
   designStatus: string
+  designerNote: string | null
 }
 
 type PortalState = 'loading' | 'ready' | 'expired' | 'error' | 'all_approved' | 'revision_submitted'
@@ -291,6 +292,12 @@ export default function ApprovalPortal() {
             <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>
               We're working on your revisions. Check back soon.
             </p>
+          )}
+          {order?.designerNote && (
+            <div style={{ marginTop: '16px', padding: '12px 16px', backgroundColor: '#F7F5F0', borderLeft: '3px solid #4600D6', borderRadius: '0 4px 4px 0' }}>
+              <p style={{ color: '#666666', fontSize: '12px', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Note from our designer</p>
+              <p style={{ color: '#1A1A1A', fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const, margin: 0 }}>{order.designerNote}</p>
+            </div>
           )}
         </div>
 

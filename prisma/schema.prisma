@@ -44,6 +44,7 @@ model Order {
   creativeDirection  String?   // Creative direction notes from customer
   isGift             Boolean   @default(false) // Whether this is a gift order
   proofSentAt        DateTime? // When proofs were last sent to customer (for follow-up tracking)
+  designerNote       String?   // Optional note from designer sent with proofs (shown in approval portal)
 
   // Manual override fields (for customer corrections)
   yearOverride       Int?      // Override for raceYear

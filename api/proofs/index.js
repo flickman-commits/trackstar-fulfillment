@@ -118,7 +118,8 @@ export default async function handler(req, res) {
             select: {
               id: true, orderNumber: true, parentOrderNumber: true,
               customerName: true, customerEmail: true, raceName: true,
-              designStatus: true, trackstarOrderType: true, shopifyOrderData: true
+              designStatus: true, trackstarOrderType: true, shopifyOrderData: true,
+              designerNote: true
             }
           }
         }
@@ -319,7 +320,7 @@ export default async function handler(req, res) {
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
         <!-- Logo -->
         <tr><td style="padding:0 0 32px;text-align:center;">
-          <img src="https://www.trackstar.art/cdn/shop/files/Trackstar_Logo_H_Dark.png" alt="Trackstar" height="28" style="height:28px;" />
+          <img src="https://www.trackstar.art/cdn/shop/files/Trackstar_Logo_Cropped.png?height=28&v=1757377797" alt="Trackstar" height="28" style="height:28px;" />
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:32px;background-color:#FFFFFF;border:1px solid #E8E6E1;">
@@ -363,10 +364,10 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to send email. Please try again.' })
       }
 
-      // Update design status to awaiting_review and record when proofs were sent
+      // Update design status to awaiting_review, record when proofs were sent, and save designer note
       await prisma.order.update({
         where: { id: orderId },
-        data: { designStatus: 'awaiting_review', proofSentAt: new Date() }
+        data: { designStatus: 'awaiting_review', proofSentAt: new Date(), designerNote: note || null }
       })
 
       console.log(`[send-to-customer] Proofs emailed to ${order.customerEmail} for order ${order.orderNumber}`)
