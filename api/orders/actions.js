@@ -4,7 +4,7 @@
  * Consolidated endpoint for small order actions. Routes by `action` field in body.
  * Reduces serverless function count (Vercel Hobby plan limit: 12).
  *
- * Actions:
+ * POST Actions (body.action):
  *   - accept-match: Accept a suggested runner match
  *   - clear-race-cache: Clear race-level cached data
  *   - clear-research: Delete runner research records
@@ -13,6 +13,10 @@
  *   - customers-served-info: Get current customers served count
  *   - customers-served-sync: Force sync count to Shopify
  *   - customers-served-set: Manually set the count (for corrections)
+ *   - feature-request: Send a bug report or feature request to Slack
+ *
+ * GET Actions (query.action):
+ *   - monday-pipeline: Vercel cron — sends Monday morning Slack summary to Dan
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -23,10 +27,24 @@ const prisma = new PrismaClient()
 export default async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
+
+  // GET requests — used by Vercel cron
+  if (req.method === 'GET') {
+    const action = req.query?.action
+    if (action === 'monday-pipeline') {
+      const authHeader = req.headers['authorization']
+      if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        return res.status(401).json({ error: 'Unauthorized' })
+      }
+      return await handleMondayPipeline(res)
+    }
+    return res.status(400).json({ error: 'Unknown GET action' })
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
@@ -54,6 +72,8 @@ export default async function handler(req, res) {
         return await handleCustomersServedSync(res)
       case 'customers-served-set':
         return await handleCustomersServedSet(body, res)
+      case 'feature-request':
+        return await handleFeatureRequest(body, res)
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` })
     }
@@ -246,4 +266,106 @@ async function handleCustomersServedSet({ count }, res) {
     formatted: parsedCount.toLocaleString('en-US'),
     syncedToShopify: synced
   })
+}
+
+// --- feature-request ---
+async function handleFeatureRequest({ type, description }, res) {
+  if (!type || !description) {
+    return res.status(400).json({ error: 'type and description are required' })
+  }
+
+  const emoji = type === 'bug' ? '🐛' : '✨'
+  const title = type === 'bug' ? 'Bug Report' : 'Feature Request'
+
+  const message = {
+    blocks: [
+      { type: 'header', text: { type: 'plain_text', text: `${emoji} New ${title}`, emoji: true } },
+      { type: 'section', text: { type: 'mrkdwn', text: description } }
+    ]
+  }
+
+  const slackResponse = await fetch(process.env.SLACK_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(message)
+  })
+
+  if (!slackResponse.ok) throw new Error('Failed to send message to Slack')
+
+  console.log(`[actions/feature-request] ${title} submitted`)
+  return res.status(200).json({ success: true, message: 'Request submitted successfully' })
+}
+
+// --- monday-pipeline (Vercel cron) ---
+async function handleMondayPipeline(res) {
+  try {
+    const pipelineOrders = await prisma.order.findMany({
+      where: {
+        trackstarOrderType: 'custom',
+        designStatus: { not: 'sent_to_production' }
+      },
+      select: {
+        id: true,
+        dueDate: true,
+        designStatus: true,
+        runnerName: true,
+        displayOrderNumber: true,
+        raceName: true
+      }
+    })
+
+    const total = pipelineOrders.length
+    const now = new Date()
+
+    // Urgent = due within 3 days (same logic as frontend)
+    const urgentOrders = pipelineOrders.filter(o => {
+      if (!o.dueDate) return false
+      const diffDays = Math.ceil((new Date(o.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      return diffDays <= 3
+    })
+
+    const revisionCount = pipelineOrders.filter(o => o.designStatus === 'in_revision').length
+    const awaitingCustomerCount = pipelineOrders.filter(o => o.designStatus === 'awaiting_review').length
+    const urgentCount = urgentOrders.length
+
+    const formatDate = (dateStr) => {
+      if (!dateStr) return 'no date'
+      const d = new Date(dateStr)
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }
+
+    const urgentSection = urgentCount > 0
+      ? `\n\n:rotating_light: *Urgent (due within 3 days):*\n${urgentOrders.map(o => `• #${o.displayOrderNumber || '?'} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${formatDate(o.dueDate)}`).join('\n')}`
+      : ''
+
+    const message = {
+      blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: '📋 Monday Custom Orders Check-In' }
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `Hey <@U09UVEP1N3Y>! Here's our custom design update for the week:\n\n*${total} custom order${total !== 1 ? 's' : ''}* in the pipeline\n*${urgentCount} urgent* (due within 3 days)\n*${revisionCount}* that we need revisions on\n*${awaitingCustomerCount}* that we are waiting on customers for${urgentSection}\n\nLet's have an epic week, brotha`
+          }
+        }
+      ]
+    }
+
+    const slackResponse = await fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message)
+    })
+
+    if (!slackResponse.ok) throw new Error('Failed to send Slack message')
+
+    console.log(`[actions/monday-pipeline] Sent pipeline summary: ${total} orders, ${urgentCount} urgent`)
+    return res.status(200).json({ success: true, total, urgentCount, revisionCount, awaitingCustomerCount })
+  } catch (error) {
+    console.error('[actions/monday-pipeline] Error:', error)
+    return res.status(500).json({ error: error.message })
+  }
 }

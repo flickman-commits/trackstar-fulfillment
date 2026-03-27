@@ -2,7 +2,7 @@
   "framework": "vite",
   "crons": [
     {
-      "path": "/api/cron/monday-pipeline",
+      "path": "/api/orders/actions?action=monday-pipeline",
       "schedule": "0 13 * * 1"
     }
   ],
