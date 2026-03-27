@@ -1750,6 +1750,49 @@ Thank you!`
                         </div>
                       )
                     })}
+                    {/* Completed orders in search (custom mobile) */}
+                    {searchQuery && filteredCompletedOrders.length > 0 && (
+                      <>
+                        <div className="px-4 py-2.5 bg-subtle-gray/50">
+                          <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
+                        </div>
+                        {filteredCompletedOrders.map((order) => {
+                          const designConfig = DESIGN_STATUS_CONFIG[order.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.sent_to_production
+                          const itemCount = getOrderItemCount(order.parentOrderNumber)
+                          return (
+                            <div
+                              key={order.id}
+                              onClick={() => setSelectedOrder(order)}
+                              className="px-4 py-3 active:bg-subtle-gray cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${designConfig.bgColor} ${designConfig.color}`}>
+                                    <span>{designConfig.icon}</span>
+                                    {designConfig.label}
+                                  </span>
+                                  <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
+                                  {itemCount > 1 && (
+                                    <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
+                                      {order.lineItemIndex + 1}/{itemCount}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="mt-1">
+                                <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
+                              </div>
+                              <div className="mt-0.5 flex items-center justify-between gap-2">
+                                <span className="text-xs text-off-black/40">Completed</span>
+                                <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
+                                  {order.effectiveRaceName || order.raceName || '—'}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </>
+                    )}
                   </>
                 )}
 
@@ -1969,6 +2012,61 @@ Thank you!`
                           </tr>
                         )
                       })}
+                      {/* Completed orders inline when searching (custom view) */}
+                      {searchQuery && filteredCompletedOrders.length > 0 && (
+                        <>
+                          <tr className="bg-subtle-gray/50">
+                            <td colSpan={6} className="px-6 py-3">
+                              <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
+                            </td>
+                          </tr>
+                          {filteredCompletedOrders.map((order, index) => {
+                            const designConfig = DESIGN_STATUS_CONFIG[order.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.sent_to_production
+                            const itemCount = getOrderItemCount(order.parentOrderNumber)
+                            return (
+                              <tr
+                                key={order.id}
+                                onClick={() => setSelectedOrder(order)}
+                                className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
+                              >
+                                <td className="pl-6 pr-2 py-5 text-center">
+                                  <img
+                                    src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
+                                    alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
+                                    title={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
+                                    className="w-5 h-5 inline-block"
+                                  />
+                                </td>
+                                <td className="px-3 py-5">
+                                  <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
+                                    <span>{designConfig.icon}</span>
+                                    {designConfig.label}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
+                                    {itemCount > 1 && (
+                                      <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
+                                        Item {order.lineItemIndex + 1} of {itemCount}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-5">
+                                  <span className="text-sm text-off-black/40">—</span>
+                                </td>
+                                <td className="px-3 py-5 hidden md:table-cell">
+                                  <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
+                                </td>
+                                <td className="px-3 pr-6 py-5 text-sm text-off-black/60 hidden lg:table-cell">
+                                  <span className="line-clamp-1">{order.effectiveRaceName || order.raceName || '—'}</span>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </>
+                      )}
                     </tbody>
                   </>
                 )}
