@@ -262,9 +262,9 @@ export default function ApprovalPortal() {
 
       {/* Header — light bar */}
       <div style={{ backgroundColor: '#F0F0F0', borderBottom: '1px solid #E0E0E0' }}>
-        <div className="max-w-3xl mx-auto px-4 py-5">
+        <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <img src="/trackstar-logo.png" alt="Trackstar" className="h-7" />
+            <img src="/trackstar-logo.png" alt="Trackstar" className="h-6" />
             <div className="text-right">
               {order?.customerName && (
                 <p style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>{order.customerName}</p>
@@ -276,9 +276,9 @@ export default function ApprovalPortal() {
       </div>
 
       {/* Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 style={{ color: '#1A1A1A', fontSize: '28px', fontWeight: 700, marginBottom: '8px', letterSpacing: '-0.01em' }}>
+      <div className="max-w-3xl mx-auto px-4 py-4">
+        <div className="mb-4">
+          <h1 style={{ color: '#1A1A1A', fontSize: '24px', fontWeight: 700, marginBottom: '4px', letterSpacing: '-0.01em' }}>
             {order?.customerName ? `Hey ${order.customerName}.` : 'Your design is ready.'}
           </h1>
           {hasPendingProofs ? (
@@ -310,11 +310,11 @@ export default function ApprovalPortal() {
             {/* Current batch of pending proofs — horizontal carousel */}
             {hasPendingProofs && (
               <>
-                <div className="mb-6">
+                <div className="mb-4">
                   <div className="relative">
                     <div
                       ref={carouselRef}
-                      className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-2"
+                      className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2"
                       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
                       onScroll={() => {
                         const el = carouselRef.current
@@ -339,11 +339,11 @@ export default function ApprovalPortal() {
                               }}
                               onClick={() => setSelectedProofId(isSelected ? null : proof.id)}
                             >
-                              {/* Option header */}
-                              <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: isSelected ? 'rgba(70, 0, 214, 0.04)' : '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
-                                <div className="flex items-center gap-3">
+                              {/* Option header — compact */}
+                              <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: isSelected ? 'rgba(70, 0, 214, 0.04)' : '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
+                                <div className="flex items-center gap-2">
                                   <span
-                                    className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold"
+                                    className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold"
                                     style={{
                                       backgroundColor: isSelected ? '#4600D6' : '#E0E0E0',
                                       color: isSelected ? '#FFFFFF' : '#666666'
@@ -351,19 +351,19 @@ export default function ApprovalPortal() {
                                   >
                                     {pendingProofs.length === 1 ? '✓' : optionNum}
                                   </span>
-                                  <span style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>
+                                  <span style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 500 }}>
                                     {pendingProofs.length === 1 ? 'Your Design' : `Option ${optionNum} of ${pendingProofs.length}`}
                                   </span>
                                 </div>
                                 {isSelected && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(70, 0, 214, 0.1)', color: '#4600D6' }}>
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: 'rgba(70, 0, 214, 0.1)', color: '#4600D6' }}>
                                     <CheckCircle2 className="w-3 h-3" /> Selected
                                   </span>
                                 )}
                               </div>
 
-                              {/* Proof display */}
-                              <div className="p-3" style={{ height: '50vh', backgroundColor: '#F5F5F5' }}>
+                              {/* Proof display — edge-to-edge, 1:1 aspect */}
+                              <div style={{ backgroundColor: '#F5F5F5' }}>
                                 {isPdf(proof.imageUrl) ? (
                                   <div onClick={e => e.stopPropagation()} className="w-full h-full flex items-center justify-center">
                                     <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin" style={{ color: '#666666' }} /></div>}>
@@ -373,12 +373,12 @@ export default function ApprovalPortal() {
                                 ) : (
                                   <div
                                     onClick={e => { e.stopPropagation(); setLightboxUrl(proof.imageUrl) }}
-                                    className="w-full h-full flex items-center justify-center"
+                                    className="w-full aspect-square"
                                   >
                                     <img
                                       src={proof.imageUrl}
                                       alt={`Option ${optionNum}`}
-                                      className="max-w-full max-h-full object-contain hover:opacity-95 transition-opacity"
+                                      className="w-full h-full object-cover hover:opacity-95 transition-opacity"
                                       draggable={false}
                                       onContextMenu={e => e.preventDefault()}
                                     />
@@ -386,9 +386,9 @@ export default function ApprovalPortal() {
                                 )}
                               </div>
 
-                              {/* Selection hint */}
-                              <div className="px-4 py-2.5 text-center" style={{ borderTop: '1px solid #E0E0E0' }}>
-                                <p className="text-xs font-medium" style={{ color: isSelected ? '#4600D6' : '#999999' }}>
+                              {/* Selection hint — compact */}
+                              <div className="px-3 py-1.5 text-center" style={{ borderTop: '1px solid #E0E0E0' }}>
+                                <p className="text-[11px] font-medium" style={{ color: isSelected ? '#4600D6' : '#999999' }}>
                                   {isSelected ? '✓ Selected' : 'Tap to select'}
                                 </p>
                               </div>
@@ -429,7 +429,7 @@ export default function ApprovalPortal() {
 
                   {/* Dot indicators */}
                   {pendingProofs.length > 1 && (
-                    <div className="flex items-center justify-center gap-1.5 mt-4">
+                    <div className="flex items-center justify-center gap-1.5 mt-2">
                       {pendingProofs.map((_, idx) => (
                         <button
                           key={idx}
