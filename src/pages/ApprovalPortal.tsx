@@ -268,9 +268,33 @@ export default function ApprovalPortal() {
               </h1>
             </div>
             <p style={{ color: '#666666', fontSize: '14px', lineHeight: 1.6, marginBottom: '4px' }}>
-              We'll send it into production right away! It should arrive in 7 business days!
+              We'll send your design to production right away.
+              <br />
+              It will arrive in 7 business days — stoked for you to get it!
             </p>
             <p style={{ color: '#999999', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
+          </div>
+
+          {/* CTAs */}
+          <div className="flex gap-3 mb-8 max-w-xs mx-auto">
+            <a
+              href="https://yotpo.com/go/nHef7FVS"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 text-center px-4 py-2.5 text-sm font-medium transition-colors"
+              style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', color: '#666666' }}
+            >
+              Leave a Review
+            </a>
+            <a
+              href="https://www.trackstar.art/collections/marathons"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 text-center px-4 py-2.5 text-sm font-medium transition-colors"
+              style={{ backgroundColor: '#1A1A1A', color: '#FFFFFF' }}
+            >
+              Build Your Collection
+            </a>
           </div>
 
           {/* Earlier batches */}
