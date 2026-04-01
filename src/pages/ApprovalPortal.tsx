@@ -280,7 +280,7 @@ export default function ApprovalPortal() {
           </div>
 
           {/* CTAs */}
-          <div className="flex gap-3 mb-8 max-w-xs mx-auto">
+          <div className="flex items-center gap-3 mb-8 max-w-xs mx-auto">
             <a
               href="https://yotpo.com/go/nHef7FVS"
               target="_blank"
