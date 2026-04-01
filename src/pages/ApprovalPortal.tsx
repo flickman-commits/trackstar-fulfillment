@@ -196,20 +196,46 @@ export default function ApprovalPortal() {
   // ═══ APPROVED ═══
   if (state === 'all_approved') {
     const approvedProof = proofs.find(p => p.status === 'approved')
+    const pastProofsForApproved = proofs.filter(p => p.status !== 'approved' && p.status !== 'pending')
+
+    // Group past proofs by batch
+    const batchMap = new Map<number, Proof[]>()
+    pastProofsForApproved.forEach(p => {
+      const b = p.batch || 1
+      if (!batchMap.has(b)) batchMap.set(b, [])
+      batchMap.get(b)!.push(p)
+    })
+    const sortedBatches = [...batchMap.entries()].sort((a, b) => b[0] - a[0])
+
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
-        <div className="text-center max-w-sm">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
-          <CheckCircle2 className="w-16 h-16 mx-auto mb-4" style={{ color: '#4600D6' }} />
-          <h1 style={{ color: '#1A1A1A', fontSize: '24px', fontWeight: 700, marginBottom: '12px', letterSpacing: '0.01em' }}>
-            Design approved.
-          </h1>
-          <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6, marginBottom: '8px' }}>
-            {approvedProof ? `You selected Option ${approvedProof.version}. ` : ''}We'll get it into production.
-          </p>
-          <p style={{ color: '#999999', fontSize: '13px', marginBottom: '24px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
+      <div className="min-h-screen" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+        {/* Lightbox */}
+        {lightboxUrl && (
+          <div
+            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-pointer"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <button onClick={() => setLightboxUrl(null)} className="absolute top-4 right-4" style={{ color: '#999999' }}>
+              <X className="w-8 h-8" />
+            </button>
+            <img
+              src={lightboxUrl}
+              alt="Proof preview"
+              className="max-w-full max-h-[90vh] object-contain select-none"
+              onClick={e => e.stopPropagation()}
+              draggable={false}
+              onContextMenu={e => e.preventDefault()}
+            />
+          </div>
+        )}
+
+        <div className="max-w-md mx-auto px-4 py-8">
+          {/* Logo */}
+          <img src="/trackstar-logo.png" alt="Trackstar" className="h-6 mx-auto mb-8" />
+
+          {/* Approved design — hero image */}
           {approvedProof && !isPdf(approvedProof.imageUrl) && (
-            <div className="mx-auto overflow-hidden" style={{ maxWidth: '240px', border: '1px solid #E0E0E0' }}>
+            <div className="mx-auto mb-6 overflow-hidden" style={{ maxWidth: '320px', border: '1px solid #E0E0E0' }}>
               <img
                 src={approvedProof.imageUrl}
                 alt="Your approved design"
@@ -220,7 +246,7 @@ export default function ApprovalPortal() {
             </div>
           )}
           {approvedProof && isPdf(approvedProof.imageUrl) && (
-            <div className="mx-auto mt-2">
+            <div className="mx-auto mb-6 text-center">
               <a
                 href={approvedProof.imageUrl}
                 target="_blank"
@@ -232,6 +258,99 @@ export default function ApprovalPortal() {
               </a>
             </div>
           )}
+
+          {/* Confirmation text */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <CheckCircle2 className="w-5 h-5" style={{ color: '#4600D6' }} />
+              <h1 style={{ color: '#1A1A1A', fontSize: '20px', fontWeight: 700, letterSpacing: '0.01em' }}>
+                Design approved.
+              </h1>
+            </div>
+            <p style={{ color: '#666666', fontSize: '14px', lineHeight: 1.6, marginBottom: '4px' }}>
+              We'll get it into production.
+            </p>
+            <p style={{ color: '#999999', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
+          </div>
+
+          {/* Earlier batches */}
+          {sortedBatches.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowEarlierVersions(!showEarlierVersions)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm transition-colors"
+                style={{ color: '#999999' }}
+              >
+                {showEarlierVersions ? (
+                  <><ChevronUp className="w-4 h-4" /> Hide earlier batches</>
+                ) : (
+                  <><ChevronDown className="w-4 h-4" /> View {sortedBatches.length} earlier batch{sortedBatches.length !== 1 ? 'es' : ''}</>
+                )}
+              </button>
+              {showEarlierVersions && (
+                <div className="space-y-6 mt-2">
+                  {sortedBatches.map(([batchNum, batchProofs]) => {
+                    const feedback = batchProofs.find(p => p.status === 'revision_requested' && p.customerFeedback)?.customerFeedback || null
+                    return (
+                      <div key={batchNum}>
+                        <p className="text-xs font-medium mb-2" style={{ color: '#999999', letterSpacing: '0.03em' }}>
+                          Batch {batchNum} — {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {batchProofs.map(proof => {
+                            const badgeStyle = proof.status === 'rejected'
+                              ? { backgroundColor: 'rgba(220, 38, 38, 0.1)', color: '#DC2626' }
+                              : { backgroundColor: 'rgba(0,0,0,0.05)', color: '#666666' }
+                            const badgeLabel = proof.status === 'rejected' ? 'Rejected' : 'Revision'
+                            return (
+                              <div key={proof.id} className="relative opacity-60">
+                                {isPdf(proof.imageUrl) ? (
+                                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-md" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
+                                    <span className="text-lg">📄</span>
+                                    <span style={{ fontSize: '10px', color: '#666666' }}>{proof.fileName || `v${proof.version}`}</span>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
+                                    <img
+                                      src={proof.imageUrl}
+                                      alt={`Option ${proof.version}`}
+                                      className="h-16 w-16 object-cover rounded-md hover:opacity-90 transition-opacity"
+                                      style={{ border: '1px solid #E0E0E0' }}
+                                      draggable={false}
+                                      onContextMenu={e => e.preventDefault()}
+                                    />
+                                  </button>
+                                )}
+                                <span
+                                  className="absolute -top-1.5 -right-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium"
+                                  style={badgeStyle}
+                                >
+                                  {badgeLabel}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {feedback && (
+                          <div className="mt-2 px-4 py-3" style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0' }}>
+                            <p className="text-xs font-medium mb-1" style={{ color: '#4600D6' }}>Your feedback:</p>
+                            <p className="text-sm" style={{ color: '#666666' }}>{feedback}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="mt-12 pt-6 text-center" style={{ borderTop: '1px solid #E0E0E0' }}>
+            <p style={{ fontSize: '11px', color: '#999999', letterSpacing: '0.05em' }}>
+              Trackstar - Celebrating athletic achievement.
+            </p>
+          </div>
         </div>
       </div>
     )
