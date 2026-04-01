@@ -207,7 +207,31 @@ export default function ApprovalPortal() {
           <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6, marginBottom: '8px' }}>
             {approvedProof ? `You selected Option ${approvedProof.version}. ` : ''}We'll get it into production.
           </p>
-          <p style={{ color: '#999999', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
+          <p style={{ color: '#999999', fontSize: '13px', marginBottom: '24px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
+          {approvedProof && !isPdf(approvedProof.imageUrl) && (
+            <div className="mx-auto overflow-hidden" style={{ maxWidth: '240px', border: '1px solid #E0E0E0' }}>
+              <img
+                src={approvedProof.imageUrl}
+                alt="Your approved design"
+                className="w-full h-auto object-contain"
+                draggable={false}
+                onContextMenu={e => e.preventDefault()}
+              />
+            </div>
+          )}
+          {approvedProof && isPdf(approvedProof.imageUrl) && (
+            <div className="mx-auto mt-2">
+              <a
+                href={approvedProof.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2"
+                style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', color: '#666666', fontSize: '13px' }}
+              >
+                📄 View your approved design (PDF)
+              </a>
+            </div>
+          )}
         </div>
       </div>
     )
