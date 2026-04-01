@@ -235,11 +235,15 @@ export default function ApprovalPortal() {
 
           {/* Approved design — hero image */}
           {approvedProof && !isPdf(approvedProof.imageUrl) && (
-            <div className="mx-auto mb-6 overflow-hidden" style={{ maxWidth: '320px', border: '1px solid #E0E0E0' }}>
+            <div
+              className="mx-auto mb-6 overflow-hidden cursor-pointer"
+              style={{ maxWidth: '320px', border: '1px solid #E0E0E0' }}
+              onClick={() => setLightboxUrl(approvedProof.imageUrl)}
+            >
               <img
                 src={approvedProof.imageUrl}
                 alt="Your approved design"
-                className="w-full h-auto object-contain"
+                className="w-full h-auto object-contain hover:opacity-95 transition-opacity"
                 draggable={false}
                 onContextMenu={e => e.preventDefault()}
               />
