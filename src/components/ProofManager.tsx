@@ -592,7 +592,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
               return (
                 <div key={batchNum} className="mt-3">
                   <p className="text-[10px] font-semibold text-off-black/30 uppercase tracking-wider mb-1.5">
-                    Round {batchNum}{batchDate ? ` — ${batchDate}` : ''} ({batchProofs.length})
+                    Batch {batchNum}{batchDate ? ` — ${batchDate}` : ''} ({batchProofs.length})
                   </p>
                   {feedback && (
                     <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2">

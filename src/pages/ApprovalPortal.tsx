@@ -13,7 +13,7 @@ interface Proof {
   batch: number
   imageUrl: string
   fileName: string | null
-  status: 'pending' | 'approved' | 'revision_requested'
+  status: 'pending' | 'approved' | 'revision_requested' | 'rejected'
   customerFeedback: string | null
   createdAt: string
   updatedAt: string
@@ -547,9 +547,9 @@ export default function ApprovalPortal() {
                       style={{ color: '#999999' }}
                     >
                       {showEarlierVersions ? (
-                        <><ChevronUp className="w-4 h-4" /> Hide earlier versions</>
+                        <><ChevronUp className="w-4 h-4" /> Hide earlier batches</>
                       ) : (
-                        <><ChevronDown className="w-4 h-4" /> View {sortedBatches.length} earlier round{sortedBatches.length !== 1 ? 's' : ''}</>
+                        <><ChevronDown className="w-4 h-4" /> View {sortedBatches.length} earlier batch{sortedBatches.length !== 1 ? 'es' : ''}</>
                       )}
                     </button>
                   )}
@@ -560,25 +560,46 @@ export default function ApprovalPortal() {
                         return (
                           <div key={batchNum}>
                             <p className="text-xs font-medium mb-2" style={{ color: '#999999', letterSpacing: '0.03em' }}>
-                              Round {batchNum} — {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
+                              Batch {batchNum} — {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
                             </p>
-                            <div className="space-y-3">
-                              {batchProofs.map((proof, idx) => (
-                                <div key={proof.id} className="overflow-hidden opacity-60" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
-                                  <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
-                                    <span style={{ color: '#666666', fontSize: '14px' }}>Option {idx + 1}</span>
+                            <div className="flex flex-wrap gap-2">
+                              {batchProofs.map(proof => {
+                                const badgeStyle = proof.status === 'approved'
+                                  ? { backgroundColor: 'rgba(70, 0, 214, 0.1)', color: '#4600D6' }
+                                  : proof.status === 'rejected'
+                                    ? { backgroundColor: 'rgba(220, 38, 38, 0.1)', color: '#DC2626' }
+                                    : { backgroundColor: 'rgba(0,0,0,0.05)', color: '#666666' }
+                                const badgeLabel = proof.status === 'approved' ? 'Approved'
+                                  : proof.status === 'rejected' ? 'Rejected'
+                                    : 'Revision'
+                                return (
+                                  <div key={proof.id} className="relative opacity-60">
+                                    {isPdf(proof.imageUrl) ? (
+                                      <div className="flex items-center gap-1.5 px-3 py-2 rounded-md" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
+                                        <span className="text-lg">📄</span>
+                                        <span style={{ fontSize: '10px', color: '#666666' }}>{proof.fileName || `v${proof.version}`}</span>
+                                      </div>
+                                    ) : (
+                                      <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
+                                        <img
+                                          src={proof.imageUrl}
+                                          alt={`Option ${proof.version}`}
+                                          className="h-16 w-16 object-cover rounded-md hover:opacity-90 transition-opacity"
+                                          style={{ border: '1px solid #E0E0E0' }}
+                                          draggable={false}
+                                          onContextMenu={e => e.preventDefault()}
+                                        />
+                                      </button>
+                                    )}
                                     <span
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                      style={{
-                                        backgroundColor: proof.status === 'approved' ? 'rgba(70, 0, 214, 0.1)' : 'rgba(0,0,0,0.05)',
-                                        color: proof.status === 'approved' ? '#4600D6' : '#666666'
-                                      }}
+                                      className="absolute -top-1.5 -right-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium"
+                                      style={badgeStyle}
                                     >
-                                      {proof.status === 'approved' ? <><CheckCircle2 className="w-3 h-3" /> Approved</> : <><AlertTriangle className="w-3 h-3" /> Revision Requested</>}
+                                      {badgeLabel}
                                     </span>
                                   </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                             {feedback && (
                               <div className="mt-2 px-4 py-3" style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0' }}>
