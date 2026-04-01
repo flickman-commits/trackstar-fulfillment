@@ -280,12 +280,12 @@ export default function ApprovalPortal() {
           </div>
 
           {/* CTAs */}
-          <div className="flex items-center gap-3 mb-8 max-w-xs mx-auto">
+          <div className="flex gap-3 mb-8 mx-auto" style={{ maxWidth: '320px' }}>
             <a
               href="https://yotpo.com/go/nHef7FVS"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors"
+              className="w-1/2 text-center px-3 py-2.5 text-sm font-medium transition-colors"
               style={{ backgroundColor: 'transparent', border: '1px solid #4600D6', color: '#4600D6', borderRadius: 0 }}
             >
               Leave a Review
@@ -294,7 +294,7 @@ export default function ApprovalPortal() {
               href="https://www.trackstar.art/collections/marathons"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors"
+              className="w-1/2 text-center px-3 py-2.5 text-sm font-medium transition-colors"
               style={{ backgroundColor: 'transparent', border: '1px solid #4600D6', color: '#4600D6', borderRadius: 0 }}
             >
               Build Your Collection
