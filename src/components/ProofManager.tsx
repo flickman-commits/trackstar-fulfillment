@@ -8,6 +8,7 @@ interface Proof {
   id: string
   orderId: string
   version: number
+  batch: number
   imageUrl: string
   fileName: string | null
   status: 'pending' | 'approved' | 'revision_requested' | 'rejected'
@@ -525,7 +526,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
       {/* Proof History — thumbnail grid grouped by batch */}
       {(() => {
         const currentBatch = proofs.filter(p => p.status === 'pending')
-        const previousBatch = proofs.filter(p => p.status !== 'pending')
+        const previousProofs = proofs.filter(p => p.status !== 'pending')
 
         const renderThumbnail = (proof: Proof) => (
           <div key={proof.id} className="relative group">
@@ -561,8 +562,14 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
           </div>
         )
 
-        // Find the latest customer feedback from previous batch
-        const latestFeedback = [...previousBatch].reverse().find(p => p.customerFeedback)
+        // Group previous proofs by batch number (descending — most recent first)
+        const batchMap = new Map<number, Proof[]>()
+        previousProofs.forEach(p => {
+          const b = p.batch || 1
+          if (!batchMap.has(b)) batchMap.set(b, [])
+          batchMap.get(b)!.push(p)
+        })
+        const sortedBatches = [...batchMap.entries()].sort((a, b) => b[0] - a[0])
 
         return (
           <>
@@ -576,21 +583,29 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
               </div>
             )}
 
-            {/* Previous batches */}
-            {previousBatch.length > 0 && (
-              <div className="mt-3">
-                <p className="text-[10px] font-semibold text-off-black/30 uppercase tracking-wider mb-1.5">Previous ({previousBatch.length})</p>
-                {latestFeedback && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2">
-                    <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-0.5">Customer Feedback</p>
-                    <p className="text-xs text-amber-900">{latestFeedback.customerFeedback}</p>
+            {/* Previous batches — grouped by round */}
+            {sortedBatches.map(([batchNum, batchProofs]) => {
+              const feedback = [...batchProofs].reverse().find(p => p.customerFeedback)
+              const batchDate = batchProofs[0]?.createdAt
+                ? new Date(batchProofs[0].createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : null
+              return (
+                <div key={batchNum} className="mt-3">
+                  <p className="text-[10px] font-semibold text-off-black/30 uppercase tracking-wider mb-1.5">
+                    Round {batchNum}{batchDate ? ` — ${batchDate}` : ''} ({batchProofs.length})
+                  </p>
+                  {feedback && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2">
+                      <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-0.5">Customer Feedback</p>
+                      <p className="text-xs text-amber-900">{feedback.customerFeedback}</p>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2 opacity-60">
+                    {[...batchProofs].reverse().map(renderThumbnail)}
                   </div>
-                )}
-                <div className="flex flex-wrap gap-2 opacity-60">
-                  {[...previousBatch].reverse().map(renderThumbnail)}
                 </div>
-              </div>
-            )}
+              )
+            })}
           </>
         )
       })()}

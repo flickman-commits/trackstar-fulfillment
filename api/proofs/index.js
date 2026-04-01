@@ -448,6 +448,21 @@ export default async function handler(req, res) {
       })
       const version = (lastProof?.version || 0) + 1
 
+      // Determine batch number: if there are no pending proofs (all previous were
+      // resolved via approval/revision/rejection), start a new batch
+      const existingProofs = await prisma.proof.findMany({
+        where: { orderId },
+        select: { batch: true, status: true }
+      })
+      let batch = 1
+      if (existingProofs.length > 0) {
+        const maxBatch = Math.max(...existingProofs.map(p => p.batch))
+        const hasPending = existingProofs.some(p => p.status === 'pending')
+        // If there are already pending proofs, they're in the current batch — join them
+        // If all proofs are resolved, start a new batch
+        batch = hasPending ? maxBatch : maxBatch + 1
+      }
+
       const supabaseClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
       let publicUrl = imageUrl || null
 
@@ -504,7 +519,7 @@ export default async function handler(req, res) {
 
       const fileName = uploadedFile?.originalFilename || imageName || null
       const proof = await prisma.proof.create({
-        data: { orderId, version, imageUrl: publicUrl, fileName, status: 'pending' }
+        data: { orderId, version, batch, imageUrl: publicUrl, fileName, status: 'pending' }
       })
 
       let approvalToken = await prisma.approvalToken.findUnique({ where: { orderId } })

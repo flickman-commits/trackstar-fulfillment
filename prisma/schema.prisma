@@ -137,6 +137,7 @@ model Proof {
   id               String   @id @default(cuid())
   orderId          String
   version          Int
+  batch            Int      @default(1) // Which send-round this proof belongs to (1 = first send, 2 = first revision, etc.)
   imageUrl         String
   fileName         String?
   status           String   @default("pending") // "pending" | "approved" | "revision_requested"

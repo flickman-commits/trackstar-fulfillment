@@ -10,6 +10,7 @@ interface Proof {
   id: string
   orderId: string
   version: number
+  batch: number
   imageUrl: string
   fileName: string | null
   status: 'pending' | 'approved' | 'revision_requested'
@@ -69,7 +70,11 @@ export default function ApprovalPortal() {
       setOrder(data.order)
       setProofs(data.proofs)
 
-      if (data.proofs.length > 0 && data.proofs.some((p: Proof) => p.status === 'approved')) {
+      // Show approved screen only if designStatus confirms it AND a proof is approved
+      // (prevents stuck "approved" screen after internal unapprove)
+      const hasApprovedProof = data.proofs.some((p: Proof) => p.status === 'approved')
+      const designConfirmsApproval = ['approved_by_customer', 'final_pdf_uploaded', 'sent_to_production'].includes(data.order.designStatus)
+      if (hasApprovedProof && designConfirmsApproval) {
         setState('all_approved')
       } else {
         setState('ready')
@@ -517,50 +522,78 @@ export default function ApprovalPortal() {
               </>
             )}
 
-            {/* Past proofs */}
-            {pastProofs.length > 0 && (
-              <div className={hasPendingProofs ? 'mt-4' : ''}>
-                {hasPendingProofs && (
-                  <button
-                    onClick={() => setShowEarlierVersions(!showEarlierVersions)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm transition-colors"
-                    style={{ color: '#999999' }}
-                  >
-                    {showEarlierVersions ? (
-                      <><ChevronUp className="w-4 h-4" /> Hide earlier versions</>
-                    ) : (
-                      <><ChevronDown className="w-4 h-4" /> View {pastProofs.length} earlier version{pastProofs.length !== 1 ? 's' : ''}</>
-                    )}
-                  </button>
-                )}
-                {(showEarlierVersions || !hasPendingProofs) && (
-                  <div className="space-y-4 mt-2">
-                    {pastProofs.map(proof => (
-                      <div key={proof.id} className="overflow-hidden opacity-60" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
-                        <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
-                          <span style={{ color: '#666666', fontSize: '14px' }}>Option {proof.version}</span>
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                            style={{
-                              backgroundColor: proof.status === 'approved' ? 'rgba(70, 0, 214, 0.1)' : 'rgba(0,0,0,0.05)',
-                              color: proof.status === 'approved' ? '#4600D6' : '#666666'
-                            }}
-                          >
-                            {proof.status === 'approved' ? <><CheckCircle2 className="w-3 h-3" /> Approved</> : <><AlertTriangle className="w-3 h-3" /> Revision Requested</>}
-                          </span>
-                        </div>
-                        {proof.customerFeedback && (
-                          <div className="px-4 py-3" style={{ borderTop: '1px solid #E0E0E0', backgroundColor: '#FAFAFA' }}>
-                            <p className="text-xs font-medium mb-1" style={{ color: '#4600D6' }}>Your feedback:</p>
-                            <p className="text-sm" style={{ color: '#666666' }}>{proof.customerFeedback}</p>
+            {/* Past proofs — grouped by batch */}
+            {pastProofs.length > 0 && (() => {
+              // Group past proofs by batch number, sorted descending (most recent batch first)
+              const batchMap = new Map<number, Proof[]>()
+              pastProofs.forEach(p => {
+                const b = p.batch || 1
+                if (!batchMap.has(b)) batchMap.set(b, [])
+                batchMap.get(b)!.push(p)
+              })
+              const sortedBatches = [...batchMap.entries()].sort((a, b) => b[0] - a[0])
+              // Find feedback per batch (the revision_requested proof with feedback)
+              const getFeedback = (batchProofs: Proof[]) => {
+                const revProof = batchProofs.find(p => p.status === 'revision_requested' && p.customerFeedback)
+                return revProof?.customerFeedback || null
+              }
+
+              return (
+                <div className={hasPendingProofs ? 'mt-4' : ''}>
+                  {hasPendingProofs && (
+                    <button
+                      onClick={() => setShowEarlierVersions(!showEarlierVersions)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 text-sm transition-colors"
+                      style={{ color: '#999999' }}
+                    >
+                      {showEarlierVersions ? (
+                        <><ChevronUp className="w-4 h-4" /> Hide earlier versions</>
+                      ) : (
+                        <><ChevronDown className="w-4 h-4" /> View {sortedBatches.length} earlier round{sortedBatches.length !== 1 ? 's' : ''}</>
+                      )}
+                    </button>
+                  )}
+                  {(showEarlierVersions || !hasPendingProofs) && (
+                    <div className="space-y-6 mt-2">
+                      {sortedBatches.map(([batchNum, batchProofs]) => {
+                        const feedback = getFeedback(batchProofs)
+                        return (
+                          <div key={batchNum}>
+                            <p className="text-xs font-medium mb-2" style={{ color: '#999999', letterSpacing: '0.03em' }}>
+                              Round {batchNum} — {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
+                            </p>
+                            <div className="space-y-3">
+                              {batchProofs.map((proof, idx) => (
+                                <div key={proof.id} className="overflow-hidden opacity-60" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
+                                  <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
+                                    <span style={{ color: '#666666', fontSize: '14px' }}>Option {idx + 1}</span>
+                                    <span
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                      style={{
+                                        backgroundColor: proof.status === 'approved' ? 'rgba(70, 0, 214, 0.1)' : 'rgba(0,0,0,0.05)',
+                                        color: proof.status === 'approved' ? '#4600D6' : '#666666'
+                                      }}
+                                    >
+                                      {proof.status === 'approved' ? <><CheckCircle2 className="w-3 h-3" /> Approved</> : <><AlertTriangle className="w-3 h-3" /> Revision Requested</>}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {feedback && (
+                              <div className="mt-2 px-4 py-3" style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0' }}>
+                                <p className="text-xs font-medium mb-1" style={{ color: '#4600D6' }}>Your feedback:</p>
+                                <p className="text-sm" style={{ color: '#666666' }}>{feedback}</p>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </>
         )}
 

@@ -209,6 +209,16 @@ async function handleDesignStatus({ orderNumber, designStatus }, res) {
     updateData.researchedAt = null
   }
 
+  // Unapprove: when moving back from approved_by_customer, reset the approved proof
+  // so the customer portal doesn't stay stuck on the "approved" screen
+  if (existing.designStatus === 'approved_by_customer' && designStatus === 'in_revision') {
+    await prisma.proof.updateMany({
+      where: { orderId: existing.id, status: 'approved' },
+      data: { status: 'revision_requested' }
+    })
+    console.log(`[actions/design-status] Reset approved proofs to revision_requested for order ${orderNumber}`)
+  }
+
   const order = await prisma.order.update({
     where: { id: existing.id },
     data: updateData
