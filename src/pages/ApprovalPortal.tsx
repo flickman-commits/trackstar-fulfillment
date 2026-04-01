@@ -281,7 +281,7 @@ export default function ApprovalPortal() {
               href="https://yotpo.com/go/nHef7FVS"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 text-center px-4 py-2 text-sm font-medium transition-colors"
+              className="flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors"
               style={{ backgroundColor: 'transparent', border: '1px solid #4600D6', color: '#4600D6', borderRadius: 0 }}
             >
               Leave a Review
@@ -290,7 +290,7 @@ export default function ApprovalPortal() {
               href="https://www.trackstar.art/collections/marathons"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 text-center px-4 py-2 text-sm font-medium transition-colors"
+              className="flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors"
               style={{ backgroundColor: 'transparent', border: '1px solid #4600D6', color: '#4600D6', borderRadius: 0 }}
             >
               Build Your Collection
