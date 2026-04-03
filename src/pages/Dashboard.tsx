@@ -1394,6 +1394,11 @@ Thank you!`
       'San Francisco Marathon': 'SF',
       'Jackson Hole Marathon': 'Jackson Hole',
       'Sydney Marathon': 'Sydney',
+      // International
+      'London Marathon': 'London',
+      'TCS London Marathon': 'London',
+      'Virgin Money London Marathon': 'London',
+      'Tokyo Marathon': 'Tokyo',
       // Alternate name formats
       'TCS New York City Marathon': 'NYC',
       'Bank of America Chicago Marathon': 'Chicago',
