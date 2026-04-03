@@ -23,6 +23,9 @@ export default {
   resultSets: {
     2025: { marathon: 545412, half: 545356 }
   },
+  eventIds: {
+    2025: { marathon: 982888, half: 982887 }
+  },
   /**
    * Eugene Marathon is typically the last Sunday in April
    */

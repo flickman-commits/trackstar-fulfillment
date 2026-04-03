@@ -1,10 +1,14 @@
 /**
  * RunSignUp Platform Scraper
  * Consolidates all races hosted on RunSignUp (Kiawah Island, Louisiana, etc.)
- * Uses Puppeteer to search the RunSignUp results UI
+ * Supports two modes:
+ *   1. REST API (fast) — if config has eventIds, uses /Rest/race/.../results/get-results
+ *   2. Puppeteer (fallback) — launches headless browser for client-side search
  */
 import { BaseScraper } from '../BaseScraper.js'
 import { launchBrowser } from '../browserLauncher.js'
+
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 export class RunSignUpScraper extends BaseScraper {
   /**
@@ -15,6 +19,7 @@ export class RunSignUpScraper extends BaseScraper {
    * @param {string} config.location - City, State
    * @param {string[]} config.eventTypes - e.g. ['Marathon', 'Half Marathon']
    * @param {Object} config.resultSets - year -> { marathon: id, half: id }
+   * @param {Object} [config.eventIds] - year -> { marathon: id, half: id } (for REST API)
    * @param {Function} config.calculateDate - (year) => Date
    */
   constructor(year, config) {
@@ -56,6 +61,12 @@ export class RunSignUpScraper extends BaseScraper {
 
     // Try each event type in order (marathon first, then half, etc.)
     const eventOrder = this.config.eventSearchOrder || ['marathon', 'half']
+    const yearEventIds = this.config.eventIds?.[this.year]
+    const useApi = !!yearEventIds
+
+    if (useApi) {
+      console.log(`[${this.tag} ${this.year}] Using REST API (fast path)`)
+    }
 
     for (const eventKey of eventOrder) {
       const resultSetId = yearSets[eventKey]
@@ -64,7 +75,12 @@ export class RunSignUpScraper extends BaseScraper {
       const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
       console.log(`[${this.tag} ${this.year}] Searching ${eventLabel} results...`)
 
-      const result = await this.searchEventType(runnerName, eventLabel, resultSetId)
+      let result
+      if (useApi && yearEventIds[eventKey]) {
+        result = await this.searchEventTypeViaApi(runnerName, eventLabel, resultSetId, yearEventIds[eventKey])
+      } else {
+        result = await this.searchEventType(runnerName, eventLabel, resultSetId)
+      }
       if (result.found) return result
     }
 
@@ -73,7 +89,91 @@ export class RunSignUpScraper extends BaseScraper {
   }
 
   /**
-   * Search for a runner in a specific event type via Puppeteer
+   * Search for a runner via RunSignUp REST API (fast, no browser needed)
+   */
+  async searchEventTypeViaApi(runnerName, eventType, resultSetId, eventId) {
+    try {
+      // Extract last name for the API query
+      const nameParts = runnerName.trim().split(/\s+/)
+      const lastName = nameParts[nameParts.length - 1]
+
+      const apiUrl = `https://runsignup.com/Rest/race/${this.raceId}/results/get-results` +
+        `?format=json&resultSetId=${resultSetId}&event_id=${eventId}` +
+        `&last_name=${encodeURIComponent(lastName)}&page=1&num=50`
+
+      console.log(`[${this.tag} ${this.year}] API request: ${apiUrl}`)
+
+      const response = await fetch(apiUrl, {
+        headers: { 'User-Agent': USER_AGENT }
+      })
+
+      if (!response.ok) {
+        console.log(`[${this.tag} ${this.year}] API returned ${response.status}, falling back to Puppeteer`)
+        return await this.searchEventType(runnerName, eventType, resultSetId)
+      }
+
+      const data = await response.json()
+      const resultSet = data?.individual_results_sets?.[0]
+      const rawResults = resultSet?.results || []
+
+      console.log(`[${this.tag} ${this.year}] API returned ${rawResults.length} results`)
+
+      if (rawResults.length === 0) {
+        return this.notFoundResult()
+      }
+
+      // Map API results to our standard format
+      const results = rawResults.map(r => ({
+        name: `${r.first_name || ''} ${r.last_name || ''}`.trim(),
+        bib: r.bib != null ? String(r.bib) : null,
+        chipTime: r.chip_time || r.clock_time || null,
+        pace: r.pace || null,
+        placeOverall: r.place != null ? String(r.place) : null,
+        gender: r.gender || null,
+        age: r.age != null ? String(r.age) : null,
+        city: r.city || null,
+        state: r.state || null
+      }))
+
+      // Filter for exact name matches
+      const matches = results.filter(r => this.namesMatch(runnerName, r.name))
+      console.log(`[${this.tag} ${this.year}] Exact matches: ${matches.length}`)
+
+      if (matches.length === 0) {
+        console.log(`[${this.tag} ${this.year}] No exact match. Closest:`)
+        results.slice(0, 3).forEach(r => console.log(`  - ${r.name} (${r.chipTime})`))
+        return this.notFoundResult()
+      }
+
+      if (matches.length > 1) {
+        console.log(`[${this.tag} ${this.year}] Multiple matches:`)
+        matches.forEach(m => console.log(`  - ${m.name}, Bib: ${m.bib}, Time: ${m.chipTime}`))
+        return this.ambiguousResult(matches.map(m => ({
+          name: m.name,
+          bib: m.bib,
+          time: m.chipTime
+        })))
+      }
+
+      const match = matches[0]
+      console.log(`\n[${this.tag} ${this.year}] FOUND RUNNER (via API):`)
+      console.log(`  Name: ${match.name}`)
+      console.log(`  Bib: ${match.bib}`)
+      console.log(`  Chip Time: ${match.chipTime}`)
+      console.log(`  Pace: ${match.pace}`)
+      console.log(`  Place: ${match.placeOverall}`)
+
+      const resultsUrl = `${this.baseUrl}/Race/Results/${this.raceId}/${resultSetId}#resultSetId-${resultSetId}`
+      return { ...this.extractRunnerData(match, eventType), resultsUrl }
+
+    } catch (error) {
+      console.error(`[${this.tag} ${this.year}] API error: ${error.message}, falling back to Puppeteer`)
+      return await this.searchEventType(runnerName, eventType, resultSetId)
+    }
+  }
+
+  /**
+   * Search for a runner in a specific event type via Puppeteer (fallback)
    */
   async searchEventType(runnerName, eventType, resultSetId) {
     let browser = null
