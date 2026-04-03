@@ -32,6 +32,7 @@ import oaklandConfig from './configs/oakland.js'
 import marinecorps1775kConfig from './configs/marinecorps1775k.js'
 import cowtownConfig from './configs/cowtown.js'
 import mesaConfig from './configs/mesa.js'
+import londonConfig from './configs/london.js'
 
 /**
  * Map platform identifier -> platform scraper class
@@ -68,6 +69,7 @@ const ALL_CONFIGS = [
   marinecorps1775kConfig,
   cowtownConfig,
   mesaConfig,
+  londonConfig,
 ]
 
 /**

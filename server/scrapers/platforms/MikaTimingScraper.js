@@ -186,12 +186,12 @@ export class MikaTimingScraper extends BaseScraper {
         const overallPlace = $row.find('.type-place.place-secondary').first().text().trim()
         const genderPlace = $row.find('.type-place.place-primary').first().text().trim()
 
-        // Extract BIB
+        // Extract BIB / Runner Number
         let bib = ''
         $row.find('.type-field').each((_, field) => {
           const text = $(field).text().trim()
-          if (text.includes('BIB')) {
-            bib = text.replace(/BIB/gi, '').trim()
+          if (text.includes('BIB') || text.includes('Runner Number')) {
+            bib = text.replace(/BIB|Runner\s*Number/gi, '').trim()
           } else if (/^\d{4,6}$/.test(text)) {
             bib = text
           }
