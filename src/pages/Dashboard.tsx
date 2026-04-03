@@ -284,6 +284,7 @@ export default function Dashboard() {
   const [latestFeedback, setLatestFeedback] = useState<string | null>(null)
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false)
   const commentFileInputRef = useRef<HTMLInputElement>(null)
+  const [raceShorthands, setRaceShorthands] = useState<Record<string, string>>({})
 
   // Fetch orders from database (filtered by activeView type)
   const fetchOrders = useCallback(async () => {
@@ -1054,6 +1055,14 @@ export default function Dashboard() {
     return () => clearInterval(poll)
   }, [fetchOrders])
 
+  // Fetch race shorthands from scraper configs (once on mount)
+  useEffect(() => {
+    fetch('/api/orders/actions?action=race-shorthands')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.shorthands) setRaceShorthands(data.shorthands) })
+      .catch(() => {})
+  }, [])
+
   // Update design status for custom orders
   const updateDesignStatus = async (orderNumber: string, designStatus: DesignStatus) => {
     // Optimistically update UI immediately before the API call
@@ -1361,18 +1370,17 @@ Thank you!`
   const getRaceShorthand = (raceName: string): string => {
     if (!raceName) return 'Race'
 
-    // Common race name mappings
+    // 1. Check API-sourced shorthands from scraper configs (auto-updated)
+    if (raceShorthands[raceName]) {
+      return raceShorthands[raceName]
+    }
+
+    // 2. Fallback: hardcoded map for races without scrapers
     const shorthandMap: { [key: string]: string } = {
       'Surf City Marathon': 'Surf City',
-      'Mesa Marathon': 'Mesa',
       'Berlin Marathon': 'Berlin',
       'Denver Colfax Marathon': 'Colfax',
       'Miami Marathon': 'Miami',
-      'Buffalo Marathon': 'Buffalo',
-      'Twin Cities Marathon': 'Twin Cities',
-      'Louisiana Marathon': 'Louisiana',
-      'Austin Marathon': 'Austin',
-      'Ascension Seton Austin Marathon': 'Austin',
       'Army Ten Miler': 'ATM',
       'Detroit Marathon': 'Detroit',
       'Columbus Marathon': 'Columbus',
@@ -1380,29 +1388,15 @@ Thank you!`
       'Grandma\'s Marathon': 'Grandma\'s',
       'Houston Marathon': 'Houston',
       'Dallas Marathon': 'Dallas',
-      'California International Marathon': 'CIM',
       'Palm Beaches Marathon': 'Palm Beaches',
-      'New York City Marathon': 'NYC',
       'Baltimore Marathon': 'Baltimore',
-      'Philadelphia Marathon': 'Philly',
       'San Antonio Marathon': 'San Antonio',
-      'Kiawah Island Marathon': 'Kiawah',
       'Honolulu Marathon': 'Honolulu',
-      'Marine Corps Marathon': 'MCM',
-      'Chicago Marathon': 'Chicago',
       'Air Force Marathon': 'Air Force',
       'San Francisco Marathon': 'SF',
       'Jackson Hole Marathon': 'Jackson Hole',
       'Sydney Marathon': 'Sydney',
-      // International
-      'London Marathon': 'London',
-      'TCS London Marathon': 'London',
-      'Virgin Money London Marathon': 'London',
       'Tokyo Marathon': 'Tokyo',
-      // Alternate name formats
-      'TCS New York City Marathon': 'NYC',
-      'Bank of America Chicago Marathon': 'Chicago',
-      'Marine Corps': 'MCM',
     }
 
     // Check for exact match

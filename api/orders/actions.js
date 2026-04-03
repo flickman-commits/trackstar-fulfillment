@@ -21,6 +21,7 @@
 
 import { PrismaClient } from '@prisma/client'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
+import { getRaceShorthands } from '../../server/scrapers/index.js'
 
 const prisma = new PrismaClient()
 
@@ -41,6 +42,9 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' })
       }
       return await handleMondayPipeline(res)
+    }
+    if (action === 'race-shorthands') {
+      return res.status(200).json({ shorthands: getRaceShorthands() })
     }
     return res.status(400).json({ error: 'Unknown GET action' })
   }

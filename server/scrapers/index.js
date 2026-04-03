@@ -182,8 +182,30 @@ export function getSupportedRaces() {
   return ALL_CONFIGS.map(config => config.raceName)
 }
 
+/**
+ * Get race name → shorthand map from all configs.
+ * Maps every alias to its tag so the frontend can generate filenames.
+ * @returns {Object} e.g. { "Chicago Marathon": "Chicago", "London Marathon": "London", ... }
+ */
+export function getRaceShorthands() {
+  const map = {}
+  for (const config of ALL_CONFIGS) {
+    const tag = config.tag || config.raceName
+    // Map the primary race name
+    map[config.raceName] = tag
+    // Map all aliases
+    if (config.aliases) {
+      for (const alias of config.aliases) {
+        map[alias] = tag
+      }
+    }
+  }
+  return map
+}
+
 export default {
   getScraperForRace,
   hasScraperForRace,
-  getSupportedRaces
+  getSupportedRaces,
+  getRaceShorthands
 }
