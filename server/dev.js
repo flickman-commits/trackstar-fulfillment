@@ -24,9 +24,10 @@ const routes = [
   { method: 'get',  path: '/api/orders',                    handler: '../api/orders/index.js' },
   { method: 'post', path: '/api/orders/import',              handler: '../api/orders/import.js' },
   { method: 'post', path: '/api/orders/research-runner',     handler: '../api/orders/research-runner.js' },
+  { method: 'get',  path: '/api/orders/actions',              handler: '../api/orders/actions.js' },
   { method: 'post', path: '/api/orders/actions',              handler: '../api/orders/actions.js' },
   { method: 'post', path: '/api/orders/update',              handler: '../api/orders/update.js' },
-  { method: 'get',  path: '/api/orders/refresh-weather',     handler: '../api/orders/refresh-weather.js' },
+  { method: 'post', path: '/api/orders/refresh-weather',     handler: '../api/orders/refresh-weather.js' },
   { method: 'post', path: '/api/orders/refresh-shopify-data', handler: '../api/orders/refresh-shopify-data.js' },
   { method: 'get',  path: '/api/orders/test-scrapers',      handler: '../api/orders/test-scrapers.js' },
   { method: 'post', path: '/api/orders/test-scrapers',      handler: '../api/orders/test-scrapers.js' },
@@ -56,7 +57,7 @@ for (const route of routes) {
   app.options(route.path, (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret')
     res.status(204).end()
   })
 }

@@ -13,10 +13,9 @@
  * Scope: transactions_r
  */
 
-import { PrismaClient } from '@prisma/client'
+import prisma from '../_lib/prisma.js'
+import { setCors, requireAdmin } from '../_lib/auth.js'
 import crypto from 'crypto'
-
-const prisma = new PrismaClient()
 
 function base64urlEncode(buffer) {
   return buffer.toString('base64')
@@ -26,8 +25,8 @@ function base64urlEncode(buffer) {
 }
 
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  if (setCors(req, res)) return
+  if (!requireAdmin(req, res)) return
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 

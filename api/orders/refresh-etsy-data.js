@@ -5,25 +5,19 @@
  * Similar to refresh-shopify-data.js but for Etsy orders.
  */
 
-import { PrismaClient, Prisma } from '@prisma/client'
+import prisma from '../_lib/prisma.js'
+import { setCors, requireAdmin } from '../_lib/auth.js'
+import { Prisma } from '@prisma/client'
 import { etsyFetch, disconnectEtsyAuth } from '../../server/services/etsyAuth.js'
 import { parseEtsyRaceName, parseEtsyPersonalization } from '../../server/services/etsyPersonalization.js'
 
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
+  if (!requireAdmin(req, res)) return
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
-
-  const prisma = new PrismaClient()
   const shopId = process.env.ETSY_SHOP_ID
 
   if (!shopId) {

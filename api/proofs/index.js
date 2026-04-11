@@ -15,14 +15,15 @@
  *   POST   { action: "approve", token, proofId, approval, feedback? } — Customer approves/revises
  */
 
-import { PrismaClient } from '@prisma/client'
+import prisma from '../_lib/prisma.js'
+import { setCors, requireAdmin } from '../_lib/auth.js'
+import { alertError } from '../_lib/alerts.js'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import crypto from 'crypto'
 import formidable from 'formidable'
 import fs from 'fs'
-
-const prisma = new PrismaClient()
+import sharp from 'sharp'
 
 // Disable Vercel's default body parser for multipart support
 export const config = { api: { bodyParser: false } }
@@ -73,6 +74,36 @@ function parseBody(req) {
   })
 }
 
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'tiff', 'tif'])
+
+/**
+ * Compress an image and generate a thumbnail.
+ * Returns { compressed, thumbnail } buffers, or null values for non-image files (PDFs, SVGs).
+ */
+async function processImage(buffer, ext) {
+  if (!IMAGE_EXTENSIONS.has(ext)) return { compressed: null, thumbnail: null }
+
+  try {
+    // Compress: resize to max 1500px wide, JPEG quality 85
+    const compressed = await sharp(buffer)
+      .resize(1500, null, { withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer()
+
+    // Thumbnail: 300px wide for grid views
+    const thumbnail = await sharp(buffer)
+      .resize(300, null, { withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer()
+
+    console.log(`[proofs] Compressed: ${(buffer.length / 1024).toFixed(0)}KB → ${(compressed.length / 1024).toFixed(0)}KB, Thumb: ${(thumbnail.length / 1024).toFixed(0)}KB`)
+    return { compressed, thumbnail }
+  } catch (err) {
+    console.warn(`[proofs] Image processing failed, using original:`, err.message)
+    return { compressed: null, thumbnail: null }
+  }
+}
+
 function buildApprovalUrl(req, token) {
   // Use VERCEL_PROJECT_PRODUCTION_URL in prod, or origin header, or fallback
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
@@ -89,25 +120,33 @@ function buildApprovalUrl(req, token) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') return res.status(200).end()
-
-  try {
-    // Parse body for non-GET requests
-    let body = {}
-    let uploadedFile = null
-    if (req.method !== 'GET') {
+  // Parse body FIRST so we can check action from both query and body before auth
+  let body = {}
+  let uploadedFile = null
+  if (req.method !== 'GET' && req.method !== 'OPTIONS') {
+    try {
       const parsed = await parseBody(req)
       body = parsed.fields
       uploadedFile = parsed.file
+    } catch (parseErr) {
+      console.error('[proofs] Body parse error:', parseErr.message)
     }
+  }
 
-    const action = req.query.action || body.action || null
+  // Determine if this is a public (customer) or merchant request BEFORE auth
+  const resolvedAction = req.query.action || body.action || null
+  const isPublicAction = resolvedAction === 'approve'
+
+  if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS', allowPublic: isPublicAction })) return
+
+  // Public routes use token-based auth (checked below), merchant routes need admin secret
+  if (!isPublicAction) {
+    if (!requireAdmin(req, res)) return
+  }
+
+  try {
     // ─── Customer Approval (public, token-based) ───
-    if (action === 'approve') {
+    if (resolvedAction === 'approve') {
       const token = req.query.token || body.token
       if (!token) return res.status(400).json({ error: 'Token is required' })
 
@@ -228,7 +267,7 @@ export default async function handler(req, res) {
     }
 
     // ─── Approval Token Management (merchant) ───
-    if (action === 'token' || action === 'generate-token') {
+    if (resolvedAction === 'token' || resolvedAction === 'generate-token') {
       if (req.method === 'GET') {
         const { orderId } = req.query
         if (!orderId) return res.status(400).json({ error: 'orderId is required' })
@@ -250,7 +289,7 @@ export default async function handler(req, res) {
         if (!order) return res.status(404).json({ error: 'Order not found' })
 
         const newToken = crypto.randomUUID()
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
 
         const approvalToken = await prisma.approvalToken.upsert({
           where: { orderId },
@@ -269,7 +308,7 @@ export default async function handler(req, res) {
     }
 
     // ─── Send Proofs to Customer via Email ───
-    if (action === 'send-to-customer') {
+    if (resolvedAction === 'send-to-customer') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
       const { orderId, note } = body
@@ -284,7 +323,7 @@ export default async function handler(req, res) {
 
       // Upsert approval token
       const newToken = crypto.randomUUID()
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
       const approvalToken = await prisma.approvalToken.upsert({
         where: { orderId },
         create: { orderId, token: newToken, expiresAt },
@@ -369,6 +408,7 @@ export default async function handler(req, res) {
         })
       } catch (emailErr) {
         console.error('[send-to-customer] Email send failed:', emailErr)
+        await alertError('Proof Email Send', emailErr, { orderNumber: order.orderNumber })
         return res.status(500).json({ error: 'Failed to send email. Please try again.' })
       }
 
@@ -393,7 +433,7 @@ export default async function handler(req, res) {
     }
 
     // ─── Notify Eli: PDF uploaded and ready for production ───
-    if (action === 'notify-production') {
+    if (resolvedAction === 'notify-production') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
       const { orderId } = body
@@ -465,20 +505,28 @@ export default async function handler(req, res) {
 
       const supabaseClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
       let publicUrl = imageUrl || null
+      let thumbnailUrl = null
 
       // File upload via FormData (preferred — no size limit issues)
       if (uploadedFile) {
         const ext = (uploadedFile.originalFilename || 'proof.png').split('.').pop()?.toLowerCase() || 'png'
         const timestamp = Date.now()
-        const filePath = `${orderId}/v${version}-${timestamp}.${ext}`
         const fileBuffer = fs.readFileSync(uploadedFile.filepath)
-
-        const { error: uploadErr } = await supabaseClient.storage
-          .from('order-proofs')
-          .upload(filePath, fileBuffer, { contentType: uploadedFile.mimetype || 'application/octet-stream', upsert: false })
 
         // Clean up temp file
         try { fs.unlinkSync(uploadedFile.filepath) } catch {}
+
+        // Compress image + generate thumbnail (non-images like PDFs pass through)
+        const { compressed, thumbnail } = await processImage(fileBuffer, ext)
+        const useCompressed = !!compressed
+        const uploadBuffer = compressed || fileBuffer
+        const uploadExt = useCompressed ? 'jpg' : ext
+        const uploadContentType = useCompressed ? 'image/jpeg' : (uploadedFile.mimetype || 'application/octet-stream')
+        const filePath = `${orderId}/v${version}-${timestamp}.${uploadExt}`
+
+        const { error: uploadErr } = await supabaseClient.storage
+          .from('order-proofs')
+          .upload(filePath, uploadBuffer, { contentType: uploadContentType, upsert: false })
 
         if (uploadErr) {
           console.error('[proofs] File upload failed:', uploadErr.message)
@@ -486,24 +534,44 @@ export default async function handler(req, res) {
         }
 
         publicUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(filePath).data.publicUrl
+
+        // Upload thumbnail if generated
+        if (thumbnail) {
+          const thumbPath = `${orderId}/v${version}-${timestamp}-thumb.jpg`
+          const { error: thumbErr } = await supabaseClient.storage
+            .from('order-proofs')
+            .upload(thumbPath, thumbnail, { contentType: 'image/jpeg', upsert: false })
+
+          if (!thumbErr) {
+            thumbnailUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(thumbPath).data.publicUrl
+          } else {
+            console.warn('[proofs] Thumbnail upload failed:', thumbErr.message)
+          }
+        }
       }
       // Base64 upload (legacy fallback)
       else if (imageData && !imageUrl) {
         const ext = (imageName || 'proof.png').split('.').pop()?.toLowerCase() || 'png'
         const timestamp = Date.now()
-        const filePath = `${orderId}/v${version}-${timestamp}.${ext}`
 
+        const buffer = Buffer.from(imageData, 'base64')
+
+        // Compress image + generate thumbnail
+        const { compressed, thumbnail } = await processImage(buffer, ext)
+        const useCompressed = !!compressed
+        const uploadBuffer = compressed || buffer
+        const uploadExt = useCompressed ? 'jpg' : ext
         const mimeTypes = {
           png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
           gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
           pdf: 'application/pdf'
         }
-        const contentType = mimeTypes[ext] || `image/${ext}`
+        const uploadContentType = useCompressed ? 'image/jpeg' : (mimeTypes[ext] || `image/${ext}`)
+        const filePath = `${orderId}/v${version}-${timestamp}.${uploadExt}`
 
-        const buffer = Buffer.from(imageData, 'base64')
         const { error: uploadErr } = await supabaseClient.storage
           .from('order-proofs')
-          .upload(filePath, buffer, { contentType, upsert: false })
+          .upload(filePath, uploadBuffer, { contentType: uploadContentType, upsert: false })
 
         if (uploadErr) {
           console.error('[proofs] Image upload failed:', uploadErr.message)
@@ -511,6 +579,20 @@ export default async function handler(req, res) {
         }
 
         publicUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(filePath).data.publicUrl
+
+        // Upload thumbnail if generated
+        if (thumbnail) {
+          const thumbPath = `${orderId}/v${version}-${timestamp}-thumb.jpg`
+          const { error: thumbErr } = await supabaseClient.storage
+            .from('order-proofs')
+            .upload(thumbPath, thumbnail, { contentType: 'image/jpeg', upsert: false })
+
+          if (!thumbErr) {
+            thumbnailUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(thumbPath).data.publicUrl
+          } else {
+            console.warn('[proofs] Thumbnail upload failed:', thumbErr.message)
+          }
+        }
       }
 
       if (!publicUrl) {
@@ -519,13 +601,13 @@ export default async function handler(req, res) {
 
       const fileName = uploadedFile?.originalFilename || imageName || null
       const proof = await prisma.proof.create({
-        data: { orderId, version, batch, imageUrl: publicUrl, fileName, status: 'pending' }
+        data: { orderId, version, batch, imageUrl: publicUrl, thumbnailUrl, fileName, status: 'pending' }
       })
 
       let approvalToken = await prisma.approvalToken.findUnique({ where: { orderId } })
       if (!approvalToken) {
         approvalToken = await prisma.approvalToken.create({
-          data: { orderId, token: crypto.randomUUID(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
+          data: { orderId, token: crypto.randomUUID(), expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }
         })
       }
 

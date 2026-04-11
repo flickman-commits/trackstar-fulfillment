@@ -6,17 +6,13 @@
  * DELETE { commentId }           — Delete a comment + its image from storage
  */
 
-import { PrismaClient } from '@prisma/client'
+import prisma from '../_lib/prisma.js'
+import { setCors, requireAdmin } from '../_lib/auth.js'
 import { createClient } from '@supabase/supabase-js'
 
-const prisma = new PrismaClient()
-
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') return res.status(200).end()
+  if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS' })) return
+  if (!requireAdmin(req, res)) return
 
   try {
     if (req.method === 'GET') {

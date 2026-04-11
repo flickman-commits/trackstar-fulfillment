@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText, Send, Star } from 'lucide-react'
+import { apiFetch } from '@/lib/api'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 
@@ -251,6 +252,8 @@ export default function Dashboard() {
   const [isResearching, setIsResearching] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
+  const [healthResults, setHealthResults] = useState<any>(null)
+  const [isRunningHealth, setIsRunningHealth] = useState(false)
   const [showReviewRequest, setShowReviewRequest] = useState(false)
   const [reviewCopied, setReviewCopied] = useState<string | null>(null)
   const [customersServedCount, setCustomersServedCount] = useState<number | null>(null)
@@ -289,7 +292,7 @@ export default function Dashboard() {
   // Fetch orders from database (filtered by activeView type)
   const fetchOrders = useCallback(async () => {
     try {
-      const response = await fetch(`/api/orders?type=${activeView}`)
+      const response = await apiFetch(`/api/orders?type=${activeView}`)
       if (!response.ok) throw new Error('Failed to fetch orders')
       const data = await response.json()
 
@@ -380,7 +383,7 @@ export default function Dashboard() {
   const importOrders = async () => {
     setIsImporting(true)
     try {
-      const response = await fetch(`/api/orders/import`, {
+      const response = await apiFetch(`/api/orders/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -420,7 +423,7 @@ export default function Dashboard() {
       const isActionsEndpoint = action === 'clear-research' || action === 'clear-race-cache'
       const url = isActionsEndpoint ? '/api/orders/actions' : `/api/orders/${action}`
       const body = isActionsEndpoint ? { action } : {}
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -445,7 +448,7 @@ export default function Dashboard() {
   // Fetch current customers served count
   const fetchCustomersServedCount = async () => {
     try {
-      const response = await fetch('/api/orders/actions', {
+      const response = await apiFetch('/api/orders/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'customers-served-info' })
@@ -468,7 +471,7 @@ export default function Dashboard() {
     }
     setIsLoadingCounter(true)
     try {
-      const response = await fetch('/api/orders/actions', {
+      const response = await apiFetch('/api/orders/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'customers-served-set', count: parsed })
@@ -489,7 +492,7 @@ export default function Dashboard() {
   const fetchRaces = async () => {
     setIsLoadingRaces(true)
     try {
-      const response = await fetch('/api/orders?list=races')
+      const response = await apiFetch('/api/orders?list=races')
       if (!response.ok) throw new Error('Failed to fetch races')
       const data = await response.json()
       setRaces(data.races || [])
@@ -514,7 +517,7 @@ export default function Dashboard() {
   const saveRaceEdit = async (raceId: number) => {
     setIsSavingRace(true)
     try {
-      const response = await fetch('/api/orders/update', {
+      const response = await apiFetch('/api/orders/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -537,7 +540,7 @@ export default function Dashboard() {
       const weatherManuallySet = raceEditValues.weatherCondition || raceEditValues.weatherTemp
       if (hasDate && hasLocation && !weatherManuallySet && result.race?.id) {
         try {
-          await fetch('/api/orders/refresh-weather', {
+          await apiFetch('/api/orders/refresh-weather', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ raceId: result.race.id })
@@ -563,7 +566,7 @@ export default function Dashboard() {
     }
     setIsSavingRace(true)
     try {
-      const response = await fetch('/api/orders/update', {
+      const response = await apiFetch('/api/orders/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -586,7 +589,7 @@ export default function Dashboard() {
       const result = await response.json().catch(() => null)
       if (newRaceValues.location && result?.race?.id) {
         try {
-          await fetch('/api/orders/refresh-weather', {
+          await apiFetch('/api/orders/refresh-weather', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ raceId: result.race.id })
@@ -608,7 +611,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!showSettings) return
-    fetch('/api/orders/test-scrapers')
+    apiFetch('/api/orders/test-scrapers')
       .then(res => res.json())
       .then(data => {
         if (data.races && scraperResults.length === 0) {
@@ -622,7 +625,7 @@ export default function Dashboard() {
   const testScrapers = async () => {
     setIsTestingScrapers(true)
     try {
-      const response = await fetch('/api/orders/test-scrapers', {
+      const response = await apiFetch('/api/orders/test-scrapers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
@@ -647,7 +650,7 @@ export default function Dashboard() {
     try {
       setToast({ message: 'Researching runner...', type: 'info' })
 
-      const response = await fetch(`/api/orders/research-runner`, {
+      const response = await apiFetch(`/api/orders/research-runner`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderNumber })
@@ -697,7 +700,7 @@ export default function Dashboard() {
       }
 
       // Fetch fresh data and update both orders list and selected order
-      const freshResponse = await fetch(`/api/orders`)
+      const freshResponse = await apiFetch(`/api/orders`)
       if (freshResponse.ok) {
         const freshData = await freshResponse.json()
         const freshOrders: Order[] = (freshData.orders || []).map((order: Record<string, unknown>) => {
@@ -775,7 +778,7 @@ export default function Dashboard() {
     try {
       setToast({ message: 'Accepting match...', type: 'info' })
 
-      const response = await fetch(`/api/orders/actions`, {
+      const response = await apiFetch(`/api/orders/actions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'accept-match', orderNumber, match })
@@ -802,7 +805,7 @@ export default function Dashboard() {
       await fetchOrders()
 
       // Update selected order with fresh data
-      const freshResponse = await fetch(`/api/orders`)
+      const freshResponse = await apiFetch(`/api/orders`)
       if (freshResponse.ok) {
         const freshData = await freshResponse.json()
         const freshOrders: Order[] = (freshData.orders || []).map((order: Record<string, unknown>) => {
@@ -869,7 +872,7 @@ export default function Dashboard() {
   // Mark order as completed
   const markAsCompleted = async (orderNumber: string) => {
     try {
-      const response = await fetch(`/api/orders/actions`, {
+      const response = await apiFetch(`/api/orders/actions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'complete', orderNumber })
@@ -942,7 +945,7 @@ export default function Dashboard() {
     }
     setIsSavingWeather(true)
     try {
-      const response = await fetch(`/api/orders/update`, {
+      const response = await apiFetch(`/api/orders/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -958,7 +961,7 @@ export default function Dashboard() {
       await fetchOrders()
 
       // Update selected order with new data
-      const updatedOrders = await fetch(`/api/orders?type=${activeView}`).then(r => r.json())
+      const updatedOrders = await apiFetch(`/api/orders?type=${activeView}`).then(r => r.json())
       const updated = updatedOrders.orders?.find((o: { orderNumber: string }) => o.orderNumber === order.orderNumber)
       if (updated) {
         setSelectedOrder({
@@ -1001,7 +1004,7 @@ export default function Dashboard() {
         updates.runnerNameOverride = null
       }
 
-      const response = await fetch(`/api/orders/update`, {
+      const response = await apiFetch(`/api/orders/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderNumber, ...updates })
@@ -1014,7 +1017,7 @@ export default function Dashboard() {
       await fetchOrders()
 
       // Update selected order with new data
-      const updatedOrders = await fetch(`/api/orders`).then(r => r.json())
+      const updatedOrders = await apiFetch(`/api/orders`).then(r => r.json())
       const updated = updatedOrders.orders?.find((o: { orderNumber: string }) => o.orderNumber === orderNumber)
       if (updated) {
         setSelectedOrder({
@@ -1057,7 +1060,7 @@ export default function Dashboard() {
 
   // Fetch race shorthands from scraper configs (once on mount)
   useEffect(() => {
-    fetch('/api/orders/actions?action=race-shorthands')
+    apiFetch('/api/orders/actions?action=race-shorthands')
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data?.shorthands) setRaceShorthands(data.shorthands) })
       .catch(() => {})
@@ -1073,7 +1076,7 @@ export default function Dashboard() {
     setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, designStatus } : o))
 
     try {
-      const response = await fetch('/api/orders/actions', {
+      const response = await apiFetch('/api/orders/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'design-status', orderNumber, designStatus })
@@ -1103,7 +1106,7 @@ export default function Dashboard() {
   const fetchComments = useCallback(async (orderId: string) => {
     setIsLoadingComments(true)
     try {
-      const response = await fetch(`/api/orders/comments?orderId=${orderId}`)
+      const response = await apiFetch(`/api/orders/comments?orderId=${orderId}`)
       if (!response.ok) throw new Error('Failed to fetch comments')
       const data = await response.json()
       setOrderComments(data.comments || [])
@@ -1139,7 +1142,7 @@ export default function Dashboard() {
         imageName = commentImageFile.name
       }
 
-      const response = await fetch('/api/orders/comments', {
+      const response = await apiFetch('/api/orders/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1174,7 +1177,7 @@ export default function Dashboard() {
 
   const deleteComment = async (commentId: string) => {
     try {
-      const response = await fetch('/api/orders/comments', {
+      const response = await apiFetch('/api/orders/comments', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commentId })
@@ -1196,7 +1199,7 @@ export default function Dashboard() {
   const sendFollowUp = async (orderId: string) => {
     setIsSendingFollowUp(true)
     try {
-      const res = await fetch(`/api/proofs`, {
+      const res = await apiFetch(`/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'send-to-customer', orderId })
@@ -2351,6 +2354,56 @@ Thank you!`
                           {isLoadingCounter ? 'Saving…' : 'Update & Sync'}
                         </button>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* System Health Check */}
+                  <div className="border-t border-border-gray p-6">
+                    <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-off-black">System Health Check</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Tests database, Etsy, Shopify, Resend, and Slack connections. Runs automatically every Monday at 12pm.</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            setIsRunningHealth(true)
+                            setHealthResults(null)
+                            try {
+                              const response = await apiFetch('/api/orders/actions?action=health-check')
+                              const data = await response.json()
+                              setHealthResults(data)
+                            } catch (err) {
+                              setHealthResults({ overall: 'error', checks: {}, error: 'Failed to run health check' })
+                            } finally {
+                              setIsRunningHealth(false)
+                            }
+                          }}
+                          disabled={isRunningHealth}
+                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                        >
+                          {isRunningHealth && <Loader2 className="w-3 h-3 animate-spin" />}
+                          {isRunningHealth ? 'Checking…' : 'Run Health Check'}
+                        </button>
+                      </div>
+
+                      {healthResults && (
+                        <div className="mt-3 space-y-1.5">
+                          <div className={`text-xs font-medium ${healthResults.overall === 'healthy' ? 'text-green-600' : healthResults.overall === 'degraded' ? 'text-amber-600' : 'text-red-600'}`}>
+                            {healthResults.overall === 'healthy' ? '✅ All systems healthy' : healthResults.overall === 'degraded' ? '⚠️ Some systems degraded' : '🚨 Critical issues detected'}
+                          </div>
+                          {healthResults.checks && Object.entries(healthResults.checks).map(([name, check]: [string, any]) => (
+                            <div key={name} className="flex items-start gap-2 text-xs">
+                              <span className="flex-shrink-0 mt-0.5">{check.status === 'ok' ? '✅' : check.status === 'warn' ? '⚠️' : '❌'}</span>
+                              <div className="min-w-0">
+                                <span className="font-medium text-off-black capitalize">{name}</span>
+                                <span className="text-off-black/50 ml-1.5">{check.detail}</span>
+                                {check.latency && <span className="text-off-black/30 ml-1">({check.latency})</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 

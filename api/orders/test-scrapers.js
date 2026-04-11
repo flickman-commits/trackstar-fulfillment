@@ -6,17 +6,13 @@
  *   2. searchRunner() — can the scraper actually find runner results?
  *        Uses a known-good runner name from the database for each race.
  */
-import { PrismaClient } from '@prisma/client'
+import prisma from '../_lib/prisma.js'
+import { setCors, requireAdmin } from '../_lib/auth.js'
 import { getSupportedRaces, getScraperForRace } from '../../server/scrapers/index.js'
 
-const prisma = new PrismaClient()
-
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') return res.status(200).end()
+  if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
+  if (!requireAdmin(req, res)) return
 
   const races = getSupportedRaces()
 

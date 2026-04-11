@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CheckCircle2, ExternalLink, Loader2, Send, Square, CheckSquare } from 'lucide-react'
 import { toast } from 'sonner'
+import { apiFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 const GOOGLE_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/1hvHh3F9Wdo8cpLPziSbIC1SUHe6Tq1OI'
@@ -27,7 +28,7 @@ export default function PostApprovalChecklist({
     setIsSending(true)
     try {
       // Send Slack notification to Eli
-      await fetch(`${API_BASE}/api/proofs`, {
+      await apiFetch(`${API_BASE}/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'notify-production', orderId })

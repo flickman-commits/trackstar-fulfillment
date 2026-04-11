@@ -3,18 +3,15 @@
  * Clears weatherFetchedAt and re-fetches using WeatherService directly
  * (Avoids importing ResearchService which pulls in Puppeteer scrapers)
  */
-import { PrismaClient } from '@prisma/client'
+import prisma from '../_lib/prisma.js'
+import { setCors, requireAdmin } from '../_lib/auth.js'
 import WeatherService from '../../server/services/WeatherService.js'
 
-const prisma = new PrismaClient()
 const weatherService = new WeatherService()
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') return res.status(200).end()
+  if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
+  if (!requireAdmin(req, res)) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   console.log('[refresh-weather] Handler invoked, method:', req.method)

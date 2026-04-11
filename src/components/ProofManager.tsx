@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
+import { apiFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -10,6 +11,7 @@ interface Proof {
   version: number
   batch: number
   imageUrl: string
+  thumbnailUrl: string | null
   fileName: string | null
   status: 'pending' | 'approved' | 'revision_requested' | 'rejected'
   customerFeedback: string | null
@@ -56,8 +58,8 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   const fetchData = useCallback(async () => {
     try {
       const [proofsRes, tokenRes] = await Promise.all([
-        fetch(`${API_BASE}/api/proofs?orderId=${orderId}`),
-        fetch(`${API_BASE}/api/proofs?action=token&orderId=${orderId}`)
+        apiFetch(`${API_BASE}/api/proofs?orderId=${orderId}`),
+        apiFetch(`${API_BASE}/api/proofs?action=token&orderId=${orderId}`)
       ])
 
       if (proofsRes.ok) {
@@ -153,7 +155,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         formData.append('file', file)
         formData.append('orderId', orderId)
 
-        const res = await fetch(`${API_BASE}/api/proofs`, {
+        const res = await apiFetch(`${API_BASE}/api/proofs`, {
           method: 'POST',
           body: formData
         })
@@ -194,7 +196,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   const deleteProof = async (proofId: string) => {
     setDeletingId(proofId)
     try {
-      const res = await fetch(`${API_BASE}/api/proofs`, {
+      const res = await apiFetch(`${API_BASE}/api/proofs`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ proofId })
@@ -212,7 +214,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
 
   const generateToken = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/proofs`, {
+      const res = await apiFetch(`${API_BASE}/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'generate-token', orderId })
@@ -255,7 +257,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
     }
     setIsSending(true)
     try {
-      const res = await fetch(`${API_BASE}/api/proofs`, {
+      const res = await apiFetch(`${API_BASE}/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'send-to-customer', orderId, note: sendNote.trim() || null })
@@ -345,7 +347,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
               ) : (
                 <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
                   <img
-                    src={proof.imageUrl}
+                    src={proof.thumbnailUrl || proof.imageUrl}
                     alt={`Proof v${proof.version}`}
                     className="h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity cursor-pointer"
                   />
@@ -538,7 +540,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
             ) : (
               <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
                 <img
-                  src={proof.imageUrl}
+                  src={proof.thumbnailUrl || proof.imageUrl}
                   alt={`Proof v${proof.version}`}
                   className="h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity cursor-pointer"
                 />

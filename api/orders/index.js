@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '../_lib/prisma.js'
+import { setCors, requireAdmin } from '../_lib/auth.js'
 import { hasScraperForRace } from '../../server/scrapers/index.js'
-
-const prisma = new PrismaClient()
 
 
 /**
@@ -84,7 +83,8 @@ function buildAustinFallbackUrl(runnerName, raceName, year, eventType) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
+  if (!requireAdmin(req, res)) return
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })

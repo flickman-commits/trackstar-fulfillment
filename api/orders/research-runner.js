@@ -4,18 +4,13 @@
  *   1. Race-level data (date, location, weather) - cached once per race/year
  *   2. Runner-level data (bib, time, pace) - cached per order
  */
+import { setCors, requireAdmin } from '../_lib/auth.js'
 import { researchService } from '../../server/services/ResearchService.js'
 import { hasScraperForRace, getSupportedRaces } from '../../server/scrapers/index.js'
 
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
+  if (!requireAdmin(req, res)) return
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })

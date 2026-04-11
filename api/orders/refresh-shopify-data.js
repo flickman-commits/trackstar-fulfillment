@@ -8,24 +8,17 @@
  * Useful for updating orders when extraction logic changes
  */
 
-import { PrismaClient } from '@prisma/client'
+import prisma from '../_lib/prisma.js'
+import { setCors, requireAdmin } from '../_lib/auth.js'
 import { shopifyFetch } from '../../server/services/shopifyAuth.js'
-
-const prisma = new PrismaClient()
 
 // Fallback for batch mode (uses direct token auth)
 const SHOPIFY_SHOP_URL = process.env.SHOPIFY_SHOP_URL
 const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN
 
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
+  if (!requireAdmin(req, res)) return
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })

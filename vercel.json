@@ -4,6 +4,10 @@
     {
       "path": "/api/orders/actions?action=monday-pipeline",
       "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/orders/actions?action=health-check",
+      "schedule": "0 11 * * 1"
     }
   ],
   "functions": {
