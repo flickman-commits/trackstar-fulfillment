@@ -1470,7 +1470,7 @@ Thank you!`
             </div>
             <div className="hidden md:block">
               <h1 className="text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1">
-                {getGreeting(activeView === 'custom' ? 'America/New_York' : 'America/New_York')}, {activeView === 'custom' ? 'Dan' : 'Elí'}
+                {getGreeting(activeView === 'custom' ? 'America/New_York' : 'America/Costa_Rica')}, {activeView === 'custom' ? 'Dan' : 'Elí'}
               </h1>
               <p className="text-sm md:text-base text-off-black/60">
                 Last updated {formatLastUpdated(lastUpdated)}
