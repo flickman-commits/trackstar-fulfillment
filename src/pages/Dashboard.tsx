@@ -190,7 +190,7 @@ function NotAvailableField({ label }: { label: string }) {
   )
 }
 
-function getGreeting(timezone: string = 'America/Costa_Rica'): string {
+function getGreeting(timezone: string = 'America/New_York'): string {
   const now = new Date()
   const localTime = new Date(now.toLocaleString('en-US', { timeZone: timezone }))
   const hour = localTime.getHours()
@@ -202,7 +202,7 @@ function getGreeting(timezone: string = 'America/Costa_Rica'): string {
 
 function formatLastUpdated(date: Date): string {
   return date.toLocaleString('en-US', {
-    timeZone: 'America/Costa_Rica',
+    timeZone: 'America/New_York',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -1262,20 +1262,22 @@ export default function Dashboard() {
   }, [selectedOrder?.id, selectedOrder?.trackstarOrderType, fetchComments])
 
   // Format due date for display
-  // Compare dates by calendar day only (ignore time/timezone)
+  const TZ = 'America/New_York'
+
+  // Compare dates by calendar day in ET (ignore time)
   const getDaysDiff = (dateStr: string): number => {
-    const d = new Date(dateStr)
-    const now = new Date()
-    // Compare using local calendar dates, not timestamps
-    const dueDay = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    // Get both dates as ET calendar date strings, then compare
+    const dueET = new Date(dateStr).toLocaleDateString('en-US', { timeZone: TZ })
+    const nowET = new Date().toLocaleDateString('en-US', { timeZone: TZ })
+    const dueDay = new Date(dueET)
+    const today = new Date(nowET)
     return Math.round((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
   }
 
   const formatDueDate = (dateStr?: string): string => {
     if (!dateStr) return 'N/A'
     const diffDays = getDaysDiff(dateStr)
-    const formatted = new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    const formatted = new Date(dateStr).toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric', year: 'numeric' })
     if (diffDays < 0) return `${formatted} (overdue)`
     if (diffDays === 0) return `${formatted} (today)`
     if (diffDays === 1) return `${formatted} (in 1 day)`
@@ -1468,7 +1470,7 @@ Thank you!`
             </div>
             <div className="hidden md:block">
               <h1 className="text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1">
-                {getGreeting(activeView === 'custom' ? 'America/New_York' : 'America/Costa_Rica')}, {activeView === 'custom' ? 'Dan' : 'Elí'}
+                {getGreeting(activeView === 'custom' ? 'America/New_York' : 'America/New_York')}, {activeView === 'custom' ? 'Dan' : 'Elí'}
               </h1>
               <p className="text-sm md:text-base text-off-black/60">
                 Last updated {formatLastUpdated(lastUpdated)}
@@ -2594,7 +2596,7 @@ Thank you!`
                               <span className="text-sm text-off-black/40 ml-2">{race.year}</span>
                             </div>
                             <div className="flex items-center gap-4 text-xs text-off-black/50">
-                              {race.raceDate && <span>{new Date(race.raceDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                              {race.raceDate && <span>{new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })}</span>}
                               {race.location && <span>{race.location}</span>}
                               {race.weatherCondition && <span>{race.weatherCondition.charAt(0).toUpperCase() + race.weatherCondition.slice(1)}</span>}
                               {race.weatherTemp && <span>{race.weatherTemp}</span>}
@@ -2995,7 +2997,7 @@ Thank you!`
                                   {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
                                   <div className="flex items-center justify-between mt-1.5">
                                     <span className="text-xs text-off-black/40">
-                                      {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                      {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                     </span>
                                     <button onClick={() => deleteComment(comment.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
                                   </div>
@@ -3275,7 +3277,7 @@ Thank you!`
                                   {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
                                   <div className="flex items-center justify-between mt-2">
                                     <span className="text-xs text-off-black/40">
-                                      {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                      {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                     </span>
                                     <button
                                       onClick={() => deleteComment(comment.id)}
