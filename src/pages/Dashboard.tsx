@@ -2372,9 +2372,13 @@ Thank you!`
                             try {
                               const response = await apiFetch('/api/orders/actions?action=health-check')
                               const data = await response.json()
-                              setHealthResults(data)
-                            } catch (err) {
-                              setHealthResults({ overall: 'error', checks: {}, error: 'Failed to run health check' })
+                              if (!response.ok && !data.checks) {
+                                setHealthResults({ overall: 'error', checks: {}, error: data.error || `HTTP ${response.status}` })
+                              } else {
+                                setHealthResults(data)
+                              }
+                            } catch (err: any) {
+                              setHealthResults({ overall: 'error', checks: {}, error: err?.message || 'Failed to run health check' })
                             } finally {
                               setIsRunningHealth(false)
                             }
@@ -2392,6 +2396,9 @@ Thank you!`
                           <div className={`text-xs font-medium ${healthResults.overall === 'healthy' ? 'text-green-600' : healthResults.overall === 'degraded' ? 'text-amber-600' : 'text-red-600'}`}>
                             {healthResults.overall === 'healthy' ? '✅ All systems healthy' : healthResults.overall === 'degraded' ? '⚠️ Some systems degraded' : '🚨 Critical issues detected'}
                           </div>
+                          {healthResults.error && (
+                            <div className="text-xs text-red-500 mt-1">{healthResults.error}</div>
+                          )}
                           {healthResults.checks && Object.entries(healthResults.checks).map(([name, check]: [string, any]) => (
                             <div key={name} className="flex items-start gap-2 text-xs">
                               <span className="flex-shrink-0 mt-0.5">{check.status === 'ok' ? '✅' : check.status === 'warn' ? '⚠️' : '❌'}</span>

@@ -6,6 +6,7 @@
  */
 
 const ALLOWED_ORIGINS = [
+  'https://fast.trackstar.art',
   'https://trackstar-fulfillment.vercel.app',
   'http://localhost:3000',
   'http://localhost:5173',
