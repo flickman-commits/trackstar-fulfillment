@@ -26,7 +26,9 @@ import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServe
 import { getRaceShorthands } from '../../server/scrapers/index.js'
 
 export default async function handler(req, res) {
-  if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
+  // Ping is public (UptimeRobot), everything else uses standard CORS
+  const isPing = req.query?.action === 'ping'
+  if (setCors(req, res, { methods: 'GET, POST, OPTIONS', allowPublic: isPing })) return
 
   // GET requests — used by Vercel cron (cron uses CRON_SECRET, not ADMIN_SECRET)
   if (req.method === 'GET') {
@@ -48,6 +50,17 @@ export default async function handler(req, res) {
       const isCron = cronAuth === `Bearer ${process.env.CRON_SECRET}`
       if (!isCron && !requireAdmin(req, res)) return
       return await handleHealthCheck(res, { sendSlack: isCron })
+    }
+    if (action === 'ping') {
+      // Public — no auth needed. Used by UptimeRobot to monitor uptime.
+      // Only returns status, no sensitive data.
+      try {
+        const start = Date.now()
+        await prisma.order.count()
+        return res.status(200).json({ status: 'ok', latency: `${Date.now() - start}ms` })
+      } catch {
+        return res.status(503).json({ status: 'down' })
+      }
     }
     return res.status(400).json({ error: 'Unknown GET action' })
   }
