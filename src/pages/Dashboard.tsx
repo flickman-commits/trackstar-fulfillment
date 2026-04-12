@@ -1262,12 +1262,20 @@ export default function Dashboard() {
   }, [selectedOrder?.id, selectedOrder?.trackstarOrderType, fetchComments])
 
   // Format due date for display
-  const formatDueDate = (dateStr?: string): string => {
-    if (!dateStr) return 'N/A'
+  // Compare dates by calendar day only (ignore time/timezone)
+  const getDaysDiff = (dateStr: string): number => {
     const d = new Date(dateStr)
     const now = new Date()
-    const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    // Compare using local calendar dates, not timestamps
+    const dueDay = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    return Math.round((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  }
+
+  const formatDueDate = (dateStr?: string): string => {
+    if (!dateStr) return 'N/A'
+    const diffDays = getDaysDiff(dateStr)
+    const formatted = new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     if (diffDays < 0) return `${formatted} (overdue)`
     if (diffDays === 0) return `${formatted} (today)`
     if (diffDays === 1) return `${formatted} (in 1 day)`
@@ -1278,10 +1286,7 @@ export default function Dashboard() {
   // Check if due date is urgent
   const isDueDateUrgent = (dateStr?: string): boolean => {
     if (!dateStr) return false
-    const d = new Date(dateStr)
-    const now = new Date()
-    const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    return diffDays <= 3
+    return getDaysDiff(dateStr) <= 3
   }
 
   // Designs to be personalized
