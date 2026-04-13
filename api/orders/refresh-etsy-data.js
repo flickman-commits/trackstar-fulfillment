@@ -141,8 +141,5 @@ export default async function handler(req, res) {
       success: false,
       error: error.message
     })
-  } finally {
-    await prisma.$disconnect()
-    await disconnectEtsyAuth()
   }
 }

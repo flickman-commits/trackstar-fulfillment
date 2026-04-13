@@ -108,8 +108,6 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Order not found' })
     }
     return res.status(500).json({ error: error.message })
-  } finally {
-    await prisma.$disconnect()
   }
 }
 
@@ -459,7 +457,7 @@ async function handleHealthCheck(res, { sendSlack = false } = {}) {
       const shopId = process.env.ETSY_SHOP_ID
       if (shopId && tokenData.access_token) {
         const testResp = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}`, {
-          headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'x-api-key': apiKey }
+          headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'x-api-key': `${apiKey}:${sharedSecret}` }
         })
         if (!testResp.ok) return { status: 'error', detail: `Shop API returned ${testResp.status}`, latency: `${Date.now() - start}ms` }
       }
@@ -533,7 +531,7 @@ async function handleHealthCheck(res, { sendSlack = false } = {}) {
       'SHOPIFY_STORE', 'SHOPIFY_CLIENT_ID', 'SHOPIFY_CLIENT_SECRET',
       'ETSY_API_KEY', 'ETSY_SHARED_SECRET', 'ETSY_SHOP_ID',
       'RESEND_API_KEY', 'SLACK_PROOF_WEBHOOK_URL',
-      'SUPABASE_URL', 'SUPABASE_SERVICE_KEY',
+      'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY',
     ]
     const missing = required.filter(k => !process.env[k])
     if (missing.length === 0) return { status: 'ok', detail: `All ${required.length} required vars set` }

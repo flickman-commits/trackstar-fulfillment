@@ -123,6 +123,7 @@ function buildApprovalUrl(req, token) {
 }
 
 export default async function handler(req, res) {
+  try {
   // Determine if this is a public (customer) request BEFORE parsing the full body.
   // Customer approval uses query param (GET) or JSON body (POST) — never multipart.
   // Multipart (file uploads) are always merchant actions requiring admin auth.
@@ -683,7 +684,9 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('[proofs] Error:', error)
     return res.status(500).json({ error: error.message })
-  } finally {
-    await prisma.$disconnect()
+  }
+  } catch (outerError) {
+    console.error('[proofs] Unhandled error:', outerError)
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

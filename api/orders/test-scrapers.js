@@ -131,7 +131,5 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('[test-scrapers] Error:', error)
     return res.status(500).json({ error: error.message })
-  } finally {
-    await prisma.$disconnect()
   }
 }
