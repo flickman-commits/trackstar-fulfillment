@@ -530,7 +530,7 @@ async function handleHealthCheck(res, { sendSlack = false } = {}) {
       'DATABASE_URL', 'ADMIN_SECRET', 'CRON_SECRET',
       'SHOPIFY_STORE', 'SHOPIFY_CLIENT_ID', 'SHOPIFY_CLIENT_SECRET',
       'ETSY_API_KEY', 'ETSY_SHARED_SECRET', 'ETSY_SHOP_ID',
-      'RESEND_API_KEY', 'SLACK_PROOF_WEBHOOK_URL',
+      'RESEND_API_KEY', 'SLACK_PROOF_WEBHOOK_URL', 'SLACK_DM_WEBHOOK_URL',
       'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY',
     ]
     const missing = required.filter(k => !process.env[k])
@@ -543,8 +543,9 @@ async function handleHealthCheck(res, { sendSlack = false } = {}) {
   if (statuses.some(s => s === 'error')) results.overall = 'degraded'
   if (statuses.filter(s => s === 'error').length >= 3) results.overall = 'critical'
 
-  // Send to Slack if cron
-  if (sendSlack && process.env.SLACK_PROOF_WEBHOOK_URL) {
+  // Send to Slack DM (falls back to team channel if DM webhook not set)
+  const slackHealthUrl = process.env.SLACK_DM_WEBHOOK_URL || process.env.SLACK_PROOF_WEBHOOK_URL
+  if (sendSlack && slackHealthUrl) {
     const emoji = { healthy: '✅', degraded: '⚠️', critical: '🚨' }
     const checkLines = Object.entries(results.checks).map(([name, check]) => {
       const icon = check.status === 'ok' ? '✅' : check.status === 'warn' ? '⚠️' : '❌'
@@ -557,7 +558,7 @@ async function handleHealthCheck(res, { sendSlack = false } = {}) {
     ].join('\n')
 
     try {
-      await fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
+      await fetch(slackHealthUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })
