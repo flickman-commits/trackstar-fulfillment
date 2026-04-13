@@ -54,8 +54,11 @@ function parseBody(req) {
         resolve({ fields: flat, file })
       })
     } else {
-      // JSON body — read manually since we disabled bodyParser
-      // In Express dev server, body may already be parsed by express.json()
+      // JSON body — check if already parsed (by Express or pre-auth peek)
+      if (req._preBody) {
+        resolve({ fields: req._preBody, file: null })
+        return
+      }
       if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
         resolve({ fields: req.body, file: null })
         return
@@ -120,22 +123,41 @@ function buildApprovalUrl(req, token) {
 }
 
 export default async function handler(req, res) {
-  // Parse body FIRST so we can check action from both query and body before auth
-  let body = {}
-  let uploadedFile = null
-  if (req.method !== 'GET' && req.method !== 'OPTIONS') {
+  // Determine if this is a public (customer) request BEFORE parsing the full body.
+  // Customer approval uses query param (GET) or JSON body (POST) — never multipart.
+  // Multipart (file uploads) are always merchant actions requiring admin auth.
+  const contentType = req.headers['content-type'] || ''
+  const isMultipart = contentType.includes('multipart/form-data')
+  const queryAction = req.query.action || null
+
+  // For non-multipart POST, peek at JSON body to check action
+  let preAction = queryAction
+  if (!preAction && req.method === 'POST' && !isMultipart) {
     try {
-      const parsed = await parseBody(req)
-      body = parsed.fields
-      uploadedFile = parsed.file
-    } catch (parseErr) {
-      console.error('[proofs] Body parse error:', parseErr.message)
-    }
+      // Express dev server may have already parsed the body
+      if (req.body && typeof req.body === 'object' && req.body.action) {
+        preAction = req.body.action
+      } else {
+        // Vercel: bodyParser disabled, read raw body to peek at action
+        const raw = await new Promise((resolve) => {
+          let data = ''
+          req.on('data', chunk => { data += chunk })
+          req.on('end', () => resolve(data))
+          req.on('error', () => resolve(''))
+        })
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw)
+            preAction = parsed.action || null
+            // Stash parsed body so parseBody() doesn't re-read the consumed stream
+            req._preBody = parsed
+          } catch {}
+        }
+      }
+    } catch {}
   }
 
-  // Determine if this is a public (customer) or merchant request BEFORE auth
-  const resolvedAction = req.query.action || body.action || null
-  const isPublicAction = resolvedAction === 'approve'
+  const isPublicAction = preAction === 'approve'
 
   if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS', allowPublic: isPublicAction })) return
 
@@ -143,6 +165,22 @@ export default async function handler(req, res) {
   if (!isPublicAction) {
     if (!requireAdmin(req, res)) return
   }
+
+  // Now parse the full body (safe — auth is verified for merchant routes)
+  let body = {}
+  let uploadedFile = null
+  if (req.method !== 'GET') {
+    try {
+      const parsed = await parseBody(req)
+      body = parsed.fields
+      uploadedFile = parsed.file
+    } catch (parseErr) {
+      console.error('[proofs] Body parse error:', parseErr.message)
+      return res.status(400).json({ error: 'Failed to parse request body' })
+    }
+  }
+
+  const resolvedAction = queryAction || body.action || null
 
   try {
     // ─── Customer Approval (public, token-based) ───
