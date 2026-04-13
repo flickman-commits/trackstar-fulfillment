@@ -33,3 +33,4 @@ dist-ssr
 .env.*.local
 .vercel
 .env*.local
+.env.vercel-check

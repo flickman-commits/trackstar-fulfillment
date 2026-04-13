@@ -63,6 +63,10 @@ model Order {
   @@index([status])
   @@index([raceName, raceYear])
   @@index([trackstarOrderType])
+  @@index([customerEmail])
+  @@index([createdAt])
+  @@index([dueDate])
+  @@index([designStatus])
 }
 
 model Race {
@@ -139,6 +143,7 @@ model Proof {
   version          Int
   batch            Int      @default(1) // Which send-round this proof belongs to (1 = first send, 2 = first revision, etc.)
   imageUrl         String
+  thumbnailUrl     String?  // Compressed ~200px thumbnail for grid views (saves egress bandwidth)
   fileName         String?
   status           String   @default("pending") // "pending" | "approved" | "revision_requested"
   customerFeedback String?

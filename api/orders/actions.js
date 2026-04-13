@@ -317,13 +317,18 @@ async function handleFeatureRequest({ type, description }, res) {
     ]
   }
 
-  const slackResponse = await fetch(process.env.SLACK_WEBHOOK_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(message)
-  })
+  try {
+    const slackResponse = await fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message)
+    })
 
-  if (!slackResponse.ok) throw new Error('Failed to send message to Slack')
+    if (!slackResponse.ok) throw new Error('Failed to send message to Slack')
+  } catch (slackErr) {
+    console.error(`[actions/feature-request] Slack send failed:`, slackErr.message)
+    return res.status(500).json({ error: 'Failed to send request to Slack' })
+  }
 
   console.log(`[actions/feature-request] ${title} submitted`)
   return res.status(200).json({ success: true, message: 'Request submitted successfully' })

@@ -51,13 +51,21 @@ export default async function handler(req, res) {
       // --- Step 2: Exchange code for tokens ---
       console.log('[etsy/auth] Exchanging authorization code for tokens...')
 
-      // Get the code_verifier from the cookie
+      // Get the code_verifier and state from cookies
       const cookies = parseCookies(req.headers.cookie || '')
       const codeVerifier = cookies.etsy_code_verifier
+      const savedState = cookies.etsy_oauth_state
 
       if (!codeVerifier) {
         return res.status(400).json({
           error: 'Missing code_verifier cookie. Please restart the OAuth flow.'
+        })
+      }
+
+      // Validate the OAuth state parameter to prevent CSRF attacks
+      if (!savedState || !state || savedState !== state) {
+        return res.status(403).json({
+          error: 'OAuth state mismatch — possible CSRF attack. Please restart the OAuth flow.'
         })
       }
 
@@ -99,8 +107,11 @@ export default async function handler(req, res) {
         console.log('[etsy/auth] Refresh token stored in DB')
       }
 
-      // Clear the cookie
-      res.setHeader('Set-Cookie', 'etsy_code_verifier=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax')
+      // Clear the cookies
+      res.setHeader('Set-Cookie', [
+        'etsy_code_verifier=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+        'etsy_oauth_state=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+      ])
 
       return res.status(200).json({
         success: true,
@@ -128,10 +139,11 @@ export default async function handler(req, res) {
       const host = req.headers['x-forwarded-host'] || req.headers.host
       const redirectUri = `${protocol}://${host}/api/etsy/auth`
 
-      // Store code_verifier in a cookie (survives the redirect)
-      res.setHeader('Set-Cookie',
-        `etsy_code_verifier=${codeVerifier}; Path=/; Max-Age=600; HttpOnly; SameSite=Lax`
-      )
+      // Store code_verifier and state in cookies (survive the redirect)
+      res.setHeader('Set-Cookie', [
+        `etsy_code_verifier=${codeVerifier}; Path=/; Max-Age=600; HttpOnly; SameSite=Lax`,
+        `etsy_oauth_state=${oauthState}; Path=/; Max-Age=600; HttpOnly; SameSite=Lax`
+      ])
 
       const authUrl = new URL('https://www.etsy.com/oauth/connect')
       authUrl.searchParams.set('response_type', 'code')

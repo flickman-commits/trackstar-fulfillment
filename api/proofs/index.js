@@ -28,6 +28,8 @@ import fs from 'fs'
 // Disable Vercel's default body parser for multipart support
 export const config = { api: { bodyParser: false } }
 
+const APPROVAL_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
+
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     const contentType = req.headers['content-type'] || ''
@@ -124,7 +126,6 @@ function buildApprovalUrl(req, token) {
 }
 
 export default async function handler(req, res) {
-  try {
   // Determine if this is a public (customer) request BEFORE parsing the full body.
   // Customer approval uses query param (GET) or JSON body (POST) — never multipart.
   // Multipart (file uploads) are always merchant actions requiring admin auth.
@@ -329,7 +330,7 @@ export default async function handler(req, res) {
         if (!order) return res.status(404).json({ error: 'Order not found' })
 
         const newToken = crypto.randomUUID()
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        const expiresAt = new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS)
 
         const approvalToken = await prisma.approvalToken.upsert({
           where: { orderId },
@@ -363,7 +364,7 @@ export default async function handler(req, res) {
 
       // Upsert approval token
       const newToken = crypto.randomUUID()
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      const expiresAt = new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS)
       const approvalToken = await prisma.approvalToken.upsert({
         where: { orderId },
         create: { orderId, token: newToken, expiresAt },
@@ -647,7 +648,7 @@ export default async function handler(req, res) {
       let approvalToken = await prisma.approvalToken.findUnique({ where: { orderId } })
       if (!approvalToken) {
         approvalToken = await prisma.approvalToken.create({
-          data: { orderId, token: crypto.randomUUID(), expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }
+          data: { orderId, token: crypto.randomUUID(), expiresAt: new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS) }
         })
       }
 
@@ -685,9 +686,5 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('[proofs] Error:', error)
     return res.status(500).json({ error: error.message })
-  }
-  } catch (outerError) {
-    console.error('[proofs] Unhandled error:', outerError)
-    return res.status(500).json({ error: 'Internal server error' })
   }
 }

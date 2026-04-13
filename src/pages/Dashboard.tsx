@@ -372,7 +372,7 @@ export default function Dashboard() {
         return prev
       })
     } catch (error) {
-      console.error('Error fetching orders:', error)
+      if (import.meta.env.DEV) console.error('Error fetching orders:', error)
       setToast({ message: 'Failed to fetch orders', type: 'error' })
     } finally {
       setIsLoading(false)
@@ -407,7 +407,7 @@ export default function Dashboard() {
       // Refresh the orders list
       await fetchOrders()
     } catch (error) {
-      console.error('Error importing orders:', error)
+      if (import.meta.env.DEV) console.error('Error importing orders:', error)
       const message = error instanceof Error ? error.message : 'Failed to import orders from Artelo'
       setToast({ message, type: 'error' })
     } finally {
@@ -458,7 +458,7 @@ export default function Dashboard() {
       setCustomersServedCount(data.count)
       setCustomersServedInput(String(data.count))
     } catch (error) {
-      console.error('Failed to fetch customers served count:', error)
+      if (import.meta.env.DEV) console.error('Failed to fetch customers served count:', error)
     }
   }
 
@@ -497,7 +497,7 @@ export default function Dashboard() {
       const data = await response.json()
       setRaces(data.races || [])
     } catch (error) {
-      console.error('Error fetching races:', error)
+      if (import.meta.env.DEV) console.error('Error fetching races:', error)
     } finally {
       setIsLoadingRaces(false)
     }
@@ -552,7 +552,7 @@ export default function Dashboard() {
       setEditingRaceId(null)
       await fetchRaces()
     } catch (error) {
-      console.error('Error saving race:', error)
+      if (import.meta.env.DEV) console.error('Error saving race:', error)
       setToast({ message: 'Failed to update race', type: 'error' })
     } finally {
       setIsSavingRace(false)
@@ -602,7 +602,7 @@ export default function Dashboard() {
       setNewRaceValues({ raceName: '', year: new Date().getFullYear().toString(), raceDate: '', location: '' })
       await fetchRaces()
     } catch (error) {
-      console.error('Error creating race:', error)
+      if (import.meta.env.DEV) console.error('Error creating race:', error)
       setToast({ message: error instanceof Error ? error.message : 'Failed to create race', type: 'error' })
     } finally {
       setIsSavingRace(false)
@@ -758,14 +758,14 @@ export default function Dashboard() {
 
         // Update selected order with fresh data
         const updatedOrder = freshOrders.find(o => o.orderNumber === orderNumber)
-        console.log('[Research] Looking for order:', orderNumber)
-        console.log('[Research] Updated order found:', updatedOrder?.orderNumber, 'researchStatus:', updatedOrder?.researchStatus, 'status:', updatedOrder?.status)
+        if (import.meta.env.DEV) console.log('[Research] Looking for order:', orderNumber)
+        if (import.meta.env.DEV) console.log('[Research] Updated order found:', updatedOrder?.orderNumber, 'researchStatus:', updatedOrder?.researchStatus, 'status:', updatedOrder?.status)
         if (updatedOrder) {
           setSelectedOrder(updatedOrder)
         }
       }
     } catch (error) {
-      console.error('Error researching order:', error)
+      if (import.meta.env.DEV) console.error('Error researching order:', error)
       const message = error instanceof Error ? error.message : 'Research failed'
       setToast({ message, type: 'error' })
     } finally {
@@ -863,7 +863,7 @@ export default function Dashboard() {
         }
       }
     } catch (error) {
-      console.error('Error accepting match:', error)
+      if (import.meta.env.DEV) console.error('Error accepting match:', error)
       const message = error instanceof Error ? error.message : 'Failed to accept match'
       setToast({ message, type: 'error' })
     }
@@ -884,7 +884,7 @@ export default function Dashboard() {
       setSelectedOrder(null)
       await fetchOrders()
     } catch (error) {
-      console.error('Error completing order:', error)
+      if (import.meta.env.DEV) console.error('Error completing order:', error)
       setToast({ message: 'Failed to complete order', type: 'error' })
     }
   }
@@ -971,7 +971,7 @@ export default function Dashboard() {
         })
       }
     } catch (error) {
-      console.error('Error saving weather:', error)
+      if (import.meta.env.DEV) console.error('Error saving weather:', error)
       setToast({ message: 'Failed to save weather', type: 'error' })
     } finally {
       setIsSavingWeather(false)
@@ -1027,7 +1027,7 @@ export default function Dashboard() {
         })
       }
     } catch (error) {
-      console.error('Error saving overrides:', error)
+      if (import.meta.env.DEV) console.error('Error saving overrides:', error)
       setToast({ message: 'Failed to save changes', type: 'error' })
     } finally {
       setIsSaving(false)
@@ -1090,7 +1090,7 @@ export default function Dashboard() {
       setToast({ message: `Design status updated to ${(DESIGN_STATUS_CONFIG[designStatus] || DESIGN_STATUS_CONFIG.not_started).label}`, type: 'success' })
       fetchOrders() // Refresh in background
     } catch (error) {
-      console.error('Error updating design status:', error)
+      if (import.meta.env.DEV) console.error('Error updating design status:', error)
       // Roll back optimistic update on failure
       if (selectedOrder?.orderNumber === orderNumber && previousStatus) {
         setSelectedOrder(prev => prev ? { ...prev, designStatus: previousStatus } : null)
@@ -1111,7 +1111,7 @@ export default function Dashboard() {
       const data = await response.json()
       setOrderComments(data.comments || [])
     } catch (error) {
-      console.error('Error fetching comments:', error)
+      if (import.meta.env.DEV) console.error('Error fetching comments:', error)
       setOrderComments([])
     } finally {
       setIsLoadingComments(false)
@@ -1168,7 +1168,7 @@ export default function Dashboard() {
       setSelectedOrder(prev => prev ? { ...prev, commentCount: (prev.commentCount || 0) + 1 } : prev)
       setToast({ message: 'Comment added', type: 'success' })
     } catch (error) {
-      console.error('Error adding comment:', error)
+      if (import.meta.env.DEV) console.error('Error adding comment:', error)
       setToast({ message: error instanceof Error ? error.message : 'Failed to add comment', type: 'error' })
     } finally {
       setIsSubmittingComment(false)
@@ -1191,7 +1191,7 @@ export default function Dashboard() {
       }
       setToast({ message: 'Comment deleted', type: 'success' })
     } catch (error) {
-      console.error('Error deleting comment:', error)
+      if (import.meta.env.DEV) console.error('Error deleting comment:', error)
       setToast({ message: 'Failed to delete comment', type: 'error' })
     }
   }

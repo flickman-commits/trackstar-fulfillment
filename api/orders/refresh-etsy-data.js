@@ -8,7 +8,7 @@
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { Prisma } from '@prisma/client'
-import { etsyFetch, disconnectEtsyAuth } from '../../server/services/etsyAuth.js'
+import { etsyFetch } from '../../server/services/etsyAuth.js'
 import { parseEtsyRaceName, parseEtsyPersonalization } from '../../server/services/etsyPersonalization.js'
 
 export default async function handler(req, res) {

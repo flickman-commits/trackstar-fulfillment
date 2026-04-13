@@ -1,11 +1,56 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'sonner'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component } from 'react'
+import type { ErrorInfo, ReactNode } from 'react'
 import Dashboard from '@/pages/Dashboard'
 import OrderDetails from '@/pages/OrderDetails'
 import ApprovalPortal from '@/pages/ApprovalPortal'
 
-const PASSWORD = 'runfast'
+const PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
+
+interface ErrorBoundaryProps {
+  children: ReactNode
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-off-black flex items-center justify-center px-4">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold text-white mb-2">Something went wrong</h1>
+            <p className="text-white/60 text-body-sm mb-6">An unexpected error occurred.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 text-body-sm font-medium text-off-black bg-white hover:bg-white/90 rounded-md transition-opacity"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 function PasswordGate({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -71,27 +116,29 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Public route — no password gate */}
-        <Route path="/approve/:token" element={<ApprovalPortal />} />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          {/* Public route — no password gate */}
+          <Route path="/approve/:token" element={<ApprovalPortal />} />
 
-        {/* Protected routes */}
-        <Route path="/*" element={
-          <PasswordGate>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/orders/:orderId" element={<OrderDetails />} />
-            </Routes>
-          </PasswordGate>
-        } />
-      </Routes>
-      <Toaster
-        position="bottom-center"
-        toastOptions={{
-          className: "!bg-off-black !text-white !rounded-md"
-        }}
-      />
-    </BrowserRouter>
+          {/* Protected routes */}
+          <Route path="/*" element={
+            <PasswordGate>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/orders/:orderId" element={<OrderDetails />} />
+              </Routes>
+            </PasswordGate>
+          } />
+        </Routes>
+        <Toaster
+          position="bottom-center"
+          toastOptions={{
+            className: "!bg-off-black !text-white !rounded-md"
+          }}
+        />
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
