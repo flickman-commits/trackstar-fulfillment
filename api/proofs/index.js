@@ -23,7 +23,7 @@ import { Resend } from 'resend'
 import crypto from 'crypto'
 import formidable from 'formidable'
 import fs from 'fs'
-import sharp from 'sharp'
+// sharp loaded dynamically in processImage() — top-level import crashes Vercel cold start
 
 // Disable Vercel's default body parser for multipart support
 export const config = { api: { bodyParser: false } }
@@ -87,6 +87,7 @@ async function processImage(buffer, ext) {
   if (!IMAGE_EXTENSIONS.has(ext)) return { compressed: null, thumbnail: null }
 
   try {
+    const sharp = (await import('sharp')).default
     // Compress: resize to max 1500px wide, JPEG quality 85
     const compressed = await sharp(buffer)
       .resize(1500, null, { withoutEnlargement: true })
