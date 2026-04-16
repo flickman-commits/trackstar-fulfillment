@@ -88,10 +88,10 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   }, [fetchData])
 
   const addFiles = (files: File[]) => {
-    const remaining = 7 - selectedFiles.length
+    const remaining = 20 - selectedFiles.length
     const toAdd = files.slice(0, remaining)
     if (toAdd.length === 0) {
-      toast.error('Maximum 7 files')
+      toast.error('Maximum 20 files')
       return
     }
 
@@ -434,7 +434,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                   </button>
                 </div>
               ))}
-              {selectedFiles.length < 7 && (
+              {selectedFiles.length < 20 && (
                 <label className="cursor-pointer flex items-center justify-center h-16 w-16 rounded-md border-2 border-dashed border-border-gray hover:border-off-black/30 transition-colors">
                   <ImagePlus className="w-4 h-4 text-off-black/30" />
                   <input
@@ -470,7 +470,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         ) : (
           <label className="cursor-pointer flex items-center justify-center gap-2 py-3 text-xs text-off-black/50 hover:text-off-black/70 transition-colors">
             <ImagePlus className="w-4 h-4" />
-            <span>Choose proof images (up to 7) or paste from clipboard</span>
+            <span>Choose proof images (up to 20) or paste from clipboard</span>
             <input
               ref={fileInputRef}
               type="file"
