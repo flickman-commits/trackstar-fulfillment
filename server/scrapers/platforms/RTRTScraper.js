@@ -68,7 +68,7 @@ export class RTRTScraper extends BaseScraper {
         console.log(`  ${idx + 1}. ${p.name || `${p.fname} ${p.lname}`} - Bib: ${p.bib || 'N/A'}`)
       })
 
-      const matches = searchResults.filter(p => {
+      let matches = searchResults.filter(p => {
         const fullName = p.name || `${p.fname || ''} ${p.lname || ''}`.trim()
         return this.namesMatch(runnerName, fullName)
       })
@@ -76,6 +76,35 @@ export class RTRTScraper extends BaseScraper {
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 
       if (matches.length === 0) return this.notFoundResult()
+
+      // For multi-course events (e.g. marathon + half at same race), resolve
+      // which event the runner is in via their `course` field.
+      // Picks based on eventSearchOrder preference.
+      let resolvedEventType = this.config.defaultEventType || 'Marathon'
+      let resolvedDistance = this.config.distanceMiles || 26.2
+      if (this.config.courseMap && this.config.eventSearchOrder) {
+        const eventOrder = this.config.eventSearchOrder
+        let foundKey = null
+        for (const eventKey of eventOrder) {
+          const courseId = (this.config.courseMap[eventKey] || '').toLowerCase()
+          if (!courseId) continue
+          const courseMatches = matches.filter(p =>
+            (p.course || '').toLowerCase() === courseId
+          )
+          if (courseMatches.length > 0) {
+            matches = courseMatches
+            foundKey = eventKey
+            break
+          }
+        }
+        if (foundKey) {
+          resolvedEventType = this.config.eventLabels?.[foundKey] || foundKey
+          resolvedDistance = this.config.distances?.[foundKey] || resolvedDistance
+          console.log(`[${this.tag}] Resolved to event: ${resolvedEventType}`)
+        } else {
+          console.log(`[${this.tag}] No matches in any configured course`)
+        }
+      }
 
       if (matches.length > 1) {
         return this.ambiguousResult(matches.map(m => ({
@@ -93,6 +122,7 @@ export class RTRTScraper extends BaseScraper {
       console.log(`  Name: ${fullName}`)
       console.log(`  Bib: ${profile.bib || 'N/A'}`)
       console.log(`  PID: ${pid || 'N/A'}`)
+      console.log(`  Event: ${resolvedEventType}`)
 
       // Fetch splits for finish time and pace
       let time = null
@@ -110,9 +140,8 @@ export class RTRTScraper extends BaseScraper {
             time = this.formatTime(cleanTime ? this.normalizeTime(cleanTime) : null)
 
             const rawPace = finishSplit.paceAvg?.replace(/\s*min\/mile$/i, '') || null
-            const distanceMiles = this.config.distanceMiles || 26.2
             pace = rawPace || this.formatPace(
-              cleanTime ? this.calculatePace(this.normalizeTime(cleanTime), distanceMiles) : null
+              cleanTime ? this.calculatePace(this.normalizeTime(cleanTime), resolvedDistance) : null
             )
 
             console.log(`  Time: ${time}`)
@@ -132,7 +161,7 @@ export class RTRTScraper extends BaseScraper {
         bibNumber: profile.bib ? String(profile.bib) : null,
         officialTime: time,
         officialPace: pace,
-        eventType: this.config.defaultEventType || 'Marathon',
+        eventType: resolvedEventType,
         yearFound: this.year,
         researchNotes: null,
         resultsUrl,
