@@ -104,10 +104,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ races })
     }
 
-    // Support filtering by order type: ?type=standard or ?type=custom
+    // Support filtering by order type: ?type=standard | custom | race_partner
     const whereClause = {}
-    if (type === 'standard' || type === 'custom') {
+    if (type === 'standard' || type === 'custom' || type === 'race_partner') {
       whereClause.trackstarOrderType = type
+    } else {
+      // No type specified: exclude race_partner rows from the default "all" query
+      // so they never leak into customer-order analytics or list views.
+      whereClause.trackstarOrderType = { not: 'race_partner' }
     }
 
     // Fetch orders with their research data and race info
@@ -184,6 +188,9 @@ export default async function handler(req, res) {
         timeCustomer: order.timeCustomer,
         creativeDirection: order.creativeDirection,
         isGift: order.isGift,
+        // Race-partner virtual fields (aliases for existing columns — no schema change)
+        partnerName: order.trackstarOrderType === 'race_partner' ? order.raceName : null,
+        partnerContactName: order.trackstarOrderType === 'race_partner' ? order.customerName : null,
         // Comment count for notes indicator
         commentCount: order._count?.comments || 0,
         // Proof count for proof indicator
@@ -219,6 +226,9 @@ export default async function handler(req, res) {
     }
     if (type === 'custom') {
       transformedOrders.sort((a, b) => getOrderDate(a) - getOrderDate(b))
+    } else if (type === 'race_partner') {
+      // Race partners: newest first (matches how Matt adds them)
+      transformedOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     } else {
       transformedOrders.sort((a, b) => getOrderDate(b) - getOrderDate(a))
     }

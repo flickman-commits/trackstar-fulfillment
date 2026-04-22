@@ -32,7 +32,9 @@ model Order {
   createdAt          DateTime  @default(now())
 
   // Trackstar order classification
-  trackstarOrderType String    @default("standard") // "standard" | "custom"
+  trackstarOrderType String    @default("standard") // "standard" | "custom" | "race_partner"
+  // Note: race_partner rows reuse raceName as the partner name and
+  // customerName/customerEmail as the partner contact — no schema change needed.
 
   // Custom order fields (populated from Shopify properties for custom orders)
   designStatus       String    @default("not_started") // "not_started" | "in_progress" | "awaiting_review" | "ready_to_send" | "done"

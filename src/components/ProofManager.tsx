@@ -35,9 +35,12 @@ interface ProofManagerProps {
   customerEmail?: string | null
   onDesignStatusChange?: (newStatus: string) => void
   onLatestFeedback?: (feedback: string | null) => void
+  // When true, hides the "Send to Customer" / "Re-send Email" buttons.
+  // Used for race-partner orders where Matt shares the approval link manually.
+  disableEmail?: boolean
 }
 
-export default function ProofManager({ orderId, designStatus, customerEmail, onDesignStatusChange, onLatestFeedback }: ProofManagerProps) {
+export default function ProofManager({ orderId, designStatus, customerEmail, onDesignStatusChange, onLatestFeedback, disableEmail }: ProofManagerProps) {
   const [proofs, setProofs] = useState<Proof[]>([])
   const [approvalToken, setApprovalToken] = useState<ApprovalToken | null>(null)
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null)
@@ -281,7 +284,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   }
 
   const hasPendingProofs = proofs.some(p => p.status === 'pending')
-  const canSend = hasPendingProofs && customerEmail
+  const canSend = hasPendingProofs && customerEmail && !disableEmail
   const showSendButton = canSend && ['in_progress', 'in_revision'].includes(designStatus || '')
   // Show note field when there are pending proofs to send, OR when files are selected (about to upload)
   const showNoteField = (showSendButton || selectedFiles.length > 0) && ['in_progress', 'in_revision'].includes(designStatus || '')

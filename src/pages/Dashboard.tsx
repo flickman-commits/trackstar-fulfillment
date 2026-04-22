@@ -73,7 +73,10 @@ interface Order {
   effectiveRunnerName?: string
   hasOverrides?: boolean
   // Trackstar order type and custom order fields
-  trackstarOrderType?: 'standard' | 'custom'
+  trackstarOrderType?: 'standard' | 'custom' | 'race_partner'
+  // Race partner fields (only populated when trackstarOrderType === 'race_partner')
+  partnerName?: string | null
+  partnerContactName?: string | null
   designStatus?: DesignStatus
   dueDate?: string
   customerEmail?: string
@@ -276,7 +279,11 @@ export default function Dashboard() {
   const [showRaceDatabase, setShowRaceDatabase] = useState(false)
   const [showScraperStatus, setShowScraperStatus] = useState(false)
   // Tab switcher: standard vs custom order view
-  const [activeView, setActiveView] = useState<'standard' | 'custom'>('standard')
+  const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner'>('standard')
+  // "New Race Partner" modal state
+  const [showNewRacePartner, setShowNewRacePartner] = useState(false)
+  const [newPartnerValues, setNewPartnerValues] = useState({ partnerName: '', raceYear: String(new Date().getFullYear()), contactName: '', contactEmail: '' })
+  const [isCreatingPartner, setIsCreatingPartner] = useState(false)
   // Comments state for custom orders
   const [orderComments, setOrderComments] = useState<OrderComment[]>([])
   const [isLoadingComments, setIsLoadingComments] = useState(false)
@@ -339,7 +346,7 @@ export default function Dashboard() {
           effectiveRunnerName: order.effectiveRunnerName as string | undefined,
           hasOverrides: order.hasOverrides as boolean | undefined,
           // Custom order fields
-          trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | undefined,
+          trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | undefined,
           designStatus: order.designStatus as DesignStatus | undefined,
           dueDate: order.dueDate as string | undefined,
           customerEmail: order.customerEmail as string | undefined,
@@ -348,6 +355,8 @@ export default function Dashboard() {
           timeCustomer: order.timeCustomer as string | undefined,
           creativeDirection: order.creativeDirection as string | undefined,
           isGift: order.isGift as boolean | undefined,
+          partnerName: order.partnerName as string | null | undefined,
+          partnerContactName: order.partnerContactName as string | null | undefined,
           // Alert flags
           hadNoTime: order.hadNoTime as boolean | undefined,
           timeFromName: order.timeFromName as string | null | undefined,
@@ -378,6 +387,39 @@ export default function Dashboard() {
       setIsLoading(false)
     }
   }, [activeView])
+
+  // Create a new race-partner "order" (used to send proof links to race orgs)
+  const createRacePartner = async () => {
+    if (!newPartnerValues.partnerName.trim()) {
+      setToast({ message: 'Partner name is required', type: 'error' })
+      return
+    }
+    setIsCreatingPartner(true)
+    try {
+      const res = await apiFetch('/api/orders/create-race-partner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partnerName: newPartnerValues.partnerName.trim(),
+          raceYear: parseInt(newPartnerValues.raceYear, 10) || new Date().getFullYear(),
+          contactName: newPartnerValues.contactName.trim() || null,
+          contactEmail: newPartnerValues.contactEmail.trim() || null,
+        })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Create failed (${res.status})`)
+      }
+      setToast({ message: 'Race partner added', type: 'success' })
+      setShowNewRacePartner(false)
+      setNewPartnerValues({ partnerName: '', raceYear: String(new Date().getFullYear()), contactName: '', contactEmail: '' })
+      await fetchOrders()
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : 'Failed to create race partner', type: 'error' })
+    } finally {
+      setIsCreatingPartner(false)
+    }
+  }
 
   // Import new orders from Artelo
   const importOrders = async () => {
@@ -738,7 +780,7 @@ export default function Dashboard() {
             effectiveRaceName: order.effectiveRaceName as string | undefined,
             effectiveRunnerName: order.effectiveRunnerName as string | undefined,
             hasOverrides: order.hasOverrides as boolean | undefined,
-            trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | undefined,
+            trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | undefined,
             designStatus: order.designStatus as DesignStatus | undefined,
             dueDate: order.dueDate as string | undefined,
             customerEmail: order.customerEmail as string | undefined,
@@ -843,7 +885,7 @@ export default function Dashboard() {
             effectiveRaceName: order.effectiveRaceName as string | undefined,
             effectiveRunnerName: order.effectiveRunnerName as string | undefined,
             hasOverrides: order.hasOverrides as boolean | undefined,
-            trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | undefined,
+            trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | undefined,
             designStatus: order.designStatus as DesignStatus | undefined,
             dueDate: order.dueDate as string | undefined,
             customerEmail: order.customerEmail as string | undefined,
@@ -1251,7 +1293,7 @@ export default function Dashboard() {
 
   // Load comments when custom order modal opens
   useEffect(() => {
-    if (selectedOrder?.trackstarOrderType === 'custom' && selectedOrder.id) {
+    if ((selectedOrder?.trackstarOrderType === 'custom' || selectedOrder?.trackstarOrderType === 'race_partner') && selectedOrder.id) {
       fetchComments(selectedOrder.id)
       setNewCommentText('')
       setCommentImageFile(null)
@@ -1297,10 +1339,14 @@ export default function Dashboard() {
   const ordersToFulfill = useMemo(() => {
     // Guard: ensure orders match the active view type to prevent cross-contamination
     const typeFiltered = orders.filter(o => (o.trackstarOrderType || 'standard') === activeView)
-    if (activeView === 'custom') {
-      // Custom view: show all non-done designs, sorted by due date ascending (oldest/most urgent first)
-      const customOrders = typeFiltered.filter(o => o.designStatus !== 'sent_to_production')
-      return customOrders.sort((a, b) => {
+    if (activeView === 'custom' || activeView === 'race_partner') {
+      // Design-driven views: show all non-done items, sorted by most recent first for race_partner
+      // (custom uses due date; race_partner has no due date so we fall back to createdAt)
+      const activeOrders = typeFiltered.filter(o => o.designStatus !== 'sent_to_production')
+      if (activeView === 'race_partner') {
+        return activeOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      }
+      return activeOrders.sort((a, b) => {
         const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
         const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
         return dateA - dateB
@@ -1320,7 +1366,7 @@ export default function Dashboard() {
   const completedOrders = useMemo(() => {
     // Guard: ensure orders match the active view type
     const typeFiltered = orders.filter(o => (o.trackstarOrderType || 'standard') === activeView)
-    if (activeView === 'custom') {
+    if (activeView === 'custom' || activeView === 'race_partner') {
       return typeFiltered.filter(o => o.designStatus === 'sent_to_production')
     }
     return typeFiltered.filter(o => o.status === 'completed')
@@ -1481,19 +1527,30 @@ Thank you!`
           {/* Right side: primary actions, right-aligned */}
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
-              <button
-                onClick={importOrders}
-                disabled={isImporting}
-                className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isImporting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Upload className="w-4 h-4" />
-                )}
-                <span className="md:hidden">{isImporting ? 'Importing…' : 'Import'}</span>
-                <span className="hidden md:inline">{isImporting ? 'Importing…' : 'Import New Orders'}</span>
-              </button>
+              {activeView === 'race_partner' ? (
+                <button
+                  onClick={() => setShowNewRacePartner(true)}
+                  className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap"
+                >
+                  <ImagePlus className="w-4 h-4" />
+                  <span className="md:hidden">New Partner</span>
+                  <span className="hidden md:inline">New Race Partner</span>
+                </button>
+              ) : (
+                <button
+                  onClick={importOrders}
+                  disabled={isImporting}
+                  className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isImporting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                  <span className="md:hidden">{isImporting ? 'Importing…' : 'Import'}</span>
+                  <span className="hidden md:inline">{isImporting ? 'Importing…' : 'Import New Orders'}</span>
+                </button>
+              )}
             </div>
             <div className="hidden md:flex flex-col items-end gap-1">
               <a
@@ -1523,8 +1580,8 @@ Thank you!`
           <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
             <div className="flex items-center gap-3">
               <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
-                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : 'Custom Designs'}</span>
-                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : 'Custom Designs'}</span>
+                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : 'Race Partners'}</span>
+                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : 'Race Partners'}</span>
               </h2>
               <span className="hidden md:inline px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
                 {ordersToFulfill.length}
@@ -1553,6 +1610,16 @@ Thank you!`
               >
                 Custom
               </button>
+              <button
+                onClick={() => { setActiveView('race_partner'); setSearchQuery('') }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
+                  activeView === 'race_partner'
+                    ? 'bg-off-black text-white border-off-black'
+                    : 'bg-white text-off-black border-border-gray'
+                }`}
+              >
+                Race Partners
+              </button>
             </div>
             {/* View Switcher - Desktop */}
             <div className="hidden md:flex gap-2">
@@ -1575,6 +1642,16 @@ Thank you!`
                 }`}
               >
                 Custom
+              </button>
+              <button
+                onClick={() => { setActiveView('race_partner'); setSearchQuery('') }}
+                className={`px-5 py-2 text-sm font-medium rounded-full transition-colors border ${
+                  activeView === 'race_partner'
+                    ? 'bg-off-black text-white border-off-black'
+                    : 'bg-white text-off-black border-border-gray hover:bg-subtle-gray'
+                }`}
+              >
+                Race Partners
               </button>
             </div>
           </div>
@@ -1711,11 +1788,12 @@ Thank you!`
                     )}
                   </>
                 ) : (
-                  /* Custom Designs - Mobile Cards */
+                  /* Custom Designs / Race Partners - Mobile Cards */
                   <>
                     {filteredOrders.map((order) => {
                       const designConfig = DESIGN_STATUS_CONFIG[order.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started
                       const itemCount = getOrderItemCount(order.parentOrderNumber)
+                      const isPartner = order.trackstarOrderType === 'race_partner'
                       return (
                         <div
                           key={order.id}
@@ -1729,32 +1807,53 @@ Thank you!`
                                 <span>{designConfig.icon}</span>
                                 {designConfig.label}
                               </span>
-                              <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
-                              {itemCount > 1 && (
-                                <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
-                                  {order.lineItemIndex + 1}/{itemCount}
-                                </span>
-                              )}
-                              {order.isGift && (
-                                <span className="text-xs">🎁</span>
+                              {!isPartner && (
+                                <>
+                                  <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
+                                  {itemCount > 1 && (
+                                    <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
+                                      {order.lineItemIndex + 1}/{itemCount}
+                                    </span>
+                                  )}
+                                  {order.isGift && (
+                                    <span className="text-xs">🎁</span>
+                                  )}
+                                </>
                               )}
                               {(order.notes || (order.commentCount ?? 0) > 0) && (
                                 <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
                               )}
                             </div>
                           </div>
-                          {/* Row 2: Runner name */}
+                          {/* Row 2: Runner name (or Partner name) */}
                           <div className="mt-1">
-                            <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
+                            <span className="text-sm text-off-black font-medium">
+                              {isPartner
+                                ? (order.partnerName || order.raceName || 'Race Partner')
+                                : (order.effectiveRunnerName || order.runnerName || 'Unknown Runner')}
+                            </span>
                           </div>
-                          {/* Row 3: Due date + Race */}
+                          {/* Row 3: Due date + Race (or Year + Contact for partner) */}
                           <div className="mt-0.5 flex items-center justify-between gap-2">
-                            <span className={`text-xs ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black/40'}`}>
-                              Due: {formatDueDate(order.dueDate)}
-                            </span>
-                            <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
-                              {order.effectiveRaceName || order.raceName || '—'}
-                            </span>
+                            {isPartner ? (
+                              <>
+                                <span className="text-xs text-off-black/40">
+                                  {order.raceYear ? `Year: ${order.raceYear}` : ''}
+                                </span>
+                                <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
+                                  {order.partnerContactName || order.customerEmail || '—'}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className={`text-xs ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black/40'}`}>
+                                  Due: {formatDueDate(order.dueDate)}
+                                </span>
+                                <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
+                                  {order.effectiveRaceName || order.raceName || '—'}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       )
@@ -1807,7 +1906,7 @@ Thank you!`
 
                 {filteredOrders.length === 0 && !searchQuery && (
                   <div className="text-center py-12 text-off-black/40 text-sm">
-                    {activeView === 'standard' ? 'No orders to personalize' : 'No custom designs'}
+                    {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet — click "New Race Partner" to add one'}
                   </div>
                 )}
                 {searchQuery && filteredOrders.length === 0 && filteredCompletedOrders.length === 0 && (
@@ -1954,6 +2053,59 @@ Thank you!`
                       )}
                     </tbody>
                   </>
+                ) : activeView === 'race_partner' ? (
+                  <>
+                    {/* Race Partners Table */}
+                    <thead className="bg-subtle-gray border-b border-border-gray sticky top-0 z-10">
+                      <tr>
+                        <th className="text-left pl-6 pr-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-44">Design Status</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Race Partner</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-24">Year</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Contact</th>
+                        <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden lg:table-cell">Proofs</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-gray">
+                      {filteredOrders.map((order, index) => {
+                        const designConfig = DESIGN_STATUS_CONFIG[order.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started
+                        return (
+                          <tr
+                            key={order.id}
+                            onClick={() => setSelectedOrder(order)}
+                            className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
+                          >
+                            <td className="pl-6 pr-3 py-5">
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
+                                <span>{designConfig.icon}</span>
+                                {designConfig.label}
+                              </span>
+                            </td>
+                            <td className="px-3 py-5">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-off-black">{order.partnerName || order.raceName || 'Race Partner'}</span>
+                                {(order.notes || (order.commentCount ?? 0) > 0) && (
+                                  <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-5">
+                              <span className="text-sm text-off-black/70">{order.raceYear || '—'}</span>
+                            </td>
+                            <td className="px-3 py-5 hidden md:table-cell">
+                              <span className="text-sm text-off-black/70">{order.partnerContactName || order.customerEmail || '—'}</span>
+                            </td>
+                            <td className="px-3 pr-6 py-5 text-sm text-off-black/60 hidden lg:table-cell">
+                              {(order.proofCount ?? 0) > 0 ? (
+                                <span className="px-2 py-0.5 bg-off-black/5 rounded text-xs font-medium">{order.proofCount} proof{order.proofCount === 1 ? '' : 's'}</span>
+                              ) : (
+                                <span className="text-off-black/30 text-xs">None</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </>
                 ) : (
                   <>
                     {/* Custom Designs Table */}
@@ -2083,7 +2235,7 @@ Thank you!`
 
               {filteredOrders.length === 0 && !searchQuery && (
                 <div className="hidden md:block text-center py-16 text-off-black/40 text-sm">
-                  {activeView === 'standard' ? 'No orders to personalize' : 'No custom designs'}
+                  {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet — click "New Race Partner" to add one'}
                 </div>
               )}
 
@@ -2727,7 +2879,7 @@ Thank you!`
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
                     <span className="text-xl">
-                      {selectedOrder.trackstarOrderType === 'custom'
+                      {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner')
                         ? (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).icon
                         : selectedOrder.status === 'flagged' ? '⚠️' :
                           selectedOrder.status === 'completed' ? '✅' :
@@ -2736,11 +2888,18 @@ Thank you!`
                           selectedOrder.researchStatus === 'found' ? '✅' : '⏳'}
                     </span>
                     <h3 className="text-heading-md text-off-black">
-                      Order {selectedOrder.displayOrderNumber}
+                      {selectedOrder.trackstarOrderType === 'race_partner'
+                        ? (selectedOrder.partnerName || selectedOrder.raceName || 'Race Partner')
+                        : `Order ${selectedOrder.displayOrderNumber}`}
                     </h3>
                     {selectedOrder.trackstarOrderType === 'custom' && (
                       <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">
                         custom
+                      </span>
+                    )}
+                    {selectedOrder.trackstarOrderType === 'race_partner' && (
+                      <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs font-medium rounded">
+                        race partner
                       </span>
                     )}
                     {selectedOrder.hasOverrides && (
@@ -2762,8 +2921,8 @@ Thank you!`
 
                 <div className="space-y-5">
 
-                  {/* ========== CUSTOM ORDER DETAIL VIEW ========== */}
-                  {selectedOrder.trackstarOrderType === 'custom' ? (
+                  {/* ========== CUSTOM / RACE PARTNER DETAIL VIEW ========== */}
+                  {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner') ? (
                     <>
                       {/* === MOBILE COMPACT SUMMARY (Custom) === */}
                       <div className="md:hidden space-y-3">
@@ -2824,41 +2983,68 @@ Thank you!`
 
                         {/* Order details card */}
                         <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Runner</span>
-                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Race</span>
-                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Year</span>
-                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Due Date</span>
-                            <span className={`text-body-sm font-medium ${isDueDateUrgent(selectedOrder.dueDate) ? 'text-red-600' : 'text-off-black'}`}>
-                              {formatDueDate(selectedOrder.dueDate)}
-                            </span>
-                          </div>
-                          {selectedOrder.bibNumberCustomer && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-off-black/60">Bib</span>
-                              <span className="text-body-sm font-medium text-off-black">{selectedOrder.bibNumberCustomer}</span>
-                            </div>
-                          )}
-                          {selectedOrder.timeCustomer && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-off-black/60">Time</span>
-                              <span className="text-body-sm font-medium text-off-black">{selectedOrder.timeCustomer}</span>
-                            </div>
-                          )}
-                          {selectedOrder.isGift && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-off-black/60">Gift Order</span>
-                              <span className="text-body-sm font-medium text-pink-600">🎁 Yes</span>
-                            </div>
+                          {selectedOrder.trackstarOrderType === 'race_partner' ? (
+                            <>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Partner</span>
+                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.partnerName || selectedOrder.raceName}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Year</span>
+                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.raceYear || 'N/A'}</span>
+                              </div>
+                              {selectedOrder.partnerContactName && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-body-sm text-off-black/60">Contact</span>
+                                  <span className="text-body-sm font-medium text-off-black">{selectedOrder.partnerContactName}</span>
+                                </div>
+                              )}
+                              {selectedOrder.customerEmail && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-body-sm text-off-black/60">Email</span>
+                                  <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Runner</span>
+                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Race</span>
+                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Year</span>
+                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A'}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Due Date</span>
+                                <span className={`text-body-sm font-medium ${isDueDateUrgent(selectedOrder.dueDate) ? 'text-red-600' : 'text-off-black'}`}>
+                                  {formatDueDate(selectedOrder.dueDate)}
+                                </span>
+                              </div>
+                              {selectedOrder.bibNumberCustomer && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-body-sm text-off-black/60">Bib</span>
+                                  <span className="text-body-sm font-medium text-off-black">{selectedOrder.bibNumberCustomer}</span>
+                                </div>
+                              )}
+                              {selectedOrder.timeCustomer && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-body-sm text-off-black/60">Time</span>
+                                  <span className="text-body-sm font-medium text-off-black">{selectedOrder.timeCustomer}</span>
+                                </div>
+                              )}
+                              {selectedOrder.isGift && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-body-sm text-off-black/60">Gift Order</span>
+                                  <span className="text-body-sm font-medium text-pink-600">🎁 Yes</span>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                         {selectedOrder.creativeDirection && (
@@ -2940,6 +3126,7 @@ Thank you!`
                             customerEmail={selectedOrder.customerEmail}
                             onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
                             onLatestFeedback={setLatestFeedback}
+                            disableEmail={selectedOrder.trackstarOrderType === 'race_partner'}
                           />
                         </div>
 
@@ -3078,14 +3265,16 @@ Thank you!`
                         </div>
                       </div>
 
-                      {/* Due date — compact inline, always visible */}
-                      <div className="flex items-center justify-between text-xs px-1">
-                        <span className="text-off-black/40">Due {formatDueDate(selectedOrder.dueDate)}</span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-off-black/40">{selectedOrder.productSize}</span>
-                          {selectedOrder.isGift && <span className="text-pink-600">🎁 Gift</span>}
+                      {/* Due date — compact inline, always visible (hidden for race_partner) */}
+                      {selectedOrder.trackstarOrderType !== 'race_partner' && (
+                        <div className="flex items-center justify-between text-xs px-1">
+                          <span className="text-off-black/40">Due {formatDueDate(selectedOrder.dueDate)}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-off-black/40">{selectedOrder.productSize}</span>
+                            {selectedOrder.isGift && <span className="text-pink-600">🎁 Gift</span>}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* ═══ STAGE-SPECIFIC PRIMARY ACTION — always at the top ═══ */}
 
@@ -3177,28 +3366,44 @@ Thank you!`
                             customerEmail={selectedOrder.customerEmail}
                             onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
                             onLatestFeedback={setLatestFeedback}
+                            disableEmail={selectedOrder.trackstarOrderType === 'race_partner'}
                           />
                         </CollapsibleSection>
                       )}
 
                       {/* Design Info — always visible, Dan needs filename at every stage */}
-                        <CollapsibleSection title="Design Info" defaultOpen={ds === 'not_started' || ds === 'in_progress'}>
+                        <CollapsibleSection title={selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Info' : 'Design Info'} defaultOpen={ds === 'not_started' || ds === 'in_progress'}>
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
-                            <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
-                            <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
-                            <StaticField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
-                            {selectedOrder.bibNumberCustomer && (
-                              <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
-                            )}
-                            {selectedOrder.timeCustomer && (
-                              <CopyableField label="Time" value={selectedOrder.timeCustomer} />
-                            )}
-                            <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                            {selectedOrder.customerEmail && (
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Email</span>
-                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
-                              </div>
+                            {selectedOrder.trackstarOrderType === 'race_partner' ? (
+                              <>
+                                <CopyableField label="Partner" value={selectedOrder.partnerName || selectedOrder.raceName || 'Race Partner'} />
+                                <StaticField label="Year" value={String(selectedOrder.raceYear || 'N/A')} />
+                                {selectedOrder.partnerContactName && (
+                                  <CopyableField label="Contact" value={selectedOrder.partnerContactName} />
+                                )}
+                                {selectedOrder.customerEmail && (
+                                  <CopyableField label="Email" value={selectedOrder.customerEmail} />
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
+                                <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
+                                <StaticField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
+                                {selectedOrder.bibNumberCustomer && (
+                                  <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
+                                )}
+                                {selectedOrder.timeCustomer && (
+                                  <CopyableField label="Time" value={selectedOrder.timeCustomer} />
+                                )}
+                                <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
+                                {selectedOrder.customerEmail && (
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-body-sm text-off-black/60">Email</span>
+                                    <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                           {selectedOrder.creativeDirection && (
@@ -3865,6 +4070,83 @@ Thank you!`
                   </div>{/* end hidden md:block wrapper */}
                     </>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* New Race Partner Modal */}
+        {showNewRacePartner && (
+          <div
+            className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowNewRacePartner(false)
+            }}
+          >
+            <div className="bg-white rounded-md max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-heading-md text-off-black">New Race Partner</h3>
+                  <button onClick={() => setShowNewRacePartner(false)} className="text-off-black/40 hover:text-off-black text-2xl leading-none">×</button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-off-black/60 uppercase tracking-wider mb-1.5">Partner / Race Name *</label>
+                    <input
+                      type="text"
+                      value={newPartnerValues.partnerName}
+                      onChange={(e) => setNewPartnerValues(v => ({ ...v, partnerName: e.target.value }))}
+                      placeholder="e.g. Jersey City Marathon"
+                      className="w-full px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-off-black/60 uppercase tracking-wider mb-1.5">Year</label>
+                    <input
+                      type="number"
+                      value={newPartnerValues.raceYear}
+                      onChange={(e) => setNewPartnerValues(v => ({ ...v, raceYear: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-off-black/60 uppercase tracking-wider mb-1.5">Contact Name</label>
+                    <input
+                      type="text"
+                      value={newPartnerValues.contactName}
+                      onChange={(e) => setNewPartnerValues(v => ({ ...v, contactName: e.target.value }))}
+                      placeholder="Optional"
+                      className="w-full px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-off-black/60 uppercase tracking-wider mb-1.5">Contact Email</label>
+                    <input
+                      type="email"
+                      value={newPartnerValues.contactEmail}
+                      onChange={(e) => setNewPartnerValues(v => ({ ...v, contactEmail: e.target.value }))}
+                      placeholder="Optional"
+                      className="w-full px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 mt-6">
+                  <button
+                    onClick={() => setShowNewRacePartner(false)}
+                    className="px-4 py-2 text-sm font-medium text-off-black/70 hover:bg-subtle-gray rounded-md transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={createRacePartner}
+                    disabled={isCreatingPartner || !newPartnerValues.partnerName.trim()}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-off-black text-white text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                  >
+                    {isCreatingPartner && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {isCreatingPartner ? 'Creating…' : 'Create'}
+                  </button>
                 </div>
               </div>
             </div>
