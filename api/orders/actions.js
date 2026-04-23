@@ -132,6 +132,8 @@ export default async function handler(req, res) {
         return await handleCreateCreatorInvite(body, res)
       case 'creator-onboard':
         return await handleCreatorOnboard(body, res)
+      case 'approve-creator-sample':
+        return await handleApproveCreatorSample(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -908,6 +910,13 @@ async function handleCreatorPortalData(token, res) {
     .map(a => a.brief)
     .filter(b => b.status === 'active')
 
+  // Race options for the onboarding dropdown. Sorted newest first so recent
+  // races appear at the top. Only expose the minimum fields the portal needs.
+  const races = await prisma.race.findMany({
+    orderBy: [{ year: 'desc' }, { raceName: 'asc' }],
+    select: { id: true, raceName: true, year: true },
+  })
+
   // Don't leak admin-only fields (commission, notes, etc.) to the creator.
   return res.status(200).json({
     creator: {
@@ -934,6 +943,7 @@ async function handleCreatorPortalData(token, res) {
     },
     briefs,
     sampleOrder: creator.sampleOrder,
+    races,
   })
 }
 
@@ -981,14 +991,9 @@ async function handleCreatorOnboard({ token, data }, res) {
     data: updates,
   })
 
-  // On first onboarding, create the sample Order and link it. This drops
-  // the creator's sample into Elí's Standard queue so he can fulfill it
-  // like any other standard order (the "Creator" badge in the list view
-  // identifies it as a free creator sample, not a paying customer).
-  if (isFirstOnboard && !creator.sampleOrderId) {
-    await createCreatorSampleOrder(updated)
-  }
-
+  // Onboarding no longer auto-creates the Order. The submission sits as a
+  // Sample Request on Matt's dashboard and only becomes a fulfillment order
+  // once he approves via `approve-creator-sample`.
   console.log(`[actions/creator-onboard] ${creator.id} onboarded (or updated): ${Object.keys(updates).join(', ')}`)
   return res.status(200).json({ success: true, creator: { id: updated.id, status: updated.status } })
 }
@@ -1051,4 +1056,49 @@ async function createCreatorSampleOrder(creator) {
 
   console.log(`[actions/creator-onboard] Created sample order ${order.orderNumber} for creator ${creator.id}`)
   return order
+}
+
+// --- approve-creator-sample ---
+// Admin clicks "Approve" on a Sample Request in the /creators dashboard.
+// We create the fulfillment Order, flip the Creator to active, and ping
+// the team Slack so Elí knows there's a new creator sample to produce.
+async function handleApproveCreatorSample({ creatorId }, res) {
+  if (!creatorId) return res.status(400).json({ error: 'creatorId is required' })
+
+  const creator = await prisma.creator.findUnique({ where: { id: creatorId } })
+  if (!creator) return res.status(404).json({ error: 'Creator not found' })
+  if (!creator.onboardedAt) return res.status(400).json({ error: 'Creator has not onboarded yet' })
+  if (creator.sampleOrderId) return res.status(400).json({ error: 'Sample already approved for this creator' })
+
+  const order = await createCreatorSampleOrder(creator)
+  await prisma.creator.update({
+    where: { id: creatorId },
+    data: { status: 'active' }
+  })
+
+  // Slack ping — best-effort. Don't block the approval on webhook failure.
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL
+  if (webhookUrl) {
+    try {
+      const lines = [
+        `🎁 *New Creator Sample Order* — ${order.orderNumber}`,
+        `Creator: ${creator.name || '(unnamed)'}${creator.instagramHandle ? ` · ${creator.instagramHandle}` : ''}`,
+        `Race: ${creator.raceName || 'Unknown'}${creator.raceYear ? ` ${creator.raceYear}` : ''}`,
+        `Print: ${creator.productSize || '—'} · ${creator.frameType || '—'}`,
+        `Shipping to: ${[creator.shippingCity, creator.shippingState].filter(Boolean).join(', ') || 'address on file'}`,
+        ``,
+        `Open Dashboard → find *${order.orderNumber}* in the Standard queue for full shipping address.`,
+      ]
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: lines.join('\n') }),
+      })
+    } catch (err) {
+      console.error('[actions/approve-creator-sample] Slack ping failed:', err.message)
+    }
+  }
+
+  console.log(`[actions/approve-creator-sample] Approved ${creatorId} → order ${order.orderNumber}`)
+  return res.status(200).json({ success: true, orderNumber: order.orderNumber })
 }

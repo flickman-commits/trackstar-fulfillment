@@ -43,10 +43,17 @@ interface PortalCreator {
   onboardedAt: string | null
 }
 
+interface RaceOption {
+  id: number
+  raceName: string
+  year: number
+}
+
 interface PortalData {
   creator: PortalCreator
   briefs: PortalBrief[]
   sampleOrder: { id: string; orderNumber: string; status: string; createdAt: string } | null
+  races: RaceOption[]
 }
 
 // ---------------------------------------------------------------------------
@@ -140,11 +147,8 @@ interface OnboardingDraft {
   email: string
   instagramHandle: string
   tiktokHandle: string
-  // Step 2: race
-  raceName: string
-  raceYear: string  // kept as string for input binding
-  bibNumber: string
-  finishTime: string
+  // Step 2: race (single dropdown value like "<raceName>__<year>")
+  raceKey: string
   // Step 3: product
   productSize: string
   frameType: string
@@ -158,8 +162,21 @@ interface OnboardingDraft {
   shippingCountry: string
 }
 
-const PRODUCT_SIZES = ['8x10', '12x18', '18x24']
-const FRAME_TYPES = ['None (print only)', 'Black Frame', 'White Frame', 'Natural Wood Frame']
+const PRODUCT_SIZES = ['8x10', '12x18']
+const FRAME_TYPES = ['Unframed', 'Black Oak', 'Natural Oak']
+
+function raceKeyOf(raceName: string | null | undefined, year: number | null | undefined): string {
+  if (!raceName || !year) return ''
+  return `${raceName}__${year}`
+}
+function parseRaceKey(key: string): { raceName: string; raceYear: number } | null {
+  const idx = key.lastIndexOf('__')
+  if (idx < 0) return null
+  const raceName = key.slice(0, idx)
+  const raceYear = parseInt(key.slice(idx + 2), 10)
+  if (!raceName || !raceYear) return null
+  return { raceName, raceYear }
+}
 
 function OnboardingWizard({ data, token, onDone }: {
   data: PortalData
@@ -173,10 +190,7 @@ function OnboardingWizard({ data, token, onDone }: {
     email: data.creator.email || '',
     instagramHandle: data.creator.instagramHandle || '',
     tiktokHandle: data.creator.tiktokHandle || '',
-    raceName: data.creator.raceName || '',
-    raceYear: data.creator.raceYear ? String(data.creator.raceYear) : String(new Date().getFullYear()),
-    bibNumber: data.creator.bibNumber || '',
-    finishTime: data.creator.finishTime || '',
+    raceKey: raceKeyOf(data.creator.raceName, data.creator.raceYear),
     productSize: data.creator.productSize || '',
     frameType: data.creator.frameType || '',
     shippingName: data.creator.shippingName || data.creator.name || '',
@@ -194,7 +208,7 @@ function OnboardingWizard({ data, token, onDone }: {
   const canProceed = () => {
     if (step === 0) return true // welcome
     if (step === 1) return draft.name.trim().length > 0 && draft.email.trim().length > 0
-    if (step === 2) return draft.raceName.trim().length > 0
+    if (step === 2) return draft.raceKey.length > 0
     if (step === 3) return draft.productSize.length > 0 && draft.frameType.length > 0
     if (step === 4) return (
       draft.shippingName.trim().length > 0 &&
@@ -209,6 +223,7 @@ function OnboardingWizard({ data, token, onDone }: {
   const handleSubmit = async () => {
     setIsSubmitting(true)
     try {
+      const parsed = parseRaceKey(draft.raceKey)
       const res = await fetch(`${API_BASE}/api/orders/actions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -220,10 +235,8 @@ function OnboardingWizard({ data, token, onDone }: {
             email: draft.email.trim(),
             instagramHandle: draft.instagramHandle.trim() || null,
             tiktokHandle: draft.tiktokHandle.trim() || null,
-            raceName: draft.raceName.trim(),
-            raceYear: draft.raceYear,
-            bibNumber: draft.bibNumber.trim() || null,
-            finishTime: draft.finishTime.trim() || null,
+            raceName: parsed?.raceName || null,
+            raceYear: parsed?.raceYear ? String(parsed.raceYear) : null,
             productSize: draft.productSize,
             frameType: draft.frameType,
             shippingName: draft.shippingName.trim(),
@@ -268,7 +281,7 @@ function OnboardingWizard({ data, token, onDone }: {
         <div className="bg-white border border-border-gray rounded-md shadow-sm p-5 md:p-6">
           {step === 0 && <StepWelcome briefs={data.briefs} />}
           {step === 1 && <StepProfile draft={draft} setDraft={setDraft} />}
-          {step === 2 && <StepRace draft={draft} setDraft={setDraft} />}
+          {step === 2 && <StepRace draft={draft} setDraft={setDraft} races={data.races} />}
           {step === 3 && <StepProduct draft={draft} setDraft={setDraft} />}
           {step === 4 && <StepShipping draft={draft} setDraft={setDraft} />}
         </div>
@@ -356,20 +369,37 @@ function StepProfile({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d
   )
 }
 
-function StepRace({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d: OnboardingDraft) => void }) {
+function StepRace({ draft, setDraft, races }: {
+  draft: OnboardingDraft
+  setDraft: (d: OnboardingDraft) => void
+  races: RaceOption[]
+}) {
   return (
     <div>
       <h2 className="text-lg font-semibold text-off-black mb-1">Your race</h2>
       <p className="text-xs text-off-black/60 mb-4">
-        Your sample print is personalized to a real race you ran. Fill in the details you want on the print.
+        Pick the race you ran — your sample print will be personalized to it. We'll find your bib and finish time for you.
       </p>
-      <div className="space-y-3">
-        <Field label="Race name *" value={draft.raceName} onChange={(v) => setDraft({ ...draft, raceName: v })} placeholder="e.g. Jersey City Marathon" autoFocus />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Year" value={draft.raceYear} onChange={(v) => setDraft({ ...draft, raceYear: v })} type="number" />
-          <Field label="Bib #" value={draft.bibNumber} onChange={(v) => setDraft({ ...draft, bibNumber: v })} placeholder="optional" />
-        </div>
-        <Field label="Finish time" value={draft.finishTime} onChange={(v) => setDraft({ ...draft, finishTime: v })} placeholder="e.g. 3:24:37 (optional)" />
+      <div>
+        <div className="text-xs text-off-black/60 mb-1">Race *</div>
+        <select
+          value={draft.raceKey}
+          onChange={(e) => setDraft({ ...draft, raceKey: e.target.value })}
+          autoFocus
+          className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white"
+        >
+          <option value="">Select a race…</option>
+          {races.map(r => (
+            <option key={r.id} value={raceKeyOf(r.raceName, r.year)}>
+              {r.raceName} — {r.year}
+            </option>
+          ))}
+        </select>
+        {races.length === 0 && (
+          <p className="text-xs text-amber-600 mt-2">
+            No race options available yet. Reach out to Matt so he can add yours.
+          </p>
+        )}
       </div>
     </div>
   )
@@ -476,7 +506,7 @@ function CreatorDashboard({ data }: { data: PortalData }) {
             <SampleStatus order={sampleOrder} />
           ) : (
             <div className="text-sm text-off-black/60">
-              We're preparing your sample now — you'll see shipping status here as soon as it's on its way.
+              Your request is in review — we'll approve it shortly and you'll see shipping status here once your sample is on the way.
             </div>
           )}
         </div>

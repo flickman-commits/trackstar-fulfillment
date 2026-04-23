@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, Users, Package, Megaphone, DollarSign, TrendingUp, Clock, X, Copy, Check, Instagram, Plus } from 'lucide-react'
+import { Loader2, Users, Package, Megaphone, DollarSign, TrendingUp, Clock, X, Copy, Check, Instagram, Plus, Send } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
 type CreatorStatus = 'invited' | 'onboarded' | 'active' | 'paused'
@@ -25,6 +25,8 @@ interface Creator {
   raceYear: number | null
   productSize: string | null
   frameType: string | null
+  shippingCity: string | null
+  shippingState: string | null
   commissionModel: CommissionModel
   commissionConfig: Record<string, unknown>
   commissionNotes: string | null
@@ -135,6 +137,7 @@ export default function CreatorsHome() {
   const [error, setError] = useState<string | null>(null)
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null)
   const [showInvite, setShowInvite] = useState(false)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
 
   const loadAll = useCallback(async () => {
     try {
@@ -161,6 +164,35 @@ export default function CreatorsHome() {
   useEffect(() => {
     loadAll()
   }, [loadAll])
+
+  // Creators that submitted onboarding but haven't had their sample approved yet.
+  // They show in the Sample Requests queue above the main list.
+  const pendingSampleRequests = creators.filter(c =>
+    c.status === 'onboarded' && !c.sampleOrder
+  )
+  const otherCreators = creators.filter(c =>
+    !(c.status === 'onboarded' && !c.sampleOrder)
+  )
+
+  const handleApproveSample = async (creator: Creator) => {
+    setApprovingId(creator.id)
+    try {
+      const res = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve-creator-sample', creatorId: creator.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Approve failed: ${res.status}`)
+      }
+      await loadAll()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to approve')
+    } finally {
+      setApprovingId(null)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-off-white">
@@ -262,11 +294,64 @@ export default function CreatorsHome() {
               />
             </div>
 
+            {/* Sample Requests — creators waiting for Matt's approval */}
+            {pendingSampleRequests.length > 0 && (
+              <div className="mt-10">
+                <h2 className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-3">
+                  Sample Requests Pending ({pendingSampleRequests.length})
+                </h2>
+                <div className="space-y-2">
+                  {pendingSampleRequests.map(c => (
+                    <div key={c.id} className="bg-amber-50 border border-amber-200 rounded-md p-4 flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+                      <button
+                        onClick={() => setSelectedCreator(c)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-off-black">{c.name || 'Unnamed Creator'}</span>
+                          {c.instagramHandle && (
+                            <span className="inline-flex items-center gap-1 text-xs text-off-black/60">
+                              <Instagram className="w-3 h-3" />
+                              {c.instagramHandle}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-off-black/60 mt-1">
+                          {c.raceName ? `${c.raceName}${c.raceYear ? ` ${c.raceYear}` : ''}` : 'No race selected'}
+                          {c.productSize && c.frameType && (
+                            <span className="mx-1.5 text-off-black/30">·</span>
+                          )}
+                          {c.productSize && c.frameType && `${c.productSize} ${c.frameType}`}
+                          {c.shippingCity && c.shippingState && (
+                            <>
+                              <span className="mx-1.5 text-off-black/30">·</span>
+                              Ships to {c.shippingCity}, {c.shippingState}
+                            </>
+                          )}
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleApproveSample(c)}
+                        disabled={approvingId === c.id}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-40 whitespace-nowrap"
+                      >
+                        {approvingId === c.id ? (
+                          <><Loader2 className="w-3 h-3 animate-spin" /> Approving…</>
+                        ) : (
+                          <><Send className="w-3 h-3" /> Approve & notify Elí</>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Creators list */}
             <div className="mt-10">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xs font-semibold text-off-black/50 uppercase tracking-wider">
-                  Creators {creators.length > 0 && <span className="text-off-black/30">({creators.length})</span>}
+                  Creators {otherCreators.length > 0 && <span className="text-off-black/30">({otherCreators.length})</span>}
                 </h2>
                 <button
                   onClick={() => setShowInvite(true)}
@@ -277,10 +362,10 @@ export default function CreatorsHome() {
                 </button>
               </div>
 
-              {creators.length === 0 ? (
+              {otherCreators.length === 0 ? (
                 <div className="bg-white border border-dashed border-off-black/20 rounded-md p-8 text-center text-off-black/50">
                   <p className="text-sm mb-1">No creators yet.</p>
-                  <p className="text-xs text-off-black/40">Generate an invite link to onboard your first creator (next commit).</p>
+                  <p className="text-xs text-off-black/40">Generate an invite link to onboard your first creator.</p>
                 </div>
               ) : (
                 <div className="bg-white border border-border-gray rounded-md shadow-sm overflow-hidden">
@@ -295,7 +380,7 @@ export default function CreatorsHome() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-gray">
-                      {creators.map((c, i) => {
+                      {otherCreators.map((c, i) => {
                         const statusCfg = STATUS_CONFIG[c.status]
                         const sampleDisplay = sampleStatusLabel(c.sampleOrder?.status)
                         return (
