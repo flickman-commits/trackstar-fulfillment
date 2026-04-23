@@ -58,6 +58,11 @@ export default async function handler(req, res) {
       if (!requireAdmin(req, res)) return
       return await handleListBriefs(res)
     }
+    if (action === 'creator-portal-data') {
+      // Public — token-gated inside handler. Used by the creator's portal
+      // page to hydrate their view.
+      return await handleCreatorPortalData(req.query?.token, res)
+    }
     if (action === 'health-check') {
       // Cron uses CRON_SECRET, manual uses ADMIN_SECRET
       const cronAuth = req.headers['authorization']
@@ -79,9 +84,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Unknown GET action' })
   }
 
-  // All POST actions require admin auth
-  if (!requireAdmin(req, res)) return
-
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
@@ -90,6 +92,13 @@ export default async function handler(req, res) {
 
     if (!action) {
       return res.status(400).json({ error: 'action is required' })
+    }
+
+    // Public POST actions — auth'd by the caller's own token inside the
+    // handler, not by the admin secret. Everything else requires admin.
+    const PUBLIC_POST_ACTIONS = new Set(['creator-onboard'])
+    if (!PUBLIC_POST_ACTIONS.has(action)) {
+      if (!requireAdmin(req, res)) return
     }
 
     switch (action) {
@@ -121,6 +130,8 @@ export default async function handler(req, res) {
         return await handleUpdateBrief(body, res)
       case 'create-creator-invite':
         return await handleCreateCreatorInvite(body, res)
+      case 'creator-onboard':
+        return await handleCreatorOnboard(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -863,4 +874,111 @@ async function handleCreateCreatorInvite({ name, email, instagramHandle, briefId
 
   console.log(`[actions/create-creator-invite] Created ${created.id} with ${briefIds?.length || 0} brief(s)`)
   return res.status(201).json({ success: true, creator: created })
+}
+
+// --- creator-portal-data (PUBLIC) ---
+// Token-gated. Returns enough info for the creator's portal to render:
+// their own profile + assigned briefs (full detail) + sample status.
+async function handleCreatorPortalData(token, res) {
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ error: 'token is required' })
+  }
+
+  const creator = await prisma.creator.findUnique({
+    where: { inviteToken: token },
+    include: {
+      briefAssignments: {
+        include: { brief: true },
+        orderBy: { assignedAt: 'asc' }
+      },
+      sampleOrder: {
+        select: { id: true, orderNumber: true, status: true, createdAt: true }
+      }
+    }
+  })
+
+  if (!creator) {
+    return res.status(404).json({ error: 'Invite not found or revoked' })
+  }
+
+  // Filter assigned briefs to active ones only — archived briefs shouldn't
+  // surface to the creator even if they were assigned historically.
+  const briefs = creator.briefAssignments
+    .map(a => a.brief)
+    .filter(b => b.status === 'active')
+
+  // Don't leak admin-only fields (commission, notes, etc.) to the creator.
+  return res.status(200).json({
+    creator: {
+      id: creator.id,
+      name: creator.name,
+      email: creator.email,
+      instagramHandle: creator.instagramHandle,
+      tiktokHandle: creator.tiktokHandle,
+      raceName: creator.raceName,
+      raceYear: creator.raceYear,
+      bibNumber: creator.bibNumber,
+      finishTime: creator.finishTime,
+      productSize: creator.productSize,
+      frameType: creator.frameType,
+      shippingName: creator.shippingName,
+      shippingAddress1: creator.shippingAddress1,
+      shippingAddress2: creator.shippingAddress2,
+      shippingCity: creator.shippingCity,
+      shippingState: creator.shippingState,
+      shippingZip: creator.shippingZip,
+      shippingCountry: creator.shippingCountry,
+      status: creator.status,
+      onboardedAt: creator.onboardedAt,
+    },
+    briefs,
+    sampleOrder: creator.sampleOrder,
+  })
+}
+
+// --- creator-onboard (PUBLIC) ---
+// Token-gated. Creator submits the onboarding wizard — we save everything
+// to their Creator row and flip status → 'onboarded'.
+// Sample-order creation lands in the next commit (Elí's queue integration).
+const CREATOR_ONBOARD_FIELDS = [
+  'name', 'email', 'instagramHandle', 'tiktokHandle',
+  'raceName', 'raceYear', 'bibNumber', 'finishTime',
+  'productSize', 'frameType',
+  'shippingName', 'shippingAddress1', 'shippingAddress2',
+  'shippingCity', 'shippingState', 'shippingZip', 'shippingCountry',
+]
+
+async function handleCreatorOnboard({ token, data }, res) {
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ error: 'token is required' })
+  }
+  if (!data || typeof data !== 'object') {
+    return res.status(400).json({ error: 'data object is required' })
+  }
+
+  const creator = await prisma.creator.findUnique({ where: { inviteToken: token } })
+  if (!creator) return res.status(404).json({ error: 'Invite not found or revoked' })
+
+  // Build the update. Only allow-listed fields are accepted.
+  const updates = {}
+  for (const key of CREATOR_ONBOARD_FIELDS) {
+    if (key in data) updates[key] = data[key]
+  }
+  if (updates.raceYear != null) updates.raceYear = parseInt(updates.raceYear, 10) || null
+
+  // Flip status + stamp onboardedAt on first-pass onboarding. Re-submits
+  // from an already-onboarded creator just update their profile fields —
+  // we don't reset onboardedAt.
+  if (!creator.onboardedAt) {
+    updates.onboardedAt = new Date()
+    updates.status = 'onboarded'
+  }
+
+  const updated = await prisma.creator.update({
+    where: { id: creator.id },
+    data: updates,
+  })
+
+  console.log(`[actions/creator-onboard] ${creator.id} onboarded (or updated): ${Object.keys(updates).join(', ')}`)
+  return res.status(200).json({ success: true, creator: { id: updated.id, status: updated.status } })
 }
