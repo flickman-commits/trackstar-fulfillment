@@ -45,6 +45,10 @@ export default async function handler(req, res) {
       if (!requireAdmin(req, res)) return
       return res.status(200).json({ shorthands: getRaceShorthands() })
     }
+    if (action === 'creator-home-metrics') {
+      if (!requireAdmin(req, res)) return
+      return await handleCreatorHomeMetrics(res)
+    }
     if (action === 'health-check') {
       // Cron uses CRON_SECRET, manual uses ADMIN_SECRET
       const cronAuth = req.headers['authorization']
@@ -637,4 +641,64 @@ async function handleCreateRacePartner({ partnerName, raceYear, contactName, con
 
   console.log(`[actions/create-race-partner] Created ${created.id} (${orderNumber})`)
   return res.status(201).json({ success: true, order: created })
+}
+
+// --- creator-home-metrics ---
+// Aggregates the homepage tiles for /creators.
+// Sample-cost is a placeholder for now (user will provide real per-size pricing
+// later). Marking the metric as PLACEHOLDER on the frontend is handled there.
+const PLACEHOLDER_SAMPLE_COST_USD = 50 // TODO: replace with per-size/frame lookup
+
+async function handleCreatorHomeMetrics(res) {
+  // Run aggregations in parallel
+  const [
+    activeCount,
+    invitedCount,
+    onboardedCount,
+    pausedCount,
+    sampleOrders,
+    thisMonthOnboards,
+  ] = await Promise.all([
+    prisma.creator.count({ where: { status: 'active' } }),
+    prisma.creator.count({ where: { status: 'invited' } }),
+    prisma.creator.count({ where: { status: 'onboarded' } }),
+    prisma.creator.count({ where: { status: 'paused' } }),
+    prisma.order.findMany({
+      where: { source: 'creator_sample' },
+      select: { id: true, status: true, productSize: true, frameType: true }
+    }),
+    prisma.creator.count({
+      where: {
+        onboardedAt: {
+          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        }
+      }
+    }),
+  ])
+
+  const samplesShipped = sampleOrders.filter(o => o.status === 'completed').length
+  const samplesPending = sampleOrders.length - samplesShipped
+  const samplesCostEstimatedUsd = sampleOrders.length * PLACEHOLDER_SAMPLE_COST_USD
+
+  return res.status(200).json({
+    creators: {
+      total: activeCount + invitedCount + onboardedCount + pausedCount,
+      active: activeCount,
+      invited: invitedCount,
+      onboarded: onboardedCount,
+      paused: pausedCount,
+      onboardedThisMonth: thisMonthOnboards,
+    },
+    samples: {
+      total: sampleOrders.length,
+      shipped: samplesShipped,
+      pending: samplesPending,
+      costEstimatedUsd: samplesCostEstimatedUsd,
+      costIsPlaceholder: true,
+    },
+    // Placeholders for Week 3 when Meta + attribution land
+    ads: { running: 0, isPlaceholder: true },
+    revenue: { attributedThisMonthUsd: 0, isPlaceholder: true },
+    commission: { pendingUsd: 0, isPlaceholder: true },
+  })
 }

@@ -5,6 +5,7 @@ import type { ErrorInfo, ReactNode } from 'react'
 import Dashboard from '@/pages/Dashboard'
 import OrderDetails from '@/pages/OrderDetails'
 import ApprovalPortal from '@/pages/ApprovalPortal'
+import CreatorsHome from '@/pages/CreatorsHome'
 
 const PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
 
@@ -128,6 +129,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/orders/:orderId" element={<OrderDetails />} />
+                <Route path="/creators" element={<CreatorsHome />} />
               </Routes>
             </PasswordGate>
           } />
