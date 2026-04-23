@@ -396,10 +396,11 @@ export default function Dashboard() {
     }
     setIsCreatingPartner(true)
     try {
-      const res = await apiFetch('/api/orders/create-race-partner', {
+      const res = await apiFetch('/api/orders/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'create-race-partner',
           partnerName: newPartnerValues.partnerName.trim(),
           raceYear: parseInt(newPartnerValues.raceYear, 10) || new Date().getFullYear(),
           contactName: newPartnerValues.contactName.trim() || null,
@@ -1588,38 +1589,20 @@ Thank you!`
               </span>
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
             </div>
-            {/* View Switcher - Mobile (compact) */}
-            <div className="flex gap-1.5 md:hidden">
-              <button
-                onClick={() => { setActiveView('standard'); setSearchQuery('') }}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
-                  activeView === 'standard'
-                    ? 'bg-off-black text-white border-off-black'
-                    : 'bg-white text-off-black border-border-gray'
-                }`}
+            {/* View Switcher - Mobile (dropdown) */}
+            <div className="relative md:hidden">
+              <select
+                value={activeView}
+                onChange={(e) => { setActiveView(e.target.value as 'standard' | 'custom' | 'race_partner'); setSearchQuery('') }}
+                className="appearance-none pl-3 pr-7 py-1.5 text-xs font-medium rounded-full border border-border-gray bg-white text-off-black focus:outline-none focus:ring-2 focus:ring-off-black/20"
               >
-                Standard
-              </button>
-              <button
-                onClick={() => { setActiveView('custom'); setSearchQuery('') }}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
-                  activeView === 'custom'
-                    ? 'bg-off-black text-white border-off-black'
-                    : 'bg-white text-off-black border-border-gray'
-                }`}
-              >
-                Custom
-              </button>
-              <button
-                onClick={() => { setActiveView('race_partner'); setSearchQuery('') }}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
-                  activeView === 'race_partner'
-                    ? 'bg-off-black text-white border-off-black'
-                    : 'bg-white text-off-black border-border-gray'
-                }`}
-              >
-                Race Partners
-              </button>
+                <option value="standard">Standard</option>
+                <option value="custom">Custom</option>
+                <option value="race_partner">Race Partners</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                <ChevronDownIcon className="w-3.5 h-3.5 text-off-black/40" />
+              </div>
             </div>
             {/* View Switcher - Desktop */}
             <div className="hidden md:flex gap-2">

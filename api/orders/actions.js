@@ -14,6 +14,7 @@
  *   - customers-served-sync: Force sync count to Shopify
  *   - customers-served-set: Manually set the count (for corrections)
  *   - feature-request: Send a bug report or feature request to Slack
+ *   - create-race-partner: Create a new race_partner Order row (reuses proofs/approval)
  *
  * GET Actions (query.action):
  *   - monday-pipeline: Vercel cron — sends Monday morning Slack summary to Dan
@@ -97,6 +98,8 @@ export default async function handler(req, res) {
         return await handleCustomersServedSet(body, res)
       case 'feature-request':
         return await handleFeatureRequest(body, res)
+      case 'create-race-partner':
+        return await handleCreateRacePartner(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -575,4 +578,63 @@ async function handleHealthCheck(res, { sendSlack = false } = {}) {
 
   const httpStatus = results.overall === 'healthy' ? 200 : 503
   return res.status(httpStatus).json(results)
+}
+
+// --- create-race-partner ---
+// Creates a "race_partner" Order row used as the parent for proof/approval
+// workflows sent to race organizations. These are NOT customer orders; they
+// reuse the Order table so the existing Proof + ApprovalToken plumbing works
+// unchanged. Race-partner rows are excluded from default all-orders queries.
+function slugifyPartner(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'partner'
+}
+
+async function handleCreateRacePartner({ partnerName, raceYear, contactName, contactEmail }, res) {
+  if (!partnerName || !String(partnerName).trim()) {
+    return res.status(400).json({ error: 'partnerName is required' })
+  }
+
+  const year = parseInt(raceYear, 10) || new Date().getFullYear()
+  const baseOrderNumber = `RP-${slugifyPartner(partnerName)}-${year}`
+
+  // Guarantee uniqueness against the (parentOrderNumber, lineItemIndex) constraint.
+  let orderNumber = baseOrderNumber
+  let suffix = 0
+  while (true) {
+    const existing = await prisma.order.findFirst({ where: { parentOrderNumber: orderNumber } })
+    if (!existing) break
+    suffix += 1
+    orderNumber = `${baseOrderNumber}-${suffix}`
+  }
+
+  // Reuse existing Order columns (no schema change):
+  //   raceName      → partner/race name
+  //   customerName  → partner contact name
+  //   customerEmail → partner contact email
+  const created = await prisma.order.create({
+    data: {
+      orderNumber,
+      parentOrderNumber: orderNumber,
+      lineItemIndex: 0,
+      source: 'race_partner',
+      arteloOrderData: {},
+      raceName: String(partnerName).trim(),
+      raceYear: year,
+      runnerName: '—',
+      productSize: '—',
+      frameType: '—',
+      trackstarOrderType: 'race_partner',
+      designStatus: 'not_started',
+      status: 'pending',
+      customerEmail: contactEmail ? String(contactEmail).trim() : null,
+      customerName: contactName ? String(contactName).trim() : null,
+    }
+  })
+
+  console.log(`[actions/create-race-partner] Created ${created.id} (${orderNumber})`)
+  return res.status(201).json({ success: true, order: created })
 }
