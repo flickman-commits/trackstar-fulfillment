@@ -58,6 +58,7 @@ model Order {
   comments         OrderComment[]
   approvalToken    ApprovalToken?
   proofs           Proof[]
+  creatorSample    Creator?  @relation("CreatorSample") // Set iff this is a creator-program sample order
 
   @@unique([parentOrderNumber, lineItemIndex]) // Each line item is unique within an order
   @@index([orderNumber])
@@ -161,4 +162,74 @@ model SystemConfig {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Trackstar Creator Program
+// -----------------------------------------------------------------------------
+// A Creator is a person Matt invites to the program. They receive an invite
+// link, land on the onboarding wizard, submit their race info + shipping, and
+// get a free sample print. The sample is fulfilled through the existing
+// Standard order queue (source = "creator_sample") so Elí processes it like
+// any other standard order.
+//
+// Future phases add: briefs, content submissions, Meta ad tagging, attribution,
+// and commission tracking. Those live in their own tables (added later).
+model Creator {
+  id                  String    @id @default(cuid())
+
+  // Invite + portal access. Token doubles as the creator's persistent portal
+  // credential — they bookmark /creator/<token> and return to it anytime.
+  inviteToken         String    @unique
+  invitedAt           DateTime  @default(now())
+  onboardedAt         DateTime?
+
+  // Profile (populated at onboarding)
+  name                String?
+  email               String?
+  instagramHandle     String?
+  tiktokHandle        String?
+
+  // Race info for the sample print (required for the personalization)
+  raceName            String?
+  raceYear            Int?
+  bibNumber           String?
+  finishTime          String?
+
+  // Product preferences for the sample
+  productSize         String?
+  frameType           String?
+
+  // Shipping address
+  shippingName        String?
+  shippingAddress1    String?
+  shippingAddress2    String?
+  shippingCity        String?
+  shippingState       String?
+  shippingZip         String?
+  shippingCountry     String?   @default("US")
+
+  // Commission — flexible per creator. Matt sets these manually after onboarding.
+  //   commissionModel: "free_product" | "flat_per_asset" | "rev_share" | "hybrid"
+  //   commissionConfig: JSON e.g. { "per_asset_usd": 50, "percent": 10 }
+  commissionModel     String    @default("free_product")
+  commissionConfig    Json      @default("{}")
+  commissionNotes     String?
+
+  // Whitelisting (Meta Partnership Ads). Optional — off by default.
+  whitelistingEnabled Boolean   @default(false)
+  metaPageId          String?
+
+  // Workflow status
+  status              String    @default("invited") // "invited" | "onboarded" | "active" | "paused"
+
+  // Link to the Standard Order that fulfills their sample.
+  sampleOrderId       String?   @unique
+  sampleOrder         Order?    @relation("CreatorSample", fields: [sampleOrderId], references: [id])
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([status])
+  @@index([email])
 }
