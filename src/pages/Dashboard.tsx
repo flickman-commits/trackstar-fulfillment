@@ -35,7 +35,7 @@ interface Order {
   parentOrderNumber: string  // Original Shopify/Etsy order number
   lineItemIndex: number      // Which line item this is (0, 1, 2, etc.)
   displayOrderNumber: string // Friendly display number (Shopify order.name like "2585")
-  source: 'shopify' | 'etsy'
+  source: 'shopify' | 'etsy' | 'creator_sample'
   raceName: string
   raceYear: number | null
   raceDate?: string
@@ -77,6 +77,17 @@ interface Order {
   // Race partner fields (only populated when trackstarOrderType === 'race_partner')
   partnerName?: string | null
   partnerContactName?: string | null
+  // Creator sample fields (only populated when source === 'creator_sample')
+  creatorShipping?: {
+    name?: string | null
+    address1?: string | null
+    address2?: string | null
+    city?: string | null
+    state?: string | null
+    zip?: string | null
+    country?: string | null
+  } | null
+  creatorSampleCreatorId?: string | null
   designStatus?: DesignStatus
   dueDate?: string
   customerEmail?: string
@@ -109,6 +120,26 @@ const DESIGN_STATUS_CONFIG: Record<DesignStatus, { icon: string; label: string; 
   approved_by_customer: { icon: '🟣', label: 'Approved by Customer', color: 'text-purple-700', bgColor: 'bg-purple-50' },
   final_pdf_uploaded: { icon: '🟤', label: 'Final PDF Uploaded', color: 'text-amber-800', bgColor: 'bg-amber-50' },
   sent_to_production: { icon: '🟢', label: 'Sent to Production', color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
+}
+
+// Source indicator — shopify/etsy icon for marketplace orders, or a distinct
+// green "Creator" chip for creator-program sample orders so Elí can tell at
+// a glance these are free fulfillments (not paying customers).
+function OrderSourceMark({ source, size = 'md' }: { source: Order['source']; size?: 'sm' | 'md' }) {
+  if (source === 'creator_sample') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-semibold whitespace-nowrap"
+        title="Creator-program sample — free fulfillment"
+      >
+        🎁 Creator
+      </span>
+    )
+  }
+  const cls = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'
+  const label = source === 'shopify' ? 'Shopify' : 'Etsy'
+  const src = source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'
+  return <img src={src} alt={label} title={label} className={`${cls} inline-block flex-shrink-0`} />
 }
 
 // Toast notification component
@@ -357,6 +388,8 @@ export default function Dashboard() {
           isGift: order.isGift as boolean | undefined,
           partnerName: order.partnerName as string | null | undefined,
           partnerContactName: order.partnerContactName as string | null | undefined,
+          creatorShipping: order.creatorShipping as Order['creatorShipping'],
+          creatorSampleCreatorId: order.creatorSampleCreatorId as string | null | undefined,
           // Alert flags
           hadNoTime: order.hadNoTime as boolean | undefined,
           timeFromName: order.timeFromName as string | null | undefined,
@@ -1674,11 +1707,7 @@ Thank you!`
                           {/* Row 1: Source + Order# + Badges ... Status */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
-                              <img
-                                src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
-                                alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
-                                className="w-4 h-4 flex-shrink-0"
-                              />
+                              <OrderSourceMark source={order.source} size="sm" />
                               <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                               {itemCount > 1 && (
                                 <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
@@ -1741,11 +1770,7 @@ Thank you!`
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <img
-                                    src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
-                                    alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
-                                    className="w-4 h-4 flex-shrink-0"
-                                  />
+                                  <OrderSourceMark source={order.source} size="sm" />
                                   <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                   {itemCount > 1 && (
                                     <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
@@ -1924,12 +1949,7 @@ Thank you!`
                             className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
                           >
                             <td className="pl-6 pr-2 py-5 text-center">
-                              <img
-                                src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
-                                alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
-                                title={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
-                                className="w-5 h-5 inline-block"
-                              />
+                              <OrderSourceMark source={order.source} />
                             </td>
                             <td className="px-3 py-5">
                               <div className="flex items-center gap-2">
@@ -2003,12 +2023,7 @@ Thank you!`
                                 className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
                               >
                                 <td className="pl-6 pr-2 py-5 text-center">
-                                  <img
-                                    src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
-                                    alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
-                                    title={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
-                                    className="w-5 h-5 inline-block"
-                                  />
+                                  <OrderSourceMark source={order.source} />
                                 </td>
                                 <td className="px-3 py-5">
                                   <div className="flex items-center gap-2">
@@ -3505,6 +3520,36 @@ Thank you!`
                   ) : (
                     <>
                   {/* ========== STANDARD ORDER DETAIL VIEW ========== */}
+
+                  {/* Creator-sample banner — shows for creator-program free samples.
+                      Visible at the top of both mobile and desktop views since this
+                      is the most important thing Elí needs to see before fulfilling. */}
+                  {selectedOrder.source === 'creator_sample' && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-md p-4 mb-3">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-semibold">
+                          🎁 Creator
+                        </span>
+                        <span className="text-xs text-emerald-800 font-medium">Free sample for the Creator Program — do not charge.</span>
+                      </div>
+                      {selectedOrder.creatorShipping && (
+                        <div>
+                          <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider mb-1.5">Shipping Address</div>
+                          <div className="bg-white border border-emerald-200 rounded p-2.5 text-sm text-off-black/80 leading-relaxed">
+                            {selectedOrder.creatorShipping.name && <div className="font-medium">{selectedOrder.creatorShipping.name}</div>}
+                            {selectedOrder.creatorShipping.address1 && <div>{selectedOrder.creatorShipping.address1}</div>}
+                            {selectedOrder.creatorShipping.address2 && <div>{selectedOrder.creatorShipping.address2}</div>}
+                            <div>
+                              {[selectedOrder.creatorShipping.city, selectedOrder.creatorShipping.state, selectedOrder.creatorShipping.zip].filter(Boolean).join(', ')}
+                            </div>
+                            {selectedOrder.creatorShipping.country && selectedOrder.creatorShipping.country !== 'US' && (
+                              <div>{selectedOrder.creatorShipping.country}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* === MOBILE COMPACT SUMMARY === */}
                   <div className="md:hidden space-y-3">

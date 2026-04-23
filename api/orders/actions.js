@@ -968,8 +968,9 @@ async function handleCreatorOnboard({ token, data }, res) {
 
   // Flip status + stamp onboardedAt on first-pass onboarding. Re-submits
   // from an already-onboarded creator just update their profile fields —
-  // we don't reset onboardedAt.
-  if (!creator.onboardedAt) {
+  // we don't reset onboardedAt (and don't re-create the sample order).
+  const isFirstOnboard = !creator.onboardedAt
+  if (isFirstOnboard) {
     updates.onboardedAt = new Date()
     updates.status = 'onboarded'
   }
@@ -979,6 +980,74 @@ async function handleCreatorOnboard({ token, data }, res) {
     data: updates,
   })
 
+  // On first onboarding, create the sample Order and link it. This drops
+  // the creator's sample into Elí's Standard queue so he can fulfill it
+  // like any other standard order (the "Creator" badge in the list view
+  // identifies it as a free creator sample, not a paying customer).
+  if (isFirstOnboard && !creator.sampleOrderId) {
+    await createCreatorSampleOrder(updated)
+  }
+
   console.log(`[actions/creator-onboard] ${creator.id} onboarded (or updated): ${Object.keys(updates).join(', ')}`)
   return res.status(200).json({ success: true, creator: { id: updated.id, status: updated.status } })
+}
+
+// Helper — create the Standard Order that Elí will fulfill as the creator's
+// sample print. Reuses the existing Order table so the whole fulfillment
+// pipeline (queue, drawer, completion) works unchanged.
+async function createCreatorSampleOrder(creator) {
+  const shortId = creator.id.slice(-6).toUpperCase()
+  const orderNumber = `CREATOR-${shortId}`
+
+  const order = await prisma.order.create({
+    data: {
+      orderNumber,
+      parentOrderNumber: orderNumber,
+      lineItemIndex: 0,
+      source: 'creator_sample',
+      trackstarOrderType: 'standard',
+      status: 'pending',
+
+      // Race + product (all required NOT NULL — populated from onboarding)
+      raceName: creator.raceName || 'Unknown Race',
+      raceYear: creator.raceYear || new Date().getFullYear(),
+      runnerName: creator.name || 'Creator',
+      productSize: creator.productSize || '—',
+      frameType: creator.frameType || '—',
+
+      // Everything Elí needs to actually produce + ship this lives here.
+      // She'll manually mirror this into Artelo. Keeping it in a single
+      // JSON blob avoids schema changes on Order.
+      arteloOrderData: {
+        creatorSample: true,
+        creatorId: creator.id,
+        bibNumber: creator.bibNumber || null,
+        finishTime: creator.finishTime || null,
+        shipping: {
+          name: creator.shippingName || creator.name || null,
+          address1: creator.shippingAddress1 || null,
+          address2: creator.shippingAddress2 || null,
+          city: creator.shippingCity || null,
+          state: creator.shippingState || null,
+          zip: creator.shippingZip || null,
+          country: creator.shippingCountry || 'US',
+        },
+        instagramHandle: creator.instagramHandle || null,
+      },
+
+      // Contact on the Order (mirrors race_partner pattern so the drawer's
+      // existing "customer" fields render sensibly).
+      customerName: creator.name || null,
+      customerEmail: creator.email || null,
+    }
+  })
+
+  // Link it back to the Creator
+  await prisma.creator.update({
+    where: { id: creator.id },
+    data: { sampleOrderId: order.id },
+  })
+
+  console.log(`[actions/creator-onboard] Created sample order ${order.orderNumber} for creator ${creator.id}`)
+  return order
 }
