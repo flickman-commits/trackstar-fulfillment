@@ -6,6 +6,7 @@ import Dashboard from '@/pages/Dashboard'
 import OrderDetails from '@/pages/OrderDetails'
 import ApprovalPortal from '@/pages/ApprovalPortal'
 import CreatorsHome from '@/pages/CreatorsHome'
+import BriefsAdmin from '@/pages/BriefsAdmin'
 
 const PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
 
@@ -130,6 +131,7 @@ export default function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/orders/:orderId" element={<OrderDetails />} />
                 <Route path="/creators" element={<CreatorsHome />} />
+                <Route path="/briefs" element={<BriefsAdmin />} />
               </Routes>
             </PasswordGate>
           } />

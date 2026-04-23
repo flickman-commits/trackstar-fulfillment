@@ -227,9 +227,51 @@ model Creator {
   sampleOrderId       String?   @unique
   sampleOrder         Order?    @relation("CreatorSample", fields: [sampleOrderId], references: [id])
 
+  // Briefs assigned to this creator — selected by Matt at invite time.
+  briefAssignments    BriefAssignment[]
+
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   @@index([status])
   @@index([email])
+}
+
+// A Brief describes a style of content Matt wants creators to film. Matt
+// curates these in /briefs and assigns them to creators at invite time (or
+// later). The creator portal shows their assigned briefs as the directive
+// for what to shoot.
+model Brief {
+  id             String   @id @default(cuid())
+  title          String
+  description    String?                // overall goal / context
+  styleOfVideo   String?                // e.g. "POV reveal", "talking head"
+  angle          String?                // messaging angle
+  targetLength   String?                // e.g. "15-30s", "60-90s"
+  hooks          String?                // newline-separated hook examples
+  persona        String?                // who they're speaking to
+  examplesNotes  String?                // free-form: paste reference URLs, notes
+  status         String   @default("active") // "active" | "archived"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assignments    BriefAssignment[]
+
+  @@index([status])
+}
+
+// Many-to-many between Creator and Brief. Matt picks which briefs a creator
+// is working on — stored here so it can change over time.
+model BriefAssignment {
+  id         String   @id @default(cuid())
+  briefId    String
+  creatorId  String
+  assignedAt DateTime @default(now())
+
+  brief      Brief    @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  creator    Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@unique([briefId, creatorId])
+  @@index([creatorId])
+  @@index([briefId])
 }

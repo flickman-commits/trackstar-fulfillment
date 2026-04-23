@@ -53,6 +53,10 @@ export default async function handler(req, res) {
       if (!requireAdmin(req, res)) return
       return await handleListCreators(res)
     }
+    if (action === 'list-briefs') {
+      if (!requireAdmin(req, res)) return
+      return await handleListBriefs(res)
+    }
     if (action === 'health-check') {
       // Cron uses CRON_SECRET, manual uses ADMIN_SECRET
       const cronAuth = req.headers['authorization']
@@ -110,6 +114,10 @@ export default async function handler(req, res) {
         return await handleCreateRacePartner(body, res)
       case 'update-creator':
         return await handleUpdateCreator(body, res)
+      case 'create-brief':
+        return await handleCreateBrief(body, res)
+      case 'update-brief':
+        return await handleUpdateBrief(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -764,4 +772,52 @@ async function handleUpdateCreator({ creatorId, updates }, res) {
 
   console.log(`[actions/update-creator] Updated creator ${creatorId}: ${Object.keys(data).join(', ')}`)
   return res.status(200).json({ success: true, creator: updated })
+}
+
+// --- list-briefs ---
+async function handleListBriefs(res) {
+  const briefs = await prisma.brief.findMany({
+    orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+    include: {
+      _count: { select: { assignments: true } }
+    }
+  })
+  return res.status(200).json({ briefs })
+}
+
+// --- create-brief ---
+const BRIEF_EDITABLE_FIELDS = [
+  'title', 'description', 'styleOfVideo', 'angle',
+  'targetLength', 'hooks', 'persona', 'examplesNotes', 'status',
+]
+
+async function handleCreateBrief(body, res) {
+  if (!body.title || !String(body.title).trim()) {
+    return res.status(400).json({ error: 'title is required' })
+  }
+  const data = { title: String(body.title).trim() }
+  for (const key of BRIEF_EDITABLE_FIELDS) {
+    if (key !== 'title' && key in body) data[key] = body[key]
+  }
+  const created = await prisma.brief.create({ data })
+  console.log(`[actions/create-brief] Created ${created.id}: ${created.title}`)
+  return res.status(201).json({ success: true, brief: created })
+}
+
+// --- update-brief ---
+async function handleUpdateBrief({ briefId, updates }, res) {
+  if (!briefId) return res.status(400).json({ error: 'briefId is required' })
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({ error: 'updates object is required' })
+  }
+  const data = {}
+  for (const key of BRIEF_EDITABLE_FIELDS) {
+    if (key in updates) data[key] = updates[key]
+  }
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'no editable fields provided' })
+  }
+  const updated = await prisma.brief.update({ where: { id: briefId }, data })
+  console.log(`[actions/update-brief] Updated ${briefId}: ${Object.keys(data).join(', ')}`)
+  return res.status(200).json({ success: true, brief: updated })
 }

@@ -163,10 +163,16 @@ export default function CreatorsHome() {
           </div>
           <div className="flex items-center gap-2">
             <Link
+              to="/briefs"
+              className="px-3 py-2 text-xs md:text-sm font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded-md transition-colors"
+            >
+              Briefs →
+            </Link>
+            <Link
               to="/"
               className="px-3 py-2 text-xs md:text-sm font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded-md transition-colors"
             >
-              ← Back to Fulfillment
+              ← Fulfillment
             </Link>
           </div>
         </div>
