@@ -5,6 +5,9 @@ import type { ErrorInfo, ReactNode } from 'react'
 import Dashboard from '@/pages/Dashboard'
 import OrderDetails from '@/pages/OrderDetails'
 import ApprovalPortal from '@/pages/ApprovalPortal'
+import CreatorsHome from '@/pages/CreatorsHome'
+import BriefsAdmin from '@/pages/BriefsAdmin'
+import CreatorPortal from '@/pages/CreatorPortal'
 
 const PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
 
@@ -119,8 +122,9 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
-          {/* Public route — no password gate */}
+          {/* Public routes — no password gate */}
           <Route path="/approve/:token" element={<ApprovalPortal />} />
+          <Route path="/creator/:token" element={<CreatorPortal />} />
 
           {/* Protected routes */}
           <Route path="/*" element={
@@ -128,6 +132,8 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/orders/:orderId" element={<OrderDetails />} />
+                <Route path="/creators" element={<CreatorsHome />} />
+                <Route path="/briefs" element={<BriefsAdmin />} />
               </Routes>
             </PasswordGate>
           } />

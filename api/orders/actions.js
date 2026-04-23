@@ -20,6 +20,7 @@
  *   - monday-pipeline: Vercel cron — sends Monday morning Slack summary to Dan
  */
 
+import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { alertError } from '../_lib/alerts.js'
@@ -45,6 +46,23 @@ export default async function handler(req, res) {
       if (!requireAdmin(req, res)) return
       return res.status(200).json({ shorthands: getRaceShorthands() })
     }
+    if (action === 'creator-home-metrics') {
+      if (!requireAdmin(req, res)) return
+      return await handleCreatorHomeMetrics(res)
+    }
+    if (action === 'list-creators') {
+      if (!requireAdmin(req, res)) return
+      return await handleListCreators(res)
+    }
+    if (action === 'list-briefs') {
+      if (!requireAdmin(req, res)) return
+      return await handleListBriefs(res)
+    }
+    if (action === 'creator-portal-data') {
+      // Public — token-gated inside handler. Used by the creator's portal
+      // page to hydrate their view.
+      return await handleCreatorPortalData(req.query?.token, res)
+    }
     if (action === 'health-check') {
       // Cron uses CRON_SECRET, manual uses ADMIN_SECRET
       const cronAuth = req.headers['authorization']
@@ -66,9 +84,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Unknown GET action' })
   }
 
-  // All POST actions require admin auth
-  if (!requireAdmin(req, res)) return
-
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
@@ -77,6 +92,13 @@ export default async function handler(req, res) {
 
     if (!action) {
       return res.status(400).json({ error: 'action is required' })
+    }
+
+    // Public POST actions — auth'd by the caller's own token inside the
+    // handler, not by the admin secret. Everything else requires admin.
+    const PUBLIC_POST_ACTIONS = new Set(['creator-onboard'])
+    if (!PUBLIC_POST_ACTIONS.has(action)) {
+      if (!requireAdmin(req, res)) return
     }
 
     switch (action) {
@@ -100,6 +122,16 @@ export default async function handler(req, res) {
         return await handleFeatureRequest(body, res)
       case 'create-race-partner':
         return await handleCreateRacePartner(body, res)
+      case 'update-creator':
+        return await handleUpdateCreator(body, res)
+      case 'create-brief':
+        return await handleCreateBrief(body, res)
+      case 'update-brief':
+        return await handleUpdateBrief(body, res)
+      case 'create-creator-invite':
+        return await handleCreateCreatorInvite(body, res)
+      case 'creator-onboard':
+        return await handleCreatorOnboard(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -637,4 +669,385 @@ async function handleCreateRacePartner({ partnerName, raceYear, contactName, con
 
   console.log(`[actions/create-race-partner] Created ${created.id} (${orderNumber})`)
   return res.status(201).json({ success: true, order: created })
+}
+
+// --- creator-home-metrics ---
+// Aggregates the homepage tiles for /creators.
+// Sample-cost is a placeholder for now (user will provide real per-size pricing
+// later). Marking the metric as PLACEHOLDER on the frontend is handled there.
+const PLACEHOLDER_SAMPLE_COST_USD = 50 // TODO: replace with per-size/frame lookup
+
+async function handleCreatorHomeMetrics(res) {
+  // Run aggregations in parallel
+  const [
+    activeCount,
+    invitedCount,
+    onboardedCount,
+    pausedCount,
+    sampleOrders,
+    thisMonthOnboards,
+  ] = await Promise.all([
+    prisma.creator.count({ where: { status: 'active' } }),
+    prisma.creator.count({ where: { status: 'invited' } }),
+    prisma.creator.count({ where: { status: 'onboarded' } }),
+    prisma.creator.count({ where: { status: 'paused' } }),
+    prisma.order.findMany({
+      where: { source: 'creator_sample' },
+      select: { id: true, status: true, productSize: true, frameType: true }
+    }),
+    prisma.creator.count({
+      where: {
+        onboardedAt: {
+          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        }
+      }
+    }),
+  ])
+
+  const samplesShipped = sampleOrders.filter(o => o.status === 'completed').length
+  const samplesPending = sampleOrders.length - samplesShipped
+  const samplesCostEstimatedUsd = sampleOrders.length * PLACEHOLDER_SAMPLE_COST_USD
+
+  return res.status(200).json({
+    creators: {
+      total: activeCount + invitedCount + onboardedCount + pausedCount,
+      active: activeCount,
+      invited: invitedCount,
+      onboarded: onboardedCount,
+      paused: pausedCount,
+      onboardedThisMonth: thisMonthOnboards,
+    },
+    samples: {
+      total: sampleOrders.length,
+      shipped: samplesShipped,
+      pending: samplesPending,
+      costEstimatedUsd: samplesCostEstimatedUsd,
+      costIsPlaceholder: true,
+    },
+    // Placeholders for Week 3 when Meta + attribution land
+    ads: { running: 0, isPlaceholder: true },
+    revenue: { attributedThisMonthUsd: 0, isPlaceholder: true },
+    commission: { pendingUsd: 0, isPlaceholder: true },
+  })
+}
+
+// --- list-creators ---
+// Returns all creators with their sample-order status joined in. Ordered by
+// invite date descending so the most recent shows up first.
+async function handleListCreators(res) {
+  const creators = await prisma.creator.findMany({
+    orderBy: { invitedAt: 'desc' },
+    include: {
+      sampleOrder: {
+        select: { id: true, orderNumber: true, status: true, createdAt: true }
+      },
+      briefAssignments: {
+        include: { brief: { select: { id: true, title: true, status: true } } }
+      }
+    }
+  })
+  return res.status(200).json({ creators })
+}
+
+// --- update-creator ---
+// Updates editable fields on a creator. Only allow-listed fields can be
+// changed through this endpoint — protects against accidental overwrite of
+// inviteToken, onboardedAt, sampleOrderId, etc.
+const CREATOR_EDITABLE_FIELDS = [
+  'name', 'email', 'instagramHandle', 'tiktokHandle',
+  'commissionModel', 'commissionConfig', 'commissionNotes',
+  'whitelistingEnabled', 'metaPageId',
+  'status',
+]
+
+async function handleUpdateCreator({ creatorId, updates }, res) {
+  if (!creatorId) {
+    return res.status(400).json({ error: 'creatorId is required' })
+  }
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({ error: 'updates object is required' })
+  }
+
+  const data = {}
+  for (const key of CREATOR_EDITABLE_FIELDS) {
+    if (key in updates) data[key] = updates[key]
+  }
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'no editable fields provided' })
+  }
+
+  const updated = await prisma.creator.update({
+    where: { id: creatorId },
+    data,
+    include: {
+      sampleOrder: {
+        select: { id: true, orderNumber: true, status: true, createdAt: true }
+      }
+    }
+  })
+
+  console.log(`[actions/update-creator] Updated creator ${creatorId}: ${Object.keys(data).join(', ')}`)
+  return res.status(200).json({ success: true, creator: updated })
+}
+
+// --- list-briefs ---
+async function handleListBriefs(res) {
+  const briefs = await prisma.brief.findMany({
+    orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+    include: {
+      _count: { select: { assignments: true } }
+    }
+  })
+  return res.status(200).json({ briefs })
+}
+
+// --- create-brief ---
+const BRIEF_EDITABLE_FIELDS = [
+  'title', 'description', 'styleOfVideo', 'angle',
+  'targetLength', 'hooks', 'persona', 'examplesNotes', 'status',
+]
+
+async function handleCreateBrief(body, res) {
+  if (!body.title || !String(body.title).trim()) {
+    return res.status(400).json({ error: 'title is required' })
+  }
+  const data = { title: String(body.title).trim() }
+  for (const key of BRIEF_EDITABLE_FIELDS) {
+    if (key !== 'title' && key in body) data[key] = body[key]
+  }
+  const created = await prisma.brief.create({ data })
+  console.log(`[actions/create-brief] Created ${created.id}: ${created.title}`)
+  return res.status(201).json({ success: true, brief: created })
+}
+
+// --- update-brief ---
+async function handleUpdateBrief({ briefId, updates }, res) {
+  if (!briefId) return res.status(400).json({ error: 'briefId is required' })
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({ error: 'updates object is required' })
+  }
+  const data = {}
+  for (const key of BRIEF_EDITABLE_FIELDS) {
+    if (key in updates) data[key] = updates[key]
+  }
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'no editable fields provided' })
+  }
+  const updated = await prisma.brief.update({ where: { id: briefId }, data })
+  console.log(`[actions/update-brief] Updated ${briefId}: ${Object.keys(data).join(', ')}`)
+  return res.status(200).json({ success: true, brief: updated })
+}
+
+// --- create-creator-invite ---
+// Creates a new Creator row in "invited" state. Matt picks which briefs
+// should appear in the creator's onboarding (optional multi-select).
+//
+// Token is URL-safe random 20 chars — short enough to DM, long enough to
+// resist guessing. Doubles as the creator's persistent portal access token.
+function makeInviteToken() {
+  return crypto.randomBytes(15).toString('base64url')
+}
+
+async function handleCreateCreatorInvite({ name, email, instagramHandle, briefIds }, res) {
+  // All fields optional except the implicit token. Matt may not know the
+  // creator's name yet when generating the link.
+  const data = {
+    inviteToken: makeInviteToken(),
+    status: 'invited',
+  }
+  if (name && String(name).trim()) data.name = String(name).trim()
+  if (email && String(email).trim()) data.email = String(email).trim()
+  if (instagramHandle && String(instagramHandle).trim()) {
+    data.instagramHandle = String(instagramHandle).trim()
+  }
+
+  const created = await prisma.creator.create({ data })
+
+  // Attach brief assignments if any were picked
+  if (Array.isArray(briefIds) && briefIds.length > 0) {
+    await prisma.briefAssignment.createMany({
+      data: briefIds.map(briefId => ({ creatorId: created.id, briefId })),
+      skipDuplicates: true,
+    })
+  }
+
+  console.log(`[actions/create-creator-invite] Created ${created.id} with ${briefIds?.length || 0} brief(s)`)
+  return res.status(201).json({ success: true, creator: created })
+}
+
+// --- creator-portal-data (PUBLIC) ---
+// Token-gated. Returns enough info for the creator's portal to render:
+// their own profile + assigned briefs (full detail) + sample status.
+async function handleCreatorPortalData(token, res) {
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ error: 'token is required' })
+  }
+
+  const creator = await prisma.creator.findUnique({
+    where: { inviteToken: token },
+    include: {
+      briefAssignments: {
+        include: { brief: true },
+        orderBy: { assignedAt: 'asc' }
+      },
+      sampleOrder: {
+        select: { id: true, orderNumber: true, status: true, createdAt: true }
+      }
+    }
+  })
+
+  if (!creator) {
+    return res.status(404).json({ error: 'Invite not found or revoked' })
+  }
+
+  // Filter assigned briefs to active ones only — archived briefs shouldn't
+  // surface to the creator even if they were assigned historically.
+  const briefs = creator.briefAssignments
+    .map(a => a.brief)
+    .filter(b => b.status === 'active')
+
+  // Don't leak admin-only fields (commission, notes, etc.) to the creator.
+  return res.status(200).json({
+    creator: {
+      id: creator.id,
+      name: creator.name,
+      email: creator.email,
+      instagramHandle: creator.instagramHandle,
+      tiktokHandle: creator.tiktokHandle,
+      raceName: creator.raceName,
+      raceYear: creator.raceYear,
+      bibNumber: creator.bibNumber,
+      finishTime: creator.finishTime,
+      productSize: creator.productSize,
+      frameType: creator.frameType,
+      shippingName: creator.shippingName,
+      shippingAddress1: creator.shippingAddress1,
+      shippingAddress2: creator.shippingAddress2,
+      shippingCity: creator.shippingCity,
+      shippingState: creator.shippingState,
+      shippingZip: creator.shippingZip,
+      shippingCountry: creator.shippingCountry,
+      status: creator.status,
+      onboardedAt: creator.onboardedAt,
+    },
+    briefs,
+    sampleOrder: creator.sampleOrder,
+  })
+}
+
+// --- creator-onboard (PUBLIC) ---
+// Token-gated. Creator submits the onboarding wizard — we save everything
+// to their Creator row and flip status → 'onboarded'.
+// Sample-order creation lands in the next commit (Elí's queue integration).
+const CREATOR_ONBOARD_FIELDS = [
+  'name', 'email', 'instagramHandle', 'tiktokHandle',
+  'raceName', 'raceYear', 'bibNumber', 'finishTime',
+  'productSize', 'frameType',
+  'shippingName', 'shippingAddress1', 'shippingAddress2',
+  'shippingCity', 'shippingState', 'shippingZip', 'shippingCountry',
+]
+
+async function handleCreatorOnboard({ token, data }, res) {
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ error: 'token is required' })
+  }
+  if (!data || typeof data !== 'object') {
+    return res.status(400).json({ error: 'data object is required' })
+  }
+
+  const creator = await prisma.creator.findUnique({ where: { inviteToken: token } })
+  if (!creator) return res.status(404).json({ error: 'Invite not found or revoked' })
+
+  // Build the update. Only allow-listed fields are accepted.
+  const updates = {}
+  for (const key of CREATOR_ONBOARD_FIELDS) {
+    if (key in data) updates[key] = data[key]
+  }
+  if (updates.raceYear != null) updates.raceYear = parseInt(updates.raceYear, 10) || null
+
+  // Flip status + stamp onboardedAt on first-pass onboarding. Re-submits
+  // from an already-onboarded creator just update their profile fields —
+  // we don't reset onboardedAt (and don't re-create the sample order).
+  const isFirstOnboard = !creator.onboardedAt
+  if (isFirstOnboard) {
+    updates.onboardedAt = new Date()
+    updates.status = 'onboarded'
+  }
+
+  const updated = await prisma.creator.update({
+    where: { id: creator.id },
+    data: updates,
+  })
+
+  // On first onboarding, create the sample Order and link it. This drops
+  // the creator's sample into Elí's Standard queue so he can fulfill it
+  // like any other standard order (the "Creator" badge in the list view
+  // identifies it as a free creator sample, not a paying customer).
+  if (isFirstOnboard && !creator.sampleOrderId) {
+    await createCreatorSampleOrder(updated)
+  }
+
+  console.log(`[actions/creator-onboard] ${creator.id} onboarded (or updated): ${Object.keys(updates).join(', ')}`)
+  return res.status(200).json({ success: true, creator: { id: updated.id, status: updated.status } })
+}
+
+// Helper — create the Standard Order that Elí will fulfill as the creator's
+// sample print. Reuses the existing Order table so the whole fulfillment
+// pipeline (queue, drawer, completion) works unchanged.
+async function createCreatorSampleOrder(creator) {
+  const shortId = creator.id.slice(-6).toUpperCase()
+  const orderNumber = `CREATOR-${shortId}`
+
+  const order = await prisma.order.create({
+    data: {
+      orderNumber,
+      parentOrderNumber: orderNumber,
+      lineItemIndex: 0,
+      source: 'creator_sample',
+      trackstarOrderType: 'standard',
+      status: 'pending',
+
+      // Race + product (all required NOT NULL — populated from onboarding)
+      raceName: creator.raceName || 'Unknown Race',
+      raceYear: creator.raceYear || new Date().getFullYear(),
+      runnerName: creator.name || 'Creator',
+      productSize: creator.productSize || '—',
+      frameType: creator.frameType || '—',
+
+      // Everything Elí needs to actually produce + ship this lives here.
+      // She'll manually mirror this into Artelo. Keeping it in a single
+      // JSON blob avoids schema changes on Order.
+      arteloOrderData: {
+        creatorSample: true,
+        creatorId: creator.id,
+        bibNumber: creator.bibNumber || null,
+        finishTime: creator.finishTime || null,
+        shipping: {
+          name: creator.shippingName || creator.name || null,
+          address1: creator.shippingAddress1 || null,
+          address2: creator.shippingAddress2 || null,
+          city: creator.shippingCity || null,
+          state: creator.shippingState || null,
+          zip: creator.shippingZip || null,
+          country: creator.shippingCountry || 'US',
+        },
+        instagramHandle: creator.instagramHandle || null,
+      },
+
+      // Contact on the Order (mirrors race_partner pattern so the drawer's
+      // existing "customer" fields render sensibly).
+      customerName: creator.name || null,
+      customerEmail: creator.email || null,
+    }
+  })
+
+  // Link it back to the Creator
+  await prisma.creator.update({
+    where: { id: creator.id },
+    data: { sampleOrderId: order.id },
+  })
+
+  console.log(`[actions/creator-onboard] Created sample order ${order.orderNumber} for creator ${creator.id}`)
+  return order
 }

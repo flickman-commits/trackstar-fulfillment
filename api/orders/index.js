@@ -191,6 +191,13 @@ export default async function handler(req, res) {
         // Race-partner virtual fields (aliases for existing columns — no schema change)
         partnerName: order.trackstarOrderType === 'race_partner' ? order.raceName : null,
         partnerContactName: order.trackstarOrderType === 'race_partner' ? order.customerName : null,
+        // Creator-sample virtual fields — surface shipping so Elí can ship the print
+        creatorShipping: order.source === 'creator_sample'
+          ? (order.arteloOrderData?.shipping || null)
+          : null,
+        creatorSampleCreatorId: order.source === 'creator_sample'
+          ? (order.arteloOrderData?.creatorId || null)
+          : null,
         // Comment count for notes indicator
         commentCount: order._count?.comments || 0,
         // Proof count for proof indicator
