@@ -1,7 +1,61 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, Users, Package, Megaphone, DollarSign, TrendingUp, Clock } from 'lucide-react'
+import { Loader2, Users, Package, Megaphone, DollarSign, TrendingUp, Clock, X, Copy, Check, Instagram } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+
+type CreatorStatus = 'invited' | 'onboarded' | 'active' | 'paused'
+type CommissionModel = 'free_product' | 'flat_per_asset' | 'rev_share' | 'hybrid'
+
+interface Creator {
+  id: string
+  inviteToken: string
+  invitedAt: string
+  onboardedAt: string | null
+  name: string | null
+  email: string | null
+  instagramHandle: string | null
+  tiktokHandle: string | null
+  raceName: string | null
+  raceYear: number | null
+  productSize: string | null
+  frameType: string | null
+  commissionModel: CommissionModel
+  commissionConfig: Record<string, unknown>
+  commissionNotes: string | null
+  whitelistingEnabled: boolean
+  metaPageId: string | null
+  status: CreatorStatus
+  sampleOrderId: string | null
+  sampleOrder?: {
+    id: string
+    orderNumber: string
+    status: string
+    createdAt: string
+  } | null
+  createdAt: string
+  updatedAt: string
+}
+
+const STATUS_CONFIG: Record<CreatorStatus, { label: string; color: string; bg: string }> = {
+  invited:    { label: 'Invited',    color: 'text-off-black/50', bg: 'bg-off-black/5' },
+  onboarded:  { label: 'Onboarded',  color: 'text-blue-700',     bg: 'bg-blue-50' },
+  active:     { label: 'Active',     color: 'text-emerald-700',  bg: 'bg-emerald-50' },
+  paused:     { label: 'Paused',     color: 'text-amber-700',    bg: 'bg-amber-50' },
+}
+
+const COMMISSION_LABEL: Record<CommissionModel, string> = {
+  free_product:    'Free product',
+  flat_per_asset:  'Flat per asset',
+  rev_share:       'Rev share',
+  hybrid:          'Hybrid',
+}
+
+function sampleStatusLabel(orderStatus: string | undefined | null): { label: string; color: string } {
+  if (!orderStatus) return { label: 'Not yet requested', color: 'text-off-black/40' }
+  if (orderStatus === 'completed') return { label: 'Sent to Production', color: 'text-emerald-700' }
+  if (orderStatus === 'flagged')   return { label: 'Flagged',            color: 'text-amber-700' }
+  return { label: 'In queue', color: 'text-blue-700' }
+}
 
 interface HomeMetrics {
   creators: {
@@ -68,24 +122,32 @@ function Tile({
 
 export default function CreatorsHome() {
   const [metrics, setMetrics] = useState<HomeMetrics | null>(null)
+  const [creators, setCreators] = useState<Creator[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null)
+
+  const loadAll = useCallback(async () => {
+    try {
+      const [metricsRes, creatorsRes] = await Promise.all([
+        apiFetch('/api/orders/actions?action=creator-home-metrics'),
+        apiFetch('/api/orders/actions?action=list-creators'),
+      ])
+      if (!metricsRes.ok) throw new Error(`Metrics failed: ${metricsRes.status}`)
+      if (!creatorsRes.ok) throw new Error(`Creators failed: ${creatorsRes.status}`)
+      setMetrics(await metricsRes.json())
+      const { creators } = await creatorsRes.json()
+      setCreators(creators)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load data')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await apiFetch('/api/orders/actions?action=creator-home-metrics')
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`)
-        const data = await res.json()
-        setMetrics(data)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load metrics')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    load()
-  }, [])
+    loadAll()
+  }, [loadAll])
 
   return (
     <div className="min-h-screen bg-off-white">
@@ -181,27 +243,391 @@ export default function CreatorsHome() {
               />
             </div>
 
-            {/* Quick links — placeholders for future pages */}
+            {/* Creators list */}
             <div className="mt-10">
-              <h2 className="text-xs font-semibold text-off-black/50 uppercase tracking-wider mb-3">Navigate</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="bg-white border border-dashed border-off-black/20 rounded-md p-4 text-off-black/40 text-sm">
-                  <div className="font-medium text-off-black/60 mb-1">Creators</div>
-                  List + drawer — ships next commit
-                </div>
-                <div className="bg-white border border-dashed border-off-black/20 rounded-md p-4 text-off-black/40 text-sm">
-                  <div className="font-medium text-off-black/60 mb-1">Briefs</div>
-                  Coming Week 2
-                </div>
-                <div className="bg-white border border-dashed border-off-black/20 rounded-md p-4 text-off-black/40 text-sm">
-                  <div className="font-medium text-off-black/60 mb-1">Reports</div>
-                  Coming Week 3
-                </div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-semibold text-off-black/50 uppercase tracking-wider">
+                  Creators {creators.length > 0 && <span className="text-off-black/30">({creators.length})</span>}
+                </h2>
+                {/* "Generate Invite" button ships next commit */}
               </div>
+
+              {creators.length === 0 ? (
+                <div className="bg-white border border-dashed border-off-black/20 rounded-md p-8 text-center text-off-black/50">
+                  <p className="text-sm mb-1">No creators yet.</p>
+                  <p className="text-xs text-off-black/40">Generate an invite link to onboard your first creator (next commit).</p>
+                </div>
+              ) : (
+                <div className="bg-white border border-border-gray rounded-md shadow-sm overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-subtle-gray border-b border-border-gray">
+                      <tr>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Creator</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-32">Status</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-44">Sample</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell w-40">Commission</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden lg:table-cell w-36">Invited</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-gray">
+                      {creators.map((c, i) => {
+                        const statusCfg = STATUS_CONFIG[c.status]
+                        const sampleDisplay = sampleStatusLabel(c.sampleOrder?.status)
+                        return (
+                          <tr
+                            key={c.id}
+                            onClick={() => setSelectedCreator(c)}
+                            className={`hover:bg-subtle-gray cursor-pointer transition-colors ${i % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
+                          >
+                            <td className="px-4 py-3.5">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-off-black">
+                                  {c.name || <span className="text-off-black/40 italic">Not yet onboarded</span>}
+                                </span>
+                                {c.instagramHandle && (
+                                  <span className="text-xs text-off-black/50 flex items-center gap-1 mt-0.5">
+                                    <Instagram className="w-3 h-3" />
+                                    {c.instagramHandle}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3.5">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusCfg.bg} ${statusCfg.color}`}>
+                                {statusCfg.label}
+                              </span>
+                            </td>
+                            <td className={`px-3 py-3.5 text-sm ${sampleDisplay.color}`}>
+                              {sampleDisplay.label}
+                            </td>
+                            <td className="px-3 py-3.5 text-sm text-off-black/70 hidden md:table-cell">
+                              {COMMISSION_LABEL[c.commissionModel]}
+                            </td>
+                            <td className="px-3 py-3.5 text-sm text-off-black/60 hidden lg:table-cell">
+                              {new Date(c.invitedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </>
         )}
       </div>
+
+      {/* Drawer */}
+      {selectedCreator && (
+        <CreatorDrawer
+          creator={selectedCreator}
+          onClose={() => setSelectedCreator(null)}
+          onSaved={async (updated) => {
+            setSelectedCreator(updated)
+            await loadAll()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Drawer — view + edit a single creator
+// ---------------------------------------------------------------------------
+function CreatorDrawer({
+  creator,
+  onClose,
+  onSaved,
+}: {
+  creator: Creator
+  onClose: () => void
+  onSaved: (updated: Creator) => void
+}) {
+  const [draft, setDraft] = useState<Creator>(creator)
+  const [isSaving, setIsSaving] = useState(false)
+  const [tokenCopied, setTokenCopied] = useState(false)
+
+  useEffect(() => { setDraft(creator) }, [creator.id])
+
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(creator)
+
+  const handleCopyInvite = async () => {
+    const url = `${window.location.origin}/creator/${creator.inviteToken}`
+    try {
+      await navigator.clipboard.writeText(url)
+      setTokenCopied(true)
+      setTimeout(() => setTokenCopied(false), 1500)
+    } catch {
+      // Clipboard can fail on insecure contexts — fall through silently
+    }
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      const updates = {
+        name: draft.name,
+        email: draft.email,
+        instagramHandle: draft.instagramHandle,
+        tiktokHandle: draft.tiktokHandle,
+        commissionModel: draft.commissionModel,
+        commissionConfig: draft.commissionConfig,
+        commissionNotes: draft.commissionNotes,
+        whitelistingEnabled: draft.whitelistingEnabled,
+        metaPageId: draft.metaPageId,
+        status: draft.status,
+      }
+      const res = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update-creator', creatorId: creator.id, updates }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Save failed: ${res.status}`)
+      }
+      const { creator: updated } = await res.json()
+      onSaved(updated)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-md max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-off-black">
+                {creator.name || 'Pending Creator'}
+              </h3>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_CONFIG[creator.status].bg} ${STATUS_CONFIG[creator.status].color}`}>
+                {STATUS_CONFIG[creator.status].label}
+              </span>
+            </div>
+            <button onClick={onClose} className="text-off-black/40 hover:text-off-black">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Invite link — always visible, copy-able */}
+          <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-5">
+            <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-1.5">Invite / Portal Link</div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs text-off-black/80 bg-white px-2 py-1.5 rounded border border-border-gray truncate">
+                {window.location.origin}/creator/{creator.inviteToken}
+              </code>
+              <button
+                onClick={handleCopyInvite}
+                className="px-2.5 py-1.5 text-xs font-medium bg-white border border-border-gray rounded hover:bg-off-black/5 transition-colors inline-flex items-center gap-1"
+              >
+                {tokenCopied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+              </button>
+            </div>
+            {creator.onboardedAt && (
+              <p className="text-[10px] text-off-black/40 mt-1.5">
+                Onboarded {new Date(creator.onboardedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </p>
+            )}
+          </div>
+
+          {/* Editable fields */}
+          <div className="space-y-4">
+            <Section title="Profile">
+              <TextField label="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
+              <TextField label="Email" value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} type="email" />
+              <TextField label="Instagram" value={draft.instagramHandle} onChange={(v) => setDraft({ ...draft, instagramHandle: v })} placeholder="@handle" />
+              <TextField label="TikTok" value={draft.tiktokHandle} onChange={(v) => setDraft({ ...draft, tiktokHandle: v })} placeholder="@handle" />
+            </Section>
+
+            <Section title="Sample">
+              <StaticRow label="Race" value={creator.raceName ? `${creator.raceName} ${creator.raceYear || ''}` : '—'} />
+              <StaticRow label="Product" value={[creator.productSize, creator.frameType].filter(Boolean).join(' · ') || '—'} />
+              <StaticRow label="Order" value={creator.sampleOrder?.orderNumber || 'Not yet created'} />
+              <StaticRow label="Status" value={sampleStatusLabel(creator.sampleOrder?.status).label} />
+            </Section>
+
+            <Section title="Commission">
+              <div>
+                <Label>Model</Label>
+                <select
+                  value={draft.commissionModel}
+                  onChange={(e) => setDraft({ ...draft, commissionModel: e.target.value as CommissionModel })}
+                  className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                >
+                  <option value="free_product">Free product only</option>
+                  <option value="flat_per_asset">Flat per asset</option>
+                  <option value="rev_share">Revenue share</option>
+                  <option value="hybrid">Hybrid (base + %)</option>
+                </select>
+              </div>
+              {draft.commissionModel === 'flat_per_asset' && (
+                <NumberField
+                  label="$ per approved asset"
+                  value={(draft.commissionConfig as { per_asset_usd?: number })?.per_asset_usd ?? null}
+                  onChange={(v) => setDraft({ ...draft, commissionConfig: { ...draft.commissionConfig, per_asset_usd: v } })}
+                />
+              )}
+              {draft.commissionModel === 'rev_share' && (
+                <NumberField
+                  label="% of attributed revenue"
+                  value={(draft.commissionConfig as { percent?: number })?.percent ?? null}
+                  onChange={(v) => setDraft({ ...draft, commissionConfig: { ...draft.commissionConfig, percent: v } })}
+                  suffix="%"
+                />
+              )}
+              {draft.commissionModel === 'hybrid' && (
+                <>
+                  <NumberField
+                    label="Base $ per asset"
+                    value={(draft.commissionConfig as { per_asset_usd?: number })?.per_asset_usd ?? null}
+                    onChange={(v) => setDraft({ ...draft, commissionConfig: { ...draft.commissionConfig, per_asset_usd: v } })}
+                  />
+                  <NumberField
+                    label="+ % of attributed revenue"
+                    value={(draft.commissionConfig as { percent?: number })?.percent ?? null}
+                    onChange={(v) => setDraft({ ...draft, commissionConfig: { ...draft.commissionConfig, percent: v } })}
+                    suffix="%"
+                  />
+                </>
+              )}
+              <TextField label="Notes" value={draft.commissionNotes} onChange={(v) => setDraft({ ...draft, commissionNotes: v })} placeholder="e.g. negotiated rate, special terms" multiline />
+            </Section>
+
+            <Section title="Whitelisting (Meta Partnership Ads)">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="whitelisting"
+                  checked={draft.whitelistingEnabled}
+                  onChange={(e) => setDraft({ ...draft, whitelistingEnabled: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="whitelisting" className="text-sm text-off-black">Enable for this creator</label>
+              </div>
+              {draft.whitelistingEnabled && (
+                <TextField label="Meta Page ID" value={draft.metaPageId} onChange={(v) => setDraft({ ...draft, metaPageId: v })} placeholder="Creator's IG/FB page ID" />
+              )}
+            </Section>
+
+            <Section title="Program Status">
+              <div>
+                <Label>Status</Label>
+                <select
+                  value={draft.status}
+                  onChange={(e) => setDraft({ ...draft, status: e.target.value as CreatorStatus })}
+                  className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                >
+                  <option value="invited">Invited</option>
+                  <option value="onboarded">Onboarded</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                </select>
+              </div>
+            </Section>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-border-gray">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-off-black/60 hover:bg-off-black/5 rounded transition-colors">
+              Close
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!isDirty || isSaving}
+              className="px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
+            >
+              {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isSaving ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-2">{title}</h4>
+      <div className="space-y-2.5">{children}</div>
+    </div>
+  )
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <div className="text-xs text-off-black/60 mb-1">{children}</div>
+}
+
+function TextField({ label, value, onChange, type = 'text', placeholder, multiline }: {
+  label: string
+  value: string | null
+  onChange: (v: string) => void
+  type?: string
+  placeholder?: string
+  multiline?: boolean
+}) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      {multiline ? (
+        <textarea
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          rows={2}
+          className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none"
+        />
+      ) : (
+        <input
+          type={type}
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+        />
+      )}
+    </div>
+  )
+}
+
+function NumberField({ label, value, onChange, suffix }: {
+  label: string
+  value: number | null
+  onChange: (v: number | null) => void
+  suffix?: string
+}) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="relative">
+        <input
+          type="number"
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+          className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+        />
+        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-off-black/40">{suffix}</span>}
+      </div>
+    </div>
+  )
+}
+
+function StaticRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between items-center text-sm">
+      <span className="text-off-black/60">{label}</span>
+      <span className="text-off-black/80 font-medium">{value}</span>
     </div>
   )
 }

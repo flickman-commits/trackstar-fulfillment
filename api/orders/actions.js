@@ -49,6 +49,10 @@ export default async function handler(req, res) {
       if (!requireAdmin(req, res)) return
       return await handleCreatorHomeMetrics(res)
     }
+    if (action === 'list-creators') {
+      if (!requireAdmin(req, res)) return
+      return await handleListCreators(res)
+    }
     if (action === 'health-check') {
       // Cron uses CRON_SECRET, manual uses ADMIN_SECRET
       const cronAuth = req.headers['authorization']
@@ -104,6 +108,8 @@ export default async function handler(req, res) {
         return await handleFeatureRequest(body, res)
       case 'create-race-partner':
         return await handleCreateRacePartner(body, res)
+      case 'update-creator':
+        return await handleUpdateCreator(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -701,4 +707,61 @@ async function handleCreatorHomeMetrics(res) {
     revenue: { attributedThisMonthUsd: 0, isPlaceholder: true },
     commission: { pendingUsd: 0, isPlaceholder: true },
   })
+}
+
+// --- list-creators ---
+// Returns all creators with their sample-order status joined in. Ordered by
+// invite date descending so the most recent shows up first.
+async function handleListCreators(res) {
+  const creators = await prisma.creator.findMany({
+    orderBy: { invitedAt: 'desc' },
+    include: {
+      sampleOrder: {
+        select: { id: true, orderNumber: true, status: true, createdAt: true }
+      }
+    }
+  })
+  return res.status(200).json({ creators })
+}
+
+// --- update-creator ---
+// Updates editable fields on a creator. Only allow-listed fields can be
+// changed through this endpoint — protects against accidental overwrite of
+// inviteToken, onboardedAt, sampleOrderId, etc.
+const CREATOR_EDITABLE_FIELDS = [
+  'name', 'email', 'instagramHandle', 'tiktokHandle',
+  'commissionModel', 'commissionConfig', 'commissionNotes',
+  'whitelistingEnabled', 'metaPageId',
+  'status',
+]
+
+async function handleUpdateCreator({ creatorId, updates }, res) {
+  if (!creatorId) {
+    return res.status(400).json({ error: 'creatorId is required' })
+  }
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({ error: 'updates object is required' })
+  }
+
+  const data = {}
+  for (const key of CREATOR_EDITABLE_FIELDS) {
+    if (key in updates) data[key] = updates[key]
+  }
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'no editable fields provided' })
+  }
+
+  const updated = await prisma.creator.update({
+    where: { id: creatorId },
+    data,
+    include: {
+      sampleOrder: {
+        select: { id: true, orderNumber: true, status: true, createdAt: true }
+      }
+    }
+  })
+
+  console.log(`[actions/update-creator] Updated creator ${creatorId}: ${Object.keys(data).join(', ')}`)
+  return res.status(200).json({ success: true, creator: updated })
 }
