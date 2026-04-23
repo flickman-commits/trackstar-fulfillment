@@ -35,6 +35,7 @@ import mesaConfig from './configs/mesa.js'
 import londonConfig from './configs/london.js'
 import eugeneConfig from './configs/eugene.js'
 import jerseyCityConfig from './configs/jerseyCity.js'
+import bostonConfig from './configs/boston.js'
 
 /**
  * Map platform identifier -> platform scraper class
@@ -74,6 +75,7 @@ const ALL_CONFIGS = [
   londonConfig,
   eugeneConfig,
   jerseyCityConfig,
+  bostonConfig,
 ]
 
 /**
