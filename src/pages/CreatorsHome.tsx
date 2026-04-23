@@ -1,10 +1,16 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, Users, Package, Megaphone, DollarSign, TrendingUp, Clock, X, Copy, Check, Instagram } from 'lucide-react'
+import { Loader2, Users, Package, Megaphone, DollarSign, TrendingUp, Clock, X, Copy, Check, Instagram, Plus } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
 type CreatorStatus = 'invited' | 'onboarded' | 'active' | 'paused'
 type CommissionModel = 'free_product' | 'flat_per_asset' | 'rev_share' | 'hybrid'
+
+interface BriefLite {
+  id: string
+  title: string
+  status: string
+}
 
 interface Creator {
   id: string
@@ -32,6 +38,7 @@ interface Creator {
     status: string
     createdAt: string
   } | null
+  briefAssignments?: Array<{ brief: BriefLite }>
   createdAt: string
   updatedAt: string
 }
@@ -123,21 +130,27 @@ function Tile({
 export default function CreatorsHome() {
   const [metrics, setMetrics] = useState<HomeMetrics | null>(null)
   const [creators, setCreators] = useState<Creator[]>([])
+  const [briefs, setBriefs] = useState<BriefLite[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null)
+  const [showInvite, setShowInvite] = useState(false)
 
   const loadAll = useCallback(async () => {
     try {
-      const [metricsRes, creatorsRes] = await Promise.all([
+      const [metricsRes, creatorsRes, briefsRes] = await Promise.all([
         apiFetch('/api/orders/actions?action=creator-home-metrics'),
         apiFetch('/api/orders/actions?action=list-creators'),
+        apiFetch('/api/orders/actions?action=list-briefs'),
       ])
       if (!metricsRes.ok) throw new Error(`Metrics failed: ${metricsRes.status}`)
       if (!creatorsRes.ok) throw new Error(`Creators failed: ${creatorsRes.status}`)
+      if (!briefsRes.ok) throw new Error(`Briefs failed: ${briefsRes.status}`)
       setMetrics(await metricsRes.json())
       const { creators } = await creatorsRes.json()
+      const { briefs } = await briefsRes.json()
       setCreators(creators)
+      setBriefs(briefs.filter((b: BriefLite) => b.status === 'active'))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load data')
     } finally {
@@ -255,7 +268,13 @@ export default function CreatorsHome() {
                 <h2 className="text-xs font-semibold text-off-black/50 uppercase tracking-wider">
                   Creators {creators.length > 0 && <span className="text-off-black/30">({creators.length})</span>}
                 </h2>
-                {/* "Generate Invite" button ships next commit */}
+                <button
+                  onClick={() => setShowInvite(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-off-black text-white text-xs font-medium rounded hover:opacity-90 transition-opacity"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  New Creator Invite
+                </button>
               </div>
 
               {creators.length === 0 ? (
@@ -335,6 +354,220 @@ export default function CreatorsHome() {
           }}
         />
       )}
+
+      {/* Invite Modal */}
+      {showInvite && (
+        <InviteModal
+          briefs={briefs}
+          onClose={() => setShowInvite(false)}
+          onCreated={async () => {
+            await loadAll()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// InviteModal — generate a fresh creator invite with optional briefs
+// ---------------------------------------------------------------------------
+function InviteModal({ briefs, onClose, onCreated }: {
+  briefs: BriefLite[]
+  onClose: () => void
+  onCreated: () => void | Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [instagram, setInstagram] = useState('')
+  const [selectedBriefIds, setSelectedBriefIds] = useState<Set<string>>(new Set())
+  const [isCreating, setIsCreating] = useState(false)
+  const [createdLink, setCreatedLink] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  const toggleBrief = (id: string) => {
+    setSelectedBriefIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleCreate = async () => {
+    setIsCreating(true)
+    try {
+      const res = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create-creator-invite',
+          name: name.trim() || null,
+          email: email.trim() || null,
+          instagramHandle: instagram.trim() || null,
+          briefIds: Array.from(selectedBriefIds),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Create failed: ${res.status}`)
+      }
+      const { creator } = await res.json()
+      const url = `${window.location.origin}/creator/${creator.inviteToken}`
+      setCreatedLink(url)
+      // Auto-copy so Matt can paste right into a DM
+      try {
+        await navigator.clipboard.writeText(url)
+        setLinkCopied(true)
+      } catch {
+        // Clipboard may not be available — fall through; user can copy manually
+      }
+      await onCreated()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to create invite')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const handleCopy = async () => {
+    if (!createdLink) return
+    try {
+      await navigator.clipboard.writeText(createdLink)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 1500)
+    } catch {
+      // Silent fallback
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-md max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-semibold text-off-black">
+              {createdLink ? 'Invite ready' : 'New Creator Invite'}
+            </h3>
+            <button onClick={onClose} className="text-off-black/40 hover:text-off-black">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* After-create view: show the link, copy affordance */}
+          {createdLink ? (
+            <div>
+              <p className="text-sm text-off-black/70 mb-3">
+                Send this link to the creator — it takes them to the onboarding wizard.
+                {linkCopied && ' Already copied to your clipboard.'}
+              </p>
+              <div className="flex items-center gap-2 mb-5">
+                <code className="flex-1 text-xs text-off-black/80 bg-subtle-gray px-2 py-2 rounded border border-border-gray truncate">
+                  {createdLink}
+                </code>
+                <button
+                  onClick={handleCopy}
+                  className="px-3 py-2 text-xs font-medium bg-white border border-border-gray rounded hover:bg-off-black/5 transition-colors inline-flex items-center gap-1"
+                >
+                  {linkCopied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                </button>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            // Pre-create form
+            <>
+              <p className="text-xs text-off-black/50 mb-4">
+                All fields optional except briefs. You can fill these in later from the creator drawer.
+              </p>
+
+              <div className="space-y-3.5">
+                <div>
+                  <div className="text-xs text-off-black/60 mb-1">Name</div>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Creator's name (optional)"
+                    className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <div className="text-xs text-off-black/60 mb-1">Email</div>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="optional"
+                    className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                  />
+                </div>
+                <div>
+                  <div className="text-xs text-off-black/60 mb-1">Instagram</div>
+                  <input
+                    type="text"
+                    value={instagram}
+                    onChange={(e) => setInstagram(e.target.value)}
+                    placeholder="@handle (optional)"
+                    className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                  />
+                </div>
+
+                <div>
+                  <div className="text-xs text-off-black/60 mb-2">
+                    Assign Briefs <span className="text-off-black/40">(optional)</span>
+                  </div>
+                  {briefs.length === 0 ? (
+                    <div className="text-xs text-off-black/40 italic bg-subtle-gray border border-dashed border-border-gray rounded p-3">
+                      No active briefs yet — you can <Link to="/briefs" className="underline">create one</Link> first, or skip and assign later.
+                    </div>
+                  ) : (
+                    <div className="space-y-1 max-h-44 overflow-y-auto border border-border-gray rounded p-2">
+                      {briefs.map(b => (
+                        <label
+                          key={b.id}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-subtle-gray cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedBriefIds.has(b.id)}
+                            onChange={() => toggleBrief(b.id)}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm text-off-black">{b.title}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-border-gray">
+                <button onClick={onClose} className="px-4 py-2 text-sm text-off-black/60 hover:bg-off-black/5 rounded transition-colors">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreate}
+                  disabled={isCreating}
+                  className="px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
+                >
+                  {isCreating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isCreating ? 'Creating…' : 'Generate Invite Link'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -453,6 +686,23 @@ function CreatorDrawer({
               <TextField label="Email" value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} type="email" />
               <TextField label="Instagram" value={draft.instagramHandle} onChange={(v) => setDraft({ ...draft, instagramHandle: v })} placeholder="@handle" />
               <TextField label="TikTok" value={draft.tiktokHandle} onChange={(v) => setDraft({ ...draft, tiktokHandle: v })} placeholder="@handle" />
+            </Section>
+
+            <Section title={`Assigned Briefs${(creator.briefAssignments?.length ?? 0) > 0 ? ` (${creator.briefAssignments!.length})` : ''}`}>
+              {(creator.briefAssignments?.length ?? 0) === 0 ? (
+                <p className="text-xs text-off-black/40 italic">No briefs assigned yet.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {creator.briefAssignments!.map(a => (
+                    <span
+                      key={a.brief.id}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-off-black/5 text-off-black/70 text-xs rounded"
+                    >
+                      {a.brief.title}
+                    </span>
+                  ))}
+                </div>
+              )}
             </Section>
 
             <Section title="Sample">

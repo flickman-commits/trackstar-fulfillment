@@ -20,6 +20,7 @@
  *   - monday-pipeline: Vercel cron — sends Monday morning Slack summary to Dan
  */
 
+import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { alertError } from '../_lib/alerts.js'
@@ -118,6 +119,8 @@ export default async function handler(req, res) {
         return await handleCreateBrief(body, res)
       case 'update-brief':
         return await handleUpdateBrief(body, res)
+      case 'create-creator-invite':
+        return await handleCreateCreatorInvite(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -726,6 +729,9 @@ async function handleListCreators(res) {
     include: {
       sampleOrder: {
         select: { id: true, orderNumber: true, status: true, createdAt: true }
+      },
+      briefAssignments: {
+        include: { brief: { select: { id: true, title: true, status: true } } }
       }
     }
   })
@@ -820,4 +826,41 @@ async function handleUpdateBrief({ briefId, updates }, res) {
   const updated = await prisma.brief.update({ where: { id: briefId }, data })
   console.log(`[actions/update-brief] Updated ${briefId}: ${Object.keys(data).join(', ')}`)
   return res.status(200).json({ success: true, brief: updated })
+}
+
+// --- create-creator-invite ---
+// Creates a new Creator row in "invited" state. Matt picks which briefs
+// should appear in the creator's onboarding (optional multi-select).
+//
+// Token is URL-safe random 20 chars — short enough to DM, long enough to
+// resist guessing. Doubles as the creator's persistent portal access token.
+function makeInviteToken() {
+  return crypto.randomBytes(15).toString('base64url')
+}
+
+async function handleCreateCreatorInvite({ name, email, instagramHandle, briefIds }, res) {
+  // All fields optional except the implicit token. Matt may not know the
+  // creator's name yet when generating the link.
+  const data = {
+    inviteToken: makeInviteToken(),
+    status: 'invited',
+  }
+  if (name && String(name).trim()) data.name = String(name).trim()
+  if (email && String(email).trim()) data.email = String(email).trim()
+  if (instagramHandle && String(instagramHandle).trim()) {
+    data.instagramHandle = String(instagramHandle).trim()
+  }
+
+  const created = await prisma.creator.create({ data })
+
+  // Attach brief assignments if any were picked
+  if (Array.isArray(briefIds) && briefIds.length > 0) {
+    await prisma.briefAssignment.createMany({
+      data: briefIds.map(briefId => ({ creatorId: created.id, briefId })),
+      skipDuplicates: true,
+    })
+  }
+
+  console.log(`[actions/create-creator-invite] Created ${created.id} with ${briefIds?.length || 0} brief(s)`)
+  return res.status(201).json({ success: true, creator: created })
 }
