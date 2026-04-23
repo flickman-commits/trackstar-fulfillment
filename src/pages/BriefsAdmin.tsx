@@ -13,6 +13,8 @@ interface Brief {
   angle: string | null
   targetLength: string | null
   hooks: string | null
+  emotion: string | null
+  fomo: string | null
   persona: string | null
   examplesNotes: string | null
   status: BriefStatus
@@ -28,6 +30,8 @@ const EMPTY_BRIEF: Omit<Brief, 'id' | 'createdAt' | 'updatedAt' | '_count'> = {
   angle: '',
   targetLength: '',
   hooks: '',
+  emotion: '',
+  fomo: '',
   persona: '',
   examplesNotes: '',
   status: 'active',
@@ -202,6 +206,8 @@ function BriefEditor({ brief, onClose, onSaved }: {
             angle: draft.angle,
             targetLength: draft.targetLength,
             hooks: draft.hooks,
+            emotion: draft.emotion,
+            fomo: draft.fomo,
             persona: draft.persona,
             examplesNotes: draft.examplesNotes,
             status: draft.status,
@@ -216,6 +222,8 @@ function BriefEditor({ brief, onClose, onSaved }: {
               angle: draft.angle,
               targetLength: draft.targetLength,
               hooks: draft.hooks,
+              emotion: draft.emotion,
+              fomo: draft.fomo,
               persona: draft.persona,
               examplesNotes: draft.examplesNotes,
               status: draft.status,
@@ -255,19 +263,46 @@ function BriefEditor({ brief, onClose, onSaved }: {
             </button>
           </div>
 
+          {/* Philosophy reminder — framing for how to write a good brief. */}
+          <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-5">
+            <p className="text-xs text-off-black/70 leading-relaxed">
+              <span className="font-semibold text-off-black">Guardrails, not scripts.</span>{' '}
+              Show what's worked, explain the framework (hook → emotion → FOMO), then let creators find their own voice. Paste your top-performing reference videos below so they have examples to study — don't hand them a line-by-line script.
+            </p>
+          </div>
+
           <div className="space-y-4">
             <FieldText label="Title *" value={draft.title} onChange={(v) => setDraft({ ...draft, title: v })} placeholder="e.g. Unboxing reveal, marathon finisher" autoFocus />
             <FieldText label="Description" value={draft.description} onChange={(v) => setDraft({ ...draft, description: v })} multiline placeholder="Overall goal or context of this brief" />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FieldText label="Style of Video" value={draft.styleOfVideo} onChange={(v) => setDraft({ ...draft, styleOfVideo: v })} placeholder="e.g. POV reveal, talking head" />
-              <FieldText label="Target Length" value={draft.targetLength} onChange={(v) => setDraft({ ...draft, targetLength: v })} placeholder="e.g. 15-30s, 60-90s" />
-              <FieldText label="Angle" value={draft.angle} onChange={(v) => setDraft({ ...draft, angle: v })} placeholder="e.g. emotional payoff, nostalgia" />
-              <FieldText label="Persona" value={draft.persona} onChange={(v) => setDraft({ ...draft, persona: v })} placeholder="Who they're speaking to" />
+            {/* ——— Information Framework ——— */}
+            <div className="pt-2">
+              <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-2">Information Framework</div>
+              <div className="space-y-3">
+                <FieldText label="Hook — opening line options" value={draft.hooks} onChange={(v) => setDraft({ ...draft, hooks: v })} multiline placeholder={`I trained 6 months for this moment…\nThe one thing no runner talks about…`} />
+                <FieldText label="Emotion — what feeling should the video land?" value={draft.emotion} onChange={(v) => setDraft({ ...draft, emotion: v })} multiline placeholder="e.g. pride, nostalgia, validation — the lever that makes the viewer lean in" />
+                <FieldText label="FOMO — why should they act now?" value={draft.fomo} onChange={(v) => setDraft({ ...draft, fomo: v })} multiline placeholder="e.g. only marathon finishers get this, limited edition, race is over soon" />
+              </div>
             </div>
 
-            <FieldText label="Hooks (one per line)" value={draft.hooks} onChange={(v) => setDraft({ ...draft, hooks: v })} multiline placeholder={`I trained for 6 months for this...\nThe moment I realized I actually did it`} />
-            <FieldText label="Examples / Reference Notes" value={draft.examplesNotes} onChange={(v) => setDraft({ ...draft, examplesNotes: v })} multiline placeholder="Paste reference URLs, describe the vibe, etc." />
+            {/* ——— Production details ——— */}
+            <div className="pt-2">
+              <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-2">Production Details</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FieldText label="Style of Video" value={draft.styleOfVideo} onChange={(v) => setDraft({ ...draft, styleOfVideo: v })} placeholder="e.g. POV reveal, talking head" />
+                <FieldText label="Target Length" value={draft.targetLength} onChange={(v) => setDraft({ ...draft, targetLength: v })} placeholder="e.g. 15-30s, 60-90s" />
+                <FieldText label="Angle" value={draft.angle} onChange={(v) => setDraft({ ...draft, angle: v })} placeholder="e.g. emotional payoff, nostalgia" />
+                <FieldText label="Persona" value={draft.persona} onChange={(v) => setDraft({ ...draft, persona: v })} placeholder="Who they're speaking to" />
+              </div>
+            </div>
+
+            <FieldText
+              label="Top-Performing References"
+              value={draft.examplesNotes}
+              onChange={(v) => setDraft({ ...draft, examplesNotes: v })}
+              multiline
+              placeholder={`Paste URLs of the best-performing videos in this style — one per line.\nAdd a short note on why each one works.\nThese are the 'show them what's worked' for creators to study.`}
+            />
 
             <div>
               <Label>Status</Label>

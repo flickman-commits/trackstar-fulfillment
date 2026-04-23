@@ -248,9 +248,15 @@ model Brief {
   styleOfVideo   String?                // e.g. "POV reveal", "talking head"
   angle          String?                // messaging angle
   targetLength   String?                // e.g. "15-30s", "60-90s"
-  hooks          String?                // newline-separated hook examples
+  // Information framework — "guardrails, not scripts". Creators get the
+  // framework, not a line-by-line script, and find their own voice inside it.
+  hooks          String?                // opening lines / hook options (newline-separated)
+  emotion        String?                // the emotional lever the content should pull
+  fomo           String?                // why the viewer should act now
   persona        String?                // who they're speaking to
-  examplesNotes  String?                // free-form: paste reference URLs, notes
+  // Top-performing reference content — the "50 best videos" idea. URLs +
+  // notes about why each works.
+  examplesNotes  String?
   status         String   @default("active") // "active" | "archived"
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

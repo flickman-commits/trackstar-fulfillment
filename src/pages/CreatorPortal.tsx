@@ -14,6 +14,8 @@ interface PortalBrief {
   angle: string | null
   targetLength: string | null
   hooks: string | null
+  emotion: string | null
+  fomo: string | null
   persona: string | null
   examplesNotes: string | null
 }
@@ -539,13 +541,30 @@ function BriefCard({ brief }: { brief: PortalBrief }) {
         {brief.angle && <Chip label={`Angle: ${brief.angle}`} />}
         {brief.persona && <Chip label={`Persona: ${brief.persona}`} />}
       </div>
-      {brief.hooks && (
-        <Box label="Hooks">
-          <pre className="whitespace-pre-wrap text-sm text-off-black/80 font-sans leading-relaxed">{brief.hooks}</pre>
-        </Box>
+      {/* Information framework — the guardrails, not a script. These are
+          direction, not lines to read. Creators find their own voice inside. */}
+      {(brief.hooks || brief.emotion || brief.fomo) && (
+        <div className="mt-2 space-y-2">
+          <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">Framework (guardrails, not a script)</div>
+          {brief.hooks && (
+            <Box label="Hook — opening line options">
+              <pre className="whitespace-pre-wrap text-sm text-off-black/80 font-sans leading-relaxed">{brief.hooks}</pre>
+            </Box>
+          )}
+          {brief.emotion && (
+            <Box label="Emotion — the feeling to land">
+              <pre className="whitespace-pre-wrap text-sm text-off-black/80 font-sans leading-relaxed">{brief.emotion}</pre>
+            </Box>
+          )}
+          {brief.fomo && (
+            <Box label="FOMO — why act now">
+              <pre className="whitespace-pre-wrap text-sm text-off-black/80 font-sans leading-relaxed">{brief.fomo}</pre>
+            </Box>
+          )}
+        </div>
       )}
       {brief.examplesNotes && (
-        <Box label="Examples / References">
+        <Box label="Top-performing references">
           <pre className="whitespace-pre-wrap text-sm text-off-black/80 font-sans leading-relaxed">{brief.examplesNotes}</pre>
         </Box>
       )}

@@ -805,7 +805,8 @@ async function handleListBriefs(res) {
 // --- create-brief ---
 const BRIEF_EDITABLE_FIELDS = [
   'title', 'description', 'styleOfVideo', 'angle',
-  'targetLength', 'hooks', 'persona', 'examplesNotes', 'status',
+  'targetLength', 'hooks', 'emotion', 'fomo', 'persona',
+  'examplesNotes', 'status',
 ]
 
 async function handleCreateBrief(body, res) {
