@@ -215,10 +215,14 @@ export class RTRTScraper extends BaseScraper {
   async _fetchSplits(pid) {
     const url = `${this.baseUrl}/events/${this.eventId}/profiles/${pid}/splits`
 
+    // RTRT default caps splits at 20 items, which truncates before FINISH-M
+    // on races with many timing points (Jersey City has 22). Request more
+    // so the finish split is always included.
     const form = new URLSearchParams({
       appid: this.appId,
       token: this.token,
-      source: 'webtracker'
+      source: 'webtracker',
+      max: '100'
     })
 
     console.log(`[${this.tag}] Fetching splits for PID ${pid}`)
