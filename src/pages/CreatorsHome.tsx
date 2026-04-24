@@ -237,20 +237,10 @@ export default function CreatorsHome() {
         {/* Metric tiles */}
         {metrics && !isLoading && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-              <Tile
-                icon={<Users className="w-4 h-4" />}
-                label="Active Creators"
-                value={metrics.creators.active + metrics.creators.onboarded}
-                subLabel={
-                  metrics.creators.invited > 0
-                    ? `${metrics.creators.invited} invite${metrics.creators.invited === 1 ? '' : 's'} pending`
-                    : 'No pending invites'
-                }
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
               <Tile
                 icon={<TrendingUp className="w-4 h-4" />}
-                label="Onboarded This Month"
+                label="Active Creators Onboarded This Month"
                 value={metrics.creators.onboardedThisMonth}
                 subLabel={`${metrics.creators.total} total in program`}
               />
@@ -270,27 +260,6 @@ export default function CreatorsHome() {
                 value={formatUsd(metrics.samples.costEstimatedUsd)}
                 subLabel="Est. at $50/sample"
                 placeholder={metrics.samples.costIsPlaceholder}
-              />
-              <Tile
-                icon={<Megaphone className="w-4 h-4" />}
-                label="Running Ads"
-                value={metrics.ads.running}
-                subLabel="Wired in Week 3"
-                placeholder={metrics.ads.isPlaceholder}
-              />
-              <Tile
-                icon={<DollarSign className="w-4 h-4" />}
-                label="Attributed Revenue"
-                value={formatUsd(metrics.revenue.attributedThisMonthUsd)}
-                subLabel="This month, from creator content"
-                placeholder={metrics.revenue.isPlaceholder}
-              />
-              <Tile
-                icon={<Clock className="w-4 h-4" />}
-                label="Commission Owed"
-                value={formatUsd(metrics.commission.pendingUsd)}
-                subLabel="Pending payout"
-                placeholder={metrics.commission.isPlaceholder}
               />
             </div>
 
