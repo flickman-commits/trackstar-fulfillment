@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, Users, Package, Megaphone, DollarSign, TrendingUp, Clock, X, Copy, Check, Instagram, Plus, Send } from 'lucide-react'
+import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
 type CreatorStatus = 'invited' | 'onboarded' | 'active' | 'paused'

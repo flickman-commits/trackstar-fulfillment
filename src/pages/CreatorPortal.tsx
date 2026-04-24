@@ -147,8 +147,9 @@ interface OnboardingDraft {
   email: string
   instagramHandle: string
   tiktokHandle: string
-  // Step 2: race (single dropdown value like "<raceName>__<year>")
-  raceKey: string
+  // Step 2: race (split into two dependent dropdowns)
+  raceName: string
+  raceYear: string  // string for <select> binding
   // Step 3: product
   productSize: string
   frameType: string
@@ -165,19 +166,6 @@ interface OnboardingDraft {
 const PRODUCT_SIZES = ['8x10', '12x18']
 const FRAME_TYPES = ['Unframed', 'Black Oak', 'Natural Oak']
 
-function raceKeyOf(raceName: string | null | undefined, year: number | null | undefined): string {
-  if (!raceName || !year) return ''
-  return `${raceName}__${year}`
-}
-function parseRaceKey(key: string): { raceName: string; raceYear: number } | null {
-  const idx = key.lastIndexOf('__')
-  if (idx < 0) return null
-  const raceName = key.slice(0, idx)
-  const raceYear = parseInt(key.slice(idx + 2), 10)
-  if (!raceName || !raceYear) return null
-  return { raceName, raceYear }
-}
-
 function OnboardingWizard({ data, token, onDone }: {
   data: PortalData
   token: string
@@ -190,7 +178,8 @@ function OnboardingWizard({ data, token, onDone }: {
     email: data.creator.email || '',
     instagramHandle: data.creator.instagramHandle || '',
     tiktokHandle: data.creator.tiktokHandle || '',
-    raceKey: raceKeyOf(data.creator.raceName, data.creator.raceYear),
+    raceName: data.creator.raceName || '',
+    raceYear: data.creator.raceYear ? String(data.creator.raceYear) : '',
     productSize: data.creator.productSize || '',
     frameType: data.creator.frameType || '',
     shippingName: data.creator.shippingName || data.creator.name || '',
@@ -208,7 +197,7 @@ function OnboardingWizard({ data, token, onDone }: {
   const canProceed = () => {
     if (step === 0) return true // welcome
     if (step === 1) return draft.name.trim().length > 0 && draft.email.trim().length > 0
-    if (step === 2) return draft.raceKey.length > 0
+    if (step === 2) return draft.raceName.length > 0 && draft.raceYear.length > 0
     if (step === 3) return draft.productSize.length > 0 && draft.frameType.length > 0
     if (step === 4) return (
       draft.shippingName.trim().length > 0 &&
@@ -223,7 +212,6 @@ function OnboardingWizard({ data, token, onDone }: {
   const handleSubmit = async () => {
     setIsSubmitting(true)
     try {
-      const parsed = parseRaceKey(draft.raceKey)
       const res = await fetch(`${API_BASE}/api/orders/actions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -235,8 +223,8 @@ function OnboardingWizard({ data, token, onDone }: {
             email: draft.email.trim(),
             instagramHandle: draft.instagramHandle.trim() || null,
             tiktokHandle: draft.tiktokHandle.trim() || null,
-            raceName: parsed?.raceName || null,
-            raceYear: parsed?.raceYear ? String(parsed.raceYear) : null,
+            raceName: draft.raceName || null,
+            raceYear: draft.raceYear || null,
             productSize: draft.productSize,
             frameType: draft.frameType,
             shippingName: draft.shippingName.trim(),
@@ -374,27 +362,48 @@ function StepRace({ draft, setDraft, races }: {
   setDraft: (d: OnboardingDraft) => void
   races: RaceOption[]
 }) {
+  // Unique race names, sorted alphabetically.
+  const raceNames = Array.from(new Set(races.map(r => r.raceName))).sort()
+  // Years available for the currently selected race, newest first.
+  const yearsForRace = draft.raceName
+    ? Array.from(new Set(races.filter(r => r.raceName === draft.raceName).map(r => r.year))).sort((a, b) => b - a)
+    : []
+
   return (
     <div>
       <h2 className="text-lg font-semibold text-off-black mb-1">Your race</h2>
       <p className="text-xs text-off-black/60 mb-4">
         Pick the race you ran — your sample print will be personalized to it. We'll find your bib and finish time for you.
       </p>
-      <div>
-        <div className="text-xs text-off-black/60 mb-1">Race *</div>
-        <select
-          value={draft.raceKey}
-          onChange={(e) => setDraft({ ...draft, raceKey: e.target.value })}
-          autoFocus
-          className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white"
-        >
-          <option value="">Select a race…</option>
-          {races.map(r => (
-            <option key={r.id} value={raceKeyOf(r.raceName, r.year)}>
-              {r.raceName} — {r.year}
-            </option>
-          ))}
-        </select>
+      <div className="space-y-3">
+        <div>
+          <div className="text-xs text-off-black/60 mb-1">Race *</div>
+          <select
+            value={draft.raceName}
+            onChange={(e) => setDraft({ ...draft, raceName: e.target.value, raceYear: '' })}
+            autoFocus
+            className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white"
+          >
+            <option value="">Select a race…</option>
+            {raceNames.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <div className="text-xs text-off-black/60 mb-1">Year *</div>
+          <select
+            value={draft.raceYear}
+            onChange={(e) => setDraft({ ...draft, raceYear: e.target.value })}
+            disabled={!draft.raceName}
+            className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white disabled:bg-subtle-gray disabled:text-off-black/40 disabled:cursor-not-allowed"
+          >
+            <option value="">{draft.raceName ? 'Select a year…' : 'Pick a race first'}</option>
+            {yearsForRace.map(y => (
+              <option key={y} value={String(y)}>{y}</option>
+            ))}
+          </select>
+        </div>
         {races.length === 0 && (
           <p className="text-xs text-amber-600 mt-2">
             No race options available yet. Reach out to Matt so he can add yours.
@@ -523,10 +532,22 @@ function CreatorDashboard({ data }: { data: PortalData }) {
           </div>
         )}
 
-        {/* Earnings placeholder */}
-        <div className="bg-white border border-dashed border-off-black/20 rounded-md p-4 text-off-black/50 text-sm">
-          <span className="inline-block px-1.5 py-0.5 bg-off-black/5 text-off-black/40 text-[9px] font-semibold uppercase tracking-wider rounded mr-2">Coming</span>
-          Once your content goes live as ads, you'll see performance + what you've earned right here.
+        {/* Video upload CTA */}
+        <div className="bg-white border border-border-gray rounded-md p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-off-black/50 uppercase tracking-wider mb-2">
+            Upload Your Videos
+          </div>
+          <p className="text-sm text-off-black/70 mb-3">
+            Your videos are due seven days after you receive the print. Please upload them here.
+          </p>
+          <a
+            href="https://drive.google.com/drive/folders/16SZxJ-1wa6cbmVndkCGIaOmxZX-_pGsf?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
+          >
+            Open upload folder →
+          </a>
         </div>
       </div>
     </div>
