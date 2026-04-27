@@ -36,6 +36,7 @@ import londonConfig from './configs/london.js'
 import eugeneConfig from './configs/eugene.js'
 import jerseyCityConfig from './configs/jerseyCity.js'
 import bostonConfig from './configs/boston.js'
+import { normalizeRaceName } from './raceNameNormalization.js'
 
 /**
  * Map platform identifier -> platform scraper class
@@ -140,12 +141,16 @@ function findConfigByKeywords(normalizedName) {
  * @throws {Error} If no scraper is available for the race
  */
 export function getScraperForRace(raceName, year) {
+  // Belt-and-suspenders: normalize bare names ("Boston" → "Boston Marathon")
+  // so any orders that snuck through with a non-canonical raceName still match.
+  const lookupName = normalizeRaceName(raceName) || raceName
+
   // 1. Try exact alias match
-  let config = ALIAS_MAP[raceName]
+  let config = ALIAS_MAP[lookupName]
 
   // 2. Try case-insensitive alias match
   if (!config) {
-    const normalizedName = raceName.toLowerCase().trim()
+    const normalizedName = lookupName.toLowerCase().trim()
     for (const [alias, cfg] of Object.entries(ALIAS_MAP)) {
       if (alias.toLowerCase() === normalizedName) {
         config = cfg

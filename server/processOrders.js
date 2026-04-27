@@ -19,6 +19,7 @@ import { etsyFetch } from './services/etsyAuth.js'
 import { parseEtsyRaceName, parseEtsyPersonalization } from './services/etsyPersonalization.js'
 import { researchService } from './services/ResearchService.js'
 import { hasScraperForRace } from './scrapers/index.js'
+import { normalizeRaceName } from './scrapers/raceNameNormalization.js'
 import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrderIds, saveCountedOrderIds } from './services/customersServed.js'
 
 // Artelo API configuration
@@ -72,19 +73,32 @@ function determineOrderSource(order) {
 }
 
 /**
- * Parse race name from Shopify product title
+ * Parse race name from Shopify product title.
+ *
+ * Handles two title formats:
+ *   Old: "Boston Marathon Personalized Race Print" → "Boston Marathon"
+ *   New: "Personalized Boston Poster"              → "Boston Marathon" (via normalize)
+ *        "Personalized Eugene Marathon Poster"     → "Eugene Marathon"
  */
 function parseRaceName(productTitle) {
   if (!productTitle) return null
-  const suffixes = ['Personalized Race Print', 'Race Print', 'Print']
+
   let raceName = productTitle.trim()
+
+  // Strip leading "Personalized " prefix (new title format)
+  raceName = raceName.replace(/^Personalized\s+/i, '').trim()
+
+  // Strip known suffixes — longest first so "Personalized Race Print" beats "Print"
+  const suffixes = ['Personalized Race Print', 'Race Print', 'Personalized Poster', 'Poster', 'Print']
   for (const suffix of suffixes) {
     if (raceName.toLowerCase().endsWith(suffix.toLowerCase())) {
       raceName = raceName.slice(0, -suffix.length).trim()
       break
     }
   }
-  return raceName || null
+
+  // Map bare names ("Boston") to canonical ("Boston Marathon") for scraper lookup
+  return normalizeRaceName(raceName) || null
 }
 
 /**
@@ -498,9 +512,9 @@ export async function processOrders(options = {}) {
 
     // 2b. Mark any DB orders as completed if they no longer appear in Artelo at all
     // (Artelo stops returning orders once they're fully fulfilled and aged out of the 100-order window)
-    // Safety guard: only check orders older than 3 days, since brand-new orders may not appear
-    // in the 100-order window yet if there's a backlog of newer orders ahead of them.
-    if (allOrders.length > 0) {
+    // Only safe to run when we got back fewer than the 100-order limit — otherwise pending orders
+    // past position 100 would be wrongly marked completed just because they fell out of the window.
+    if (allOrders.length > 0 && allOrders.length < 100) {
       const allArteloOrderIds = new Set(allOrders.map(o => o.orderId))
       const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
       const pendingDbOrders = await prisma.order.findMany({

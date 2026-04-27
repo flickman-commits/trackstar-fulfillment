@@ -1325,9 +1325,9 @@ export default function Dashboard() {
     if (commentFileInputRef.current) commentFileInputRef.current.value = ''
   }
 
-  // Load comments when custom order modal opens
+  // Load comments when any order modal opens
   useEffect(() => {
-    if ((selectedOrder?.trackstarOrderType === 'custom' || selectedOrder?.trackstarOrderType === 'race_partner') && selectedOrder.id) {
+    if (selectedOrder?.id) {
       fetchComments(selectedOrder.id)
       setNewCommentText('')
       setCommentImageFile(null)
@@ -1335,7 +1335,7 @@ export default function Dashboard() {
     } else {
       setOrderComments([])
     }
-  }, [selectedOrder?.id, selectedOrder?.trackstarOrderType, fetchComments])
+  }, [selectedOrder?.id, fetchComments])
 
   // Format due date for display
   const TZ = 'America/New_York'
@@ -3667,6 +3667,70 @@ Thank you!`
                       </div>
                     )}
 
+                    {/* Comments (Mobile) */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">
+                        Comments {orderComments.length > 0 && `(${orderComments.length})`}
+                      </h4>
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-2">
+                        <textarea
+                          value={newCommentText}
+                          onChange={(e) => setNewCommentText(e.target.value)}
+                          onPaste={handleCommentPaste}
+                          placeholder="Add a comment or paste an image..."
+                          className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
+                          rows={2}
+                        />
+                        {commentImagePreview && (
+                          <div className="relative inline-block">
+                            <img src={commentImagePreview} alt="Preview" className="max-h-24 rounded-md border border-border-gray" />
+                            <button onClick={clearCommentImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
+                            <ImagePlus className="w-3 h-3 inline mr-1" />
+                            Image
+                            <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
+                          </label>
+                          <span className="text-xs text-off-black/40 flex-1">or paste</span>
+                          <button
+                            onClick={submitComment}
+                            disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
+                            className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                          >
+                            {isSubmittingComment ? 'Adding...' : 'Add'}
+                          </button>
+                        </div>
+                      </div>
+                      {isLoadingComments ? (
+                        <div className="text-center py-3"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
+                      ) : orderComments.length === 0 ? (
+                        <p className="text-xs text-off-black/40 text-center py-2">No comments yet</p>
+                      ) : (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {orderComments.map(comment => (
+                            <div key={comment.id} className="bg-white border border-border-gray rounded-md p-2.5">
+                              {comment.imageUrl && (
+                                <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
+                                  <img src={comment.imageUrl} alt="Attachment" className="max-h-32 rounded-md mb-1.5 border border-border-gray hover:opacity-90" />
+                                </a>
+                              )}
+                              {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
+                              <div className="flex items-center justify-between mt-1.5">
+                                <span className="text-xs text-off-black/40">
+                                  {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                </span>
+                                <button onClick={() => deleteComment(comment.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {/* Close button */}
                     <button
                       onClick={closeModal}
@@ -4005,6 +4069,78 @@ Thank you!`
                       </div>
                     </div>
                   )}
+
+                  {/* Comments */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">
+                      Comments {orderComments.length > 0 && `(${orderComments.length})`}
+                    </h4>
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3 mb-3">
+                      <textarea
+                        value={newCommentText}
+                        onChange={(e) => setNewCommentText(e.target.value)}
+                        onPaste={handleCommentPaste}
+                        placeholder="Add a comment or paste an image..."
+                        className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
+                        rows={2}
+                      />
+                      {commentImagePreview && (
+                        <div className="relative inline-block">
+                          <img src={commentImagePreview} alt="Upload preview" className="max-h-32 rounded-md border border-border-gray" />
+                          <button
+                            onClick={clearCommentImage}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
+                          <ImagePlus className="w-3 h-3 inline mr-1" />
+                          Image
+                          <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
+                        </label>
+                        <span className="text-xs text-off-black/40 flex-1">or paste</span>
+                        <button
+                          onClick={submitComment}
+                          disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
+                          className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                        >
+                          {isSubmittingComment ? 'Adding...' : 'Add'}
+                        </button>
+                      </div>
+                    </div>
+                    {isLoadingComments ? (
+                      <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
+                    ) : orderComments.length === 0 ? (
+                      <p className="text-xs text-off-black/40 text-center py-3">No comments yet</p>
+                    ) : (
+                      <div className="space-y-3 max-h-64 overflow-y-auto">
+                        {orderComments.map(comment => (
+                          <div key={comment.id} className="bg-white border border-border-gray rounded-md p-3 group">
+                            {comment.imageUrl && (
+                              <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
+                                <img src={comment.imageUrl} alt="Attachment" className="max-h-48 rounded-md mb-2 border border-border-gray hover:opacity-90 cursor-pointer" />
+                              </a>
+                            )}
+                            {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
+                            <div className="flex items-center justify-between mt-2">
+                              <span className="text-xs text-off-black/40">
+                                {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                              <button
+                                onClick={() => deleteComment(comment.id)}
+                                className="text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Flag Reason - only for flagged orders */}
                   {selectedOrder.status === 'flagged' && selectedOrder.flagReason && (
