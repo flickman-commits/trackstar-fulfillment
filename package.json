@@ -43,6 +43,7 @@
     "react-markdown": "^9.0.3",
     "react-router-dom": "^6.28.1",
     "resend": "^6.9.4",
+    "sharp": "^0.34.5",
     "sonner": "^1.7.1",
     "styled-components": "^6.1.15",
     "tailwind-merge": "^2.6.0",

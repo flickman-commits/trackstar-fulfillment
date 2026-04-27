@@ -12,6 +12,7 @@ interface Proof {
   version: number
   batch: number
   imageUrl: string
+  thumbnailUrl: string | null
   fileName: string | null
   status: 'pending' | 'approved' | 'revision_requested' | 'rejected'
   customerFeedback: string | null
@@ -340,7 +341,7 @@ export default function ApprovalPortal() {
                                 ) : (
                                   <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
                                     <img
-                                      src={proof.imageUrl}
+                                      src={proof.thumbnailUrl || proof.imageUrl}
                                       alt={`Option ${proof.version}`}
                                       className="h-16 w-16 object-cover rounded-md hover:opacity-90 transition-opacity"
                                       style={{ border: '1px solid #E0E0E0' }}
@@ -753,7 +754,7 @@ export default function ApprovalPortal() {
                                     ) : (
                                       <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
                                         <img
-                                          src={proof.imageUrl}
+                                          src={proof.thumbnailUrl || proof.imageUrl}
                                           alt={`Option ${proof.version}`}
                                           className="h-16 w-16 object-cover rounded-md hover:opacity-90 transition-opacity"
                                           style={{ border: '1px solid #E0E0E0' }}
