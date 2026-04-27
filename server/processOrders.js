@@ -669,6 +669,12 @@ export async function processOrders(options = {}) {
                   // Classify custom orders (e.g. "Any Race - Custom Trackstar Print")
                   if (isCustomOrder(extracted.raceName)) {
                     updateData.trackstarOrderType = 'custom'
+
+                    // Backfill due date if missing: Etsy create_timestamp (seconds) + 14 days
+                    const etsyCreatedAt = etsyReceipt.create_timestamp
+                    if (etsyCreatedAt && !existing.dueDate) {
+                      updateData.dueDate = new Date(etsyCreatedAt * 1000 + 14 * 24 * 60 * 60 * 1000)
+                    }
                   }
 
                   if (extracted.needsAttention && existing.status === 'pending' && !isCustomOrder(extracted.raceName)) {
@@ -785,6 +791,13 @@ export async function processOrders(options = {}) {
                   // Classify custom orders (e.g. "Any Race - Custom Trackstar Print")
                   if (isCustomOrder(extracted.raceName)) {
                     trackstarOrderType = 'custom'
+
+                    // Compute due date: Etsy create_timestamp (seconds) + 14 days
+                    const etsyCreatedAt = etsyReceipt.create_timestamp
+                    if (etsyCreatedAt) {
+                      dueDate = new Date(etsyCreatedAt * 1000 + 14 * 24 * 60 * 60 * 1000)
+                    }
+
                     log(`[processOrders] 🎨 Custom Etsy order detected: ${order.orderId}-${lineItemIndex}`)
                   }
 

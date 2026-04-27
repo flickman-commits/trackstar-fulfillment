@@ -66,7 +66,12 @@ export class BrookseeScraper extends BaseScraper {
 
   async searchEventType(runnerName, raceId, event, eventLabel) {
     try {
-      const url = `${this.baseUrl}/results?race=${raceId}&event=${encodeURIComponent(event)}&search=${encodeURIComponent(runnerName)}`
+      // Brooksee searches the `search` param as a substring against lastname
+      // only. Passing the full "First Last" string returns zero matches.
+      // Send just the last whitespace-separated token; we'll filter the
+      // candidates by full-name match below via this.namesMatch().
+      const lastNameToken = runnerName.trim().split(/\s+/).pop() || runnerName
+      const url = `${this.baseUrl}/results?race=${raceId}&event=${encodeURIComponent(event)}&search=${encodeURIComponent(lastNameToken)}`
 
       const response = await fetch(url, {
         headers: {
