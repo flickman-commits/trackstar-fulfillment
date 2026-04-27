@@ -1,30 +1,35 @@
 /**
- * Eugene Marathon - RunSignUp platform
- * Results: https://runsignup.com/Race/Results/181564
+ * Eugene Marathon - Brooksee platform (LaurelT timing)
+ * Results: https://results.laurelt.com/eug/results
+ *
+ * Eugene moved off RunSignUp and onto LaurelT (Brooksee under the hood)
+ * starting in 2026. The HTML structure is the standard Brooksee format
+ * (td.placeoverall, td.bib, td.chiptime, a.individual etc.).
+ *
+ * Race IDs (year -> Brooksee race ID):
+ *   167913 = 2026
  */
 export default {
-  platform: 'runsignup',
+  platform: 'brooksee',
   raceName: 'Eugene Marathon',
   tag: 'Eugene',
-  raceId: 181564,
+  baseUrl: 'https://results.laurelt.com/eug',
   location: 'Eugene, OR',
   eventTypes: ['Marathon', 'Half Marathon'],
-  eventSearchOrder: ['marathon', 'half'],
+  eventSearchOrder: ['Marathon', 'Half Marathon'],
   eventLabels: {
-    marathon: 'Marathon',
-    half: 'Half Marathon'
+    Marathon: 'Marathon',
+    'Half Marathon': 'Half Marathon',
   },
   aliases: [
     'Eugene Marathon',
-    'Oregon Eugene Marathon'
+    'Oregon Eugene Marathon',
+    'Eugene Half Marathon',
   ],
   keywords: ['eugene'],
   keywordRequiresMarathon: true,
-  resultSets: {
-    2025: { marathon: 545412, half: 545356 }
-  },
-  eventIds: {
-    2025: { marathon: 982888, half: 982887 }
+  raceIds: {
+    2026: '167913',
   },
   /**
    * Eugene Marathon is typically the last Sunday in April
