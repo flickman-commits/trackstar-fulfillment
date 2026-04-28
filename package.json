@@ -7,10 +7,12 @@
     "dev": "concurrently -n api,vite -c blue,green \"npm run dev:api\" \"npm run dev:vite\"",
     "dev:api": "node --env-file=.env.local server/dev.js",
     "dev:vite": "vite",
-    "build": "prisma generate && tsc && vite build",
+    "build": "node scripts/lint-scrapers.js && prisma generate && tsc && vite build",
     "postinstall": "prisma generate",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:scrapers": "node scripts/lint-scrapers.js",
+    "test:scrapers": "node scripts/verify-scraper-chip-times.js",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {

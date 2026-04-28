@@ -1,0 +1,43 @@
+name: Scraper checks
+
+# Runs on any change to server/scrapers/ — catches:
+#   1. New platform scrapers added without a chip-time fixture
+#   2. Time-extraction regressions (gun time vs chip time bugs)
+
+on:
+  pull_request:
+    paths:
+      - 'server/scrapers/**'
+      - 'scripts/lint-scrapers.js'
+      - 'scripts/verify-scraper-chip-times.js'
+  push:
+    branches: [main]
+    paths:
+      - 'server/scrapers/**'
+
+jobs:
+  lint:
+    name: Lint scraper fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint:scrapers
+
+  verify:
+    name: Verify chip times against live results pages
+    runs-on: ubuntu-latest
+    # Allow this to fail without blocking PRs (external sites may be flaky)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:scrapers

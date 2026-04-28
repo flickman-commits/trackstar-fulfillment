@@ -566,6 +566,38 @@ async function handleHealthCheck(res, { sendSlack = false } = {}) {
     return { status: 'ok', detail: 'Webhook URL configured' }
   })()
 
+  // 5b. Scrapers (chip-time fixtures) — catches gun-time regressions early
+  results.checks.scrapers = await (async () => {
+    const start = Date.now()
+    try {
+      const [{ CHIP_TIME_FIXTURES }, { getScraperForRace }] = await Promise.all([
+        import('../../server/scrapers/__tests__/chip-time-fixtures.js'),
+        import('../../server/scrapers/index.js')
+      ])
+      const norm = (t) => (t || '').toString().replace(/^0+/, '').replace(/^:/, '').trim()
+      const failures = []
+      for (const fx of CHIP_TIME_FIXTURES) {
+        try {
+          const scraper = getScraperForRace(fx.race, fx.year)
+          const r = await scraper.searchRunner(fx.runner)
+          if (!r.found) { failures.push(`${fx.race} ${fx.year}: not found`); continue }
+          if (norm(r.officialTime) !== norm(fx.expectedChipTime)) {
+            failures.push(`${fx.race} ${fx.year}: got ${r.officialTime} expected ${fx.expectedChipTime}`)
+          }
+        } catch (err) {
+          failures.push(`${fx.race} ${fx.year}: ${err.message}`)
+        }
+      }
+      const latency = `${Date.now() - start}ms`
+      if (failures.length === 0) {
+        return { status: 'ok', latency, detail: `All ${CHIP_TIME_FIXTURES.length} chip-time fixtures pass` }
+      }
+      return { status: 'error', latency, detail: `${failures.length} fixture(s) failing: ${failures.slice(0, 3).join('; ')}` }
+    } catch (err) {
+      return { status: 'error', detail: `Failed to load fixtures: ${err.message}` }
+    }
+  })()
+
   // 6. Environment variables
   results.checks.envVars = (() => {
     const required = [
