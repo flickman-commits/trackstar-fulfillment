@@ -122,18 +122,27 @@ export class RunSignUpScraper extends BaseScraper {
         return this.notFoundResult()
       }
 
-      // Map API results to our standard format
-      const results = rawResults.map(r => ({
-        name: `${r.first_name || ''} ${r.last_name || ''}`.trim(),
-        bib: r.bib != null ? String(r.bib) : null,
-        chipTime: r.chip_time || r.clock_time || null,
-        pace: r.pace || null,
-        placeOverall: r.place != null ? String(r.place) : null,
-        gender: r.gender || null,
-        age: r.age != null ? String(r.age) : null,
-        city: r.city || null,
-        state: r.state || null
-      }))
+      // Map API results to our standard format.
+      // IMPORTANT: ONLY use chip_time. RunSignUp's `clock_time` is gun time —
+      // never fall back to it. If chip_time is missing, we'd rather report
+      // a missing time than the wrong (gun) time and have the order printed wrong.
+      const results = rawResults.map(r => {
+        const chip = (r.chip_time && String(r.chip_time).trim()) || null
+        if (!chip && r.clock_time) {
+          console.warn(`[${this.tag} ${this.year}] Runner ${r.first_name} ${r.last_name} has clock_time but no chip_time — refusing to use gun time`)
+        }
+        return {
+          name: `${r.first_name || ''} ${r.last_name || ''}`.trim(),
+          bib: r.bib != null ? String(r.bib) : null,
+          chipTime: chip,
+          pace: r.pace || null,
+          placeOverall: r.place != null ? String(r.place) : null,
+          gender: r.gender || null,
+          age: r.age != null ? String(r.age) : null,
+          city: r.city || null,
+          state: r.state || null
+        }
+      })
 
       // Filter for exact name matches
       const matches = results.filter(r => this.namesMatch(runnerName, r.name))
