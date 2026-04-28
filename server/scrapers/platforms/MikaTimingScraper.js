@@ -202,18 +202,32 @@ export class MikaTimingScraper extends BaseScraper {
         const division = divisionText.replace(/Division/gi, '').trim()
 
         // Extract times
+        // Boston Marathon shows BOTH "Finish Net" (chip time) and "Finish Gun" (gun time).
+        // We always prefer chip time. Fall back to plain "Finish" (Chicago, etc.)
+        // and explicitly skip gun time.
         let halfTime = ''
         let finishTime = ''
+        let finishTimeIsChip = false
         $row.find('.type-time').each((_, field) => {
           const $field = $(field)
           const label = $field.find('.list-label').text().trim()
-          const timeMatch = $field.text().match(/(\d{2}:\d{2}:\d{2})/)
+          const labelUpper = label.toUpperCase()
+          const timeMatch = $field.text().match(/(\d{1,2}:\d{2}:\d{2})/)
           const time = timeMatch ? timeMatch[1] : ''
+          if (!time) return
 
-          if (label === 'HALF' || $field.text().includes('HALF')) {
+          if (labelUpper.includes('HALF')) {
             halfTime = time
-          } else if (label === 'Finish' || $field.text().includes('Finish')) {
+          } else if (labelUpper.includes('NET') || labelUpper === 'CHIP' || labelUpper.includes('CHIP')) {
+            // Chip / net time — preferred (Boston: "Finish Net")
             finishTime = time
+            finishTimeIsChip = true
+          } else if (labelUpper.includes('GUN')) {
+            // Explicitly skip gun time — never use it as the finish time
+            return
+          } else if (labelUpper.includes('FINISH')) {
+            // Plain "Finish" (Chicago, etc.) — only use if no chip time has been set yet
+            if (!finishTimeIsChip) finishTime = time
           }
         })
 
