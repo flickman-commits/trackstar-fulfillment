@@ -1389,11 +1389,14 @@ export default function Dashboard() {
         return dateA - dateB
       })
     }
-    // Standard view: filter by status, newest Shopify order first
+    // Standard view: filter by status; expedited orders pinned to top, then newest Shopify order first
     const fulfillOrders = typeFiltered.filter(o =>
       o.status === 'flagged' || o.status === 'ready' || o.status === 'pending' || o.status === 'missing_year'
     )
     return fulfillOrders.sort((a, b) => {
+      // Pin expedited shipping orders to the top
+      if (a.isExpedited && !b.isExpedited) return -1
+      if (!a.isExpedited && b.isExpedited) return 1
       const dateA = new Date(a.orderPlacedAt || a.shopifyCreatedAt || a.createdAt).getTime()
       const dateB = new Date(b.orderPlacedAt || b.shopifyCreatedAt || b.createdAt).getTime()
       return dateB - dateA
