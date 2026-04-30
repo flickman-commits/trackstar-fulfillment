@@ -1,6 +1,7 @@
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { hasScraperForRace } from '../../server/scrapers/index.js'
+import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
 
 
 /**
@@ -208,6 +209,9 @@ export default async function handler(req, res) {
         displayOrderNumber: order.shopifyOrderData?.name
           ? String(order.shopifyOrderData.name).replace('#', '')
           : order.parentOrderNumber,
+        // Shipping info — expose for expedited badge + callout in dashboard
+        shippingMethod: getShippingMethod(order.shopifyOrderData),
+        isExpedited: isExpeditedShipping(order.shopifyOrderData),
         // Original order date from marketplace (for sorting by when customer placed order)
         orderPlacedAt: order.shopifyOrderData?.created_at
           || (order.etsyOrderData?.create_timestamp

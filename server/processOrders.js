@@ -21,6 +21,7 @@ import { researchService } from './services/ResearchService.js'
 import { hasScraperForRace } from './scrapers/index.js'
 import { normalizeRaceName } from './scrapers/raceNameNormalization.js'
 import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrderIds, saveCountedOrderIds } from './services/customersServed.js'
+import { isExpeditedShipping, getShippingMethod } from './lib/shipping.js'
 
 // Artelo API configuration
 const ARTELO_API_URL = 'https://www.artelo.io/api/open/orders/get'
@@ -845,6 +846,38 @@ export async function processOrders(options = {}) {
               orderResult.runnerName = runnerName
 
               log(`[processOrders] ✅ Imported: ${order.orderId}-${lineItemIndex} (${orderSource}${trackstarOrderType === 'custom' ? ', CUSTOM' : ''}) - ${raceName} - ${runnerName}`)
+
+              // Notify Eli when a STANDARD order comes in with expedited shipping.
+              // (Expedited shipping is only meaningful on standard orders — customs
+              // have their own due-date workflow.)
+              try {
+                if (
+                  trackstarOrderType === 'standard' &&
+                  orderSource === 'shopify' &&
+                  isExpeditedShipping(lineItemShopifyData)
+                ) {
+                  const shippingMethod = getShippingMethod(lineItemShopifyData)
+                  const displayNum = lineItemShopifyData?.name || `#${order.orderId}`
+                  const eliDmUrl = process.env.SLACK_ELI_DM_WEBHOOK_URL
+                  const fallbackUrl = process.env.SLACK_PROOF_WEBHOOK_URL
+                  const slackUrl = eliDmUrl || fallbackUrl
+                  if (slackUrl) {
+                    const text = `🚀 <@U09UVEP1N3Y> *EXPEDITED ORDER* — *${displayNum}* (${raceName}, ${runnerName})\n` +
+                      `Customer paid for *${shippingMethod || 'expedited'}* shipping. Please prioritize this order:\n` +
+                      `• Verify all personalization is complete\n` +
+                      `• You can send this one to production yourself (no need to wait for Matt)\n` +
+                      `• After submitting to production, ping Artelo via customer support: _"hey - we just submitted order ${displayNum} for production and the customer requested expedited shipping - please use 2-day air and charge to our account. thanks!"_`
+                    fetch(slackUrl, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ text })
+                    }).catch(e => log(`[processOrders] Expedited Slack notification failed: ${e.message}`))
+                    log(`[processOrders] 🚀 Expedited shipping detected on ${order.orderId}-${lineItemIndex} — Slack sent`)
+                  }
+                }
+              } catch (e) {
+                log(`[processOrders] Error checking expedited shipping: ${e.message}`)
+              }
             }
 
             // 3. Run research if enabled and we have a scraper for this race

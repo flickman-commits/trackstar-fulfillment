@@ -101,6 +101,9 @@ interface Order {
   proofSentAt?: string | null
   shopifyCreatedAt?: string | null
   orderPlacedAt?: string | null
+  // Shipping
+  shippingMethod?: string | null
+  isExpedited?: boolean
 }
 
 interface OrderComment {
@@ -1720,6 +1723,9 @@ Thank you!`
                               {order.timeFromName && (
                                 <span className="px-1 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] rounded border border-blue-500/20">⏱ {order.timeFromName}</span>
                               )}
+                              {order.isExpedited && order.trackstarOrderType === 'standard' && (
+                                <span className="px-1.5 py-0.5 bg-red-500/10 text-red-600 text-[9px] font-bold rounded border border-red-500/30 whitespace-nowrap">🚀 EXPEDITED</span>
+                              )}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               <span className="text-base" title={statusDisplay.label}>{statusDisplay.icon}</span>
@@ -1982,6 +1988,9 @@ Thank you!`
                                 )}
                                 {order.timeFromName && (
                                   <span className="px-1 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] rounded border border-blue-500/20" title={`Customer time: ${order.timeFromName}`}>⏱ {order.timeFromName}</span>
+                                )}
+                                {order.isExpedited && order.trackstarOrderType === 'standard' && (
+                                  <span className="px-1.5 py-0.5 bg-red-500/10 text-red-600 text-[9px] font-bold rounded border border-red-500/30 whitespace-nowrap" title={`Customer paid for ${order.shippingMethod || 'expedited'} shipping — prioritize`}>🚀 EXPEDITED</span>
                                 )}
                               </div>
                               {order.status === 'flagged' && order.flagReason && (
@@ -3520,6 +3529,31 @@ Thank you!`
                   ) : (
                     <>
                   {/* ========== STANDARD ORDER DETAIL VIEW ========== */}
+
+                  {/* Expedited shipping callout — Eli's instructions for prioritizing
+                      and pinging Artelo after sending to production. Only shown when
+                      the customer paid for expedited shipping (Standard orders only). */}
+                  {selectedOrder.isExpedited && (
+                    <div className="bg-red-50 border-2 border-red-300 rounded-md p-4 mb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-base">🚀</span>
+                        <span className="text-sm font-bold text-red-800 uppercase tracking-wide">Expedited Shipping — Eli, prioritize this</span>
+                      </div>
+                      <div className="text-xs text-red-900/90 leading-relaxed space-y-1.5">
+                        <p>The customer paid for <strong>{selectedOrder.shippingMethod || 'expedited'}</strong> shipping. Get this out the door fast:</p>
+                        <ol className="list-decimal list-inside space-y-1 pl-1">
+                          <li>Double-check that all personalization fields are filled in correctly.</li>
+                          <li>Send it to production yourself — no need to wait for Matt's approval.</li>
+                          <li>
+                            After submitting to production, ping Artelo via customer support with this exact message:
+                            <div className="mt-1.5 p-2 bg-white border border-red-200 rounded text-xs text-off-black italic font-mono">
+                              "hey - we just submitted order #{selectedOrder.displayOrderNumber} for production and the customer requested expedited shipping - please use 2-day air and charge to our account. thanks!"
+                            </div>
+                          </li>
+                        </ol>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Creator-sample banner — shows for creator-program free samples.
                       Visible at the top of both mobile and desktop views since this
