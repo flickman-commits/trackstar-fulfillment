@@ -398,7 +398,10 @@ export default function Dashboard() {
           timeFromName: order.timeFromName as string | null | undefined,
           // Marketplace order date for sorting
           shopifyCreatedAt: order.shopifyCreatedAt as string | null | undefined,
-          orderPlacedAt: order.orderPlacedAt as string | null | undefined
+          orderPlacedAt: order.orderPlacedAt as string | null | undefined,
+          // Shipping (for expedited badge / callout)
+          shippingMethod: order.shippingMethod as string | null | undefined,
+          isExpedited: order.isExpedited as boolean | undefined
         }
       })
 
