@@ -77,7 +77,24 @@ export const CHIP_TIME_FIXTURES = [
   // (Buffalo — add when verified)
 
   // ── RaceRoster ────────────────────────────────────────────────────────
-  // (Cowtown — add when verified)
+  {
+    platform: 'raceroster',
+    race: 'Pittsburgh Marathon',
+    year: 2025,
+    runner: 'Lori Smith',
+    expectedChipTime: '4:34:33',
+    expectedBib: '3931',
+    notes: 'Pittsburgh 2025 marathon — verifies sub-event filtering + chip time',
+  },
+  {
+    platform: 'raceroster',
+    race: 'Oakland Marathon',
+    year: 2024,
+    runner: 'Sara Bagnell',
+    expectedChipTime: '2:57:39',
+    expectedBib: '1362',
+    notes: 'Oakland 2024 women\'s winner — verifies historic year support',
+  },
 
   // ── RTRT ──────────────────────────────────────────────────────────────
   // (Marine Corps, Jersey City — add when verified)

@@ -30,9 +30,19 @@ export default {
   keywords: ['oakland'],
   keywordRequiresMarathon: true,
   eventCodes: {
+    2024: '3m5mzpssngyxw7qz',
+    2025: 'dzbk7fwzszetwf9b',
     2026: 'hpcsg4kr4jdaaqk2',
   },
   subEventIds: {
+    2024: {
+      marathon: 193062,
+      halfMarathon: 193063,
+    },
+    2025: {
+      marathon: 223814,
+      halfMarathon: 223815,
+    },
     2026: {
       marathon: 253779,
       halfMarathon: 253780,
