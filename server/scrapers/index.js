@@ -15,6 +15,8 @@ import { RaceRosterScraper } from './platforms/RaceRosterScraper.js'
 import { XacteScraper } from './platforms/XacteScraper.js'
 import { ScoreThisScraper } from './platforms/ScoreThisScraper.js'
 import { BrookseeScraper } from './platforms/BrookseeScraper.js'
+import { TokyoMarathonScraper } from './platforms/TokyoMarathonScraper.js'
+import { MultiSportAustraliaScraper } from './platforms/MultiSportAustraliaScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -35,6 +37,9 @@ import mesaConfig from './configs/mesa.js'
 import londonConfig from './configs/london.js'
 import eugeneConfig from './configs/eugene.js'
 import jerseyCityConfig from './configs/jerseyCity.js'
+import berlinConfig from './configs/berlin.js'
+import tokyoConfig from './configs/tokyo.js'
+import sydneyConfig from './configs/sydney.js'
 import bostonConfig from './configs/boston.js'
 import illinoisConfig from './configs/illinois.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
@@ -53,6 +58,8 @@ const PLATFORM_MAP = {
   xacte: XacteScraper,
   scorethis: ScoreThisScraper,
   brooksee: BrookseeScraper,
+  tokyo: TokyoMarathonScraper,
+  'multisport-australia': MultiSportAustraliaScraper,
 }
 
 /**
@@ -79,6 +86,9 @@ const ALL_CONFIGS = [
   jerseyCityConfig,
   bostonConfig,
   illinoisConfig,
+  berlinConfig,
+  tokyoConfig,
+  sydneyConfig,
 ]
 
 /**

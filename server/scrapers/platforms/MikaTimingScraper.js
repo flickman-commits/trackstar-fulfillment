@@ -62,6 +62,32 @@ export class MikaTimingScraper extends BaseScraper {
     }
   }
 
+  /**
+   * Resolve the event code for the current year. Tries (in order):
+   *   1. config.eventCodes[year] — hardcoded per-year mapping
+   *   2. config.eventCode — single static code (e.g. 'R', 'MAR')
+   *   3. Auto-discovery — fetch the year's listing page and extract `event=XXX`
+   */
+  async resolveEventCode() {
+    if (this.config.eventCodes?.[this.year]) return this.config.eventCodes[this.year]
+    if (this.config.eventCode) return this.config.eventCode
+    // Fallback: discover from listing page
+    try {
+      const url = `${this.baseUrl}/?pid=list&event_main_group=${this.year}`
+      const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' } })
+      if (!resp.ok) return null
+      const html = await resp.text()
+      const match = html.match(/event=([A-Z][A-Z0-9_]+)/)
+      if (match) {
+        console.log(`[${this.tag} ${this.year}] Auto-discovered event code: ${match[1]}`)
+        return match[1]
+      }
+    } catch (err) {
+      console.warn(`[${this.tag} ${this.year}] Event code discovery failed: ${err.message}`)
+    }
+    return 'MAR' // last-resort default
+  }
+
   async searchRunner(runnerName) {
     console.log(`\n${'='.repeat(50)}`)
     console.log(`[${this.tag} ${this.year}] Searching for: "${runnerName}"`)
@@ -72,12 +98,13 @@ export class MikaTimingScraper extends BaseScraper {
       const firstName = nameParts.length > 1 ? nameParts[0] : ''
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0]
 
+      const eventCode = await this.resolveEventCode()
       const searchParams = new URLSearchParams({
         pid: 'list',
         event_main_group: String(this.year),
         'search[name]': lastName,
         'search[firstname]': firstName,
-        event: this.config.eventCode || 'MAR',
+        event: eventCode,
         num_results: '50',
         search_sort: 'name'
       })

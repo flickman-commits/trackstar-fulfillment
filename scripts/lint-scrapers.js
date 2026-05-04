@@ -49,6 +49,8 @@ const PLATFORM_NAME_ALIASES = {
   'mikatiming': 'mika',
   'myraceai': 'myrace',
   'racerosters': 'raceroster',
+  'tokyomarathon': 'tokyo',
+  'multisportaustralia': 'multisport-australia',
 }
 
 // 3. Verify every platform has at least one fixture

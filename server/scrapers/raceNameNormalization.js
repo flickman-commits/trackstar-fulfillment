@@ -16,6 +16,16 @@ const RACE_NAME_ALIASES = {
   // Future-proofing — currently parse correctly but cheap to be defensive:
   Eugene: 'Eugene Marathon',
   'Orange County': 'Orange County Marathon',
+
+  // World Majors collection (May 2026) — listings titled
+  // "Personalized {City} World Major Race Poster" parse to "{City} World Major Race"
+  'New York City World Major Race': 'NYC Marathon',
+  'London World Major Race': 'London Marathon',
+  'Chicago World Major Race': 'Chicago Marathon',
+  'Boston World Major Race': 'Boston Marathon',
+  'Berlin World Major Race': 'Berlin Marathon',
+  'Tokyo World Major Race': 'Tokyo Marathon',
+  'Sydney World Major Race': 'Sydney Marathon',
 }
 
 /**

@@ -1,0 +1,208 @@
+/**
+ * Tokyo Marathon Scraper
+ *
+ * Custom PHP form on marathon.tokyo:
+ *   - Search:  POST  /{year}/result/index.php   (form: name, sex[], page, etc.)
+ *   - Detail:  POST  /{year}/result/detail.php  (form: d_number=<bib>)
+ *
+ * Search results don't include times — only the detail page does.
+ * Detail page has both `タイム(ネット)／Time (net)` and `タイム(グロス)／Time (gross)`.
+ * We always use the net time (chip time), never the gross (gun) time.
+ */
+import { BaseScraper } from '../BaseScraper.js'
+import * as cheerio from 'cheerio'
+
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+export class TokyoMarathonScraper extends BaseScraper {
+  /**
+   * @param {number} year
+   * @param {Object} config
+   * @param {string} config.raceName
+   * @param {string} config.location
+   * @param {Function} config.calculateDate
+   */
+  constructor(year, config) {
+    super(config.raceName, year)
+    this.config = config
+    this.tag = config.tag || config.raceName
+    this.baseUrl = `https://www.marathon.tokyo/${year}/result`
+  }
+
+  async getRaceInfo() {
+    return {
+      raceDate: this.config.calculateDate(this.year),
+      location: this.config.location,
+      eventTypes: this.config.eventTypes || ['Marathon'],
+      resultsUrl: this.baseUrl,
+      resultsSiteType: 'tokyo'
+    }
+  }
+
+  async searchRunner(runnerName) {
+    console.log(`\n${'='.repeat(50)}`)
+    console.log(`[${this.tag} ${this.year}] Searching for: "${runnerName}"`)
+    console.log(`${'='.repeat(50)}`)
+
+    try {
+      // Step 1: Search by name
+      const formBody = new URLSearchParams({
+        number: '',
+        name: runnerName.trim(),
+        'sex[]': '1',
+        sort_key: 'place',
+        sort_asc: '1',
+        page: '1',
+        d_number: ''
+      })
+      // Tokyo expects multiple sex[] values; URLSearchParams collapses them, so add manually
+      const fullBody = formBody.toString() + '&sex%5B%5D=2&sex%5B%5D=0'
+
+      console.log(`[${this.tag}] POST ${this.baseUrl}/index.php (name="${runnerName}")`)
+      const searchResp = await fetch(`${this.baseUrl}/index.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': USER_AGENT,
+          Accept: 'text/html'
+        },
+        body: fullBody
+      })
+
+      if (!searchResp.ok) {
+        console.log(`[${this.tag}] Search failed: ${searchResp.status}`)
+        return this.notFoundResult()
+      }
+
+      const html = await searchResp.text()
+      const candidates = this._parseSearchResults(html)
+      console.log(`[${this.tag}] Found ${candidates.length} candidate runners`)
+
+      if (candidates.length === 0) return this.notFoundResult()
+
+      // Filter by name match
+      const matches = candidates.filter(c => this.namesMatch(runnerName, c.name))
+      console.log(`[${this.tag}] Exact matches: ${matches.length}`)
+
+      if (matches.length === 0) {
+        candidates.slice(0, 3).forEach(c => console.log(`  closest: ${c.name} bib=${c.bib}`))
+        return this.notFoundResult()
+      }
+      if (matches.length > 1) {
+        return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: m.bib, time: null })))
+      }
+
+      // Step 2: Fetch detail page for the matched runner using their bib number
+      const match = matches[0]
+      console.log(`[${this.tag}] Fetching detail for bib ${match.bib}`)
+      const detailResp = await fetch(`${this.baseUrl}/detail.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': USER_AGENT
+        },
+        body: `d_number=${encodeURIComponent(match.bib)}`
+      })
+      if (!detailResp.ok) {
+        console.log(`[${this.tag}] Detail fetch failed: ${detailResp.status}`)
+        return this.notFoundResult()
+      }
+      const detailHtml = await detailResp.text()
+      const netTime = this._extractNetTime(detailHtml)
+
+      if (!netTime) {
+        console.log(`[${this.tag}] No net time on detail page`)
+        return this.notFoundResult()
+      }
+
+      const time = this.formatTime(netTime)
+      const distanceMiles = this.config.distanceMiles || 26.2
+      const pace = this.formatPace(this.calculatePace(netTime, distanceMiles))
+
+      console.log(`\n[${this.tag}] FOUND RUNNER:`)
+      console.log(`  Name: ${match.name}`)
+      console.log(`  Bib: ${match.bib}`)
+      console.log(`  Net Time (chip): ${time}`)
+
+      return {
+        found: true,
+        bibNumber: String(match.bib),
+        officialTime: time,
+        officialPace: pace,
+        eventType: this.config.defaultEventType || 'Marathon',
+        yearFound: this.year,
+        researchNotes: null,
+        resultsUrl: this.baseUrl,
+        rawData: { name: match.name, bib: match.bib, place: match.place }
+      }
+    } catch (error) {
+      console.error(`[${this.tag}] Error: ${error.message}`)
+      return { ...this.notFoundResult(), researchNotes: `Error: ${error.message}` }
+    }
+  }
+
+  /**
+   * Parse the search results table.
+   * Columns (per the form layout): Place, Race Category, Bib, Name, Age, Sex, Country, City
+   */
+  _parseSearchResults(html) {
+    const $ = cheerio.load(html)
+    const candidates = []
+
+    $('tr').each((_, tr) => {
+      const tds = $(tr).find('td')
+      if (tds.length < 4) return
+
+      const place = $(tds[0]).text().trim()
+      const bib = $(tds[2]).text().trim()
+      const fullName = $(tds[3]).text().trim()
+      // The name cell has Japanese + English combined (e.g. "鈴木 朋樹TOMOKI SUZUKI")
+      // We extract the latin (English) portion since runners are submitted in English.
+      const latinName = (fullName.match(/[A-Z][A-Z\s.\-']{2,}/g) || []).join(' ').trim()
+      const finalName = latinName || fullName
+
+      if (bib && /^\d+$/.test(bib)) {
+        candidates.push({
+          name: finalName,
+          bib: bib,
+          place: place
+        })
+      }
+    })
+
+    return candidates
+  }
+
+  /**
+   * Extract the net (chip) time from the detail page.
+   * Detail page has rows like:
+   *   <th>タイム(ネット)／Time (net)</th>
+   *   <td>02:38:10</td>
+   *   <th>タイム(グロス)／Time (gross)</th>
+   *   <td>02:38:18</td>
+   * We always pick the net time, never gross.
+   */
+  _extractNetTime(html) {
+    const $ = cheerio.load(html)
+    let netTime = null
+
+    // Look for the row whose header includes "ネット" (net) — find sibling td
+    $('th').each((_, th) => {
+      const headerText = $(th).text().trim()
+      if (/ネット|net\s*\)/i.test(headerText) && !/グロス|gross/i.test(headerText)) {
+        // Try sibling <td> next, or look in same <tr>
+        const $tr = $(th).closest('tr')
+        const tds = $tr.find('td')
+        for (let i = 0; i < tds.length; i++) {
+          const text = $(tds[i]).text().trim()
+          const m = text.match(/(\d{1,2}:\d{2}:\d{2})/)
+          if (m) { netTime = m[1]; return false }
+        }
+      }
+    })
+
+    return netTime
+  }
+}
+
+export default TokyoMarathonScraper

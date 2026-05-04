@@ -35,6 +35,37 @@ export const CHIP_TIME_FIXTURES = [
     expectedBib: '2',
     notes: 'World record holder — chip time at Chicago 2023',
   },
+  {
+    platform: 'mika',
+    race: 'Berlin Marathon',
+    year: 2024,
+    runner: 'Milkesa Mengesha',
+    expectedChipTime: '2:03:17',
+    expectedBib: null,
+    notes: 'Berlin 2024 men\'s winner — verifies Mika auto-discovery of dynamic event code',
+  },
+
+  // ── Tokyo Marathon (custom platform) ──────────────────────────────────
+  {
+    platform: 'tokyo',
+    race: 'Tokyo Marathon',
+    year: 2025,
+    runner: 'Tadese Takele',
+    expectedChipTime: '2:03:22',
+    expectedBib: '5',
+    notes: 'Tokyo 2025 men\'s winner — verifies net (chip) time, NOT gross (gun)',
+  },
+
+  // ── MultiSport Australia (Sydney) ─────────────────────────────────────
+  {
+    platform: 'multisport-australia',
+    race: 'Sydney Marathon',
+    year: 2025,
+    runner: 'Eliud Kipchoge',
+    expectedChipTime: '2:08:31',
+    expectedBib: null,
+    notes: 'Sydney 2025 — verifies net_time extraction + Cloudflare bypass',
+  },
 
   // ── Brooksee ──────────────────────────────────────────────────────────
   // (CIM, etc. — add when verified)
