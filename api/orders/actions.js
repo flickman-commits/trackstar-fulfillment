@@ -1059,7 +1059,89 @@ async function handleCreatorOnboard({ token, data }, res) {
   // Sample Request on Matt's dashboard and only becomes a fulfillment order
   // once he approves via `approve-creator-sample`.
   console.log(`[actions/creator-onboard] ${creator.id} onboarded (or updated): ${Object.keys(updates).join(', ')}`)
+
+  // First-time onboard → ping Matt that there's a new sample request waiting
+  // for his approval. Best-effort; failures don't block the response.
+  if (isFirstOnboard) {
+    await pingSampleRequested(updated)
+  }
+
   return res.status(200).json({ success: true, creator: { id: updated.id, status: updated.status } })
+}
+
+// --- Slack helpers ---
+// Best-effort POST. Webhook URLs are pre-bound to a destination channel/DM,
+// so the caller picks the audience by env var, not by message content.
+async function postSlack(webhookUrl, text) {
+  if (!webhookUrl) return
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+  } catch (err) {
+    console.error('[slack] webhook post failed:', err.message)
+  }
+}
+
+// Sent to the team channel when a creator finishes onboarding. Matt sees this
+// and reviews the request on /creators before approving.
+async function pingSampleRequested(creator) {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL
+  if (!webhookUrl) return
+  const mention = process.env.SLACK_USER_ID_MATT ? `<@${process.env.SLACK_USER_ID_MATT}> ` : ''
+  const appUrl = process.env.APP_BASE_URL || ''
+  const reviewLink = appUrl ? `\n\nReview & approve → ${appUrl}/creators` : ''
+  const lines = [
+    `${mention}🎬 *New Creator Sample Request*`,
+    `Creator: *${creator.name || '(unnamed)'}*${creator.instagramHandle ? ` · ${creator.instagramHandle}` : ''}`,
+    `Race: ${creator.raceName || 'Unknown'}${creator.raceYear ? ` ${creator.raceYear}` : ''}`,
+    `Print: ${creator.productSize || '—'} · ${creator.frameType || '—'}`,
+    `Ships to: ${[creator.shippingCity, creator.shippingState].filter(Boolean).join(', ') || 'address on file'}`,
+    reviewLink,
+  ].filter(Boolean)
+  await postSlack(webhookUrl, lines.join('\n'))
+}
+
+// DM'd to Elí (via SLACK_ELI_DM_WEBHOOK_URL) once Matt clicks Approve. We
+// inline everything he needs to manually mirror this into Artelo: full
+// shipping address, race, print spec, runner details, contact info — so he
+// doesn't have to log into the dashboard to fulfill.
+async function pingSampleApprovedToEli(creator, order) {
+  const webhookUrl = process.env.SLACK_ELI_DM_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
+  if (!webhookUrl) return
+
+  const fullAddress = [
+    creator.shippingName || creator.name,
+    creator.shippingAddress1,
+    creator.shippingAddress2,
+    [creator.shippingCity, creator.shippingState, creator.shippingZip].filter(Boolean).join(', '),
+    creator.shippingCountry || 'US',
+  ].filter(Boolean).join('\n')
+
+  const runnerDetails = [
+    creator.bibNumber ? `Bib #${creator.bibNumber}` : null,
+    creator.finishTime ? `Time: ${creator.finishTime}` : null,
+  ].filter(Boolean).join(' · ')
+
+  const lines = [
+    `🎁 *New Creator Sample to Build* — ${order.orderNumber}`,
+    `Please create this order manually in Artelo.`,
+    ``,
+    `*Creator:* ${creator.name || '(unnamed)'}${creator.instagramHandle ? ` · ${creator.instagramHandle}` : ''}`,
+    creator.email ? `*Email:* ${creator.email}` : null,
+    ``,
+    `*Race:* ${creator.raceName || 'Unknown'}${creator.raceYear ? ` ${creator.raceYear}` : ''}`,
+    runnerDetails ? `*Runner:* ${runnerDetails}` : null,
+    `*Print:* ${creator.productSize || '—'} · ${creator.frameType || '—'}`,
+    ``,
+    `*Ship to:*`,
+    '```',
+    fullAddress || '(no address on file)',
+    '```',
+  ].filter(Boolean)
+  await postSlack(webhookUrl, lines.join('\n'))
 }
 
 // Helper — create the Standard Order that Elí will fulfill as the creator's
@@ -1140,28 +1222,10 @@ async function handleApproveCreatorSample({ creatorId }, res) {
     data: { status: 'active' }
   })
 
-  // Slack ping — best-effort. Don't block the approval on webhook failure.
-  const webhookUrl = process.env.SLACK_WEBHOOK_URL
-  if (webhookUrl) {
-    try {
-      const lines = [
-        `🎁 *New Creator Sample Order* — ${order.orderNumber}`,
-        `Creator: ${creator.name || '(unnamed)'}${creator.instagramHandle ? ` · ${creator.instagramHandle}` : ''}`,
-        `Race: ${creator.raceName || 'Unknown'}${creator.raceYear ? ` ${creator.raceYear}` : ''}`,
-        `Print: ${creator.productSize || '—'} · ${creator.frameType || '—'}`,
-        `Shipping to: ${[creator.shippingCity, creator.shippingState].filter(Boolean).join(', ') || 'address on file'}`,
-        ``,
-        `Open Dashboard → find *${order.orderNumber}* in the Standard queue for full shipping address.`,
-      ]
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: lines.join('\n') }),
-      })
-    } catch (err) {
-      console.error('[actions/approve-creator-sample] Slack ping failed:', err.message)
-    }
-  }
+  // Slack — DM Elí with everything he needs to manually build the order in
+  // Artelo. We send the full address and contact details inline so he doesn't
+  // have to context-switch into the dashboard. Best-effort; non-blocking.
+  await pingSampleApprovedToEli(creator, order)
 
   console.log(`[actions/approve-creator-sample] Approved ${creatorId} → order ${order.orderNumber}`)
   return res.status(200).json({ success: true, orderNumber: order.orderNumber })
