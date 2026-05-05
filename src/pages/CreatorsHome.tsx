@@ -39,6 +39,9 @@ interface Creator {
     orderNumber: string
     status: string
     createdAt: string
+    trackingNumber?: string | null
+    trackingCarrier?: string | null
+    shippedAt?: string | null
   } | null
   briefAssignments?: Array<{ brief: BriefLite }>
   // Internal-only: per-creator sample COGS based on size + frame.
@@ -97,31 +100,35 @@ function formatUsd(n: number) {
 function Tile({
   icon,
   label,
+  shortLabel,
   value,
   subLabel,
   placeholder = false,
 }: {
   icon: React.ReactNode
   label: string
+  shortLabel?: string  // Used on mobile when the full label is too long
   value: string | number
   subLabel?: string
   placeholder?: boolean
 }) {
   return (
-    <div className={`relative bg-white border rounded-md p-4 md:p-5 ${
+    <div className={`relative bg-white border rounded-md p-3 md:p-5 ${
       placeholder ? 'border-dashed border-off-black/20' : 'border-border-gray shadow-sm'
     }`}>
-      <div className="flex items-center gap-2 text-off-black/50 mb-2">
-        {icon}
-        <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
+      <div className="flex items-center gap-1.5 md:gap-2 text-off-black/50 mb-1.5 md:mb-2">
+        <span className="hidden md:inline-flex">{icon}</span>
+        <span className="text-[10px] md:text-xs font-semibold uppercase tracking-tight md:tracking-wider leading-tight">
+          {shortLabel ? <><span className="md:hidden">{shortLabel}</span><span className="hidden md:inline">{label}</span></> : label}
+        </span>
       </div>
-      <div className={`text-2xl md:text-3xl font-bold ${placeholder ? 'text-off-black/30' : 'text-off-black'}`}>
+      <div className={`text-xl md:text-3xl font-bold ${placeholder ? 'text-off-black/30' : 'text-off-black'}`}>
         {value}
       </div>
-      {subLabel && <div className="text-xs text-off-black/50 mt-1">{subLabel}</div>}
+      {subLabel && <div className="text-[10px] md:text-xs text-off-black/50 mt-1 hidden md:block">{subLabel}</div>}
       {placeholder && (
         <span
-          className="absolute top-2 right-2 px-1.5 py-0.5 bg-off-black/5 text-off-black/40 text-[9px] font-medium rounded uppercase tracking-wider"
+          className="absolute top-2 right-2 px-1.5 py-0.5 bg-off-black/5 text-off-black/40 text-[9px] font-medium rounded uppercase tracking-wider hidden md:inline"
           title="Placeholder value — real metric lands in a later phase"
         >
           Placeholder
@@ -140,6 +147,7 @@ export default function CreatorsHome() {
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null)
   const [showInvite, setShowInvite] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [decliningId, setDecliningId] = useState<string | null>(null)
 
   const loadAll = useCallback(async () => {
     try {
@@ -176,6 +184,27 @@ export default function CreatorsHome() {
     !(c.status === 'onboarded' && !c.sampleOrder)
   )
 
+  const handleDeclineSample = async (creator: Creator) => {
+    if (!confirm(`Decline sample request from ${creator.name || 'this creator'}? They'll be paused — no fulfillment order will be created.`)) return
+    setDecliningId(creator.id)
+    try {
+      const res = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'decline-creator-sample', creatorId: creator.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Decline failed: ${res.status}`)
+      }
+      await loadAll()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to decline')
+    } finally {
+      setDecliningId(null)
+    }
+  }
+
   const handleApproveSample = async (creator: Creator) => {
     setApprovingId(creator.id)
     try {
@@ -197,7 +226,7 @@ export default function CreatorsHome() {
   }
 
   return (
-    <div className="min-h-screen bg-off-white">
+    <div className="min-h-screen bg-[#F0F0F0]">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -211,15 +240,15 @@ export default function CreatorsHome() {
           <div className="flex items-center gap-2">
             <Link
               to="/briefs"
-              className="px-3 py-2 text-xs md:text-sm font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded-md transition-colors"
+              className="px-3 py-1.5 text-xs md:text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
             >
-              Briefs →
+              Briefs
             </Link>
             <Link
               to="/"
-              className="px-3 py-2 text-xs md:text-sm font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded-md transition-colors"
+              className="px-3 py-1.5 text-xs md:text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
             >
-              ← Fulfillment
+              Fulfillment
             </Link>
           </div>
         </div>
@@ -239,10 +268,11 @@ export default function CreatorsHome() {
         {/* Metric tiles */}
         {metrics && !isLoading && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+            <div className="grid grid-cols-3 gap-2 md:gap-4">
               <Tile
                 icon={<TrendingUp className="w-4 h-4" />}
-                label="Active Creators Onboarded This Month"
+                label="New Creators This Month"
+                shortLabel="New This Mo."
                 value={metrics.creators.onboardedThisMonth}
                 subLabel={`${metrics.creators.total} total in program`}
               />
@@ -259,6 +289,7 @@ export default function CreatorsHome() {
               <Tile
                 icon={<DollarSign className="w-4 h-4" />}
                 label="Spent on Samples"
+                shortLabel="Spent"
                 value={formatUsd(metrics.samples.costEstimatedUsd)}
                 subLabel="COGS by size + frame"
                 placeholder={metrics.samples.costIsPlaceholder}
@@ -301,17 +332,30 @@ export default function CreatorsHome() {
                           )}
                         </div>
                       </button>
-                      <button
-                        onClick={() => handleApproveSample(c)}
-                        disabled={approvingId === c.id}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-40 whitespace-nowrap"
-                      >
-                        {approvingId === c.id ? (
-                          <><Loader2 className="w-3 h-3 animate-spin" /> Approving…</>
-                        ) : (
-                          <><Send className="w-3 h-3" /> Approve & notify Elí</>
-                        )}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleDeclineSample(c)}
+                          disabled={decliningId === c.id || approvingId === c.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-border-gray hover:bg-off-black/5 text-off-black/70 text-xs font-medium rounded transition-colors disabled:opacity-40 whitespace-nowrap"
+                        >
+                          {decliningId === c.id ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" /> Declining…</>
+                          ) : (
+                            <><X className="w-3 h-3" /> Decline</>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleApproveSample(c)}
+                          disabled={approvingId === c.id || decliningId === c.id}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-40 whitespace-nowrap"
+                        >
+                          {approvingId === c.id ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" /> Approving…</>
+                          ) : (
+                            <><Send className="w-3 h-3" /> Approve & notify Elí</>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -770,6 +814,18 @@ function CreatorDrawer({
               />
               <StaticRow label="Order" value={creator.sampleOrder?.orderNumber || 'Not yet created'} />
               <StaticRow label="Status" value={sampleStatusLabel(creator.sampleOrder?.status).label} />
+              {creator.sampleOrder && (
+                <TrackingField
+                  creatorId={creator.id}
+                  initialNumber={creator.sampleOrder.trackingNumber || ''}
+                  initialCarrier={creator.sampleOrder.trackingCarrier || ''}
+                  shippedAt={creator.sampleOrder.shippedAt || null}
+                  onSaved={(updated) => onSaved({
+                    ...creator,
+                    sampleOrder: creator.sampleOrder ? { ...creator.sampleOrder, ...updated } : creator.sampleOrder,
+                  })}
+                />
+              )}
             </Section>
 
             <Section title="Commission">
@@ -944,6 +1000,92 @@ function StaticRow({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between items-center text-sm">
       <span className="text-off-black/60">{label}</span>
       <span className="text-off-black/80 font-medium">{value}</span>
+    </div>
+  )
+}
+
+// Inline tracking-number editor in the creator drawer. Saving a non-empty
+// number sets `shippedAt` server-side and lights up the "Shipped" stage in
+// the creator portal. Clearing the number reverts to "Approved".
+function TrackingField({
+  creatorId,
+  initialNumber,
+  initialCarrier,
+  shippedAt,
+  onSaved,
+}: {
+  creatorId: string
+  initialNumber: string
+  initialCarrier: string
+  shippedAt: string | null
+  onSaved: (updated: { trackingNumber: string | null; trackingCarrier: string | null; shippedAt: string | null }) => void
+}) {
+  const [number, setNumber] = useState(initialNumber)
+  const [carrier, setCarrier] = useState(initialCarrier)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const isDirty = number !== initialNumber || carrier !== initialCarrier
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      const res = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set-creator-sample-tracking',
+          creatorId,
+          trackingNumber: number,
+          trackingCarrier: carrier,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Save failed: ${res.status}`)
+      }
+      const { order } = await res.json()
+      onSaved({
+        trackingNumber: order.trackingNumber,
+        trackingCarrier: order.trackingCarrier,
+        shippedAt: order.shippedAt,
+      })
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to save tracking')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="pt-2 border-t border-border-gray">
+      <Label>Tracking{shippedAt && <span className="text-emerald-700 ml-2 normal-case">· marked shipped {new Date(shippedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}</Label>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={carrier}
+          onChange={(e) => setCarrier(e.target.value)}
+          placeholder="Carrier (USPS, UPS…)"
+          className="w-32 px-2.5 py-1.5 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+        />
+        <input
+          type="text"
+          value={number}
+          onChange={(e) => setNumber(e.target.value)}
+          placeholder="Tracking number"
+          className="flex-1 px-2.5 py-1.5 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+        />
+        <button
+          onClick={handleSave}
+          disabled={!isDirty || isSaving}
+          className="px-3 py-1.5 bg-off-black text-white text-xs font-medium rounded hover:opacity-90 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center gap-1"
+        >
+          {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+          Save
+        </button>
+      </div>
+      <p className="text-[10px] text-off-black/40 mt-1">
+        Saving a tracking number marks the sample as <strong>Shipped</strong> in the creator's portal.
+      </p>
     </div>
   )
 }

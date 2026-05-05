@@ -134,6 +134,10 @@ export default async function handler(req, res) {
         return await handleCreatorOnboard(body, res)
       case 'approve-creator-sample':
         return await handleApproveCreatorSample(body, res)
+      case 'decline-creator-sample':
+        return await handleDeclineCreatorSample(body, res)
+      case 'set-creator-sample-tracking':
+        return await handleSetCreatorSampleTracking(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -786,7 +790,10 @@ async function handleListCreators(res) {
     orderBy: { invitedAt: 'desc' },
     include: {
       sampleOrder: {
-        select: { id: true, orderNumber: true, status: true, createdAt: true }
+        select: {
+          id: true, orderNumber: true, status: true, createdAt: true,
+          trackingNumber: true, trackingCarrier: true, shippedAt: true,
+        }
       },
       briefAssignments: {
         include: { brief: { select: { id: true, title: true, status: true } } }
@@ -835,7 +842,10 @@ async function handleUpdateCreator({ creatorId, updates }, res) {
     data,
     include: {
       sampleOrder: {
-        select: { id: true, orderNumber: true, status: true, createdAt: true }
+        select: {
+          id: true, orderNumber: true, status: true, createdAt: true,
+          trackingNumber: true, trackingCarrier: true, shippedAt: true,
+        }
       }
     }
   })
@@ -946,7 +956,10 @@ async function handleCreatorPortalData(token, res) {
         orderBy: { assignedAt: 'asc' }
       },
       sampleOrder: {
-        select: { id: true, orderNumber: true, status: true, createdAt: true }
+        select: {
+          id: true, orderNumber: true, status: true, createdAt: true,
+          trackingNumber: true, trackingCarrier: true, shippedAt: true,
+        }
       }
     }
   })
@@ -1152,4 +1165,52 @@ async function handleApproveCreatorSample({ creatorId }, res) {
 
   console.log(`[actions/approve-creator-sample] Approved ${creatorId} → order ${order.orderNumber}`)
   return res.status(200).json({ success: true, orderNumber: order.orderNumber })
+}
+
+// --- decline-creator-sample ---
+// Admin clicks "Decline" on a Sample Request. Resets creator back to invited status.
+async function handleDeclineCreatorSample({ creatorId }, res) {
+  if (!creatorId) return res.status(400).json({ error: 'creatorId is required' })
+
+  const creator = await prisma.creator.findUnique({ where: { id: creatorId } })
+  if (!creator) return res.status(404).json({ error: 'Creator not found' })
+  if (creator.sampleOrderId) return res.status(400).json({ error: 'Sample already approved — cannot decline' })
+
+  await prisma.creator.update({
+    where: { id: creatorId },
+    data: { status: 'paused' }
+  })
+
+  console.log(`[actions/decline-creator-sample] Declined sample for ${creatorId} (${creator.name || 'unnamed'})`)
+  return res.status(200).json({ success: true })
+}
+
+// --- set-creator-sample-tracking ---
+// Admin pastes a tracking # in the creator drawer. Setting it = "shipped"
+// in the creator portal (no separate status flip). Empty string clears it.
+async function handleSetCreatorSampleTracking({ creatorId, trackingNumber, trackingCarrier }, res) {
+  if (!creatorId) return res.status(400).json({ error: 'creatorId is required' })
+
+  const creator = await prisma.creator.findUnique({
+    where: { id: creatorId },
+    select: { sampleOrderId: true }
+  })
+  if (!creator) return res.status(404).json({ error: 'Creator not found' })
+  if (!creator.sampleOrderId) return res.status(400).json({ error: 'No sample order yet — approve first' })
+
+  const trimmed = (trackingNumber || '').trim()
+  const carrier = (trackingCarrier || '').trim()
+
+  const order = await prisma.order.update({
+    where: { id: creator.sampleOrderId },
+    data: {
+      trackingNumber: trimmed || null,
+      trackingCarrier: carrier || null,
+      shippedAt: trimmed ? new Date() : null,
+    },
+    select: { orderNumber: true, trackingNumber: true, trackingCarrier: true, shippedAt: true }
+  })
+
+  console.log(`[actions/set-creator-sample-tracking] ${creatorId} → ${trimmed || '(cleared)'}`)
+  return res.status(200).json({ success: true, order })
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, Plus, X, FileText, Archive, Users } from 'lucide-react'
+import { Loader2, Plus, X, FileText, Archive, Users, Link as LinkIcon } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
 type BriefStatus = 'active' | 'archived'
@@ -296,12 +296,9 @@ function BriefEditor({ brief, onClose, onSaved }: {
               </div>
             </div>
 
-            <FieldText
-              label="Top-Performing References"
+            <ReferencesField
               value={draft.examplesNotes}
               onChange={(v) => setDraft({ ...draft, examplesNotes: v })}
-              multiline
-              placeholder={`Paste URLs of the best-performing videos in this style — one per line.\nAdd a short note on why each one works.\nThese are the 'show them what's worked' for creators to study.`}
             />
 
             <div>
@@ -369,6 +366,110 @@ function FieldText({ label, value, onChange, multiline, placeholder, autoFocus }
           className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
         />
       )}
+    </div>
+  )
+}
+
+// Top-performing references — list of {url, note} rows. Persisted as a single
+// string in `examplesNotes`, one row per line, formatted as `URL` or `URL — note`.
+type Reference = { url: string; note: string }
+
+function parseReferences(raw: string | null): Reference[] {
+  if (!raw) return []
+  return raw
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const urlMatch = line.match(/https?:\/\/\S+/)
+      if (urlMatch) {
+        const url = urlMatch[0]
+        const rest = line.replace(url, '').replace(/^[\s—–-]+/, '').trim()
+        return { url, note: rest }
+      }
+      return { url: '', note: line }
+    })
+}
+
+function serializeReferences(refs: Reference[]): string {
+  return refs
+    .map(r => {
+      const url = r.url.trim()
+      const note = r.note.trim()
+      if (url && note) return `${url} — ${note}`
+      return url || note
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function ReferencesField({ value, onChange }: {
+  value: string | null
+  onChange: (v: string) => void
+}) {
+  const [refs, setRefs] = useState<Reference[]>(() => {
+    const parsed = parseReferences(value)
+    return parsed.length > 0 ? parsed : [{ url: '', note: '' }]
+  })
+
+  const update = (next: Reference[]) => {
+    setRefs(next)
+    onChange(serializeReferences(next))
+  }
+
+  const updateRow = (i: number, patch: Partial<Reference>) => {
+    update(refs.map((r, idx) => idx === i ? { ...r, ...patch } : r))
+  }
+
+  const addRow = () => update([...refs, { url: '', note: '' }])
+  const removeRow = (i: number) => {
+    const next = refs.filter((_, idx) => idx !== i)
+    update(next.length > 0 ? next : [{ url: '', note: '' }])
+  }
+
+  return (
+    <div>
+      <Label>Top-Performing References</Label>
+      <div className="space-y-2">
+        {refs.map((r, i) => (
+          <div key={i} className="flex items-start gap-2">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-2">
+              <div className="relative">
+                <LinkIcon className="w-3.5 h-3.5 text-off-black/30 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="url"
+                  value={r.url}
+                  onChange={(e) => updateRow(i, { url: e.target.value })}
+                  placeholder="https://…"
+                  className="w-full pl-8 pr-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                />
+              </div>
+              <input
+                type="text"
+                value={r.note}
+                onChange={(e) => updateRow(i, { note: e.target.value })}
+                placeholder="Why it works (optional)"
+                className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => removeRow(i)}
+              className="p-2 text-off-black/40 hover:text-off-black hover:bg-off-black/5 rounded transition-colors"
+              aria-label="Remove reference"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={addRow}
+        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-off-black/60 hover:text-off-black transition-colors"
+      >
+        <Plus className="w-3.5 h-3.5" /> Add reference
+      </button>
     </div>
   )
 }

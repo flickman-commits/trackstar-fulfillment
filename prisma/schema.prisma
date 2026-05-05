@@ -48,6 +48,13 @@ model Order {
   proofSentAt        DateTime? // When proofs were last sent to customer (for follow-up tracking)
   designerNote       String?   // Optional note from designer sent with proofs (shown in approval portal)
 
+  // Shipping. Currently used by creator-sample orders to surface a real
+  // "shipped" signal in the creator portal (status='completed' means "sent to
+  // production", which is not the same as out-the-door).
+  trackingNumber     String?
+  trackingCarrier    String?   // Free-text: "USPS", "UPS", "FedEx", etc.
+  shippedAt          DateTime?
+
   // Manual override fields (for customer corrections)
   yearOverride       Int?      // Override for raceYear
   raceNameOverride   String?   // Override for raceName

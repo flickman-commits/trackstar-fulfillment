@@ -43,6 +43,16 @@ interface PortalCreator {
   onboardedAt: string | null
 }
 
+interface PortalCreatorSampleOrder {
+  id: string
+  orderNumber: string
+  status: string
+  createdAt: string
+  trackingNumber: string | null
+  trackingCarrier: string | null
+  shippedAt: string | null
+}
+
 interface RaceOption {
   id: number
   raceName: string
@@ -52,7 +62,7 @@ interface RaceOption {
 interface PortalData {
   creator: PortalCreator
   briefs: PortalBrief[]
-  sampleOrder: { id: string; orderNumber: string; status: string; createdAt: string } | null
+  sampleOrder: PortalCreatorSampleOrder | null
   races: RaceOption[]
 }
 
@@ -558,7 +568,16 @@ function CreatorDashboard({ data }: { data: PortalData }) {
         {/* Sample tracker — Domino's-style */}
         <div className="bg-white border border-border-gray rounded-md p-5 mb-5">
           <h2 className="text-sm font-semibold text-off-black mb-4">Your Sample</h2>
-          <SampleTracker order={sampleOrder} />
+          <SampleTracker order={sampleOrder} onboardedAt={creator.onboardedAt} />
+          {sampleOrder?.trackingNumber && (
+            <div className="mt-4 pt-4 border-t border-border-gray flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              <span className="text-off-black/50 uppercase tracking-wider font-semibold">Tracking</span>
+              {sampleOrder.trackingCarrier && (
+                <span className="text-off-black/70">{sampleOrder.trackingCarrier}</span>
+              )}
+              <span className="font-mono text-off-black">{sampleOrder.trackingNumber}</span>
+            </div>
+          )}
         </div>
 
         {/* Briefs */}
@@ -606,12 +625,20 @@ function CreatorDashboard({ data }: { data: PortalData }) {
   )
 }
 
-// Domino's-style 4-stage tracker. Stages map to the order lifecycle:
-//   Requested  → sample order exists (always done if we got here)
-//   Approved   → status moved past 'pending' (i.e. ready/completed/flagged-and-recovered)
-//   Shipped    → status === 'completed' (currently our terminal "out the door" state)
-//   Delivered  → no signal in DB yet; reserved for future
-function SampleTracker({ order }: { order: { status: string; createdAt: string } | null }) {
+// Domino's-style 4-stage tracker. Each stage reads from independent signals,
+// not Order.status — that field is for internal fulfillment, not the creator
+// view. Mapping:
+//   Requested  → creator submitted onboarding (`onboardedAt` set)
+//   Approved   → admin clicked Approve → fulfillment order exists
+//   Shipped    → admin entered a tracking number
+//   Delivered  → not wired yet (carrier API or manual, future)
+function SampleTracker({
+  order,
+  onboardedAt,
+}: {
+  order: PortalCreatorSampleOrder | null
+  onboardedAt: string | null
+}) {
   const stages = [
     { key: 'requested', label: 'Requested', Icon: ClipboardList },
     { key: 'approved',  label: 'Approved',  Icon: CheckCircle2 },
@@ -619,12 +646,11 @@ function SampleTracker({ order }: { order: { status: string; createdAt: string }
     { key: 'delivered', label: 'Delivered', Icon: Home },
   ] as const
 
-  const status = order?.status
   const stageIndex = (() => {
-    if (!order) return -1
-    if (status === 'completed') return 2 // shipped
-    if (status && status !== 'pending') return 1 // approved (ready/flagged etc)
-    return 0 // just requested
+    if (order?.trackingNumber) return 2 // shipped
+    if (order) return 1                 // approved
+    if (onboardedAt) return 0           // requested
+    return -1                           // pre-onboarding
   })()
 
   return (
@@ -739,7 +765,7 @@ function BriefCard({ brief, hideTitle = false }: { brief: PortalBrief; hideTitle
       )}
       {brief.examplesNotes && (
         <Box label="Top-performing references">
-          <pre className="whitespace-pre-wrap text-sm text-off-black/80 font-sans leading-relaxed">{brief.examplesNotes}</pre>
+          <ReferenceList raw={brief.examplesNotes} />
         </Box>
       )}
     </div>
@@ -760,6 +786,46 @@ function Box({ label, children }: { label: string; children: React.ReactNode }) 
       <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">{label}</div>
       <div className="bg-white border border-border-gray rounded p-2.5">{children}</div>
     </div>
+  )
+}
+
+// Renders the brief's `examplesNotes` field as a list of clickable reference links.
+// Each line is parsed as `URL` or `URL — note`. Lines without URLs render as plain text
+// (legacy briefs that pre-date the structured form).
+function ReferenceList({ raw }: { raw: string }) {
+  const rows = raw
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const urlMatch = line.match(/https?:\/\/\S+/)
+      if (urlMatch) {
+        const url = urlMatch[0]
+        const note = line.replace(url, '').replace(/^[\s—–-]+/, '').trim()
+        return { url, note }
+      }
+      return { url: '', note: line }
+    })
+
+  return (
+    <ul className="space-y-1.5 text-sm">
+      {rows.map((r, i) => (
+        <li key={i} className="text-off-black/80 leading-relaxed">
+          {r.url ? (
+            <a
+              href={r.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#4F2DD4] hover:underline break-all font-medium"
+            >
+              {r.url}
+            </a>
+          ) : null}
+          {r.url && r.note ? <span className="text-off-black/40"> — </span> : null}
+          {r.note ? <span>{r.note}</span> : null}
+        </li>
+      ))}
+    </ul>
   )
 }
 
