@@ -20,6 +20,11 @@ function normalizeTime(t) {
   return String(t).replace(/^0+/, '').replace(/^:/, '').trim()
 }
 
+function normalizePace(p) {
+  if (!p) return ''
+  return String(p).trim().replace(/\/(mi|mile|km)$/i, '').trim()
+}
+
 async function main() {
   console.log(`\nRunning ${CHIP_TIME_FIXTURES.length} chip-time fixtures...\n`)
 
@@ -33,6 +38,8 @@ async function main() {
       const result = await scraper.searchRunner(fx.runner)
       const got = normalizeTime(result.officialTime)
       const want = normalizeTime(fx.expectedChipTime)
+      const gotPace = normalizePace(result.officialPace)
+      const wantPace = normalizePace(fx.expectedChipPace)
 
       if (!result.found) {
         console.log('❌ NOT_FOUND')
@@ -40,11 +47,14 @@ async function main() {
       } else if (got !== want) {
         console.log(`❌ TIME_MISMATCH (got ${got}, expected ${want})`)
         results.push({ ...fx, pass: false, reason: `Time mismatch: got ${got}, expected ${want}` })
+      } else if (fx.expectedChipPace && gotPace !== wantPace) {
+        console.log(`❌ PACE_MISMATCH (got ${gotPace || '<empty>'}, expected ${wantPace}) — likely gun-pace regression`)
+        results.push({ ...fx, pass: false, reason: `Pace mismatch: got ${gotPace}, expected ${wantPace}` })
       } else if (fx.expectedBib && result.bibNumber !== fx.expectedBib) {
         console.log(`❌ BIB_MISMATCH (got ${result.bibNumber}, expected ${fx.expectedBib})`)
         results.push({ ...fx, pass: false, reason: `Bib mismatch: got ${result.bibNumber}, expected ${fx.expectedBib}` })
       } else {
-        console.log(`✅ ${got}`)
+        console.log(`✅ ${got} @ ${gotPace || '?'}/mi`)
         results.push({ ...fx, pass: true })
       }
     } catch (err) {
