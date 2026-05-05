@@ -56,6 +56,17 @@ export const CHIP_TIME_FIXTURES = [
     notes: 'Tokyo 2025 men\'s winner — verifies net (chip) time, NOT gross (gun)',
   },
 
+  // ── Athlinks (Orange County) ──────────────────────────────────────────
+  {
+    platform: 'athlinks',
+    race: 'Orange County Marathon',
+    year: 2025,
+    runner: 'Xavier Smith',
+    expectedChipTime: '2:23:41',
+    expectedBib: '3',
+    notes: 'OC 2025 men\'s winner — verifies Athlinks Search API + course filter (marathon vs half)',
+  },
+
   // ── MultiSport Australia (Sydney) ─────────────────────────────────────
   {
     platform: 'multisport-australia',

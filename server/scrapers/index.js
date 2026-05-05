@@ -17,6 +17,7 @@ import { ScoreThisScraper } from './platforms/ScoreThisScraper.js'
 import { BrookseeScraper } from './platforms/BrookseeScraper.js'
 import { TokyoMarathonScraper } from './platforms/TokyoMarathonScraper.js'
 import { MultiSportAustraliaScraper } from './platforms/MultiSportAustraliaScraper.js'
+import { AthlinksScraper } from './platforms/AthlinksScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -41,6 +42,7 @@ import berlinConfig from './configs/berlin.js'
 import tokyoConfig from './configs/tokyo.js'
 import sydneyConfig from './configs/sydney.js'
 import pittsburghConfig from './configs/pittsburgh.js'
+import orangeCountyConfig from './configs/orangeCounty.js'
 import bostonConfig from './configs/boston.js'
 import illinoisConfig from './configs/illinois.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
@@ -61,6 +63,7 @@ const PLATFORM_MAP = {
   brooksee: BrookseeScraper,
   tokyo: TokyoMarathonScraper,
   'multisport-australia': MultiSportAustraliaScraper,
+  athlinks: AthlinksScraper,
 }
 
 /**
@@ -91,6 +94,7 @@ const ALL_CONFIGS = [
   tokyoConfig,
   sydneyConfig,
   pittsburghConfig,
+  orangeCountyConfig,
 ]
 
 /**
