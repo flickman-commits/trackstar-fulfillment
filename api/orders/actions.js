@@ -707,9 +707,19 @@ async function handleCreateRacePartner({ partnerName, raceYear, contactName, con
 
 // --- creator-home-metrics ---
 // Aggregates the homepage tiles for /creators.
-// Sample-cost is a placeholder for now (user will provide real per-size pricing
-// later). Marking the metric as PLACEHOLDER on the frontend is handled there.
-const PLACEHOLDER_SAMPLE_COST_USD = 50 // TODO: replace with per-size/frame lookup
+
+// Internal-only sample COGS by size + frame. Do not surface to creators.
+// Source: 2026 vendor pricing from Matt.
+const SAMPLE_COST_USD = {
+  '8x10':  { unframed: 10.40, framed: 31.94 },
+  '12x18': { unframed: 13.42, framed: 44.81 },
+}
+function sampleCostUsd(size, frame) {
+  const sizeRow = SAMPLE_COST_USD[size]
+  if (!sizeRow) return 0
+  const isFramed = frame && frame !== 'Unframed'
+  return isFramed ? sizeRow.framed : sizeRow.unframed
+}
 
 async function handleCreatorHomeMetrics(res) {
   // Run aggregations in parallel
@@ -740,7 +750,10 @@ async function handleCreatorHomeMetrics(res) {
 
   const samplesShipped = sampleOrders.filter(o => o.status === 'completed').length
   const samplesPending = sampleOrders.length - samplesShipped
-  const samplesCostEstimatedUsd = sampleOrders.length * PLACEHOLDER_SAMPLE_COST_USD
+  const samplesCostEstimatedUsd = sampleOrders.reduce(
+    (sum, o) => sum + sampleCostUsd(o.productSize, o.frameType),
+    0
+  )
 
   return res.status(200).json({
     creators: {
@@ -756,7 +769,7 @@ async function handleCreatorHomeMetrics(res) {
       shipped: samplesShipped,
       pending: samplesPending,
       costEstimatedUsd: samplesCostEstimatedUsd,
-      costIsPlaceholder: true,
+      costIsPlaceholder: false,
     },
     // Placeholders for Week 3 when Meta + attribution land
     ads: { running: 0, isPlaceholder: true },
@@ -780,7 +793,13 @@ async function handleListCreators(res) {
       }
     }
   })
-  return res.status(200).json({ creators })
+  // Attach internal-only sample cost per creator. Drives the COGS rollup
+  // in the admin drawer; never surfaced in the creator-facing portal.
+  const enriched = creators.map(c => ({
+    ...c,
+    sampleCostUsd: sampleCostUsd(c.productSize, c.frameType),
+  }))
+  return res.status(200).json({ creators: enriched })
 }
 
 // --- update-creator ---

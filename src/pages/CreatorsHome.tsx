@@ -41,6 +41,8 @@ interface Creator {
     createdAt: string
   } | null
   briefAssignments?: Array<{ brief: BriefLite }>
+  // Internal-only: per-creator sample COGS based on size + frame.
+  sampleCostUsd?: number
   createdAt: string
   updatedAt: string
 }
@@ -258,7 +260,7 @@ export default function CreatorsHome() {
                 icon={<DollarSign className="w-4 h-4" />}
                 label="Spent on Samples"
                 value={formatUsd(metrics.samples.costEstimatedUsd)}
-                subLabel="Est. at $50/sample"
+                subLabel="COGS by size + frame"
                 placeholder={metrics.samples.costIsPlaceholder}
               />
             </div>
@@ -762,6 +764,10 @@ function CreatorDrawer({
             <Section title="Sample">
               <StaticRow label="Race" value={creator.raceName ? `${creator.raceName} ${creator.raceYear || ''}` : '—'} />
               <StaticRow label="Product" value={[creator.productSize, creator.frameType].filter(Boolean).join(' · ') || '—'} />
+              <StaticRow
+                label="Cost (COGS)"
+                value={creator.sampleCostUsd ? formatUsd(creator.sampleCostUsd) : '—'}
+              />
               <StaticRow label="Order" value={creator.sampleOrder?.orderNumber || 'Not yet created'} />
               <StaticRow label="Status" value={sampleStatusLabel(creator.sampleOrder?.status).label} />
             </Section>
