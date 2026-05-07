@@ -3,6 +3,11 @@
  * RaceRoster platform
  * Results: https://results.raceroster.com/v3/events/{eventCode}
  *
+ * Sub-events (2026):
+ *   261999 = DICK'S Sporting Goods Pittsburgh Marathon
+ *   262000 = UPMC Health Plan Pittsburgh Half Marathon
+ *   262001 = UPMC Health Plan Pittsburgh BACK Half Marathon
+ *
  * Sub-events (2025):
  *   225165 = DICK'S Sporting Goods Pittsburgh Marathon
  *   225166 = UPMC Health Plan Pittsburgh Half Marathon
@@ -31,11 +36,16 @@ export default {
   keywordRequiresMarathon: true,
   eventCodes: {
     2025: 'a3kqfszb4xt5edr9',
+    2026: '3m45g2s35y7abrk5',
   },
   subEventIds: {
     2025: {
       marathon: 225165,
       halfMarathon: 225166,
+    },
+    2026: {
+      marathon: 261999,
+      halfMarathon: 262000,
     },
   },
   /**
