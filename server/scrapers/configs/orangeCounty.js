@@ -8,6 +8,8 @@
  *   2023: 1045324
  *   2024: 1072997
  *   2025: 1107977
+ *   2026: 1130297  (live front-end is now ChronoTrack at live.chronotrack.com,
+ *                   but results still flow through to Athlinks Search API)
  *
  * Within each event, distances are split into "courses". The course names
  * vary year-to-year (e.g. "Full Marathon", "Marathon", "HOAG OC Marathon"),
@@ -53,6 +55,7 @@ export default {
     2023: 1045324,
     2024: 1072997,
     2025: 1107977,
+    2026: 1130297,
   },
   /**
    * OC Marathon is the first Sunday of May.
