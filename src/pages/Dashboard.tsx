@@ -55,7 +55,7 @@ interface Order {
   bibNumber?: string
   officialTime?: string
   officialPace?: string
-  researchStatus?: 'found' | 'not_found' | 'ambiguous' | null
+  researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | null
   researchNotes?: string
   // Weather data
   weatherTemp?: string
@@ -361,7 +361,7 @@ export default function Dashboard() {
           officialTime: order.officialTime as string | undefined,
           officialPace: order.officialPace as string | undefined,
           eventType: order.eventType as string | undefined,
-          researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | null,
+          researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | null,
           researchNotes: order.researchNotes as string | undefined,
           resultsUrl: order.resultsUrl as string | undefined,
           // Weather
@@ -807,7 +807,7 @@ export default function Dashboard() {
             officialTime: order.officialTime as string | undefined,
             officialPace: order.officialPace as string | undefined,
             eventType: order.eventType as string | undefined,
-            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | null,
+            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | null,
             researchNotes: order.researchNotes as string | undefined,
             resultsUrl: order.resultsUrl as string | undefined,
             weatherTemp: order.weatherTemp as string | undefined,
@@ -912,7 +912,7 @@ export default function Dashboard() {
             officialTime: order.officialTime as string | undefined,
             officialPace: order.officialPace as string | undefined,
             eventType: order.eventType as string | undefined,
-            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | null,
+            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | null,
             researchNotes: order.researchNotes as string | undefined,
             resultsUrl: order.resultsUrl as string | undefined,
             weatherTemp: order.weatherTemp as string | undefined,
@@ -1461,6 +1461,10 @@ Thank you!`
     if (order.status === 'missing_year') return { icon: '📅', label: 'Missing Year' }
     if (order.status === 'ready') return { icon: '✅', label: 'Ready' }
     if (order.researchStatus === 'found') return { icon: '✅', label: 'Researched' }
+    if (order.researchStatus === 'no_scraper') return { icon: '🚧', label: 'No scraper for this race' }
+    if (order.researchStatus === 'year_not_configured') return { icon: '🗓️', label: 'Year not configured' }
+    if (order.researchStatus === 'ambiguous') return { icon: '❓', label: 'Multiple matches' }
+    if (order.researchStatus === 'not_found') return { icon: '🔎', label: 'Runner not found' }
     if (order.hasScraperAvailable) return { icon: '🔍', label: 'Can Research' }
     return { icon: '⏳', label: 'Pending' }
   }
@@ -4056,19 +4060,51 @@ Thank you!`
                   {/* Research Status */}
                   {selectedOrder.researchStatus && selectedOrder.researchStatus !== 'found' && (
                     <div>
-                      <h4 className="text-xs font-semibold text-warning-amber uppercase tracking-tight mb-2">Research Status</h4>
-                      <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
-                        <p className="text-body-sm text-amber-800">
-                          {selectedOrder.researchStatus === 'not_found' && 'Runner not found in race results. Please verify the name and year.'}
-                          {selectedOrder.researchStatus === 'ambiguous' && (possibleMatchesMap[selectedOrder.orderNumber]?.length
-                            ? 'Possible matches found. Is this the right runner?'
-                            : 'Multiple runners found with this name. Manual verification needed.'
-                          )}
-                        </p>
-                        {selectedOrder.researchNotes && !possibleMatchesMap[selectedOrder.orderNumber]?.length && (
-                          <p className="text-body-sm text-amber-700 mt-2">{selectedOrder.researchNotes}</p>
-                        )}
-                      </div>
+                      {(() => {
+                        const status = selectedOrder.researchStatus
+                        // Different visual treatment per status:
+                        //   - no_scraper / year_not_configured = red (config gap, blocks fulfillment)
+                        //   - not_found / ambiguous = amber (resolvable via manual verification)
+                        const isConfigGap = status === 'no_scraper' || status === 'year_not_configured'
+                        const labelColor = isConfigGap ? 'text-red-700' : 'text-warning-amber'
+                        const boxClasses = isConfigGap
+                          ? 'bg-red-50 border border-red-200 rounded-md p-4'
+                          : 'bg-amber-50 border border-amber-200 rounded-md p-4'
+                        const textPrimary = isConfigGap ? 'text-red-800' : 'text-amber-800'
+                        const textSecondary = isConfigGap ? 'text-red-700' : 'text-amber-700'
+
+                        const heading = (status === 'no_scraper'
+                          ? '🚧 No scraper for this race'
+                          : status === 'year_not_configured'
+                            ? `🗓️ ${selectedOrder.effectiveRaceName || selectedOrder.raceName} ${selectedOrder.effectiveRaceYear || selectedOrder.raceYear} not configured yet`
+                            : 'Research Status')
+
+                        const message = (
+                          status === 'no_scraper'
+                            ? `We don't have a scraper for "${selectedOrder.effectiveRaceName || selectedOrder.raceName}". A developer needs to add one — or add this name as an alias to an existing scraper config if it should map to one.`
+                          : status === 'year_not_configured'
+                            ? `The scraper exists, but this year's event/result IDs aren't wired up yet. A developer needs to update the config so this year's runners can be looked up.`
+                          : status === 'not_found'
+                            ? 'Runner not found in race results. Please verify the name and year.'
+                          : status === 'ambiguous'
+                            ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
+                                ? 'Possible matches found. Is this the right runner?'
+                                : 'Multiple runners found with this name. Manual verification needed.')
+                          : null
+                        )
+
+                        return (
+                          <>
+                            <h4 className={`text-xs font-semibold ${labelColor} uppercase tracking-tight mb-2`}>{heading}</h4>
+                            <div className={boxClasses}>
+                              <p className={`text-body-sm ${textPrimary}`}>{message}</p>
+                              {selectedOrder.researchNotes && !possibleMatchesMap[selectedOrder.orderNumber]?.length && (
+                                <p className={`text-body-sm ${textSecondary} mt-2`}>{selectedOrder.researchNotes}</p>
+                              )}
+                            </div>
+                          </>
+                        )
+                      })()}
 
                       {/* Suggested matches with Accept buttons */}
                       {possibleMatchesMap[selectedOrder.orderNumber]?.length > 0 && (

@@ -179,9 +179,10 @@ export class BaseScraper {
   }
 
   /**
-   * Return standardized "not found" result
+   * Return standardized "not found" result.
+   * @param {string} [reason] - Optional context (e.g. "Closest match: Bob Smith (3:10:42)")
    */
-  notFoundResult() {
+  notFoundResult(reason) {
     return {
       found: false,
       bibNumber: null,
@@ -189,7 +190,31 @@ export class BaseScraper {
       officialPace: null,
       eventType: null,
       yearFound: this.year,
-      researchNotes: 'Runner not found in results'
+      // 'not_found' = runner truly not in the results page
+      researchStatus: 'not_found',
+      researchNotes: reason || `Runner not found in ${this.raceName} ${this.year} results`
+    }
+  }
+
+  /**
+   * Year exists in the scraper config space but no event/result IDs are wired
+   * up for this specific year (typical case: race just happened and we haven't
+   * added the new year yet). Distinct from "runner not found" — surfaces in the
+   * dashboard as a config-needed alert, not a missing-runner.
+   */
+  yearNotConfiguredResult(extraNote) {
+    const note = `${this.raceName} ${this.year} not configured yet — ` +
+      `event/result IDs need to be added to the scraper config.` +
+      (extraNote ? ` (${extraNote})` : '')
+    return {
+      found: false,
+      bibNumber: null,
+      officialTime: null,
+      officialPace: null,
+      eventType: null,
+      yearFound: this.year,
+      researchStatus: 'year_not_configured',
+      researchNotes: note
     }
   }
 
@@ -206,6 +231,7 @@ export class BaseScraper {
       officialPace: null,
       eventType: null,
       yearFound: this.year,
+      researchStatus: 'ambiguous',
       researchNotes: `Multiple matches found: ${matches.length} runners with similar names`
     }
   }

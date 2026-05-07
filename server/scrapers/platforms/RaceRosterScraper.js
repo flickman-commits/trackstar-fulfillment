@@ -69,17 +69,21 @@ export class RaceRosterScraper extends BaseScraper {
     const eventCode = this.config.eventCodes?.[this.year]
     if (!eventCode) {
       console.log(`[${this.tag} ${this.year}] No event code configured for this year`)
-      return {
-        ...this.notFoundResult(),
-        researchNotes: `Results not available for ${this.year}`
-      }
+      return this.yearNotConfiguredResult('missing eventCodes entry')
     }
 
     // Search across all configured sub-events in order
     const eventOrder = this.config.eventSearchOrder || ['marathon', 'halfMarathon']
+    const yearSubEvents = this.config.subEventIds?.[this.year] || {}
+
+    // If no sub-event IDs at all for this year, that's a year-not-configured case too
+    if (Object.keys(yearSubEvents).length === 0) {
+      console.log(`[${this.tag} ${this.year}] No sub-event IDs configured for this year`)
+      return this.yearNotConfiguredResult('missing subEventIds entry')
+    }
 
     for (const eventKey of eventOrder) {
-      const subEventId = this.config.subEventIds?.[this.year]?.[eventKey]
+      const subEventId = yearSubEvents[eventKey]
       if (!subEventId) continue
 
       const eventLabel = this.config.eventLabels?.[eventKey] || eventKey

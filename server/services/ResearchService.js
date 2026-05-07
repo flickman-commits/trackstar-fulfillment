@@ -39,16 +39,28 @@ export class ResearchService {
     const effectiveRaceYear = order.yearOverride ?? order.raceYear
     const effectiveRunnerName = order.runnerNameOverride ?? order.runnerName
 
-    if (!hasScraperForRace(effectiveRaceName)) {
-      throw new Error(`No scraper available for race: ${effectiveRaceName}`)
-    }
-
     if (!effectiveRunnerName) {
       throw new Error('Order is missing runner name')
     }
 
     if (!effectiveRaceYear) {
       throw new Error('Order is missing race year')
+    }
+
+    // No scraper for this race → record it as a research record with status
+    // 'no_scraper' so the dashboard can surface it clearly, AND fire a Slack
+    // alert so we know to add scraper support.
+    if (!hasScraperForRace(effectiveRaceName)) {
+      await this._notifyMissingScraper({
+        kind: 'no_scraper',
+        race: effectiveRaceName,
+        year: effectiveRaceYear,
+        orderNumber,
+        runner: effectiveRunnerName,
+      })
+      // Throw so the caller knows research couldn't run; the API endpoint
+      // converts this into a 400 response with `supportedRaces`.
+      throw new Error(`No scraper available for race: ${effectiveRaceName}`)
     }
 
     console.log(`[ResearchService] Starting research for order ${orderNumber}`)
@@ -273,9 +285,25 @@ export class ResearchService {
       officialPace: results.officialPace,
       eventType: results.eventType,
       yearFound: results.yearFound,
-      researchStatus: results.found ? 'found' : (results.ambiguous ? 'ambiguous' : 'not_found'),
+      // Pass through the scraper's specific status if it returned one (e.g.
+      // 'year_not_configured'), otherwise derive from found/ambiguous flags.
+      researchStatus: results.researchStatus
+        || (results.found ? 'found' : (results.ambiguous ? 'ambiguous' : 'not_found')),
       researchNotes: results.researchNotes,
       resultsUrl: results.resultsUrl || null
+    }
+
+    // Fire a Slack alert if the scraper exists but the year isn't configured.
+    // Don't await — fire-and-forget; we don't want notification failures to
+    // block the research record from being saved.
+    if (researchData.researchStatus === 'year_not_configured') {
+      this._notifyMissingScraper({
+        kind: 'year_not_configured',
+        race: race.raceName,
+        year: race.year,
+        orderNumber: order.orderNumber,
+        runner: runnerName,
+      }).catch(err => console.warn('[ResearchService] Slack notify failed:', err.message))
     }
 
     let research
@@ -385,6 +413,47 @@ export class ResearchService {
       where: { orderId, raceId, researchStatus: 'found' }
     })
     return !!research
+  }
+
+  /**
+   * Send a Slack alert when a scraper is missing or a year isn't configured.
+   * De-duplicates by race+year+kind so we only notify once per missing config
+   * per process (no point spamming when 30 orders for the same race come in).
+   *
+   * Goes to SLACK_DM_WEBHOOK_URL if set (Matt's DM), otherwise the proof
+   * channel webhook so it doesn't get lost.
+   */
+  async _notifyMissingScraper({ kind, race, year, orderNumber, runner }) {
+    const dedupeKey = `${kind}:${race}:${year}`
+    if (!ResearchService._notifiedKeys) ResearchService._notifiedKeys = new Set()
+    if (ResearchService._notifiedKeys.has(dedupeKey)) return
+    ResearchService._notifiedKeys.add(dedupeKey)
+
+    const slackUrl = process.env.SLACK_DM_WEBHOOK_URL || process.env.SLACK_PROOF_WEBHOOK_URL
+    if (!slackUrl) return
+
+    const heading = kind === 'no_scraper'
+      ? `🚧 *No scraper for race:* \`${race}\``
+      : `🗓️ *${race} ${year} not configured yet*`
+    const detail = kind === 'no_scraper'
+      ? `An order came in for *${race}* but we don't have a scraper for this race. Either add one (or add an alias if it should match an existing scraper).`
+      : `The ${race} scraper exists but ${year} event/result IDs aren't in the config yet. Add them so this year's runners can be looked up.`
+    const text = [
+      heading,
+      detail,
+      `Order: \`${orderNumber}\` — runner: *${runner}*`,
+    ].join('\n')
+
+    try {
+      await fetch(slackUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      console.log(`[ResearchService] Slack alert sent: ${kind} for ${race} ${year}`)
+    } catch (err) {
+      console.warn('[ResearchService] Slack alert failed:', err.message)
+    }
   }
 
   /**

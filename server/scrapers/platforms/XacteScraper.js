@@ -55,10 +55,7 @@ export class XacteScraper extends BaseScraper {
 
     if (!this.eventId) {
       console.log(`[${this.tag}] No event ID configured for year ${this.year}`)
-      return {
-        ...this.notFoundResult(),
-        researchNotes: `No event ID configured for ${this.year}`
-      }
+      return this.yearNotConfiguredResult('missing Xacte eventIds entry')
     }
 
     try {

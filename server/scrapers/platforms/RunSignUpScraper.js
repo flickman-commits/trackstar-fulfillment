@@ -53,10 +53,7 @@ export class RunSignUpScraper extends BaseScraper {
     const yearSets = this.config.resultSets?.[this.year]
     if (!yearSets) {
       console.log(`[${this.tag} ${this.year}] No result sets configured for this year`)
-      return {
-        ...this.notFoundResult(),
-        researchNotes: `Results not available for ${this.year}`
-      }
+      return this.yearNotConfiguredResult('missing resultSets entry')
     }
 
     // Try each event type in order (marathon first, then half, etc.)

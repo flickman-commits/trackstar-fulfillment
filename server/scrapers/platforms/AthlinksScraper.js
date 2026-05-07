@@ -52,10 +52,7 @@ export class AthlinksScraper extends BaseScraper {
     console.log(`${'='.repeat(50)}`)
 
     if (!this.eventId) {
-      return {
-        ...this.notFoundResult(),
-        researchNotes: `No Athlinks eventId configured for year ${this.year}`
-      }
+      return this.yearNotConfiguredResult('missing Athlinks eventIds entry')
     }
 
     try {
