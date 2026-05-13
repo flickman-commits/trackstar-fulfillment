@@ -14,7 +14,7 @@
  */
 
 import prisma from '../_lib/prisma.js'
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors } from '../_lib/auth.js'
 import crypto from 'crypto'
 
 function base64urlEncode(buffer) {
@@ -25,8 +25,14 @@ function base64urlEncode(buffer) {
 }
 
 export default async function handler(req, res) {
-  if (setCors(req, res)) return
-  if (!requireAdmin(req, res)) return
+  // This endpoint is intentionally public — it has to be browser-navigable so
+  // an admin can complete the Etsy OAuth consent flow. CSRF protection is
+  // handled by the PKCE code_verifier + state cookies (see step 2 below).
+  // The redirect_uri is locked to fast.trackstar.art at the Etsy app config
+  // level, so even if someone hits step 1, the code can only ever come back
+  // to our own callback. The worst an attacker could do is initiate a flow
+  // they can't complete (requires Matt's Etsy login to consent).
+  if (setCors(req, res, { allowPublic: true })) return
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
