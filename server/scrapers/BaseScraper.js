@@ -219,6 +219,25 @@ export class BaseScraper {
   }
 
   /**
+   * Upstream timing site is unreachable / returning 5xx / taking too long.
+   * Distinct from "runner not found" — surfaces in the dashboard as a
+   * transient infrastructure issue, not a missing-runner. Suggests "try
+   * again in a few minutes" rather than "check the spelling".
+   */
+  upstreamErrorResult(detail) {
+    return {
+      found: false,
+      bibNumber: null,
+      officialTime: null,
+      officialPace: null,
+      eventType: null,
+      yearFound: this.year,
+      researchStatus: 'upstream_error',
+      researchNotes: `${this.raceName} ${this.year} timing site is unreachable or slow${detail ? ` (${detail})` : ''}. Try again in a few minutes.`
+    }
+  }
+
+  /**
    * Return standardized "ambiguous" result (multiple matches)
    */
   ambiguousResult(matches) {

@@ -55,7 +55,7 @@ interface Order {
   bibNumber?: string
   officialTime?: string
   officialPace?: string
-  researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | null
+  researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null
   researchNotes?: string
   // Weather data
   weatherTemp?: string
@@ -361,7 +361,7 @@ export default function Dashboard() {
           officialTime: order.officialTime as string | undefined,
           officialPace: order.officialPace as string | undefined,
           eventType: order.eventType as string | undefined,
-          researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | null,
+          researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null,
           researchNotes: order.researchNotes as string | undefined,
           resultsUrl: order.resultsUrl as string | undefined,
           // Weather
@@ -807,7 +807,7 @@ export default function Dashboard() {
             officialTime: order.officialTime as string | undefined,
             officialPace: order.officialPace as string | undefined,
             eventType: order.eventType as string | undefined,
-            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | null,
+            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null,
             researchNotes: order.researchNotes as string | undefined,
             resultsUrl: order.resultsUrl as string | undefined,
             weatherTemp: order.weatherTemp as string | undefined,
@@ -912,7 +912,7 @@ export default function Dashboard() {
             officialTime: order.officialTime as string | undefined,
             officialPace: order.officialPace as string | undefined,
             eventType: order.eventType as string | undefined,
-            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | null,
+            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null,
             researchNotes: order.researchNotes as string | undefined,
             resultsUrl: order.resultsUrl as string | undefined,
             weatherTemp: order.weatherTemp as string | undefined,
@@ -1463,6 +1463,7 @@ Thank you!`
     if (order.researchStatus === 'found') return { icon: '✅', label: 'Researched' }
     if (order.researchStatus === 'no_scraper') return { icon: '🚧', label: 'No scraper for this race' }
     if (order.researchStatus === 'year_not_configured') return { icon: '🗓️', label: 'Year not configured' }
+    if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site unreachable — retry' }
     if (order.researchStatus === 'ambiguous') return { icon: '❓', label: 'Multiple matches' }
     if (order.researchStatus === 'not_found') return { icon: '🔎', label: 'Runner not found' }
     if (order.hasScraperAvailable) return { icon: '🔍', label: 'Can Research' }
@@ -4063,8 +4064,8 @@ Thank you!`
                       {(() => {
                         const status = selectedOrder.researchStatus
                         // Different visual treatment per status:
-                        //   - no_scraper / year_not_configured = red (config gap, blocks fulfillment)
-                        //   - not_found / ambiguous = amber (resolvable via manual verification)
+                        //   - no_scraper / year_not_configured = red (config gap, blocks fulfillment, dev needed)
+                        //   - upstream_error / not_found / ambiguous = amber (transient or resolvable via manual verification)
                         const isConfigGap = status === 'no_scraper' || status === 'year_not_configured'
                         const labelColor = isConfigGap ? 'text-red-700' : 'text-warning-amber'
                         const boxClasses = isConfigGap
@@ -4077,13 +4078,17 @@ Thank you!`
                           ? '🚧 No scraper for this race'
                           : status === 'year_not_configured'
                             ? `🗓️ ${selectedOrder.effectiveRaceName || selectedOrder.raceName} ${selectedOrder.effectiveRaceYear || selectedOrder.raceYear} not configured yet`
-                            : 'Research Status')
+                          : status === 'upstream_error'
+                            ? '🌐 Timing site unreachable — try again in a few minutes'
+                          : 'Research Status')
 
                         const message = (
                           status === 'no_scraper'
                             ? `We don't have a scraper for "${selectedOrder.effectiveRaceName || selectedOrder.raceName}". A developer needs to add one — or add this name as an alias to an existing scraper config if it should map to one.`
                           : status === 'year_not_configured'
                             ? `The scraper exists, but this year's event/result IDs aren't wired up yet. A developer needs to update the config so this year's runners can be looked up.`
+                          : status === 'upstream_error'
+                            ? `The timing site (e.g. Athlinks, RTRT, RaceRoster) is slow or down right now. This isn't a problem with our app or the runner's data — just retry the lookup in a couple minutes.`
                           : status === 'not_found'
                             ? 'Runner not found in race results. Please verify the name and year.'
                           : status === 'ambiguous'

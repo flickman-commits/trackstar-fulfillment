@@ -58,18 +58,57 @@ export class AthlinksScraper extends BaseScraper {
     try {
       const url = `${this.apiBase}/Events/Race/Result/Api/${this.eventId}/Search?search=${encodeURIComponent(runnerName)}`
       console.log(`[${this.tag}] GET ${url}`)
-      const resp = await fetch(url, {
-        headers: {
-          'User-Agent': USER_AGENT,
-          'Accept': 'application/json',
-          'Origin': 'https://www.athlinks.com',
-          'Referer': 'https://www.athlinks.com/'
+
+      // Athlinks (alaska.athlinks.com) is occasionally slow or returns 5xx —
+      // we set a hard timeout of 12s per attempt, retry once on 5xx/timeout,
+      // and surface a clear "upstream error" status if both attempts fail.
+      const fetchOnce = async () => {
+        const ctrl = new AbortController()
+        const t = setTimeout(() => ctrl.abort(), 12_000)
+        try {
+          return await fetch(url, {
+            signal: ctrl.signal,
+            headers: {
+              'User-Agent': USER_AGENT,
+              'Accept': 'application/json',
+              'Origin': 'https://www.athlinks.com',
+              'Referer': 'https://www.athlinks.com/'
+            }
+          })
+        } finally { clearTimeout(t) }
+      }
+
+      let resp
+      try {
+        resp = await fetchOnce()
+        if (!resp.ok && resp.status >= 500) {
+          console.log(`[${this.tag}] Got ${resp.status}, retrying once...`)
+          await new Promise(r => setTimeout(r, 1500))
+          resp = await fetchOnce()
         }
-      })
-      if (!resp.ok) {
-        console.log(`[${this.tag}] Search failed: ${resp.status}`)
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          console.log(`[${this.tag}] Timed out, retrying once...`)
+          await new Promise(r => setTimeout(r, 1500))
+          try { resp = await fetchOnce() }
+          catch (err2) {
+            return this.upstreamErrorResult(`${err2.name === 'AbortError' ? 'timed out' : err2.message} after retry`)
+          }
+        } else {
+          return this.upstreamErrorResult(err.message)
+        }
+      }
+
+      if (!resp || !resp.ok) {
+        const status = resp ? resp.status : 'no-response'
+        console.log(`[${this.tag}] Search failed after retry: ${status}`)
+        // 5xx / timeout = upstream issue. 4xx = configuration issue (e.g. wrong eventId).
+        if (!resp || resp.status >= 500) {
+          return this.upstreamErrorResult(`HTTP ${status}`)
+        }
         return this.notFoundResult()
       }
+
       const data = await resp.json()
       const courses = data?.result?.courses || []
       console.log(`[${this.tag}] ${courses.length} course(s) returned`)
