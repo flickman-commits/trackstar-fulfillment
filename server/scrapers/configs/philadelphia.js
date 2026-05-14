@@ -1,15 +1,21 @@
 /**
  * Philadelphia Marathon - MyChipTime platform
- * Results: https://www.mychiptime.com/searchevent.php?id=16897
+ * Results: https://www.mychiptime.com/searchevent.php?id={eventId}
+ *
+ * Per-year event IDs (each year is a separate MCT event, NOT shared):
+ *   2024: 16165  → "Marathon 2024"
+ *   2025: 16897  → "2025 Marathon 2025"
+ *
+ * Half marathon is a separate event ID under the same weekend.
  */
 export default {
   platform: 'mychiptime',
   raceName: 'Philadelphia Marathon',
   tag: 'Philadelphia',
   location: 'Philadelphia, PA',
-  parseMode: 'searchevent',
-  endpoint: 'searchevent.php',
-  defaultEventId: '16897',
+  parseMode: 'simple',
+  endpoint: 'searchResultGen.php',
+  defaultEventId: '16897', // latest known — fallback if year not in eventIds
   eventTypes: ['Marathon'],
   eventSearchOrder: ['marathon'],
   eventLabels: {
@@ -23,11 +29,8 @@ export default {
   keywords: ['philadelphia', 'philly'],
   keywordRequiresMarathon: true,
   eventIds: {
-    // Philadelphia uses a single event ID for all years (searchevent.php?id=16897)
-    // The site handles year filtering internally
-    2024: { marathon: '16897' },
+    2024: { marathon: '16165' },
     2025: { marathon: '16897' },
-    2026: { marathon: '16897' }
   },
   /**
    * Philadelphia Marathon is typically the third Sunday of November

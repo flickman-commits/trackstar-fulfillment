@@ -153,8 +153,9 @@ export class MyChipTimeScraper extends BaseScraper {
 
       let searchUrl, html
 
-      if (parseMode === 'columns') {
-        // searchResultGen.php style (Austin)
+      if (parseMode === 'columns' || parseMode === 'simple') {
+        // searchResultGen.php style — used by Austin (14+ col, gun+chip)
+        // and Philadelphia (5 col, single time)
         const params = new URLSearchParams({
           eID: eventId,
           fname: firstName,
@@ -162,7 +163,9 @@ export class MyChipTimeScraper extends BaseScraper {
         })
         searchUrl = `${this.baseUrl}/searchResultGen.php?${params.toString()}`
       } else {
-        // searchevent.php style (Philadelphia)
+        // searchevent.php style (legacy heuristic — kept for any race that
+        // still uses this layout; Philadelphia previously used this but it
+        // actually returned the search FORM page, not results).
         const lname = encodeURIComponent(lastName.toUpperCase())
         const fname = encodeURIComponent(firstName.toUpperCase())
         searchUrl = `${this.baseUrl}/searchevent.php?id=${eventId}&lname=${lname}&fname=${fname}`
@@ -186,7 +189,9 @@ export class MyChipTimeScraper extends BaseScraper {
       // Parse results based on mode
       const results = parseMode === 'columns'
         ? this._parseColumnsHtml(html)
-        : this._parseSearchEventHtml(html)
+        : parseMode === 'simple'
+          ? this._parseSimpleHtml(html)
+          : this._parseSearchEventHtml(html)
 
       console.log(`[${this.tag}] Found ${results.length} results`)
 
@@ -272,6 +277,89 @@ export class MyChipTimeScraper extends BaseScraper {
         genPlace:      $(cells[16])?.text()?.trim() || '',
         pace:          $(cells[17])?.text()?.trim() || '',
       })
+    })
+
+    return results
+  }
+
+  /**
+   * Parse searchResultGen.php HTML for Philadelphia Marathon (and similarly
+   * configured events). MyChipTime returns two different table shapes:
+   *
+   *   - **Compact (5 cells)** — when there are multiple matches:
+   *       Position | Bib | First Name | Last Name | Time
+   *     This response has no separate gun/chip — the single "Time" column
+   *     is chip time (MCT default).
+   *
+   *   - **Detail (14+ cells)** — when there's exactly 1 match:
+   *       Gun Time | Chip Time | Bib | First | Last | Share | Cert | Photos
+   *       | City | State | Age | Gender | Division | Class Pos | Overall
+   *       | Age | Zip | Gen Place | Total Pace | …split data
+   *
+   * We accept both. For the detail layout we prefer chip time (cells[1])
+   * and use the published pace (cells[18]).
+   */
+  _parseSimpleHtml(html) {
+    const $ = cheerio.load(html)
+    const results = []
+
+    if (html.includes('0 results returned')) {
+      console.log(`[${this.tag}] MyChipTime returned 0 results`)
+      return results
+    }
+
+    const tableEl = $('table#myTable').length
+      ? $('table#myTable')
+      : $('table').first()
+
+    tableEl.find('tbody tr, tr').each((_, row) => {
+      const cells = $(row).find('td')
+      const n = cells.length
+
+      // Detail layout: 14+ cells starting with Gun Time + Chip Time
+      if (n >= 14) {
+        const chipTime = $(cells[1]).text().trim()
+        const bib = $(cells[2]).text().trim()
+        if (!bib || isNaN(parseInt(bib))) return
+        if (!chipTime || !/\d{1,2}:\d{2}:\d{2}/.test(chipTime)) return
+
+        const firstName = $(cells[3]).text().trim()
+        const lastName = $(cells[4]).text().trim()
+        results.push({
+          gunTime:       $(cells[0]).text().trim(),
+          chipTime:      chipTime, // ALWAYS chip — never fall back to gun
+          bib:           bib,
+          firstName:     firstName,
+          lastName:      lastName,
+          fullName:      `${firstName} ${lastName}`,
+          city:          $(cells[8]).text().trim(),
+          state:         $(cells[9]).text().trim(),
+          overallPlace:  $(cells[14])?.text()?.trim() || '',
+          pace:          $(cells[18])?.text()?.trim() || '',
+        })
+        return
+      }
+
+      // Compact layout: 5 cells — single "Time" column (chip time)
+      if (n === 5) {
+        const place = $(cells[0]).text().trim()
+        const bib = $(cells[1]).text().trim()
+        const firstName = $(cells[2]).text().trim()
+        const lastName = $(cells[3]).text().trim()
+        const time = $(cells[4]).text().trim()
+        if (!bib || isNaN(parseInt(bib))) return
+        if (!time || !/\d{1,2}:\d{2}:\d{2}/.test(time)) return
+
+        results.push({
+          gunTime:       null,
+          chipTime:      time,
+          bib:           bib,
+          firstName:     firstName,
+          lastName:      lastName,
+          fullName:      `${firstName} ${lastName}`,
+          overallPlace:  place,
+        })
+      }
     })
 
     return results
