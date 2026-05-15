@@ -708,7 +708,11 @@ export async function processOrders(options = {}) {
               // Create new order for this line item
               let raceName = 'Unknown Race'
               let raceYear = new Date().getFullYear()
-              let runnerName = order.customerAddress?.name || 'Unknown Runner'
+              // Don't fall back to the shipping customer name — they're often
+              // not the same person as the runner, and silently using it
+              // hides the fact that personalization was bypassed. Leaving it
+              // as "Unknown Runner" surfaces orders that need manual lookup.
+              let runnerName = 'Unknown Runner'
               let status = 'pending'
               let lineItemShopifyData = null
               let lineItemEtsyData = null

@@ -278,8 +278,10 @@ app.post('/api/orders/import', async (req, res) => {
         const productSize = rawSize.startsWith('x') ? rawSize.slice(1) : rawSize;
         const frameType = firstItem?.product?.frameColor || 'Unknown';
 
-        // Default values
-        let runnerName = order.customerAddress?.name || 'Unknown Runner';
+        // Default values. Note: don't fall back to the shipping customer name
+        // when personalization is missing — keep it as "Unknown Runner" so
+        // bypassed-personalization orders surface for manual lookup.
+        let runnerName = 'Unknown Runner';
         let raceName = 'Unknown Race';
         let raceYear = new Date().getFullYear();
         let shopifyOrderData = null;
