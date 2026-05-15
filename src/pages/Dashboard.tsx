@@ -290,6 +290,17 @@ export default function Dashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [isResearching, setIsResearching] = useState(false)
+
+  // --- Bulk research state ---
+  // Drives the floating bottom-right progress pill + post-run summary.
+  type BulkSummary = { found: number; notFound: number; ambiguous: number; error: number; total: number; scope: string }
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const [bulkTotal, setBulkTotal] = useState(0)
+  const [bulkProcessed, setBulkProcessed] = useState(0)
+  const [bulkCounts, setBulkCounts] = useState({ found: 0, notFound: 0, ambiguous: 0, error: 0 })
+  const [bulkScope, setBulkScope] = useState('')
+  const bulkStopRef = useRef(false)
+  const [bulkSummary, setBulkSummary] = useState<BulkSummary | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
   const [healthResults, setHealthResults] = useState<any>(null)
@@ -1501,6 +1512,83 @@ export default function Dashboard() {
     return base.filter(o => matchesSearch(o, query))
   }, [completedOrders, raceFilter, searchQuery, matchesSearch])
 
+  // --- Bulk research ---
+  // Orders eligible for batch research from the *currently visible* queue.
+  // Skips: completed, missing scraper, already researched, creator/partner.
+  // Honors the active race + search filters so the user can scope a run.
+  const bulkResearchEligible = useMemo(() => {
+    return filteredOrders.filter(o =>
+      o.status !== 'completed' &&
+      o.hasScraperAvailable === true &&
+      o.researchStatus !== 'found' &&
+      (o.trackstarOrderType || 'standard') === 'standard' &&
+      (o.effectiveRaceYear || o.raceYear)
+    )
+  }, [filteredOrders])
+
+  const cancelBulkResearch = useCallback(() => {
+    bulkStopRef.current = true
+  }, [])
+
+  const runBulkResearch = useCallback(async () => {
+    if (bulkRunning) return
+    const queue = bulkResearchEligible.map(o => o.orderNumber)
+    if (queue.length === 0) return
+
+    // Confirm so a misplaced click on a huge queue doesn't surprise.
+    const scopeLabel = raceFilter || (searchQuery ? `search: ${searchQuery}` : 'all queues')
+    if (!confirm(`Research ${queue.length} order${queue.length === 1 ? '' : 's'} in ${scopeLabel}? This may take a couple minutes — you can keep working in the background.`)) return
+
+    bulkStopRef.current = false
+    setBulkRunning(true)
+    setBulkTotal(queue.length)
+    setBulkProcessed(0)
+    setBulkCounts({ found: 0, notFound: 0, ambiguous: 0, error: 0 })
+    setBulkScope(scopeLabel)
+    setBulkSummary(null)
+
+    const CHUNK_SIZE = 10
+    const tally = { found: 0, notFound: 0, ambiguous: 0, error: 0 }
+
+    for (let i = 0; i < queue.length && !bulkStopRef.current; i += CHUNK_SIZE) {
+      const chunk = queue.slice(i, i + CHUNK_SIZE)
+      try {
+        const res = await apiFetch('/api/orders/research-runner', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderNumbers: chunk }),
+        })
+        if (!res.ok) {
+          // Whole chunk failed at HTTP level — count all as errors.
+          tally.error += chunk.length
+        } else {
+          const data = await res.json()
+          for (const r of (data.batchResults || [])) {
+            if (r.error) { tally.error++; continue }
+            const status = r.runnerResearch?.researchStatus
+            if (status === 'found') tally.found++
+            else if (status === 'ambiguous') tally.ambiguous++
+            else if (status === 'not_found') tally.notFound++
+            else tally.error++
+          }
+        }
+      } catch {
+        tally.error += chunk.length
+      }
+      setBulkCounts({ ...tally })
+      setBulkProcessed(Math.min(i + chunk.length, queue.length))
+    }
+
+    setBulkRunning(false)
+    // Refresh the order list so the new research data is visible everywhere.
+    fetchOrders()
+    setBulkSummary({
+      ...tally,
+      total: queue.length,
+      scope: scopeLabel,
+    })
+  }, [bulkRunning, bulkResearchEligible, raceFilter, searchQuery, fetchOrders])
+
   // --- Keyboard navigation between orders (j/k) ---
   // When the order detail modal is open, j moves to the next order in the
   // currently visible queue and k moves to the previous one. Skipped when
@@ -1820,6 +1908,22 @@ Thank you!`
                   </select>
                   <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${raceFilter ? 'text-white' : 'text-off-black/40'}`} />
                 </div>
+                {/* Bulk-research trigger — adapts label to the active filter.
+                    Hidden in custom / race_partner views (they don't research). */}
+                {activeView === 'standard' && bulkResearchEligible.length > 0 && (
+                  <button
+                    onClick={runBulkResearch}
+                    disabled={bulkRunning}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    <FlaskConical className="w-4 h-4" />
+                    {bulkRunning
+                      ? 'Researching…'
+                      : raceFilter
+                        ? `Research ${raceFilter} (${bulkResearchEligible.length})`
+                        : `Research queue (${bulkResearchEligible.length})`}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -3072,6 +3176,87 @@ Thank you!`
         )}
 
         {/* Order Details Modal */}
+        {/* Bulk-research floating widget. Two states:
+              1) Running → live progress + Stop button
+              2) Done    → sticky summary until dismissed */}
+        {bulkRunning && (
+          <div className="fixed bottom-4 right-4 z-50 w-80 bg-white border border-border-gray rounded-lg shadow-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span className="text-sm font-semibold text-off-black">Researching {bulkScope}</span>
+              </div>
+              <button
+                onClick={cancelBulkResearch}
+                className="text-xs text-off-black/50 hover:text-off-black px-2 py-0.5 rounded hover:bg-off-black/5"
+              >
+                Stop
+              </button>
+            </div>
+            <div className="h-1.5 bg-off-black/5 rounded-full overflow-hidden mb-2">
+              <div
+                className="h-full bg-blue-600 transition-all duration-300"
+                style={{ width: bulkTotal > 0 ? `${(bulkProcessed / bulkTotal) * 100}%` : '0%' }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-off-black/60 tabular-nums">{bulkProcessed} / {bulkTotal}</span>
+              <div className="flex items-center gap-2 text-off-black/60">
+                {bulkCounts.found > 0 && <span className="text-green-700">✓ {bulkCounts.found}</span>}
+                {bulkCounts.notFound > 0 && <span className="text-warning-amber">⚠ {bulkCounts.notFound}</span>}
+                {bulkCounts.ambiguous > 0 && <span className="text-warning-amber">? {bulkCounts.ambiguous}</span>}
+                {bulkCounts.error > 0 && <span className="text-red-600">🚧 {bulkCounts.error}</span>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!bulkRunning && bulkSummary && (
+          <div className="fixed bottom-4 right-4 z-50 w-80 bg-white border border-border-gray rounded-lg shadow-xl p-4">
+            <div className="flex items-start justify-between mb-2">
+              <div className="text-sm font-semibold text-off-black">
+                Research complete
+                <span className="block text-[11px] font-normal text-off-black/50 mt-0.5">
+                  {bulkSummary.scope} · {bulkSummary.total} order{bulkSummary.total === 1 ? '' : 's'}
+                </span>
+              </div>
+              <button
+                onClick={() => setBulkSummary(null)}
+                className="text-off-black/40 hover:text-off-black p-1 -m-1 rounded hover:bg-off-black/5"
+                aria-label="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-1 text-xs">
+              {bulkSummary.found > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-green-700">✓ Researched</span>
+                  <span className="font-medium text-off-black tabular-nums">{bulkSummary.found}</span>
+                </div>
+              )}
+              {bulkSummary.notFound > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-warning-amber">⚠ Not found — needs manual lookup</span>
+                  <span className="font-medium text-off-black tabular-nums">{bulkSummary.notFound}</span>
+                </div>
+              )}
+              {bulkSummary.ambiguous > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-warning-amber">? Ambiguous — multiple matches</span>
+                  <span className="font-medium text-off-black tabular-nums">{bulkSummary.ambiguous}</span>
+                </div>
+              )}
+              {bulkSummary.error > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-red-600">🚧 Error — scraper or upstream issue</span>
+                  <span className="font-medium text-off-black tabular-nums">{bulkSummary.error}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {selectedOrder && (
           <div
             className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
