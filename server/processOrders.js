@@ -408,6 +408,23 @@ export async function processOrders(options = {}) {
     orders: []  // Details of processed orders
   }
 
+  // Load the user-defined race-name alias map once per import run. Maps
+  // variant -> canonical, e.g. "Eugene Marathon (+ Half Marathon)" -> "Eugene
+  // Marathon". Edited via the Race Database "Merge into…" action.
+  let raceNameAliases = {}
+  try {
+    const aliasRow = await prisma.systemConfig.findUnique({
+      where: { key: 'race_name_aliases' }
+    })
+    if (aliasRow?.value) raceNameAliases = JSON.parse(aliasRow.value)
+  } catch {
+    raceNameAliases = {}
+  }
+  const canonicalizeRaceName = (name) => {
+    if (!name) return name
+    return raceNameAliases[name] || name
+  }
+
   try {
     // 1. Fetch orders from Artelo
     log('\n[processOrders] Fetching orders from Artelo...')
@@ -617,7 +634,7 @@ export async function processOrders(options = {}) {
                 if (lineItem) {
                   const extracted = extractShopifyPersonalization(lineItem)
 
-                  updateData.raceName = extracted.raceName || existing.raceName
+                  updateData.raceName = canonicalizeRaceName(extracted.raceName) || existing.raceName
                   updateData.runnerName = extracted.runnerName || existing.runnerName
                   updateData.raceYear = extracted.raceYear || existing.raceYear
                   updateData.hadNoTime = extracted.hadNoTime || false
@@ -662,7 +679,7 @@ export async function processOrders(options = {}) {
                 if (transaction) {
                   const extracted = extractEtsyPersonalization(transaction)
 
-                  updateData.raceName = extracted.raceName || existing.raceName
+                  updateData.raceName = canonicalizeRaceName(extracted.raceName) || existing.raceName
                   updateData.runnerName = extracted.runnerName || existing.runnerName
                   updateData.raceYear = extracted.raceYear || existing.raceYear
                   updateData.etsyOrderData = etsyReceipt
@@ -741,7 +758,7 @@ export async function processOrders(options = {}) {
                 if (lineItem) {
                   const extracted = extractShopifyPersonalization(lineItem)
 
-                  raceName = extracted.raceName || raceName
+                  raceName = canonicalizeRaceName(extracted.raceName) || raceName
                   runnerName = extracted.runnerName || runnerName
                   raceYear = extracted.raceYear || raceYear
                   hadNoTime = extracted.hadNoTime || false
@@ -787,7 +804,7 @@ export async function processOrders(options = {}) {
                 if (transaction) {
                   const extracted = extractEtsyPersonalization(transaction)
 
-                  raceName = extracted.raceName || raceName
+                  raceName = canonicalizeRaceName(extracted.raceName) || raceName
                   runnerName = extracted.runnerName || runnerName
                   raceYear = extracted.raceYear || raceYear
                   hadNoTime = extracted.hadNoTime || false

@@ -150,6 +150,8 @@ export default async function handler(req, res) {
         return await handleSetCreatorSampleTracking(body, res)
       case 'set-race-shorthand':
         return await handleSetRaceShorthand(body, res)
+      case 'merge-race':
+        return await handleMergeRace(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -1386,3 +1388,101 @@ async function handleSetRaceShorthand({ raceName, shorthand }, res) {
   console.log(`[actions/set-race-shorthand] ${raceName} → ${trimmed || '(cleared)'}`)
   return res.status(200).json({ success: true, overrides })
 }
+
+// --- merge-race ---
+// Consolidates a variant raceName under a canonical one. Three-part operation:
+//   1. Persist the alias in SystemConfig so future imports normalize.
+//   2. Rewrite all Order.raceName rows from variant -> canonical.
+//   3. Reconcile Race rows by year (merge or rename).
+// Safe to re-run — idempotent if the alias is already in place.
+async function handleMergeRace({ aliasName, canonicalName }, res) {
+  const variant = (aliasName || '').trim()
+  const canonical = (canonicalName || '').trim()
+  if (!variant || !canonical) {
+    return res.status(400).json({ error: 'aliasName and canonicalName are required' })
+  }
+  if (variant === canonical) {
+    return res.status(400).json({ error: 'aliasName and canonicalName must differ' })
+  }
+
+  // --- 1) Persist alias map ---
+  const existing = await prisma.systemConfig.findUnique({
+    where: { key: 'race_name_aliases' }
+  })
+  let aliases = {}
+  try {
+    aliases = existing?.value ? JSON.parse(existing.value) : {}
+  } catch { aliases = {} }
+  aliases[variant] = canonical
+  // If canonical was itself an alias of something else, that's wrong — bail.
+  if (aliases[canonical] && aliases[canonical] !== canonical) {
+    return res.status(400).json({ error: `Target "${canonical}" is itself aliased to "${aliases[canonical]}". Merge into that instead.` })
+  }
+
+  const payload = JSON.stringify(aliases)
+  if (existing) {
+    await prisma.systemConfig.update({
+      where: { key: 'race_name_aliases' },
+      data: { value: payload }
+    })
+  } else {
+    await prisma.systemConfig.create({
+      data: { key: 'race_name_aliases', value: payload }
+    })
+  }
+
+  // --- 2) Backfill Order rows ---
+  const orderResult = await prisma.order.updateMany({
+    where: { raceName: variant },
+    data: { raceName: canonical },
+  })
+
+  // --- 3) Reconcile Race rows by year. RunnerResearch.raceId is a hard FK,
+  //        so we must reparent before deleting variant Race rows. ---
+  const variantRaces = await prisma.race.findMany({ where: { raceName: variant } })
+  let renamed = 0
+  let merged = 0
+  for (const aliasRace of variantRaces) {
+    const target = await prisma.race.findFirst({
+      where: { raceName: canonical, year: aliasRace.year }
+    })
+    if (!target) {
+      // No collision — just rename in place.
+      await prisma.race.update({
+        where: { id: aliasRace.id },
+        data: { raceName: canonical }
+      })
+      renamed++
+    } else {
+      // Collision — merge fields into the canonical row (only fill nulls,
+      // never overwrite existing canonical data), reparent research, drop alias.
+      const mergeData = {}
+      if (!target.raceDate && aliasRace.raceDate) mergeData.raceDate = aliasRace.raceDate
+      if (!target.location && aliasRace.location) mergeData.location = aliasRace.location
+      if (!target.resultsUrl && aliasRace.resultsUrl) mergeData.resultsUrl = aliasRace.resultsUrl
+      if (!target.resultsSiteType && aliasRace.resultsSiteType) mergeData.resultsSiteType = aliasRace.resultsSiteType
+      if (!target.weatherCondition && aliasRace.weatherCondition) mergeData.weatherCondition = aliasRace.weatherCondition
+      if (!target.weatherTemp && aliasRace.weatherTemp) mergeData.weatherTemp = aliasRace.weatherTemp
+      if (!target.weatherFetchedAt && aliasRace.weatherFetchedAt) mergeData.weatherFetchedAt = aliasRace.weatherFetchedAt
+      if (Object.keys(mergeData).length > 0) {
+        await prisma.race.update({ where: { id: target.id }, data: mergeData })
+      }
+      await prisma.runnerResearch.updateMany({
+        where: { raceId: aliasRace.id },
+        data: { raceId: target.id },
+      })
+      await prisma.race.delete({ where: { id: aliasRace.id } })
+      merged++
+    }
+  }
+
+  console.log(`[actions/merge-race] "${variant}" → "${canonical}"  orders=${orderResult.count}  races=${renamed} renamed, ${merged} merged`)
+  return res.status(200).json({
+    success: true,
+    ordersUpdated: orderResult.count,
+    racesRenamed: renamed,
+    racesMerged: merged,
+    aliases,
+  })
+}
+

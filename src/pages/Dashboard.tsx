@@ -347,6 +347,9 @@ export default function Dashboard() {
   const [editingShorthandFor, setEditingShorthandFor] = useState<string | null>(null)
   const [editingShorthandValue, setEditingShorthandValue] = useState('')
   const [savingShorthand, setSavingShorthand] = useState(false)
+  const [mergingRace, setMergingRace] = useState<string | null>(null)  // race the user is choosing a merge target for
+  const [mergeTarget, setMergeTarget] = useState('')
+  const [isMergingRace, setIsMergingRace] = useState(false)
 
   // Fetch orders from database (filtered by activeView type)
   const fetchOrders = useCallback(async () => {
@@ -1176,6 +1179,38 @@ export default function Dashboard() {
   }, [])
   useEffect(() => { fetchRaceShorthands() }, [fetchRaceShorthands])
 
+  // Merge one race name into another. Backfills orders + race rows
+  // on the server and refetches everything when done.
+  const mergeRace = async (aliasName: string, canonicalName: string) => {
+    if (!canonicalName || aliasName === canonicalName) return
+    if (!confirm(`Merge "${aliasName}" into "${canonicalName}"?\n\nAll orders and race entries with this name will be re-pointed. This can't be undone (without manually re-aliasing back).`)) return
+    setIsMergingRace(true)
+    try {
+      const res = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'merge-race', aliasName, canonicalName }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Merge failed: ${res.status}`)
+      }
+      const data = await res.json()
+      setToast({
+        message: `Merged: ${data.ordersUpdated} orders · ${data.racesRenamed} renamed · ${data.racesMerged} merged`,
+        type: 'success',
+      })
+      setMergingRace(null)
+      setMergeTarget('')
+      await fetchRaces()
+      await fetchOrders()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to merge')
+    } finally {
+      setIsMergingRace(false)
+    }
+  }
+
   // Save (or clear, when empty) a user shorthand override.
   const saveRaceShorthand = async (raceName: string, shorthand: string) => {
     setSavingShorthand(true)
@@ -1983,6 +2018,7 @@ Thank you!`
                           <div className="mt-0.5 flex items-center justify-between gap-2">
                             <span className="text-xs text-off-black/40">
                               {order.status === 'flagged' && order.flagReason ? order.flagReason
+                                : (order.effectiveRaceName || order.raceName) === 'Unknown Race' ? 'Unknown race — needs assistance'
                                 : order.status === 'missing_year' && !order.yearOverride ? 'Year Missing'
                                 : order.status === 'ready' && order.bibNumber ? `Bib: ${order.bibNumber} · ${order.hadNoTime ? 'No Time' : order.officialTime}`
                                 : order.researchStatus === 'not_found' ? 'Not found — manual lookup needed'
@@ -2236,6 +2272,9 @@ Thank you!`
                               </div>
                               {order.status === 'flagged' && order.flagReason && (
                                 <p className="text-xs text-warning-amber mt-1 leading-tight">{order.flagReason}</p>
+                              )}
+                              {(order.effectiveRaceName || order.raceName) === 'Unknown Race' && (
+                                <p className="text-xs text-warning-amber mt-1 leading-tight">Unknown race — needs assistance</p>
                               )}
                               {order.status === 'missing_year' && !order.yearOverride && (
                                 <p className="text-xs text-warning-amber mt-1 leading-tight">Year Missing</p>
@@ -3003,6 +3042,48 @@ Thank you!`
                                 )}
                               </div>
                             </div>
+                            {/* Merge controls — inline picker when this group is the active merge source */}
+                            {mergingRace === raceName ? (
+                              <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+                                <span className="text-[11px] text-amber-900 shrink-0">Merge <strong>{raceName}</strong> into:</span>
+                                <select
+                                  value={mergeTarget}
+                                  onChange={(e) => setMergeTarget(e.target.value)}
+                                  className="flex-1 min-w-0 px-2 py-1 text-xs border border-amber-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-amber-300"
+                                  autoFocus
+                                >
+                                  <option value="">Choose canonical race…</option>
+                                  {Array.from(new Set(races.map(r => r.raceName)))
+                                    .filter(n => n !== raceName)
+                                    .sort()
+                                    .map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                                <button
+                                  onClick={() => mergeRace(raceName, mergeTarget)}
+                                  disabled={!mergeTarget || isMergingRace}
+                                  className="px-2.5 py-1 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                                >
+                                  {isMergingRace ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                  Merge
+                                </button>
+                                <button
+                                  onClick={() => { setMergingRace(null); setMergeTarget('') }}
+                                  className="text-xs text-off-black/50 hover:text-off-black/70 p-1"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="px-4 py-1.5 bg-off-black/[0.01] border-b border-border-gray flex justify-end">
+                                <button
+                                  onClick={() => { setMergingRace(raceName); setMergeTarget('') }}
+                                  className="text-[11px] text-off-black/50 hover:text-off-black transition-colors inline-flex items-center gap-1"
+                                  title="Consolidate this race into another (renames orders + race entries)"
+                                >
+                                  Merge into…
+                                </button>
+                              </div>
+                            )}
                             {/* Year entries */}
                             <div className="divide-y divide-border-gray">
                               {sortedYears.map((race) => (
