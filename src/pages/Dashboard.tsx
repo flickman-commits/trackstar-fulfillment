@@ -283,6 +283,7 @@ const REVIEW_PRODUCTS: { name: string; link: string }[] = [
 export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [raceFilter, setRaceFilter] = useState('')  // empty = show all races
   const [showCompleted, setShowCompleted] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1430,17 +1431,42 @@ export default function Dashboard() {
     (o.effectiveRunnerName || '').toLowerCase().includes(query)
   , [])
 
+  // Race dropdown options — built from the currently-visible queue so the
+  // counts reflect "what would I see if I picked this race?". Pulled from the
+  // active queue rather than completedOrders so we don't surface stale races.
+  const raceFilterOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const o of ordersToFulfill) {
+      const name = o.effectiveRaceName || o.raceName || ''
+      if (!name) continue
+      counts.set(name, (counts.get(name) || 0) + 1)
+    }
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [ordersToFulfill])
+
+  // Reset race filter when switching tabs — the option may not exist in the
+  // new view, which would otherwise leave the queue mysteriously empty.
+  useEffect(() => { setRaceFilter('') }, [activeView])
+
   const filteredOrders = useMemo(() => {
-    if (!searchQuery) return ordersToFulfill
+    let base = ordersToFulfill
+    if (raceFilter) {
+      base = base.filter(o => (o.effectiveRaceName || o.raceName) === raceFilter)
+    }
+    if (!searchQuery) return base
     const query = searchQuery.toLowerCase()
-    return ordersToFulfill.filter(o => matchesSearch(o, query))
-  }, [ordersToFulfill, searchQuery, matchesSearch])
+    return base.filter(o => matchesSearch(o, query))
+  }, [ordersToFulfill, raceFilter, searchQuery, matchesSearch])
 
   const filteredCompletedOrders = useMemo(() => {
-    if (!searchQuery) return completedOrders
+    let base = completedOrders
+    if (raceFilter) {
+      base = base.filter(o => (o.effectiveRaceName || o.raceName) === raceFilter)
+    }
+    if (!searchQuery) return base
     const query = searchQuery.toLowerCase()
-    return completedOrders.filter(o => matchesSearch(o, query))
-  }, [completedOrders, searchQuery, matchesSearch])
+    return base.filter(o => matchesSearch(o, query))
+  }, [completedOrders, raceFilter, searchQuery, matchesSearch])
 
   // --- Keyboard navigation between orders (j/k) ---
   // When the order detail modal is open, j moves to the next order in the
@@ -1726,17 +1752,37 @@ Thank you!`
 
           {/* Content Card */}
           <div className="bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
-            {/* Search inside card */}
+            {/* Search + Race filter inside card. On mobile they stack;
+                on md+ they sit side-by-side with the race select fixed width. */}
             <div className="p-3 md:p-4 border-b border-border-gray flex-shrink-0">
-              <div className="relative">
-                <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
-                <input
-                  type="text"
-                  placeholder={activeView === 'standard' ? "Search orders..." : "Search designs..."}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
-                />
+              <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
+                  <input
+                    type="text"
+                    placeholder={activeView === 'standard' ? "Search orders..." : "Search designs..."}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
+                  />
+                </div>
+                <div className="relative md:w-64">
+                  <select
+                    value={raceFilter}
+                    onChange={(e) => setRaceFilter(e.target.value)}
+                    className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2.5 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors cursor-pointer ${
+                      raceFilter
+                        ? 'bg-off-black text-white border-off-black'
+                        : 'bg-subtle-gray border-border-gray text-off-black'
+                    }`}
+                  >
+                    <option value="" className="bg-white text-off-black">All races ({raceFilterOptions.reduce((s, [, c]) => s + c, 0)})</option>
+                    {raceFilterOptions.map(([name, count]) => (
+                      <option key={name} value={name} className="bg-white text-off-black">{name} ({count})</option>
+                    ))}
+                  </select>
+                  <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${raceFilter ? 'text-white' : 'text-off-black/40'}`} />
+                </div>
               </div>
             </div>
 
