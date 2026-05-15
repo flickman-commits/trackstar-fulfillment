@@ -88,6 +88,7 @@ interface Order {
     country?: string | null
   } | null
   creatorSampleCreatorId?: string | null
+  frameType?: string | null  // Only surfaced for creator-sample callout — Artelo has it baked into other orders
   designStatus?: DesignStatus
   dueDate?: string
   customerEmail?: string
@@ -3576,6 +3577,17 @@ Thank you!`
                           🎁 Creator
                         </span>
                         <span className="text-xs text-emerald-800 font-medium">Free sample for the Creator Program — do not charge.</span>
+                      </div>
+                      {/* Print — surface frame type alongside size since creator
+                          samples are manual orders. For regular orders Artelo
+                          already has the frame baked in; for these, Elí needs
+                          to pick it himself when creating the manual order. */}
+                      <div className="mb-3">
+                        <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider mb-1.5">Print</div>
+                        <div className="bg-white border border-emerald-200 rounded p-2.5 text-sm text-off-black/80 flex flex-wrap gap-x-4 gap-y-1">
+                          <span><span className="text-off-black/50">Size:</span> <span className="font-medium">{selectedOrder.productSize || '—'}</span></span>
+                          <span><span className="text-off-black/50">Frame:</span> <span className="font-medium">{selectedOrder.frameType || '—'}</span></span>
+                        </div>
                       </div>
                       {selectedOrder.creatorShipping && (
                         <div>
