@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send } from 'lucide-react'
+import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send, Mail, Music2, Pencil } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
 type CreatorStatus = 'invited' | 'onboarded' | 'active' | 'paused'
@@ -716,6 +716,7 @@ function CreatorDrawer({
   const [draft, setDraft] = useState<Creator>(creator)
   const [isSaving, setIsSaving] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
 
   useEffect(() => { setDraft(creator) }, [creator.id])
 
@@ -828,12 +829,50 @@ function CreatorDrawer({
 
           {/* Editable fields */}
           <div className="space-y-4">
-            <Section title="Profile">
-              <TextField label="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
-              <TextField label="Email" value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} type="email" />
-              <TextField label="Instagram" value={draft.instagramHandle} onChange={(v) => setDraft({ ...draft, instagramHandle: v })} placeholder="@handle" />
-              <TextField label="TikTok" value={draft.tiktokHandle} onChange={(v) => setDraft({ ...draft, tiktokHandle: v })} placeholder="@handle" />
-            </Section>
+            <div className="bg-white border border-border-gray rounded-md p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">Profile</h4>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingProfile(v => !v)}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors"
+                >
+                  {isEditingProfile ? <><Check className="w-3 h-3" /> Done</> : <><Pencil className="w-3 h-3" /> Edit</>}
+                </button>
+              </div>
+              {isEditingProfile ? (
+                <div className="space-y-2.5">
+                  <TextField label="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
+                  <TextField label="Email" value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} type="email" />
+                  <TextField label="Instagram" value={draft.instagramHandle} onChange={(v) => setDraft({ ...draft, instagramHandle: v })} placeholder="@handle or full URL" />
+                  <TextField label="TikTok" value={draft.tiktokHandle} onChange={(v) => setDraft({ ...draft, tiktokHandle: v })} placeholder="@handle or full URL" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <ProfileRow label="Name" value={draft.name} />
+                  <ProfileRow
+                    label="Email"
+                    value={draft.email}
+                    href={draft.email ? `mailto:${draft.email}` : null}
+                    icon={<Mail className="w-3.5 h-3.5" />}
+                  />
+                  <ProfileRow
+                    label="Instagram"
+                    value={draft.instagramHandle}
+                    display={socialHandle(draft.instagramHandle)}
+                    href={socialUrl('instagram', draft.instagramHandle)}
+                    icon={<Instagram className="w-3.5 h-3.5" />}
+                  />
+                  <ProfileRow
+                    label="TikTok"
+                    value={draft.tiktokHandle}
+                    display={socialHandle(draft.tiktokHandle)}
+                    href={socialUrl('tiktok', draft.tiktokHandle)}
+                    icon={<Music2 className="w-3.5 h-3.5" />}
+                  />
+                </div>
+              )}
+            </div>
 
             <Section title={`Assigned Briefs${(creator.briefAssignments?.length ?? 0) > 0 ? ` (${creator.briefAssignments!.length})` : ''}`}>
               {(creator.briefAssignments?.length ?? 0) === 0 ? (
@@ -1008,6 +1047,67 @@ function CreatorDrawer({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Normalize a social input (handle or URL) into a clickable URL.
+// Accepts: "@handle", "handle", "https://instagram.com/handle", "instagram.com/handle"
+function socialUrl(platform: 'instagram' | 'tiktok', raw: string | null): string | null {
+  if (!raw) return null
+  const v = raw.trim()
+  if (!v) return null
+  if (/^https?:\/\//i.test(v)) return v
+  const handle = v.replace(/^@/, '').replace(/^.*\.com\//i, '').replace(/\/$/, '')
+  if (!handle) return null
+  return platform === 'tiktok'
+    ? `https://www.tiktok.com/@${handle.replace(/^@/, '')}`
+    : `https://www.instagram.com/${handle}`
+}
+
+// Extract a friendly display handle from either a raw handle or a full URL.
+function socialHandle(raw: string | null): string | null {
+  if (!raw) return null
+  const v = raw.trim()
+  if (!v) return null
+  if (!/^https?:\/\//i.test(v)) return v
+  // Pull the trailing path segment from a URL — e.g. /_butch.82/ → @_butch.82
+  const match = v.match(/\/(@?[^/?]+)\/?(?:[?#].*)?$/)
+  if (!match) return v
+  const seg = match[1].replace(/^@/, '')
+  return `@${seg}`
+}
+
+function ProfileRow({
+  label, value, display, href, icon,
+}: {
+  label: string
+  value: string | null
+  display?: string | null     // optional friendlier rendering (e.g. handle vs URL)
+  href?: string | null
+  icon?: React.ReactNode
+}) {
+  const text = display ?? value
+  return (
+    <div className="flex items-baseline gap-3 text-sm">
+      <span className="text-off-black/50 text-xs w-20 shrink-0">{label}</span>
+      {text ? (
+        href ? (
+          <a
+            href={href}
+            target={href.startsWith('mailto:') ? undefined : '_blank'}
+            rel={href.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
+            className="inline-flex items-center gap-1.5 text-off-black hover:text-[#4F2DD4] hover:underline break-all"
+          >
+            {icon && <span className="text-off-black/40">{icon}</span>}
+            <span>{text}</span>
+          </a>
+        ) : (
+          <span className="text-off-black/80 break-all">{text}</span>
+        )
+      ) : (
+        <span className="text-off-black/30 italic">—</span>
+      )}
     </div>
   )
 }
