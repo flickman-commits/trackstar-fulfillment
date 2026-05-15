@@ -764,7 +764,9 @@ export default function Dashboard() {
           officialPace: data.results.officialPace,
           eventType: data.results.eventType,
           researchStatus: 'found' as const,
-          hadNoTime: !data.results.officialTime,
+          // Keep hadNoTime as set by the customer at order time. Don't let
+          // research toggle it — the "No Time" choice is the customer's
+          // explicit opt-out, not a "we couldn't find one" placeholder.
         } : prev)
         setToast({
           message: `Found! Bib: ${data.results.bibNumber}, Time: ${data.results.officialTime}`,
@@ -1878,7 +1880,7 @@ Thank you!`
                             <span className="text-xs text-off-black/40">
                               {order.status === 'flagged' && order.flagReason ? order.flagReason
                                 : order.status === 'missing_year' && !order.yearOverride ? 'Year Missing'
-                                : order.status === 'ready' && order.bibNumber ? `Bib: ${order.bibNumber} · ${order.officialTime}`
+                                : order.status === 'ready' && order.bibNumber ? `Bib: ${order.bibNumber} · ${order.hadNoTime ? 'No Time' : order.officialTime}`
                                 : order.status === 'pending' && order.hasScraperAvailable && (order.effectiveRaceYear || order.raceYear) ? 'Ready to research'
                                 : order.status === 'pending' && !order.hasScraperAvailable ? 'Manual research needed'
                                 : statusDisplay.label}
@@ -2130,7 +2132,7 @@ Thank you!`
                                 <p className="text-xs text-warning-amber mt-1 leading-tight">Year Missing</p>
                               )}
                               {order.status === 'ready' && order.bibNumber && (
-                                <p className="text-xs text-green-600 mt-1 leading-tight">Bib: {order.bibNumber} • {order.officialTime}</p>
+                                <p className="text-xs text-green-600 mt-1 leading-tight">Bib: {order.bibNumber} • {order.hadNoTime ? 'No Time' : order.officialTime}</p>
                               )}
                               {order.status === 'pending' && order.hasScraperAvailable && (order.effectiveRaceYear || order.raceYear) && (
                                 <p className="text-xs text-blue-600 mt-1 leading-tight">Ready to research</p>
@@ -3865,15 +3867,17 @@ Thank you!`
                               <span className="text-body-sm font-medium text-green-900">{selectedOrder.bibNumber}</span>
                             </div>
                           )}
-                          {selectedOrder.officialTime ? (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-green-800/60">Time</span>
-                              <span className="text-body-sm font-medium text-green-900">{selectedOrder.officialTime}</span>
-                            </div>
-                          ) : selectedOrder.hadNoTime ? (
+                          {/* hadNoTime wins over any research result — it's the
+                              customer's "no time on poster" opt-in. */}
+                          {selectedOrder.hadNoTime ? (
                             <div className="flex justify-between items-center">
                               <span className="text-body-sm text-green-800/60">Time</span>
                               <span className="text-xs px-2 py-0.5 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">No Time</span>
+                            </div>
+                          ) : selectedOrder.officialTime ? (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-green-800/60">Time</span>
+                              <span className="text-body-sm font-medium text-green-900">{selectedOrder.officialTime}</span>
                             </div>
                           ) : selectedOrder.timeFromName ? (
                             <div className="flex justify-between items-center">
@@ -3881,7 +3885,12 @@ Thank you!`
                               <span className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">⏱ {selectedOrder.timeFromName}</span>
                             </div>
                           ) : null}
-                          {selectedOrder.officialPace && (
+                          {selectedOrder.hadNoTime ? (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-green-800/60">Pace</span>
+                              <span className="text-xs px-2 py-0.5 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">No Pace</span>
+                            </div>
+                          ) : selectedOrder.officialPace && (
                             <div className="flex justify-between items-center">
                               <span className="text-body-sm text-green-800/60">Pace</span>
                               <span className="text-body-sm font-medium text-green-900">{selectedOrder.officialPace}</span>
@@ -4134,15 +4143,17 @@ Thank you!`
                       ) : (
                         <NotAvailableField label="Bib" />
                       )}
-                      {selectedOrder.officialTime ? (
-                        <CopyableField label="Time" value={selectedOrder.officialTime} />
-                      ) : selectedOrder.hadNoTime ? (
+                      {/* hadNoTime is the customer's explicit "no time on the
+                          poster" opt-in — it must win over any research result. */}
+                      {selectedOrder.hadNoTime ? (
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-off-black/40 w-16">Time</span>
                           <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
                             ⚠️ No Time
                           </span>
                         </div>
+                      ) : selectedOrder.officialTime ? (
+                        <CopyableField label="Time" value={selectedOrder.officialTime} />
                       ) : selectedOrder.timeFromName ? (
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-off-black/40 w-16">Time</span>
@@ -4155,7 +4166,16 @@ Thank you!`
                       ) : (
                         <NotAvailableField label="Time" />
                       )}
-                      {selectedOrder.officialPace ? (
+                      {/* Pace is suppressed alongside Time when the customer
+                          opted out — a poster without a time shouldn't show a pace. */}
+                      {selectedOrder.hadNoTime ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-off-black/40 w-16">Pace</span>
+                          <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
+                            ⚠️ No Pace
+                          </span>
+                        </div>
+                      ) : selectedOrder.officialPace ? (
                         <CopyableField label="Pace" value={selectedOrder.officialPace} />
                       ) : selectedOrder.hasScraperAvailable ? (
                         <PendingField label="Pace" />
