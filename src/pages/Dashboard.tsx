@@ -4404,8 +4404,14 @@ Thank you!`
                         {isResearching ? 'Researching...' : 'Research Runner'}
                       </button>
                     )}
-                    {(selectedOrder.status === 'ready' || selectedOrder.researchStatus === 'found') &&
-                     selectedOrder.status !== 'completed' &&
+                    {/* Mark as Completed is always available (except for already-
+                        completed / flagged orders, which have their own actions).
+                        Sometimes we fulfill without running research on this tool,
+                        so the button needs to be reachable even when status is
+                        still 'pending' or 'missing_year'. When Research Runner
+                        also shows, both share the row 50/50. */}
+                    {selectedOrder.status !== 'completed' &&
+                     selectedOrder.status !== 'flagged' &&
                      !isEditing && (
                       <button
                         onClick={() => markAsCompleted(selectedOrder.orderNumber)}
