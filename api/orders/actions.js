@@ -44,7 +44,17 @@ export default async function handler(req, res) {
     }
     if (action === 'race-shorthands') {
       if (!requireAdmin(req, res)) return
-      return res.status(200).json({ shorthands: getRaceShorthands() })
+      // Merge user overrides over scraper-config defaults. Overrides win so
+      // Matt can correct funky filename mappings without a code change.
+      const defaults = getRaceShorthands()
+      const overrideRow = await prisma.systemConfig.findUnique({
+        where: { key: 'race_shorthand_overrides' }
+      })
+      let overrides = {}
+      try {
+        overrides = overrideRow?.value ? JSON.parse(overrideRow.value) : {}
+      } catch { overrides = {} }
+      return res.status(200).json({ shorthands: { ...defaults, ...overrides }, overrides })
     }
     if (action === 'creator-home-metrics') {
       if (!requireAdmin(req, res)) return
@@ -138,6 +148,8 @@ export default async function handler(req, res) {
         return await handleDeclineCreatorSample(body, res)
       case 'set-creator-sample-tracking':
         return await handleSetCreatorSampleTracking(body, res)
+      case 'set-race-shorthand':
+        return await handleSetRaceShorthand(body, res)
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
@@ -1332,4 +1344,45 @@ async function handleSetCreatorSampleTracking({ creatorId, trackingNumber, track
 
   console.log(`[actions/set-creator-sample-tracking] ${creatorId} → ${trimmed || '(cleared)'}`)
   return res.status(200).json({ success: true, order })
+}
+
+// --- set-race-shorthand ---
+// Admin sets/clears the filename shorthand for a given race name. Stored as
+// a JSON map in SystemConfig (key: race_shorthand_overrides). Empty string
+// or null removes the override and falls back to scraper-config default.
+async function handleSetRaceShorthand({ raceName, shorthand }, res) {
+  if (!raceName || typeof raceName !== 'string') {
+    return res.status(400).json({ error: 'raceName is required' })
+  }
+
+  const existing = await prisma.systemConfig.findUnique({
+    where: { key: 'race_shorthand_overrides' }
+  })
+
+  let overrides = {}
+  try {
+    overrides = existing?.value ? JSON.parse(existing.value) : {}
+  } catch { overrides = {} }
+
+  const trimmed = (shorthand || '').trim()
+  if (trimmed) {
+    overrides[raceName] = trimmed
+  } else {
+    delete overrides[raceName]
+  }
+
+  const payload = JSON.stringify(overrides)
+  if (existing) {
+    await prisma.systemConfig.update({
+      where: { key: 'race_shorthand_overrides' },
+      data: { value: payload }
+    })
+  } else {
+    await prisma.systemConfig.create({
+      data: { key: 'race_shorthand_overrides', value: payload }
+    })
+  }
+
+  console.log(`[actions/set-race-shorthand] ${raceName} → ${trimmed || '(cleared)'}`)
+  return res.status(200).json({ success: true, overrides })
 }

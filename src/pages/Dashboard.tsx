@@ -332,6 +332,10 @@ export default function Dashboard() {
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false)
   const commentFileInputRef = useRef<HTMLInputElement>(null)
   const [raceShorthands, setRaceShorthands] = useState<Record<string, string>>({})
+  const [raceShorthandOverrides, setRaceShorthandOverrides] = useState<Record<string, string>>({})
+  const [editingShorthandFor, setEditingShorthandFor] = useState<string | null>(null)
+  const [editingShorthandValue, setEditingShorthandValue] = useState('')
+  const [savingShorthand, setSavingShorthand] = useState(false)
 
   // Fetch orders from database (filtered by activeView type)
   const fetchOrders = useCallback(async () => {
@@ -1146,13 +1150,40 @@ export default function Dashboard() {
     return () => clearInterval(poll)
   }, [fetchOrders])
 
-  // Fetch race shorthands from scraper configs (once on mount)
-  useEffect(() => {
-    apiFetch('/api/orders/actions?action=race-shorthands')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => { if (data?.shorthands) setRaceShorthands(data.shorthands) })
-      .catch(() => {})
+  // Fetch race shorthands from scraper configs + user overrides (once on mount).
+  // Reusable so the Race Database modal can refetch after a user edits an override.
+  const fetchRaceShorthands = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/orders/actions?action=race-shorthands')
+      if (!res.ok) return
+      const data = await res.json()
+      if (data?.shorthands) setRaceShorthands(data.shorthands)
+      if (data?.overrides) setRaceShorthandOverrides(data.overrides)
+    } catch { /* swallow — filenames still render via fallback */ }
   }, [])
+  useEffect(() => { fetchRaceShorthands() }, [fetchRaceShorthands])
+
+  // Save (or clear, when empty) a user shorthand override.
+  const saveRaceShorthand = async (raceName: string, shorthand: string) => {
+    setSavingShorthand(true)
+    try {
+      const res = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set-race-shorthand', raceName, shorthand }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Save failed: ${res.status}`)
+      }
+      await fetchRaceShorthands()
+      setEditingShorthandFor(null)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to save shorthand')
+    } finally {
+      setSavingShorthand(false)
+    }
+  }
 
   // Update design status for custom orders
   const updateDesignStatus = async (orderNumber: string, designStatus: DesignStatus) => {
@@ -1582,10 +1613,13 @@ Thank you!`
       return shorthandMap[raceName]
     }
 
-    // Generate acronym from race name
-    // Remove common words and take initials
+    // Generate acronym from race name.
+    // Strip "Marathon"/"Half"/etc., THEN strip non-alphanumerics so leftover
+    // parens or symbols (e.g. "Eugene Marathon (+ Half Marathon)") don't
+    // sneak into the acronym as "E()" or similar.
     const words = raceName
       .replace(/Marathon|Half Marathon|10K|5K|Race|Ultra|Trail/gi, '')
+      .replace(/[^A-Za-z0-9\s]/g, ' ')
       .trim()
       .split(/\s+/)
       .filter(word => word.length > 0)
@@ -2766,7 +2800,8 @@ Thank you!`
                   </div>
                 )}
 
-                {/* Race List */}
+                {/* Race List — grouped by raceName, with year entries nested.
+                    Each group exposes the filename shorthand for editing. */}
                 {isLoadingRaces ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className="w-5 h-5 animate-spin text-off-black/40" />
@@ -2774,10 +2809,78 @@ Thank you!`
                 ) : races.length === 0 ? (
                   <p className="text-sm text-off-black/40 text-center py-8">No races in database</p>
                 ) : (
-                  <div className="space-y-2">
-                    {races.map((race) => (
-                      <div key={race.id} className="py-3 px-4 rounded-lg bg-subtle-gray border border-border-gray">
-                        {editingRaceId === race.id ? (
+                  <div className="space-y-4">
+                    {Object.entries(
+                      races.reduce<Record<string, typeof races>>((acc, r) => {
+                        (acc[r.raceName] ||= []).push(r)
+                        return acc
+                      }, {})
+                    )
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([raceName, group]) => {
+                        const sortedYears = [...group].sort((a, b) => b.year - a.year)
+                        const currentShorthand = raceShorthands[raceName] || ''
+                        const isOverridden = !!raceShorthandOverrides[raceName]
+                        const isEditingThis = editingShorthandFor === raceName
+                        return (
+                          <div key={raceName} className="rounded-lg border border-border-gray overflow-hidden">
+                            {/* Group header — race name + shorthand control */}
+                            <div className="bg-off-black/[0.03] px-4 py-3 flex items-center gap-3 border-b border-border-gray">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold text-off-black truncate">{raceName}</div>
+                                <div className="text-[11px] text-off-black/40 mt-0.5">{sortedYears.length} {sortedYears.length === 1 ? 'year' : 'years'}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-off-black/40 uppercase tracking-wider">Filename</span>
+                                {isEditingThis ? (
+                                  <>
+                                    <input
+                                      type="text"
+                                      value={editingShorthandValue}
+                                      onChange={(e) => setEditingShorthandValue(e.target.value)}
+                                      placeholder="e.g. Boston"
+                                      autoFocus
+                                      className="w-28 px-2 py-1 text-xs border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') saveRaceShorthand(raceName, editingShorthandValue)
+                                        if (e.key === 'Escape') setEditingShorthandFor(null)
+                                      }}
+                                    />
+                                    <button
+                                      onClick={() => saveRaceShorthand(raceName, editingShorthandValue)}
+                                      disabled={savingShorthand}
+                                      className="text-xs text-green-600 hover:text-green-700 disabled:opacity-50"
+                                    >
+                                      {savingShorthand ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingShorthandFor(null)}
+                                      className="text-xs text-off-black/50 hover:text-off-black/70"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => { setEditingShorthandFor(raceName); setEditingShorthandValue(currentShorthand) }}
+                                    className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-mono rounded border ${
+                                      isOverridden
+                                        ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                        : 'bg-white border-border-gray text-off-black/70 hover:bg-off-black/5'
+                                    }`}
+                                    title={isOverridden ? 'User-set override (click to edit)' : 'Default from scraper config (click to override)'}
+                                  >
+                                    {currentShorthand || '—'}
+                                    <Pencil className="w-2.5 h-2.5 opacity-50" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            {/* Year entries */}
+                            <div className="divide-y divide-border-gray">
+                              {sortedYears.map((race) => (
+                                <div key={race.id} className="py-2.5 px-4 bg-white">
+                                  {editingRaceId === race.id ? (
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium text-off-black">{race.raceName} {race.year}</span>
@@ -2845,27 +2948,28 @@ Thank you!`
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-off-black">{race.raceName}</span>
-                              <span className="text-sm text-off-black/40 ml-2">{race.year}</span>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs text-off-black/50">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-semibold text-off-black w-12 shrink-0 tabular-nums">{race.year}</span>
+                            <div className="flex-1 flex items-center gap-4 text-xs text-off-black/50 min-w-0">
                               {race.raceDate && <span>{new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })}</span>}
-                              {race.location && <span>{race.location}</span>}
+                              {race.location && <span className="truncate">{race.location}</span>}
                               {race.weatherCondition && <span>{race.weatherCondition.charAt(0).toUpperCase() + race.weatherCondition.slice(1)}</span>}
                               {race.weatherTemp && <span>{race.weatherTemp}</span>}
-                              <button
-                                onClick={() => startEditingRace(race)}
-                                className="text-blue-600 hover:text-blue-700 transition-colors"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
                             </div>
+                            <button
+                              onClick={() => startEditingRace(race)}
+                              className="text-blue-600 hover:text-blue-700 transition-colors shrink-0"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         )}
-                      </div>
-                    ))}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
                   </div>
                 )}
               </div>
