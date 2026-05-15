@@ -4427,7 +4427,28 @@ Thank you!`
                     </div>
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                       {selectedOrder.eventType ? (
-                        <StaticField label="Event" value={selectedOrder.eventType} />
+                        // Flag non-marathon events so the designer doesn't
+                        // assume "Marathon" by default — Half, 10K, 5K, etc.
+                        // use different templates.
+                        (() => {
+                          const isMarathon = /^marathon$/i.test(selectedOrder.eventType.trim())
+                          return (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-off-black/60">Event</span>
+                              <div className="flex items-center gap-2">
+                                {!isMarathon && (
+                                  <span
+                                    className="inline-flex items-center px-1.5 py-0.5 bg-warning-amber/15 text-warning-amber border border-warning-amber/30 text-[10px] font-bold rounded leading-none"
+                                    title="Not the full marathon — double-check the template"
+                                  >
+                                    !!
+                                  </span>
+                                )}
+                                <span className={`text-body-sm font-medium ${isMarathon ? 'text-off-black' : 'text-warning-amber'}`}>{selectedOrder.eventType}</span>
+                              </div>
+                            </div>
+                          )
+                        })()
                       ) : selectedOrder.hasScraperAvailable ? (
                         <PendingField label="Event" />
                       ) : (
