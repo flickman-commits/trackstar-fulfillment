@@ -1985,7 +1985,12 @@ Thank you!`
                               {order.status === 'flagged' && order.flagReason ? order.flagReason
                                 : order.status === 'missing_year' && !order.yearOverride ? 'Year Missing'
                                 : order.status === 'ready' && order.bibNumber ? `Bib: ${order.bibNumber} · ${order.hadNoTime ? 'No Time' : order.officialTime}`
-                                : order.status === 'pending' && order.hasScraperAvailable && (order.effectiveRaceYear || order.raceYear) ? 'Ready to research'
+                                : order.researchStatus === 'not_found' ? 'Not found — manual lookup needed'
+                                : order.researchStatus === 'ambiguous' ? 'Multiple matches — review needed'
+                                : order.researchStatus === 'upstream_error' ? 'Timing site unreachable — retry'
+                                : order.researchStatus === 'no_scraper' ? 'Manual research needed'
+                                : order.researchStatus === 'year_not_configured' ? 'Year not yet configured'
+                                : order.status === 'pending' && order.hasScraperAvailable && !order.researchStatus && (order.effectiveRaceYear || order.raceYear) ? 'Ready to research'
                                 : order.status === 'pending' && !order.hasScraperAvailable ? 'Manual research needed'
                                 : statusDisplay.label}
                             </span>
@@ -2238,7 +2243,23 @@ Thank you!`
                               {order.status === 'ready' && order.bibNumber && (
                                 <p className="text-xs text-green-600 mt-1 leading-tight">Bib: {order.bibNumber} • {order.hadNoTime ? 'No Time' : order.officialTime}</p>
                               )}
-                              {order.status === 'pending' && order.hasScraperAvailable && (order.effectiveRaceYear || order.raceYear) && (
+                              {/* Research-attempted-but-incomplete states. These
+                                  preempt "Ready to research" so a queue that's
+                                  been through bulk research shows real status. */}
+                              {order.researchStatus === 'not_found' && (
+                                <p className="text-xs text-warning-amber mt-1 leading-tight">Not found — manual lookup needed</p>
+                              )}
+                              {order.researchStatus === 'ambiguous' && (
+                                <p className="text-xs text-warning-amber mt-1 leading-tight">Multiple matches — review needed</p>
+                              )}
+                              {order.researchStatus === 'upstream_error' && (
+                                <p className="text-xs text-warning-amber mt-1 leading-tight">Timing site unreachable — retry</p>
+                              )}
+                              {order.researchStatus === 'year_not_configured' && (
+                                <p className="text-xs text-red-600 mt-1 leading-tight">Year not yet configured</p>
+                              )}
+                              {/* "Ready to research" only shows if research has NOT been attempted yet */}
+                              {order.status === 'pending' && order.hasScraperAvailable && !order.researchStatus && (order.effectiveRaceYear || order.raceYear) && (
                                 <p className="text-xs text-blue-600 mt-1 leading-tight">Ready to research</p>
                               )}
                               {order.status === 'pending' && !order.hasScraperAvailable && (
@@ -4667,10 +4688,12 @@ Thank you!`
 
                   {/* Actions */}
                   <div className="flex gap-3 pt-3">
-                    {/* Research button - show if scraper available and not already researched */}
+                    {/* Research button — always available while the order is in
+                        flight (not completed) and has a scraper + year, so the
+                        user can re-research after fixing a misspelled runner
+                        name or correcting the race year. Label adapts. */}
                     {selectedOrder.hasScraperAvailable &&
                      (selectedOrder.effectiveRaceYear || selectedOrder.raceYear) &&
-                     selectedOrder.researchStatus !== 'found' &&
                      selectedOrder.status !== 'completed' &&
                      !isEditing && (
                       <button
@@ -4683,7 +4706,9 @@ Thank you!`
                         ) : (
                           <FlaskConical className="w-4 h-4" />
                         )}
-                        {isResearching ? 'Researching...' : 'Research Runner'}
+                        {isResearching
+                          ? 'Researching...'
+                          : selectedOrder.researchStatus === 'found' ? 'Re-research Runner' : 'Research Runner'}
                       </button>
                     )}
                     {/* Mark as Completed is always available (except for already-
