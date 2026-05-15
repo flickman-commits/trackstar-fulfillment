@@ -230,6 +230,11 @@ model Creator {
   // Workflow status
   status              String    @default("invited") // "invited" | "onboarded" | "active" | "paused"
 
+  // Content delivery status — tracks whether the creator has handed over the
+  // promised content. Distinct from `status` (which is program-level).
+  //   "not_received" | "received" | "edited" | "posted"
+  contentStatus       String    @default("not_received")
+
   // Link to the Standard Order that fulfills their sample.
   sampleOrderId       String?   @unique
   sampleOrder         Order?    @relation("CreatorSample", fields: [sampleOrderId], references: [id])

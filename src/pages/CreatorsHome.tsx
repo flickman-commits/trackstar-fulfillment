@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api'
 
 type CreatorStatus = 'invited' | 'onboarded' | 'active' | 'paused'
 type CommissionModel = 'free_product' | 'flat_per_asset' | 'rev_share' | 'hybrid'
+type ContentStatus = 'not_received' | 'received' | 'edited' | 'posted'
 
 interface BriefLite {
   id: string
@@ -23,10 +24,18 @@ interface Creator {
   tiktokHandle: string | null
   raceName: string | null
   raceYear: number | null
+  bibNumber: string | null
+  finishTime: string | null
   productSize: string | null
   frameType: string | null
+  shippingName: string | null
+  shippingAddress1: string | null
+  shippingAddress2: string | null
   shippingCity: string | null
   shippingState: string | null
+  shippingZip: string | null
+  shippingCountry: string | null
+  contentStatus: ContentStatus
   commissionModel: CommissionModel
   commissionConfig: Record<string, unknown>
   commissionNotes: string | null
@@ -55,6 +64,15 @@ const STATUS_CONFIG: Record<CreatorStatus, { label: string; color: string; bg: s
   onboarded:  { label: 'Onboarded',  color: 'text-blue-700',     bg: 'bg-blue-50' },
   active:     { label: 'Active',     color: 'text-emerald-700',  bg: 'bg-emerald-50' },
   paused:     { label: 'Paused',     color: 'text-amber-700',    bg: 'bg-amber-50' },
+}
+
+// Content-delivery pipeline — tracks the asset, not the creator's program
+// standing. Owned/updated by Matt as he reviews / edits / publishes.
+const CONTENT_STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; bg: string }> = {
+  not_received: { label: 'Not received', color: 'text-off-black/50', bg: 'bg-off-black/5' },
+  received:     { label: 'Received',     color: 'text-blue-700',     bg: 'bg-blue-50' },
+  edited:       { label: 'Edited',       color: 'text-amber-700',    bg: 'bg-amber-50' },
+  posted:       { label: 'Posted',       color: 'text-emerald-700',  bg: 'bg-emerald-50' },
 }
 
 const COMMISSION_LABEL: Record<CommissionModel, string> = {
@@ -390,6 +408,7 @@ export default function CreatorsHome() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Creator</th>
                         <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-32">Status</th>
                         <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-44">Sample</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-32">Content</th>
                         <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell w-40">Commission</th>
                         <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden lg:table-cell w-36">Invited</th>
                       </tr>
@@ -424,6 +443,16 @@ export default function CreatorsHome() {
                             </td>
                             <td className={`px-3 py-3.5 text-sm ${sampleDisplay.color}`}>
                               {sampleDisplay.label}
+                            </td>
+                            <td className="px-3 py-3.5">
+                              {(() => {
+                                const cs = CONTENT_STATUS_CONFIG[c.contentStatus] || CONTENT_STATUS_CONFIG.not_received
+                                return (
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cs.bg} ${cs.color}`}>
+                                    {cs.label}
+                                  </span>
+                                )
+                              })()}
                             </td>
                             <td className="px-3 py-3.5 text-sm text-off-black/70 hidden md:table-cell">
                               {COMMISSION_LABEL[c.commissionModel]}
@@ -707,16 +736,34 @@ function CreatorDrawer({
     setIsSaving(true)
     try {
       const updates = {
+        // Profile
         name: draft.name,
         email: draft.email,
         instagramHandle: draft.instagramHandle,
         tiktokHandle: draft.tiktokHandle,
+        // Sample
+        raceName: draft.raceName,
+        raceYear: draft.raceYear,
+        bibNumber: draft.bibNumber,
+        finishTime: draft.finishTime,
+        productSize: draft.productSize,
+        frameType: draft.frameType,
+        // Shipping — server mirrors these onto the linked fulfillment order
+        shippingName: draft.shippingName,
+        shippingAddress1: draft.shippingAddress1,
+        shippingAddress2: draft.shippingAddress2,
+        shippingCity: draft.shippingCity,
+        shippingState: draft.shippingState,
+        shippingZip: draft.shippingZip,
+        shippingCountry: draft.shippingCountry,
+        // Commission + lifecycle
         commissionModel: draft.commissionModel,
         commissionConfig: draft.commissionConfig,
         commissionNotes: draft.commissionNotes,
         whitelistingEnabled: draft.whitelistingEnabled,
         metaPageId: draft.metaPageId,
         status: draft.status,
+        contentStatus: draft.contentStatus,
       }
       const res = await apiFetch('/api/orders/actions', {
         method: 'POST',
@@ -805,9 +852,31 @@ function CreatorDrawer({
               )}
             </Section>
 
-            <Section title="Sample">
-              <StaticRow label="Race" value={creator.raceName ? `${creator.raceName} ${creator.raceYear || ''}` : '—'} />
-              <StaticRow label="Product" value={[creator.productSize, creator.frameType].filter(Boolean).join(' · ') || '—'} />
+            <Section title="Content">
+              <div>
+                <Label>Status</Label>
+                <select
+                  value={draft.contentStatus}
+                  onChange={(e) => setDraft({ ...draft, contentStatus: e.target.value as ContentStatus })}
+                  className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                >
+                  <option value="not_received">Not received</option>
+                  <option value="received">Received</option>
+                  <option value="edited">Edited</option>
+                  <option value="posted">Posted</option>
+                </select>
+              </div>
+            </Section>
+
+            <Section title="Sample Details">
+              <div className="grid grid-cols-2 gap-3">
+                <TextField label="Race" value={draft.raceName} onChange={(v) => setDraft({ ...draft, raceName: v })} placeholder="Boston Marathon" />
+                <NumberField label="Year" value={draft.raceYear} onChange={(v) => setDraft({ ...draft, raceYear: v })} />
+                <TextField label="Bib #" value={draft.bibNumber} onChange={(v) => setDraft({ ...draft, bibNumber: v })} />
+                <TextField label="Finish time" value={draft.finishTime} onChange={(v) => setDraft({ ...draft, finishTime: v })} placeholder="3:42:18" />
+                <TextField label="Size" value={draft.productSize} onChange={(v) => setDraft({ ...draft, productSize: v })} placeholder='18x24"' />
+                <TextField label="Frame" value={draft.frameType} onChange={(v) => setDraft({ ...draft, frameType: v })} placeholder="Black / White / Natural" />
+              </div>
               <StaticRow
                 label="Cost (COGS)"
                 value={creator.sampleCostUsd ? formatUsd(creator.sampleCostUsd) : '—'}
@@ -826,6 +895,21 @@ function CreatorDrawer({
                   })}
                 />
               )}
+            </Section>
+
+            <Section title="Shipping Address">
+              <p className="text-[10px] text-off-black/50 -mt-1 mb-1 leading-relaxed">
+                Edits here are mirrored onto the fulfillment order so Elí ships to the new address.
+              </p>
+              <TextField label="Recipient name" value={draft.shippingName} onChange={(v) => setDraft({ ...draft, shippingName: v })} />
+              <TextField label="Address line 1" value={draft.shippingAddress1} onChange={(v) => setDraft({ ...draft, shippingAddress1: v })} />
+              <TextField label="Address line 2" value={draft.shippingAddress2} onChange={(v) => setDraft({ ...draft, shippingAddress2: v })} placeholder="Apt / suite (optional)" />
+              <div className="grid grid-cols-3 gap-3">
+                <TextField label="City" value={draft.shippingCity} onChange={(v) => setDraft({ ...draft, shippingCity: v })} />
+                <TextField label="State" value={draft.shippingState} onChange={(v) => setDraft({ ...draft, shippingState: v })} />
+                <TextField label="ZIP" value={draft.shippingZip} onChange={(v) => setDraft({ ...draft, shippingZip: v })} />
+              </div>
+              <TextField label="Country" value={draft.shippingCountry} onChange={(v) => setDraft({ ...draft, shippingCountry: v })} placeholder="US" />
             </Section>
 
             <Section title="Commission">

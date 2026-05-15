@@ -814,10 +814,27 @@ async function handleListCreators(res) {
 // changed through this endpoint — protects against accidental overwrite of
 // inviteToken, onboardedAt, sampleOrderId, etc.
 const CREATOR_EDITABLE_FIELDS = [
+  // Profile
   'name', 'email', 'instagramHandle', 'tiktokHandle',
+  // Sample details — editable after onboarding in case the creator emails
+  // a correction (different race, size, bib, etc.)
+  'raceName', 'raceYear', 'bibNumber', 'finishTime',
+  'productSize', 'frameType',
+  // Shipping — these get re-mirrored onto the linked fulfillment Order below
+  // so the dashboard reflects the corrected address.
+  'shippingName', 'shippingAddress1', 'shippingAddress2',
+  'shippingCity', 'shippingState', 'shippingZip', 'shippingCountry',
+  // Commissions / whitelisting / lifecycle
   'commissionModel', 'commissionConfig', 'commissionNotes',
   'whitelistingEnabled', 'metaPageId',
-  'status',
+  'status', 'contentStatus',
+]
+
+// Shipping-field subset — used to detect when we also need to mirror the
+// change onto the linked fulfillment Order so Elí ships to the right place.
+const CREATOR_SHIPPING_FIELDS = [
+  'shippingName', 'shippingAddress1', 'shippingAddress2',
+  'shippingCity', 'shippingState', 'shippingZip', 'shippingCountry',
 ]
 
 async function handleUpdateCreator({ creatorId, updates }, res) {
@@ -833,6 +850,13 @@ async function handleUpdateCreator({ creatorId, updates }, res) {
     if (key in updates) data[key] = updates[key]
   }
 
+  // Coerce raceYear to an int if present — frontend may send it as string.
+  if (data.raceYear != null && data.raceYear !== '') {
+    data.raceYear = parseInt(data.raceYear, 10) || null
+  } else if (data.raceYear === '') {
+    data.raceYear = null
+  }
+
   if (Object.keys(data).length === 0) {
     return res.status(400).json({ error: 'no editable fields provided' })
   }
@@ -846,9 +870,40 @@ async function handleUpdateCreator({ creatorId, updates }, res) {
           id: true, orderNumber: true, status: true, createdAt: true,
           trackingNumber: true, trackingCarrier: true, shippedAt: true,
         }
+      },
+      briefAssignments: {
+        include: { brief: { select: { id: true, title: true, status: true } } }
       }
     }
   })
+
+  // If shipping changed AND there's a linked fulfillment Order, re-mirror the
+  // address into arteloOrderData.shipping so the Dashboard's creator banner
+  // and Elí's queue both reflect the corrected destination.
+  const shippingTouched = CREATOR_SHIPPING_FIELDS.some(k => k in updates)
+  if (shippingTouched && updated.sampleOrderId) {
+    const existing = await prisma.order.findUnique({
+      where: { id: updated.sampleOrderId },
+      select: { arteloOrderData: true }
+    })
+    const nextArtelo = {
+      ...(existing?.arteloOrderData || {}),
+      shipping: {
+        name: updated.shippingName || updated.name || null,
+        address1: updated.shippingAddress1 || null,
+        address2: updated.shippingAddress2 || null,
+        city: updated.shippingCity || null,
+        state: updated.shippingState || null,
+        zip: updated.shippingZip || null,
+        country: updated.shippingCountry || 'US',
+      },
+    }
+    await prisma.order.update({
+      where: { id: updated.sampleOrderId },
+      data: { arteloOrderData: nextArtelo },
+    })
+    console.log(`[actions/update-creator] Mirrored shipping → order ${updated.sampleOrderId}`)
+  }
 
   console.log(`[actions/update-creator] Updated creator ${creatorId}: ${Object.keys(data).join(', ')}`)
   return res.status(200).json({ success: true, creator: updated })
