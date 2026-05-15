@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText, Send, Star, Users } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import ProofManager from '@/components/ProofManager'
@@ -1441,6 +1441,48 @@ export default function Dashboard() {
     const query = searchQuery.toLowerCase()
     return completedOrders.filter(o => matchesSearch(o, query))
   }, [completedOrders, searchQuery, matchesSearch])
+
+  // --- Keyboard navigation between orders (j/k) ---
+  // When the order detail modal is open, j moves to the next order in the
+  // currently visible queue and k moves to the previous one. Skipped when
+  // the user is typing into a field or in the middle of an inline edit.
+  const currentOrderIndex = useMemo(() => {
+    if (!selectedOrder) return -1
+    return filteredOrders.findIndex(o => o.id === selectedOrder.id)
+  }, [selectedOrder, filteredOrders])
+
+  const navigateOrder = useCallback((direction: 'next' | 'prev') => {
+    if (currentOrderIndex < 0) return
+    const target = direction === 'next' ? currentOrderIndex + 1 : currentOrderIndex - 1
+    if (target < 0 || target >= filteredOrders.length) return
+    setSelectedOrder(filteredOrders[target])
+    setIsEditing(false)
+    setEditValues({ yearOverride: '', raceNameOverride: '', runnerNameOverride: '' })
+  }, [currentOrderIndex, filteredOrders])
+
+  useEffect(() => {
+    if (!selectedOrder) return
+    const handler = (e: KeyboardEvent) => {
+      // Don't hijack j/k when the user is typing or editing inline
+      const target = e.target as HTMLElement | null
+      if (target) {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        if (target.isContentEditable) return
+      }
+      if (isEditing) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === 'j') {
+        e.preventDefault()
+        navigateOrder('next')
+      } else if (e.key === 'k') {
+        e.preventDefault()
+        navigateOrder('prev')
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [selectedOrder, isEditing, navigateOrder])
 
   // Helper to check if an order has multiple items
   const getOrderItemCount = useCallback((parentOrderNumber: string) => {
@@ -2925,12 +2967,42 @@ Thank you!`
                       <span title="Has notes/comments"><MessageSquareText className="w-4 h-4 text-amber-500" /></span>
                     )}
                   </div>
-                  <button
-                    onClick={closeModal}
-                    className="text-off-black/40 hover:text-off-black text-2xl leading-none transition-colors"
-                  >
-                    ×
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {/* j/k navigation — only shown when the open order is in the
+                        current visible queue (filteredOrders). Buttons reflect
+                        the keyboard shortcuts so the affordance is discoverable. */}
+                    {currentOrderIndex >= 0 && (
+                      <>
+                        <button
+                          onClick={() => navigateOrder('prev')}
+                          disabled={currentOrderIndex <= 0}
+                          title="Previous order (press k)"
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                          <kbd className="font-mono text-[10px] px-1 py-0.5 bg-off-black/10 rounded leading-none">k</kbd>
+                        </button>
+                        <button
+                          onClick={() => navigateOrder('next')}
+                          disabled={currentOrderIndex >= filteredOrders.length - 1}
+                          title="Next order (press j)"
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <kbd className="font-mono text-[10px] px-1 py-0.5 bg-off-black/10 rounded leading-none">j</kbd>
+                          <ChevronDownIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="text-[10px] text-off-black/40 px-1.5 tabular-nums">
+                          {currentOrderIndex + 1} / {filteredOrders.length}
+                        </span>
+                      </>
+                    )}
+                    <button
+                      onClick={closeModal}
+                      className="text-off-black/40 hover:text-off-black text-2xl leading-none transition-colors px-1"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-5">
