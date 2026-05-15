@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send, Mail, Music2, Pencil } from 'lucide-react'
+import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send, Mail, Music2, Pencil, ChevronDown } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
 type CreatorStatus = 'invited' | 'onboarded' | 'active' | 'paused'
@@ -717,6 +717,8 @@ function CreatorDrawer({
   const [isSaving, setIsSaving] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [isEditingSample, setIsEditingSample] = useState(false)
+  const [isEditingShipping, setIsEditingShipping] = useState(false)
 
   useEffect(() => { setDraft(creator) }, [creator.id])
 
@@ -791,16 +793,12 @@ function CreatorDrawer({
     >
       <div className="bg-white rounded-md max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
         <div className="p-6">
-          {/* Header */}
+          {/* Header — name only. Program + content status moved into colored
+              dropdowns just below the invite link so they're easy to scan/edit. */}
           <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-off-black">
-                {creator.name || 'Pending Creator'}
-              </h3>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_CONFIG[creator.status].bg} ${STATUS_CONFIG[creator.status].color}`}>
-                {STATUS_CONFIG[creator.status].label}
-              </span>
-            </div>
+            <h3 className="text-lg font-semibold text-off-black">
+              {creator.name || 'Pending Creator'}
+            </h3>
             <button onClick={onClose} className="text-off-black/40 hover:text-off-black">
               <X className="w-5 h-5" />
             </button>
@@ -829,17 +827,30 @@ function CreatorDrawer({
 
           {/* Editable fields */}
           <div className="space-y-4">
-            <div className="bg-white border border-border-gray rounded-md p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">Profile</h4>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingProfile(v => !v)}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors"
-                >
-                  {isEditingProfile ? <><Check className="w-3 h-3" /> Done</> : <><Pencil className="w-3 h-3" /> Edit</>}
-                </button>
-              </div>
+            {/* Two top-level statuses — color-tinted dropdowns. Program = where
+                the creator stands in our pipeline. Content = where the asset is. */}
+            <div className="grid grid-cols-2 gap-3">
+              <StatusSelect<CreatorStatus>
+                label="Program"
+                value={draft.status}
+                onChange={(v) => setDraft({ ...draft, status: v })}
+                options={['invited', 'onboarded', 'active', 'paused']}
+                config={STATUS_CONFIG}
+              />
+              <StatusSelect<ContentStatus>
+                label="Content"
+                value={draft.contentStatus}
+                onChange={(v) => setDraft({ ...draft, contentStatus: v })}
+                options={['not_received', 'received', 'edited', 'posted']}
+                config={CONTENT_STATUS_CONFIG}
+              />
+            </div>
+
+            <EditableCard
+              title="Profile"
+              isEditing={isEditingProfile}
+              onToggle={() => setIsEditingProfile(v => !v)}
+            >
               {isEditingProfile ? (
                 <div className="space-y-2.5">
                   <TextField label="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
@@ -872,7 +883,7 @@ function CreatorDrawer({
                   />
                 </div>
               )}
-            </div>
+            </EditableCard>
 
             <Section title={`Assigned Briefs${(creator.briefAssignments?.length ?? 0) > 0 ? ` (${creator.briefAssignments!.length})` : ''}`}>
               {(creator.briefAssignments?.length ?? 0) === 0 ? (
@@ -891,65 +902,96 @@ function CreatorDrawer({
               )}
             </Section>
 
-            <Section title="Content">
-              <div>
-                <Label>Status</Label>
-                <select
-                  value={draft.contentStatus}
-                  onChange={(e) => setDraft({ ...draft, contentStatus: e.target.value as ContentStatus })}
-                  className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-                >
-                  <option value="not_received">Not received</option>
-                  <option value="received">Received</option>
-                  <option value="edited">Edited</option>
-                  <option value="posted">Posted</option>
-                </select>
+            <EditableCard
+              title="Sample Details"
+              isEditing={isEditingSample}
+              onToggle={() => setIsEditingSample(v => !v)}
+            >
+              {isEditingSample ? (
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <TextField label="Race" value={draft.raceName} onChange={(v) => setDraft({ ...draft, raceName: v })} placeholder="Boston Marathon" />
+                    <NumberField label="Year" value={draft.raceYear} onChange={(v) => setDraft({ ...draft, raceYear: v })} />
+                    <TextField label="Bib #" value={draft.bibNumber} onChange={(v) => setDraft({ ...draft, bibNumber: v })} />
+                    <TextField label="Finish time" value={draft.finishTime} onChange={(v) => setDraft({ ...draft, finishTime: v })} placeholder="3:42:18" />
+                    <TextField label="Size" value={draft.productSize} onChange={(v) => setDraft({ ...draft, productSize: v })} placeholder='18x24"' />
+                    <TextField label="Frame" value={draft.frameType} onChange={(v) => setDraft({ ...draft, frameType: v })} placeholder="Black / White / Natural" />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <ProfileRow
+                    label="Race"
+                    value={draft.raceName ? `${draft.raceName}${draft.raceYear ? ` · ${draft.raceYear}` : ''}` : null}
+                  />
+                  <ProfileRow label="Bib #" value={draft.bibNumber} />
+                  <ProfileRow label="Finish time" value={draft.finishTime} />
+                  <ProfileRow label="Size" value={draft.productSize} />
+                  <ProfileRow label="Frame" value={draft.frameType} />
+                </div>
+              )}
+              <div className="mt-3 pt-3 border-t border-border-gray space-y-2">
+                <ProfileRow
+                  label="Cost (COGS)"
+                  value={creator.sampleCostUsd ? formatUsd(creator.sampleCostUsd) : '—'}
+                />
+                <ProfileRow
+                  label="Order"
+                  value={creator.sampleOrder?.orderNumber || 'Not yet created'}
+                />
+                <ProfileRow
+                  label="Status"
+                  value={sampleStatusLabel(creator.sampleOrder?.status).label}
+                />
               </div>
-            </Section>
+            </EditableCard>
 
-            <Section title="Sample Details">
-              <div className="grid grid-cols-2 gap-3">
-                <TextField label="Race" value={draft.raceName} onChange={(v) => setDraft({ ...draft, raceName: v })} placeholder="Boston Marathon" />
-                <NumberField label="Year" value={draft.raceYear} onChange={(v) => setDraft({ ...draft, raceYear: v })} />
-                <TextField label="Bib #" value={draft.bibNumber} onChange={(v) => setDraft({ ...draft, bibNumber: v })} />
-                <TextField label="Finish time" value={draft.finishTime} onChange={(v) => setDraft({ ...draft, finishTime: v })} placeholder="3:42:18" />
-                <TextField label="Size" value={draft.productSize} onChange={(v) => setDraft({ ...draft, productSize: v })} placeholder='18x24"' />
-                <TextField label="Frame" value={draft.frameType} onChange={(v) => setDraft({ ...draft, frameType: v })} placeholder="Black / White / Natural" />
-              </div>
-              <StaticRow
-                label="Cost (COGS)"
-                value={creator.sampleCostUsd ? formatUsd(creator.sampleCostUsd) : '—'}
-              />
-              <StaticRow label="Order" value={creator.sampleOrder?.orderNumber || 'Not yet created'} />
-              <StaticRow label="Status" value={sampleStatusLabel(creator.sampleOrder?.status).label} />
-              {creator.sampleOrder && (
-                <TrackingField
-                  creatorId={creator.id}
-                  initialNumber={creator.sampleOrder.trackingNumber || ''}
-                  initialCarrier={creator.sampleOrder.trackingCarrier || ''}
-                  shippedAt={creator.sampleOrder.shippedAt || null}
-                  onSaved={(updated) => onSaved({
-                    ...creator,
-                    sampleOrder: creator.sampleOrder ? { ...creator.sampleOrder, ...updated } : creator.sampleOrder,
-                  })}
+            <EditableCard
+              title="Shipping & Tracking"
+              isEditing={isEditingShipping}
+              onToggle={() => setIsEditingShipping(v => !v)}
+            >
+              {isEditingShipping ? (
+                <div className="space-y-2.5">
+                  <p className="text-[10px] text-off-black/50 leading-relaxed">
+                    Edits here are mirrored onto the fulfillment order so Elí ships to the new address.
+                  </p>
+                  <TextField label="Recipient name" value={draft.shippingName} onChange={(v) => setDraft({ ...draft, shippingName: v })} />
+                  <TextField label="Address line 1" value={draft.shippingAddress1} onChange={(v) => setDraft({ ...draft, shippingAddress1: v })} />
+                  <TextField label="Address line 2" value={draft.shippingAddress2} onChange={(v) => setDraft({ ...draft, shippingAddress2: v })} placeholder="Apt / suite (optional)" />
+                  <div className="grid grid-cols-3 gap-3">
+                    <TextField label="City" value={draft.shippingCity} onChange={(v) => setDraft({ ...draft, shippingCity: v })} />
+                    <TextField label="State" value={draft.shippingState} onChange={(v) => setDraft({ ...draft, shippingState: v })} />
+                    <TextField label="ZIP" value={draft.shippingZip} onChange={(v) => setDraft({ ...draft, shippingZip: v })} />
+                  </div>
+                  <TextField label="Country" value={draft.shippingCountry} onChange={(v) => setDraft({ ...draft, shippingCountry: v })} placeholder="US" />
+                </div>
+              ) : (
+                <AddressBlock
+                  name={draft.shippingName}
+                  address1={draft.shippingAddress1}
+                  address2={draft.shippingAddress2}
+                  city={draft.shippingCity}
+                  state={draft.shippingState}
+                  zip={draft.shippingZip}
+                  country={draft.shippingCountry}
                 />
               )}
-            </Section>
-
-            <Section title="Shipping Address">
-              <p className="text-[10px] text-off-black/50 -mt-1 mb-1 leading-relaxed">
-                Edits here are mirrored onto the fulfillment order so Elí ships to the new address.
-              </p>
-              <TextField label="Recipient name" value={draft.shippingName} onChange={(v) => setDraft({ ...draft, shippingName: v })} />
-              <TextField label="Address line 1" value={draft.shippingAddress1} onChange={(v) => setDraft({ ...draft, shippingAddress1: v })} />
-              <TextField label="Address line 2" value={draft.shippingAddress2} onChange={(v) => setDraft({ ...draft, shippingAddress2: v })} placeholder="Apt / suite (optional)" />
-              <div className="grid grid-cols-3 gap-3">
-                <TextField label="City" value={draft.shippingCity} onChange={(v) => setDraft({ ...draft, shippingCity: v })} />
-                <TextField label="State" value={draft.shippingState} onChange={(v) => setDraft({ ...draft, shippingState: v })} />
-                <TextField label="ZIP" value={draft.shippingZip} onChange={(v) => setDraft({ ...draft, shippingZip: v })} />
-              </div>
-              <TextField label="Country" value={draft.shippingCountry} onChange={(v) => setDraft({ ...draft, shippingCountry: v })} placeholder="US" />
-            </Section>
+              {creator.sampleOrder && (
+                <div className="mt-3 pt-3 border-t border-border-gray">
+                  <TrackingField
+                    creatorId={creator.id}
+                    initialNumber={creator.sampleOrder.trackingNumber || ''}
+                    initialCarrier={creator.sampleOrder.trackingCarrier || ''}
+                    shippedAt={creator.sampleOrder.shippedAt || null}
+                    onSaved={(updated) => onSaved({
+                      ...creator,
+                      sampleOrder: creator.sampleOrder ? { ...creator.sampleOrder, ...updated } : creator.sampleOrder,
+                    })}
+                  />
+                </div>
+              )}
+            </EditableCard>
 
             <Section title="Commission">
               <div>
@@ -1014,21 +1056,6 @@ function CreatorDrawer({
               )}
             </Section>
 
-            <Section title="Program Status">
-              <div>
-                <Label>Status</Label>
-                <select
-                  value={draft.status}
-                  onChange={(e) => setDraft({ ...draft, status: e.target.value as CreatorStatus })}
-                  className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-                >
-                  <option value="invited">Invited</option>
-                  <option value="onboarded">Onboarded</option>
-                  <option value="active">Active</option>
-                  <option value="paused">Paused</option>
-                </select>
-              </div>
-            </Section>
           </div>
 
           {/* Footer */}
@@ -1076,6 +1103,90 @@ function socialHandle(raw: string | null): string | null {
   if (!match) return v
   const seg = match[1].replace(/^@/, '')
   return `@${seg}`
+}
+
+// Card with a title row and an Edit/Done toggle in the corner. Children
+// decide what to render in each mode — the card just owns the chrome.
+function EditableCard({ title, isEditing, onToggle, children }: {
+  title: string
+  isEditing: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-white border border-border-gray rounded-md p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">{title}</h4>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors"
+        >
+          {isEditing ? <><Check className="w-3 h-3" /> Done</> : <><Pencil className="w-3 h-3" /> Edit</>}
+        </button>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// Color-tinted dropdown — background reflects the currently selected value.
+// Used for the Program + Content status pickers at the top of the drawer so
+// a glance tells you both states without having to read labels.
+function StatusSelect<T extends string>({
+  label, value, onChange, options, config,
+}: {
+  label: string
+  value: T
+  onChange: (v: T) => void
+  options: T[]
+  config: Record<T, { label: string; bg: string; color: string }>
+}) {
+  const cfg = config[value]
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className={`relative rounded border border-current/10 ${cfg.bg}`}>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value as T)}
+          className={`w-full appearance-none bg-transparent px-3 py-2 pr-8 text-sm font-medium ${cfg.color} focus:outline-none focus:ring-2 focus:ring-off-black/20 cursor-pointer`}
+        >
+          {options.map(opt => (
+            <option key={opt} value={opt} className="bg-white text-off-black font-normal">
+              {config[opt].label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className={`w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${cfg.color}`} />
+      </div>
+    </div>
+  )
+}
+
+function AddressBlock({ name, address1, address2, city, state, zip, country }: {
+  name: string | null
+  address1: string | null
+  address2: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  country: string | null
+}) {
+  const cityLine = [city, state].filter(Boolean).join(', ') + (zip ? ` ${zip}` : '')
+  const hasAny = name || address1 || address2 || cityLine.trim() || country
+  if (!hasAny) {
+    return <div className="text-sm text-off-black/30 italic">No address on file</div>
+  }
+  return (
+    <div className="text-sm text-off-black/80 leading-relaxed">
+      {name && <div className="font-medium text-off-black">{name}</div>}
+      {address1 && <div>{address1}</div>}
+      {address2 && <div>{address2}</div>}
+      {cityLine.trim() && <div>{cityLine}</div>}
+      {country && country !== 'US' && <div>{country}</div>}
+    </div>
+  )
 }
 
 function ProfileRow({
@@ -1175,15 +1286,6 @@ function NumberField({ label, value, onChange, suffix }: {
         />
         {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-off-black/40">{suffix}</span>}
       </div>
-    </div>
-  )
-}
-
-function StaticRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-off-black/60">{label}</span>
-      <span className="text-off-black/80 font-medium">{value}</span>
     </div>
   )
 }
