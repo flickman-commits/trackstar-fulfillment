@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText, Send, Star } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText, Send, Star, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
@@ -1604,23 +1605,14 @@ Thank you!`
                 </button>
               )}
             </div>
-            <div className="hidden md:flex flex-col items-end gap-1">
-              <a
-                href="https://www.artelo.io/app/orders?tab=ACTION_REQUIRED"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-off-black/40 hover:text-off-black/70 transition-colors"
+            <div className="hidden md:flex items-end">
+              <Link
+                to="/creators"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
               >
-                Go to Artelo Orders &rarr;
-              </a>
-              <a
-                href="https://admin.shopify.com/store/flickman-3247/orders"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-off-black/40 hover:text-off-black/70 transition-colors"
-              >
-                Go to Shopify Orders &rarr;
-              </a>
+                <Users className="w-4 h-4" />
+                Creators
+              </Link>
             </div>
           </div>
         </div>
