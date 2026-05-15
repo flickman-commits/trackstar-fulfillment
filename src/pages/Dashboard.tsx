@@ -3912,29 +3912,44 @@ Thank you!`
                   </div>
 
                   {/* === DESKTOP FULL DETAIL VIEW === */}
-                  {/* Product Info */}
-                  <div className="hidden md:block">
-                    <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Product Info</h4>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
-                      <StaticField label="Size" value={selectedOrder.productSize} />
-                      <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                    </div>
-                  </div>
-
-                  {/* Editable Order Info */}
-                  <div className="hidden md:block">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Order Details</h4>
-                      {!isEditing && selectedOrder.status !== 'completed' && (
+                  {/* Top badges — race · year · size. These are the cheat-sheet
+                      for "which template and artboard do I open?" Edit pencil
+                      opens an inline form to override race / year / runner name. */}
+                  {!isEditing && (
+                    <div className="hidden md:flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center px-3 py-1.5 bg-off-black/5 border border-border-gray rounded-md text-sm font-semibold text-off-black">
+                        {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Unknown Race'}
+                      </span>
+                      <span className={`inline-flex items-center px-3 py-1.5 border rounded-md text-sm font-semibold ${
+                        (selectedOrder.effectiveRaceYear || selectedOrder.raceYear)
+                          ? 'bg-off-black/5 border-border-gray text-off-black'
+                          : 'bg-amber-50 border-amber-200 text-warning-amber'
+                      }`}>
+                        {selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'Year?'}
+                      </span>
+                      <span className="inline-flex items-center px-3 py-1.5 bg-off-black/5 border border-border-gray rounded-md text-sm font-semibold text-off-black">
+                        {selectedOrder.productSize}
+                      </span>
+                      {selectedOrder.hasOverrides && (
+                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[10px] rounded">edited</span>
+                      )}
+                      {selectedOrder.status !== 'completed' && (
                         <button
                           onClick={() => startEditing(selectedOrder)}
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                          className="ml-auto inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
                         >
                           <Pencil className="w-3 h-3" />
                           Edit
                         </button>
                       )}
-                      {isEditing && (
+                    </div>
+                  )}
+
+                  {/* Edit form — only when isEditing. Replaces the badges row. */}
+                  {isEditing && (
+                    <div className="hidden md:block">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Edit Order</h4>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => saveOverrides(selectedOrder.orderNumber, selectedOrder)}
@@ -3952,11 +3967,8 @@ Thank you!`
                             Cancel
                           </button>
                         </div>
-                      )}
-                    </div>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
-                      {/* Runner Name - Editable */}
-                      {isEditing ? (
+                      </div>
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                         <div className="flex justify-between items-center">
                           <span className="text-body-sm text-off-black/60">Runner</span>
                           <input
@@ -3966,22 +3978,6 @@ Thank you!`
                             className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-48 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
-                      ) : (
-                        <div className="flex justify-between items-center">
-                          <span className="text-body-sm text-off-black/60">Runner</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-body-sm font-medium text-off-black">
-                              {selectedOrder.effectiveRunnerName || selectedOrder.runnerName}
-                            </span>
-                            {selectedOrder.runnerNameOverride && (
-                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[10px] rounded">edited</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Race Name - Editable */}
-                      {isEditing ? (
                         <div className="flex justify-between items-center">
                           <span className="text-body-sm text-off-black/60">Race</span>
                           <input
@@ -3991,22 +3987,6 @@ Thank you!`
                             className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-48 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
-                      ) : (
-                        <div className="flex justify-between items-center">
-                          <span className="text-body-sm text-off-black/60">Race</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-body-sm font-medium text-off-black">
-                              {selectedOrder.effectiveRaceName || selectedOrder.raceName}
-                            </span>
-                            {selectedOrder.raceNameOverride && (
-                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[10px] rounded">edited</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Year - Editable */}
-                      {isEditing ? (
                         <div className="flex justify-between items-center">
                           <span className="text-body-sm text-off-black/60">Year</span>
                           <input
@@ -4018,22 +3998,65 @@ Thank you!`
                             max="2030"
                           />
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Runner Details — copy-pasteable name + research data, top of stack */}
+                  <div className="hidden md:block">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Runner Details</h4>
+                      {selectedOrder.resultsUrl && (
+                        <a
+                          href={selectedOrder.resultsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                        >
+                          View Results ↗
+                        </a>
+                      )}
+                    </div>
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                      {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
+                        <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
                       ) : (
-                        <div className="flex justify-between items-center">
-                          <span className="text-body-sm text-off-black/60">Year</span>
-                          <div className="flex items-center gap-2">
-                            {(selectedOrder.effectiveRaceYear || selectedOrder.raceYear) ? (
-                              <span className="text-body-sm font-medium text-off-black">
-                                {selectedOrder.effectiveRaceYear || selectedOrder.raceYear}
-                              </span>
-                            ) : (
-                              <span className="text-body-sm text-warning-amber font-medium">Missing</span>
-                            )}
-                            {selectedOrder.yearOverride && (
-                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[10px] rounded">edited</span>
-                            )}
-                          </div>
+                        <PendingField label="Name" />
+                      )}
+                      {selectedOrder.bibNumber ? (
+                        <CopyableField label="Bib" value={selectedOrder.bibNumber} />
+                      ) : selectedOrder.hasScraperAvailable ? (
+                        <PendingField label="Bib" />
+                      ) : (
+                        <NotAvailableField label="Bib" />
+                      )}
+                      {selectedOrder.officialTime ? (
+                        <CopyableField label="Time" value={selectedOrder.officialTime} />
+                      ) : selectedOrder.hadNoTime ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-off-black/40 w-16">Time</span>
+                          <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
+                            ⚠️ No Time
+                          </span>
                         </div>
+                      ) : selectedOrder.timeFromName ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-off-black/40 w-16">Time</span>
+                          <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">
+                            ⏱ {selectedOrder.timeFromName}
+                          </span>
+                        </div>
+                      ) : selectedOrder.hasScraperAvailable ? (
+                        <PendingField label="Time" />
+                      ) : (
+                        <NotAvailableField label="Time" />
+                      )}
+                      {selectedOrder.officialPace ? (
+                        <CopyableField label="Pace" value={selectedOrder.officialPace} />
+                      ) : selectedOrder.hasScraperAvailable ? (
+                        <PendingField label="Pace" />
+                      ) : (
+                        <NotAvailableField label="Pace" />
                       )}
                     </div>
                   </div>
@@ -4121,65 +4144,6 @@ Thank you!`
                         <CopyableField label="Temp" value={selectedOrder.weatherTemp} />
                       ) : (
                         <PendingField label="Temp" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Runner Research Results */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Research Results</h4>
-                      {selectedOrder.resultsUrl && (
-                        <a
-                          href={selectedOrder.resultsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                          View Results ↗
-                        </a>
-                      )}
-                    </div>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
-                      {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
-                        <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
-                      ) : (
-                        <PendingField label="Name" />
-                      )}
-                      {selectedOrder.bibNumber ? (
-                        <CopyableField label="Bib" value={selectedOrder.bibNumber} />
-                      ) : selectedOrder.hasScraperAvailable ? (
-                        <PendingField label="Bib" />
-                      ) : (
-                        <NotAvailableField label="Bib" />
-                      )}
-                      {selectedOrder.officialTime ? (
-                        <CopyableField label="Time" value={selectedOrder.officialTime} />
-                      ) : selectedOrder.hadNoTime ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-off-black/40 w-16">Time</span>
-                          <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
-                            ⚠️ No Time
-                          </span>
-                        </div>
-                      ) : selectedOrder.timeFromName ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-off-black/40 w-16">Time</span>
-                          <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">
-                            ⏱ {selectedOrder.timeFromName}
-                          </span>
-                        </div>
-                      ) : selectedOrder.hasScraperAvailable ? (
-                        <PendingField label="Time" />
-                      ) : (
-                        <NotAvailableField label="Time" />
-                      )}
-                      {selectedOrder.officialPace ? (
-                        <CopyableField label="Pace" value={selectedOrder.officialPace} />
-                      ) : selectedOrder.hasScraperAvailable ? (
-                        <PendingField label="Pace" />
-                      ) : (
-                        <NotAvailableField label="Pace" />
                       )}
                     </div>
                   </div>
@@ -4276,6 +4240,14 @@ Thank you!`
                       </div>
                     </div>
                   )}
+
+                  {/* Filename — last step before exporting. Copy-pasteable. */}
+                  <div className="hidden md:block">
+                    <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Filename</h4>
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4">
+                      <CopyableField label="File" value={generateFilename(selectedOrder)} />
+                    </div>
+                  </div>
 
                   {/* Comments */}
                   <div>
