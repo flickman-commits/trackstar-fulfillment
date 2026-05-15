@@ -394,6 +394,9 @@ export default function Dashboard() {
           partnerContactName: order.partnerContactName as string | null | undefined,
           creatorShipping: order.creatorShipping as Order['creatorShipping'],
           creatorSampleCreatorId: order.creatorSampleCreatorId as string | null | undefined,
+          // Frame type — only surfaced in the creator-sample callout. For regular
+          // orders Artelo has it baked in, so we don't show it elsewhere.
+          frameType: order.frameType as string | null | undefined,
           // Alert flags
           hadNoTime: order.hadNoTime as boolean | undefined,
           timeFromName: order.timeFromName as string | null | undefined,
