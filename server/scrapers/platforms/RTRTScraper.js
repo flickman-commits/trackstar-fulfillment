@@ -75,7 +75,14 @@ export class RTRTScraper extends BaseScraper {
 
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 
-      if (matches.length === 0) return this.notFoundResult()
+      if (matches.length === 0) {
+        console.log(`[${this.tag}] No name match. Surfacing ${Math.min(searchResults.length, 10)} candidates.`)
+        return this.notFoundResult(null, searchResults.slice(0, 10).map(p => ({
+          name: p.name || `${p.fname || ''} ${p.lname || ''}`.trim(),
+          bib: p.bib,
+          eventType: this.config.defaultEventType || 'Marathon',
+        })))
+      }
 
       // For multi-course events (e.g. marathon + half at same race), resolve
       // which event the runner is in via their `course` field.

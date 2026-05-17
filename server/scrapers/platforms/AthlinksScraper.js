@@ -113,7 +113,10 @@ export class AthlinksScraper extends BaseScraper {
       const courses = data?.result?.courses || []
       console.log(`[${this.tag}] ${courses.length} course(s) returned`)
 
-      // Walk courses in eventSearchOrder so marathon takes precedence over half
+      // Walk courses in eventSearchOrder so marathon takes precedence over half.
+      // We also collect non-matching candidates across all courses to surface
+      // as possibleMatches if no exact match is found.
+      const allCandidates = []
       const order = this.config.eventSearchOrder || ['marathon', 'half']
       for (const distKey of order) {
         const courseRegex = this.config.courseMap?.[distKey]
@@ -132,7 +135,22 @@ export class AthlinksScraper extends BaseScraper {
           )
           console.log(`[${this.tag}] Course "${course.courseName}" (${distKey}): ${matches.length} name match(es)`)
 
-          if (matches.length === 0) continue
+          if (matches.length === 0) {
+            // Save these as candidates in case we don't find any exact match in any course
+            const eventLabel = this.config.eventLabels?.[distKey] || distKey
+            for (const r of results.slice(0, 10)) {
+              const time = this._extractTime(r)
+              allCandidates.push({
+                name: r.displayName || `${r.firstName} ${r.lastName}`.trim(),
+                bib: r.bib,
+                time,
+                city: r.city,
+                state: r.stateProv,
+                eventType: eventLabel,
+              })
+            }
+            continue
+          }
           if (matches.length > 1) {
             return this.ambiguousResult(matches.map(m => ({
               name: m.displayName,
@@ -184,8 +202,8 @@ export class AthlinksScraper extends BaseScraper {
         }
       }
 
-      console.log(`[${this.tag}] No matching runner across configured courses`)
-      return this.notFoundResult()
+      console.log(`[${this.tag}] No matching runner across configured courses. Surfacing ${allCandidates.length} candidates.`)
+      return this.notFoundResult(null, allCandidates.slice(0, 15))
     } catch (error) {
       console.error(`[${this.tag}] Error: ${error.message}`)
       return { ...this.notFoundResult(), researchNotes: `Error: ${error.message}` }

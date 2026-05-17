@@ -70,9 +70,13 @@ export class MyRaceAiScraper extends BaseScraper {
       console.log(`[${this.tag} ${this.year}] Exact matches after filtering: ${matches.length}`)
 
       if (matches.length === 0) {
-        console.log(`[${this.tag} ${this.year}] No exact match. Closest:`)
-        results.slice(0, 3).forEach(r => console.log(`  - ${r.name} (${r.finishChipTime})`))
-        return this.notFoundResult()
+        console.log(`[${this.tag} ${this.year}] No exact match. Surfacing ${Math.min(results.length, 10)} candidates.`)
+        return this.notFoundResult(null, results.slice(0, 10).map(r => ({
+          name: r.name,
+          bib: r.bib,
+          time: r.finishChipTime,
+          eventType: this.config.defaultEventType || 'Marathon',
+        })))
       }
 
       if (matches.length > 1) {

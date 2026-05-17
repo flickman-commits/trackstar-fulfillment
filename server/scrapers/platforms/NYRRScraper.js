@@ -125,8 +125,13 @@ export class NYRRScraper extends BaseScraper {
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 
       if (matches.length === 0) {
-        console.log(`[${this.tag}] No exact match for: ${runnerName}`)
-        return this.notFoundResult()
+        console.log(`[${this.tag}] No exact match for: ${runnerName}. Surfacing ${Math.min(results.length, 10)} candidates.`)
+        return this.notFoundResult(null, results.slice(0, 10).map(r => ({
+          name: `${r.firstName} ${r.lastName}`.trim(),
+          bib: r.bib,
+          time: r.overallTime,
+          eventType: this.config.defaultEventType || 'Marathon',
+        })))
       }
 
       if (matches.length > 1) {

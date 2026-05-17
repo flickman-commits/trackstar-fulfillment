@@ -206,12 +206,16 @@ export class MyChipTimeScraper extends BaseScraper {
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 
       if (matches.length === 0) {
-        console.log(`[${this.tag}] No exact match. Closest results:`)
-        results.slice(0, 3).forEach(r => {
-          const name = r.fullName || r.name || `${r.firstName} ${r.lastName}`
-          console.log(`  - ${name}`)
-        })
-        return this._notFound()
+        console.log(`[${this.tag}] No exact match. Surfacing ${Math.min(results.length, 10)} candidates.`)
+        return this._notFound(null, results.slice(0, 10).map(r => ({
+          name: r.fullName || r.name || `${r.firstName || ''} ${r.lastName || ''}`.trim(),
+          bib: r.bib,
+          time: r.chipTime || r.finishTime,
+          pace: r.pace,
+          city: r.city,
+          state: r.state,
+          eventType: this.config.defaultEventType || 'Marathon',
+        })))
       }
 
       if (matches.length > 1) {
@@ -454,7 +458,7 @@ export class MyChipTimeScraper extends BaseScraper {
     }
   }
 
-  _notFound(notes = null) {
+  _notFound(notes = null, possibleMatches = null) {
     return {
       found: false,
       ambiguous: false,
@@ -463,7 +467,8 @@ export class MyChipTimeScraper extends BaseScraper {
       officialPace: null,
       eventType: null,
       yearFound: this.year,
-      researchNotes: notes || 'Runner not found in results'
+      researchNotes: notes || 'Runner not found in results',
+      possibleMatches: Array.isArray(possibleMatches) && possibleMatches.length > 0 ? possibleMatches : null
     }
   }
 }

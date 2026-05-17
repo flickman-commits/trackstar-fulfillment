@@ -2,6 +2,8 @@
  * Base class for all race result scrapers
  * Provides common interface and shared utilities
  */
+import { firstNamesEquivalent } from './nicknames.js'
+
 export class BaseScraper {
   constructor(raceName, year) {
     this.raceName = raceName
@@ -155,23 +157,38 @@ export class BaseScraper {
   }
 
   /**
-   * Check if two names match (fuzzy comparison)
+   * Check if two names match (fuzzy comparison).
+   *
+   * Match types (in order of preference):
+   *   1. Exact match after normalization (lowercase, "Last, First" reorder)
+   *   2. First+last with middle names ignored
+   *   3. First+last with nickname expansion (Mike↔Michael, Liz↔Elizabeth)
+   *
+   * @param {string} name1 - the search query (what the customer entered)
+   * @param {string} name2 - the candidate from the results page
+   * @returns {boolean}
    */
   namesMatch(name1, name2) {
     const n1 = this.normalizeName(name1)
     const n2 = this.normalizeName(name2)
+    if (!n1 || !n2) return false
 
     // Exact match
     if (n1 === n2) return true
 
-    // Check if one contains the other (handles middle names)
     const parts1 = n1.split(' ')
     const parts2 = n2.split(' ')
 
-    // First and last name match
     if (parts1.length >= 2 && parts2.length >= 2) {
-      if (parts1[0] === parts2[0] && parts1[parts1.length - 1] === parts2[parts2.length - 1]) {
-        return true
+      const first1 = parts1[0]
+      const last1  = parts1[parts1.length - 1]
+      const first2 = parts2[0]
+      const last2  = parts2[parts2.length - 1]
+
+      // Last name must match exactly. First name can match exactly OR via nickname.
+      if (last1 === last2) {
+        if (first1 === first2) return true
+        if (firstNamesEquivalent(first1, first2)) return true
       }
     }
 
@@ -181,8 +198,13 @@ export class BaseScraper {
   /**
    * Return standardized "not found" result.
    * @param {string} [reason] - Optional context (e.g. "Closest match: Bob Smith (3:10:42)")
+   * @param {Array} [possibleMatches] - Optional list of candidate runners to surface
+   *   to the dashboard so the user can pick one manually. Each entry should be
+   *   `{ name, bib?, time?, pace?, city?, state?, eventType?, resultsUrl? }`.
+   *   Use when the scraper found candidates that didn't pass namesMatch (e.g.
+   *   last-name-only search → 50 Smiths to choose from).
    */
-  notFoundResult(reason) {
+  notFoundResult(reason, possibleMatches) {
     return {
       found: false,
       bibNumber: null,
@@ -192,7 +214,10 @@ export class BaseScraper {
       yearFound: this.year,
       // 'not_found' = runner truly not in the results page
       researchStatus: 'not_found',
-      researchNotes: reason || `Runner not found in ${this.raceName} ${this.year} results`
+      researchNotes: reason || `Runner not found in ${this.raceName} ${this.year} results`,
+      possibleMatches: Array.isArray(possibleMatches) && possibleMatches.length > 0
+        ? possibleMatches
+        : null
     }
   }
 

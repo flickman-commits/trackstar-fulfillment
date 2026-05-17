@@ -101,11 +101,14 @@ export class BrookseeScraper extends BaseScraper {
       console.log(`[${this.tag} ${this.year}] Name matches in ${eventLabel}: ${matches.length}`)
 
       if (matches.length === 0) {
-        if (rows.length > 0) {
-          console.log(`[${this.tag} ${this.year}] Closest results:`)
-          rows.slice(0, 3).forEach(r => console.log(`  - ${r.firstName} ${r.lastName} (bib ${r.bib})`))
-        }
-        return this.notFoundResult()
+        console.log(`[${this.tag} ${this.year}] No name match. Surfacing ${Math.min(rows.length, 10)} candidates.`)
+        return this.notFoundResult(null, rows.slice(0, 10).map(r => ({
+          name: `${r.firstName} ${r.lastName}`.trim(),
+          bib: r.bib,
+          time: r.chipTime || r.finishTime,
+          pace: r.pace,
+          eventType: eventLabel,
+        })))
       }
 
       if (matches.length > 1) {

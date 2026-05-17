@@ -162,7 +162,15 @@ export class ScoreThisScraper extends BaseScraper {
       console.log(`[${this.tag}] Full name matches: ${nameMatches.length}`)
 
       if (nameMatches.length === 0) {
-        return this.notFoundResult()
+        console.log(`[${this.tag}] No full-name match. Surfacing ${Math.min(lastNameMatches.length, 10)} last-name candidates.`)
+        return this.notFoundResult(null, lastNameMatches.slice(0, 10).map(r => ({
+          name: `${r.firstName} ${r.lastName}`.trim(),
+          bib: r.bib,
+          time: r.chipTime,
+          eventType: r.eventType,
+          city: r.city,
+          state: r.state,
+        })))
       }
 
       // Try to find a match in preferred event order

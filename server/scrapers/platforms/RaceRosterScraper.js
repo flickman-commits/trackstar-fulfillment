@@ -126,13 +126,14 @@ export class RaceRosterScraper extends BaseScraper {
       console.log(`[${this.tag} ${this.year}] Matches in ${eventLabel} with name match: ${eventMatches.length}`)
 
       if (eventMatches.length === 0) {
-        // Log closest matches for debugging
+        // Surface close matches as possibleMatches so user can pick one
         const closeMatches = allMatches.filter(m => String(m.resultSubEventId) === String(subEventId))
-        if (closeMatches.length > 0) {
-          console.log(`[${this.tag} ${this.year}] Closest results in ${eventLabel}:`)
-          closeMatches.slice(0, 3).forEach(m => console.log(`  - ${m.name} (bib ${m.bib})`))
-        }
-        return this.notFoundResult()
+        console.log(`[${this.tag} ${this.year}] No name match in ${eventLabel}. Surfacing ${Math.min(closeMatches.length, 10)} candidates.`)
+        return this.notFoundResult(null, closeMatches.slice(0, 10).map(m => ({
+          name: m.name,
+          bib: m.bib,
+          eventType: eventLabel,
+        })))
       }
 
       if (eventMatches.length > 1) {

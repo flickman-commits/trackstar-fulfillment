@@ -104,8 +104,13 @@ export class XacteScraper extends BaseScraper {
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 
       if (matches.length === 0) {
-        console.log(`[${this.tag}] No exact match for: ${runnerName}`)
-        return this.notFoundResult()
+        console.log(`[${this.tag}] No exact match for: ${runnerName}. Surfacing ${Math.min(results.length, 10)} candidates.`)
+        return this.notFoundResult(null, results.slice(0, 10).map(r => ({
+          name: `${r.firstname || ''} ${r.lastname || ''}`.trim(),
+          bib: r.bib,
+          time: r.chiptime || r.guntime,
+          eventType: this.config.defaultEventType || 'Marathon',
+        })))
       }
 
       // If multiple matches, try to narrow by event search order

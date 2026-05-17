@@ -146,9 +146,17 @@ export class RunSignUpScraper extends BaseScraper {
       console.log(`[${this.tag} ${this.year}] Exact matches: ${matches.length}`)
 
       if (matches.length === 0) {
-        console.log(`[${this.tag} ${this.year}] No exact match. Closest:`)
-        results.slice(0, 3).forEach(r => console.log(`  - ${r.name} (${r.chipTime})`))
-        return this.notFoundResult()
+        console.log(`[${this.tag} ${this.year}] No exact match. Surfacing ${Math.min(results.length, 10)} candidates as possibleMatches:`)
+        results.slice(0, 10).forEach(r => console.log(`  - ${r.name} (${r.chipTime})`))
+        return this.notFoundResult(null, results.slice(0, 10).map(r => ({
+          name: r.name,
+          bib: r.bib,
+          time: r.chipTime,
+          pace: r.pace,
+          city: r.city,
+          state: r.state,
+          eventType
+        })))
       }
 
       if (matches.length > 1) {
@@ -254,13 +262,17 @@ export class RunSignUpScraper extends BaseScraper {
       console.log(`[${this.tag} ${this.year}] Exact matches after name filtering: ${matches.length}`)
 
       if (matches.length === 0) {
-        console.log(`[${this.tag} ${this.year}] No exact match for: ${runnerName}`)
-        console.log(`[${this.tag} ${this.year}] Closest results were:`)
-        results.slice(0, 3).forEach(r => {
-          console.log(`  - ${r.name} (${r.chipTime})`)
-        })
+        console.log(`[${this.tag} ${this.year}] No exact match for: ${runnerName}. Surfacing ${Math.min(results.length, 10)} candidates.`)
         await browser.close()
-        return this.notFoundResult()
+        return this.notFoundResult(null, results.slice(0, 10).map(r => ({
+          name: r.name,
+          bib: r.bib,
+          time: r.chipTime,
+          pace: r.pace,
+          city: r.city,
+          state: r.state,
+          eventType
+        })))
       }
 
       if (matches.length > 1) {

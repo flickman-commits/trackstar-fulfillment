@@ -126,8 +126,11 @@ export class MultiSportAustraliaScraper extends BaseScraper {
       console.log(`[${this.tag}] Exact matches: ${matches.length}`)
 
       if (matches.length === 0) {
-        candidates.slice(0, 3).forEach(c => console.log(`  closest: ${c.name}`))
-        return this.notFoundResult()
+        console.log(`[${this.tag}] No name match. Surfacing ${Math.min(candidates.length, 10)} candidates.`)
+        return this.notFoundResult(null, candidates.slice(0, 10).map(c => ({
+          name: c.name,
+          eventType: this.config.defaultEventType || 'Marathon',
+        })))
       }
       if (matches.length > 1) {
         return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: null, time: null })))
