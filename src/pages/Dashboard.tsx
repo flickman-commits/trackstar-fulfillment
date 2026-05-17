@@ -306,6 +306,11 @@ export default function Dashboard() {
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
   const [healthResults, setHealthResults] = useState<any>(null)
   const [isRunningHealth, setIsRunningHealth] = useState(false)
+  type ConnTestStep = { name: string; status: 'ok' | 'warn' | 'error'; message: string; detail?: string | null; latency?: string }
+  type ConnTestProvider = { status: 'ok' | 'warn' | 'error' | 'pending'; steps: ConnTestStep[] }
+  type ConnTestResult = { timestamp: string; providers: { artelo: ConnTestProvider; shopify: ConnTestProvider; etsy: ConnTestProvider }; error?: string }
+  const [connTestResults, setConnTestResults] = useState<ConnTestResult | null>(null)
+  const [isRunningConnTest, setIsRunningConnTest] = useState(false)
   const [showReviewRequest, setShowReviewRequest] = useState(false)
   const [reviewCopied, setReviewCopied] = useState<string | null>(null)
   const [customersServedCount, setCustomersServedCount] = useState<number | null>(null)
@@ -2841,6 +2846,85 @@ Thank you!`
                           {isLoadingCounter ? 'Saving…' : 'Update & Sync'}
                         </button>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Test Connections — granular Artelo / Shopify / Etsy diagnostics */}
+                  <div className="border-t border-border-gray p-6">
+                    <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-off-black">Test Connections</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Step-by-step diagnostics for Artelo, Shopify, and Etsy — tells you exactly which credential or API call is failing.</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            setIsRunningConnTest(true)
+                            setConnTestResults(null)
+                            try {
+                              const response = await apiFetch('/api/orders/actions?action=test-connections')
+                              const data = await response.json()
+                              if (!response.ok && !data.providers) {
+                                setConnTestResults({ timestamp: new Date().toISOString(), providers: { artelo: { status: 'error', steps: [] }, shopify: { status: 'error', steps: [] }, etsy: { status: 'error', steps: [] } }, error: data.error || `HTTP ${response.status}` })
+                              } else {
+                                setConnTestResults(data)
+                              }
+                            } catch (err: unknown) {
+                              const msg = err instanceof Error ? err.message : 'Failed to test connections'
+                              setConnTestResults({ timestamp: new Date().toISOString(), providers: { artelo: { status: 'error', steps: [] }, shopify: { status: 'error', steps: [] }, etsy: { status: 'error', steps: [] } }, error: msg })
+                            } finally {
+                              setIsRunningConnTest(false)
+                            }
+                          }}
+                          disabled={isRunningConnTest}
+                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                        >
+                          {isRunningConnTest && <Loader2 className="w-3 h-3 animate-spin" />}
+                          {isRunningConnTest ? 'Testing…' : 'Test Connections'}
+                        </button>
+                      </div>
+
+                      {connTestResults && (
+                        <div className="mt-4 space-y-3">
+                          {connTestResults.error && (
+                            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{connTestResults.error}</div>
+                          )}
+                          {(['artelo', 'shopify', 'etsy'] as const).map(provider => {
+                            const p = connTestResults.providers[provider]
+                            if (!p) return null
+                            const providerLabel = { artelo: 'Artelo', shopify: 'Shopify', etsy: 'Etsy' }[provider]
+                            const headerIcon = p.status === 'ok' ? '✅' : p.status === 'warn' ? '⚠️' : '❌'
+                            const headerColor = p.status === 'ok' ? 'text-green-700' : p.status === 'warn' ? 'text-amber-700' : 'text-red-700'
+                            const bgColor = p.status === 'ok' ? 'bg-green-50 border-green-200' : p.status === 'warn' ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'
+                            return (
+                              <div key={provider} className={`rounded border ${bgColor} p-3`}>
+                                <div className={`text-xs font-bold ${headerColor} uppercase tracking-wide mb-2`}>
+                                  {headerIcon} {providerLabel}
+                                </div>
+                                <div className="space-y-1.5">
+                                  {p.steps.map((step, idx) => (
+                                    <div key={idx} className="flex items-start gap-2 text-xs">
+                                      <span className="flex-shrink-0 mt-0.5">{step.status === 'ok' ? '✅' : step.status === 'warn' ? '⚠️' : '❌'}</span>
+                                      <div className="min-w-0 flex-1">
+                                        <span className="font-medium text-off-black">{step.name}</span>
+                                        {step.latency && <span className="text-off-black/30 ml-1.5">({step.latency})</span>}
+                                        <div className={`mt-0.5 ${step.status === 'ok' ? 'text-off-black/60' : step.status === 'warn' ? 'text-amber-700' : 'text-red-700'}`}>
+                                          {step.message}
+                                        </div>
+                                        {step.detail && (
+                                          <div className="mt-1 px-2 py-1 bg-white/60 border border-black/5 rounded font-mono text-[10px] text-off-black/60 break-all whitespace-pre-wrap">
+                                            {step.detail}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
 

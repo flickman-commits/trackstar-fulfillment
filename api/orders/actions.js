@@ -80,6 +80,11 @@ export default async function handler(req, res) {
       if (!isCron && !requireAdmin(req, res)) return
       return await handleHealthCheck(res, { sendSlack: isCron })
     }
+    if (action === 'test-connections') {
+      // Detailed Artelo / Shopify / Etsy step-by-step connection diagnostics
+      if (!requireAdmin(req, res)) return
+      return await handleTestConnections(res)
+    }
     if (action === 'ping') {
       // Public — no auth needed. Used by UptimeRobot to monitor uptime.
       // Only returns status, no sensitive data.
@@ -498,6 +503,247 @@ async function handleMondayPipeline(res) {
     console.error('[actions/monday-pipeline] Error:', error)
     return res.status(500).json({ error: error.message })
   }
+}
+
+// --- test-connections ---
+// Granular, step-by-step diagnostics for Artelo + Shopify + Etsy. Each provider
+// runs a sequence of steps and we report exactly which one passed/failed and
+// why — so when something breaks, the user can see which credential or call is
+// the actual culprit instead of getting a generic "Etsy: error" message.
+async function handleTestConnections(res) {
+  const results = {
+    timestamp: new Date().toISOString(),
+    providers: {
+      artelo: { status: 'pending', steps: [] },
+      shopify: { status: 'pending', steps: [] },
+      etsy: { status: 'pending', steps: [] },
+    }
+  }
+
+  // Helper that times a step and records it on the provider
+  const runStep = async (provider, name, fn) => {
+    const start = Date.now()
+    try {
+      const result = await fn()
+      const latency = Date.now() - start
+      const step = {
+        name,
+        status: result?.status || 'ok',
+        message: result?.message || 'ok',
+        detail: result?.detail || null,
+        latency: `${latency}ms`
+      }
+      results.providers[provider].steps.push(step)
+      return step.status !== 'error'
+    } catch (err) {
+      results.providers[provider].steps.push({
+        name,
+        status: 'error',
+        message: err.message || 'Unknown error',
+        detail: err.stack ? err.stack.split('\n').slice(0, 3).join(' | ') : null,
+        latency: `${Date.now() - start}ms`
+      })
+      return false
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // ARTELO — fetch a small page of orders
+  // ─────────────────────────────────────────────────────────────────
+  await runStep('artelo', 'API key configured', async () => {
+    if (!process.env.ARTELO_API_KEY) {
+      return { status: 'error', message: 'ARTELO_API_KEY env var is missing' }
+    }
+    return { status: 'ok', message: `Key present (${process.env.ARTELO_API_KEY.length} chars)` }
+  })
+
+  let arteloOrdersCount = 0
+  await runStep('artelo', 'GET /api/open/orders/get', async () => {
+    if (!process.env.ARTELO_API_KEY) return { status: 'error', message: 'Skipped (no key)' }
+    const params = new URLSearchParams({ limit: '5', allOrders: 'true' })
+    const resp = await fetch(`https://www.artelo.io/api/open/orders/get?${params}`, {
+      headers: { 'Authorization': `Bearer ${process.env.ARTELO_API_KEY}`, 'Content-Type': 'application/json' }
+    })
+    if (!resp.ok) {
+      const body = await resp.text()
+      return { status: 'error', message: `HTTP ${resp.status}`, detail: body.slice(0, 300) }
+    }
+    const data = await resp.json()
+    arteloOrdersCount = Array.isArray(data) ? data.length : (data.orders?.length || 0)
+    return { status: 'ok', message: `HTTP 200 — ${arteloOrdersCount} order(s) in sample` }
+  })
+
+  await runStep('artelo', 'Response shape valid', async () => {
+    if (arteloOrdersCount === 0) {
+      return { status: 'warn', message: 'API returned 0 orders — could be empty store, but worth verifying' }
+    }
+    return { status: 'ok', message: `Got ${arteloOrdersCount} order(s) with the expected JSON shape` }
+  })
+
+  // ─────────────────────────────────────────────────────────────────
+  // SHOPIFY — OAuth + shop + orders
+  // ─────────────────────────────────────────────────────────────────
+  await runStep('shopify', 'Env vars present', async () => {
+    const missing = []
+    if (!process.env.SHOPIFY_STORE) missing.push('SHOPIFY_STORE')
+    if (!process.env.SHOPIFY_CLIENT_ID) missing.push('SHOPIFY_CLIENT_ID')
+    if (!process.env.SHOPIFY_CLIENT_SECRET) missing.push('SHOPIFY_CLIENT_SECRET')
+    if (missing.length) return { status: 'error', message: `Missing: ${missing.join(', ')}` }
+    return { status: 'ok', message: `Store: ${process.env.SHOPIFY_STORE}` }
+  })
+
+  let shopifyToken = null
+  await runStep('shopify', 'OAuth client_credentials exchange', async () => {
+    if (!process.env.SHOPIFY_CLIENT_ID || !process.env.SHOPIFY_CLIENT_SECRET) {
+      return { status: 'error', message: 'Skipped (missing credentials)' }
+    }
+    const resp = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: process.env.SHOPIFY_CLIENT_ID,
+        client_secret: process.env.SHOPIFY_CLIENT_SECRET,
+        grant_type: 'client_credentials'
+      })
+    })
+    if (!resp.ok) {
+      const body = await resp.text()
+      return { status: 'error', message: `HTTP ${resp.status}`, detail: body.slice(0, 300) }
+    }
+    const data = await resp.json()
+    shopifyToken = data.access_token
+    const scopes = data.scope ? data.scope.split(',').join(', ') : 'unknown'
+    return { status: 'ok', message: `Token issued. Scopes: ${scopes}` }
+  })
+
+  await runStep('shopify', 'GET /shop.json', async () => {
+    if (!shopifyToken) return { status: 'error', message: 'Skipped (no access token)' }
+    const resp = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2024-01/shop.json`, {
+      headers: { 'X-Shopify-Access-Token': shopifyToken }
+    })
+    if (!resp.ok) {
+      const body = await resp.text()
+      return { status: 'error', message: `HTTP ${resp.status}`, detail: body.slice(0, 300) }
+    }
+    const data = await resp.json()
+    return { status: 'ok', message: `Shop: ${data.shop?.name || '?'} (${data.shop?.email || '?'})` }
+  })
+
+  await runStep('shopify', 'GET /orders.json (verify read_orders scope)', async () => {
+    if (!shopifyToken) return { status: 'error', message: 'Skipped (no access token)' }
+    const resp = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2024-01/orders.json?limit=1&status=any&fields=id,name,created_at`, {
+      headers: { 'X-Shopify-Access-Token': shopifyToken }
+    })
+    if (!resp.ok) {
+      const body = await resp.text()
+      return { status: 'error', message: `HTTP ${resp.status} (likely scope issue)`, detail: body.slice(0, 300) }
+    }
+    const data = await resp.json()
+    const sample = data.orders?.[0]
+    return { status: 'ok', message: sample ? `Latest order: ${sample.name} (${sample.created_at?.slice(0, 10)})` : 'Endpoint reachable, no orders returned' }
+  })
+
+  // ─────────────────────────────────────────────────────────────────
+  // ETSY — env + token refresh + shop + transactions
+  // ─────────────────────────────────────────────────────────────────
+  await runStep('etsy', 'Env vars present', async () => {
+    const missing = []
+    if (!process.env.ETSY_API_KEY) missing.push('ETSY_API_KEY')
+    if (!process.env.ETSY_SHARED_SECRET) missing.push('ETSY_SHARED_SECRET')
+    if (!process.env.ETSY_SHOP_ID) missing.push('ETSY_SHOP_ID')
+    if (missing.length) return { status: 'error', message: `Missing: ${missing.join(', ')}` }
+    return { status: 'ok', message: `Shop ID: ${process.env.ETSY_SHOP_ID}` }
+  })
+
+  let etsyRefreshTokenRow = null
+  await runStep('etsy', 'Refresh token in database', async () => {
+    etsyRefreshTokenRow = await prisma.systemConfig.findUnique({ where: { key: 'etsy_refresh_token' } })
+    if (!etsyRefreshTokenRow?.value) {
+      return { status: 'error', message: 'No refresh token in DB — visit /api/etsy/auth to re-authenticate' }
+    }
+    return { status: 'ok', message: `Token stored (${etsyRefreshTokenRow.value.length} chars)` }
+  })
+
+  let etsyAccessToken = null
+  await runStep('etsy', 'Refresh access token', async () => {
+    if (!etsyRefreshTokenRow?.value || !process.env.ETSY_API_KEY) {
+      return { status: 'error', message: 'Skipped (missing key or refresh token)' }
+    }
+    const resp = await fetch('https://api.etsy.com/v3/public/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: process.env.ETSY_API_KEY,
+        refresh_token: etsyRefreshTokenRow.value
+      }).toString()
+    })
+    if (!resp.ok) {
+      const body = await resp.text()
+      return { status: 'error', message: `Refresh failed (HTTP ${resp.status}) — visit /api/etsy/auth to re-authenticate`, detail: body.slice(0, 300) }
+    }
+    const data = await resp.json()
+    etsyAccessToken = data.access_token
+    // Persist rotated refresh token if Etsy issued a new one
+    if (data.refresh_token && data.refresh_token !== etsyRefreshTokenRow.value) {
+      await prisma.systemConfig.upsert({
+        where: { key: 'etsy_refresh_token' },
+        update: { value: data.refresh_token },
+        create: { key: 'etsy_refresh_token', value: data.refresh_token }
+      })
+      return { status: 'ok', message: `Access token issued (expires in ${data.expires_in}s). Refresh token rotated and saved.` }
+    }
+    return { status: 'ok', message: `Access token issued (expires in ${data.expires_in}s)` }
+  })
+
+  await runStep('etsy', 'GET /shops/{shopId}', async () => {
+    if (!etsyAccessToken) return { status: 'error', message: 'Skipped (no access token)' }
+    const resp = await fetch(`https://openapi.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}`, {
+      headers: {
+        'Authorization': `Bearer ${etsyAccessToken}`,
+        'x-api-key': `${process.env.ETSY_API_KEY}:${process.env.ETSY_SHARED_SECRET}`
+      }
+    })
+    if (!resp.ok) {
+      const body = await resp.text()
+      return { status: 'error', message: `HTTP ${resp.status}`, detail: body.slice(0, 300) }
+    }
+    const data = await resp.json()
+    return { status: 'ok', message: `Shop: ${data.shop_name || '?'} (${data.title || '?'})` }
+  })
+
+  await runStep('etsy', 'GET /shops/{shopId}/receipts (verify transactions_r scope)', async () => {
+    if (!etsyAccessToken) return { status: 'error', message: 'Skipped (no access token)' }
+    const resp = await fetch(`https://openapi.etsy.com/v3/application/shops/${process.env.ETSY_SHOP_ID}/receipts?limit=1`, {
+      headers: {
+        'Authorization': `Bearer ${etsyAccessToken}`,
+        'x-api-key': `${process.env.ETSY_API_KEY}:${process.env.ETSY_SHARED_SECRET}`
+      }
+    })
+    if (!resp.ok) {
+      const body = await resp.text()
+      return { status: 'error', message: `HTTP ${resp.status} (likely scope issue — need transactions_r)`, detail: body.slice(0, 300) }
+    }
+    const data = await resp.json()
+    const sample = data.results?.[0]
+    return { status: 'ok', message: sample ? `Latest receipt: #${sample.receipt_id} (${data.count} total)` : `Endpoint reachable, ${data.count || 0} receipts` }
+  })
+
+  // ─────────────────────────────────────────────────────────────────
+  // Roll up overall status per provider
+  // ─────────────────────────────────────────────────────────────────
+  for (const provider of Object.keys(results.providers)) {
+    const steps = results.providers[provider].steps
+    if (steps.some(s => s.status === 'error')) {
+      results.providers[provider].status = 'error'
+    } else if (steps.some(s => s.status === 'warn')) {
+      results.providers[provider].status = 'warn'
+    } else {
+      results.providers[provider].status = 'ok'
+    }
+  }
+
+  return res.status(200).json(results)
 }
 
 // --- health-check ---
