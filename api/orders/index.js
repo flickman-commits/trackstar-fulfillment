@@ -2,6 +2,7 @@ import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { hasScraperForRace } from '../../server/scrapers/index.js'
 import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
+import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
 
 
 /**
@@ -221,6 +222,10 @@ export default async function handler(req, res) {
         // Shipping info — expose for expedited badge + callout in dashboard
         shippingMethod: getShippingMethod(order.shopifyOrderData),
         isExpedited: isExpeditedShipping(order.shopifyOrderData),
+        // Order total + big-spender flag — for the "💰 BIG SPENDER" prioritize callout
+        orderTotalUsd: getOrderTotalUsd(order),
+        isBigSpender: isBigSpender(order),
+        bigSpenderThresholdUsd: BIG_SPENDER_THRESHOLD_USD,
         // Original order date from marketplace (for sorting by when customer placed order)
         orderPlacedAt: order.shopifyOrderData?.created_at
           || (order.etsyOrderData?.create_timestamp

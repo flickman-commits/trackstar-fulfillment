@@ -107,6 +107,10 @@ interface Order {
   // Shipping
   shippingMethod?: string | null
   isExpedited?: boolean
+  // Big-spender flag — true if order total > $300 (configurable on backend)
+  orderTotalUsd?: number | null
+  isBigSpender?: boolean
+  bigSpenderThresholdUsd?: number
 }
 
 interface OrderComment {
@@ -435,7 +439,11 @@ export default function Dashboard() {
           orderPlacedAt: order.orderPlacedAt as string | null | undefined,
           // Shipping (for expedited badge / callout)
           shippingMethod: order.shippingMethod as string | null | undefined,
-          isExpedited: order.isExpedited as boolean | undefined
+          isExpedited: order.isExpedited as boolean | undefined,
+          // Big-spender (>= $300) badge + prioritize callout
+          orderTotalUsd: order.orderTotalUsd as number | null | undefined,
+          isBigSpender: order.isBigSpender as boolean | undefined,
+          bigSpenderThresholdUsd: order.bigSpenderThresholdUsd as number | undefined
         }
       })
 
@@ -1526,9 +1534,13 @@ export default function Dashboard() {
       o.status === 'flagged' || o.status === 'ready' || o.status === 'pending' || o.status === 'missing_year'
     )
     return fulfillOrders.sort((a, b) => {
-      // Pin expedited shipping orders to the top
+      // Priority pinning: expedited shipping > big spender > newest first.
+      // Expedited beats big spender because the customer paid extra for speed
+      // (hard deadline). Big spender is a soft priority (do these next).
       if (a.isExpedited && !b.isExpedited) return -1
       if (!a.isExpedited && b.isExpedited) return 1
+      if (a.isBigSpender && !b.isBigSpender) return -1
+      if (!a.isBigSpender && b.isBigSpender) return 1
       const dateA = new Date(a.orderPlacedAt || a.shopifyCreatedAt || a.createdAt).getTime()
       const dateB = new Date(b.orderPlacedAt || b.shopifyCreatedAt || b.createdAt).getTime()
       return dateB - dateA
@@ -2041,6 +2053,14 @@ Thank you!`
                               {order.isExpedited && order.trackstarOrderType === 'standard' && (
                                 <span className="px-1.5 py-0.5 bg-red-500/10 text-red-600 text-[9px] font-bold rounded border border-red-500/30 whitespace-nowrap">🚀 EXPEDITED</span>
                               )}
+                              {order.isBigSpender && order.trackstarOrderType === 'standard' && (
+                                <span
+                                  className="px-1.5 py-0.5 bg-amber-500/10 text-amber-700 text-[9px] font-bold rounded border border-amber-500/30 whitespace-nowrap"
+                                  title={order.orderTotalUsd ? `Customer spent $${Math.round(order.orderTotalUsd)} — prioritize` : 'Big spender — prioritize'}
+                                >
+                                  💰 BIG SPENDER
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               <span className="text-base" title={statusDisplay.label}>{statusDisplay.icon}</span>
@@ -2312,6 +2332,14 @@ Thank you!`
                                 )}
                                 {order.isExpedited && order.trackstarOrderType === 'standard' && (
                                   <span className="px-1.5 py-0.5 bg-red-500/10 text-red-600 text-[9px] font-bold rounded border border-red-500/30 whitespace-nowrap" title={`Customer paid for ${order.shippingMethod || 'expedited'} shipping — prioritize`}>🚀 EXPEDITED</span>
+                                )}
+                                {order.isBigSpender && order.trackstarOrderType === 'standard' && (
+                                  <span
+                                    className="px-1.5 py-0.5 bg-amber-500/10 text-amber-700 text-[9px] font-bold rounded border border-amber-500/30 whitespace-nowrap"
+                                    title={order.orderTotalUsd ? `Customer spent $${Math.round(order.orderTotalUsd)} — prioritize` : 'Big spender — prioritize'}
+                                  >
+                                    💰 BIG SPENDER
+                                  </span>
                                 )}
                               </div>
                               {order.status === 'flagged' && order.flagReason && (
@@ -2731,7 +2759,7 @@ Thank you!`
             className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
             onClick={(e) => { if (e.target === e.currentTarget) { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) } }}
           >
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md md:max-w-2xl max-h-[85vh] overflow-hidden">
               {showReviewRequest ? (
                 /* Review Request panel */
                 <div className="flex flex-col h-full max-h-[85vh]" style={{ animation: 'slideInRight 200ms ease-out' }}>
@@ -2780,7 +2808,7 @@ Thank you!`
                 </div>
               ) : (
                 /* Settings main content */
-                <div className="overflow-y-auto">
+                <div className="overflow-y-auto max-h-[85vh]">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray">
                     <h2 className="text-base font-semibold text-off-black">Settings</h2>
                     <button onClick={() => { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) }} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
@@ -4259,6 +4287,29 @@ Thank you!`
                   ) : (
                     <>
                   {/* ========== STANDARD ORDER DETAIL VIEW ========== */}
+
+                  {/* Big-spender callout — order total ≥ $300. Soft priority: get
+                      to this before normal standard orders. Doesn't have a hard
+                      deadline like Expedited so we show it as amber, not red. */}
+                  {selectedOrder.isBigSpender && (
+                    <div className="bg-amber-50 border-2 border-amber-300 rounded-md p-4 mb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-base">💰</span>
+                        <span className="text-sm font-bold text-amber-800 uppercase tracking-wide">
+                          Big Spender — Prioritize this order
+                        </span>
+                      </div>
+                      <div className="text-xs text-amber-900/90 leading-relaxed">
+                        <p>
+                          Customer spent{' '}
+                          <strong>
+                            ${selectedOrder.orderTotalUsd ? Math.round(selectedOrder.orderTotalUsd).toLocaleString() : '—'}
+                          </strong>
+                          {' '}on this order. Move it ahead of the regular queue so they get their print quickly.
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Expedited shipping callout — Eli's instructions for prioritizing
                       and pinging Artelo after sending to production. Only shown when
