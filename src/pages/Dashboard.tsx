@@ -40,6 +40,7 @@ interface Order {
   raceName: string
   raceYear: number | null
   raceDate?: string
+  raceDateIso?: string | null  // ISO YYYY-MM-DD, for the date input in edit mode
   raceLocation?: string
   resultsUrl?: string
   eventType?: string
@@ -373,6 +374,7 @@ export default function Dashboard() {
           raceName: order.raceName as string,
           raceYear: order.raceYear as number | null,
           raceDate: order.raceDate as string | undefined,
+          raceDateIso: order.raceDateIso as string | null | undefined,
           raceLocation: order.raceLocation as string | undefined,
           runnerName: order.runnerName as string,
           productSize: order.productSize as string,
@@ -1024,12 +1026,15 @@ export default function Dashboard() {
   }>({ yearOverride: '', raceNameOverride: '', runnerNameOverride: '' })
   const [isSaving, setIsSaving] = useState(false)
 
-  // Weather edit mode state
+  // Race Data edit mode state — covers date, weather, temp on the Race record.
+  // Variables retain the "weather" naming for backward compat with the rest of
+  // the file, but the UI label is "Race Data".
   const [isEditingWeather, setIsEditingWeather] = useState(false)
   const [weatherEditValues, setWeatherEditValues] = useState<{
+    raceDate: string  // ISO YYYY-MM-DD (HTML date input format)
     weatherCondition: string
     weatherTemp: string
-  }>({ weatherCondition: '', weatherTemp: '' })
+  }>({ raceDate: '', weatherCondition: '', weatherTemp: '' })
   const [isSavingWeather, setIsSavingWeather] = useState(false)
 
   // Start editing mode
@@ -1048,22 +1053,23 @@ export default function Dashboard() {
     setEditValues({ yearOverride: '', raceNameOverride: '', runnerNameOverride: '' })
   }
 
-  // Start editing weather
+  // Start editing race data (date, weather, temp)
   const startEditingWeather = (order: Order) => {
     setWeatherEditValues({
+      raceDate: order.raceDateIso || '',
       weatherCondition: order.weatherCondition || '',
       weatherTemp: order.weatherTemp || ''
     })
     setIsEditingWeather(true)
   }
 
-  // Cancel editing weather
+  // Cancel editing race data
   const cancelEditingWeather = () => {
     setIsEditingWeather(false)
-    setWeatherEditValues({ weatherCondition: '', weatherTemp: '' })
+    setWeatherEditValues({ raceDate: '', weatherCondition: '', weatherTemp: '' })
   }
 
-  // Save weather edits
+  // Save race data edits (date + weather)
   const saveWeather = async (order: Order) => {
     if (!order.raceId) {
       setToast({ message: 'No race data to update', type: 'error' })
@@ -1077,12 +1083,13 @@ export default function Dashboard() {
         body: JSON.stringify({
           orderNumber: order.orderNumber,
           raceId: order.raceId,
+          raceDate: weatherEditValues.raceDate || null,
           weatherTemp: weatherEditValues.weatherTemp || null,
           weatherCondition: weatherEditValues.weatherCondition || null
         })
       })
-      if (!response.ok) throw new Error('Failed to save weather')
-      setToast({ message: 'Weather updated!', type: 'success' })
+      if (!response.ok) throw new Error('Failed to save race data')
+      setToast({ message: 'Race data updated!', type: 'success' })
       setIsEditingWeather(false)
       await fetchOrders()
 
@@ -1097,8 +1104,8 @@ export default function Dashboard() {
         })
       }
     } catch (error) {
-      if (import.meta.env.DEV) console.error('Error saving weather:', error)
-      setToast({ message: 'Failed to save weather', type: 'error' })
+      if (import.meta.env.DEV) console.error('Error saving race data:', error)
+      setToast({ message: 'Failed to save race data', type: 'error' })
     } finally {
       setIsSavingWeather(false)
     }
@@ -4641,7 +4648,17 @@ Thank you!`
                       ) : (
                         <NotAvailableField label="Event" />
                       )}
-                      {selectedOrder.raceDate ? (
+                      {isEditingWeather ? (
+                        <div className="flex justify-between items-center">
+                          <span className="text-body-sm text-off-black/60">Date</span>
+                          <input
+                            type="date"
+                            value={weatherEditValues.raceDate}
+                            onChange={(e) => setWeatherEditValues(prev => ({ ...prev, raceDate: e.target.value }))}
+                            className="w-40 px-2 py-1 text-sm text-right border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                          />
+                        </div>
+                      ) : selectedOrder.raceDate ? (
                         <CopyableField label="Date" value={selectedOrder.raceDate} />
                       ) : selectedOrder.hasScraperAvailable ? (
                         <PendingField label="Date" />

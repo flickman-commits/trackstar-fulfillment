@@ -177,6 +177,9 @@ export default async function handler(req, res) {
           : null,
         // Race data (Tier 1) - formatted for direct copy to Illustrator
         raceDate: formatRaceDate(race?.raceDate),
+        // Raw ISO date (YYYY-MM-DD) for editing — backs the date input in the
+        // order detail panel's Race Data edit mode.
+        raceDateIso: race?.raceDate ? new Date(race.raceDate).toISOString().slice(0, 10) : null,
         raceLocation: race?.location || null,
         resultsUrl: research?.resultsUrl || buildAustinFallbackUrl(research?.runnerName || effectiveRunnerName, effectiveRaceName, effectiveRaceYear, research?.eventType),
         weatherTemp: formatTemp(race?.weatherTemp),

@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { orderNumber, yearOverride, raceNameOverride, runnerNameOverride, raceId, weatherTemp, weatherCondition, raceAction, raceData } = req.body
+    const { orderNumber, yearOverride, raceNameOverride, runnerNameOverride, raceId, weatherTemp, weatherCondition, raceDate, raceAction, raceData } = req.body
 
     // Race-specific operations (no orderNumber required)
     if (raceAction === 'update' && raceId) {
@@ -97,22 +97,27 @@ export default async function handler(req, res) {
       updateData.status = 'pending'
     }
 
-    // Update weather on the Race record if provided
-    if (raceId && (weatherTemp !== undefined || weatherCondition !== undefined)) {
-      const weatherUpdate = {}
+    // Update race-level data (weather, date) on the Race record if provided.
+    // Edits made from inside the order detail panel write through to the Race
+    // table so every order for that race picks up the corrected value.
+    if (raceId && (weatherTemp !== undefined || weatherCondition !== undefined || raceDate !== undefined)) {
+      const raceUpdate = {}
       if (weatherTemp !== undefined) {
-        weatherUpdate.weatherTemp = weatherTemp || null
+        raceUpdate.weatherTemp = weatherTemp || null
       }
       if (weatherCondition !== undefined) {
-        weatherUpdate.weatherCondition = weatherCondition ? weatherCondition.toLowerCase() : null
+        raceUpdate.weatherCondition = weatherCondition ? weatherCondition.toLowerCase() : null
       }
-      weatherUpdate.weatherFetchedAt = new Date()
+      if (raceDate !== undefined) {
+        raceUpdate.raceDate = raceDate ? new Date(raceDate) : null
+      }
+      raceUpdate.weatherFetchedAt = new Date()
 
       await prisma.race.update({
         where: { id: raceId },
-        data: weatherUpdate
+        data: raceUpdate
       })
-      console.log(`[API /orders/update] Race ${raceId} weather updated:`, weatherUpdate)
+      console.log(`[API /orders/update] Race ${raceId} updated:`, raceUpdate)
     }
 
     // Update the order
