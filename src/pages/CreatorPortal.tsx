@@ -356,6 +356,15 @@ function StepContentAgreement({ briefs, agreed, setAgreed }: {
         </div>
       )}
 
+      {/* Paid-ads disclosure — sits right above the checkbox so it's part of
+          what they're agreeing to. Not hidden, not buried in fine print. */}
+      <div className="mb-3 p-4 bg-[#4F2DD4]/5 border border-[#4F2DD4]/20 rounded-md">
+        <div className="text-[10px] font-semibold text-[#4F2DD4] uppercase tracking-wider mb-1.5">Heads up — paid ads</div>
+        <p className="text-sm text-off-black/80 leading-relaxed">
+          The content you submit may be used as <strong>paid advertising</strong> on Meta (Instagram + Facebook) and other platforms. By checking the box below you're giving Trackstar permission to run your content as ads — including under your own handle if you've enabled whitelisting.
+        </p>
+      </div>
+
       <label className="flex items-start gap-3 p-4 bg-subtle-gray border border-border-gray rounded-md cursor-pointer hover:bg-off-black/5 transition-colors">
         <input
           type="checkbox"
@@ -364,7 +373,7 @@ function StepContentAgreement({ briefs, agreed, setAgreed }: {
           className="mt-0.5 w-4 h-4 accent-[#4F2DD4] cursor-pointer"
         />
         <span className="text-sm text-off-black/90 leading-relaxed">
-          By checking this box I'm agreeing to create the above content by 7 days after receiving my print.
+          By checking this box I'm agreeing to create the above content by 7 days after receiving my print, and I'm giving Trackstar permission to run it as paid ads.
         </span>
       </label>
     </div>
