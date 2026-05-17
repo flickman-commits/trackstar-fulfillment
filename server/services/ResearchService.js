@@ -293,7 +293,12 @@ export class ResearchService {
       researchStatus: results.researchStatus
         || (results.found ? 'found' : (results.ambiguous ? 'ambiguous' : 'not_found')),
       researchNotes: results.researchNotes,
-      resultsUrl: results.resultsUrl || null
+      resultsUrl: results.resultsUrl || null,
+      // Persist candidate matches so the dashboard can show the picker on
+      // future loads, not just immediately after research finishes.
+      possibleMatches: Array.isArray(results.possibleMatches) && results.possibleMatches.length > 0
+        ? results.possibleMatches
+        : null,
     }
 
     // Fire a Slack alert if the scraper exists but the year isn't configured.

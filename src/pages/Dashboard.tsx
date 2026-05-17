@@ -435,6 +435,21 @@ export default function Dashboard() {
       setOrders(transformedOrders)
       setLastUpdated(new Date())
 
+      // Hydrate possibleMatchesMap from persisted research records so the
+      // accept-button picker shows up even after a page reload (not just
+      // immediately after running research).
+      type PossibleMatchRow = { name: string; bib: string; time: string; pace?: string; city?: string; state?: string; eventType?: string; resultsUrl?: string }
+      const persistedMatches: Record<string, PossibleMatchRow[]> = {}
+      for (const o of data.orders || []) {
+        const matches = (o as { possibleMatches?: PossibleMatchRow[] }).possibleMatches
+        if (Array.isArray(matches) && matches.length > 0) {
+          persistedMatches[o.orderNumber as string] = matches
+        }
+      }
+      if (Object.keys(persistedMatches).length > 0) {
+        setPossibleMatchesMap(prev => ({ ...persistedMatches, ...prev }))
+      }
+
       // Sync selectedOrder with fresh data if the detail panel is open
       setSelectedOrder(prev => {
         if (!prev) return null

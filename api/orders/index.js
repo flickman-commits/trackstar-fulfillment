@@ -169,6 +169,12 @@ export default async function handler(req, res) {
         eventType: research?.eventType || null,
         researchStatus: research?.researchStatus || null,
         researchNotes: research?.researchNotes || null,
+        // Persisted candidate matches — populates the dashboard's accept-button
+        // picker for ambiguous orders (so it shows even after page reload, not
+        // just immediately after research runs).
+        possibleMatches: Array.isArray(research?.possibleMatches) && research.possibleMatches.length > 0
+          ? research.possibleMatches
+          : null,
         // Race data (Tier 1) - formatted for direct copy to Illustrator
         raceDate: formatRaceDate(race?.raceDate),
         raceLocation: race?.location || null,

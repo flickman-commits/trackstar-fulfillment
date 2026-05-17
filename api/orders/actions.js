@@ -190,7 +190,9 @@ async function handleAcceptMatch({ orderNumber, match }, res) {
       eventType: match.eventType || research.eventType || null,
       resultsUrl: match.resultsUrl || research.resultsUrl || null,
       researchStatus: 'found',
-      researchNotes: `Accepted match: "${match.name}" (original search: "${order.runnerName}")`
+      researchNotes: `Accepted match: "${match.name}" (original search: "${order.runnerName}")`,
+      // Clear the persisted candidate list so the picker stops showing on this order
+      possibleMatches: null,
     }
   })
 

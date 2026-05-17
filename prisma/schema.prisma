@@ -111,9 +111,13 @@ model RunnerResearch {
   officialPace   String?
   eventType      String?  // "Marathon" or "Half Marathon"
   yearFound      Int?
-  researchStatus String   @default("pending") // "found", "not_found", "ambiguous"
+  researchStatus String   @default("pending") // "found", "not_found", "ambiguous", "no_scraper", "year_not_configured", "upstream_error"
   researchNotes  String?
   resultsUrl     String?  // URL where this runner's results were found
+  // Candidate matches surfaced when no exact name match was found. Each item:
+  // { name, bib?, time?, pace?, city?, state?, eventType?, resultsUrl? }
+  // The dashboard renders these as Accept-button rows so the user can pick.
+  possibleMatches Json?
   createdAt      DateTime @default(now())
 
   // Relations
