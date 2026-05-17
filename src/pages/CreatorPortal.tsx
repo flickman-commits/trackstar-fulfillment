@@ -403,10 +403,15 @@ function StepRace({ draft, setDraft, races }: {
 }) {
   // Unique race names, sorted alphabetically.
   const raceNames = Array.from(new Set(races.map(r => r.raceName))).sort()
-  // Years available for the currently selected race, newest first.
-  const yearsForRace = draft.raceName
-    ? Array.from(new Set(races.filter(r => r.raceName === draft.raceName).map(r => r.year))).sort((a, b) => b - a)
-    : []
+  // Year options — fixed range from 2000 → current year (newest first). The
+  // race table can't be the source of truth for available years because not
+  // every variant has rows in Race yet, and creators may pick years we haven't
+  // imported orders for.
+  const currentYear = new Date().getFullYear()
+  const yearOptions = Array.from(
+    { length: currentYear - 2000 + 1 },
+    (_, i) => currentYear - i
+  )
 
   return (
     <div>
@@ -434,11 +439,10 @@ function StepRace({ draft, setDraft, races }: {
           <select
             value={draft.raceYear}
             onChange={(e) => setDraft({ ...draft, raceYear: e.target.value })}
-            disabled={!draft.raceName}
-            className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white disabled:bg-subtle-gray disabled:text-off-black/40 disabled:cursor-not-allowed"
+            className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white"
           >
-            <option value="">{draft.raceName ? 'Select a year…' : 'Pick a race first'}</option>
-            {yearsForRace.map(y => (
+            <option value="">Select a year…</option>
+            {yearOptions.map(y => (
               <option key={y} value={String(y)}>{y}</option>
             ))}
           </select>
