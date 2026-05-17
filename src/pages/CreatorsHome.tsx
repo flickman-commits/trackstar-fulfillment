@@ -481,6 +481,10 @@ export default function CreatorsHome() {
             setSelectedCreator(updated)
             await loadAll()
           }}
+          onDeleted={async () => {
+            setSelectedCreator(null)
+            await loadAll()
+          }}
         />
       )}
 
@@ -708,13 +712,16 @@ function CreatorDrawer({
   creator,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   creator: Creator
   onClose: () => void
   onSaved: (updated: Creator) => void
+  onDeleted: () => void | Promise<void>
 }) {
   const [draft, setDraft] = useState<Creator>(creator)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [isEditingSample, setIsEditingSample] = useState(false)
@@ -732,6 +739,33 @@ function CreatorDrawer({
       setTimeout(() => setTokenCopied(false), 1500)
     } catch {
       // Clipboard can fail on insecure contexts — fall through silently
+    }
+  }
+
+  const handleDelete = async () => {
+    const shippedOrCompleted = !!(creator.sampleOrder?.trackingNumber || creator.sampleOrder?.shippedAt || creator.sampleOrder?.status === 'completed')
+    const orderNote = creator.sampleOrder
+      ? shippedOrCompleted
+        ? `\n\nThe linked sample order ${creator.sampleOrder.orderNumber} has already shipped/completed — it will stay in the fulfillment queue.`
+        : `\n\nThe linked sample order ${creator.sampleOrder.orderNumber} (not yet shipped) will also be deleted.`
+      : ''
+    if (!confirm(`Delete creator "${creator.name || 'unnamed'}"? This can't be undone.${orderNote}`)) return
+    setIsDeleting(true)
+    try {
+      const res = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete-creator', creatorId: creator.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Delete failed: ${res.status}`)
+      }
+      await onDeleted()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to delete')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -1058,19 +1092,30 @@ function CreatorDrawer({
 
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-border-gray">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-off-black/60 hover:bg-off-black/5 rounded transition-colors">
-              Close
-            </button>
+          {/* Footer — Delete pinned to the far left (destructive actions get
+              spatial separation from primary actions). */}
+          <div className="flex items-center justify-between gap-2 mt-6 pt-4 border-t border-border-gray">
             <button
-              onClick={handleSave}
-              disabled={!isDirty || isSaving}
-              className="px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
+              onClick={handleDelete}
+              disabled={isDeleting || isSaving}
+              className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-40 inline-flex items-center gap-1.5"
             >
-              {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {isSaving ? 'Saving…' : 'Save changes'}
+              {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+              {isDeleting ? 'Deleting…' : 'Delete creator'}
             </button>
+            <div className="flex items-center gap-2">
+              <button onClick={onClose} className="px-4 py-2 text-sm text-off-black/60 hover:bg-off-black/5 rounded transition-colors">
+                Close
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!isDirty || isSaving || isDeleting}
+                className="px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
+              >
+                {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSaving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -139,6 +139,8 @@ export default async function handler(req, res) {
         return await handleCreateRacePartner(body, res)
       case 'update-creator':
         return await handleUpdateCreator(body, res)
+      case 'delete-creator':
+        return await handleDeleteCreator(body, res)
       case 'create-brief':
         return await handleCreateBrief(body, res)
       case 'update-brief':
@@ -1769,3 +1771,48 @@ async function handleMergeRace({ aliasName, canonicalName }, res) {
   })
 }
 
+
+// --- delete-creator ---
+// Removes a creator. BriefAssignment rows cascade away with them. If they
+// have a linked sample Order that hasn't shipped yet (no tracking number, not
+// completed), we delete that too so it stops cluttering Elí's queue. If the
+// order is already shipped or completed, we keep it for fulfillment history
+// — only the creator's back-pointer goes.
+async function handleDeleteCreator({ creatorId }, res) {
+  if (!creatorId) return res.status(400).json({ error: 'creatorId is required' })
+
+  const creator = await prisma.creator.findUnique({
+    where: { id: creatorId },
+    include: {
+      sampleOrder: {
+        select: { id: true, orderNumber: true, status: true, trackingNumber: true, shippedAt: true }
+      }
+    }
+  })
+  if (!creator) return res.status(404).json({ error: 'Creator not found' })
+
+  const sampleOrder = creator.sampleOrder
+  const isShipped = !!(sampleOrder?.trackingNumber || sampleOrder?.shippedAt)
+  const isCompleted = sampleOrder?.status === 'completed'
+  const shouldDeleteOrder = sampleOrder && !isShipped && !isCompleted
+
+  // Order is deleted first so the Creator's FK doesn't block deletion. The
+  // Order's cascades (comments, proofs, research) handle their own cleanup.
+  if (shouldDeleteOrder) {
+    // Detach the back-pointer before deleting the Order to avoid the FK conflict.
+    await prisma.creator.update({
+      where: { id: creatorId },
+      data: { sampleOrderId: null }
+    })
+    await prisma.order.delete({ where: { id: sampleOrder.id } })
+  }
+
+  await prisma.creator.delete({ where: { id: creatorId } })
+
+  console.log(`[actions/delete-creator] Deleted ${creatorId} (${creator.name || 'unnamed'})${shouldDeleteOrder ? ` + order ${sampleOrder.orderNumber}` : ''}`)
+  return res.status(200).json({
+    success: true,
+    deletedOrderNumber: shouldDeleteOrder ? sampleOrder.orderNumber : null,
+    orderKept: sampleOrder && !shouldDeleteOrder ? sampleOrder.orderNumber : null,
+  })
+}
