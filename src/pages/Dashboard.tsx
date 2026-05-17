@@ -350,6 +350,9 @@ export default function Dashboard() {
   const [mergingRace, setMergingRace] = useState<string | null>(null)  // race the user is choosing a merge target for
   const [mergeTarget, setMergeTarget] = useState('')
   const [isMergingRace, setIsMergingRace] = useState(false)
+  // Race Database UX: search + collapse
+  const [raceDbSearch, setRaceDbSearch] = useState('')
+  const [expandedRaceGroups, setExpandedRaceGroups] = useState<Set<string>>(new Set())
 
   // Fetch orders from database (filtered by activeView type)
   const fetchOrders = useCallback(async () => {
@@ -2908,16 +2911,53 @@ Thank you!`
             onClick={(e) => { if (e.target === e.currentTarget) setShowRaceDatabase(false) }}
           >
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray flex-shrink-0">
-                <h2 className="text-base font-semibold text-off-black">Race Database</h2>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setShowAddRace(!showAddRace)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors"
-                  >
-                    {showAddRace ? 'Cancel' : '+ Add Race'}
-                  </button>
-                  <button onClick={() => setShowRaceDatabase(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
+              <div className="px-6 py-4 border-b border-border-gray flex-shrink-0 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-semibold text-off-black">Race Database</h2>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowAddRace(!showAddRace)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors"
+                    >
+                      {showAddRace ? 'Cancel' : '+ Add Race'}
+                    </button>
+                    <button onClick={() => setShowRaceDatabase(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
+                  </div>
+                </div>
+                {/* Search bar — filters race groups by name (and location/year) */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search races by name, year, or location…"
+                    value={raceDbSearch}
+                    onChange={(e) => setRaceDbSearch(e.target.value)}
+                    className="w-full pl-8 pr-8 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                  />
+                  <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/40" />
+                  {raceDbSearch && (
+                    <button
+                      onClick={() => setRaceDbSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-off-black/40 hover:text-off-black/70"
+                      title="Clear search"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  {raceDbSearch && (
+                    <div className="absolute right-9 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          // Expand all matching groups when searching
+                          const matches = Array.from(new Set(races.map(r => r.raceName)))
+                            .filter(name => name.toLowerCase().includes(raceDbSearch.toLowerCase()))
+                          setExpandedRaceGroups(new Set(matches))
+                        }}
+                        className="text-[10px] text-off-black/50 hover:text-off-black underline"
+                      >
+                        Expand all
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2974,29 +3014,75 @@ Thank you!`
                   </div>
                 ) : races.length === 0 ? (
                   <p className="text-sm text-off-black/40 text-center py-8">No races in database</p>
-                ) : (
-                  <div className="space-y-4">
-                    {Object.entries(
-                      races.reduce<Record<string, typeof races>>((acc, r) => {
-                        (acc[r.raceName] ||= []).push(r)
-                        return acc
-                      }, {})
-                    )
-                      .sort(([a], [b]) => a.localeCompare(b))
+                ) : (() => {
+                  // Group all races by raceName
+                  const grouped = races.reduce<Record<string, typeof races>>((acc, r) => {
+                    (acc[r.raceName] ||= []).push(r)
+                    return acc
+                  }, {})
+
+                  // Apply search filter — matches against race name, year, or location
+                  const q = raceDbSearch.trim().toLowerCase()
+                  const filteredEntries = Object.entries(grouped)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .filter(([raceName, group]) => {
+                      if (!q) return true
+                      if (raceName.toLowerCase().includes(q)) return true
+                      return group.some(r =>
+                        String(r.year).includes(q) ||
+                        (r.location || '').toLowerCase().includes(q)
+                      )
+                    })
+
+                  if (filteredEntries.length === 0) {
+                    return <p className="text-sm text-off-black/40 text-center py-8">No races match "{raceDbSearch}"</p>
+                  }
+
+                  return (
+                  <div className="space-y-3">
+                    {filteredEntries
                       .map(([raceName, group]) => {
                         const sortedYears = [...group].sort((a, b) => b.year - a.year)
                         const currentShorthand = raceShorthands[raceName] || ''
                         const isOverridden = !!raceShorthandOverrides[raceName]
                         const isEditingThis = editingShorthandFor === raceName
+                        const isExpanded = expandedRaceGroups.has(raceName)
+                        const toggleExpanded = () => {
+                          setExpandedRaceGroups(prev => {
+                            const next = new Set(prev)
+                            if (next.has(raceName)) next.delete(raceName)
+                            else next.add(raceName)
+                            return next
+                          })
+                        }
+                        // Show year range in collapsed header for quick scanning
+                        const yearRange = sortedYears.length === 1
+                          ? String(sortedYears[0].year)
+                          : `${sortedYears[sortedYears.length - 1].year}–${sortedYears[0].year}`
                         return (
                           <div key={raceName} className="rounded-lg border border-border-gray overflow-hidden">
-                            {/* Group header — race name + shorthand control */}
-                            <div className="bg-off-black/[0.03] px-4 py-3 flex items-center gap-3 border-b border-border-gray">
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-semibold text-off-black truncate">{raceName}</div>
-                                <div className="text-[11px] text-off-black/40 mt-0.5">{sortedYears.length} {sortedYears.length === 1 ? 'year' : 'years'}</div>
-                              </div>
-                              <div className="flex items-center gap-2">
+                            {/* Group header — clicking the left side toggles expand;
+                                inner buttons (filename edit) stop propagation. */}
+                            <div className="bg-off-black/[0.03] flex items-center gap-3 border-b border-border-gray">
+                              <button
+                                type="button"
+                                onClick={toggleExpanded}
+                                className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3 hover:bg-off-black/[0.04] transition-colors text-left"
+                                aria-expanded={isExpanded}
+                                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${raceName}`}
+                              >
+                                {isExpanded
+                                  ? <ChevronDownIcon className="w-4 h-4 text-off-black/50 shrink-0" />
+                                  : <ChevronRight className="w-4 h-4 text-off-black/50 shrink-0" />
+                                }
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-semibold text-off-black truncate">{raceName}</div>
+                                  <div className="text-[11px] text-off-black/40 mt-0.5">
+                                    {sortedYears.length} {sortedYears.length === 1 ? 'year' : 'years'} · {yearRange}
+                                  </div>
+                                </div>
+                              </button>
+                              <div className="flex items-center gap-2 px-4">
                                 <span className="text-[10px] text-off-black/40 uppercase tracking-wider">Filename</span>
                                 {isEditingThis ? (
                                   <>
@@ -3006,6 +3092,7 @@ Thank you!`
                                       onChange={(e) => setEditingShorthandValue(e.target.value)}
                                       placeholder="e.g. Boston"
                                       autoFocus
+                                      onClick={(e) => e.stopPropagation()}
                                       className="w-28 px-2 py-1 text-xs border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') saveRaceShorthand(raceName, editingShorthandValue)
@@ -3013,14 +3100,14 @@ Thank you!`
                                       }}
                                     />
                                     <button
-                                      onClick={() => saveRaceShorthand(raceName, editingShorthandValue)}
+                                      onClick={(e) => { e.stopPropagation(); saveRaceShorthand(raceName, editingShorthandValue) }}
                                       disabled={savingShorthand}
                                       className="text-xs text-green-600 hover:text-green-700 disabled:opacity-50"
                                     >
                                       {savingShorthand ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                                     </button>
                                     <button
-                                      onClick={() => setEditingShorthandFor(null)}
+                                      onClick={(e) => { e.stopPropagation(); setEditingShorthandFor(null) }}
                                       className="text-xs text-off-black/50 hover:text-off-black/70"
                                     >
                                       <X className="w-3 h-3" />
@@ -3028,7 +3115,7 @@ Thank you!`
                                   </>
                                 ) : (
                                   <button
-                                    onClick={() => { setEditingShorthandFor(raceName); setEditingShorthandValue(currentShorthand) }}
+                                    onClick={(e) => { e.stopPropagation(); setEditingShorthandFor(raceName); setEditingShorthandValue(currentShorthand) }}
                                     className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-mono rounded border ${
                                       isOverridden
                                         ? 'bg-blue-50 border-blue-200 text-blue-700'
@@ -3042,6 +3129,8 @@ Thank you!`
                                 )}
                               </div>
                             </div>
+                            {/* Body — merge controls + year entries. Only rendered when expanded. */}
+                            {isExpanded && (<>
                             {/* Merge controls — inline picker when this group is the active merge source */}
                             {mergingRace === raceName ? (
                               <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
@@ -3175,11 +3264,13 @@ Thank you!`
                                 </div>
                               ))}
                             </div>
+                            </>)}{/* /isExpanded body */}
                           </div>
                         )
                       })}
                   </div>
-                )}
+                  )
+                })()}
               </div>
             </div>
           </div>
