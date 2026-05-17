@@ -1488,6 +1488,20 @@ export default function Dashboard() {
     return getDaysDiff(dateStr) <= 3
   }
 
+  // Format an order's placed-at timestamp as "May 3 (9 days ago)" / "today" / "yesterday"
+  const formatOrderPlacedAt = (dateStr?: string | null): string | null => {
+    if (!dateStr) return null
+    const diffDays = -getDaysDiff(dateStr)  // negative because placed-at is in the past
+    const formatted = new Date(dateStr).toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric' })
+    if (diffDays === 0) return `${formatted} (today)`
+    if (diffDays === 1) return `${formatted} (yesterday)`
+    if (diffDays > 1 && diffDays < 14) return `${formatted} (${diffDays} days ago)`
+    // For older orders, fall back to including the year for clarity
+    const withYear = new Date(dateStr).toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric', year: 'numeric' })
+    if (diffDays >= 14 && diffDays < 365) return `${withYear} (${Math.floor(diffDays / 7)} weeks ago)`
+    return withYear
+  }
+
   // Designs to be personalized
   // Standard view: pending + flagged + ready + missing_year, sorted newest first
   // Custom view: all items where designStatus !== 'sent_to_production', sorted oldest first (by due date)
@@ -4527,6 +4541,14 @@ Thank you!`
                       <span className="inline-flex items-center px-3 py-1.5 bg-off-black/5 border border-border-gray rounded-md text-sm font-semibold text-off-black">
                         {selectedOrder.productSize}
                       </span>
+                      {selectedOrder.orderPlacedAt && (
+                        <span
+                          className="inline-flex items-center px-3 py-1.5 bg-off-black/5 border border-border-gray rounded-md text-xs text-off-black/60"
+                          title={`Ordered on ${new Date(selectedOrder.orderPlacedAt).toLocaleString('en-US', { timeZone: TZ })}`}
+                        >
+                          📅 Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}
+                        </span>
+                      )}
                       {selectedOrder.hasOverrides && (
                         <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[10px] rounded">edited</span>
                       )}
