@@ -9,6 +9,7 @@
  *   - clear-race-cache: Clear race-level cached data
  *   - clear-research: Delete runner research records
  *   - complete: Mark an order as completed
+ *   - reopen: Un-complete an order — brings it back into the active queue
  *   - design-status: Update design status of a custom order
  *   - customers-served-info: Get current customers served count
  *   - customers-served-sync: Force sync count to Shopify
@@ -125,6 +126,8 @@ export default async function handler(req, res) {
         return await handleClearResearch(body, res)
       case 'complete':
         return await handleComplete(body, res)
+      case 'reopen':
+        return await handleReopen(body, res)
       case 'design-status':
         return await handleDesignStatus(body, res)
       case 'customers-served-info':
@@ -301,6 +304,34 @@ async function handleComplete({ orderNumber }, res) {
   })
 
   console.log(`[actions/complete] Order ${orderNumber} marked as completed`)
+  return res.status(200).json({ success: true, order })
+}
+
+// --- reopen ---
+// Un-completes an order. Restores status based on whether we have research
+// data: 'ready' if found, otherwise 'pending'. This brings the order back
+// into the active queue so it can be edited / re-researched / re-fulfilled.
+async function handleReopen({ orderNumber }, res) {
+  if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
+
+  const existing = await prisma.order.findFirst({
+    where: { orderNumber },
+    include: { runnerResearch: { orderBy: { id: 'desc' }, take: 1 } }
+  })
+  if (!existing) return res.status(404).json({ error: 'Order not found' })
+  if (existing.status !== 'completed') {
+    return res.status(400).json({ error: `Order is not completed (current status: ${existing.status})` })
+  }
+
+  const research = existing.runnerResearch[0]
+  const newStatus = research?.researchStatus === 'found' ? 'ready' : 'pending'
+
+  const order = await prisma.order.update({
+    where: { id: existing.id },
+    data: { status: newStatus }
+  })
+
+  console.log(`[actions/reopen] Order ${orderNumber} re-opened (status: completed → ${newStatus})`)
   return res.status(200).json({ success: true, order })
 }
 

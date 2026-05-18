@@ -1030,6 +1030,34 @@ export default function Dashboard() {
     }
   }
 
+  // Re-open a completed order. Brings it back into the active queue with
+  // status='ready' (if research exists) or 'pending' (if it doesn't), so
+  // it shows up in the standard view again and can be re-edited / printed.
+  const reopenOrder = async (orderNumber: string) => {
+    const ok = window.confirm('Re-open this order? It will go back into the active queue and disappear from the completed list.')
+    if (!ok) return
+    try {
+      const response = await apiFetch(`/api/orders/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reopen', orderNumber })
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to re-open order')
+      }
+
+      setToast({ message: 'Order re-opened — back in the queue', type: 'success' })
+      setSelectedOrder(null)
+      await fetchOrders()
+    } catch (error) {
+      if (import.meta.env.DEV) console.error('Error re-opening order:', error)
+      const msg = error instanceof Error ? error.message : 'Failed to re-open order'
+      setToast({ message: msg, type: 'error' })
+    }
+  }
+
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
   const [editValues, setEditValues] = useState<{
@@ -5107,6 +5135,16 @@ Thank you!`
                         className="flex-1 px-5 py-3 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium"
                       >
                         Mark as Completed
+                      </button>
+                    )}
+                    {/* Re-open — only for already-completed orders. Sends the
+                        order back into the active queue. */}
+                    {selectedOrder.status === 'completed' && !isEditing && (
+                      <button
+                        onClick={() => reopenOrder(selectedOrder.orderNumber)}
+                        className="flex-1 px-5 py-3 bg-white border-2 border-amber-300 text-amber-700 rounded-md hover:bg-amber-50 transition-colors font-medium"
+                      >
+                        ↩ Re-Open Order
                       </button>
                     )}
                     {selectedOrder.status === 'flagged' && !isEditing && (
