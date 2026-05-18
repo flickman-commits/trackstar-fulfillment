@@ -33,6 +33,7 @@ import losAngelesConfig from './configs/losAngeles.js'
 import buffaloConfig from './configs/buffalo.js'
 import oaklandConfig from './configs/oakland.js'
 import marinecorps1775kConfig from './configs/marinecorps1775k.js'
+import marinecorpsHistoricHalfConfig from './configs/marinecorpsHistoricHalf.js'
 import cowtownConfig from './configs/cowtown.js'
 import mesaConfig from './configs/mesa.js'
 import londonConfig from './configs/london.js'
@@ -83,6 +84,7 @@ const ALL_CONFIGS = [
   buffaloConfig,
   oaklandConfig,
   marinecorps1775kConfig,
+  marinecorpsHistoricHalfConfig,
   cowtownConfig,
   mesaConfig,
   londonConfig,
