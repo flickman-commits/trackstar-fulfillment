@@ -55,6 +55,18 @@ export const CHIP_TIME_FIXTURES = [
     notes: 'Berlin 2024 men\'s winner — verifies Mika auto-discovery of dynamic event code',
   },
 
+  // ── RTRT (Marine Corps Historic Half) ─────────────────────────────────
+  {
+    platform: 'rtrt',
+    race: 'Marine Corps Historic Half',
+    year: 2025,
+    runner: 'Corey Smith',
+    expectedChipTime: '2:13:56',
+    expectedChipPace: '10:14',
+    expectedBib: '2263',
+    notes: 'MCHH 2025 — verifies RTRT netTime (chip), NOT waveTime (gun-equivalent ~2:15:30). Also verifies courseMap filters to halfmarathon course (5K is a separate course at the same RTRT event).',
+  },
+
   // ── Tokyo Marathon (custom platform) ──────────────────────────────────
   {
     platform: 'tokyo',
