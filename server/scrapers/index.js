@@ -44,6 +44,7 @@ import tokyoConfig from './configs/tokyo.js'
 import sydneyConfig from './configs/sydney.js'
 import pittsburghConfig from './configs/pittsburgh.js'
 import orangeCountyConfig from './configs/orangeCounty.js'
+import houstonConfig from './configs/houston.js'
 import bostonConfig from './configs/boston.js'
 import illinoisConfig from './configs/illinois.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
@@ -97,6 +98,7 @@ const ALL_CONFIGS = [
   sydneyConfig,
   pittsburghConfig,
   orangeCountyConfig,
+  houstonConfig,
 ]
 
 /**
