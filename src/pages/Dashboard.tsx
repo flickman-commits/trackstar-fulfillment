@@ -111,6 +111,17 @@ interface Order {
   orderTotalUsd?: number | null
   isBigSpender?: boolean
   bigSpenderThresholdUsd?: number
+  // Which Shopify/Etsy product was ordered — drives which design template
+  // Eli uses (e.g. regular Boston print vs Boston World Major poster).
+  productInfo?: {
+    productId: string
+    variantId: string | null
+    rawTitle: string | null
+    designVariant: string | null
+    label: string | null
+    heroImageUrl: string | null
+    inCatalog: boolean
+  } | null
 }
 
 interface OrderComment {
@@ -443,7 +454,9 @@ export default function Dashboard() {
           // Big-spender (>= $300) badge + prioritize callout
           orderTotalUsd: order.orderTotalUsd as number | null | undefined,
           isBigSpender: order.isBigSpender as boolean | undefined,
-          bigSpenderThresholdUsd: order.bigSpenderThresholdUsd as number | undefined
+          bigSpenderThresholdUsd: order.bigSpenderThresholdUsd as number | undefined,
+          // Which product was ordered → drives design variant
+          productInfo: order.productInfo as Order['productInfo']
         }
       })
 
@@ -4315,6 +4328,48 @@ Thank you!`
                   ) : (
                     <>
                   {/* ========== STANDARD ORDER DETAIL VIEW ========== */}
+
+                  {/* Product / design-variant identifier — keyed off the stable
+                      Shopify product_id (NOT the title). Shows the hero image so
+                      Eli can recognize at a glance which design template to use.
+                      Falls back to the raw title for any product not in the
+                      catalog (server/lib/productCatalog.js). */}
+                  {selectedOrder.productInfo && (
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-3 flex items-center gap-3">
+                      {selectedOrder.productInfo.heroImageUrl ? (
+                        <a
+                          href={selectedOrder.productInfo.heroImageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-shrink-0 block w-14 h-14 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90 transition-opacity"
+                          title="Click to view full size"
+                        >
+                          <img src={selectedOrder.productInfo.heroImageUrl} alt={selectedOrder.productInfo.label || 'Product'} className="w-full h-full object-cover" />
+                        </a>
+                      ) : (
+                        <div className="flex-shrink-0 w-14 h-14 rounded border border-border-gray bg-white flex items-center justify-center text-2xl text-off-black/30">
+                          📄
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product / Design Variant</div>
+                        <div className="text-sm font-medium text-off-black truncate">
+                          {selectedOrder.productInfo.label || 'Unknown product'}
+                        </div>
+                        <div className="text-[10px] text-off-black/40 mt-0.5">
+                          Shopify product ID: <span className="font-mono">{selectedOrder.productInfo.productId || '—'}</span>
+                          {!selectedOrder.productInfo.inCatalog && (
+                            <span
+                              className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium"
+                              title="This product isn't in server/lib/productCatalog.js. Add it so the design variant displays clearly."
+                            >
+                              not in catalog
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Big-spender callout — order total ≥ $300. Soft priority: get
                       to this before normal standard orders. Doesn't have a hard

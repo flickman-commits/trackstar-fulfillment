@@ -3,6 +3,7 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { hasScraperForRace } from '../../server/scrapers/index.js'
 import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
 import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
+import { getProductInfo } from '../../server/lib/productCatalog.js'
 
 
 /**
@@ -226,6 +227,10 @@ export default async function handler(req, res) {
         orderTotalUsd: getOrderTotalUsd(order),
         isBigSpender: isBigSpender(order),
         bigSpenderThresholdUsd: BIG_SPENDER_THRESHOLD_USD,
+        // Which product/design variant Eli should use. Keyed off the stable
+        // Shopify product_id (or Etsy listing_id), not the rename-able title.
+        // See server/lib/productCatalog.js for the catalog.
+        productInfo: getProductInfo(order),
         // Original order date from marketplace (for sorting by when customer placed order)
         orderPlacedAt: order.shopifyOrderData?.created_at
           || (order.etsyOrderData?.create_timestamp
