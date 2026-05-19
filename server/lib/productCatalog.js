@@ -80,30 +80,44 @@ export function getProductInfo(order) {
     const productId = String(li.product_id || '')
     const fromCatalog = SHOPIFY_PRODUCTS[productId]
     return {
+      source: 'shopify',
       productId,
+      productIdLabel: 'Shopify product ID',
       variantId: li.variant_id ? String(li.variant_id) : null,
       rawTitle: li.title || null,
       designVariant: fromCatalog?.designVariant || null,
       label: fromCatalog?.label || li.title || null,
       heroImageUrl: fromCatalog?.heroImageUrl || null,
+      // Catalog is only required for Shopify (we use it to map title-changing
+      // products to a stable design variant + hero image). Etsy resolves its
+      // own hero image from the listings API at serialize time, so the
+      // catalog is informational there.
       inCatalog: !!fromCatalog,
+      catalogRequired: true,
     }
   }
 
-  // Etsy
+  // Etsy — listing_id is the stable identifier. Hero image gets resolved
+  // separately via server/lib/etsyImageCache.js (we don't have it inline
+  // on the receipt data — Etsy keeps images on a separate endpoint).
   if (order.source === 'etsy') {
     const tx = order.etsyOrderData?.transactions?.[order.lineItemIndex || 0]
     if (!tx) return null
     const listingId = String(tx.listing_id || '')
     const fromCatalog = ETSY_LISTINGS[listingId]
     return {
+      source: 'etsy',
       productId: listingId,
+      productIdLabel: 'Etsy listing ID',
       variantId: null,
       rawTitle: tx.title || null,
       designVariant: fromCatalog?.designVariant || null,
       label: fromCatalog?.label || tx.title || null,
       heroImageUrl: fromCatalog?.heroImageUrl || null,
       inCatalog: !!fromCatalog,
+      // Etsy's hero image comes from the listings API, not our catalog —
+      // so missing-from-catalog isn't a problem for Etsy.
+      catalogRequired: false,
     }
   }
 

@@ -4,6 +4,7 @@ import { hasScraperForRace } from '../../server/scrapers/index.js'
 import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
 import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
 import { getProductInfo } from '../../server/lib/productCatalog.js'
+import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 
 
 /**
@@ -261,6 +262,27 @@ export default async function handler(req, res) {
       transformedOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     } else {
       transformedOrders.sort((a, b) => getOrderDate(b) - getOrderDate(a))
+    }
+
+    // Resolve hero images for Etsy orders (deduped by listing_id). Etsy
+    // images live on a separate /listings/{id}/images endpoint — we fetch
+    // once per unique listing and cache in-process (24h TTL).
+    const etsyListingsNeedingImage = [...new Set(
+      transformedOrders
+        .filter(o => o.productInfo?.source === 'etsy' && !o.productInfo.heroImageUrl && o.productInfo.productId)
+        .map(o => o.productInfo.productId)
+    )]
+    if (etsyListingsNeedingImage.length > 0) {
+      const urlPairs = await Promise.all(
+        etsyListingsNeedingImage.map(async id => [id, await getEtsyListingImageUrl(id)])
+      )
+      const urlMap = Object.fromEntries(urlPairs)
+      for (const o of transformedOrders) {
+        if (o.productInfo?.source === 'etsy' && !o.productInfo.heroImageUrl) {
+          const url = urlMap[o.productInfo.productId]
+          if (url) o.productInfo.heroImageUrl = url
+        }
+      }
     }
 
     return res.status(200).json({ orders: transformedOrders })

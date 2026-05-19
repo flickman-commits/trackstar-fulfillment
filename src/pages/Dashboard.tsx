@@ -114,13 +114,16 @@ interface Order {
   // Which Shopify/Etsy product was ordered — drives which design template
   // Eli uses (e.g. regular Boston print vs Boston World Major poster).
   productInfo?: {
+    source: 'shopify' | 'etsy'
     productId: string
+    productIdLabel: string  // "Shopify product ID" or "Etsy listing ID"
     variantId: string | null
     rawTitle: string | null
     designVariant: string | null
     label: string | null
     heroImageUrl: string | null
     inCatalog: boolean
+    catalogRequired: boolean
   } | null
 }
 
@@ -4357,11 +4360,11 @@ Thank you!`
                           {selectedOrder.productInfo.label || 'Unknown product'}
                         </div>
                         <div className="text-[10px] text-off-black/40 mt-0.5">
-                          Shopify product ID: <span className="font-mono">{selectedOrder.productInfo.productId || '—'}</span>
-                          {!selectedOrder.productInfo.inCatalog && (
+                          {selectedOrder.productInfo.productIdLabel || 'Product ID'}: <span className="font-mono">{selectedOrder.productInfo.productId || '—'}</span>
+                          {selectedOrder.productInfo.catalogRequired && !selectedOrder.productInfo.inCatalog && (
                             <span
                               className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium"
-                              title="This product isn't in server/lib/productCatalog.js. Add it so the design variant displays clearly."
+                              title="This Shopify product isn't in server/lib/productCatalog.js. Add it to lock in the design variant + hero image."
                             >
                               not in catalog
                             </span>
