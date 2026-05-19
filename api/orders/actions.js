@@ -112,7 +112,7 @@ export default async function handler(req, res) {
 
     // Public POST actions — auth'd by the caller's own token inside the
     // handler, not by the admin secret. Everything else requires admin.
-    const PUBLIC_POST_ACTIONS = new Set(['creator-onboard'])
+    const PUBLIC_POST_ACTIONS = new Set(['creator-onboard', 'create-public-invite'])
     if (!PUBLIC_POST_ACTIONS.has(action)) {
       if (!requireAdmin(req, res)) return
     }
@@ -150,6 +150,8 @@ export default async function handler(req, res) {
         return await handleUpdateBrief(body, res)
       case 'create-creator-invite':
         return await handleCreateCreatorInvite(body, res)
+      case 'create-public-invite':
+        return await handleCreatePublicInvite(body, res)
       case 'creator-onboard':
         return await handleCreatorOnboard(body, res)
       case 'approve-creator-sample':
@@ -1323,6 +1325,36 @@ async function handleCreateCreatorInvite({ name, email, instagramHandle, briefId
 
   console.log(`[actions/create-creator-invite] Created ${created.id} with ${briefIds?.length || 0} brief(s)`)
   return res.status(201).json({ success: true, creator: created })
+}
+
+// --- create-public-invite (PUBLIC) ---
+// Hit by the public /apply landing page. Mints a fresh Creator row and
+// returns the inviteToken so the client can redirect into the onboarding
+// wizard at /creator/<token>. Auto-assigns every currently-active brief so
+// the creator sees content directives during onboarding — no admin step
+// required between Apply Now and onboarding.
+async function handleCreatePublicInvite(_body, res) {
+  const created = await prisma.creator.create({
+    data: {
+      inviteToken: makeInviteToken(),
+      status: 'invited',
+    }
+  })
+
+  const activeBriefs = await prisma.brief.findMany({
+    where: { status: 'active' },
+    select: { id: true }
+  })
+  if (activeBriefs.length > 0) {
+    await prisma.briefAssignment.createMany({
+      data: activeBriefs.map(b => ({ creatorId: created.id, briefId: b.id })),
+      skipDuplicates: true,
+    })
+  }
+
+  console.log(`[actions/create-public-invite] Public apply → creator ${created.id} (token ${created.inviteToken})`)
+  // Don't leak the whole row — just the token the client needs to redirect.
+  return res.status(201).json({ success: true, inviteToken: created.inviteToken })
 }
 
 // --- creator-portal-data (PUBLIC) ---
