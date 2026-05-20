@@ -43,6 +43,13 @@ export default async function handler(req, res) {
       }
       return await handleMondayPipeline(res)
     }
+    if (action === 'daily-design-update') {
+      // Cron uses CRON_SECRET; manual runs (for debugging) use ADMIN_SECRET.
+      const cronAuth = req.headers['authorization']
+      const isCron = cronAuth === `Bearer ${process.env.CRON_SECRET}`
+      if (!isCron && !requireAdmin(req, res)) return
+      return await handleDailyDesignUpdate(res)
+    }
     if (action === 'race-shorthands') {
       if (!requireAdmin(req, res)) return
       // Merge user overrides over scraper-config defaults. Overrides win so
@@ -536,6 +543,110 @@ async function handleMondayPipeline(res) {
     return res.status(200).json({ success: true, total, urgentCount, revisionCount, awaitingCustomerCount })
   } catch (error) {
     console.error('[actions/monday-pipeline] Error:', error)
+    return res.status(500).json({ error: error.message })
+  }
+}
+
+// --- daily-design-update (Vercel cron, every morning) ---
+// Posts a daily standup to #design with how many custom + standard orders
+// the team has on their plate, plus flags for anything due this week or
+// already overdue on the custom side. Standard side is just a count since
+// standard orders don't carry due dates.
+async function handleDailyDesignUpdate(res) {
+  try {
+    // Custom orders that aren't done yet
+    const customOrders = await prisma.order.findMany({
+      where: {
+        trackstarOrderType: 'custom',
+        designStatus: { not: 'sent_to_production' },
+      },
+      select: {
+        dueDate: true,
+        designStatus: true,
+        runnerName: true,
+        displayOrderNumber: true,
+        raceName: true,
+      }
+    })
+
+    // Standard orders still in flight (not completed)
+    const standardCount = await prisma.order.count({
+      where: {
+        trackstarOrderType: 'standard',
+        status: { in: ['pending', 'ready', 'flagged', 'missing_year'] },
+      }
+    })
+
+    const now = new Date()
+    const endOfWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+    const overdue = []
+    const dueThisWeek = []
+    for (const o of customOrders) {
+      if (!o.dueDate) continue
+      const due = new Date(o.dueDate)
+      if (due < now) overdue.push({ ...o, due })
+      else if (due <= endOfWeek) dueThisWeek.push({ ...o, due })
+    }
+
+    // Sort soonest-due first within each bucket.
+    overdue.sort((a, b) => a.due - b.due)
+    dueThisWeek.sort((a, b) => a.due - b.due)
+
+    const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
+    const orderLine = (o) => `• #${o.displayOrderNumber || '?'} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
+
+    const overdueSection = overdue.length > 0
+      ? `\n\n:rotating_light: *Overdue (${overdue.length}):*\n${overdue.map(orderLine).join('\n')}`
+      : ''
+    const weekSection = dueThisWeek.length > 0
+      ? `\n\n:date: *Due this week (${dueThisWeek.length}):*\n${dueThisWeek.map(orderLine).join('\n')}`
+      : ''
+
+    const appUrl = process.env.APP_BASE_URL || ''
+    const links = appUrl
+      ? `\n\nQueues → <${appUrl}/|Standard>  ·  <${appUrl}/?type=custom|Custom>`
+      : ''
+
+    const message = {
+      blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: '☀️ Daily Design Standup' }
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `Good morning! Here's where we stand today:\n\n*${customOrders.length} custom order${customOrders.length === 1 ? '' : 's'}* to fulfill\n*${standardCount} standard order${standardCount === 1 ? '' : 's'}* to fulfill${overdueSection}${weekSection}${links}`
+          }
+        }
+      ]
+    }
+
+    const webhookUrl = process.env.SLACK_DESIGN_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
+    if (!webhookUrl) {
+      console.warn('[actions/daily-design-update] No webhook URL configured — skipping post')
+      return res.status(200).json({ success: false, error: 'no webhook configured' })
+    }
+
+    const slackResponse = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message),
+    })
+    if (!slackResponse.ok) throw new Error(`Slack post failed: ${slackResponse.status}`)
+
+    console.log(`[actions/daily-design-update] Posted standup: ${customOrders.length} custom (${overdue.length} overdue, ${dueThisWeek.length} this week), ${standardCount} standard`)
+    return res.status(200).json({
+      success: true,
+      customTotal: customOrders.length,
+      standardTotal: standardCount,
+      overdue: overdue.length,
+      dueThisWeek: dueThisWeek.length,
+    })
+  } catch (error) {
+    console.error('[actions/daily-design-update] Error:', error)
     return res.status(500).json({ error: error.message })
   }
 }
@@ -1502,10 +1613,12 @@ async function postSlack(webhookUrl, text) {
   }
 }
 
-// Sent to the team channel when a creator finishes onboarding. Matt sees this
-// and reviews the request on /creators before approving.
+// Sent to #trackstar-creators when a creator finishes onboarding. Matt sees
+// this (he's mentioned by user ID) and reviews the request on /creators.
+// Falls back to the general team webhook if the creators-specific one isn't
+// set so we don't lose the ping during transition.
 async function pingSampleRequested(creator) {
-  const webhookUrl = process.env.SLACK_WEBHOOK_URL
+  const webhookUrl = process.env.SLACK_CREATORS_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
   if (!webhookUrl) return
   const mention = process.env.SLACK_USER_ID_MATT ? `<@${process.env.SLACK_USER_ID_MATT}> ` : ''
   const appUrl = process.env.APP_BASE_URL || ''

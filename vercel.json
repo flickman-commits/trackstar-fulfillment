@@ -8,6 +8,10 @@
     {
       "path": "/api/orders/actions?action=health-check",
       "schedule": "0 11 * * 1"
+    },
+    {
+      "path": "/api/orders/actions?action=daily-design-update",
+      "schedule": "0 13 * * *"
     }
   ],
   "functions": {
