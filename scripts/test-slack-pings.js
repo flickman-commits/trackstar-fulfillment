@@ -52,6 +52,7 @@ async function postDesignStandup() {
       orderNumber: true,
       parentOrderNumber: true,
       raceName: true,
+      shopifyOrderData: true,
     }
   })
 
@@ -64,6 +65,13 @@ async function postDesignStandup() {
 
   const now = new Date()
   const endOfWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+  const displayNum = (o) => {
+    const name = o.shopifyOrderData?.name
+    if (typeof name === 'string') return name.replace(/^#/, '')
+    return o.parentOrderNumber || o.orderNumber || '?'
+  }
+
   const overdue = []
   const dueThisWeek = []
   for (const o of customOrders) {
@@ -76,30 +84,32 @@ async function postDesignStandup() {
   dueThisWeek.sort((a, b) => a.due - b.due)
 
   const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
-  const orderLine = (o) => `• #${o.parentOrderNumber || o.orderNumber || '?'} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
-
-  const overdueSection = overdue.length > 0
-    ? `\n\n:rotating_light: *Overdue (${overdue.length}):*\n${overdue.map(orderLine).join('\n')}`
-    : ''
-  const weekSection = dueThisWeek.length > 0
-    ? `\n\n:date: *Due this week (${dueThisWeek.length}):*\n${dueThisWeek.map(orderLine).join('\n')}`
-    : ''
+  const orderLine = (o) => `• #${displayNum(o)} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
 
   const appUrl = process.env.APP_BASE_URL || ''
-  const links = appUrl
-    ? `\n\nQueues → <${appUrl}/|Standard>  ·  <${appUrl}/?type=custom|Custom>`
+  const dashboardFooter = appUrl
+    ? `\n\nDashboard → <${appUrl}/|Standard>  ·  <${appUrl}/?type=custom|Custom>`
     : ''
+
+  const customSection = [
+    `*🎨 CUSTOM ORDERS*`,
+    `*${customOrders.length}* in the queue${overdue.length > 0 ? ` · *${overdue.length} overdue*` : ''}${dueThisWeek.length > 0 ? ` · ${dueThisWeek.length} due this week` : ''}`,
+    overdue.length > 0 ? `\n:rotating_light: *Overdue (${overdue.length}):*\n${overdue.map(orderLine).join('\n')}` : '',
+    dueThisWeek.length > 0 ? `\n:date: *Due this week (${dueThisWeek.length}):*\n${dueThisWeek.map(orderLine).join('\n')}` : '',
+  ].filter(Boolean).join('\n')
+
+  const standardSection = [
+    `*📦 STANDARD ORDERS*`,
+    `*${standardCount}* to fulfill`,
+  ].join('\n')
 
   const message = {
     blocks: [
       { type: 'header', text: { type: 'plain_text', text: '☀️ Daily Design Standup (test)' } },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `Good morning! Here's where we stand today:\n\n*${customOrders.length} custom order${customOrders.length === 1 ? '' : 's'}* to fulfill\n*${standardCount} standard order${standardCount === 1 ? '' : 's'}* to fulfill${overdueSection}${weekSection}${links}`
-        }
-      }
+      { type: 'section', text: { type: 'mrkdwn', text: customSection } },
+      { type: 'divider' },
+      { type: 'section', text: { type: 'mrkdwn', text: standardSection } },
+      ...(dashboardFooter ? [{ type: 'section', text: { type: 'mrkdwn', text: dashboardFooter } }] : []),
     ]
   }
 

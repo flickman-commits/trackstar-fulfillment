@@ -549,10 +549,10 @@ async function handleMondayPipeline(res) {
 }
 
 // --- daily-design-update (Vercel cron, every morning) ---
-// Posts a daily standup to #design with how many custom + standard orders
-// the team has on their plate, plus flags for anything due this week or
-// already overdue on the custom side. Standard side is just a count since
-// standard orders don't carry due dates.
+// Posts a daily standup to #design organized into two sections — custom
+// orders (with overdue + due-this-week breakouts) and standard orders.
+// Uses the human-readable Shopify display number (e.g. "2585") rather
+// than the internal parentOrderNumber (e.g. "7161307431195").
 async function handleDailyDesignUpdate(res) {
   try {
     // Custom orders that aren't done yet
@@ -568,6 +568,7 @@ async function handleDailyDesignUpdate(res) {
         orderNumber: true,
         parentOrderNumber: true,
         raceName: true,
+        shopifyOrderData: true,  // for the display number
       }
     })
 
@@ -582,6 +583,13 @@ async function handleDailyDesignUpdate(res) {
     const now = new Date()
     const endOfWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
+    // Pull the Shopify display number ("#2585" → "2585") with fallbacks.
+    const displayNum = (o) => {
+      const name = o.shopifyOrderData?.name
+      if (typeof name === 'string') return name.replace(/^#/, '')
+      return o.parentOrderNumber || o.orderNumber || '?'
+    }
+
     const overdue = []
     const dueThisWeek = []
     for (const o of customOrders) {
@@ -590,25 +598,31 @@ async function handleDailyDesignUpdate(res) {
       if (due < now) overdue.push({ ...o, due })
       else if (due <= endOfWeek) dueThisWeek.push({ ...o, due })
     }
-
-    // Sort soonest-due first within each bucket.
     overdue.sort((a, b) => a.due - b.due)
     dueThisWeek.sort((a, b) => a.due - b.due)
 
     const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
-    const orderLine = (o) => `• #${o.parentOrderNumber || o.orderNumber || '?'} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
-
-    const overdueSection = overdue.length > 0
-      ? `\n\n:rotating_light: *Overdue (${overdue.length}):*\n${overdue.map(orderLine).join('\n')}`
-      : ''
-    const weekSection = dueThisWeek.length > 0
-      ? `\n\n:date: *Due this week (${dueThisWeek.length}):*\n${dueThisWeek.map(orderLine).join('\n')}`
-      : ''
+    const orderLine = (o) => `• #${displayNum(o)} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
 
     const appUrl = process.env.APP_BASE_URL || ''
-    const links = appUrl
-      ? `\n\nQueues → <${appUrl}/|Standard>  ·  <${appUrl}/?type=custom|Custom>`
+    const dashboardFooter = appUrl
+      ? `\n\nDashboard → <${appUrl}/|Standard>  ·  <${appUrl}/?type=custom|Custom>`
       : ''
+
+    // Two big sections so the team's eye knows exactly where to look:
+    //   1) CUSTOM ORDERS — counts + overdue + due-this-week lists
+    //   2) STANDARD ORDERS — just the count (no due dates on standard)
+    const customSection = [
+      `*🎨 CUSTOM ORDERS*`,
+      `*${customOrders.length}* in the queue${overdue.length > 0 ? ` · *${overdue.length} overdue*` : ''}${dueThisWeek.length > 0 ? ` · ${dueThisWeek.length} due this week` : ''}`,
+      overdue.length > 0 ? `\n:rotating_light: *Overdue (${overdue.length}):*\n${overdue.map(orderLine).join('\n')}` : '',
+      dueThisWeek.length > 0 ? `\n:date: *Due this week (${dueThisWeek.length}):*\n${dueThisWeek.map(orderLine).join('\n')}` : '',
+    ].filter(Boolean).join('\n')
+
+    const standardSection = [
+      `*📦 STANDARD ORDERS*`,
+      `*${standardCount}* to fulfill`,
+    ].join('\n')
 
     const message = {
       blocks: [
@@ -618,11 +632,17 @@ async function handleDailyDesignUpdate(res) {
         },
         {
           type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `Good morning! Here's where we stand today:\n\n*${customOrders.length} custom order${customOrders.length === 1 ? '' : 's'}* to fulfill\n*${standardCount} standard order${standardCount === 1 ? '' : 's'}* to fulfill${overdueSection}${weekSection}${links}`
-          }
-        }
+          text: { type: 'mrkdwn', text: customSection }
+        },
+        { type: 'divider' },
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: standardSection }
+        },
+        ...(dashboardFooter ? [{
+          type: 'section',
+          text: { type: 'mrkdwn', text: dashboardFooter }
+        }] : []),
       ]
     }
 
