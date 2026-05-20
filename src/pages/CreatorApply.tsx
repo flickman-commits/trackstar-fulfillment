@@ -56,11 +56,11 @@ export default function CreatorApply() {
           Creator Program
         </span>
         <h1 className="text-4xl md:text-6xl font-bold text-off-black leading-[1.05] tracking-tight mb-5">
-          Get a free print.<br />
-          Run with us.
+          Share your story.<br />
+          Get a free Trackstar print.
         </h1>
-        <p className="text-base md:text-lg text-off-black/70 max-w-xl mx-auto leading-relaxed">
-          Trackstar turns your race into custom art — a personalized print with your name, bib, time, pace, weather, all of it. We send it free to runners who'll share the story.
+        <p className="text-base md:text-lg text-off-black/70 max-w-2xl mx-auto leading-relaxed">
+          Trackstar creates beautiful race art out of your marathons. Personalized print with your name, bib, time, pace, and the course you ran. Join the Creator Program and get a free print in exchange for content. Details below.
         </p>
         <button
           onClick={handleApply}
