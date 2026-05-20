@@ -486,7 +486,8 @@ async function handleMondayPipeline(res) {
         dueDate: true,
         designStatus: true,
         runnerName: true,
-        displayOrderNumber: true,
+        orderNumber: true,
+        parentOrderNumber: true,
         raceName: true
       }
     })
@@ -512,7 +513,7 @@ async function handleMondayPipeline(res) {
     }
 
     const urgentSection = urgentCount > 0
-      ? `\n\n:rotating_light: *Urgent (due within 3 days):*\n${urgentOrders.map(o => `• #${o.displayOrderNumber || '?'} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${formatDate(o.dueDate)}`).join('\n')}`
+      ? `\n\n:rotating_light: *Urgent (due within 3 days):*\n${urgentOrders.map(o => `• #${o.parentOrderNumber || o.orderNumber || '?'} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${formatDate(o.dueDate)}`).join('\n')}`
       : ''
 
     const message = {
@@ -564,7 +565,8 @@ async function handleDailyDesignUpdate(res) {
         dueDate: true,
         designStatus: true,
         runnerName: true,
-        displayOrderNumber: true,
+        orderNumber: true,
+        parentOrderNumber: true,
         raceName: true,
       }
     })
@@ -594,7 +596,7 @@ async function handleDailyDesignUpdate(res) {
     dueThisWeek.sort((a, b) => a.due - b.due)
 
     const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
-    const orderLine = (o) => `• #${o.displayOrderNumber || '?'} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
+    const orderLine = (o) => `• #${o.parentOrderNumber || o.orderNumber || '?'} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
 
     const overdueSection = overdue.length > 0
       ? `\n\n:rotating_light: *Overdue (${overdue.length}):*\n${overdue.map(orderLine).join('\n')}`
