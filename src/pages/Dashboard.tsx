@@ -102,6 +102,8 @@ interface Order {
   commentCount?: number
   proofCount?: number
   proofSentAt?: string | null
+  delayNoticeSentAt?: string | null
+  delayNoticeDaysLate?: number | null
   shopifyCreatedAt?: string | null
   orderPlacedAt?: string | null
   // Shipping
@@ -459,7 +461,10 @@ export default function Dashboard() {
           isBigSpender: order.isBigSpender as boolean | undefined,
           bigSpenderThresholdUsd: order.bigSpenderThresholdUsd as number | undefined,
           // Which product was ordered → drives design variant
-          productInfo: order.productInfo as Order['productInfo']
+          productInfo: order.productInfo as Order['productInfo'],
+          // Custom-order delay notice — drives the "delay notice sent" badge
+          delayNoticeSentAt: order.delayNoticeSentAt as string | null | undefined,
+          delayNoticeDaysLate: order.delayNoticeDaysLate as number | null | undefined,
         }
       })
 
@@ -1071,6 +1076,50 @@ export default function Dashboard() {
       if (import.meta.env.DEV) console.error('Error re-opening order:', error)
       const msg = error instanceof Error ? error.message : 'Failed to re-open order'
       setToast({ message: msg, type: 'error' })
+    }
+  }
+
+  // "Notify Customer of Delay" — Dan's emergency-only button for custom orders
+  const [delayDialogOpen, setDelayDialogOpen] = useState(false)
+  const [delayDaysInput, setDelayDaysInput] = useState('3')
+  const [isSendingDelay, setIsSendingDelay] = useState(false)
+
+  const openDelayDialog = () => {
+    setDelayDaysInput('3')
+    setDelayDialogOpen(true)
+  }
+  const closeDelayDialog = () => {
+    if (isSendingDelay) return
+    setDelayDialogOpen(false)
+  }
+  const sendDelayNotice = async (orderNumber: string) => {
+    const days = parseInt(delayDaysInput, 10)
+    if (!Number.isFinite(days) || days < 1 || days > 60) {
+      setToast({ message: 'Days late must be a whole number between 1 and 60', type: 'error' })
+      return
+    }
+    setIsSendingDelay(true)
+    try {
+      const response = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'notify-custom-delay', orderNumber, daysLate: days })
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to send delay notice')
+      }
+      setToast({ message: `Delay notice sent — promised ${days} day${days === 1 ? '' : 's'} late`, type: 'success' })
+      setDelayDialogOpen(false)
+      // Update local state immediately so the badge shows up without a refetch
+      const sentAt = new Date().toISOString()
+      setSelectedOrder(prev => prev ? { ...prev, delayNoticeSentAt: sentAt, delayNoticeDaysLate: days } : prev)
+      setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, delayNoticeSentAt: sentAt, delayNoticeDaysLate: days } : o))
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to send delay notice'
+      setToast({ message: msg, type: 'error' })
+    } finally {
+      setIsSendingDelay(false)
     }
   }
 
@@ -3856,6 +3905,22 @@ Thank you!`
                             </>
                           )}
                         </div>
+
+                        {/* Delay-notice banner (Mobile) */}
+                        {selectedOrder.delayNoticeSentAt && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
+                            <span className="text-base leading-none">⏰</span>
+                            <div className="flex-1 text-xs">
+                              <p className="font-medium text-amber-900">
+                                Pushed due date {selectedOrder.delayNoticeDaysLate ?? '?'} day{selectedOrder.delayNoticeDaysLate === 1 ? '' : 's'} — email sent
+                              </p>
+                              <p className="text-amber-700/80 mt-0.5">
+                                Customer notified {new Date(selectedOrder.delayNoticeSentAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
                         {selectedOrder.creativeDirection && (
                           <div>
                             <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Creative Direction</h4>
@@ -4003,6 +4068,21 @@ Thank you!`
                           )}
                         </div>
 
+                        {/* Emergency delay notice — custom orders only.
+                            Tucked away as a tertiary action so Dan doesn't reach
+                            for it unless it's actually warranted. */}
+                        {selectedOrder.trackstarOrderType === 'custom' && selectedOrder.customerEmail && (
+                          <div className="pt-1">
+                            <button
+                              onClick={openDelayDialog}
+                              className="w-full px-3 py-2 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 rounded-md transition-colors text-xs font-medium inline-flex items-center justify-center gap-1.5"
+                            >
+                              <span>⏰</span>
+                              Notify Customer of Delay
+                            </button>
+                          </div>
+                        )}
+
                         <div className="pt-1">
                           <button
                             onClick={closeModal}
@@ -4081,6 +4161,23 @@ Thank you!`
                           <div className="flex items-center gap-3">
                             <span className="text-off-black/40">{selectedOrder.productSize}</span>
                             {selectedOrder.isGift && <span className="text-pink-600">🎁 Gift</span>}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Delay-notice banner — shown when Dan has emailed the customer
+                          warning them about a delay. The due date itself isn't changed
+                          (we keep it as the original promise) — this is purely a flag. */}
+                      {selectedOrder.delayNoticeSentAt && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
+                          <span className="text-base leading-none">⏰</span>
+                          <div className="flex-1 text-xs">
+                            <p className="font-medium text-amber-900">
+                              Pushed due date {selectedOrder.delayNoticeDaysLate ?? '?'} day{selectedOrder.delayNoticeDaysLate === 1 ? '' : 's'} — email sent
+                            </p>
+                            <p className="text-amber-700/80 mt-0.5">
+                              Customer notified {new Date(selectedOrder.delayNoticeSentAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
                           </div>
                         </div>
                       )}
@@ -4305,6 +4402,21 @@ Thank you!`
                             </div>
                           )}
                         </CollapsibleSection>
+                      )}
+
+                      {/* Emergency delay notice — custom orders only. Sits above
+                          the close row so Dan can find it but it's not the
+                          primary action. */}
+                      {selectedOrder.trackstarOrderType === 'custom' && selectedOrder.customerEmail && (
+                        <div className="pt-1">
+                          <button
+                            onClick={openDelayDialog}
+                            className="w-full px-3 py-2 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 rounded-md transition-colors text-xs font-medium inline-flex items-center justify-center gap-1.5"
+                          >
+                            <span>⏰</span>
+                            Notify Customer of Delay
+                          </button>
+                        </div>
                       )}
 
                       {/* Bottom actions */}
@@ -5307,6 +5419,94 @@ Thank you!`
                   >
                     {isCreatingPartner && <Loader2 className="w-4 h-4 animate-spin" />}
                     {isCreatingPartner ? 'Creating…' : 'Create'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notify Customer of Delay — emergency dialog for custom orders.
+            Sends a Resend email apologizing for the delay, stores the flag
+            on the order so a banner appears in the modal, and DMs Matt. */}
+        {delayDialogOpen && selectedOrder && (
+          <div
+            className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-[60]"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeDelayDialog()
+            }}
+          >
+            <div className="bg-white rounded-md max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-heading-md text-off-black flex items-center gap-2">
+                    <span>⏰</span> Notify Customer of Delay
+                  </h3>
+                  <button
+                    onClick={closeDelayDialog}
+                    disabled={isSendingDelay}
+                    className="text-off-black/40 hover:text-off-black text-2xl leading-none disabled:opacity-40"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Warning copy — make the consequence obvious */}
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4">
+                  <p className="text-xs font-semibold text-amber-900 mb-1">
+                    Emergency use only
+                  </p>
+                  <p className="text-xs text-amber-800/90 leading-relaxed">
+                    This emails the customer that their order will be late. We do <strong>not</strong> want to make a habit of this — only use it when a delay is unavoidable. The due date will stay the same; a flag will appear on this order showing it was sent.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-off-black/60 uppercase tracking-wider mb-1.5">
+                      Customer
+                    </label>
+                    <div className="text-sm text-off-black">
+                      {selectedOrder.customerName ? `${selectedOrder.customerName} · ` : ''}
+                      <span className="text-off-black/60">{selectedOrder.customerEmail}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-off-black/60 uppercase tracking-wider mb-1.5">
+                      How many days late will it be?
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={delayDaysInput}
+                      onChange={(e) => setDelayDaysInput(e.target.value)}
+                      disabled={isSendingDelay}
+                      className="w-full px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 disabled:opacity-50"
+                      autoFocus
+                    />
+                    <p className="text-[11px] text-off-black/50 mt-1.5">
+                      Email will tell them their mockup may arrive ~{delayDaysInput || '?'} day{delayDaysInput === '1' ? '' : 's'} after their original due date.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 mt-6">
+                  <button
+                    onClick={closeDelayDialog}
+                    disabled={isSendingDelay}
+                    className="px-4 py-2 text-sm font-medium text-off-black/70 hover:bg-subtle-gray rounded-md transition-colors disabled:opacity-40"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => sendDelayNotice(selectedOrder.orderNumber)}
+                    disabled={isSendingDelay || !delayDaysInput.trim()}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isSendingDelay && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {isSendingDelay ? 'Sending…' : 'Send Delay Notice'}
                   </button>
                 </div>
               </div>

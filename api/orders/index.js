@@ -217,6 +217,9 @@ export default async function handler(req, res) {
         proofCount: order._count?.proofs || 0,
         // When proofs were last sent (for follow-up tracking)
         proofSentAt: order.proofSentAt,
+        // Delay-notice tracking (custom orders) — drives the "delay notice sent" badge
+        delayNoticeSentAt: order.delayNoticeSentAt,
+        delayNoticeDaysLate: order.delayNoticeDaysLate,
         // Shopify display order number (e.g. "2855") and order date for sorting
         displayOrderNumber: order.shopifyOrderData?.name
           ? String(order.shopifyOrderData.name).replace('#', '')

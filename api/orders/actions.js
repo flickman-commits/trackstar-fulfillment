@@ -27,6 +27,7 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
 import { getRaceShorthands } from '../../server/scrapers/index.js'
+import { Resend } from 'resend'
 
 export default async function handler(req, res) {
   // Ping is public (UptimeRobot), everything else uses standard CORS
@@ -137,6 +138,8 @@ export default async function handler(req, res) {
         return await handleReopen(body, res)
       case 'design-status':
         return await handleDesignStatus(body, res)
+      case 'notify-custom-delay':
+        return await handleNotifyCustomDelay(body, res)
       case 'customers-served-info':
         return await handleCustomersServedInfo(res)
       case 'customers-served-sync':
@@ -402,6 +405,131 @@ async function handleDesignStatus({ orderNumber, designStatus }, res) {
     }).catch(e => console.warn('[actions] Slack failed:', e.message))
   }
 
+  return res.status(200).json({ success: true, order })
+}
+
+// --- notify-custom-delay ---
+// Sends Dan's "we're a bit behind" email to a custom-order customer.
+// Doesn't change the order's dueDate — instead records that the notice was
+// sent so the dashboard shows a "delay notice sent" badge. Pings Matt in
+// Slack each time, so we have visibility into how often this is used (the
+// goal is "rarely").
+async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
+  if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
+  const days = parseInt(daysLate, 10)
+  if (!Number.isFinite(days) || days < 1 || days > 60) {
+    return res.status(400).json({ error: 'daysLate must be an integer between 1 and 60' })
+  }
+
+  const existing = await prisma.order.findFirst({ where: { orderNumber } })
+  if (!existing) return res.status(404).json({ error: 'Order not found' })
+  if (existing.trackstarOrderType !== 'custom') {
+    return res.status(400).json({ error: 'Delay notice is only for custom orders' })
+  }
+  if (!existing.customerEmail) {
+    return res.status(400).json({ error: 'No customer email on file for this order — cannot send delay notice' })
+  }
+
+  if (!process.env.RESEND_API_KEY) {
+    return res.status(500).json({ error: 'Email service not configured (RESEND_API_KEY missing)' })
+  }
+
+  // Format the original due date in ET so it reads naturally to the customer
+  const TZ = 'America/New_York'
+  const originalDueDate = existing.dueDate
+    ? new Date(existing.dueDate).toLocaleDateString('en-US', { timeZone: TZ, month: 'long', day: 'numeric' })
+    : null
+
+  // Display number on the email (matches what's shown in the dashboard)
+  const shopifyData = existing.shopifyOrderData
+  const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
+    ? String(shopifyData.name) : `#${existing.parentOrderNumber}`
+
+  const firstName = existing.customerName || 'there'
+  const dueDateLine = originalDueDate
+    ? `your mockup may arrive about <strong>${days} days after the ${originalDueDate}</strong> date we originally quoted.`
+    : `your mockup may arrive about <strong>${days} days later</strong> than we originally quoted.`
+
+  // On-brand email template — matches the proof email style (cream bg, dark
+  // text, purple accent). Helvetica Neue for consistency.
+  const emailHtml = `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#F7F5F0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F5F0;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+        <!-- Logo -->
+        <tr><td style="padding:0 0 32px;text-align:center;">
+          <img src="https://www.trackstar.art/cdn/shop/files/Trackstar_Logo_Cropped.png?height=28&v=1757377797" alt="Trackstar" height="28" style="height:28px;" />
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="padding:32px;background-color:#FFFFFF;border:1px solid #E8E6E1;">
+          <h1 style="margin:0 0 20px;font-size:22px;color:#1A1A1A;font-weight:700;letter-spacing:0.02em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">A quick heads-up on your order</h1>
+          <p style="margin:0 0 14px;font-size:15px;color:#555555;line-height:1.6;">Hey ${firstName},</p>
+          <p style="margin:0 0 14px;font-size:15px;color:#555555;line-height:1.6;">
+            Quick update — we've been swamped with custom orders the past couple of weeks, and things are running slightly behind where we'd hoped.
+          </p>
+          <p style="margin:0 0 14px;font-size:15px;color:#555555;line-height:1.6;">
+            We haven't forgotten you. We refuse to put out a design we're not proud of, so ${dueDateLine}
+          </p>
+          <p style="margin:0 0 14px;font-size:15px;color:#555555;line-height:1.6;">
+            We're sorry for the wait, and we promise it'll be worth it. We believe in keeping you in the loop, so we wanted to tell you personally. Excited to share your design soon.
+          </p>
+          <p style="margin:24px 0 0;font-size:15px;color:#555555;line-height:1.6;">
+            Thanks for your patience,<br/>
+            <strong>The Trackstar Design Team</strong>
+          </p>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="padding:24px 0 0;text-align:center;">
+          <p style="margin:0;font-size:11px;color:#999999;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">Trackstar — Celebrating athletic achievement.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+
+  const resend = new Resend(process.env.RESEND_API_KEY)
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Trackstar <proofs@orders.trackstar.art>'
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to: [existing.customerEmail],
+      cc: ['fast@trackstar.art'],
+      subject: 'A quick heads-up on your Trackstar order',
+      html: emailHtml,
+    })
+  } catch (emailErr) {
+    console.error('[actions/notify-custom-delay] Email send failed:', emailErr)
+    await alertError('Custom-order delay email', emailErr, { orderNumber, customerEmail: existing.customerEmail })
+    return res.status(500).json({ error: 'Failed to send delay email. Please try again.' })
+  }
+
+  // Record that we sent the notice (don't change the dueDate itself)
+  const order = await prisma.order.update({
+    where: { id: existing.id },
+    data: {
+      delayNoticeSentAt: new Date(),
+      delayNoticeDaysLate: days,
+    }
+  })
+
+  // Slack DM to Matt — fire-and-forget. Uses the DM webhook if set, falls
+  // back to the proof channel webhook.
+  const slackUrl = process.env.SLACK_DM_WEBHOOK_URL || process.env.SLACK_PROOF_WEBHOOK_URL
+  if (slackUrl) {
+    const dueDateText = originalDueDate ? ` (was due ${originalDueDate})` : ''
+    const text = `⏰ *Custom-order delay notice sent* — order *${displayNum}* for ${existing.customerName || 'customer'} (${existing.raceName || 'custom design'}). Promised *${days} day${days === 1 ? '' : 's'}* late${dueDateText}. Email went to ${existing.customerEmail}.`
+    fetch(slackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    }).catch(e => console.warn('[actions/notify-custom-delay] Slack notify failed:', e.message))
+  }
+
+  console.log(`[actions/notify-custom-delay] Order ${orderNumber}: delay email sent (${days} days late)`)
   return res.status(200).json({ success: true, order })
 }
 
