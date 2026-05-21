@@ -33,6 +33,106 @@ const ACTIONABLE_STATUSES = ['PendingFulfillmentAction', 'AwaitingPayment']
 // Race name strings that indicate a custom order (customer provides their own data)
 const CUSTOM_ORDER_RACE_NAMES = ['Custom Trackstar Print (Any Race)']
 
+// -----------------------------------------------------------------------------
+// Multi-line-item matcher (Artelo ↔ Shopify / Etsy)
+// -----------------------------------------------------------------------------
+// CRITICAL: Artelo's `orderItems[]` array is NOT guaranteed to be in the same
+// order as Shopify's `line_items[]`. We observed a real mix-up on order #3348
+// where Artelo flipped the items — the customer ordered 12x18 (Victor) +
+// 8x10 (Hannah), but Artelo returned them as 8x10 first then 12x18, and our
+// old positional `[lineItemIndex]` lookup glued Victor's name onto the 8x10
+// print and Hannah's onto the 12x18.
+//
+// This helper builds a stable mapping artelo[i] → shopify[j] (or -1 if none)
+// by matching on the print size (and frame as a tiebreaker for duplicates),
+// then falling back to positional for any leftovers. It's used everywhere we
+// pair an Artelo line item with its Shopify counterpart.
+
+function normalizePrintSize(raw) {
+  if (!raw) return ''
+  // Artelo prefixes with "x" (e.g. "x8x10"); strip it. Lowercase + trim.
+  return String(raw).replace(/^x/i, '').toLowerCase().trim()
+}
+
+function shopifySkuContainsSize(sku, size) {
+  if (!sku || !size) return false
+  // SKUs look like "eugene-s1p-12x18-bl-pok-am" — size is a hyphen-bounded token
+  return new RegExp(`(^|[-_])${size}([-_]|$)`, 'i').test(sku)
+}
+
+/**
+ * Score-based stable matching. We compute a score for every (artelo[i],
+ * upstream[j]) pair, then greedily assign highest-scoring pairs first.
+ * Positional alignment is a tiebreaker (small penalty for index distance) —
+ * this means when sizes don't disambiguate (e.g. two 8x10s), positional
+ * stays put. Swaps only happen when size info clearly points to a different
+ * pairing.
+ */
+function buildMatchMapByScore(arteloItems, upstreamItems, scoreSizeMatchFns) {
+  const n = arteloItems?.length || 0
+  const result = new Array(n).fill(-1)
+  if (!upstreamItems?.length || !n) return result
+
+  const candidates = []
+  for (let i = 0; i < n; i++) {
+    const aSize = normalizePrintSize(arteloItems[i]?.product?.size)
+    for (let j = 0; j < upstreamItems.length; j++) {
+      let score = 0
+      if (aSize) {
+        for (const fn of scoreSizeMatchFns) {
+          score += fn(upstreamItems[j], aSize)
+        }
+      }
+      // Positional tiebreaker — small penalty for index distance. Keeps
+      // positional matching when no size info disambiguates.
+      score -= Math.abs(i - j)
+      candidates.push({ i, j, score })
+    }
+  }
+  // Highest score first; deterministic tiebreak by i then j
+  candidates.sort((a, b) => b.score - a.score || a.i - b.i || a.j - b.j)
+  const usedI = new Set()
+  const usedJ = new Set()
+  for (const c of candidates) {
+    if (usedI.has(c.i) || usedJ.has(c.j)) continue
+    result[c.i] = c.j
+    usedI.add(c.i)
+    usedJ.add(c.j)
+  }
+  return result
+}
+
+/**
+ * Build mapping from Artelo line-item index → Shopify line-item index.
+ * Returns an array `map` where `map[arteloIdx] = shopifyIdx | -1`.
+ */
+function buildShopifyMatchMap(arteloItems, shopifyLineItems) {
+  return buildMatchMapByScore(arteloItems, shopifyLineItems, [
+    // SKU containing the size token is the strongest signal (SKU encodes
+    // the actual variant, while variant_title is display text that can be
+    // misleading — e.g. "Black Oak" used as a label for "Black Premium Oak").
+    (li, size) => shopifySkuContainsSize(li?.sku, size) ? 100 : 0,
+    // variant_title is a weaker signal but still useful
+    (li, size) => (li?.variant_title || '').toLowerCase().includes(size) ? 50 : 0,
+  ])
+}
+
+/**
+ * Same idea for Etsy transactions. SKU first, then variations text.
+ */
+function buildEtsyMatchMap(arteloItems, etsyTransactions) {
+  return buildMatchMapByScore(arteloItems, etsyTransactions, [
+    (t, size) => shopifySkuContainsSize(t?.sku, size) ? 100 : 0,
+    (t, size) => {
+      const haystacks = [
+        t?.title || '',
+        ...(t?.variations || []).map(v => `${v?.formatted_name || ''} ${v?.formatted_value || ''}`)
+      ].join(' ').toLowerCase()
+      return haystacks.includes(size) ? 50 : 0
+    },
+  ])
+}
+
 /**
  * Check if a race name indicates a custom order
  */
@@ -577,6 +677,18 @@ export async function processOrders(options = {}) {
           etsyReceipt = await fetchEtsyReceiptData(order.orderId)
         }
 
+        // Build Artelo-index → Shopify/Etsy-index maps once for this order.
+        // CRITICAL: Artelo can return orderItems in a different order than the
+        // upstream Shopify/Etsy line_items. Positional indexing would glue the
+        // wrong runner name to the wrong print size. See buildShopifyMatchMap
+        // and buildEtsyMatchMap above.
+        const shopifyMatchMap = isShopify
+          ? buildShopifyMatchMap(order.orderItems || [], shopifyData?.shopifyOrderData?.line_items || [])
+          : null
+        const etsyMatchMap = isEtsy
+          ? buildEtsyMatchMap(order.orderItems || [], etsyReceipt?.transactions || [])
+          : null
+
         // Process each line item separately
         for (let lineItemIndex = 0; lineItemIndex < numItems; lineItemIndex++) {
           const orderResult = {
@@ -629,8 +741,13 @@ export async function processOrders(options = {}) {
                                            shopifyData.shopifyOrderData?.customer?.email || existing.customerEmail
                 updateData.customerName = shopifyData.shopifyOrderData?.customer?.first_name || existing.customerName
 
-                // Extract personalization for this specific line item
-                const lineItem = shopifyData.shopifyOrderData?.line_items?.[lineItemIndex]
+                // Extract personalization for this specific line item.
+                // IMPORTANT: use the matchMap (not lineItemIndex) — Artelo can
+                // reorder items relative to Shopify. See buildShopifyMatchMap.
+                const shopifyIdx = shopifyMatchMap?.[lineItemIndex] ?? -1
+                const lineItem = shopifyIdx >= 0
+                  ? shopifyData.shopifyOrderData?.line_items?.[shopifyIdx]
+                  : null
                 if (lineItem) {
                   const extracted = extractShopifyPersonalization(lineItem)
 
@@ -674,8 +791,13 @@ export async function processOrders(options = {}) {
                 // Extract customer email from receipt
                 updateData.customerEmail = etsyReceipt.buyer_email || existing.customerEmail
 
-                // Extract personalization for this specific line item
-                const transaction = etsyReceipt.transactions?.[lineItemIndex]
+                // Extract personalization for this specific line item.
+                // IMPORTANT: use the matchMap (not lineItemIndex) — Artelo can
+                // reorder items relative to Etsy. See buildEtsyMatchMap.
+                const etsyIdx = etsyMatchMap?.[lineItemIndex] ?? -1
+                const transaction = etsyIdx >= 0
+                  ? etsyReceipt.transactions?.[etsyIdx]
+                  : null
                 if (transaction) {
                   const extracted = extractEtsyPersonalization(transaction)
 
@@ -753,8 +875,13 @@ export async function processOrders(options = {}) {
                                 shopifyData.shopifyOrderData?.customer?.email || null
                 customerName = shopifyData.shopifyOrderData?.customer?.first_name || null
 
-                // Extract personalization for this specific line item
-                const lineItem = shopifyData.shopifyOrderData?.line_items?.[lineItemIndex]
+                // Extract personalization for this specific line item.
+                // IMPORTANT: use the matchMap (not lineItemIndex) — Artelo can
+                // reorder items relative to Shopify. See buildShopifyMatchMap.
+                const shopifyIdx = shopifyMatchMap?.[lineItemIndex] ?? -1
+                const lineItem = shopifyIdx >= 0
+                  ? shopifyData.shopifyOrderData?.line_items?.[shopifyIdx]
+                  : null
                 if (lineItem) {
                   const extracted = extractShopifyPersonalization(lineItem)
 
@@ -799,8 +926,13 @@ export async function processOrders(options = {}) {
                 // Extract customer email from receipt
                 customerEmail = etsyReceipt.buyer_email || null
 
-                // Extract personalization for this specific line item
-                const transaction = etsyReceipt.transactions?.[lineItemIndex]
+                // Extract personalization for this specific line item.
+                // IMPORTANT: use the matchMap (not lineItemIndex) — Artelo can
+                // reorder items relative to Etsy. See buildEtsyMatchMap.
+                const etsyIdx = etsyMatchMap?.[lineItemIndex] ?? -1
+                const transaction = etsyIdx >= 0
+                  ? etsyReceipt.transactions?.[etsyIdx]
+                  : null
                 if (transaction) {
                   const extracted = extractEtsyPersonalization(transaction)
 
