@@ -163,7 +163,7 @@ export default function ApprovalPortal() {
   // ═══ LOADING ═══
   if (state === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" style={{ color: '#666666' }} />
           <p style={{ color: '#666666', fontSize: '14px' }}>Loading your design...</p>
@@ -175,7 +175,7 @@ export default function ApprovalPortal() {
   // ═══ ERROR ═══
   if (state === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <div className="text-center max-w-sm">
           <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
           <XCircle className="w-12 h-12 mx-auto mb-4" style={{ color: '#4600D6' }} />
@@ -189,7 +189,7 @@ export default function ApprovalPortal() {
   // ═══ EXPIRED ═══
   if (state === 'expired') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <div className="text-center max-w-sm">
           <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
           <AlertTriangle className="w-12 h-12 mx-auto mb-4" style={{ color: '#4600D6' }} />
@@ -215,7 +215,7 @@ export default function ApprovalPortal() {
     const sortedBatches = [...batchMap.entries()].sort((a, b) => b[0] - a[0])
 
     return (
-      <div className="min-h-screen" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         {/* Lightbox */}
         {lightboxUrl && (
           <div
@@ -394,7 +394,7 @@ export default function ApprovalPortal() {
   // ═══ REVISION SUBMITTED — success state ═══
   if (state === 'revision_submitted') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <div className="text-center max-w-sm">
           <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
           <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(200, 85, 61, 0.1)' }}>
@@ -428,7 +428,7 @@ export default function ApprovalPortal() {
     : null
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       {/* Approve confirmation modal */}
       {proofBeingConfirmed && (
         <div
@@ -524,8 +524,18 @@ export default function ApprovalPortal() {
               We're working on your revisions. Check back soon.
             </p>
           )}
+          {/* "Don't email us" callout — light purple, sits right under the
+              subheader so customers see it before they even scroll to the
+              designs. Brand purple #4600D6 at low opacity. */}
+          {hasPendingProofs && (
+            <div style={{ marginTop: '14px', padding: '10px 14px', backgroundColor: 'rgba(70, 0, 214, 0.06)', border: '1px solid rgba(70, 0, 214, 0.18)', borderRadius: '6px' }}>
+              <p style={{ color: '#1A1A1A', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
+                <strong style={{ color: '#4600D6' }}>Please don't email us with revisions</strong> — tap <strong>Request Revision to this Design</strong> on the design you want changed.
+              </p>
+            </div>
+          )}
           {order?.designerNote && (
-            <div style={{ marginTop: '16px', padding: '12px 16px', backgroundColor: '#F7F5F0', borderLeft: '3px solid #4600D6', borderRadius: '0 4px 4px 0' }}>
+            <div style={{ marginTop: '16px', padding: '12px 16px', backgroundColor: '#FFFFFF', borderLeft: '3px solid #4600D6', borderRadius: '0 4px 4px 0' }}>
               <p style={{ color: '#666666', fontSize: '12px', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Note from our designer</p>
               <p style={{ color: '#1A1A1A', fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const, margin: 0 }}>{order.designerNote}</p>
             </div>
@@ -735,22 +745,9 @@ export default function ApprovalPortal() {
                   )}
                 </div>
 
-                {/* Persistent "don't email us" callout. Always at the bottom,
-                    always visible. Each design card carries its own Approve
-                    and Make Revisions buttons, so the only thing this footer
-                    needs to do is keep the anti-email message in front of
-                    the customer at all times. */}
-                <div className="sticky bottom-0 backdrop-blur-sm -mx-4 px-4 py-3 mt-6" style={{ backgroundColor: 'rgba(247, 245, 240, 0.96)', borderTop: '1px solid #E0E0E0' }}>
-                  <div className="max-w-2xl mx-auto flex items-start gap-2.5 px-3 py-2.5" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E8E6E1' }}>
-                    <span style={{ fontSize: '15px', lineHeight: 1.2, marginTop: '1px' }}>✋</span>
-                    <p style={{ color: '#1A1A1A', fontSize: '12px', margin: 0, lineHeight: 1.55 }}>
-                      <strong>Please don't email us with revisions.</strong>{' '}
-                      <span style={{ color: '#666666' }}>
-                        To request changes to a design, tap <strong style={{ color: '#1A1A1A' }}>Request Revision to this Design</strong> on that design above and type your notes there.
-                      </span>
-                    </p>
-                  </div>
-                </div>
+                {/* The "don't email us" callout used to live here as a sticky
+                    footer. Moved up under the subheader so customers see it
+                    before they even start scrolling through designs. */}
               </>
             )}
 
