@@ -12,6 +12,14 @@
     {
       "path": "/api/orders/actions?action=daily-design-update",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/orders/actions?action=weekly-ads-debrief",
+      "schedule": "0 20 * * 5"
+    },
+    {
+      "path": "/api/orders/actions?action=weekly-ads-debrief",
+      "schedule": "0 21 * * 5"
     }
   ],
   "functions": {

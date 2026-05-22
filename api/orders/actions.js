@@ -29,6 +29,7 @@ import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServe
 import { shopifyFetch } from '../../server/services/shopifyAuth.js'
 import { getRaceShorthands } from '../../server/scrapers/index.js'
 import { Resend } from 'resend'
+import { runWeeklyAdsDebrief, isFridayFourPmEastern } from '../../server/services/weeklyAdsDebrief.js'
 
 export default async function handler(req, res) {
   // Ping is public (UptimeRobot), everything else uses standard CORS
@@ -89,6 +90,17 @@ export default async function handler(req, res) {
       const isCron = cronAuth === `Bearer ${process.env.CRON_SECRET}`
       if (!isCron && !requireAdmin(req, res)) return
       return await handleHealthCheck(res, { sendSlack: isCron })
+    }
+    if (action === 'weekly-ads-debrief') {
+      // Cron uses CRON_SECRET, manual uses ADMIN_SECRET.
+      // Cron fires twice (20:00 + 21:00 UTC Friday) to handle DST; the
+      // function checks isFridayFourPmEastern() and skips if not 4pm ET.
+      // Manual triggers (?dryRun=1 or just the action) bypass the guard.
+      const cronAuth = req.headers['authorization']
+      const isCron = cronAuth === `Bearer ${process.env.CRON_SECRET}`
+      if (!isCron && !requireAdmin(req, res)) return
+      const dryRun = req.query?.dryRun === '1' || req.query?.dryRun === 'true'
+      return await handleWeeklyAdsDebrief(res, { isCron, dryRun })
     }
     if (action === 'test-connections') {
       // Detailed Artelo / Shopify / Etsy step-by-step connection diagnostics
@@ -2148,7 +2160,6 @@ async function handleDeleteCreator({ creatorId }, res) {
   })
 }
 
-
 // --- shopify-products ---
 // Fetch all Shopify products for populating the product catalog
 async function handleShopifyProducts(res) {
@@ -2203,4 +2214,36 @@ function slugify(title) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
+}
+
+// --- weekly-ads-debrief (Vercel cron — Fridays at 4pm ET) ---
+// Pulls last 7 days of Meta Ads + Shopify sales + the financial tracker,
+// fetches the Ad Ops Playbook from Notion, runs analysis through Claude,
+// posts the report to #trackstar-ads.
+async function handleWeeklyAdsDebrief(res, { isCron, dryRun }) {
+  try {
+    // Cron fires twice per Friday (20:00 + 21:00 UTC) to cover DST. Only
+    // run when it's actually 4pm in New York. Manual triggers (isCron=false)
+    // bypass this guard so Matt can test any time.
+    if (isCron && !isFridayFourPmEastern()) {
+      console.log('[actions/weekly-ads-debrief] Skipping — not 4pm ET right now')
+      return res.status(200).json({ skipped: true, reason: 'not_4pm_eastern' })
+    }
+
+    const result = await runWeeklyAdsDebrief({ dryRun: !!dryRun })
+    return res.status(200).json({ success: true, ...result })
+  } catch (e) {
+    console.error('[actions/weekly-ads-debrief] FAILED:', e)
+    await alertError('Weekly Ads Debrief', e, {})
+    // Also try to ping the debrief channel so Matt knows it failed
+    const webhook = process.env.SLACK_ADS_DEBRIEF_WEBHOOK_URL
+    if (webhook) {
+      fetch(webhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: `⚠️ *Weekly ads debrief failed*: ${e.message}` })
+      }).catch(() => {})
+    }
+    return res.status(500).json({ error: e.message })
+  }
 }
