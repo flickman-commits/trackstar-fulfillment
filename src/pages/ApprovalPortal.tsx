@@ -47,7 +47,9 @@ export default function ApprovalPortal() {
   const [selectedProofId, setSelectedProofId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [showRevisionForm, setShowRevisionForm] = useState(false)
+  // showRevisionForm gating was removed — the feedback textarea is now always
+  // visible on the page. Customers were missing the "Request Changes" toggle
+  // entirely and emailing edits back instead.
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [showEarlierVersions, setShowEarlierVersions] = useState(false)
   const [activeSlide, setActiveSlide] = useState(0)
@@ -144,7 +146,6 @@ export default function ApprovalPortal() {
         return
       }
       setFeedback('')
-      setShowRevisionForm(false)
       setRevisionOptionNum(optionIdx + 1)
       setState('revision_submitted')
     } catch {
@@ -627,69 +628,71 @@ export default function ApprovalPortal() {
                   )}
                 </div>
 
-                {/* Sticky action bar */}
-                <div className="sticky bottom-0 backdrop-blur-sm -mx-4 px-4 py-4" style={{ backgroundColor: 'rgba(247, 245, 240, 0.95)', borderTop: '1px solid #E0E0E0' }}>
-                  {showRevisionForm ? (
-                    <div className="space-y-3 max-w-2xl mx-auto">
-                      <div className="flex items-center justify-between">
-                        <label style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>What changes would you like?</label>
-                        <button onClick={() => setShowRevisionForm(false)} style={{ color: '#999999' }}>
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <textarea
-                        value={feedback}
-                        onChange={(e) => setFeedback(e.target.value)}
-                        placeholder="e.g., Change the bib number to 1234 and make the text larger..."
-                        className="w-full px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-300"
-                        style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', color: '#1A1A1A' }}
-                        rows={3}
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleRequestRevision}
-                          disabled={submitting || !feedback.trim()}
-                          className="flex-1 px-4 py-3 text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                          style={{ backgroundColor: '#1A1A1A', color: '#FFFFFF' }}
-                        >
-                          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Revision Request'}
-                        </button>
-                        <button
-                          onClick={() => setShowRevisionForm(false)}
-                          className="px-4 py-3 text-sm transition-colors"
-                          style={{ color: '#666666' }}
-                        >
-                          Cancel
-                        </button>
+                {/* Always-visible feedback card.
+                    Customers were emailing edits back instead of using the
+                    portal — making the textarea hidden behind a click was the
+                    root cause. Now the input is there from the moment they
+                    land, with an explicit "don't email us" callout. */}
+                <div className="max-w-2xl mx-auto mt-6">
+                  <div className="p-4" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
+                    <div className="flex items-start gap-2 mb-3 pb-3" style={{ borderBottom: '1px solid #F0EDE6' }}>
+                      <span style={{ fontSize: '16px', lineHeight: '1.2' }}>✏️</span>
+                      <div>
+                        <p style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 600, margin: 0, lineHeight: 1.5 }}>
+                          Need changes? Type them below.
+                        </p>
+                        <p style={{ color: '#666666', fontSize: '12px', margin: '4px 0 0', lineHeight: 1.5 }}>
+                          Your notes go straight to our design team. <strong style={{ color: '#1A1A1A' }}>Please don't email us with edits</strong> — we can only process changes submitted through this form.
+                        </p>
                       </div>
                     </div>
-                  ) : (
-                    <div className="flex gap-3 max-w-2xl mx-auto">
-                      <button
-                        onClick={handleApprove}
-                        disabled={!selectedProofId || submitting}
-                        className="flex-1 px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
-                        style={{ backgroundColor: '#4600D6', color: '#FFFFFF' }}
-                      >
-                        {submitting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-4 h-4" />
-                            {selectedProofId ? 'Approve Selected Design' : 'Select a Design to Approve'}
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => { setShowRevisionForm(true); setSelectedProofId(null) }}
-                        className="px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', color: '#666666' }}
-                      >
-                        Request Changes
-                      </button>
-                    </div>
-                  )}
+                    <label htmlFor="feedback-textarea" style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 500, display: 'block', marginBottom: '6px' }}>
+                      What changes would you like?
+                    </label>
+                    <textarea
+                      id="feedback-textarea"
+                      value={feedback}
+                      onChange={(e) => setFeedback(e.target.value)}
+                      placeholder="e.g., Change the bib number to 1234 and make the text larger…"
+                      className="w-full px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-300"
+                      style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0', color: '#1A1A1A' }}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                {/* Sticky action bar — two equally-weighted buttons.
+                    Previously "Approve" was big purple and "Request Changes"
+                    was a thin secondary outline; customers read that as
+                    "Approve is the real action" and emailed edits instead.
+                    Now both buttons are peers — same size, both colored. */}
+                <div className="sticky bottom-0 backdrop-blur-sm -mx-4 px-4 py-4 mt-4" style={{ backgroundColor: 'rgba(247, 245, 240, 0.95)', borderTop: '1px solid #E0E0E0' }}>
+                  <div className="flex gap-3 max-w-2xl mx-auto">
+                    <button
+                      onClick={handleApprove}
+                      disabled={!selectedProofId || submitting}
+                      className="flex-1 px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
+                      style={{ backgroundColor: '#4600D6', color: '#FFFFFF' }}
+                    >
+                      {submitting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          {selectedProofId ? 'Approve Selected Design' : 'Select a Design to Approve'}
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleRequestRevision}
+                      disabled={submitting || !feedback.trim()}
+                      title={!feedback.trim() ? 'Type your changes in the box above first' : ''}
+                      className="flex-1 px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
+                      style={{ backgroundColor: '#1A1A1A', color: '#FFFFFF' }}
+                    >
+                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Request Changes'}
+                    </button>
+                  </div>
                 </div>
               </>
             )}

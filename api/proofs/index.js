@@ -414,14 +414,28 @@ export default async function handler(req, res) {
         <tr><td style="padding:32px;background-color:#FFFFFF;border:1px solid #E8E6E1;">
           <h1 style="margin:0 0 16px;font-size:22px;color:#1A1A1A;font-weight:700;letter-spacing:0.02em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">${headline}</h1>
           <p style="margin:0 0 8px;font-size:15px;color:#666666;line-height:1.6;">Hi ${customerName},</p>
-          <p style="margin:0 0 ${note ? '16px' : '32px'};font-size:15px;color:#666666;line-height:1.6;">${bodyText}</p>${note ? `
-          <p style="margin:0 0 32px;font-size:14px;color:#1A1A1A;line-height:1.6;padding:12px 16px;background-color:#F7F5F0;border-left:3px solid #4600D6;font-style:italic;">${note.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>` : ''}
+          <p style="margin:0 0 ${note ? '16px' : '24px'};font-size:15px;color:#666666;line-height:1.6;">${bodyText}</p>${note ? `
+          <p style="margin:0 0 24px;font-size:14px;color:#1A1A1A;line-height:1.6;padding:12px 16px;background-color:#F7F5F0;border-left:3px solid #4600D6;font-style:italic;">${note.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>` : ''}
+
+          <!-- How this works — head off the "I'll just reply to this email" instinct -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr><td style="background-color:#F7F5F0;padding:16px 20px;border-left:3px solid #4600D6;">
+            <p style="margin:0 0 12px;font-size:11px;font-weight:700;color:#4600D6;letter-spacing:0.1em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">HOW THIS WORKS</p>
+            <p style="margin:0 0 6px;font-size:14px;color:#1A1A1A;line-height:1.5;"><strong style="color:#4600D6;">1.</strong> &nbsp;Click below to see your design${proofCount > 1 ? ' options' : ''}.</p>
+            <p style="margin:0 0 6px;font-size:14px;color:#1A1A1A;line-height:1.5;"><strong style="color:#4600D6;">2.</strong> &nbsp;Either approve your favorite, or request changes — <strong>both happen right in the portal</strong>.</p>
+            <p style="margin:0;font-size:14px;color:#1A1A1A;line-height:1.5;"><strong style="color:#4600D6;">3.</strong> &nbsp;We'll work on your revisions and send you updated mockups.</p>
+          </td></tr></table>
+
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
             <a href="${approvalUrl}" style="display:inline-block;background-color:#4600D6;color:#FFFFFF;font-size:14px;font-weight:700;padding:14px 40px;border-radius:0px;text-decoration:none;letter-spacing:0.5px;text-transform:uppercase;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
               REVIEW YOUR DESIGN${proofCount > 1 ? 'S' : ''}
             </a>
           </td></tr></table>
-          <p style="margin:28px 0 0;font-size:12px;color:#999999;text-align:center;">This link expires in 30 days.</p>
+
+          <!-- Anti-reply line. Customers were emailing edits back instead of using the portal. -->
+          <p style="margin:24px 0 0;font-size:13px;color:#666666;text-align:center;line-height:1.55;padding:0 12px;">
+            ✋ &nbsp;Please don't reply to this email with edits — we can only process changes through the <strong style="color:#1A1A1A;">Request Changes</strong> button on the portal.
+          </p>
+          <p style="margin:16px 0 0;font-size:11px;color:#999999;text-align:center;">This link expires in 30 days.</p>
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:24px 0 0;text-align:center;">
@@ -444,6 +458,11 @@ export default async function handler(req, res) {
           from: fromEmail,
           to: [order.customerEmail],
           cc: ['fast@trackstar.art'],
+          // Route replies to a real inbox so we can set up an auto-responder
+          // that redirects customers back to the portal. Customers were
+          // emailing edits to proofs@orders.trackstar.art (a Resend send-only
+          // address) and the messages were vanishing.
+          replyTo: process.env.PROOF_REPLY_TO_EMAIL || 'fast@trackstar.art',
           subject,
           html: emailHtml
         })
