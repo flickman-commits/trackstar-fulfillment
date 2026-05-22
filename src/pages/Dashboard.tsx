@@ -1031,7 +1031,11 @@ export default function Dashboard() {
     }
   }
 
-  // Mark order as completed
+  // Mark order as completed.
+  // Keep the modal open after the action — Eli often wants to take another
+  // look at the same order right after marking it (re-check filename, etc.),
+  // and the optimistic status flip swaps the button to "Re-Open Order" so
+  // he can immediately un-do if he hit it by mistake.
   const markAsCompleted = async (orderNumber: string) => {
     try {
       const response = await apiFetch(`/api/orders/actions`, {
@@ -1043,7 +1047,9 @@ export default function Dashboard() {
       if (!response.ok) throw new Error('Failed to mark as completed')
 
       setToast({ message: 'Order marked as completed!', type: 'success' })
-      setSelectedOrder(null)
+      // Optimistically reflect the new status without closing the modal
+      setSelectedOrder(prev => prev && prev.orderNumber === orderNumber ? { ...prev, status: 'completed' } : prev)
+      setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, status: 'completed' } : o))
       await fetchOrders()
     } catch (error) {
       if (import.meta.env.DEV) console.error('Error completing order:', error)
