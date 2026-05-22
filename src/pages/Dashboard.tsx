@@ -1783,19 +1783,41 @@ export default function Dashboard() {
   // When the order detail modal is open, j moves to the next order in the
   // currently visible queue and k moves to the previous one. Skipped when
   // the user is typing into a field or in the middle of an inline edit.
+  //
+  // navigableOrders = filteredOrders + currently selected order (if not already
+  // in filteredOrders). This allows j/k to keep working after marking an order
+  // complete — you can still navigate away to the next unfulfilled order, but
+  // won't cycle through other completed orders.
+  const navigableOrders = useMemo(() => {
+    if (!selectedOrder) return filteredOrders
+    const inFiltered = filteredOrders.some(o => o.id === selectedOrder.id)
+    if (inFiltered) return filteredOrders
+    // Insert selected order at its natural position (by orderNumber) so j/k feel consistent
+    const result = [...filteredOrders]
+    const insertIdx = result.findIndex(o =>
+      (o.orderNumber || '').localeCompare(selectedOrder.orderNumber || '') > 0
+    )
+    if (insertIdx === -1) {
+      result.push(selectedOrder)
+    } else {
+      result.splice(insertIdx, 0, selectedOrder)
+    }
+    return result
+  }, [filteredOrders, selectedOrder])
+
   const currentOrderIndex = useMemo(() => {
     if (!selectedOrder) return -1
-    return filteredOrders.findIndex(o => o.id === selectedOrder.id)
-  }, [selectedOrder, filteredOrders])
+    return navigableOrders.findIndex(o => o.id === selectedOrder.id)
+  }, [selectedOrder, navigableOrders])
 
   const navigateOrder = useCallback((direction: 'next' | 'prev') => {
     if (currentOrderIndex < 0) return
     const target = direction === 'next' ? currentOrderIndex + 1 : currentOrderIndex - 1
-    if (target < 0 || target >= filteredOrders.length) return
-    setSelectedOrder(filteredOrders[target])
+    if (target < 0 || target >= navigableOrders.length) return
+    setSelectedOrder(navigableOrders[target])
     setIsEditing(false)
     setEditValues({ yearOverride: '', raceNameOverride: '', runnerNameOverride: '' })
-  }, [currentOrderIndex, filteredOrders])
+  }, [currentOrderIndex, navigableOrders])
 
   useEffect(() => {
     if (!selectedOrder) return
