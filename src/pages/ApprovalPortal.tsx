@@ -44,12 +44,18 @@ export default function ApprovalPortal() {
   const [order, setOrder] = useState<OrderInfo | null>(null)
   const [proofs, setProofs] = useState<Proof[]>([])
   const [errorMessage, setErrorMessage] = useState('')
-  const [selectedProofId, setSelectedProofId] = useState<string | null>(null)
+  // selectedProofId removed — each card now carries its own Approve + Make
+  // Revisions buttons, so there's no separate "select a design" step.
   const [feedback, setFeedback] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  // showRevisionForm gating was removed — the feedback textarea is now always
-  // visible on the page. Customers were missing the "Request Changes" toggle
-  // entirely and emailing edits back instead.
+  // Which proof has its inline revision form expanded. null = none.
+  // Customers were getting confused by the separate "select then act" flow,
+  // so each design card now carries its own Approve + Make Revisions buttons,
+  // and "Make Revisions" expands a textarea inline on that card.
+  const [revisingProofId, setRevisingProofId] = useState<string | null>(null)
+  // Lightweight confirmation modal for Approve clicks — prevents fat-finger
+  // approvals (especially on mobile). Stores the proof being confirmed.
+  const [confirmApproveProofId, setConfirmApproveProofId] = useState<string | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [showEarlierVersions, setShowEarlierVersions] = useState(false)
   const [activeSlide, setActiveSlide] = useState(0)
@@ -92,20 +98,21 @@ export default function ApprovalPortal() {
     fetchData()
   }, [fetchData])
 
-  const handleApprove = async () => {
-    if (!token || !selectedProofId) return
+  const handleApprove = async (proofId: string) => {
+    if (!token || !proofId) return
     setSubmitting(true)
     try {
       const res = await fetch(`${API_BASE}/api/proofs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve', token, proofId: selectedProofId, approval: 'approve' })
+        body: JSON.stringify({ action: 'approve', token, proofId, approval: 'approve' })
       })
       if (!res.ok) {
         const data = await res.json()
         alert(data.error || 'Something went wrong')
         return
       }
+      setConfirmApproveProofId(null)
       await fetchData()
     } catch {
       alert('Unable to submit. Please try again.')
@@ -116,13 +123,10 @@ export default function ApprovalPortal() {
 
   const [revisionOptionNum, setRevisionOptionNum] = useState<number | null>(null)
 
-  const handleRequestRevision = async () => {
-    if (!token || !feedback.trim()) return
+  const handleRequestRevision = async (proofId: string) => {
+    if (!token || !feedback.trim() || !proofId) return
     const pendingProofs = proofs.filter(p => p.status === 'pending')
-    // Use selected proof if one is selected, otherwise use the first pending
-    const targetProof = selectedProofId
-      ? pendingProofs.find(p => p.id === selectedProofId) || pendingProofs[0]
-      : pendingProofs[0]
+    const targetProof = pendingProofs.find(p => p.id === proofId)
     if (!targetProof) return
 
     const optionIdx = pendingProofs.indexOf(targetProof)
@@ -146,6 +150,7 @@ export default function ApprovalPortal() {
         return
       }
       setFeedback('')
+      setRevisingProofId(null)
       setRevisionOptionNum(optionIdx + 1)
       setState('revision_submitted')
     } catch {
@@ -412,8 +417,56 @@ export default function ApprovalPortal() {
   const pastProofs = proofs.filter(p => p.status !== 'pending')
   const hasPendingProofs = pendingProofs.length > 0
 
+  // Approve confirmation modal — prevents fat-finger approvals, especially
+  // on mobile. Reads the proof out of state so the same modal handles any
+  // option the customer picked.
+  const proofBeingConfirmed = confirmApproveProofId
+    ? proofs.find(p => p.id === confirmApproveProofId)
+    : null
+  const proofBeingConfirmedOptionNum = proofBeingConfirmed
+    ? proofs.filter(p => p.status === 'pending').indexOf(proofBeingConfirmed) + 1
+    : null
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F5F0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      {/* Approve confirmation modal */}
+      {proofBeingConfirmed && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(26, 26, 26, 0.6)' }}
+          onClick={(e) => { if (e.target === e.currentTarget && !submitting) setConfirmApproveProofId(null) }}
+        >
+          <div className="max-w-sm w-full" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
+            <div className="p-6">
+              <h3 style={{ color: '#1A1A1A', fontSize: '18px', fontWeight: 700, margin: '0 0 12px' }}>
+                Approve {proofBeingConfirmedOptionNum && proofs.filter(p => p.status === 'pending').length > 1 ? `Option ${proofBeingConfirmedOptionNum}` : 'this design'}?
+              </h3>
+              <p style={{ color: '#666666', fontSize: '14px', margin: '0 0 20px', lineHeight: 1.55 }}>
+                We'll send this design straight to production. No more changes after this — last chance to request revisions if you spot anything.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmApproveProofId(null)}
+                  disabled={submitting}
+                  className="flex-1 px-4 py-3 text-sm font-medium transition-colors disabled:opacity-40"
+                  style={{ backgroundColor: '#FFFFFF', color: '#1A1A1A', border: '1px solid #E0E0E0' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleApprove(confirmApproveProofId!)}
+                  disabled={submitting}
+                  className="flex-1 px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
+                  style={{ backgroundColor: '#4600D6', color: '#FFFFFF' }}
+                >
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Yes, Approve'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lightbox */}
       {lightboxUrl && (
         <div
@@ -503,29 +556,25 @@ export default function ApprovalPortal() {
                       }}
                     >
                       {pendingProofs.map((proof, idx) => {
-                        const isSelected = selectedProofId === proof.id
                         const optionNum = idx + 1
+                        const isRevising = revisingProofId === proof.id
 
                         return (
                           <div key={proof.id} className="snap-center shrink-0 w-full">
                             <div
-                              className="overflow-hidden transition-all cursor-pointer mx-1"
+                              className="overflow-hidden transition-all mx-1"
                               style={{
                                 backgroundColor: '#FFFFFF',
-                                border: isSelected ? '2px solid #4600D6' : '2px solid #E0E0E0',
-                                boxShadow: isSelected ? '0 0 0 3px rgba(70, 0, 214, 0.15)' : '0 1px 3px rgba(0,0,0,0.06)'
+                                border: isRevising ? '2px solid #1A1A1A' : '2px solid #E0E0E0',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
                               }}
-                              onClick={() => setSelectedProofId(isSelected ? null : proof.id)}
                             >
                               {/* Option header — compact */}
-                              <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: isSelected ? 'rgba(70, 0, 214, 0.04)' : '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
+                              <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
                                 <div className="flex items-center gap-2">
                                   <span
                                     className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold"
-                                    style={{
-                                      backgroundColor: isSelected ? '#4600D6' : '#E0E0E0',
-                                      color: isSelected ? '#FFFFFF' : '#666666'
-                                    }}
+                                    style={{ backgroundColor: '#E0E0E0', color: '#666666' }}
                                   >
                                     {pendingProofs.length === 1 ? '✓' : optionNum}
                                   </span>
@@ -533,25 +582,20 @@ export default function ApprovalPortal() {
                                     {pendingProofs.length === 1 ? 'Your Design' : `Option ${optionNum} of ${pendingProofs.length}`}
                                   </span>
                                 </div>
-                                {isSelected && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: 'rgba(70, 0, 214, 0.1)', color: '#4600D6' }}>
-                                    <CheckCircle2 className="w-3 h-3" /> Selected
-                                  </span>
-                                )}
                               </div>
 
                               {/* Proof display — fits viewport, 1:1 max */}
                               <div style={{ backgroundColor: '#F5F5F5', maxHeight: 'calc(100vh - 280px)' }} className="flex items-center justify-center overflow-hidden">
                                 {isPdf(proof.imageUrl) ? (
-                                  <div onClick={e => e.stopPropagation()} className="w-full flex items-center justify-center" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+                                  <div className="w-full flex items-center justify-center" style={{ maxHeight: 'calc(100vh - 280px)' }}>
                                     <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin" style={{ color: '#666666' }} /></div>}>
                                       <PdfViewer url={proof.imageUrl} maxHeight={Math.round(window.innerHeight * 0.48)} />
                                     </Suspense>
                                   </div>
                                 ) : (
                                   <div
-                                    onClick={e => { e.stopPropagation(); setLightboxUrl(proof.imageUrl) }}
-                                    className="w-full flex items-center justify-center"
+                                    onClick={() => setLightboxUrl(proof.imageUrl)}
+                                    className="w-full flex items-center justify-center cursor-zoom-in"
                                     style={{ maxHeight: 'calc(100vh - 280px)' }}
                                   >
                                     <img
@@ -566,11 +610,64 @@ export default function ApprovalPortal() {
                                 )}
                               </div>
 
-                              {/* Selection hint — compact */}
-                              <div className="px-3 py-1.5 text-center" style={{ borderTop: '1px solid #E0E0E0' }}>
-                                <p className="text-[11px] font-medium" style={{ color: isSelected ? '#4600D6' : '#999999' }}>
-                                  {isSelected ? '✓ Selected' : 'Tap to select'}
-                                </p>
+                              {/* Per-card action buttons — each design carries its
+                                  own Approve + Make Revisions. No separate
+                                  "select then act" step. */}
+                              <div className="p-3 space-y-2" style={{ borderTop: '1px solid #E0E0E0' }}>
+                                <button
+                                  onClick={() => setConfirmApproveProofId(proof.id)}
+                                  disabled={submitting || isRevising}
+                                  className="w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
+                                  style={{ backgroundColor: '#4600D6', color: '#FFFFFF' }}
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  {pendingProofs.length === 1 ? 'Approve This Design' : `Approve Option ${optionNum}`}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setRevisingProofId(isRevising ? null : proof.id)
+                                    setFeedback('')
+                                  }}
+                                  disabled={submitting}
+                                  className="w-full px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                                  style={{
+                                    backgroundColor: isRevising ? '#1A1A1A' : '#FFFFFF',
+                                    color: isRevising ? '#FFFFFF' : '#1A1A1A',
+                                    border: '1px solid #1A1A1A'
+                                  }}
+                                >
+                                  ✏️ {isRevising ? 'Close revisions form' : 'Make Revisions'}
+                                </button>
+
+                                {/* Inline revisions form — expands below the
+                                    buttons when "Make Revisions" is clicked.
+                                    Keeps feedback visually tied to the design
+                                    it belongs to. */}
+                                {isRevising && (
+                                  <div className="pt-3 mt-1 space-y-2" style={{ borderTop: '1px solid #F0EDE6' }}>
+                                    <label htmlFor={`feedback-${proof.id}`} style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 500, display: 'block' }}>
+                                      What changes would you like to {pendingProofs.length === 1 ? 'this design' : `Option ${optionNum}`}?
+                                    </label>
+                                    <textarea
+                                      id={`feedback-${proof.id}`}
+                                      value={feedback}
+                                      onChange={(e) => setFeedback(e.target.value)}
+                                      placeholder="e.g., Change the bib number to 1234 and make the text larger…"
+                                      className="w-full px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                      style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0', color: '#1A1A1A' }}
+                                      rows={4}
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => handleRequestRevision(proof.id)}
+                                      disabled={submitting || !feedback.trim()}
+                                      className="w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
+                                      style={{ backgroundColor: '#1A1A1A', color: '#FFFFFF' }}
+                                    >
+                                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : `Send Revisions${pendingProofs.length > 1 ? ` for Option ${optionNum}` : ''}`}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -628,70 +725,20 @@ export default function ApprovalPortal() {
                   )}
                 </div>
 
-                {/* Always-visible feedback card.
-                    Customers were emailing edits back instead of using the
-                    portal — making the textarea hidden behind a click was the
-                    root cause. Now the input is there from the moment they
-                    land, with an explicit "don't email us" callout. */}
-                <div className="max-w-2xl mx-auto mt-6">
-                  <div className="p-4" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
-                    <div className="flex items-start gap-2 mb-3 pb-3" style={{ borderBottom: '1px solid #F0EDE6' }}>
-                      <span style={{ fontSize: '16px', lineHeight: '1.2' }}>✏️</span>
-                      <div>
-                        <p style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 600, margin: 0, lineHeight: 1.5 }}>
-                          Need changes? Type them below.
-                        </p>
-                        <p style={{ color: '#666666', fontSize: '12px', margin: '4px 0 0', lineHeight: 1.5 }}>
-                          Your notes go straight to our design team. <strong style={{ color: '#1A1A1A' }}>Please don't email us with edits</strong> — we can only process changes submitted through this form.
-                        </p>
-                      </div>
-                    </div>
-                    <label htmlFor="feedback-textarea" style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 500, display: 'block', marginBottom: '6px' }}>
-                      What changes would you like?
-                    </label>
-                    <textarea
-                      id="feedback-textarea"
-                      value={feedback}
-                      onChange={(e) => setFeedback(e.target.value)}
-                      placeholder="e.g., Change the bib number to 1234 and make the text larger…"
-                      className="w-full px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-300"
-                      style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0', color: '#1A1A1A' }}
-                      rows={3}
-                    />
-                  </div>
-                </div>
-
-                {/* Sticky action bar — two equally-weighted buttons.
-                    Previously "Approve" was big purple and "Request Changes"
-                    was a thin secondary outline; customers read that as
-                    "Approve is the real action" and emailed edits instead.
-                    Now both buttons are peers — same size, both colored. */}
-                <div className="sticky bottom-0 backdrop-blur-sm -mx-4 px-4 py-4 mt-4" style={{ backgroundColor: 'rgba(247, 245, 240, 0.95)', borderTop: '1px solid #E0E0E0' }}>
-                  <div className="flex gap-3 max-w-2xl mx-auto">
-                    <button
-                      onClick={handleApprove}
-                      disabled={!selectedProofId || submitting}
-                      className="flex-1 px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
-                      style={{ backgroundColor: '#4600D6', color: '#FFFFFF' }}
-                    >
-                      {submitting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4" />
-                          {selectedProofId ? 'Approve Selected Design' : 'Select a Design to Approve'}
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={handleRequestRevision}
-                      disabled={submitting || !feedback.trim()}
-                      title={!feedback.trim() ? 'Type your changes in the box above first' : ''}
-                      className="flex-1 px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
-                      style={{ backgroundColor: '#1A1A1A', color: '#FFFFFF' }}
-                    >
-                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Request Changes'}
-                    </button>
+                {/* Persistent "don't email us" callout. Always at the bottom,
+                    always visible. Each design card carries its own Approve
+                    and Make Revisions buttons, so the only thing this footer
+                    needs to do is keep the anti-email message in front of
+                    the customer at all times. */}
+                <div className="sticky bottom-0 backdrop-blur-sm -mx-4 px-4 py-3 mt-6" style={{ backgroundColor: 'rgba(247, 245, 240, 0.96)', borderTop: '1px solid #E0E0E0' }}>
+                  <div className="max-w-2xl mx-auto flex items-start gap-2.5 px-3 py-2.5" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E8E6E1' }}>
+                    <span style={{ fontSize: '15px', lineHeight: 1.2, marginTop: '1px' }}>✋</span>
+                    <p style={{ color: '#1A1A1A', fontSize: '12px', margin: 0, lineHeight: 1.55 }}>
+                      <strong>Please don't email us with revisions.</strong>{' '}
+                      <span style={{ color: '#666666' }}>
+                        To request changes to a design, tap <strong style={{ color: '#1A1A1A' }}>Make Revisions</strong> on that design above and type your notes there.
+                      </span>
+                    </p>
                   </div>
                 </div>
               </>
