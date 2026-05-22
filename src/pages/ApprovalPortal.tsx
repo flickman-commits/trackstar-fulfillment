@@ -541,6 +541,16 @@ export default function ApprovalPortal() {
             {/* Current batch of pending proofs — horizontal carousel */}
             {hasPendingProofs && (
               <>
+                {/* Swipe affordance — only when there are multiple designs.
+                    Shows on mobile (where arrow buttons used to be hidden);
+                    on desktop the side arrows do the job. */}
+                {pendingProofs.length > 1 && (
+                  <div className="md:hidden flex items-center justify-center gap-2 mb-3" style={{ color: '#666666', fontSize: '12px', fontWeight: 500 }}>
+                    <ChevronLeft className="w-4 h-4" style={{ color: '#999999' }} />
+                    <span>Swipe to see {pendingProofs.length === 2 ? 'the other design' : `all ${pendingProofs.length} designs`}</span>
+                    <ChevronRight className="w-4 h-4" style={{ color: '#999999' }} />
+                  </div>
+                )}
                 <div className="mb-4 mx-auto" style={{ maxWidth: 'min(512px, 100%)' }}>
                   <div className="relative">
                     <div
@@ -636,7 +646,7 @@ export default function ApprovalPortal() {
                                     border: '1px solid #1A1A1A'
                                   }}
                                 >
-                                  ✏️ {isRevising ? 'Close revisions form' : 'Make Revisions'}
+                                  {isRevising ? 'Close revisions form' : (pendingProofs.length === 1 ? 'Request Revision to this Design' : `Request Revision to Option ${optionNum}`)}
                                 </button>
 
                                 {/* Inline revisions form — expands below the
@@ -736,7 +746,7 @@ export default function ApprovalPortal() {
                     <p style={{ color: '#1A1A1A', fontSize: '12px', margin: 0, lineHeight: 1.55 }}>
                       <strong>Please don't email us with revisions.</strong>{' '}
                       <span style={{ color: '#666666' }}>
-                        To request changes to a design, tap <strong style={{ color: '#1A1A1A' }}>Make Revisions</strong> on that design above and type your notes there.
+                        To request changes to a design, tap <strong style={{ color: '#1A1A1A' }}>Request Revision to this Design</strong> on that design above and type your notes there.
                       </span>
                     </p>
                   </div>
