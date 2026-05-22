@@ -3,9 +3,13 @@
  * Returns product IDs, titles, and hero images for adding to productCatalog.js
  */
 
+import { setCors, requireAdmin } from './_lib/auth.js'
 import { shopifyFetch } from '../server/services/shopifyAuth.js'
 
 export default async function handler(req, res) {
+  if (setCors(req, res)) return
+  if (!(await requireAdmin(req, res))) return
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
