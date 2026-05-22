@@ -26,6 +26,7 @@ import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
+import { shopifyFetch } from '../../server/services/shopifyAuth.js'
 import { getRaceShorthands } from '../../server/scrapers/index.js'
 import { Resend } from 'resend'
 
@@ -104,6 +105,10 @@ export default async function handler(req, res) {
       } catch {
         return res.status(503).json({ status: 'down' })
       }
+    }
+    if (action === 'shopify-products') {
+      if (!requireAdmin(req, res)) return
+      return await handleShopifyProducts(res)
     }
     return res.status(400).json({ error: 'Unknown GET action' })
   }
@@ -2141,4 +2146,61 @@ async function handleDeleteCreator({ creatorId }, res) {
     deletedOrderNumber: shouldDeleteOrder ? sampleOrder.orderNumber : null,
     orderKept: sampleOrder && !shouldDeleteOrder ? sampleOrder.orderNumber : null,
   })
+}
+
+
+// --- shopify-products ---
+// Fetch all Shopify products for populating the product catalog
+async function handleShopifyProducts(res) {
+  console.log('[actions/shopify-products] Fetching all products...')
+
+  const products = []
+  let pageNum = 1
+
+  // Fetch all products (Shopify paginates at 250)
+  while (true) {
+    const params = new URLSearchParams({ limit: '250' })
+    const response = await shopifyFetch(`/products.json?${params}`)
+    products.push(...response.products)
+
+    console.log(`[actions/shopify-products] Page ${pageNum}: ${response.products.length} products (total: ${products.length})`)
+
+    if (response.products.length < 250) break
+    pageNum++
+    break // safety: only one page for now
+  }
+
+  // Format for easy catalog entry creation
+  const catalogEntries = products.map(p => ({
+    productId: String(p.id),
+    title: p.title,
+    heroImageUrl: p.images?.[0]?.src || null,
+    slug: slugify(p.title),
+  }))
+
+  // Output ready-to-paste JS
+  const catalogJS = products.map(p => {
+    const heroImage = p.images?.[0]?.src || null
+    return `  // ${p.title}
+  '${p.id}': {
+    designVariant: '${slugify(p.title)}',
+    label: '${p.title.replace(/'/g, "\\'")}',
+    heroImageUrl: ${heroImage ? `'${heroImage}'` : 'null'},
+  },`
+  }).join('\n\n')
+
+  console.log(`[actions/shopify-products] Returning ${products.length} products`)
+
+  return res.status(200).json({
+    count: products.length,
+    products: catalogEntries,
+    catalogJS,
+  })
+}
+
+function slugify(title) {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
 }
