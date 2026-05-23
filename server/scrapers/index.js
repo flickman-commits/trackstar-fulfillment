@@ -47,6 +47,7 @@ import orangeCountyConfig from './configs/orangeCounty.js'
 import houstonConfig from './configs/houston.js'
 import bostonConfig from './configs/boston.js'
 import illinoisConfig from './configs/illinois.js'
+import denverColfaxConfig from './configs/denverColfax.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
 
 /**

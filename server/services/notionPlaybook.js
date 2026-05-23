@@ -11,8 +11,18 @@
  * decision framework table, and the angle categories to be readable.
  */
 import { Client } from '@notionhq/client'
+import prisma from '../../api/_lib/prisma.js'
 
 const PLAYBOOK_PAGE_ID = '322977ac2a3e8158b3ecc1bc02c3f023'
+
+// SystemConfig key for the cached playbook. Bumping the version invalidates
+// all existing cache entries — useful if the rendering logic changes.
+const CACHE_KEY = 'notion_playbook_cache_v1'
+
+// 24h TTL. The playbook changes infrequently — when Matt updates it manually,
+// the cron uses the previous-day version for at most one run, then refreshes.
+// Acceptable tradeoff for staying under the 60s function timeout.
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 let cachedClient = null
 function getClient() {
@@ -106,13 +116,56 @@ async function fetchBlocksRecursive(client, parentId, indent = 0) {
 
 /**
  * Fetch the Ad Ops Playbook as a single markdown-ish string.
- * If Notion is unreachable, returns null and lets the caller fall back to
- * the skill's hardcoded defaults.
+ *
+ * Cached in Postgres (SystemConfig) with a 24h TTL — Notion's recursive
+ * block-fetch API can take 5-15 seconds, which alone risks tipping the
+ * weekly cron over the 60s function timeout. Caching means only the first
+ * run of any 24h window pays that cost; subsequent runs (or any other
+ * code that needs the playbook) get an instant DB read.
+ *
+ * @param {object} opts
+ * @param {boolean} opts.forceFresh - skip the cache and re-fetch from Notion.
+ *   Useful for testing or after a known playbook edit.
  */
-export async function fetchPlaybookMarkdown() {
+export async function fetchPlaybookMarkdown({ forceFresh = false } = {}) {
+  // Cache read (best-effort — if the DB is down, fall through to Notion)
+  if (!forceFresh) {
+    try {
+      const row = await prisma.systemConfig.findUnique({ where: { key: CACHE_KEY } })
+      if (row?.value) {
+        const cached = JSON.parse(row.value)
+        const age = Date.now() - (cached.cachedAt || 0)
+        if (cached.text && age < CACHE_TTL_MS) {
+          const ageMin = Math.round(age / 1000 / 60)
+          console.log(`[notionPlaybook] Cache HIT (age ${ageMin}min, ${cached.text.length} chars)`)
+          return cached.text
+        }
+      }
+    } catch (e) {
+      console.warn('[notionPlaybook] Cache read failed (will fetch fresh):', e.message)
+    }
+  }
+
+  // Cache miss / forced refresh — hit Notion
   try {
+    console.log('[notionPlaybook] Cache miss — fetching from Notion...')
     const client = getClient()
     const text = await fetchBlocksRecursive(client, PLAYBOOK_PAGE_ID)
+
+    // Write back to cache (best-effort — if this fails the function still
+    // succeeds, we just won't have a cached copy for next time)
+    try {
+      const value = JSON.stringify({ text, cachedAt: Date.now() })
+      await prisma.systemConfig.upsert({
+        where: { key: CACHE_KEY },
+        create: { key: CACHE_KEY, value },
+        update: { value },
+      })
+      console.log(`[notionPlaybook] Cached ${text.length} chars`)
+    } catch (e) {
+      console.warn('[notionPlaybook] Cache write failed (non-fatal):', e.message)
+    }
+
     return text
   } catch (e) {
     console.error('[notionPlaybook] Failed to fetch:', e.message)

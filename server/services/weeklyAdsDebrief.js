@@ -28,9 +28,13 @@ import { fetchPlaybookMarkdown } from './notionPlaybook.js'
 import { shopifyFetch } from './shopifyAuth.js'
 import { WEEKLY_ADS_DEBRIEF_SYSTEM_PROMPT } from '../lib/weeklyAdsDebriefSkill.js'
 
-// Model: Sonnet is the sweet spot for cost/quality on this kind of analysis.
-// Bump to Opus if the debriefs start feeling shallow.
-const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
+// Model: Haiku 4.5 by default. On Vercel Hobby we're capped at 60s per
+// function and Sonnet's 15-30s response time eats too much of that budget.
+// Haiku usually finishes in 5-10s, fits comfortably, costs less. If the
+// analysis quality starts to feel shallow, set ADS_DEBRIEF_MODEL in Vercel
+// env vars to bump to Sonnet (then also bump maxDuration to 300, which
+// requires Vercel Pro).
+const CLAUDE_MODEL = process.env.ADS_DEBRIEF_MODEL || 'claude-haiku-4-5'
 const CLAUDE_MAX_TOKENS = 4000
 
 // Slack has a 40k char limit per message. Block kit text fields cap at 3000
@@ -306,8 +310,17 @@ export async function runWeeklyAdsDebrief({ dryRun = false } = {}) {
     .join('\n')
   const inputTokens = completion.usage?.input_tokens || 0
   const outputTokens = completion.usage?.output_tokens || 0
-  // Sonnet 4.5 pricing as of 2026-05: $3/M input, $15/M output
-  const costUsd = (inputTokens / 1_000_000) * 3 + (outputTokens / 1_000_000) * 15
+  // Per-model pricing (best-effort estimate — Anthropic's published rates).
+  // If they change, update the table. The Slack post will still go out
+  // either way; only the cost figure in the header is affected.
+  const PRICING = {
+    'claude-haiku-4-5':   { input: 1,  output: 5 },
+    'claude-sonnet-4-5':  { input: 3,  output: 15 },
+    'claude-opus-4-5':    { input: 15, output: 75 },
+  }
+  // Pick rates by matching the prefix (handles date-stamped model names too)
+  const rate = Object.entries(PRICING).find(([k]) => CLAUDE_MODEL.startsWith(k))?.[1] || PRICING['claude-haiku-4-5']
+  const costUsd = (inputTokens / 1_000_000) * rate.input + (outputTokens / 1_000_000) * rate.output
 
   console.log(`[weeklyAdsDebrief] Claude returned ${report.length} chars; tokens in=${inputTokens} out=${outputTokens}; cost ~$${costUsd.toFixed(4)}`)
 
