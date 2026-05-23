@@ -11,6 +11,7 @@ export default {
 
   eventIds: {
     2025: 2552,
+    // 2026: TBD — fill in once Xacte publishes the event
   },
 
   subEvents: {
@@ -19,6 +20,7 @@ export default {
       half:     { id: 6362, distance: 21097 },
       tenMiler: { id: 6365, distance: 16093 },
     },
+    // 2026: { marathon: { id: TBD, distance: 42195 }, half: { id: TBD, distance: 21097 }, tenMiler: { id: TBD, distance: 16093 } },
   },
 
   eventTypes: ['Marathon', 'Half Marathon', '10 Miler'],
@@ -45,6 +47,7 @@ export default {
   calculateDate(year) {
     const knownDates = {
       2025: new Date(2025, 4, 18),
+      2026: new Date(2026, 4, 17),
     }
 
     if (knownDates[year]) return knownDates[year]

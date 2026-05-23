@@ -108,7 +108,7 @@ export class XacteScraper extends BaseScraper {
         return this.notFoundResult(null, results.slice(0, 10).map(r => ({
           name: `${r.firstname || ''} ${r.lastname || ''}`.trim(),
           bib: r.bib,
-          time: r.chiptime || r.guntime,
+          time: this._msToTime(r.chiptime),
           eventType: this.config.defaultEventType || 'Marathon',
         })))
       }

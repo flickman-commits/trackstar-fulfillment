@@ -100,6 +100,7 @@ const ALL_CONFIGS = [
   pittsburghConfig,
   orangeCountyConfig,
   houstonConfig,
+  denverColfaxConfig,
 ]
 
 /**
