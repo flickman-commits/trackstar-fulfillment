@@ -11,7 +11,7 @@ export default {
 
   eventIds: {
     2025: 2552,
-    // 2026: TBD — fill in once Xacte publishes the event
+    2026: 2635,
   },
 
   subEvents: {
@@ -20,7 +20,11 @@ export default {
       half:     { id: 6362, distance: 21097 },
       tenMiler: { id: 6365, distance: 16093 },
     },
-    // 2026: { marathon: { id: TBD, distance: 42195 }, half: { id: TBD, distance: 21097 }, tenMiler: { id: TBD, distance: 16093 } },
+    2026: {
+      marathon: { id: 6600, distance: 42195 },
+      half:     { id: 6599, distance: 21097 },
+      // tenMiler: TBD — not yet published on Xacte
+    },
   },
 
   eventTypes: ['Marathon', 'Half Marathon', '10 Miler'],
