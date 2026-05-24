@@ -700,11 +700,14 @@ async function handleMondayPipeline(res) {
 // than the internal parentOrderNumber (e.g. "7161307431195").
 async function handleDailyDesignUpdate(res) {
   try {
-    // Custom orders that aren't done yet
+    // Custom orders that still need design work. Restricted to the two
+    // statuses where Dan is the one holding the ball — once a proof has
+    // been sent to the customer or further, the standup doesn't need to
+    // surface it anymore.
     const customOrders = await prisma.order.findMany({
       where: {
         trackstarOrderType: 'custom',
-        designStatus: { not: 'sent_to_production' },
+        designStatus: { in: ['not_started', 'in_progress'] },
       },
       select: {
         dueDate: true,
@@ -736,15 +739,15 @@ async function handleDailyDesignUpdate(res) {
     }
 
     const overdue = []
-    const dueThisWeek = []
+    const dueNext7Days = []
     for (const o of customOrders) {
       if (!o.dueDate) continue
       const due = new Date(o.dueDate)
       if (due < now) overdue.push({ ...o, due })
-      else if (due <= endOfWeek) dueThisWeek.push({ ...o, due })
+      else if (due <= endOfWeek) dueNext7Days.push({ ...o, due })
     }
     overdue.sort((a, b) => a.due - b.due)
-    dueThisWeek.sort((a, b) => a.due - b.due)
+    dueNext7Days.sort((a, b) => a.due - b.due)
 
     const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
     const orderLine = (o) => `• #${displayNum(o)} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
@@ -754,20 +757,18 @@ async function handleDailyDesignUpdate(res) {
       ? `\n\nDashboard → <${appUrl}/|Standard>  ·  <${appUrl}/?type=custom|Custom>`
       : ''
 
-    // Two big sections so the team's eye knows exactly where to look:
-    //   1) CUSTOM ORDERS — counts + overdue + due-this-week lists
-    //   2) STANDARD ORDERS — just the count (no due dates on standard)
-    const customSection = [
-      `*🎨 CUSTOM ORDERS*`,
-      `*${customOrders.length}* in the queue${overdue.length > 0 ? ` · *${overdue.length} overdue*` : ''}${dueThisWeek.length > 0 ? ` · ${dueThisWeek.length} due this week` : ''}`,
-      overdue.length > 0 ? `\n:rotating_light: *Overdue (${overdue.length}):*\n${overdue.map(orderLine).join('\n')}` : '',
-      dueThisWeek.length > 0 ? `\n:date: *Due this week (${dueThisWeek.length}):*\n${dueThisWeek.map(orderLine).join('\n')}` : '',
-    ].filter(Boolean).join('\n')
-
+    // Standard above Custom — Eli's section gets eyes first, then Dan's.
     const standardSection = [
       `*📦 STANDARD ORDERS*`,
       `*${standardCount}* to fulfill`,
     ].join('\n')
+
+    const customSection = [
+      `*🎨 CUSTOM ORDERS*`,
+      `*${customOrders.length}* in the queue${overdue.length > 0 ? ` · *${overdue.length} overdue*` : ''}${dueNext7Days.length > 0 ? ` · ${dueNext7Days.length} due in the next 7 days` : ''}`,
+      overdue.length > 0 ? `\n:rotating_light: *Overdue (${overdue.length}):*\n${overdue.map(orderLine).join('\n')}` : '',
+      dueNext7Days.length > 0 ? `\n:date: *Due in the next 7 days (${dueNext7Days.length}):*\n${dueNext7Days.map(orderLine).join('\n')}` : '',
+    ].filter(Boolean).join('\n')
 
     const message = {
       blocks: [
@@ -777,12 +778,12 @@ async function handleDailyDesignUpdate(res) {
         },
         {
           type: 'section',
-          text: { type: 'mrkdwn', text: customSection }
+          text: { type: 'mrkdwn', text: standardSection }
         },
         { type: 'divider' },
         {
           type: 'section',
-          text: { type: 'mrkdwn', text: standardSection }
+          text: { type: 'mrkdwn', text: customSection }
         },
         ...(dashboardFooter ? [{
           type: 'section',
@@ -804,13 +805,13 @@ async function handleDailyDesignUpdate(res) {
     })
     if (!slackResponse.ok) throw new Error(`Slack post failed: ${slackResponse.status}`)
 
-    console.log(`[actions/daily-design-update] Posted standup: ${customOrders.length} custom (${overdue.length} overdue, ${dueThisWeek.length} this week), ${standardCount} standard`)
+    console.log(`[actions/daily-design-update] Posted standup: ${customOrders.length} custom (${overdue.length} overdue, ${dueNext7Days.length} due next 7 days), ${standardCount} standard`)
     return res.status(200).json({
       success: true,
       customTotal: customOrders.length,
       standardTotal: standardCount,
       overdue: overdue.length,
-      dueThisWeek: dueThisWeek.length,
+      dueNext7Days: dueNext7Days.length,
     })
   } catch (error) {
     console.error('[actions/daily-design-update] Error:', error)
