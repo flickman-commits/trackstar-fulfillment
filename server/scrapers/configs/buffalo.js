@@ -4,7 +4,8 @@
  * Data: https://scorethis-results.com/ResultFiles/{YYYYMMDD}BFLM.txt
  *
  * Race held on the last Sunday in May (day before Memorial Day).
- * Confirmed years: 2017, 2022, 2023, 2024, 2025
+ * Confirmed years: 2017, 2022, 2023, 2024, 2025, 2026
+ * 2026 URL: https://scorethis-results.com/ResultFiles/20260524BFLM.txt
  *
  * Note: The event type label varies between years:
  *  - 2023-2024: "Half" for half marathon
