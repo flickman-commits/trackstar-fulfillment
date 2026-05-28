@@ -365,12 +365,14 @@ const APPLICATION_CONTENT_BRIEFS = [
   },
   {
     title: "'Why Trackstar?' Video",
-    // TODO: replace with a real reference reel once Matt picks one
-    referenceUrl: 'https://www.instagram.com/reel/DV8r0jlDVkS/',
+    // Temporarily points to the Trackstar IG profile so applicants get
+    // a sense of the brand. Swap in a real reference reel once Matt
+    // picks one.
+    referenceUrl: 'https://www.instagram.com/trackstar_art/',
   },
   {
     title: 'Race Recap Video',
-    referenceUrl: 'https://www.instagram.com/reel/DXseR6sDXzT/',
+    referenceUrl: 'https://www.instagram.com/reel/DXseR6sDXzT/?utm_source=ig_web_copy_link&igsh=MzRlODBiNWFlZA==',
   },
 ]
 
