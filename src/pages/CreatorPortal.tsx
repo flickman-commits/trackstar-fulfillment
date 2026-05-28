@@ -357,7 +357,7 @@ function StepWelcome(_: { briefs: PortalBrief[] }) {
 const APPLICATION_CONTENT_BRIEFS = [
   {
     title: 'Surprise Unboxing Video',
-    referenceUrl: 'https://www.instagram.com/reel/DV8r0jlDVkS/',
+    referenceUrl: 'https://www.instagram.com/reel/DV8r0jIDVkS/?utm_source=ig_web_copy_link&igsh=MzRlODBiNWFlZA==',
   },
   {
     title: "'Why Trackstar?' Video",
