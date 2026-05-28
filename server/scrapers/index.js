@@ -160,13 +160,11 @@ function findConfigByKeywords(normalizedName) {
 }
 
 /**
- * Get the appropriate scraper for a race
+ * Match a race name to its config using alias + fuzzy matching.
  * @param {string} raceName - Name of the race
- * @param {number} year - Year of the race
- * @returns {BaseScraper} Scraper instance
- * @throws {Error} If no scraper is available for the race
+ * @returns {Object|null} The matched config, or null if none matches
  */
-export function getScraperForRace(raceName, year) {
+function findConfigForRace(raceName) {
   // Belt-and-suspenders: normalize bare names ("Boston" → "Boston Marathon")
   // so any orders that snuck through with a non-canonical raceName still match.
   const lookupName = normalizeRaceName(raceName) || raceName
@@ -190,6 +188,19 @@ export function getScraperForRace(raceName, year) {
     }
   }
 
+  return config || null
+}
+
+/**
+ * Get the appropriate scraper for a race
+ * @param {string} raceName - Name of the race
+ * @param {number} year - Year of the race
+ * @returns {BaseScraper} Scraper instance
+ * @throws {Error} If no scraper is available for the race
+ */
+export function getScraperForRace(raceName, year) {
+  const config = findConfigForRace(raceName)
+
   if (!config) {
     throw new Error(`No scraper available for race: ${raceName}`)
   }
@@ -209,6 +220,46 @@ export function hasScraperForRace(raceName) {
   } catch {
     return false
   }
+}
+
+/**
+ * Platforms that spin up a headless browser (Puppeteer). Too slow/heavy to run
+ * on a public, unauthenticated, serverless endpoint — excluded from public lookup.
+ */
+const PUPPETEER_PLATFORMS = new Set(['runsignup', 'multisport-australia'])
+
+/**
+ * Whether a race is safe to expose via the public results-lookup endpoint.
+ * True only when we have a scraper AND that scraper is HTTP-based (not Puppeteer).
+ * @param {string} raceName - Name of the race
+ * @returns {boolean}
+ */
+export function isRacePublicSafe(raceName) {
+  const config = findConfigForRace(raceName)
+  return !!config && !PUPPETEER_PLATFORMS.has(config.platform)
+}
+
+/**
+ * Resolve any race name/alias to its canonical primary race name.
+ * Lets callers compare two differently-spelled names (e.g. "boston" vs
+ * "Boston Marathon") by resolving both to the same canonical string.
+ * @param {string} raceName - Name of the race
+ * @returns {string|null} Canonical config.raceName, or null if unmatched
+ */
+export function getCanonicalRaceName(raceName) {
+  const config = findConfigForRace(raceName)
+  return config ? config.raceName : null
+}
+
+/**
+ * List of primary race names safe to expose via the public lookup endpoint.
+ * Used to render the "instant lookup available" badge on the storefront.
+ * @returns {string[]}
+ */
+export function getPublicSafeRaces() {
+  return ALL_CONFIGS
+    .filter(config => !PUPPETEER_PLATFORMS.has(config.platform))
+    .map(config => config.raceName)
 }
 
 /**
@@ -244,5 +295,8 @@ export default {
   getScraperForRace,
   hasScraperForRace,
   getSupportedRaces,
-  getRaceShorthands
+  getRaceShorthands,
+  isRacePublicSafe,
+  getPublicSafeRaces,
+  getCanonicalRaceName
 }

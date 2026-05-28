@@ -40,6 +40,8 @@ const routes = [
   { method: 'get',    path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'post',   path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'delete', path: '/api/proofs',                 handler: '../api/proofs/index.js' },
+  // Public storefront results lookup (gated behind PUBLIC_LOOKUP_ENABLED)
+  { method: 'get',    path: '/api/public/results-lookup',  handler: '../api/public/results-lookup.js' },
 ]
 
 // Load all handlers and register routes
