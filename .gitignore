@@ -34,3 +34,4 @@ dist-ssr
 .vercel
 .env*.local
 .env.vercel-check
+products_export.csv
