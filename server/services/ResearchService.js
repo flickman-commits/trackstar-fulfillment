@@ -204,6 +204,76 @@ export class ResearchService {
   }
 
   /**
+   * Search for a runner's result — the shared, DB-free search core.
+   *
+   * Does NOT touch the database, so it's safe to call from any context (order
+   * research, the public storefront lookup, ad-hoc scripts). Order research
+   * wraps this with caching + persistence; the public endpoint calls it directly.
+   *
+   * Applies three layers of matching:
+   *   1. Direct scraper search on the full name.
+   *   2. Promote close-but-inexact candidates to 'ambiguous' (so a picker shows).
+   *   3. Last-name-only fallback when the full name misses entirely.
+   *
+   * @param {string} raceName - Race name (alias/fuzzy names are resolved)
+   * @param {number} year - Race year
+   * @param {string} runnerName - Full name to search for
+   * @returns {Promise<Object>} Normalized scraper result (found, ambiguous,
+   *   possibleMatches, bibNumber, officialTime, officialPace, eventType,
+   *   researchStatus, researchNotes, rawData, ...)
+   */
+  async findRunner(raceName, year, runnerName) {
+    console.log(`[ResearchService] Searching for runner: ${runnerName}`)
+    const scraper = getScraperForRace(raceName, year)
+    let results = await scraper.searchRunner(runnerName)
+
+    // If the initial search returned candidates (close matches that didn't pass
+    // namesMatch), surface them as 'ambiguous' so the dashboard shows the
+    // possible-match picker instead of just "Runner not found".
+    if (!results.found && !results.ambiguous && results.possibleMatches?.length > 0) {
+      console.log(`[ResearchService] Initial search returned ${results.possibleMatches.length} candidates — marking ambiguous`)
+      results.ambiguous = true
+      results.researchStatus = 'ambiguous'
+      results.researchNotes = `No exact match for "${runnerName}". ${results.possibleMatches.length} possible match${results.possibleMatches.length > 1 ? 'es' : ''} found — please verify.`
+    }
+
+    // Last-name fallback: if full name not found AND no candidates surfaced yet,
+    // try searching by last name only. This catches the rare case where the
+    // upstream search itself didn't even return the runner because the FIRST
+    // name doesn't match what the upstream indexes.
+    if (!results.found && !results.ambiguous) {
+      const nameParts = runnerName.trim().split(/\s+/)
+      if (nameParts.length >= 2) {
+        const lastName = nameParts[nameParts.length - 1]
+        console.log(`[ResearchService] Full name not found, trying last name only: "${lastName}"`)
+        const fallbackScraper = getScraperForRace(raceName, year)
+        const fallbackResults = await fallbackScraper.searchRunner(lastName)
+
+        if (fallbackResults.found) {
+          // Single exact match found by last name — use it but note the fallback
+          const foundName = fallbackResults.rawData?.name
+            || `${fallbackResults.rawData?.firstName || ''} ${fallbackResults.rawData?.lastName || ''}`.trim()
+            || lastName
+          console.log(`[ResearchService] Found via last name fallback: ${foundName}`)
+          fallbackResults.researchNotes = `Found as "${foundName}" (searched by last name "${lastName}")`
+          results = fallbackResults
+        } else if (fallbackResults.ambiguous || fallbackResults.possibleMatches?.length > 0) {
+          // Surface the candidates as ambiguous so user can pick
+          console.log(`[ResearchService] Last-name fallback surfaced ${fallbackResults.possibleMatches?.length || 0} candidates`)
+          results = fallbackResults
+          results.ambiguous = true
+          results.researchStatus = 'ambiguous'
+          results.researchNotes = `No exact match for "${runnerName}". Found ${fallbackResults.possibleMatches?.length || 'multiple'} runner(s) with last name "${lastName}" — please verify.`
+        } else {
+          console.log(`[ResearchService] Last name fallback also returned no results`)
+        }
+      }
+    }
+
+    return results
+  }
+
+  /**
    * TIER 2: Get runner data from cache or fetch from scraper
    * @param {Object} order - Order with runnerName, raceName, raceYear
    * @param {Object} race - Race record
@@ -230,53 +300,8 @@ export class ResearchService {
       return existingResearch
     }
 
-    // Fetch from scraper using effective values
-    console.log(`[ResearchService] Searching for runner: ${runnerName}`)
-    const scraper = getScraperForRace(raceName, raceYear)
-    let results = await scraper.searchRunner(runnerName)
-
-    // If the initial search returned candidates (close matches that didn't pass
-    // namesMatch), surface them as 'ambiguous' so the dashboard shows the
-    // possible-match picker instead of just "Runner not found".
-    if (!results.found && !results.ambiguous && results.possibleMatches?.length > 0) {
-      console.log(`[ResearchService] Initial search returned ${results.possibleMatches.length} candidates — marking ambiguous`)
-      results.ambiguous = true
-      results.researchStatus = 'ambiguous'
-      results.researchNotes = `No exact match for "${runnerName}". ${results.possibleMatches.length} possible match${results.possibleMatches.length > 1 ? 'es' : ''} found — please verify.`
-    }
-
-    // Last-name fallback: if full name not found AND no candidates surfaced yet,
-    // try searching by last name only. This catches the rare case where the
-    // upstream search itself didn't even return the runner because the FIRST
-    // name doesn't match what the upstream indexes.
-    if (!results.found && !results.ambiguous) {
-      const nameParts = runnerName.trim().split(/\s+/)
-      if (nameParts.length >= 2) {
-        const lastName = nameParts[nameParts.length - 1]
-        console.log(`[ResearchService] Full name not found, trying last name only: "${lastName}"`)
-        const fallbackScraper = getScraperForRace(raceName, raceYear)
-        const fallbackResults = await fallbackScraper.searchRunner(lastName)
-
-        if (fallbackResults.found) {
-          // Single exact match found by last name — use it but note the fallback
-          const foundName = fallbackResults.rawData?.name
-            || `${fallbackResults.rawData?.firstName || ''} ${fallbackResults.rawData?.lastName || ''}`.trim()
-            || lastName
-          console.log(`[ResearchService] Found via last name fallback: ${foundName}`)
-          fallbackResults.researchNotes = `Found as "${foundName}" (searched by last name "${lastName}")`
-          results = fallbackResults
-        } else if (fallbackResults.ambiguous || fallbackResults.possibleMatches?.length > 0) {
-          // Surface the candidates as ambiguous so user can pick
-          console.log(`[ResearchService] Last-name fallback surfaced ${fallbackResults.possibleMatches?.length || 0} candidates`)
-          results = fallbackResults
-          results.ambiguous = true
-          results.researchStatus = 'ambiguous'
-          results.researchNotes = `No exact match for "${runnerName}". Found ${fallbackResults.possibleMatches?.length || 'multiple'} runner(s) with last name "${lastName}" — please verify.`
-        } else {
-          console.log(`[ResearchService] Last name fallback also returned no results`)
-        }
-      }
-    }
+    // Fetch from scraper using effective values (shared, DB-free search core)
+    const results = await this.findRunner(raceName, raceYear, runnerName)
 
     // Prepare research data (store the effective name used for search)
     const researchData = {
