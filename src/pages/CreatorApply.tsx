@@ -50,71 +50,114 @@ export default function CreatorApply() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="max-w-3xl mx-auto px-4 md:px-8 pt-12 md:pt-20 pb-10 md:pb-14 text-center">
-        <span className="inline-flex items-center px-3 py-1 mb-5 text-[11px] font-semibold tracking-wider uppercase bg-[#4F2DD4]/10 text-[#4F2DD4] rounded-full">
-          Creator Program
-        </span>
-        <h1 className="text-4xl md:text-6xl font-bold text-off-black leading-[1.05] tracking-tight mb-5">
-          Share your story.<br />
-          Get a free Trackstar print.
-        </h1>
-        <p className="text-base md:text-lg text-off-black/70 max-w-2xl mx-auto leading-relaxed">
-          Trackstar creates beautiful race art out of your marathons. Personalized print with your name, bib, time, pace, and the course you ran. Join the Creator Program and get a free print in exchange for content. Details below.
-        </p>
-        <button
-          onClick={handleApply}
-          disabled={isStarting}
-          className="inline-flex items-center gap-2 mt-8 px-6 py-3.5 bg-off-black text-white text-base font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Apply Now
-          {!isStarting && <ArrowRight className="w-4 h-4" />}
-        </button>
-        {error && (
-          <p className="mt-4 text-sm text-red-600">{error}</p>
-        )}
-      </section>
+      {/* Hero — 2-col grid on desktop. Mobile: UGC fan on top, then text.
+          Desktop: text left, UGC scattered to the right. */}
+      <section className="max-w-6xl mx-auto px-4 md:px-8 pt-8 md:pt-16 lg:pt-20 pb-10 md:pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center">
 
-      {/* UGC fan — three creator photos splayed like a magician's hand of
-          cards. Anchors the hero with visual social proof before the
-          structured benefit sections. Tim is the centerpiece (on top,
-          straight); Nat fans left, Sophie fans right. */}
-      <section className="max-w-3xl mx-auto px-4 md:px-8 pb-12 md:pb-16">
-        <div className="relative mx-auto h-64 md:h-80" style={{ maxWidth: '480px' }}>
-          {/* Left card — Nat, rotated counter-clockwise, behind */}
-          <img
-            src="/Nat_UGC.png"
-            alt="Nat with her Trackstar print"
-            className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-lg"
-            style={{
-              borderRadius: '5px',
-              transform: 'translateX(-110%) rotate(-12deg)',
-              zIndex: 10,
-            }}
-          />
-          {/* Right card — Sophie, rotated clockwise, behind */}
-          <img
-            src="/Sophie_UGC.png"
-            alt="Sophie with her Trackstar print"
-            className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-lg"
-            style={{
-              borderRadius: '5px',
-              transform: 'translateX(10%) rotate(12deg)',
-              zIndex: 10,
-            }}
-          />
-          {/* Center card — Tim, on top, no rotation */}
-          <img
-            src="/Tim_UGC_1.jpg"
-            alt="Tim with his Trackstar print"
-            className="absolute top-0 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-xl"
-            style={{
-              borderRadius: '5px',
-              transform: 'translateX(-50%)',
-              zIndex: 20,
-            }}
-          />
+          {/* UGC visuals — order 1 on mobile (above), order 2 on desktop (right) */}
+          <div className="order-1 lg:order-2">
+
+            {/* Mobile/tablet fan — three cards splayed like a magician's
+                hand. Tim center on top; Nat left, Sophie right. */}
+            <div className="block lg:hidden relative mx-auto h-64 md:h-80" style={{ maxWidth: '480px' }}>
+              <img
+                src="/Nat_UGC.png"
+                alt="Nat with her Trackstar print"
+                className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-lg"
+                style={{ borderRadius: '5px', transform: 'translateX(-110%) rotate(-12deg)', zIndex: 10 }}
+              />
+              <img
+                src="/Sophie_UGC.png"
+                alt="Sophie with her Trackstar print"
+                className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-lg"
+                style={{ borderRadius: '5px', transform: 'translateX(10%) rotate(12deg)', zIndex: 10 }}
+              />
+              <img
+                src="/Tim_UGC_1.jpg"
+                alt="Tim with his Trackstar print"
+                className="absolute top-0 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-xl"
+                style={{ borderRadius: '5px', transform: 'translateX(-50%)', zIndex: 20 }}
+              />
+            </div>
+
+            {/* Desktop scattered arrangement — more dynamic than the tight
+                mobile fan. Reads as a diagonal flow top-left → bottom-right,
+                with Tim as the slightly-larger centerpiece. */}
+            <div className="hidden lg:block relative" style={{ height: '500px' }}>
+              {/* Nat — upper-left, tilted left */}
+              <img
+                src="/Nat_UGC.png"
+                alt="Nat with her Trackstar print"
+                className="absolute w-44 h-64 object-cover"
+                style={{
+                  borderRadius: '5px',
+                  top: '0px',
+                  left: '0px',
+                  transform: 'rotate(-12deg)',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+                  zIndex: 10,
+                }}
+              />
+              {/* Tim — center, slightly larger, on top */}
+              <img
+                src="/Tim_UGC_1.jpg"
+                alt="Tim with his Trackstar print"
+                className="absolute w-52 h-72 object-cover"
+                style={{
+                  borderRadius: '5px',
+                  top: '90px',
+                  left: '38%',
+                  transform: 'translateX(-50%) rotate(2deg)',
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
+                  zIndex: 30,
+                }}
+              />
+              {/* Sophie — bottom-right, tilted right */}
+              <img
+                src="/Sophie_UGC.png"
+                alt="Sophie with her Trackstar print"
+                className="absolute w-44 h-64 object-cover"
+                style={{
+                  borderRadius: '5px',
+                  bottom: '0px',
+                  right: '0px',
+                  transform: 'rotate(14deg)',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+                  zIndex: 10,
+                }}
+              />
+            </div>
+
+          </div>
+
+          {/* Text content — order 2 on mobile, order 1 on desktop.
+              Centered on mobile, left-aligned on desktop. */}
+          <div className="order-2 lg:order-1 text-center lg:text-left">
+            <span className="inline-flex items-center px-3 py-1 mb-5 text-[11px] font-semibold tracking-wider uppercase bg-[#4F2DD4]/10 text-[#4F2DD4] rounded-full">
+              Creator Program
+            </span>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-off-black leading-[1.05] tracking-tight mb-5">
+              Share your story.<br />
+              Get a free Trackstar print.
+            </h1>
+            <p className="text-base md:text-lg text-off-black/70 leading-relaxed lg:max-w-xl">
+              Trackstar creates beautiful race art out of your marathons. Personalized print with your name, bib, time, pace, and the course you ran. Join the Creator Program and get a free print in exchange for content. Details below.
+            </p>
+            <button
+              onClick={handleApply}
+              disabled={isStarting}
+              className="inline-flex items-center gap-2 mt-8 px-6 py-3.5 bg-off-black text-white text-base font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Apply Now
+              {!isStarting && <ArrowRight className="w-4 h-4" />}
+            </button>
+            {error && (
+              <p className="mt-4 text-sm text-red-600">{error}</p>
+            )}
+          </div>
+
         </div>
       </section>
 
