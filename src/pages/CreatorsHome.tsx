@@ -61,7 +61,7 @@ interface Creator {
 
 const STATUS_CONFIG: Record<CreatorStatus, { label: string; color: string; bg: string }> = {
   invited:    { label: 'Invited',    color: 'text-off-black/50', bg: 'bg-off-black/5' },
-  onboarded:  { label: 'Onboarded',  color: 'text-blue-700',     bg: 'bg-blue-50' },
+  applied:    { label: 'Applied',    color: 'text-blue-700',     bg: 'bg-blue-50' },
   active:     { label: 'Active',     color: 'text-emerald-700',  bg: 'bg-emerald-50' },
   paused:     { label: 'Paused',     color: 'text-amber-700',    bg: 'bg-amber-50' },
 }
