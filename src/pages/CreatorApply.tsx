@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Gift, DollarSign, Megaphone, Check, ArrowRight } from 'lucide-react'
+import { Loader2, Sparkles, Frame, Heart, Check, ArrowRight } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -76,24 +76,24 @@ export default function CreatorApply() {
         )}
       </section>
 
-      {/* What you get */}
+      {/* What you get — focused entirely on why the print is great */}
       <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What you get</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           <PerkCard
-            icon={<Gift className="w-5 h-5" />}
-            title="A free personalized print"
-            body="Pick your size and frame. We mail it directly to you — yours to keep."
+            icon={<Sparkles className="w-5 h-5" />}
+            title="100% personalized to you"
+            body="Your name, bib number, finish time, pace, and the actual course you ran — all baked into the design. No two prints are the same."
           />
           <PerkCard
-            icon={<Megaphone className="w-5 h-5" />}
-            title="Your story, amplified"
-            body="We may run your content as paid ads on Meta — getting your work in front of way more runners than organic alone."
+            icon={<Frame className="w-5 h-5" />}
+            title="Looks beautiful on your wall"
+            body="Designed to be displayed. Choose your size and frame — it ships ready to hang the moment it arrives."
           />
           <PerkCard
-            icon={<DollarSign className="w-5 h-5" />}
-            title="Commission opportunities"
-            body="Top creators get paid per piece or a share of attributed revenue. We sort out the details after your first deliverable lands."
+            icon={<Heart className="w-5 h-5" />}
+            title="A keepsake you'll keep forever"
+            body="Race medals end up in a drawer. This is the version of your race you'll see every day — and the conversation piece every guest will ask about."
           />
         </div>
       </section>
@@ -102,20 +102,38 @@ export default function CreatorApply() {
       <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What we ask</h2>
         <div className="bg-white border border-border-gray rounded-md p-5 md:p-6 space-y-3">
-          <Bullet>One or two short-form videos (Reels or TikToks) within <strong>7 days</strong> of receiving your print.</Bullet>
-          <Bullet>Permission for Trackstar to run your content as <strong>paid ads</strong>, including under your own handle if you've enabled whitelisting.</Bullet>
-          <Bullet>That you actually ran the race — the print's personalized to your real bib + time.</Bullet>
+          <Bullet><strong>2–3 short-form videos</strong> (TikTok or Reels) within 7 days of receiving your print.</Bullet>
+          <Bullet>Permission for Trackstar to run that content as a <strong>paid ad</strong>.</Bullet>
+        </div>
+      </section>
+
+      {/* Who you are — sets expectations on who we accept */}
+      <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">Who you are</h2>
+        <div className="bg-white border border-border-gray rounded-md p-5 md:p-6 space-y-3">
+          <Bullet>
+            You've run one of the races in our{' '}
+            <a
+              href="https://www.trackstar.art/collections/all"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#4F2DD4] hover:underline font-medium"
+            >
+              full marathon collection
+            </a>
+            {' '}— or you're gifting the print to someone who has.
+          </Bullet>
+          <Bullet>You're comfortable on camera and have made short-form content before.</Bullet>
         </div>
       </section>
 
       {/* How it works */}
       <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">How it works</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           <Step n={1} title="Apply">Two minutes. Tell us about your race and where to ship the print.</Step>
           <Step n={2} title="We approve">We review and ship your print. You'll see real-time tracking in your portal.</Step>
           <Step n={3} title="Film + share">Open the print, react, post. We'll share a brief with hooks + angles to study.</Step>
-          <Step n={4} title="Optional: get paid">If your content performs, we'll bring you onto a commission plan.</Step>
         </div>
       </section>
 

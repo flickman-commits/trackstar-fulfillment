@@ -1427,6 +1427,8 @@ async function handleListCreators(res) {
 const CREATOR_EDITABLE_FIELDS = [
   // Profile
   'name', 'email', 'instagramHandle', 'tiktokHandle',
+  // Application questions — editable post-application so Matt can fix typos
+  'bestContentLinks', 'whyWorkWithUs',
   // Sample details — editable after onboarding in case the creator emails
   // a correction (different race, size, bib, etc.)
   'raceName', 'raceYear', 'bibNumber', 'finishTime',
@@ -1685,6 +1687,8 @@ async function handleCreatorPortalData(token, res) {
       email: creator.email,
       instagramHandle: creator.instagramHandle,
       tiktokHandle: creator.tiktokHandle,
+      bestContentLinks: creator.bestContentLinks,
+      whyWorkWithUs: creator.whyWorkWithUs,
       raceName: creator.raceName,
       raceYear: creator.raceYear,
       bibNumber: creator.bibNumber,
@@ -1713,6 +1717,7 @@ async function handleCreatorPortalData(token, res) {
 // Sample-order creation lands in the next commit (Elí's queue integration).
 const CREATOR_ONBOARD_FIELDS = [
   'name', 'email', 'instagramHandle', 'tiktokHandle',
+  'bestContentLinks', 'whyWorkWithUs',
   'raceName', 'raceYear', 'bibNumber', 'finishTime',
   'productSize', 'frameType',
   'shippingName', 'shippingAddress1', 'shippingAddress2',

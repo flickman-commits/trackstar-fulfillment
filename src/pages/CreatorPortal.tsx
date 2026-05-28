@@ -26,6 +26,8 @@ interface PortalCreator {
   email: string | null
   instagramHandle: string | null
   tiktokHandle: string | null
+  bestContentLinks: string | null
+  whyWorkWithUs: string | null
   raceName: string | null
   raceYear: number | null
   bibNumber: string | null
@@ -138,11 +140,13 @@ export default function CreatorPortal() {
 type Step = 0 | 1 | 2 | 3 | 4 | 5
 
 interface OnboardingDraft {
-  // Step 1: profile
+  // Step 1: profile + application questions
   name: string
   email: string
   instagramHandle: string
   tiktokHandle: string
+  bestContentLinks: string  // freeform — URLs / handles
+  whyWorkWithUs: string     // optional pitch
   // Step 2: race (split into two dependent dropdowns)
   raceName: string
   raceYear: string  // string for <select> binding
@@ -175,6 +179,8 @@ function OnboardingWizard({ data, token, onDone }: {
     email: data.creator.email || '',
     instagramHandle: data.creator.instagramHandle || '',
     tiktokHandle: data.creator.tiktokHandle || '',
+    bestContentLinks: data.creator.bestContentLinks || '',
+    whyWorkWithUs: data.creator.whyWorkWithUs || '',
     raceName: data.creator.raceName || '',
     raceYear: data.creator.raceYear ? String(data.creator.raceYear) : '',
     productSize: data.creator.productSize || '',
@@ -193,7 +199,11 @@ function OnboardingWizard({ data, token, onDone }: {
   // Per-step validation — only blocks Next when a hard-required field is empty
   const canProceed = () => {
     if (step === 0) return true // welcome
-    if (step === 1) return draft.name.trim().length > 0 && draft.email.trim().length > 0
+    if (step === 1) return (
+      draft.name.trim().length > 0 &&
+      draft.email.trim().length > 0 &&
+      draft.bestContentLinks.trim().length > 0
+    )
     if (step === 2) return draft.raceName.length > 0 && draft.raceYear.length > 0
     if (step === 3) return draft.productSize.length > 0 && draft.frameType.length > 0
     if (step === 4) return (
@@ -221,6 +231,8 @@ function OnboardingWizard({ data, token, onDone }: {
             email: draft.email.trim(),
             instagramHandle: draft.instagramHandle.trim() || null,
             tiktokHandle: draft.tiktokHandle.trim() || null,
+            bestContentLinks: draft.bestContentLinks.trim() || null,
+            whyWorkWithUs: draft.whyWorkWithUs.trim() || null,
             raceName: draft.raceName || null,
             raceYear: draft.raceYear || null,
             productSize: draft.productSize,
@@ -317,9 +329,16 @@ function OnboardingWizard({ data, token, onDone }: {
 function StepWelcome(_: { briefs: PortalBrief[] }) {
   return (
     <div>
-      <h1 className="text-3xl font-bold text-off-black mb-4 leading-tight text-center">
-        Welcome to the Trackstar Creator Program
+      <h1 className="text-3xl font-bold text-off-black mb-3 leading-tight text-center">
+        Trackstar Creator Program Application
       </h1>
+
+      {/* Subhead badge — sets the "this is quick" expectation right at the top */}
+      <div className="flex justify-center mb-4">
+        <span className="inline-flex items-center px-3 py-1 text-[11px] font-semibold tracking-wider uppercase bg-[#4F2DD4]/10 text-[#4F2DD4] rounded-full">
+          Takes less than 2 min
+        </span>
+      </div>
 
       <img
         src="/Tim_UGC_1.jpg"
@@ -328,7 +347,7 @@ function StepWelcome(_: { briefs: PortalBrief[] }) {
       />
 
       <p className="text-sm text-off-black/80 leading-relaxed">
-        ^^ This is going to be you shortly! We're stoked to send you a personalized Trackstar print in exchange for some content! This flow will walk you through everything you need to know and ask a couple questions.
+        ^^ This could be you. Apply below and we'll review your application — if it's a fit we'll ship you a personalized Trackstar print in exchange for some short-form content.
       </p>
     </div>
   )
@@ -400,6 +419,30 @@ function StepProfile({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d
           value={draft.tiktokHandle}
           onChange={(v) => setDraft({ ...draft, tiktokHandle: v })}
         />
+
+        {/* Best content — required, so applicants give us something to evaluate */}
+        <div>
+          <div className="text-xs text-off-black/60 mb-1">Your best content *</div>
+          <textarea
+            value={draft.bestContentLinks}
+            onChange={(e) => setDraft({ ...draft, bestContentLinks: e.target.value })}
+            placeholder="Paste 1–3 links to UGC videos you've made (TikTok, Reels, YouTube Shorts, etc.). Helps us see your style."
+            rows={3}
+            className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white resize-none"
+          />
+        </div>
+
+        {/* Why work with us — optional pitch */}
+        <div>
+          <div className="text-xs text-off-black/60 mb-1">Why do you want to work with us?</div>
+          <textarea
+            value={draft.whyWorkWithUs}
+            onChange={(e) => setDraft({ ...draft, whyWorkWithUs: e.target.value })}
+            placeholder="Optional. Tell us why Trackstar caught your eye — what about the brand or the print resonates with you?"
+            rows={4}
+            className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white resize-none"
+          />
+        </div>
       </div>
     </div>
   )
@@ -469,7 +512,8 @@ function StepRace({ draft, setDraft, races }: {
 function StepProduct({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d: OnboardingDraft) => void }) {
   return (
     <div>
-      <h2 className="text-3xl font-bold text-off-black mb-4 leading-tight">Which size and frame?</h2>
+      <h2 className="text-3xl font-bold text-off-black mb-1 leading-tight">If you're approved, which size and frame would you like?</h2>
+      <p className="text-xs text-off-black/60 mb-4">We'll send this exact configuration if your application's accepted.</p>
 
       <div className="mb-4">
         <div className="text-xs text-off-black/60 mb-2">Size *</div>

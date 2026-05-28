@@ -204,6 +204,13 @@ model Creator {
   instagramHandle     String?
   tiktokHandle        String?
 
+  // Application questions (the public landing page is framed as an
+  // application — both fields collected during /apply onboarding).
+  //   bestContentLinks: pasted URLs / handles of their best UGC examples
+  //   whyWorkWithUs:    optional freeform pitch from the applicant
+  bestContentLinks    String?
+  whyWorkWithUs       String?
+
   // Race info for the sample print (required for the personalization)
   raceName            String?
   raceYear            Int?
