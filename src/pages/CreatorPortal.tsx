@@ -353,34 +353,69 @@ function StepWelcome(_: { briefs: PortalBrief[] }) {
   )
 }
 
-function StepContentAgreement({ briefs, agreed, setAgreed }: {
+// Simplified content briefs for the application step. Full briefs (with
+// guardrails, hook options, persona, etc.) are shown to the creator in
+// their portal AFTER acceptance — applicants just need the high-level
+// list so they can decide whether to commit. Edit the reference URLs
+// when better examples land.
+const APPLICATION_CONTENT_BRIEFS = [
+  {
+    title: 'Surprise Unboxing Video',
+    referenceUrl: 'https://www.instagram.com/reel/DV8r0jlDVkS/',
+  },
+  {
+    title: "'Why Trackstar?' Video",
+    // TODO: replace with a real reference reel once Matt picks one
+    referenceUrl: 'https://www.instagram.com/reel/DV8r0jlDVkS/',
+  },
+  {
+    title: 'Race Recap Video',
+    referenceUrl: 'https://www.instagram.com/reel/DXseR6sDXzT/',
+  },
+]
+
+function StepContentAgreement({ briefs: _briefs, agreed, setAgreed }: {
   briefs: PortalBrief[]
   agreed: boolean
   setAgreed: (v: boolean) => void
 }) {
   return (
     <div>
-      <h2 className="text-3xl font-bold text-off-black mb-1 leading-tight">Content Needed</h2>
-      <p className="text-xs text-off-black/60 mb-4">
-        Here's what we'd love you to create with your print.
-      </p>
+      <h2 className="text-3xl font-bold text-off-black mb-4 leading-tight">Content Needed</h2>
 
-      {briefs.length > 0 ? (
-        <div className="space-y-3 mb-5">
-          {briefs.map(b => <BriefCard key={b.id} brief={b} />)}
-        </div>
-      ) : (
-        <div className="text-sm text-off-black/60 mb-5 p-3 bg-subtle-gray rounded border border-border-gray">
-          Matt will share specific briefs with you shortly.
-        </div>
-      )}
+      <div className="space-y-2 mb-2">
+        {APPLICATION_CONTENT_BRIEFS.map((brief, idx) => (
+          <div
+            key={brief.title}
+            className="flex items-center justify-between gap-3 px-4 py-3 bg-subtle-gray border border-border-gray rounded-md"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="shrink-0 w-6 h-6 rounded-full bg-off-black text-white text-xs font-semibold inline-flex items-center justify-center">
+                {idx + 1}
+              </span>
+              <span className="text-sm font-medium text-off-black truncate">{brief.title}</span>
+            </div>
+            <a
+              href={brief.referenceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 text-xs font-medium text-[#4F2DD4] hover:underline whitespace-nowrap"
+            >
+              Reference ↗
+            </a>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-off-black/50 italic mb-5">
+        *More details on these briefs will be given once you're accepted into the program.
+      </p>
 
       {/* Paid-ads disclosure — sits right above the checkbox so it's part of
           what they're agreeing to. Not hidden, not buried in fine print. */}
       <div className="mb-3 p-4 bg-[#4F2DD4]/5 border border-[#4F2DD4]/20 rounded-md">
-        <div className="text-[10px] font-semibold text-[#4F2DD4] uppercase tracking-wider mb-1.5">Heads up — paid ads</div>
+        <div className="text-sm font-semibold text-off-black mb-1.5">Agree to be in social media ads</div>
         <p className="text-sm text-off-black/80 leading-relaxed">
-          The content you submit may be used as <strong>paid advertising</strong> on Meta (Instagram + Facebook) and other platforms. By checking the box below you're giving Trackstar permission to run your content as ads — including under your own handle if you've enabled whitelisting.
+          The content you submit may be used as <strong>paid advertising</strong> on Meta (Instagram + Facebook) and other platforms. By checking the box below you're giving Trackstar permission to use your content in ads.
         </p>
       </div>
 
@@ -392,7 +427,7 @@ function StepContentAgreement({ briefs, agreed, setAgreed }: {
           className="mt-0.5 w-4 h-4 accent-[#4F2DD4] cursor-pointer"
         />
         <span className="text-sm text-off-black/90 leading-relaxed">
-          By checking this box I'm agreeing to create the above content by 7 days after receiving my print, and I'm giving Trackstar permission to run it as paid ads.
+          By checking this box I'm agreeing to create the above content by 7 days after receiving my print, and I'm giving Trackstar permission to use my content in ads.
         </span>
       </label>
     </div>

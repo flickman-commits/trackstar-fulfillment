@@ -55,80 +55,33 @@ export default function CreatorApply() {
       <section className="max-w-6xl mx-auto px-4 md:px-8 pt-8 md:pt-16 lg:pt-20 pb-10 md:pb-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center">
 
-          {/* UGC visuals — order 1 on mobile (above), order 2 on desktop (right) */}
+          {/* UGC visuals — order 1 on mobile (above), order 2 on desktop (right).
+              Same magician's-fan layout at every breakpoint; just sizes up on
+              wider screens so it fills the right column nicely on desktop. */}
           <div className="order-1 lg:order-2">
-
-            {/* Mobile/tablet fan — three cards splayed like a magician's
-                hand. Tim center on top; Nat left, Sophie right. */}
-            <div className="block lg:hidden relative mx-auto h-64 md:h-80" style={{ maxWidth: '480px' }}>
+            <div className="relative mx-auto h-64 md:h-80 lg:h-96" style={{ maxWidth: '520px' }}>
+              {/* Nat — fanned left, behind */}
               <img
                 src="/Nat_UGC.png"
                 alt="Nat with her Trackstar print"
-                className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-lg"
+                className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 lg:w-52 lg:h-72 object-cover shadow-lg"
                 style={{ borderRadius: '5px', transform: 'translateX(-110%) rotate(-12deg)', zIndex: 10 }}
               />
+              {/* Sophie — fanned right, behind */}
               <img
                 src="/Sophie_UGC.png"
                 alt="Sophie with her Trackstar print"
-                className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-lg"
+                className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 lg:w-52 lg:h-72 object-cover shadow-lg"
                 style={{ borderRadius: '5px', transform: 'translateX(10%) rotate(12deg)', zIndex: 10 }}
               />
+              {/* Tim — centerpiece, on top, straight */}
               <img
                 src="/Tim_UGC_1.jpg"
                 alt="Tim with his Trackstar print"
-                className="absolute top-0 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-xl"
+                className="absolute top-0 left-1/2 w-36 h-52 md:w-44 md:h-64 lg:w-52 lg:h-72 object-cover shadow-xl"
                 style={{ borderRadius: '5px', transform: 'translateX(-50%)', zIndex: 20 }}
               />
             </div>
-
-            {/* Desktop scattered arrangement — more dynamic than the tight
-                mobile fan. Reads as a diagonal flow top-left → bottom-right,
-                with Tim as the slightly-larger centerpiece. */}
-            <div className="hidden lg:block relative" style={{ height: '500px' }}>
-              {/* Nat — upper-left, tilted left */}
-              <img
-                src="/Nat_UGC.png"
-                alt="Nat with her Trackstar print"
-                className="absolute w-44 h-64 object-cover"
-                style={{
-                  borderRadius: '5px',
-                  top: '0px',
-                  left: '0px',
-                  transform: 'rotate(-12deg)',
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
-                  zIndex: 10,
-                }}
-              />
-              {/* Tim — center, slightly larger, on top */}
-              <img
-                src="/Tim_UGC_1.jpg"
-                alt="Tim with his Trackstar print"
-                className="absolute w-52 h-72 object-cover"
-                style={{
-                  borderRadius: '5px',
-                  top: '90px',
-                  left: '38%',
-                  transform: 'translateX(-50%) rotate(2deg)',
-                  boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
-                  zIndex: 30,
-                }}
-              />
-              {/* Sophie — bottom-right, tilted right */}
-              <img
-                src="/Sophie_UGC.png"
-                alt="Sophie with her Trackstar print"
-                className="absolute w-44 h-64 object-cover"
-                style={{
-                  borderRadius: '5px',
-                  bottom: '0px',
-                  right: '0px',
-                  transform: 'rotate(14deg)',
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
-                  zIndex: 10,
-                }}
-              />
-            </div>
-
           </div>
 
           {/* Text content — order 2 on mobile, order 1 on desktop.
