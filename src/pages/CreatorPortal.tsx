@@ -506,6 +506,17 @@ function StepRace({ draft, setDraft, races }: {
       <p className="text-xs text-off-black/60 mb-4">
         We'll find your bib # and finish time for you, based off your name.
       </p>
+
+      {/* Eligibility callout — the dropdown only contains races we currently
+          have designs for, but applicants don't know that without an
+          explanation. Spelling it out here also gates expectations: if
+          their race isn't listed, they're not eligible (yet). */}
+      <div className="mb-4 p-3 bg-[#4F2DD4]/5 border border-[#4F2DD4]/20 rounded-md">
+        <p className="text-sm text-off-black/80 leading-relaxed">
+          <strong>To be eligible</strong>, you must've run a race we have a design for. If you don't see your race in the list below, we don't currently have a design for it.
+        </p>
+      </div>
+
       <div className="space-y-3">
         <div>
           <div className="text-xs text-off-black/60 mb-1">Race *</div>
