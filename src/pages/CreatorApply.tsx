@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Sparkles, Frame, Heart, Check, ArrowRight } from 'lucide-react'
+import { Loader2, Check, ArrowRight } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -90,17 +90,13 @@ export default function CreatorApply() {
             <span className="inline-flex items-center px-3 py-1 mb-5 text-[11px] font-semibold tracking-wider uppercase bg-[#4F2DD4]/10 text-[#4F2DD4] rounded-full">
               Creator Program
             </span>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-off-black leading-[1.05] tracking-tight mb-5">
-              Share your story.<br />
-              Get a free Trackstar print.
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-off-black leading-[1.05] tracking-tight mb-6">
+              Get a free Trackstar print in exchange for 2–3 videos.
             </h1>
-            <p className="text-base md:text-lg text-off-black/70 leading-relaxed lg:max-w-xl">
-              Trackstar creates beautiful race art out of your marathons. Personalized print with your name, bib, time, pace, and the course you ran. Join the Creator Program and get a free print in exchange for content. Details below.
-            </p>
             <button
               onClick={handleApply}
               disabled={isStarting}
-              className="inline-flex items-center gap-2 mt-8 px-6 py-3.5 bg-off-black text-white text-base font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="inline-flex items-center gap-2 mt-2 px-6 py-3.5 bg-off-black text-white text-base font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               Apply Now
@@ -114,55 +110,23 @@ export default function CreatorApply() {
         </div>
       </section>
 
-      {/* What you get — focused entirely on why the print is great */}
+      {/* What you get — single product line, no 3-card array. The cards
+          were trying to sell the print's value props; the new framing
+          is "this is the thing you get" with a one-line tagline below. */}
       <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-2">What you get</h2>
-        <h3 className="text-2xl md:text-3xl font-bold text-off-black leading-tight mb-5 md:mb-6">Your own personalized Trackstar print</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-          <PerkCard
-            icon={<Sparkles className="w-5 h-5" />}
-            title="100% personalized to you"
-            body="Your name, bib number, finish time, pace, and the actual course you ran — all baked into the design. No two prints are the same."
-          />
-          <PerkCard
-            icon={<Frame className="w-5 h-5" />}
-            title="Looks beautiful on your wall"
-            body="Designed to be displayed. Choose your size and frame — it ships ready to hang the moment it arrives."
-          />
-          <PerkCard
-            icon={<Heart className="w-5 h-5" />}
-            title="A keepsake you'll keep forever"
-            body="Race medals end up in a drawer. This is the version of your race you'll see every day — and the conversation piece every guest will ask about."
-          />
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What you get</h2>
+        <div className="bg-white border border-border-gray rounded-md p-5 md:p-6">
+          <div className="text-xl md:text-2xl font-bold text-off-black leading-tight">(1x) Personalized Trackstar Race Print</div>
+          <div className="text-sm md:text-base text-off-black/60 mt-1.5">Custom-designed with your name, bib, finish time, and the course you ran.</div>
         </div>
       </section>
 
-      {/* What we ask */}
+      {/* What we ask — one bullet only. The paid-ads consent moved into
+          the application wizard (StepContentAgreement). */}
       <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What we ask</h2>
-        <div className="bg-white border border-border-gray rounded-md p-5 md:p-6 space-y-3">
+        <div className="bg-white border border-border-gray rounded-md p-5 md:p-6">
           <Bullet><strong>2–3 short-form videos</strong> (TikTok or Reels) within 7 days of receiving your print.</Bullet>
-          <Bullet>Permission for Trackstar to run that content as a <strong>paid ad</strong>.</Bullet>
-        </div>
-      </section>
-
-      {/* Who you are — sets expectations on who we accept */}
-      <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">Who you are</h2>
-        <div className="bg-white border border-border-gray rounded-md p-5 md:p-6 space-y-3">
-          <Bullet>
-            You've run one of the races in our{' '}
-            <a
-              href="https://www.trackstar.art/collections/all"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#4F2DD4] hover:underline font-medium"
-            >
-              full marathon collection
-            </a>
-            {' '}— or you're gifting the print to someone who has.
-          </Bullet>
-          <Bullet>You're comfortable on camera and have made short-form content before.</Bullet>
         </div>
       </section>
 
@@ -170,20 +134,17 @@ export default function CreatorApply() {
       <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">How it works</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-          <Step n={1} title="Apply">Two minutes. Tell us about your race and where to ship the print.</Step>
-          <Step n={2} title="We approve">We review and ship your print. You'll see real-time tracking in your portal.</Step>
-          <Step n={3} title="Film + share">Open the print, react, post. We'll share a brief with hooks + angles to study.</Step>
+          <Step n={1} title="Apply">Tell us which race you ran and your address.</Step>
+          <Step n={2} title="Approve">If it's a good fit, we'll approve!</Step>
+          <Step n={3} title="Film Content">We'll give a full brief on how to do it.</Step>
         </div>
       </section>
 
-      {/* CTA repeat */}
+      {/* Closing CTA — bare H1 + button. No subhead clutter. */}
       <section className="max-w-3xl mx-auto px-4 md:px-8 pb-16 md:pb-24 text-center">
-        <h2 className="text-2xl md:text-3xl font-bold text-off-black leading-tight mb-3">
-          Ready to run with us?
-        </h2>
-        <p className="text-sm md:text-base text-off-black/60 mb-6">
-          Applications take under two minutes. You'll know everything you need before you commit.
-        </p>
+        <h1 className="text-3xl md:text-4xl font-bold text-off-black leading-tight mb-6">
+          Get your free Trackstar print
+        </h1>
         <button
           onClick={handleApply}
           disabled={isStarting}
@@ -210,18 +171,6 @@ export default function CreatorApply() {
           </div>
         </div>
       </footer>
-    </div>
-  )
-}
-
-function PerkCard({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
-  return (
-    <div className="bg-white border border-border-gray rounded-md p-5">
-      <div className="w-9 h-9 rounded-md bg-[#4F2DD4]/10 text-[#4F2DD4] flex items-center justify-center mb-3">
-        {icon}
-      </div>
-      <div className="text-base font-semibold text-off-black mb-1.5">{title}</div>
-      <div className="text-sm text-off-black/60 leading-relaxed">{body}</div>
     </div>
   )
 }
