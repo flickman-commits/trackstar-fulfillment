@@ -116,7 +116,8 @@ export default function CreatorApply() {
 
       {/* What you get — focused entirely on why the print is great */}
       <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What you get</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-2">What you get</h2>
+        <h3 className="text-2xl md:text-3xl font-bold text-off-black leading-tight mb-5 md:mb-6">Your own personalized Trackstar print</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           <PerkCard
             icon={<Sparkles className="w-5 h-5" />}
