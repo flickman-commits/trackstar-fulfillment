@@ -76,6 +76,48 @@ export default function CreatorApply() {
         )}
       </section>
 
+      {/* UGC fan — three creator photos splayed like a magician's hand of
+          cards. Anchors the hero with visual social proof before the
+          structured benefit sections. Tim is the centerpiece (on top,
+          straight); Nat fans left, Sophie fans right. */}
+      <section className="max-w-3xl mx-auto px-4 md:px-8 pb-12 md:pb-16">
+        <div className="relative mx-auto h-64 md:h-80" style={{ maxWidth: '480px' }}>
+          {/* Left card — Nat, rotated counter-clockwise, behind */}
+          <img
+            src="/Nat_UGC.png"
+            alt="Nat with her Trackstar print"
+            className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-lg"
+            style={{
+              borderRadius: '5px',
+              transform: 'translateX(-110%) rotate(-12deg)',
+              zIndex: 10,
+            }}
+          />
+          {/* Right card — Sophie, rotated clockwise, behind */}
+          <img
+            src="/Sophie_UGC.png"
+            alt="Sophie with her Trackstar print"
+            className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-lg"
+            style={{
+              borderRadius: '5px',
+              transform: 'translateX(10%) rotate(12deg)',
+              zIndex: 10,
+            }}
+          />
+          {/* Center card — Tim, on top, no rotation */}
+          <img
+            src="/Tim_UGC_1.jpg"
+            alt="Tim with his Trackstar print"
+            className="absolute top-0 left-1/2 w-36 h-52 md:w-44 md:h-64 object-cover shadow-xl"
+            style={{
+              borderRadius: '5px',
+              transform: 'translateX(-50%)',
+              zIndex: 20,
+            }}
+          />
+        </div>
+      </section>
+
       {/* What you get — focused entirely on why the print is great */}
       <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What you get</h2>
