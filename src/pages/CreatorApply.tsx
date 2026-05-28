@@ -96,7 +96,7 @@ export default function CreatorApply() {
             <button
               onClick={handleApply}
               disabled={isStarting}
-              className="inline-flex items-center gap-2 mt-2 px-6 py-3.5 bg-off-black text-white text-base font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="inline-flex items-center gap-2 mt-2 px-6 py-3.5 bg-[#4F2DD4] text-white text-base font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               Apply Now
@@ -110,53 +110,34 @@ export default function CreatorApply() {
         </div>
       </section>
 
-      {/* What you get — single product line, no 3-card array. The cards
-          were trying to sell the print's value props; the new framing
-          is "this is the thing you get" with a one-line tagline below. */}
+      {/* What you get / What we ask — paired sections, matched formatting.
+          2-col grid on desktop, stacked on mobile. Both use the same card
+          shell + a single checkmark bullet, so they read as siblings. */}
       <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What you get</h2>
-        <div className="bg-white border border-border-gray rounded-md p-5 md:p-6">
-          <div className="text-xl md:text-2xl font-bold text-off-black leading-tight">(1x) Personalized Trackstar Race Print</div>
-          <div className="text-sm md:text-base text-off-black/60 mt-1.5">Custom-designed with your name, bib, finish time, and the course you ran.</div>
-        </div>
-      </section>
-
-      {/* What we ask — one bullet only. The paid-ads consent moved into
-          the application wizard (StepContentAgreement). */}
-      <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What we ask</h2>
-        <div className="bg-white border border-border-gray rounded-md p-5 md:p-6">
-          <Bullet><strong>2–3 short-form videos</strong> (TikTok or Reels) within 7 days of receiving your print.</Bullet>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-6">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What you get</h2>
+            <div className="bg-white border border-border-gray rounded-md p-5 md:p-6">
+              <Bullet>A personalized Trackstar race print customized with your name, bib, finish time, and the course you ran.</Bullet>
+            </div>
+          </div>
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What we ask</h2>
+            <div className="bg-white border border-border-gray rounded-md p-5 md:p-6">
+              <Bullet><strong>2–3 short-form videos</strong> (TikTok or Reels) within 7 days of receiving your print.</Bullet>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
+      <section className="max-w-5xl mx-auto px-4 md:px-8 pb-16 md:pb-24">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">How it works</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-          <Step n={1} title="Apply">Tell us which race you ran and your address.</Step>
+          <Step n={1} title="Apply">Tell us why you're a good fit, which race you ran, and your address.</Step>
           <Step n={2} title="Approve">If it's a good fit, we'll approve!</Step>
           <Step n={3} title="Film Content">We'll give a full brief on how to do it.</Step>
         </div>
-      </section>
-
-      {/* Closing CTA — bare H1 + button. No subhead clutter. */}
-      <section className="max-w-3xl mx-auto px-4 md:px-8 pb-16 md:pb-24 text-center">
-        <h1 className="text-3xl md:text-4xl font-bold text-off-black leading-tight mb-6">
-          Get your free Trackstar print
-        </h1>
-        <button
-          onClick={handleApply}
-          disabled={isStarting}
-          className="inline-flex items-center gap-2 px-6 py-3.5 bg-[#4F2DD4] text-white text-base font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Apply Now
-          {!isStarting && <ArrowRight className="w-4 h-4" />}
-        </button>
-        {error && (
-          <p className="mt-4 text-sm text-red-600">{error}</p>
-        )}
       </section>
 
       {/* Footer */}
@@ -177,8 +158,8 @@ export default function CreatorApply() {
 
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2.5 text-sm text-off-black/80 leading-relaxed">
-      <Check className="w-4 h-4 mt-0.5 text-[#4F2DD4] shrink-0" />
+    <div className="flex items-start gap-3 text-base text-off-black/80 leading-relaxed">
+      <Check className="w-5 h-5 mt-0.5 text-[#4F2DD4] shrink-0" />
       <span>{children}</span>
     </div>
   )
