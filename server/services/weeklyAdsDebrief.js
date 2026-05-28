@@ -28,13 +28,12 @@ import { fetchPlaybookMarkdown } from './notionPlaybook.js'
 import { shopifyFetch } from './shopifyAuth.js'
 import { WEEKLY_ADS_DEBRIEF_SYSTEM_PROMPT } from '../lib/weeklyAdsDebriefSkill.js'
 
-// Model: Haiku 4.5 by default. On Vercel Hobby we're capped at 60s per
-// function and Sonnet's 15-30s response time eats too much of that budget.
-// Haiku usually finishes in 5-10s, fits comfortably, costs less. If the
-// analysis quality starts to feel shallow, set ADS_DEBRIEF_MODEL in Vercel
-// env vars to bump to Sonnet (then also bump maxDuration to 300, which
-// requires Vercel Pro).
-const CLAUDE_MODEL = process.env.ADS_DEBRIEF_MODEL || 'claude-haiku-4-5'
+// Model: Sonnet 4.5. Pro plan gives us 300s function timeout — Sonnet's
+// 15-30s response time fits comfortably with room to spare and produces
+// noticeably sharper analysis than Haiku. Override via ADS_DEBRIEF_MODEL
+// env var if you ever want to swap (e.g. back to Haiku for cost or up to
+// Opus for the hardest weeks).
+const CLAUDE_MODEL = process.env.ADS_DEBRIEF_MODEL || 'claude-sonnet-4-5'
 const CLAUDE_MAX_TOKENS = 4000
 
 // Slack has a 40k char limit per message. Block kit text fields cap at 3000
