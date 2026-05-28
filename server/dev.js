@@ -40,8 +40,10 @@ const routes = [
   { method: 'get',    path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'post',   path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'delete', path: '/api/proofs',                 handler: '../api/proofs/index.js' },
-  // Public storefront results lookup (gated behind PUBLIC_LOOKUP_ENABLED)
-  { method: 'get',    path: '/api/public/results-lookup',  handler: '../api/public/results-lookup.js' },
+  // Public storefront results lookup (gated behind PUBLIC_LOOKUP_ENABLED).
+  // Consolidated into actions.js to stay under Vercel's 12-function limit;
+  // mirrors the vercel.json rewrite that injects ?action=public-results-lookup.
+  { method: 'get',    path: '/api/public/results-lookup',  handler: '../api/orders/actions.js', query: { action: 'public-results-lookup' } },
 ]
 
 // Load all handlers and register routes
@@ -51,10 +53,16 @@ for (const route of routes) {
 
   // Register for the specific method, plus OPTIONS for CORS preflight
   // For dynamic routes (e.g. /api/approve/:token), copy Express params to query
-  // so the handler works identically in both Express and Vercel
-  const middleware = route.paramAdapter
-    ? [(req, res, next) => { Object.assign(req.query, req.params); next() }, handler]
-    : [handler]
+  // so the handler works identically in both Express and Vercel.
+  // `route.query` injects static query params, mirroring vercel.json rewrites.
+  const adapters = []
+  if (route.paramAdapter) {
+    adapters.push((req, res, next) => { Object.assign(req.query, req.params); next() })
+  }
+  if (route.query) {
+    adapters.push((req, res, next) => { Object.assign(req.query, route.query); next() })
+  }
+  const middleware = [...adapters, handler]
   app[route.method](route.path, ...middleware)
   app.options(route.path, (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
