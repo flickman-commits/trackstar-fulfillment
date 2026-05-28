@@ -242,7 +242,7 @@ model Creator {
   metaPageId          String?
 
   // Workflow status
-  status              String    @default("invited") // "invited" | "onboarded" | "active" | "paused"
+  status              String    @default("invited") // "invited" | "applied" | "active" | "paused"
 
   // Content delivery status — tracks whether the creator has handed over the
   // promised content. Distinct from `status` (which is program-level).

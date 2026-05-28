@@ -1341,14 +1341,14 @@ async function handleCreatorHomeMetrics(res) {
   const [
     activeCount,
     invitedCount,
-    onboardedCount,
+    appliedCount,
     pausedCount,
     sampleOrders,
-    thisMonthOnboards,
+    thisMonthApplications,
   ] = await Promise.all([
     prisma.creator.count({ where: { status: 'active' } }),
     prisma.creator.count({ where: { status: 'invited' } }),
-    prisma.creator.count({ where: { status: 'onboarded' } }),
+    prisma.creator.count({ where: { status: 'applied' } }),
     prisma.creator.count({ where: { status: 'paused' } }),
     prisma.order.findMany({
       where: { source: 'creator_sample' },
@@ -1356,6 +1356,8 @@ async function handleCreatorHomeMetrics(res) {
     }),
     prisma.creator.count({
       where: {
+        // onboardedAt column name preserved — it stamps when the wizard
+        // is submitted, which under the new naming is the "applied" moment.
         onboardedAt: {
           gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
         }
@@ -1372,12 +1374,12 @@ async function handleCreatorHomeMetrics(res) {
 
   return res.status(200).json({
     creators: {
-      total: activeCount + invitedCount + onboardedCount + pausedCount,
+      total: activeCount + invitedCount + appliedCount + pausedCount,
       active: activeCount,
       invited: invitedCount,
-      onboarded: onboardedCount,
+      applied: appliedCount,
       paused: pausedCount,
-      onboardedThisMonth: thisMonthOnboards,
+      appliedThisMonth: thisMonthApplications,
     },
     samples: {
       total: sampleOrders.length,
@@ -1712,8 +1714,8 @@ async function handleCreatorPortalData(token, res) {
 }
 
 // --- creator-onboard (PUBLIC) ---
-// Token-gated. Creator submits the onboarding wizard — we save everything
-// to their Creator row and flip status → 'onboarded'.
+// Token-gated. Creator submits the application wizard — we save everything
+// to their Creator row and flip status → 'applied'.
 // Sample-order creation lands in the next commit (Elí's queue integration).
 const CREATOR_ONBOARD_FIELDS = [
   'name', 'email', 'instagramHandle', 'tiktokHandle',
@@ -1742,13 +1744,16 @@ async function handleCreatorOnboard({ token, data }, res) {
   }
   if (updates.raceYear != null) updates.raceYear = parseInt(updates.raceYear, 10) || null
 
-  // Flip status + stamp onboardedAt on first-pass onboarding. Re-submits
-  // from an already-onboarded creator just update their profile fields —
-  // we don't reset onboardedAt (and don't re-create the sample order).
+  // Flip status + stamp onboardedAt on first-pass application submit.
+  // Re-submits from an already-applied creator just update their profile
+  // fields — we don't reset onboardedAt (and don't re-create the sample
+  // order). The `onboardedAt` column name is preserved to avoid churning
+  // the schema; semantically it now records the time the application was
+  // submitted ("applied at").
   const isFirstOnboard = !creator.onboardedAt
   if (isFirstOnboard) {
     updates.onboardedAt = new Date()
-    updates.status = 'onboarded'
+    updates.status = 'applied'
   }
 
   const updated = await prisma.creator.update({

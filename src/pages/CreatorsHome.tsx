@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send, Mail, Music2, Pencil, ChevronDown } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
-type CreatorStatus = 'invited' | 'onboarded' | 'active' | 'paused'
+type CreatorStatus = 'invited' | 'applied' | 'active' | 'paused'
 type CommissionModel = 'free_product' | 'flat_per_asset' | 'rev_share' | 'hybrid'
 type ContentStatus = 'not_received' | 'received' | 'edited' | 'posted'
 
@@ -94,9 +94,9 @@ interface HomeMetrics {
     total: number
     active: number
     invited: number
-    onboarded: number
+    applied: number
     paused: number
-    onboardedThisMonth: number
+    appliedThisMonth: number
   }
   samples: {
     total: number
@@ -193,13 +193,13 @@ export default function CreatorsHome() {
     loadAll()
   }, [loadAll])
 
-  // Creators that submitted onboarding but haven't had their sample approved yet.
-  // They show in the Sample Requests queue above the main list.
+  // Creators that submitted the public application but haven't been approved
+  // yet. They show in the Creators Applied queue above the main list.
   const pendingSampleRequests = creators.filter(c =>
-    c.status === 'onboarded' && !c.sampleOrder
+    c.status === 'applied' && !c.sampleOrder
   )
   const otherCreators = creators.filter(c =>
-    !(c.status === 'onboarded' && !c.sampleOrder)
+    !(c.status === 'applied' && !c.sampleOrder)
   )
 
   const handleDeclineSample = async (creator: Creator) => {
@@ -291,7 +291,7 @@ export default function CreatorsHome() {
                 icon={<TrendingUp className="w-4 h-4" />}
                 label="New Creators This Month"
                 shortLabel="New This Mo."
-                value={metrics.creators.onboardedThisMonth}
+                value={metrics.creators.appliedThisMonth}
                 subLabel={`${metrics.creators.total} total in program`}
               />
               <Tile
@@ -314,11 +314,11 @@ export default function CreatorsHome() {
               />
             </div>
 
-            {/* Sample Requests — creators waiting for Matt's approval */}
+            {/* Creators Applied — applicants awaiting Matt's approval */}
             {pendingSampleRequests.length > 0 && (
               <div className="mt-10">
                 <h2 className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-3">
-                  Sample Requests Pending ({pendingSampleRequests.length})
+                  Creators Applied ({pendingSampleRequests.length})
                 </h2>
                 <div className="space-y-2">
                   {pendingSampleRequests.map(c => (
@@ -868,7 +868,7 @@ function CreatorDrawer({
                 label="Program"
                 value={draft.status}
                 onChange={(v) => setDraft({ ...draft, status: v })}
-                options={['invited', 'onboarded', 'active', 'paused']}
+                options={['invited', 'applied', 'active', 'paused']}
                 config={STATUS_CONFIG}
               />
               <StatusSelect<ContentStatus>
