@@ -140,6 +140,9 @@
     letter-spacing: -0.04em;
     color: var(--tsil-text);
   }
+  /* Keep hidden states hidden — class display rules below would otherwise
+     out-specify the browser's default [hidden] rule and show every state. */
+  #tsil-{{ section.id }} [hidden] { display: none !important; }
   #tsil-{{ section.id }} .tsil__card {
     border: 1px solid var(--tsil-border);
     background: var(--tsil-bg);
