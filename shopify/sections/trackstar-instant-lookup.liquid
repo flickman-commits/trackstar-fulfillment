@@ -161,9 +161,9 @@
     background: var(--tsil-bg);
     padding: 1.5rem;
   }
-  /* Header is right-aligned: logo (or title) sits at the right edge. */
-  #tsil-{{ section.id }} .tsil__head { text-align: right; }
-  #tsil-{{ section.id }} .tsil__logo { display: inline-block; height: 28px; width: auto; max-width: 75%; }
+  /* Header is left-aligned: logo (or title) sits at the left edge. */
+  #tsil-{{ section.id }} .tsil__head { text-align: left; }
+  #tsil-{{ section.id }} .tsil__logo { display: inline-block; height: 34px; width: auto; max-width: 75%; }
   #tsil-{{ section.id }} .tsil__title { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
   #tsil-{{ section.id }} .tsil__sub { margin: .35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; }
   #tsil-{{ section.id }} .tsil__form { display: grid; gap: .9rem; margin-top: 1.25rem; }
@@ -483,7 +483,7 @@
       "type": "image_picker",
       "id": "logo",
       "label": "Header logo",
-      "info": "Right-aligned logo shown at the top of the widget. When set, it replaces the Heading text. Upload the \"Trackstar Instant Lookup\" wordmark here."
+      "info": "Left-aligned logo shown at the top of the widget. When set, it replaces the Heading text. Upload the \"Trackstar Instant Lookup\" wordmark here."
     },
     {
       "type": "text",
