@@ -99,6 +99,7 @@
     {%- comment -%} STATE: multiple suggestions {%- endcomment -%}
     <div class="tsil__suggestions" data-tsil-state="suggestions" hidden>
       <p class="tsil__found-head">We found a few matches — pick yours:</p>
+      <p class="tsil__refine-hint" data-tsil-refine-hint hidden>Showing the first 10. Add or correct your first name to narrow it down.</p>
       <div class="tsil__match-list" data-tsil-suggestion-list></div>
       <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-manual-link>Enter info manually</button>
       <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Search again</button>
@@ -216,6 +217,7 @@
   @keyframes tsil-spin { to { transform: rotate(360deg); } }
   #tsil-{{ section.id }} .tsil__result, #tsil-{{ section.id }} .tsil__suggestions, #tsil-{{ section.id }} .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
   #tsil-{{ section.id }} .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.04em; }
+  #tsil-{{ section.id }} .tsil__refine-hint { margin: -.35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; letter-spacing: -0.04em; }
   #tsil-{{ section.id }} .tsil__confirm-note {
     margin: 0;
     padding: .7rem .8rem;
@@ -391,6 +393,7 @@
           }
           if (data.suggestions && data.suggestions.length) {
             renderSuggestions(data.suggestions);
+            root.querySelector('[data-tsil-refine-hint]').hidden = !data.truncated;
             show('suggestions');
             return;
           }

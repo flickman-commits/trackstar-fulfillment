@@ -144,6 +144,11 @@ export class BaseScraper {
     // Convert to lowercase and trim
     let normalized = name.toLowerCase().trim()
 
+    // Fold accents/diacritics so "José" matches "Jose", "Müller" matches
+    // "Muller", etc. NFD splits an accented char into base + combining mark,
+    // then we strip the combining marks (U+0300–U+036F).
+    normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
     // Handle "Last, First" format
     if (normalized.includes(',')) {
       const [last, first] = normalized.split(',').map(s => s.trim())

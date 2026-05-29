@@ -80,7 +80,12 @@ export class BrookseeScraper extends BaseScraper {
         return true
       })
       console.log(`[${this.tag} ${this.year}] No exact match; surfacing ${unique.length} candidate(s)`)
-      return this.notFoundResult(null, unique.slice(0, 10))
+      const DISPLAY_CAP = 10
+      const out = this.notFoundResult(null, unique.slice(0, DISPLAY_CAP))
+      // Tell the caller the list was trimmed so the UI can prompt the shopper
+      // to refine instead of silently hiding matches.
+      if (unique.length > DISPLAY_CAP) out.possibleMatchesTruncated = true
+      return out
     }
 
     console.log(`[${this.tag} ${this.year}] Runner not found in any event type`)
@@ -124,8 +129,10 @@ export class BrookseeScraper extends BaseScraper {
       console.log(`[${this.tag} ${this.year}] Name matches in ${eventLabel}: ${matches.length}`)
 
       if (matches.length === 0) {
-        console.log(`[${this.tag} ${this.year}] No name match. Surfacing ${Math.min(rows.length, 10)} candidates.`)
-        return this.notFoundResult(null, rows.slice(0, 10).map(r => ({
+        // Surface a generous slice here; searchRunner aggregates across events,
+        // de-dupes, applies the final display cap, and flags truncation.
+        console.log(`[${this.tag} ${this.year}] No name match. Surfacing ${Math.min(rows.length, 25)} candidates.`)
+        return this.notFoundResult(null, rows.slice(0, 25).map(r => ({
           name: `${r.firstName} ${r.lastName}`.trim(),
           bib: r.bib,
           time: r.chipTime || r.finishTime,

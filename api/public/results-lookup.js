@@ -128,6 +128,9 @@ export default async function handler(req, res) {
         found: false,
         instant: true,
         fallbackRequired: true,
+        // The candidate list was trimmed upstream — let the widget prompt the
+        // shopper to refine their search rather than hiding matches silently.
+        truncated: result.possibleMatchesTruncated === true,
         suggestions: (result.possibleMatches || []).map(m => ({
           name: m.name,
           bib: m.bib ?? null,
