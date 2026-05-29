@@ -50,7 +50,17 @@
 >
   <div class="tsil__card">
     <div class="tsil__head" data-tsil-head>
-      <h3 class="tsil__title">{{ section.settings.heading | escape }}</h3>
+      {% if section.settings.logo != blank %}
+        <img
+          class="tsil__logo"
+          src="{{ section.settings.logo | image_url: width: 600 }}"
+          alt="{{ section.settings.heading | escape }}"
+          width="{{ section.settings.logo.width }}"
+          height="{{ section.settings.logo.height }}"
+          loading="lazy">
+      {% else %}
+        <h3 class="tsil__title">{{ section.settings.heading | escape }}</h3>
+      {% endif %}
       {% if section.settings.subheading != blank %}
         <p class="tsil__sub">{{ section.settings.subheading | escape }}</p>
       {% endif %}
@@ -150,8 +160,11 @@
     background: var(--tsil-bg);
     padding: 1.5rem;
   }
+  /* Header is right-aligned: logo (or title) sits at the right edge. */
+  #tsil-{{ section.id }} .tsil__head { text-align: right; }
+  #tsil-{{ section.id }} .tsil__logo { display: inline-block; height: 28px; width: auto; max-width: 75%; }
   #tsil-{{ section.id }} .tsil__title { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
-  #tsil-{{ section.id }} .tsil__sub { margin: 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; }
+  #tsil-{{ section.id }} .tsil__sub { margin: .35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; }
   #tsil-{{ section.id }} .tsil__form { display: grid; gap: .9rem; margin-top: 1.25rem; }
   #tsil-{{ section.id }} .tsil__row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
   #tsil-{{ section.id }} .tsil__field { display: grid; gap: .35rem; }
@@ -464,9 +477,16 @@
   "class": "shopify-section--trackstar-instant-lookup",
   "settings": [
     {
+      "type": "image_picker",
+      "id": "logo",
+      "label": "Header logo",
+      "info": "Right-aligned logo shown at the top of the widget. When set, it replaces the Heading text. Upload the \"Trackstar Instant Lookup\" wordmark here."
+    },
+    {
       "type": "text",
       "id": "heading",
       "label": "Heading",
+      "info": "Fallback shown only when no Header logo is uploaded.",
       "default": "Trackstar Instant Lookup"
     },
     {
