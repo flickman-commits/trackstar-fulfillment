@@ -81,15 +81,16 @@
     <div class="tsil__result" data-tsil-state="found" hidden>
       <p class="tsil__found-head">We found your result</p>
       <div class="tsil__match" data-tsil-found-card></div>
-      <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>That's me</button>
-      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Not me (search again)</button>
+      <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>That is correct</button>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Not the right runner (search again)</button>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-manual-link>Enter info manually</button>
     </div>
 
     {%- comment -%} STATE: multiple suggestions {%- endcomment -%}
     <div class="tsil__suggestions" data-tsil-state="suggestions" hidden>
       <p class="tsil__found-head">We found a few matches — pick yours:</p>
       <div class="tsil__match-list" data-tsil-suggestion-list></div>
-      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-manual-link>None of these — enter manually</button>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-manual-link>Enter info manually</button>
       <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Search again</button>
     </div>
 
@@ -117,9 +118,9 @@
 
     {%- comment -%} STATE: attached / success {%- endcomment -%}
     <div class="tsil__done" data-tsil-state="done" hidden>
-      <p class="tsil__found-head">Result attached</p>
+      <p class="tsil__found-head">Result confirmed</p>
       <div class="tsil__match" data-tsil-done-card></div>
-      <p class="tsil__sub">Add to cart to finish your order.</p>
+      <p class="tsil__confirm-note">These details will be printed on your poster. Click <strong>Add to Cart</strong> below to lock them in.</p>
       <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Edit details</button>
     </div>
   </div>
@@ -202,6 +203,16 @@
   @keyframes tsil-spin { to { transform: rotate(360deg); } }
   #tsil-{{ section.id }} .tsil__result, #tsil-{{ section.id }} .tsil__suggestions, #tsil-{{ section.id }} .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
   #tsil-{{ section.id }} .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.04em; }
+  #tsil-{{ section.id }} .tsil__confirm-note {
+    margin: 0;
+    padding: .7rem .8rem;
+    background: var(--tsil-soft);
+    border-left: 3px solid var(--tsil-accent);
+    font-size: .85rem;
+    line-height: 1.4;
+    letter-spacing: -0.04em;
+    color: var(--tsil-text);
+  }
   #tsil-{{ section.id }} .tsil__match, #tsil-{{ section.id }} .tsil__match-list { display: grid; gap: .5rem; }
   #tsil-{{ section.id }} .tsil__match-card {
     text-align: left;
@@ -434,14 +445,13 @@
     root.querySelectorAll('[data-tsil-reset]').forEach(function (btn) {
       btn.addEventListener('click', function () { setError(''); setSubmitDisabled(true); show('search'); });
     });
-    var manualLink = root.querySelector('[data-tsil-manual-link]');
-    if (manualLink) {
-      manualLink.addEventListener('click', function () {
+    root.querySelectorAll('[data-tsil-manual-link]').forEach(function (link) {
+      link.addEventListener('click', function () {
         prefillManual(root.querySelector('[name="tsil-name"]').value.trim());
         root.querySelector('[data-tsil-manual-note]').textContent = 'Enter your result manually.';
         show('manual');
       });
-    }
+    });
 
     show('search');
   })();
