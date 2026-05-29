@@ -1,0 +1,394 @@
+{{ 'trackstar-sticky-atc.css' | asset_url | stylesheet_tag }}
+
+{%- assign variant = product.selected_or_first_available_variant -%}
+
+<div
+  class="trackstar-satc section-{{ section.id }}"
+  id="trackstar-sticky-atc"
+  style="
+    --satc-bg: {{ section.settings.bar_bg }};
+    --satc-text: {{ section.settings.bar_text }};
+    --satc-btn-bg: {{ section.settings.button_bg }};
+    --satc-btn-text: {{ section.settings.button_text_color }};
+    --satc-overlay-bg: {{ section.settings.overlay_bg }};
+  "
+>
+  {%- comment -%} Sticky bottom bar {%- endcomment -%}
+  <div class="trackstar-satc__bar" id="trackstar-satc-bar">
+    <div class="trackstar-satc__bar-inner">
+      <button
+        type="button"
+        class="trackstar-satc__bar-btn"
+        data-open-personalize
+      >
+        {{ section.settings.button_text }} <span class="trackstar-satc__bar-badge">Starts at {{ product.price_min | money_without_trailing_zeros }}</span>
+      </button>
+    </div>
+  </div>
+
+  {%- comment -%} Slide-up overlay — the actual form gets moved here via JS {%- endcomment -%}
+  <div class="trackstar-satc__overlay" id="trackstar-satc-overlay">
+    <div class="trackstar-satc__overlay-backdrop" data-close-personalize></div>
+    <div class="trackstar-satc__panel" id="trackstar-satc-panel">
+      <div class="trackstar-satc__panel-header">
+        <div class="trackstar-satc__panel-header-top">
+          <h3 class="trackstar-satc__panel-title">{{ section.settings.panel_title }}</h3>
+          <button type="button" class="trackstar-satc__panel-close" data-close-personalize aria-label="Close">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="trackstar-satc__panel-product">
+          {%- if product.featured_image -%}
+            <img
+              src="{{ product.featured_image | image_url: width: 120 }}"
+              alt="{{ product.title }}"
+              width="60"
+              height="60"
+              class="trackstar-satc__panel-img"
+            >
+          {%- endif -%}
+          <div>
+            <span class="trackstar-satc__panel-product-title">{{ product.title }}</span>
+            <span class="trackstar-satc__panel-product-price" id="trackstar-satc-price">{{ variant.price | money }}</span>
+          </div>
+        </div>
+        <p class="trackstar-satc__panel-value-line">Framed & shipped for less than you'd pay at a frame shop.</p>
+      </div>
+
+      <div class="trackstar-satc__panel-body">
+        {%- comment -%} The real product form gets cloned/moved here {%- endcomment -%}
+        <div id="trackstar-satc-form-target" class="shopify-section"></div>
+        <div class="trackstar-satc__panel-trust">
+          <span>🇺🇸 Printed in the USA</span>
+          <span>✅ 100% Accuracy Guarantee</span>
+          <span>📦 Delivered in 7–10 days</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    var initialized = false;
+
+    function init() {
+      if (initialized) return;
+      initialized = true;
+
+      var bar = document.getElementById('trackstar-satc-bar');
+      var overlay = document.getElementById('trackstar-satc-overlay');
+      var formTarget = document.getElementById('trackstar-satc-form-target');
+
+      if (!bar || !overlay) return;
+
+      // ---- Show/hide sticky bar based on scroll ----
+      // Show sticky bar as soon as the main CTA button scrolls out of view
+      var mainCta = document.querySelector('.trackstar-personalize-trigger');
+      if (mainCta) {
+        var observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            bar.classList.toggle('trackstar-satc__bar--visible', !entry.isIntersecting);
+          });
+        }, { threshold: 0 });
+        observer.observe(mainCta);
+      } else {
+        // Fallback: watch entire product section
+        var mainProduct = document.querySelector('.product-information');
+        if (mainProduct) {
+          var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+              bar.classList.toggle('trackstar-satc__bar--visible', !entry.isIntersecting);
+            });
+          }, { threshold: 0 });
+          observer.observe(mainProduct);
+        } else {
+          window.addEventListener('scroll', function() {
+            bar.classList.toggle('trackstar-satc__bar--visible', window.scrollY > 400);
+          }, { passive: true });
+        }
+      }
+
+      // ---- Open/close panel ----
+      function openPanel() {
+        overlay.classList.add('trackstar-satc__overlay--open');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closePanel() {
+        overlay.classList.remove('trackstar-satc__overlay--open');
+        document.body.style.overflow = '';
+      }
+
+      document.querySelectorAll('[data-open-personalize]').forEach(function(btn) {
+        btn.addEventListener('click', openPanel);
+      });
+
+      document.querySelectorAll('[data-close-personalize]').forEach(function(btn) {
+        btn.addEventListener('click', closePanel);
+      });
+
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closePanel();
+      });
+
+      // ---- Move form elements into the panel ----
+      if (!formTarget) return;
+
+      var productInfo = document.querySelector('.product-information');
+      if (!productInfo) return;
+
+      // Move all form-related components from the main product area into the modal
+      function moveFormElements() {
+        var moved = 0;
+
+        // Move variant pickers — actual tag is <variant-picker>, NOT variant-main-picker-component
+        productInfo.querySelectorAll('variant-picker').forEach(function(el) {
+          formTarget.appendChild(el);
+          el.style.display = '';
+          moved++;
+        });
+
+        // Move custom property inputs (theme blocks)
+        productInfo.querySelectorAll('product-custom-property-component').forEach(function(el) {
+          formTarget.appendChild(el);
+          el.style.display = '';
+          moved++;
+        });
+
+        // Move Easeify/TPO option sets (Runner Name, Race Year, etc.)
+        productInfo.querySelectorAll('.tpo_option-set-wrapper').forEach(function(el) {
+          formTarget.appendChild(el);
+          el.style.display = '';
+          moved++;
+        });
+
+        // Move the buy-buttons wrapper (span.buy-buttons-block) which contains the product-form-component
+        productInfo.querySelectorAll('.buy-buttons-block').forEach(function(el) {
+          formTarget.appendChild(el);
+          el.style.display = '';
+          moved++;
+        });
+
+        // Also catch any product-form-component not inside a buy-buttons-block
+        productInfo.querySelectorAll('product-form-component').forEach(function(el) {
+          if (!el.closest('.buy-buttons-block')) {
+            formTarget.appendChild(el);
+            el.style.display = '';
+            moved++;
+          }
+        });
+
+        // Move the Trackstar Instant Lookup widget — place it FIRST so the
+        // shopper verifies their result before choosing size/frame. It writes
+        // the verified data into the product form (also moved here), so it must
+        // live in the same modal DOM as the buy buttons.
+        productInfo.querySelectorAll('.tsil').forEach(function(el) {
+          formTarget.insertBefore(el, formTarget.firstChild);
+          el.style.display = '';
+          moved++;
+        });
+
+        console.log('[Trackstar Sticky ATC] Moved ' + moved + ' elements to modal');
+        return moved;
+      }
+
+      // Initial move
+      moveFormElements();
+
+      // ---- Variant wiring fix ----
+      // The theme's web components use scoped event listeners that break when
+      // elements are moved to a new DOM location. We bypass this entirely by:
+      // 1. Listening for variant:update events (dispatched by variant-picker)
+      // 2. Manually updating the hidden input[name="id"] in the product form
+      // 3. Updating the add-to-cart button state
+      var variantsData = {{ product.variants | json }};
+      var variantsMap = {};
+      variantsData.forEach(function(v) { variantsMap[v.id] = v; });
+
+      formTarget.addEventListener('variant:update', function(e) {
+        console.log('[Trackstar] variant:update event caught', e.detail);
+        if (!e.detail || !e.detail.resource) return;
+        var variant = e.detail.resource;
+
+        // Update the hidden variant ID input in the product form
+        var hiddenInput = formTarget.querySelector('input[name="id"]');
+        if (hiddenInput) {
+          hiddenInput.value = variant.id;
+          console.log('[Trackstar] Updated hidden input to variant:', variant.id);
+        }
+
+        // Update price in modal header
+        var modalPrice = document.getElementById('trackstar-satc-price');
+        if (modalPrice && variant.price != null) {
+          modalPrice.textContent = '$' + (variant.price / 100).toFixed(2);
+        }
+      });
+
+      // Fallback: watch the variant picker's JSON script tag directly
+      // The variant picker morphs itself with new HTML after fetching,
+      // and the JSON script contains the selected variant data
+      function watchVariantPickerJSON() {
+        var vp = formTarget.querySelector('variant-picker');
+        if (!vp) return;
+
+        var jsonObserver = new MutationObserver(function() {
+          var jsonScript = vp.querySelector('script[type="application/json"]');
+          if (!jsonScript) return;
+          try {
+            var variant = JSON.parse(jsonScript.textContent);
+            if (variant && variant.id) {
+              var hiddenInput = formTarget.querySelector('input[name="id"]');
+              if (hiddenInput && hiddenInput.value != variant.id) {
+                hiddenInput.value = variant.id;
+                console.log('[Trackstar] JSON fallback updated variant to:', variant.id);
+              }
+              // Update price in modal header
+              var modalPrice = document.getElementById('trackstar-satc-price');
+              if (modalPrice && variant.price != null) {
+                modalPrice.textContent = '$' + (variant.price / 100).toFixed(2);
+              }
+            }
+          } catch(ex) {}
+        });
+
+        jsonObserver.observe(vp, { childList: true, subtree: true, characterData: true });
+      }
+
+      setTimeout(watchVariantPickerJSON, 1000);
+
+      // Easeify and other apps inject elements dynamically, so we
+      // observe the product-information area for new form components
+      var formObserver = new MutationObserver(function(mutations) {
+        var needsMove = false;
+        mutations.forEach(function(m) {
+          m.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1) {
+              var tag = node.tagName.toLowerCase();
+              if (tag === 'product-custom-property-component' ||
+                  tag === 'variant-picker' ||
+                  tag === 'product-form-component' ||
+                  node.classList.contains('buy-buttons-block') ||
+                  node.classList.contains('tsil') ||
+                  node.classList.contains('tpo_option-set-wrapper')) {
+                needsMove = true;
+              }
+              // Also check if the added node contains any of our targets
+              if (node.querySelector && node.querySelector('variant-picker, product-form-component, product-custom-property-component, .buy-buttons-block, .tsil, .tpo_option-set-wrapper')) {
+                needsMove = true;
+              }
+            }
+          });
+        });
+        if (needsMove) moveFormElements();
+      });
+
+      formObserver.observe(productInfo, { childNodes: true, subtree: true });
+
+      // Also retry a few times to catch late-loading app injections
+      var retries = 0;
+      var retryInterval = setInterval(function() {
+        moveFormElements();
+        retries++;
+        if (retries >= 5) clearInterval(retryInterval);
+      }, 1000);
+
+      // Style the ATC button in the modal
+      function styleModalButtons() {
+        var atcButtons = formTarget.querySelectorAll('button[type="submit"], [name="add"]');
+        atcButtons.forEach(function(btn) {
+          btn.style.borderRadius = '0';
+          btn.style.textTransform = 'uppercase';
+          btn.style.fontWeight = '700';
+          btn.style.letterSpacing = '0.05em';
+        });
+      }
+
+      // Run styling after initial move and periodically to catch dynamic elements
+      setTimeout(styleModalButtons, 500);
+      setTimeout(styleModalButtons, 1500);
+      setTimeout(styleModalButtons, 3000);
+
+    }
+
+    // Run after a delay to ensure Shopify's web components have rendered
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(init, 800);
+      });
+    } else {
+      setTimeout(init, 800);
+    }
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Sticky Add to Cart",
+  "tag": "section",
+  "class": "trackstar-satc-section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Sticky bar"
+    },
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "Bar button text",
+      "default": "Personalize My Print"
+    },
+    {
+      "type": "header",
+      "content": "Slide-up panel"
+    },
+    {
+      "type": "text",
+      "id": "panel_title",
+      "label": "Panel title",
+      "default": "Personalize Your Print"
+    },
+    {
+      "type": "header",
+      "content": "Colors"
+    },
+    {
+      "type": "color",
+      "id": "bar_bg",
+      "label": "Bar background",
+      "default": "#f5f5f5"
+    },
+    {
+      "type": "color",
+      "id": "bar_text",
+      "label": "Bar text color",
+      "default": "#1a1a1a"
+    },
+    {
+      "type": "color",
+      "id": "button_bg",
+      "label": "Button background",
+      "default": "#4600D6"
+    },
+    {
+      "type": "color",
+      "id": "button_text_color",
+      "label": "Button text color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "overlay_bg",
+      "label": "Panel background",
+      "default": "#ffffff"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Sticky Add to Cart"
+    }
+  ]
+}
+{% endschema %}
