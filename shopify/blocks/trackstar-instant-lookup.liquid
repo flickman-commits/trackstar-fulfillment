@@ -9,10 +9,11 @@
   fulfillment when they add to cart.
 
   INSTALL
-    1. Copy this file into your theme at: sections/trackstar-instant-lookup.liquid
-    2. On the Vermont City Marathon product template, add this section
-       (Theme editor → product template → Add section → "Trackstar Instant Lookup").
-    3. In the section settings, confirm the Race name and API base URL.
+    1. Copy this file into your theme at: blocks/trackstar-instant-lookup.liquid
+    2. On the product template, add this block INSIDE the product information
+       section (Theme editor → product template → product section → Add block →
+       "Trackstar Instant Lookup"). Drag it next to the add-to-cart button.
+    3. In the block settings, confirm the Race name and API base URL.
 
   HOW THE DATA REACHES FULFILLMENT
     On confirm, the widget writes these cart line-item properties (it fills the
@@ -24,7 +25,7 @@
       - "Bib #"
       - "Time"
       - "_lookup_verified"  (hidden: "true" = instant match, "false" = manual entry)
-    The property names are configurable in the section settings if your theme
+    The property names are configurable in the block settings if your theme
     uses different ones.
 
   SAFETY
@@ -36,46 +37,47 @@
 
 <div
   class="tsil"
-  id="tsil-{{ section.id }}"
-  data-race="{{ section.settings.race_name | default: product.title | escape }}"
-  data-api-base="{{ section.settings.api_base | default: 'https://fast.trackstar.art' | escape }}"
-  data-require-lookup="{{ section.settings.require_lookup }}"
-  data-prop-runner="{{ section.settings.prop_runner | escape }}"
-  data-prop-year="{{ section.settings.prop_year | escape }}"
-  data-prop-race="{{ section.settings.prop_race | escape }}"
-  data-prop-bib="{{ section.settings.prop_bib | escape }}"
-  data-prop-time="{{ section.settings.prop_time | escape }}"
-  data-prop-verified="{{ section.settings.prop_verified | escape }}"
-  style="--tsil-accent: {{ section.settings.accent_color | default: '#4600D6' }};"
+  id="tsil-{{ block.id }}"
+  data-race="{{ block.settings.race_name | default: product.title | escape }}"
+  data-api-base="{{ block.settings.api_base | default: 'https://fast.trackstar.art' | escape }}"
+  data-require-lookup="{{ block.settings.require_lookup }}"
+  data-prop-runner="{{ block.settings.prop_runner | escape }}"
+  data-prop-year="{{ block.settings.prop_year | escape }}"
+  data-prop-race="{{ block.settings.prop_race | escape }}"
+  data-prop-bib="{{ block.settings.prop_bib | escape }}"
+  data-prop-time="{{ block.settings.prop_time | escape }}"
+  data-prop-verified="{{ block.settings.prop_verified | escape }}"
+  style="--tsil-accent: {{ block.settings.accent_color | default: '#4600D6' }};"
+  {{ block.shopify_attributes }}
 >
   <div class="tsil__card">
     <div class="tsil__head" data-tsil-head>
-      {% if section.settings.logo != blank %}
+      {% if block.settings.logo != blank %}
         <img
           class="tsil__logo"
-          src="{{ section.settings.logo | image_url: width: 600 }}"
-          alt="{{ section.settings.heading | escape }}"
-          width="{{ section.settings.logo.width }}"
-          height="{{ section.settings.logo.height }}"
+          src="{{ block.settings.logo | image_url: width: 600 }}"
+          alt="{{ block.settings.heading | escape }}"
+          width="{{ block.settings.logo.width }}"
+          height="{{ block.settings.logo.height }}"
           loading="lazy">
       {% else %}
-        <h3 class="tsil__title">{{ section.settings.heading | escape }}</h3>
+        <h3 class="tsil__title">{{ block.settings.heading | escape }}</h3>
       {% endif %}
-      {% if section.settings.subheading != blank %}
-        <p class="tsil__sub">{{ section.settings.subheading | escape }}</p>
+      {% if block.settings.subheading != blank %}
+        <p class="tsil__sub">{{ block.settings.subheading | escape }}</p>
       {% endif %}
     </div>
 
     {%- comment -%} STATE: search form {%- endcomment -%}
     <form class="tsil__form" data-tsil-state="search" novalidate>
       <div class="tsil__field">
-        <label class="tsil__label" for="tsil-name-{{ section.id }}">Runner name</label>
-        <input class="tsil__input" id="tsil-name-{{ section.id }}" name="tsil-name"
+        <label class="tsil__label" for="tsil-name-{{ block.id }}">Runner name</label>
+        <input class="tsil__input" id="tsil-name-{{ block.id }}" name="tsil-name"
                type="text" autocomplete="off" placeholder="First & last name" maxlength="80" required>
       </div>
       <div class="tsil__field">
-        <label class="tsil__label" for="tsil-year-{{ section.id }}">Race year</label>
-        <select class="tsil__input" id="tsil-year-{{ section.id }}" name="tsil-year" data-tsil-year required></select>
+        <label class="tsil__label" for="tsil-year-{{ block.id }}">Race year</label>
+        <select class="tsil__input" id="tsil-year-{{ block.id }}" name="tsil-year" data-tsil-year required></select>
       </div>
       <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-submit>Find my result</button>
       <p class="tsil__error" data-tsil-error hidden></p>
@@ -110,17 +112,17 @@
       <p class="tsil__found-head">Enter your result manually</p>
       <p class="tsil__sub" data-tsil-manual-note>We couldn't find your result automatically — no problem, just type it in.</p>
       <div class="tsil__field">
-        <label class="tsil__label" for="tsil-mname-{{ section.id }}">Runner name</label>
-        <input class="tsil__input" id="tsil-mname-{{ section.id }}" name="tsil-mname" type="text" maxlength="80" required>
+        <label class="tsil__label" for="tsil-mname-{{ block.id }}">Runner name</label>
+        <input class="tsil__input" id="tsil-mname-{{ block.id }}" name="tsil-mname" type="text" maxlength="80" required>
       </div>
       <div class="tsil__row">
         <div class="tsil__field">
-          <label class="tsil__label" for="tsil-mbib-{{ section.id }}">Bib # <span class="tsil__opt">(optional)</span></label>
-          <input class="tsil__input" id="tsil-mbib-{{ section.id }}" name="tsil-mbib" type="text" maxlength="20">
+          <label class="tsil__label" for="tsil-mbib-{{ block.id }}">Bib # <span class="tsil__opt">(optional)</span></label>
+          <input class="tsil__input" id="tsil-mbib-{{ block.id }}" name="tsil-mbib" type="text" maxlength="20">
         </div>
         <div class="tsil__field">
-          <label class="tsil__label" for="tsil-mtime-{{ section.id }}">Finish time <span class="tsil__opt">(optional)</span></label>
-          <input class="tsil__input" id="tsil-mtime-{{ section.id }}" name="tsil-mtime" type="text" placeholder="3:45:12" maxlength="20">
+          <label class="tsil__label" for="tsil-mtime-{{ block.id }}">Finish time <span class="tsil__opt">(optional)</span></label>
+          <input class="tsil__input" id="tsil-mtime-{{ block.id }}" name="tsil-mtime" type="text" placeholder="3:45:12" maxlength="20">
         </div>
       </div>
       <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-manual-submit>Use these details</button>
@@ -138,7 +140,7 @@
 </div>
 
 <style>
-  #tsil-{{ section.id }} {
+  #tsil-{{ block.id }} {
     --tsil-accent-hover: #5A1AE6;
     --tsil-text: #1A1A1A;
     --tsil-muted: #666666;
@@ -153,25 +155,25 @@
   }
   /* Keep hidden states hidden — class display rules below would otherwise
      out-specify the browser's default [hidden] rule and show every state. */
-  #tsil-{{ section.id }} [hidden] { display: none !important; }
+  #tsil-{{ block.id }} [hidden] { display: none !important; }
   /* When the intro is collapsed (results view), drop the leading gap. */
-  #tsil-{{ section.id }} .tsil__head[hidden] ~ [data-tsil-state] { margin-top: 0; }
-  #tsil-{{ section.id }} .tsil__card {
+  #tsil-{{ block.id }} .tsil__head[hidden] ~ [data-tsil-state] { margin-top: 0; }
+  #tsil-{{ block.id }} .tsil__card {
     border: 1px solid var(--tsil-border);
     background: var(--tsil-bg);
     padding: 1.5rem;
   }
   /* Header is left-aligned: logo (or title) sits at the left edge. */
-  #tsil-{{ section.id }} .tsil__head { text-align: left; }
-  #tsil-{{ section.id }} .tsil__logo { display: inline-block; height: 34px; width: auto; max-width: 75%; }
-  #tsil-{{ section.id }} .tsil__title { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
-  #tsil-{{ section.id }} .tsil__sub { margin: .35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; }
-  #tsil-{{ section.id }} .tsil__form { display: grid; gap: .9rem; margin-top: 1.25rem; }
-  #tsil-{{ section.id }} .tsil__row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
-  #tsil-{{ section.id }} .tsil__field { display: grid; gap: .35rem; }
-  #tsil-{{ section.id }} .tsil__label { font-size: .9rem; font-weight: 500; letter-spacing: -0.04em; }
-  #tsil-{{ section.id }} .tsil__opt { font-weight: 400; color: var(--tsil-muted); }
-  #tsil-{{ section.id }} .tsil__input {
+  #tsil-{{ block.id }} .tsil__head { text-align: left; }
+  #tsil-{{ block.id }} .tsil__logo { display: inline-block; height: 34px; width: auto; max-width: 75%; }
+  #tsil-{{ block.id }} .tsil__title { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
+  #tsil-{{ block.id }} .tsil__sub { margin: .35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; }
+  #tsil-{{ block.id }} .tsil__form { display: grid; gap: .9rem; margin-top: 1.25rem; }
+  #tsil-{{ block.id }} .tsil__row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
+  #tsil-{{ block.id }} .tsil__field { display: grid; gap: .35rem; }
+  #tsil-{{ block.id }} .tsil__label { font-size: .9rem; font-weight: 500; letter-spacing: -0.04em; }
+  #tsil-{{ block.id }} .tsil__opt { font-weight: 400; color: var(--tsil-muted); }
+  #tsil-{{ block.id }} .tsil__input {
     width: 100%;
     box-sizing: border-box;
     padding: .7rem .8rem;
@@ -183,12 +185,12 @@
     color: var(--tsil-text);
     background: var(--tsil-bg);
   }
-  #tsil-{{ section.id }} .tsil__input:focus {
+  #tsil-{{ block.id }} .tsil__input:focus {
     outline: none;
     border-color: var(--tsil-accent);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--tsil-accent) 25%, transparent);
   }
-  #tsil-{{ section.id }} .tsil__btn {
+  #tsil-{{ block.id }} .tsil__btn {
     width: 100%;
     padding: 12px 24px;
     border-radius: 0;
@@ -201,24 +203,24 @@
     border: 1px solid transparent;
     transition: background-color .15s ease, opacity .15s ease;
   }
-  #tsil-{{ section.id }} .tsil__btn:disabled { opacity: .55; cursor: progress; }
-  #tsil-{{ section.id }} .tsil__btn--primary { background: var(--tsil-accent); color: #FFFFFF; }
-  #tsil-{{ section.id }} .tsil__btn--primary:hover { background: var(--tsil-accent-hover); }
-  #tsil-{{ section.id }} .tsil__btn--ghost { background: transparent; color: var(--tsil-muted); border-color: var(--tsil-border); }
-  #tsil-{{ section.id }} .tsil__btn--ghost:hover { color: var(--tsil-text); border-color: var(--tsil-text); }
-  #tsil-{{ section.id }} .tsil__error { margin: 0; color: #B42318; font-size: .9rem; letter-spacing: -0.04em; }
-  #tsil-{{ section.id }} .tsil__loading { display: flex; align-items: center; gap: .6rem; margin-top: 1.25rem; color: var(--tsil-muted); font-size: 1rem; }
-  #tsil-{{ section.id }} .tsil__spinner {
+  #tsil-{{ block.id }} .tsil__btn:disabled { opacity: .55; cursor: progress; }
+  #tsil-{{ block.id }} .tsil__btn--primary { background: var(--tsil-accent); color: #FFFFFF; }
+  #tsil-{{ block.id }} .tsil__btn--primary:hover { background: var(--tsil-accent-hover); }
+  #tsil-{{ block.id }} .tsil__btn--ghost { background: transparent; color: var(--tsil-muted); border-color: var(--tsil-border); }
+  #tsil-{{ block.id }} .tsil__btn--ghost:hover { color: var(--tsil-text); border-color: var(--tsil-text); }
+  #tsil-{{ block.id }} .tsil__error { margin: 0; color: #B42318; font-size: .9rem; letter-spacing: -0.04em; }
+  #tsil-{{ block.id }} .tsil__loading { display: flex; align-items: center; gap: .6rem; margin-top: 1.25rem; color: var(--tsil-muted); font-size: 1rem; }
+  #tsil-{{ block.id }} .tsil__spinner {
     width: 18px; height: 18px; border-radius: 50%;
     border: 2px solid var(--tsil-border);
     border-top-color: var(--tsil-accent);
     animation: tsil-spin .7s linear infinite;
   }
   @keyframes tsil-spin { to { transform: rotate(360deg); } }
-  #tsil-{{ section.id }} .tsil__result, #tsil-{{ section.id }} .tsil__suggestions, #tsil-{{ section.id }} .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
-  #tsil-{{ section.id }} .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.04em; }
-  #tsil-{{ section.id }} .tsil__refine-hint { margin: -.35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; letter-spacing: -0.04em; }
-  #tsil-{{ section.id }} .tsil__confirm-note {
+  #tsil-{{ block.id }} .tsil__result, #tsil-{{ block.id }} .tsil__suggestions, #tsil-{{ block.id }} .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
+  #tsil-{{ block.id }} .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.04em; }
+  #tsil-{{ block.id }} .tsil__refine-hint { margin: -.35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; letter-spacing: -0.04em; }
+  #tsil-{{ block.id }} .tsil__confirm-note {
     margin: 0;
     padding: .7rem .8rem;
     background: var(--tsil-soft);
@@ -228,8 +230,8 @@
     letter-spacing: -0.04em;
     color: var(--tsil-text);
   }
-  #tsil-{{ section.id }} .tsil__match, #tsil-{{ section.id }} .tsil__match-list { display: grid; gap: .5rem; }
-  #tsil-{{ section.id }} .tsil__match-card {
+  #tsil-{{ block.id }} .tsil__match, #tsil-{{ block.id }} .tsil__match-list { display: grid; gap: .5rem; }
+  #tsil-{{ block.id }} .tsil__match-card {
     text-align: left;
     width: 100%;
     border: 1px solid var(--tsil-border);
@@ -240,14 +242,14 @@
     letter-spacing: -0.04em;
     cursor: pointer;
   }
-  #tsil-{{ section.id }} button.tsil__match-card:hover { border-color: var(--tsil-accent); }
-  #tsil-{{ section.id }} .tsil__match-name { font-weight: 700; }
-  #tsil-{{ section.id }} .tsil__match-meta { color: var(--tsil-muted); font-size: .9rem; margin-top: .15rem; }
+  #tsil-{{ block.id }} button.tsil__match-card:hover { border-color: var(--tsil-accent); }
+  #tsil-{{ block.id }} .tsil__match-name { font-weight: 700; }
+  #tsil-{{ block.id }} .tsil__match-meta { color: var(--tsil-muted); font-size: .9rem; margin-top: .15rem; }
 </style>
 
 <script>
   (function () {
-    var root = document.getElementById('tsil-{{ section.id }}');
+    var root = document.getElementById('tsil-{{ block.id }}');
     if (!root) return;
 
     var cfg = {
@@ -476,8 +478,6 @@
 {% schema %}
 {
   "name": "Trackstar Instant Lookup",
-  "tag": "section",
-  "class": "shopify-section--trackstar-instant-lookup",
   "settings": [
     {
       "type": "image_picker",
@@ -502,7 +502,7 @@
       "type": "text",
       "id": "race_name",
       "label": "Race name override",
-      "info": "Leave blank for normal use — the widget auto-detects the race from the product title, so this section works on your shared product template across all races. Only set this to force a specific race name on one product."
+      "info": "Leave blank for normal use — the widget auto-detects the race from the product title, so this block works on your shared product template across all races. Only set this to force a specific race name on one product."
     },
     {
       "type": "text",
