@@ -1,0 +1,518 @@
+{% comment %}
+  Trackstar Instant Lookup
+  ------------------------
+  Customer-facing race-result lookup for a product page (PDP). The race is
+  fixed per product (e.g. "Vermont City Marathon"); the shopper enters their
+  YEAR and RUNNER NAME, and this widget calls the public lookup endpoint to
+  find their official result. On a match (or after manual entry) it fills the
+  product form's personalization fields so the verified data rides along to
+  fulfillment when they add to cart.
+
+  INSTALL
+    1. Copy this file into your theme at: sections/trackstar-instant-lookup.liquid
+    2. On the Vermont City Marathon product template, add this section
+       (Theme editor → product template → Add section → "Trackstar Instant Lookup").
+    3. In the section settings, confirm the Race name and API base URL.
+
+  HOW THE DATA REACHES FULFILLMENT
+    On confirm, the widget writes these cart line-item properties (it fills the
+    matching inputs in your product form if they exist, otherwise it injects
+    hidden inputs). The order pipeline already reads these exact names:
+      - "Runner Name (First & Last)"
+      - "Race Year"
+      - "Race Name"
+      - "Bib #"
+      - "Time"
+      - "_lookup_verified"  (hidden: "true" = instant match, "false" = manual entry)
+    The property names are configurable in the section settings if your theme
+    uses different ones.
+
+  SAFETY
+    The endpoint is dark until PUBLIC_LOOKUP_ENABLED=true server-side, and the
+    per-race allowlist (PUBLIC_LOOKUP_RACES) controls which races go live. If
+    the endpoint is off or a race isn't enabled, the widget quietly falls back
+    to manual entry — no dead ends.
+{% endcomment %}
+
+<div
+  class="tsil"
+  id="tsil-{{ section.id }}"
+  data-race="{{ section.settings.race_name | default: product.title | escape }}"
+  data-api-base="{{ section.settings.api_base | default: 'https://fast.trackstar.art' | escape }}"
+  data-require-lookup="{{ section.settings.require_lookup }}"
+  data-prop-runner="{{ section.settings.prop_runner | escape }}"
+  data-prop-year="{{ section.settings.prop_year | escape }}"
+  data-prop-race="{{ section.settings.prop_race | escape }}"
+  data-prop-bib="{{ section.settings.prop_bib | escape }}"
+  data-prop-time="{{ section.settings.prop_time | escape }}"
+  data-prop-verified="{{ section.settings.prop_verified | escape }}"
+  style="--tsil-accent: {{ section.settings.accent_color | default: '#4600D6' }};"
+>
+  <div class="tsil__card">
+    <div class="tsil__head">
+      <span class="tsil__badge">Instant Lookup</span>
+      <h3 class="tsil__title">{{ section.settings.heading | escape }}</h3>
+      {% if section.settings.subheading != blank %}
+        <p class="tsil__sub">{{ section.settings.subheading | escape }}</p>
+      {% endif %}
+    </div>
+
+    {%- comment -%} STATE: search form {%- endcomment -%}
+    <form class="tsil__form" data-tsil-state="search" novalidate>
+      <div class="tsil__field">
+        <label class="tsil__label" for="tsil-name-{{ section.id }}">Runner name</label>
+        <input class="tsil__input" id="tsil-name-{{ section.id }}" name="tsil-name"
+               type="text" autocomplete="off" placeholder="First & last name" maxlength="80" required>
+      </div>
+      <div class="tsil__field">
+        <label class="tsil__label" for="tsil-year-{{ section.id }}">Race year</label>
+        <select class="tsil__input" id="tsil-year-{{ section.id }}" name="tsil-year" data-tsil-year required></select>
+      </div>
+      <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-submit>Find my result</button>
+      <p class="tsil__error" data-tsil-error hidden></p>
+    </form>
+
+    {%- comment -%} STATE: loading {%- endcomment -%}
+    <div class="tsil__loading" data-tsil-state="loading" hidden>
+      <span class="tsil__spinner" aria-hidden="true"></span>
+      <span data-tsil-loading-text>Searching results…</span>
+    </div>
+
+    {%- comment -%} STATE: single match found {%- endcomment -%}
+    <div class="tsil__result" data-tsil-state="found" hidden>
+      <p class="tsil__found-head">We found your result</p>
+      <div class="tsil__match" data-tsil-found-card></div>
+      <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>That's me</button>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Not me — search again</button>
+    </div>
+
+    {%- comment -%} STATE: multiple suggestions {%- endcomment -%}
+    <div class="tsil__suggestions" data-tsil-state="suggestions" hidden>
+      <p class="tsil__found-head">We found a few matches — pick yours:</p>
+      <div class="tsil__match-list" data-tsil-suggestion-list></div>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-manual-link>None of these — enter manually</button>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Search again</button>
+    </div>
+
+    {%- comment -%} STATE: manual entry fallback {%- endcomment -%}
+    <form class="tsil__form" data-tsil-state="manual" hidden novalidate>
+      <p class="tsil__found-head">Enter your result manually</p>
+      <p class="tsil__sub" data-tsil-manual-note>We couldn't find your result automatically — no problem, just type it in.</p>
+      <div class="tsil__field">
+        <label class="tsil__label" for="tsil-mname-{{ section.id }}">Runner name</label>
+        <input class="tsil__input" id="tsil-mname-{{ section.id }}" name="tsil-mname" type="text" maxlength="80" required>
+      </div>
+      <div class="tsil__row">
+        <div class="tsil__field">
+          <label class="tsil__label" for="tsil-mbib-{{ section.id }}">Bib # <span class="tsil__opt">(optional)</span></label>
+          <input class="tsil__input" id="tsil-mbib-{{ section.id }}" name="tsil-mbib" type="text" maxlength="20">
+        </div>
+        <div class="tsil__field">
+          <label class="tsil__label" for="tsil-mtime-{{ section.id }}">Finish time <span class="tsil__opt">(optional)</span></label>
+          <input class="tsil__input" id="tsil-mtime-{{ section.id }}" name="tsil-mtime" type="text" placeholder="3:45:12" maxlength="20">
+        </div>
+      </div>
+      <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-manual-submit>Use these details</button>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Back to lookup</button>
+    </form>
+
+    {%- comment -%} STATE: attached / success {%- endcomment -%}
+    <div class="tsil__done" data-tsil-state="done" hidden>
+      <p class="tsil__found-head">Result attached</p>
+      <div class="tsil__match" data-tsil-done-card></div>
+      <p class="tsil__sub">Add to cart to finish your order.</p>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Edit details</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  #tsil-{{ section.id }} {
+    --tsil-accent-hover: #5A1AE6;
+    --tsil-text: #1A1A1A;
+    --tsil-muted: #666666;
+    --tsil-border: #E0E0E0;
+    --tsil-bg: #FFFFFF;
+    --tsil-soft: #F5F5F5;
+    margin: 1.25rem 0;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--font-body--family, 'Helvetica Neue', Helvetica, Arial, sans-serif);
+    letter-spacing: -0.04em;
+    color: var(--tsil-text);
+  }
+  #tsil-{{ section.id }} .tsil__card {
+    border: 1px solid var(--tsil-border);
+    background: var(--tsil-bg);
+    padding: 1.5rem;
+  }
+  #tsil-{{ section.id }} .tsil__badge {
+    display: inline-block;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
+    color: var(--tsil-accent);
+  }
+  #tsil-{{ section.id }} .tsil__title { margin: .4rem 0 .25rem; font-size: 1.25rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
+  #tsil-{{ section.id }} .tsil__sub { margin: 0 0 .25rem; color: var(--tsil-muted); font-size: 1rem; line-height: 1.5; }
+  #tsil-{{ section.id }} .tsil__form { display: grid; gap: .9rem; margin-top: 1.25rem; }
+  #tsil-{{ section.id }} .tsil__row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
+  #tsil-{{ section.id }} .tsil__field { display: grid; gap: .35rem; }
+  #tsil-{{ section.id }} .tsil__label { font-size: .9rem; font-weight: 500; letter-spacing: -0.04em; }
+  #tsil-{{ section.id }} .tsil__opt { font-weight: 400; color: var(--tsil-muted); }
+  #tsil-{{ section.id }} .tsil__input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .7rem .8rem;
+    border: 1px solid var(--tsil-border);
+    border-radius: 0;
+    font-family: inherit;
+    font-size: 1rem;
+    letter-spacing: -0.04em;
+    color: var(--tsil-text);
+    background: var(--tsil-bg);
+  }
+  #tsil-{{ section.id }} .tsil__input:focus {
+    outline: none;
+    border-color: var(--tsil-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tsil-accent) 25%, transparent);
+  }
+  #tsil-{{ section.id }} .tsil__btn {
+    width: 100%;
+    padding: 12px 24px;
+    border-radius: 0;
+    font-family: inherit;
+    font-size: .95rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background-color .15s ease, opacity .15s ease;
+  }
+  #tsil-{{ section.id }} .tsil__btn:disabled { opacity: .55; cursor: progress; }
+  #tsil-{{ section.id }} .tsil__btn--primary { background: var(--tsil-accent); color: #FFFFFF; }
+  #tsil-{{ section.id }} .tsil__btn--primary:hover { background: var(--tsil-accent-hover); }
+  #tsil-{{ section.id }} .tsil__btn--ghost { background: transparent; color: var(--tsil-muted); border-color: var(--tsil-border); }
+  #tsil-{{ section.id }} .tsil__btn--ghost:hover { color: var(--tsil-text); border-color: var(--tsil-text); }
+  #tsil-{{ section.id }} .tsil__error { margin: 0; color: #B42318; font-size: .9rem; letter-spacing: -0.04em; }
+  #tsil-{{ section.id }} .tsil__loading { display: flex; align-items: center; gap: .6rem; margin-top: 1.25rem; color: var(--tsil-muted); font-size: 1rem; }
+  #tsil-{{ section.id }} .tsil__spinner {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--tsil-border);
+    border-top-color: var(--tsil-accent);
+    animation: tsil-spin .7s linear infinite;
+  }
+  @keyframes tsil-spin { to { transform: rotate(360deg); } }
+  #tsil-{{ section.id }} .tsil__result, #tsil-{{ section.id }} .tsil__suggestions, #tsil-{{ section.id }} .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
+  #tsil-{{ section.id }} .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.04em; }
+  #tsil-{{ section.id }} .tsil__match, #tsil-{{ section.id }} .tsil__match-list { display: grid; gap: .5rem; }
+  #tsil-{{ section.id }} .tsil__match-card {
+    text-align: left;
+    width: 100%;
+    border: 1px solid var(--tsil-border);
+    border-radius: 0;
+    padding: .75rem .85rem;
+    background: var(--tsil-soft);
+    font-family: inherit;
+    letter-spacing: -0.04em;
+    cursor: pointer;
+  }
+  #tsil-{{ section.id }} button.tsil__match-card:hover { border-color: var(--tsil-accent); }
+  #tsil-{{ section.id }} .tsil__match-name { font-weight: 700; }
+  #tsil-{{ section.id }} .tsil__match-meta { color: var(--tsil-muted); font-size: .9rem; margin-top: .15rem; }
+</style>
+
+<script>
+  (function () {
+    var root = document.getElementById('tsil-{{ section.id }}');
+    if (!root) return;
+
+    var cfg = {
+      race: root.getAttribute('data-race') || '',
+      apiBase: (root.getAttribute('data-api-base') || '').replace(/\/+$/, ''),
+      requireLookup: root.getAttribute('data-require-lookup') === 'true',
+      props: {
+        runner: root.getAttribute('data-prop-runner'),
+        year: root.getAttribute('data-prop-year'),
+        race: root.getAttribute('data-prop-race'),
+        bib: root.getAttribute('data-prop-bib'),
+        time: root.getAttribute('data-prop-time'),
+        verified: root.getAttribute('data-prop-verified')
+      }
+    };
+
+    var states = {};
+    root.querySelectorAll('[data-tsil-state]').forEach(function (el) {
+      states[el.getAttribute('data-tsil-state')] = el;
+    });
+
+    function show(state) {
+      Object.keys(states).forEach(function (k) { states[k].hidden = (k !== state); });
+    }
+
+    // Populate the year dropdown: current year back 15 years, newest first.
+    var yearSelect = root.querySelector('[data-tsil-year]');
+    var nowYear = new Date().getFullYear();
+    for (var y = nowYear; y >= nowYear - 15; y--) {
+      var opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      yearSelect.appendChild(opt);
+    }
+
+    var errorEl = root.querySelector('[data-tsil-error]');
+    function setError(msg) {
+      if (!msg) { errorEl.hidden = true; errorEl.textContent = ''; return; }
+      errorEl.hidden = false;
+      errorEl.textContent = msg;
+    }
+
+    // ---- result rendering helpers ----
+    function fmtMeta(r) {
+      var bits = [];
+      if (r.eventType) bits.push(r.eventType);
+      if (r.bib) bits.push('Bib ' + r.bib);
+      if (r.time) bits.push(r.time);
+      if (r.pace) bits.push(r.pace + ' /mi');
+      return bits.join(' · ');
+    }
+    function fillCard(container, r) {
+      container.innerHTML = '';
+      var card = document.createElement('div');
+      var nameEl = document.createElement('div');
+      nameEl.className = 'tsil__match-name';
+      nameEl.textContent = r.name || root.querySelector('[name="tsil-name"]').value;
+      var metaEl = document.createElement('div');
+      metaEl.className = 'tsil__match-meta';
+      metaEl.textContent = fmtMeta(r) || 'Result on file';
+      card.appendChild(nameEl);
+      card.appendChild(metaEl);
+      container.appendChild(card);
+    }
+
+    // ---- write data into the product form ----
+    function findProductForm() {
+      return document.querySelector('form[action$="/cart/add"], form[action*="/cart/add"]');
+    }
+    function setProp(form, key, value) {
+      if (!key) return;
+      var selector = 'input[name="properties[' + key + ']"], textarea[name="properties[' + key + ']"], select[name="properties[' + key + ']"]';
+      var field = form.querySelector(selector);
+      if (field) {
+        field.value = value == null ? '' : String(value);
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        var hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'properties[' + key + ']';
+        hidden.value = value == null ? '' : String(value);
+        hidden.setAttribute('data-tsil-injected', key);
+        form.appendChild(hidden);
+      }
+    }
+
+    function setSubmitDisabled(disabled) {
+      if (!cfg.requireLookup) return;
+      var form = findProductForm();
+      if (!form) return;
+      form.querySelectorAll('[type="submit"], [name="add"]').forEach(function (btn) {
+        btn.disabled = disabled;
+      });
+    }
+    // If lookup is required, lock add-to-cart until a result is attached.
+    setSubmitDisabled(true);
+
+    function attach(result, verified) {
+      var form = findProductForm();
+      var year = root.querySelector('[name="tsil-year"]').value;
+      var name = result.name || root.querySelector('[name="tsil-name"]').value;
+      if (form) {
+        setProp(form, cfg.props.runner, name);
+        setProp(form, cfg.props.year, year);
+        setProp(form, cfg.props.race, cfg.race);
+        setProp(form, cfg.props.bib, result.bib || '');
+        setProp(form, cfg.props.time, result.time || '');
+        setProp(form, cfg.props.verified, verified ? 'true' : 'false');
+      }
+      setSubmitDisabled(false);
+      fillCard(root.querySelector('[data-tsil-done-card]'), { name: name, bib: result.bib, time: result.time, pace: result.pace, eventType: result.eventType });
+      show('done');
+    }
+
+    // ---- the lookup call ----
+    function doLookup(name, year) {
+      setError('');
+      show('loading');
+      root.querySelector('[data-tsil-loading-text]').textContent = 'Searching ' + cfg.race + ' results…';
+
+      var url = cfg.apiBase + '/api/public/results-lookup'
+        + '?race=' + encodeURIComponent(cfg.race)
+        + '&year=' + encodeURIComponent(year)
+        + '&name=' + encodeURIComponent(name);
+
+      fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (data) {
+            return { status: r.status, data: data };
+          });
+        })
+        .then(function (res) {
+          var data = res.data || {};
+          if (data.found && data.result) {
+            fillCard(root.querySelector('[data-tsil-found-card]'), data.result);
+            root.querySelector('[data-tsil-confirm]').onclick = function () { attach(data.result, true); };
+            show('found');
+            return;
+          }
+          if (data.suggestions && data.suggestions.length) {
+            renderSuggestions(data.suggestions);
+            show('suggestions');
+            return;
+          }
+          // Everything else (not found, lookup off/404, error, rate-limited) → manual.
+          prefillManual(name);
+          if (res.status === 429) {
+            root.querySelector('[data-tsil-manual-note]').textContent = 'Lots of lookups right now — please enter your result manually.';
+          } else {
+            root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find your result automatically — no problem, just type it in.";
+          }
+          show('manual');
+        })
+        .catch(function () {
+          prefillManual(name);
+          root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't reach the lookup service — please enter your result manually.";
+          show('manual');
+        });
+    }
+
+    function renderSuggestions(list) {
+      var wrap = root.querySelector('[data-tsil-suggestion-list]');
+      wrap.innerHTML = '';
+      list.forEach(function (m) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tsil__match-card';
+        var nameEl = document.createElement('div');
+        nameEl.className = 'tsil__match-name';
+        nameEl.textContent = m.name || 'Runner';
+        var metaEl = document.createElement('div');
+        metaEl.className = 'tsil__match-meta';
+        metaEl.textContent = fmtMeta(m) || 'Result on file';
+        btn.appendChild(nameEl);
+        btn.appendChild(metaEl);
+        btn.onclick = function () { attach(m, true); };
+        wrap.appendChild(btn);
+      });
+    }
+
+    function prefillManual(name) {
+      root.querySelector('[name="tsil-mname"]').value = name || '';
+    }
+
+    // ---- wire up events ----
+    states.search.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = root.querySelector('[name="tsil-name"]').value.trim();
+      var year = root.querySelector('[name="tsil-year"]').value;
+      if (!name) { setError('Please enter the runner name.'); return; }
+      if (name.length > 80) { setError('Name is too long.'); return; }
+      doLookup(name, year);
+    });
+
+    states.manual.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = root.querySelector('[name="tsil-mname"]').value.trim();
+      if (!name) { return; }
+      attach({
+        name: name,
+        bib: root.querySelector('[name="tsil-mbib"]').value.trim(),
+        time: root.querySelector('[name="tsil-mtime"]').value.trim()
+      }, false);
+    });
+
+    root.querySelectorAll('[data-tsil-reset]').forEach(function (btn) {
+      btn.addEventListener('click', function () { setError(''); setSubmitDisabled(true); show('search'); });
+    });
+    var manualLink = root.querySelector('[data-tsil-manual-link]');
+    if (manualLink) {
+      manualLink.addEventListener('click', function () {
+        prefillManual(root.querySelector('[name="tsil-name"]').value.trim());
+        root.querySelector('[data-tsil-manual-note]').textContent = 'Enter your result manually.';
+        show('manual');
+      });
+    }
+
+    show('search');
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Trackstar Instant Lookup",
+  "tag": "section",
+  "class": "shopify-section--trackstar-instant-lookup",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Verify your race result"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Enter your name and year — we'll pull your official time."
+    },
+    {
+      "type": "text",
+      "id": "race_name",
+      "label": "Race name",
+      "info": "The race for this product, e.g. \"Vermont City Marathon\". Leave blank to use the product title.",
+      "default": "Vermont City Marathon"
+    },
+    {
+      "type": "text",
+      "id": "api_base",
+      "label": "API base URL",
+      "default": "https://fast.trackstar.art"
+    },
+    {
+      "type": "checkbox",
+      "id": "require_lookup",
+      "label": "Require lookup before add to cart",
+      "info": "Disables the Add to cart button until a result is attached.",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "Appearance"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent color",
+      "info": "Trackstar Purple by default. Used for buttons, links, and highlights.",
+      "default": "#4600D6"
+    },
+    {
+      "type": "header",
+      "content": "Cart property names",
+      "info": "Must match the line-item property names your product form / fulfillment pipeline uses."
+    },
+    { "type": "text", "id": "prop_runner", "label": "Runner name property", "default": "Runner Name (First & Last)" },
+    { "type": "text", "id": "prop_year", "label": "Race year property", "default": "Race Year" },
+    { "type": "text", "id": "prop_race", "label": "Race name property", "default": "Race Name" },
+    { "type": "text", "id": "prop_bib", "label": "Bib property", "default": "Bib #" },
+    { "type": "text", "id": "prop_time", "label": "Time property", "default": "Time" },
+    { "type": "text", "id": "prop_verified", "label": "Verified flag property", "default": "_lookup_verified" }
+  ],
+  "presets": [
+    {
+      "name": "Trackstar Instant Lookup"
+    }
+  ]
+}
+{% endschema %}
