@@ -49,8 +49,7 @@
   style="--tsil-accent: {{ section.settings.accent_color | default: '#4600D6' }};"
 >
   <div class="tsil__card">
-    <div class="tsil__head">
-      <span class="tsil__badge">Instant Lookup</span>
+    <div class="tsil__head" data-tsil-head>
       <h3 class="tsil__title">{{ section.settings.heading | escape }}</h3>
       {% if section.settings.subheading != blank %}
         <p class="tsil__sub">{{ section.settings.subheading | escape }}</p>
@@ -83,7 +82,7 @@
       <p class="tsil__found-head">We found your result</p>
       <div class="tsil__match" data-tsil-found-card></div>
       <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>That's me</button>
-      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Not me — search again</button>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Not me (search again)</button>
     </div>
 
     {%- comment -%} STATE: multiple suggestions {%- endcomment -%}
@@ -143,21 +142,15 @@
   /* Keep hidden states hidden — class display rules below would otherwise
      out-specify the browser's default [hidden] rule and show every state. */
   #tsil-{{ section.id }} [hidden] { display: none !important; }
+  /* When the intro is collapsed (results view), drop the leading gap. */
+  #tsil-{{ section.id }} .tsil__head[hidden] ~ [data-tsil-state] { margin-top: 0; }
   #tsil-{{ section.id }} .tsil__card {
     border: 1px solid var(--tsil-border);
     background: var(--tsil-bg);
     padding: 1.5rem;
   }
-  #tsil-{{ section.id }} .tsil__badge {
-    display: inline-block;
-    font-size: .72rem;
-    font-weight: 700;
-    letter-spacing: -0.04em;
-    text-transform: uppercase;
-    color: var(--tsil-accent);
-  }
-  #tsil-{{ section.id }} .tsil__title { margin: .4rem 0 .25rem; font-size: 1.25rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
-  #tsil-{{ section.id }} .tsil__sub { margin: 0 0 .25rem; color: var(--tsil-muted); font-size: 1rem; line-height: 1.5; }
+  #tsil-{{ section.id }} .tsil__title { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
+  #tsil-{{ section.id }} .tsil__sub { margin: 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; }
   #tsil-{{ section.id }} .tsil__form { display: grid; gap: .9rem; margin-top: 1.25rem; }
   #tsil-{{ section.id }} .tsil__row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
   #tsil-{{ section.id }} .tsil__field { display: grid; gap: .35rem; }
@@ -250,8 +243,11 @@
       states[el.getAttribute('data-tsil-state')] = el;
     });
 
+    var headEl = root.querySelector('[data-tsil-head]');
     function show(state) {
       Object.keys(states).forEach(function (k) { states[k].hidden = (k !== state); });
+      // Collapse the heading/subheading intro once we're past the search step.
+      if (headEl) headEl.hidden = (state !== 'search');
     }
 
     // Populate the year dropdown: current year back 15 years, newest first.
@@ -461,13 +457,13 @@
       "type": "text",
       "id": "heading",
       "label": "Heading",
-      "default": "Verify your race result"
+      "default": "Trackstar Instant Lookup"
     },
     {
       "type": "text",
       "id": "subheading",
       "label": "Subheading",
-      "default": "Enter your name and year — we'll pull your official time."
+      "default": "Verify your runner's time."
     },
     {
       "type": "text",
