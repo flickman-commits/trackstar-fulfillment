@@ -52,12 +52,35 @@ export class BrookseeScraper extends BaseScraper {
 
     const eventOrder = this.config.eventSearchOrder || ['Marathon', 'Half Marathon']
 
+    // Collect close-but-inexact candidates across every event type. Without
+    // this, an ambiguous/candidate result from one event was thrown away and
+    // the loop fell through to a bare "not found" — which made the multi-match
+    // picker impossible to ever reach for Brooksee races.
+    let candidates = []
+
     for (const event of eventOrder) {
       const eventLabel = this.config.eventLabels?.[event] || event
       console.log(`[${this.tag} ${this.year}] Searching ${eventLabel}...`)
 
       const result = await this.searchEventType(runnerName, raceId, event, eventLabel)
       if (result.found) return result
+      // notFoundResult surfaces last-name candidates via possibleMatches;
+      // ambiguousResult surfaces exact-ish matches via matches.
+      if (Array.isArray(result.possibleMatches)) candidates = candidates.concat(result.possibleMatches)
+      if (Array.isArray(result.matches)) candidates = candidates.concat(result.matches)
+    }
+
+    if (candidates.length > 0) {
+      // De-dupe by name+bib and cap the list so the picker stays manageable.
+      const seen = new Set()
+      const unique = candidates.filter(c => {
+        const key = `${(c.name || '').toLowerCase()}|${c.bib || ''}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      console.log(`[${this.tag} ${this.year}] No exact match; surfacing ${unique.length} candidate(s)`)
+      return this.notFoundResult(null, unique.slice(0, 10))
     }
 
     console.log(`[${this.tag} ${this.year}] Runner not found in any event type`)
