@@ -379,8 +379,8 @@ async function handleDesignStatus({ orderNumber, designStatus }, res) {
 
   const existing = await prisma.order.findFirst({ where: { orderNumber } })
   if (!existing) return res.status(404).json({ error: 'Order not found' })
-  if (existing.trackstarOrderType !== 'custom') {
-    return res.status(400).json({ error: 'Design status can only be updated for custom orders' })
+  if (existing.trackstarOrderType !== 'custom' && existing.trackstarOrderType !== 'race_partner') {
+    return res.status(400).json({ error: 'Design status can only be updated for custom or race partner orders' })
   }
 
   const updateData = { designStatus }
@@ -1942,7 +1942,8 @@ async function handleApproveCreatorSample({ creatorId }, res) {
 }
 
 // --- decline-creator-sample ---
-// Admin clicks "Decline" on a Sample Request. Resets creator back to invited status.
+// Admin clicks "Decline" on a Sample Request. Marks the creator 'denied' — they
+// drop out of the admin table but stay in the DB so they can be un-denied later.
 async function handleDeclineCreatorSample({ creatorId }, res) {
   if (!creatorId) return res.status(400).json({ error: 'creatorId is required' })
 
@@ -1952,7 +1953,7 @@ async function handleDeclineCreatorSample({ creatorId }, res) {
 
   await prisma.creator.update({
     where: { id: creatorId },
-    data: { status: 'paused' }
+    data: { status: 'denied' }
   })
 
   console.log(`[actions/decline-creator-sample] Declined sample for ${creatorId} (${creator.name || 'unnamed'})`)

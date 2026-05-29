@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send, Mail, Music2, Pencil, ChevronDown } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
-type CreatorStatus = 'invited' | 'applied' | 'active' | 'paused'
+type CreatorStatus = 'invited' | 'applied' | 'active' | 'paused' | 'denied'
 type CommissionModel = 'free_product' | 'flat_per_asset' | 'rev_share' | 'hybrid'
 type ContentStatus = 'not_received' | 'received' | 'edited' | 'posted'
 
@@ -64,6 +64,7 @@ const STATUS_CONFIG: Record<CreatorStatus, { label: string; color: string; bg: s
   applied:    { label: 'Applied',    color: 'text-blue-700',     bg: 'bg-blue-50' },
   active:     { label: 'Active',     color: 'text-emerald-700',  bg: 'bg-emerald-50' },
   paused:     { label: 'Paused',     color: 'text-amber-700',    bg: 'bg-amber-50' },
+  denied:     { label: 'Denied',     color: 'text-red-700',      bg: 'bg-red-50' },
 }
 
 // Content-delivery pipeline — tracks the asset, not the creator's program
@@ -166,6 +167,7 @@ export default function CreatorsHome() {
   const [showInvite, setShowInvite] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [decliningId, setDecliningId] = useState<string | null>(null)
+  const [showDenied, setShowDenied] = useState(false)
 
   const loadAll = useCallback(async () => {
     try {
@@ -199,11 +201,15 @@ export default function CreatorsHome() {
     c.status === 'applied' && !c.sampleOrder
   )
   const otherCreators = creators.filter(c =>
-    !(c.status === 'applied' && !c.sampleOrder)
+    !(c.status === 'applied' && !c.sampleOrder) &&
+    // Denied creators stay in the DB (can be un-denied from the drawer) but
+    // are hidden from the table.
+    c.status !== 'denied'
   )
+  const deniedCreators = creators.filter(c => c.status === 'denied')
 
   const handleDeclineSample = async (creator: Creator) => {
-    if (!confirm(`Decline sample request from ${creator.name || 'this creator'}? They'll be paused — no fulfillment order will be created.`)) return
+    if (!confirm(`Decline sample request from ${creator.name || 'this creator'}? They'll be marked denied and hidden from the list — no fulfillment order will be created. You can un-deny them later from "Show denied".`)) return
     setDecliningId(creator.id)
     try {
       const res = await apiFetch('/api/orders/actions', {
@@ -468,6 +474,46 @@ export default function CreatorsHome() {
                 </div>
               )}
             </div>
+
+            {/* Denied creators — hidden by default. Toggle reveals them so they
+                can be re-opened and un-denied via the drawer. */}
+            {deniedCreators.length > 0 && (
+              <div className="mt-8">
+                <button
+                  onClick={() => setShowDenied(v => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-off-black/40 hover:text-off-black/70 transition-colors"
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDenied ? '' : '-rotate-90'}`} />
+                  {showDenied ? 'Hide' : 'Show'} denied ({deniedCreators.length})
+                </button>
+                {showDenied && (
+                  <div className="mt-3 bg-white border border-border-gray rounded-md shadow-sm divide-y divide-border-gray">
+                    {deniedCreators.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => setSelectedCreator(c)}
+                        className="w-full text-left px-4 py-3 hover:bg-subtle-gray transition-colors flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <span className="text-sm font-medium text-off-black/70">
+                            {c.name || <span className="italic text-off-black/40">Unnamed Creator</span>}
+                          </span>
+                          {c.instagramHandle && (
+                            <span className="text-xs text-off-black/40 flex items-center gap-1 mt-0.5">
+                              <Instagram className="w-3 h-3" />
+                              {c.instagramHandle}
+                            </span>
+                          )}
+                        </div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 shrink-0">
+                          Denied
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -868,7 +914,7 @@ function CreatorDrawer({
                 label="Program"
                 value={draft.status}
                 onChange={(v) => setDraft({ ...draft, status: v })}
-                options={['invited', 'applied', 'active', 'paused']}
+                options={['invited', 'applied', 'active', 'paused', 'denied']}
                 config={STATUS_CONFIG}
               />
               <StatusSelect<ContentStatus>

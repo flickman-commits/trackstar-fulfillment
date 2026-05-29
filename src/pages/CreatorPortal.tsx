@@ -199,7 +199,7 @@ function OnboardingWizard({ data, token, onDone }: {
   // Per-step validation — only blocks Next when a hard-required field is empty
   const canProceed = () => {
     if (step === 0) return true // welcome
-    if (step === 1) return draft.name.trim().length > 0 && draft.email.trim().length > 0
+    if (step === 1) return draft.name.trim().length > 0 && draft.email.trim().length > 0 && draft.whyWorkWithUs.trim().length > 0
     if (step === 2) return draft.raceName.length > 0 && draft.raceYear.length > 0
     if (step === 3) return draft.productSize.length > 0 && draft.frameType.length > 0
     if (step === 4) return (
@@ -453,27 +453,13 @@ function StepProfile({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d
           onChange={(v) => setDraft({ ...draft, tiktokHandle: v })}
         />
 
-        {/* Best content — optional; links-only intent communicated via the
-            placeholder. If supplied, helps Matt evaluate the application
-            without having to dig through profiles. */}
+        {/* Why work with us — required pitch */}
         <div>
-          <div className="text-xs text-off-black/60 mb-1">Your best content</div>
-          <textarea
-            value={draft.bestContentLinks}
-            onChange={(e) => setDraft({ ...draft, bestContentLinks: e.target.value })}
-            placeholder="Paste links only — one per line (TikTok, Reels, YouTube Shorts, etc.)"
-            rows={3}
-            className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white resize-none"
-          />
-        </div>
-
-        {/* Why work with us — optional pitch */}
-        <div>
-          <div className="text-xs text-off-black/60 mb-1">Why do you want to work with us?</div>
+          <div className="text-xs text-off-black/60 mb-1">Why do you want to work with us? *</div>
           <textarea
             value={draft.whyWorkWithUs}
             onChange={(e) => setDraft({ ...draft, whyWorkWithUs: e.target.value })}
-            placeholder="Optional. Tell us why Trackstar caught your eye — what about the brand or the print resonates with you?"
+            placeholder="What caught your eye about our brand? What about it resonates with you?"
             rows={4}
             className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white resize-none"
           />
