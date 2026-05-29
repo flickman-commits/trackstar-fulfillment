@@ -656,7 +656,7 @@ function CreatorDashboard({ data }: { data: PortalData }) {
 
         {/* Sample tracker — Domino's-style */}
         <div className="bg-white border border-border-gray rounded-md p-5 mb-5">
-          <h2 className="text-sm font-semibold text-off-black mb-4">Your Sample</h2>
+          <h2 className="text-sm font-semibold text-off-black mb-4">Your Application</h2>
           <SampleTracker order={sampleOrder} onboardedAt={creator.onboardedAt} />
           {sampleOrder?.trackingNumber && (
             <div className="mt-4 pt-4 border-t border-border-gray flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -717,7 +717,7 @@ function CreatorDashboard({ data }: { data: PortalData }) {
 // Domino's-style 4-stage tracker. Each stage reads from independent signals,
 // not Order.status — that field is for internal fulfillment, not the creator
 // view. Mapping:
-//   Requested  → creator submitted onboarding (`onboardedAt` set)
+//   Applied    → creator submitted their application (`onboardedAt` set)
 //   Approved   → admin clicked Approve → fulfillment order exists
 //   Shipped    → admin entered a tracking number
 //   Delivered  → not wired yet (carrier API or manual, future)
@@ -729,7 +729,7 @@ function SampleTracker({
   onboardedAt: string | null
 }) {
   const stages = [
-    { key: 'requested', label: 'Requested', Icon: ClipboardList },
+    { key: 'applied',   label: 'Applied',   Icon: ClipboardList },
     { key: 'approved',  label: 'Approved',  Icon: CheckCircle2 },
     { key: 'shipped',   label: 'Shipped',   Icon: Truck },
     { key: 'delivered', label: 'Delivered', Icon: Home },
