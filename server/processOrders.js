@@ -19,7 +19,7 @@ import { etsyFetch } from './services/etsyAuth.js'
 import { parseEtsyRaceName, parseEtsyPersonalization } from './services/etsyPersonalization.js'
 import { researchService } from './services/ResearchService.js'
 import { hasScraperForRace } from './scrapers/index.js'
-import { normalizeRaceName } from './scrapers/raceNameNormalization.js'
+import { parseRaceNameFromTitle } from './scrapers/raceNameNormalization.js'
 import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrderIds, saveCountedOrderIds } from './services/customersServed.js'
 import { isExpeditedShipping, getShippingMethod } from './lib/shipping.js'
 
@@ -174,35 +174,6 @@ function determineOrderSource(order) {
 }
 
 /**
- * Parse race name from Shopify product title.
- *
- * Handles two title formats:
- *   Old: "Boston Marathon Personalized Race Print" → "Boston Marathon"
- *   New: "Personalized Boston Poster"              → "Boston Marathon" (via normalize)
- *        "Personalized Eugene Marathon Poster"     → "Eugene Marathon"
- */
-function parseRaceName(productTitle) {
-  if (!productTitle) return null
-
-  let raceName = productTitle.trim()
-
-  // Strip leading "Personalized " prefix (new title format)
-  raceName = raceName.replace(/^Personalized\s+/i, '').trim()
-
-  // Strip known suffixes — longest first so "Personalized Race Print" beats "Print"
-  const suffixes = ['Personalized Race Print', 'Race Print', 'Personalized Poster', 'Poster', 'Print']
-  for (const suffix of suffixes) {
-    if (raceName.toLowerCase().endsWith(suffix.toLowerCase())) {
-      raceName = raceName.slice(0, -suffix.length).trim()
-      break
-    }
-  }
-
-  // Map bare names ("Boston") to canonical ("Boston Marathon") for scraper lookup
-  return normalizeRaceName(raceName) || null
-}
-
-/**
  * Clean runner name by removing invalid entries like "no time" and customer-provided times
  * Returns { cleaned, hadNoTime, customerTime }
  * e.g., "Jennifer Samp no time" → { cleaned: "Jennifer Samp", hadNoTime: true, customerTime: null }
@@ -290,7 +261,7 @@ function extractShopifyPersonalization(lineItem) {
   result.productTitle = lineItem.title || null
 
   // Parse race name from product title (default, may be overridden by Race Name property)
-  result.raceName = parseRaceName(lineItem.title)
+  result.raceName = parseRaceNameFromTitle(lineItem.title)
 
   // Extract from properties
   if (lineItem.properties && Array.isArray(lineItem.properties)) {
@@ -445,7 +416,7 @@ function extractEtsyPersonalization(transaction) {
   }
 
   // Parse race name from listing title
-  result.raceName = parseEtsyRaceName(transaction.title) || parseRaceName(transaction.title)
+  result.raceName = parseEtsyRaceName(transaction.title) || parseRaceNameFromTitle(transaction.title)
 
   // Find personalization in variations
   const variations = transaction.variations || []

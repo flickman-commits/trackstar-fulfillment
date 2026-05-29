@@ -28,6 +28,61 @@ const RACE_NAME_ALIASES = {
   'Sydney World Major Race': 'Sydney Marathon',
 }
 
+// Listing-title decorations stripped before matching a title to a race.
+// Longest first so "Personalized Race Print" wins over "Print".
+const TITLE_SUFFIXES = ['Personalized Race Print', 'Race Print', 'Personalized Poster', 'Poster', 'Print']
+
+/**
+ * Parse a race name out of a Shopify/Etsy product title.
+ *
+ * Shared by order ingestion (server/processOrders.js,
+ * api/orders/refresh-shopify-data.js) AND the public results-lookup widget,
+ * so a product title resolves to the same canonical race name everywhere.
+ *
+ * Handles two title formats:
+ *   Old: "Boston Marathon Personalized Race Print" → "Boston Marathon"
+ *   New: "Personalized Boston Poster"              → "Boston Marathon" (via normalize)
+ *        "Personalized Vermont City Marathon Poster" → "Vermont City Marathon"
+ *
+ * @param {string|null|undefined} productTitle
+ * @returns {string|null} canonical race name, or null if input was empty
+ */
+export function parseRaceNameFromTitle(productTitle) {
+  if (!productTitle) return null
+
+  let raceName = productTitle.trim()
+
+  // Strip leading "Personalized " prefix (new title format)
+  raceName = raceName.replace(/^Personalized\s+/i, '').trim()
+
+  for (const suffix of TITLE_SUFFIXES) {
+    if (raceName.toLowerCase().endsWith(suffix.toLowerCase())) {
+      raceName = raceName.slice(0, -suffix.length).trim()
+      break
+    }
+  }
+
+  // Map bare names ("Boston") to canonical ("Boston Marathon") for scraper lookup
+  return normalizeRaceName(raceName) || null
+}
+
+/**
+ * Parse a race name out of a Shopify product handle.
+ *
+ * Handles are lowercase, dash-separated slugs, e.g.
+ *   "personalized-vermont-city-marathon-poster" → "Vermont City Marathon"
+ * Converts dashes to spaces and delegates to parseRaceNameFromTitle, so the
+ * storefront widget can resolve a product handle without a title round-trip.
+ *
+ * @param {string|null|undefined} handle
+ * @returns {string|null} canonical race name, or null if input was empty
+ */
+export function parseRaceNameFromHandle(handle) {
+  if (!handle) return null
+  const title = String(handle).replace(/-+/g, ' ').trim()
+  return parseRaceNameFromTitle(title)
+}
+
 /**
  * Normalize a race name to its canonical form. Idempotent on canonical names.
  *

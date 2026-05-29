@@ -27,33 +27,20 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
 import { shopifyFetch } from '../../server/services/shopifyAuth.js'
-import { getRaceShorthands, isRacePublicSafe, getCanonicalRaceName } from '../../server/scrapers/index.js'
+import { getRaceShorthands } from '../../server/scrapers/index.js'
 import { Resend } from 'resend'
 import { runWeeklyAdsDebrief, isFridayFourPmEastern } from '../../server/services/weeklyAdsDebrief.js'
-import { researchService } from '../../server/services/ResearchService.js'
-import {
-  checkRateLimit as checkPublicRateLimit,
-  buildCacheKey as buildPublicCacheKey,
-  getCached as getPublicCached,
-  setCached as setPublicCached,
-} from '../../server/lib/publicRateLimit.js'
 
 export default async function handler(req, res) {
-  // Public actions (no auth, open CORS): ping (UptimeRobot) + public-results-lookup
-  // (Shopify storefront). Everything else uses the standard locked-down CORS.
+  // Public action (no auth, open CORS): ping (UptimeRobot). The storefront
+  // results lookup now lives in api/public/results-lookup.js. Everything else
+  // uses the standard locked-down CORS.
   const action = req.query?.action
   const isPing = action === 'ping'
-  const isPublicResultsLookup = action === 'public-results-lookup'
-  const isPublic = isPing || isPublicResultsLookup
-  if (setCors(req, res, { methods: 'GET, POST, OPTIONS', allowPublic: isPublic })) return
+  if (setCors(req, res, { methods: 'GET, POST, OPTIONS', allowPublic: isPing })) return
 
   // GET requests — used by Vercel cron (cron uses CRON_SECRET, not ADMIN_SECRET)
   if (req.method === 'GET') {
-    // Public: results-lookup is unauthenticated (Shopify storefront use).
-    // Handled here BEFORE any admin-secret/cron-secret gating below.
-    if (isPublicResultsLookup) {
-      return await handlePublicResultsLookup(req, res)
-    }
     if (action === 'monday-pipeline') {
       const authHeader = req.headers['authorization']
       if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -2271,130 +2258,5 @@ async function handleWeeklyAdsDebrief(res, { isCron, dryRun }) {
       }).catch(() => {})
     }
     return res.status(500).json({ error: e.message })
-  }
-}
-
-// --- public-results-lookup (PUBLIC, no auth) ---
-// Unauthenticated results lookup for the Shopify storefront. Reachable at
-// the original /api/public/results-lookup URL via a vercel.json rewrite —
-// this consolidation freed up a serverless function slot under the Hobby
-// plan's 12-function cap. Behavior is otherwise identical to the standalone
-// endpoint it replaced.
-//
-//   GET /api/public/results-lookup?race=boston&year=2024&name=John+Smith
-//
-// Read-only. Gated behind PUBLIC_LOOKUP_ENABLED so it stays dark until we
-// explicitly turn it on. Rate-limited per IP. Cached per name+race+year.
-function getPublicClientIp(req) {
-  const fwd = req.headers['x-forwarded-for']
-  if (fwd) return String(fwd).split(',')[0].trim()
-  return req.socket?.remoteAddress || 'unknown'
-}
-
-function publicLookupFallback(extra = {}) {
-  return { found: false, fallbackRequired: true, instant: false, ...extra }
-}
-
-// Per-race rollout gate. PUBLIC_LOOKUP_RACES = comma-separated allowlist.
-// When set, only those races get instant lookup; everything else falls back
-// to manual entry. When unset, all HTTP-safe races are allowed.
-function isPublicLookupRaceAllowed(race) {
-  const raw = (process.env.PUBLIC_LOOKUP_RACES || '').trim()
-  if (!raw) return true
-
-  const requested = getCanonicalRaceName(race)
-  if (!requested) return false
-
-  return raw
-    .split(',')
-    .map(r => getCanonicalRaceName(r.trim()))
-    .filter(Boolean)
-    .includes(requested)
-}
-
-async function handlePublicResultsLookup(req, res) {
-  // Kill-switch: 404 until explicitly enabled so the endpoint stays invisible
-  if (process.env.PUBLIC_LOOKUP_ENABLED !== 'true') {
-    return res.status(404).json({ error: 'Not found' })
-  }
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
-
-  const race = String(req.query.race || '').trim()
-  const name = String(req.query.name || '').trim()
-  const yearRaw = String(req.query.year || '').trim()
-  const year = parseInt(yearRaw, 10)
-
-  if (!race || !name || !yearRaw) {
-    return res.status(400).json({ error: 'race, year, and name are required' })
-  }
-  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
-    return res.status(400).json({ error: 'year must be a valid 4-digit year' })
-  }
-  if (name.length > 80 || race.length > 80) {
-    return res.status(400).json({ error: 'race and name must be under 80 characters' })
-  }
-
-  // Rate limit before doing any work
-  const ip = getPublicClientIp(req)
-  const limit = checkPublicRateLimit(ip)
-  if (!limit.allowed) {
-    res.setHeader('Retry-After', Math.ceil(limit.retryAfterMs / 1000))
-    return res.status(429).json({
-      error: 'Too many lookups. Please try again later.',
-      ...publicLookupFallback(),
-    })
-  }
-
-  // Races without an HTTP scraper / not in the rollout allowlist → manual fallback
-  if (!isRacePublicSafe(race) || !isPublicLookupRaceAllowed(race)) {
-    return res.status(200).json(publicLookupFallback({ reason: 'no_instant_lookup' }))
-  }
-
-  const cacheKey = buildPublicCacheKey({ race, year, name })
-  const cached = getPublicCached(cacheKey)
-  if (cached) {
-    return res.status(200).json({ ...cached, cached: true })
-  }
-
-  try {
-    const result = await researchService.findRunner(race, year, name)
-
-    let payload
-    if (result.found) {
-      payload = {
-        found: true,
-        instant: true,
-        result: {
-          name,
-          bib: result.bibNumber,
-          time: result.officialTime,
-          pace: result.officialPace,
-          eventType: result.eventType,
-        },
-      }
-    } else if (result.ambiguous || (result.possibleMatches && result.possibleMatches.length > 0)) {
-      payload = {
-        found: false,
-        instant: true,
-        fallbackRequired: true,
-        suggestions: (result.possibleMatches || []).map(m => ({
-          name: m.name,
-          bib: m.bib ?? null,
-          time: m.time ?? null,
-          pace: m.pace ?? null,
-          eventType: m.eventType ?? null,
-        })),
-      }
-    } else {
-      payload = publicLookupFallback({ reason: 'not_found', instant: true })
-    }
-
-    setPublicCached(cacheKey, payload)
-    return res.status(200).json(payload)
-  } catch (error) {
-    console.error('[actions/public-results-lookup] lookup failed:', error.message)
-    return res.status(200).json(publicLookupFallback({ reason: 'lookup_error' }))
   }
 }

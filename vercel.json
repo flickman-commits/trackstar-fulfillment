@@ -29,10 +29,6 @@
   },
   "rewrites": [
     {
-      "source": "/api/public/results-lookup",
-      "destination": "/api/orders/actions?action=public-results-lookup"
-    },
-    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

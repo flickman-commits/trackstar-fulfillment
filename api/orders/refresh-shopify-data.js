@@ -11,7 +11,7 @@
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { shopifyFetch } from '../../server/services/shopifyAuth.js'
-import { normalizeRaceName } from '../../server/scrapers/raceNameNormalization.js'
+import { parseRaceNameFromTitle } from '../../server/scrapers/raceNameNormalization.js'
 
 // Fallback for batch mode (uses direct token auth)
 const SHOPIFY_SHOP_URL = process.env.SHOPIFY_SHOP_URL
@@ -199,7 +199,7 @@ function extractShopifyData(lineItems) {
 
   const firstItem = lineItems[0]
   result.rawProductTitle = firstItem.title || null
-  result.raceName = parseRaceName(result.rawProductTitle)
+  result.raceName = parseRaceNameFromTitle(result.rawProductTitle)
 
   for (const item of lineItems) {
     if (!item.properties || !Array.isArray(item.properties)) continue
@@ -239,35 +239,6 @@ function extractShopifyData(lineItems) {
   }
 
   return result
-}
-
-/**
- * Parse race name from product title.
- *
- * Handles two title formats:
- *   Old: "Boston Marathon Personalized Race Print" → "Boston Marathon"
- *   New: "Personalized Boston Poster"              → "Boston Marathon" (via normalize)
- *        "Personalized Eugene Marathon Poster"     → "Eugene Marathon"
- */
-function parseRaceName(productTitle) {
-  if (!productTitle) return null
-
-  let raceName = productTitle.trim()
-
-  // Strip leading "Personalized " prefix (new title format)
-  raceName = raceName.replace(/^Personalized\s+/i, '').trim()
-
-  // Strip known suffixes — longest first so "Personalized Race Print" beats "Print"
-  const suffixes = ['Personalized Race Print', 'Race Print', 'Personalized Poster', 'Poster', 'Print']
-  for (const suffix of suffixes) {
-    if (raceName.toLowerCase().endsWith(suffix.toLowerCase())) {
-      raceName = raceName.slice(0, -suffix.length).trim()
-      break
-    }
-  }
-
-  // Map bare names ("Boston") to canonical ("Boston Marathon") for scraper lookup
-  return normalizeRaceName(raceName) || null
 }
 
 /**

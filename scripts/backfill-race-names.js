@@ -19,29 +19,11 @@
  *   node scripts/backfill-race-names.js --apply      # actually write changes
  */
 import { PrismaClient } from '@prisma/client'
-import { normalizeRaceName } from '../server/scrapers/raceNameNormalization.js'
+import { parseRaceNameFromTitle } from '../server/scrapers/raceNameNormalization.js'
 
 const prisma = new PrismaClient()
 
 const APPLY = process.argv.includes('--apply')
-
-// Must mirror parseRaceName in api/orders/refresh-shopify-data.js + server/processOrders.js
-function parseRaceName(productTitle) {
-  if (!productTitle) return null
-
-  let raceName = productTitle.trim()
-  raceName = raceName.replace(/^Personalized\s+/i, '').trim()
-
-  const suffixes = ['Personalized Race Print', 'Race Print', 'Personalized Poster', 'Poster', 'Print']
-  for (const suffix of suffixes) {
-    if (raceName.toLowerCase().endsWith(suffix.toLowerCase())) {
-      raceName = raceName.slice(0, -suffix.length).trim()
-      break
-    }
-  }
-
-  return normalizeRaceName(raceName) || null
-}
 
 // Match the ingestion logic: a "Race Name" line-item property overrides the title parse.
 function getRaceNameFromLineItem(lineItem) {
@@ -58,7 +40,7 @@ function getRaceNameFromLineItem(lineItem) {
     }
   }
 
-  return parseRaceName(lineItem.title)
+  return parseRaceNameFromTitle(lineItem.title)
 }
 
 async function main() {

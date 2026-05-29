@@ -41,9 +41,7 @@ const routes = [
   { method: 'post',   path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'delete', path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   // Public storefront results lookup (gated behind PUBLIC_LOOKUP_ENABLED).
-  // Consolidated into actions.js to stay under Vercel's 12-function limit;
-  // mirrors the vercel.json rewrite that injects ?action=public-results-lookup.
-  { method: 'get',    path: '/api/public/results-lookup',  handler: '../api/orders/actions.js', query: { action: 'public-results-lookup' } },
+  { method: 'get',    path: '/api/public/results-lookup',  handler: '../api/public/results-lookup.js' },
 ]
 
 // Load all handlers and register routes
