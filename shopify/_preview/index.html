@@ -159,6 +159,22 @@
     font-size: 1.1rem;
   }
 
+  /* Italic "*printed on your poster" note, sits just under the data card. */
+  #tsil-preview .tsil__print-note {
+    margin: -.4rem 0 .1rem;
+    font-style: italic;
+    font-size: .8rem;
+    line-height: 1.4;
+    letter-spacing: -0.04em;
+    color: var(--tsil-muted);
+  }
+
+  /* ---- Is-this-a-gift radio group (required) ---- */
+  #tsil-preview .tsil__giftq { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1.1rem; font-size: .9rem; letter-spacing: -0.04em; }
+  #tsil-preview .tsil__giftq-label { font-weight: 500; }
+  #tsil-preview .tsil__radio { display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; }
+  #tsil-preview .tsil__radio input { width: 16px; height: 16px; accent-color: var(--tsil-accent); cursor: pointer; }
+
   /* ---- No-time checkbox ---- */
   #tsil-preview .tsil__notime {
     display: flex;
@@ -302,15 +318,17 @@
     <div class="tsil__result" data-tsil-state="found" hidden>
       <p class="tsil__found-head" data-tsil-found-head>Is this you?</p>
       <div class="tsil__bigcard" data-tsil-found-card></div>
+      <p class="tsil__print-note">*These details will be printed on your poster.</p>
       <label class="tsil__notime">
         <input class="tsil__notime-cb" type="checkbox" data-tsil-notime>
         <span>Don't want your time/pace on it? Check this box</span>
       </label>
-      <label class="tsil__notime">
-        <input class="tsil__notime-cb" type="checkbox" data-tsil-gift>
-        <span>Is this a gift?</span>
-      </label>
-      <p class="tsil__confirm-note">These details will be printed on your poster.</p>
+      <div class="tsil__giftq">
+        <span class="tsil__giftq-label">Is this a gift?</span>
+        <label class="tsil__radio"><input type="radio" name="tsil-gift-preview" value="yes" data-tsil-gift> Yes</label>
+        <label class="tsil__radio"><input type="radio" name="tsil-gift-preview" value="no" data-tsil-gift> No</label>
+      </div>
+      <p class="tsil__error" data-tsil-found-error hidden></p>
       <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>Confirm info</button>
       <div class="tsil__minor">
         <button class="tsil__btn-link" type="button" data-tsil-reset>Search again</button>
@@ -569,18 +587,30 @@
       pendingResult._verified = verified;
       var cb = root.querySelector('[data-tsil-notime]');
       if (cb) cb.checked = false;
-      var giftCb = root.querySelector('[data-tsil-gift]');
-      if (giftCb) giftCb.checked = false;
+      root.querySelectorAll('[data-tsil-gift]').forEach(function (r) { r.checked = false; });
+      setFoundError('');
       root.querySelector('[data-tsil-found-head]').textContent = heading;
       renderBigCard(result, false);
       show('found');
     }
 
     // Final lock-in — write the cart properties and collapse to the green success card.
+    var foundErrorEl = root.querySelector('[data-tsil-found-error]');
+    function setFoundError(msg) {
+      if (!foundErrorEl) return;
+      if (!msg) { foundErrorEl.hidden = true; foundErrorEl.textContent = ''; return; }
+      foundErrorEl.hidden = false;
+      foundErrorEl.textContent = msg;
+    }
+
     function confirmInfo() {
       if (!pendingResult) return;
       var noTime = !!(root.querySelector('[data-tsil-notime]') || {}).checked;
-      var isGift = !!(root.querySelector('[data-tsil-gift]') || {}).checked;
+      // "Is this a gift?" is required — block confirm until answered.
+      var giftRadio = root.querySelector('[data-tsil-gift]:checked');
+      if (!giftRadio) { setFoundError('Please let us know if this is a gift.'); return; }
+      setFoundError('');
+      var isGift = giftRadio.value === 'yes';
       var form = findProductForm();
       var year = root.querySelector('[name="tsil-year"]').value;
       var name = pendingResult.name || root.querySelector('[name="tsil-name"]').value;
@@ -727,8 +757,8 @@
         setSubmitDisabled(true);
         var cb = root.querySelector('[data-tsil-notime]');
         if (cb) cb.checked = false;
-        var giftCb = root.querySelector('[data-tsil-gift]');
-        if (giftCb) giftCb.checked = false;
+        root.querySelectorAll('[data-tsil-gift]').forEach(function (r) { r.checked = false; });
+        setFoundError('');
         show('search');
       });
     });
