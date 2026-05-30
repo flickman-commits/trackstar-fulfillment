@@ -58,6 +58,21 @@ model Order {
   trackingCarrier    String?   // Free-text: "USPS", "UPS", "FedEx", etc.
   shippedAt          DateTime?
 
+  // Customer-confirmed race result, captured by the storefront Instant Lookup
+  // widget on STANDARD race orders. Distinct from bibNumberCustomer/timeCustomer
+  // above (those are free-text fields for CUSTOM "any race" orders).
+  //   lookupVerified = true  → customer confirmed an official-results match
+  //                            (same data the scraper would find, human-verified)
+  //                  = false → customer typed it manually (still research as fallback)
+  //                  = null  → no widget data (Etsy, or a PDP without the widget)
+  //                            → research runs normally, exactly as before.
+  // Phase 1 reads these to skip research when verified; Phase 0 only captures them.
+  lookupVerified     Boolean?  // Did the data come from a confirmed official match?
+  customerBib        String?   // Bib # from the widget (verified or manual)
+  customerFinishTime String?   // Finish time from the widget (verified or manual)
+  customerPace       String?   // Pace from the widget (only set on a verified match)
+  customerEventType  String?   // Event/distance from the widget (e.g. "Marathon")
+
   // Manual override fields (for customer corrections)
   yearOverride       Int?      // Override for raceYear
   raceNameOverride   String?   // Override for raceName

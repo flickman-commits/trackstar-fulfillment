@@ -24,6 +24,8 @@
       - "Race Name"
       - "Bib #"
       - "Time"
+      - "Pace"               (only on a verified match — blank on manual entry)
+      - "Event"              (event/distance, only on a verified match)
       - "_lookup_verified"  (hidden: "true" = instant match, "false" = manual entry)
     The property names are configurable in the block settings if your theme
     uses different ones.
@@ -46,6 +48,8 @@
   data-prop-race="{{ block.settings.prop_race | escape }}"
   data-prop-bib="{{ block.settings.prop_bib | escape }}"
   data-prop-time="{{ block.settings.prop_time | escape }}"
+  data-prop-pace="{{ block.settings.prop_pace | escape }}"
+  data-prop-event="{{ block.settings.prop_event | escape }}"
   data-prop-verified="{{ block.settings.prop_verified | escape }}"
   style="--tsil-accent: {{ block.settings.accent_color | default: '#4600D6' }};"
   {{ block.shopify_attributes }}
@@ -262,6 +266,8 @@
         race: root.getAttribute('data-prop-race'),
         bib: root.getAttribute('data-prop-bib'),
         time: root.getAttribute('data-prop-time'),
+        pace: root.getAttribute('data-prop-pace'),
+        event: root.getAttribute('data-prop-event'),
         verified: root.getAttribute('data-prop-verified')
       }
     };
@@ -361,6 +367,10 @@
         setProp(form, cfg.props.race, cfg.race);
         setProp(form, cfg.props.bib, result.bib || '');
         setProp(form, cfg.props.time, result.time || '');
+        // Pace + event come from the official-results match only. On manual
+        // entry these are blank — the backend falls back to research for them.
+        setProp(form, cfg.props.pace, result.pace || '');
+        setProp(form, cfg.props.event, result.eventType || '');
         setProp(form, cfg.props.verified, verified ? 'true' : 'false');
       }
       setSubmitDisabled(false);
@@ -515,7 +525,7 @@
       "id": "require_lookup",
       "label": "Require lookup before add to cart",
       "info": "Disables the Add to cart button until a result is attached.",
-      "default": false
+      "default": true
     },
     {
       "type": "header",
@@ -538,6 +548,8 @@
     { "type": "text", "id": "prop_race", "label": "Race name property", "default": "Race Name" },
     { "type": "text", "id": "prop_bib", "label": "Bib property", "default": "Bib #" },
     { "type": "text", "id": "prop_time", "label": "Time property", "default": "Time" },
+    { "type": "text", "id": "prop_pace", "label": "Pace property", "default": "Pace" },
+    { "type": "text", "id": "prop_event", "label": "Event property", "default": "Event" },
     { "type": "text", "id": "prop_verified", "label": "Verified flag property", "default": "_lookup_verified" }
   ],
   "presets": [

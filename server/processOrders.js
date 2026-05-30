@@ -249,7 +249,12 @@ function extractShopifyPersonalization(lineItem) {
     bibNumberCustomer: null,
     timeCustomer: null,
     creativeDirection: null,
-    isGift: false
+    isGift: false,
+    // Instant Lookup widget result (standard orders). lookupVerified: null =
+    // no widget data, true = confirmed official match, false = typed manually.
+    lookupVerified: null,
+    customerPace: null,
+    customerEventType: null
   }
 
   if (!lineItem) {
@@ -309,6 +314,18 @@ function extractShopifyPersonalization(lineItem) {
       }
       else if (name === 'Gift' || name === 'Gift:' || name === 'gift') {
         result.isGift = value ? (value.toLowerCase() === 'yes' || value.toLowerCase() === 'true') : false
+      }
+      // Instant Lookup widget: pace + event/distance (only present on a verified match)
+      else if (name === 'Pace' || name === 'Pace:' || name === 'pace') {
+        result.customerPace = value || null
+      }
+      else if (name === 'Event' || name === 'Event Type' || name === 'event' || name === 'event_type' || name === 'Distance' || name === 'distance') {
+        result.customerEventType = value || null
+      }
+      // Instant Lookup widget: verified flag. Hidden property (leading underscore).
+      // "true" = customer confirmed an official-results match; "false" = typed manually.
+      else if (name === '_lookup_verified' || name === 'lookup_verified') {
+        result.lookupVerified = value ? value.toLowerCase() === 'true' : false
       }
     }
   }
@@ -729,6 +746,14 @@ export async function processOrders(options = {}) {
                   updateData.shopifyOrderData = shopifyData.shopifyOrderData
                   updateData.notes = shopifyData.notes || existing.notes
 
+                  // Capture the Instant Lookup widget result for ALL order types
+                  // (backfill path for orders that were missing Shopify data).
+                  updateData.lookupVerified = extracted.lookupVerified
+                  updateData.customerBib = extracted.bibNumberCustomer
+                  updateData.customerFinishTime = extracted.timeCustomer
+                  updateData.customerPace = extracted.customerPace
+                  updateData.customerEventType = extracted.customerEventType
+
                   // Classify and extract custom order fields
                   // Check product title for custom order detection, not the extracted raceName
                   if (isCustomOrder(extracted.productTitle)) {
@@ -837,6 +862,13 @@ export async function processOrders(options = {}) {
               let customerEmail = null
               let customerName = null
               let dueDate = null
+              // Instant Lookup widget result (standard orders, Shopify only).
+              // Captured for ALL order types; null when the widget wasn't used.
+              let lookupVerified = null
+              let customerBib = null
+              let customerFinishTime = null
+              let customerPace = null
+              let customerEventType = null
 
               if (isShopify && shopifyData) {
                 log(`[processOrders] Processing Shopify line item ${lineItemIndex} for order ${order.orderId}...`)
@@ -862,6 +894,15 @@ export async function processOrders(options = {}) {
                   hadNoTime = extracted.hadNoTime || false
                   lineItemShopifyData = shopifyData.shopifyOrderData
                   notes = shopifyData.notes
+
+                  // Capture the Instant Lookup widget result for ALL order types.
+                  // Phase 0 only persists these; Phase 1 will read lookupVerified
+                  // to skip research when the customer confirmed an official match.
+                  lookupVerified = extracted.lookupVerified
+                  customerBib = extracted.bibNumberCustomer
+                  customerFinishTime = extracted.timeCustomer
+                  customerPace = extracted.customerPace
+                  customerEventType = extracted.customerEventType
 
                   // Custom order classification — check product title, not extracted raceName
                   // (for custom orders, raceName is the customer-provided race, e.g. "Jfk 50",
@@ -960,7 +1001,13 @@ export async function processOrders(options = {}) {
                   bibNumberCustomer,
                   timeCustomer,
                   creativeDirection,
-                  isGift: isGiftOrder
+                  isGift: isGiftOrder,
+                  // Instant Lookup widget result (Phase 0 capture)
+                  lookupVerified,
+                  customerBib,
+                  customerFinishTime,
+                  customerPace,
+                  customerEventType
                 }
               })
 
