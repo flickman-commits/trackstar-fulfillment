@@ -81,7 +81,14 @@ async function handleSingleOrder(req, res, shopifyOrderId) {
           hadNoTime: lineItemData.hadNoTime || false,
           notes: notes || existing.notes,
           shopifyOrderData: shopifyOrder,
-          status: lineItemData.needsAttention ? 'missing_year' : existing.status
+          status: lineItemData.needsAttention ? 'missing_year' : existing.status,
+          // Widget / Easify parity fields
+          customerBib: lineItemData.customerBib,
+          customerFinishTime: lineItemData.customerFinishTime,
+          customerPace: lineItemData.customerPace,
+          customerEventType: lineItemData.customerEventType,
+          lookupVerified: lineItemData.lookupVerified,
+          isGift: lineItemData.isGift
         }
       })
     }
@@ -159,7 +166,14 @@ async function handleBatchRefresh(req, res) {
           shopifyOrderData: shopifyOrder,
           hadNoTime: parsed.hadNoTime,
           notes: notes,
-          status: parsed.needsAttention ? 'missing_year' : 'pending'
+          status: parsed.needsAttention ? 'missing_year' : 'pending',
+          // Widget / Easify parity fields
+          customerBib: parsed.customerBib,
+          customerFinishTime: parsed.customerFinishTime,
+          customerPace: parsed.customerPace,
+          customerEventType: parsed.customerEventType,
+          lookupVerified: parsed.lookupVerified,
+          isGift: parsed.isGift
         }
       })
 
@@ -187,6 +201,14 @@ function extractShopifyData(lineItems) {
     raceYear: null,
     needsAttention: false,
     hadNoTime: false,
+    // Parity with processOrders.extractShopifyPersonalization — Instant Lookup
+    // widget / Easify fields so a refresh repopulates the same columns.
+    customerBib: null,
+    customerFinishTime: null,
+    customerPace: null,
+    customerEventType: null,
+    lookupVerified: null,
+    isGift: false,
     rawProductTitle: null,
     rawRunnerName: null,
     rawRaceYear: null,
@@ -230,6 +252,25 @@ function extractShopifyData(lineItems) {
       else if (name === 'Race Name' || name === 'race name' || name === 'race_name') {
         result.rawRaceName = value
         if (value) result.raceName = value
+      }
+      else if (name === 'Bib #' || name === 'Bib #:' || name === 'bib_number') {
+        result.customerBib = value || null
+      }
+      else if (name === 'Time' || name === 'Time:' || name === 'time') {
+        result.customerFinishTime = value || null
+      }
+      else if (name === 'Pace' || name === 'Pace:' || name === 'pace') {
+        result.customerPace = value || null
+      }
+      else if (name === 'Event' || name === 'Event Type' || name === 'event' || name === 'event_type' || name === 'Distance' || name === 'distance') {
+        result.customerEventType = value || null
+      }
+      else if (name === 'Gift' || name === 'Gift:' || name === 'gift') {
+        const v = value.toLowerCase()
+        result.isGift = v === 'this is a gift' || v === 'yes' || v === 'true'
+      }
+      else if (name === '_lookup_verified' || name === 'lookup_verified') {
+        result.lookupVerified = value ? value.toLowerCase() === 'true' : false
       }
     }
   }
