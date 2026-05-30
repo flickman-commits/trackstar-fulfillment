@@ -50,6 +50,7 @@
   data-prop-time="{{ block.settings.prop_time | escape }}"
   data-prop-pace="{{ block.settings.prop_pace | escape }}"
   data-prop-event="{{ block.settings.prop_event | escape }}"
+  data-prop-notime="{{ block.settings.prop_notime | escape }}"
   data-prop-verified="{{ block.settings.prop_verified | escape }}"
   style="--tsil-accent: {{ block.settings.accent_color | default: '#4600D6' }};"
   {{ block.shopify_attributes }}
@@ -93,22 +94,31 @@
       <span data-tsil-loading-text>Searching results…</span>
     </div>
 
-    {%- comment -%} STATE: single match found {%- endcomment -%}
+    {%- comment -%} STATE: result confirmation (single match, a picked suggestion, or manual entry) {%- endcomment -%}
     <div class="tsil__result" data-tsil-state="found" hidden>
-      <p class="tsil__found-head">We found your result</p>
-      <div class="tsil__match" data-tsil-found-card></div>
-      <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>That is correct</button>
-      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Not the right runner (search again)</button>
-      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-manual-link>Enter info manually</button>
+      <p class="tsil__found-head" data-tsil-found-head>Is this you?</p>
+      <div class="tsil__bigcard" data-tsil-found-card></div>
+      <label class="tsil__notime">
+        <input class="tsil__notime-cb" type="checkbox" data-tsil-notime>
+        <span>Don't want your time/pace on it? Check this box</span>
+      </label>
+      <p class="tsil__confirm-note">These details will be printed on your poster.</p>
+      <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>Confirm info</button>
+      <div class="tsil__minor">
+        <button class="tsil__btn-link" type="button" data-tsil-reset>Search again</button>
+        <button class="tsil__btn-link" type="button" data-tsil-manual-link>Enter info manually</button>
+      </div>
     </div>
 
     {%- comment -%} STATE: multiple suggestions {%- endcomment -%}
     <div class="tsil__suggestions" data-tsil-state="suggestions" hidden>
-      <p class="tsil__found-head">We found a few matches — pick yours:</p>
+      <p class="tsil__found-head">We found multiple results — select the one that's you</p>
       <p class="tsil__refine-hint" data-tsil-refine-hint hidden>Showing the first 10. Add or correct your first name to narrow it down.</p>
       <div class="tsil__match-list" data-tsil-suggestion-list></div>
-      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-manual-link>Enter info manually</button>
-      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Search again</button>
+      <div class="tsil__minor">
+        <button class="tsil__btn-link" type="button" data-tsil-reset>Search again</button>
+        <button class="tsil__btn-link" type="button" data-tsil-manual-link>Enter info manually</button>
+      </div>
     </div>
 
     {%- comment -%} STATE: manual entry fallback {%- endcomment -%}
@@ -135,10 +145,15 @@
 
     {%- comment -%} STATE: attached / success {%- endcomment -%}
     <div class="tsil__done" data-tsil-state="done" hidden>
-      <p class="tsil__found-head">Result confirmed</p>
-      <div class="tsil__match" data-tsil-done-card></div>
-      <p class="tsil__confirm-note">These details will be printed on your poster. Click <strong>Add to Cart</strong> below to lock them in.</p>
-      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Edit details</button>
+      <div class="tsil__done-card">
+        <span class="tsil__check" aria-hidden="true"></span>
+        <div class="tsil__done-text">
+          <p class="tsil__done-head">Confirmed</p>
+          <p class="tsil__done-summary" data-tsil-done-summary></p>
+        </div>
+        <button class="tsil__btn-link tsil__done-edit" type="button" data-tsil-edit>Edit</button>
+      </div>
+      <p class="tsil__confirm-note">Click <strong>Add to Cart</strong> below to lock it in.</p>
     </div>
   </div>
 </div>
@@ -222,7 +237,7 @@
   }
   @keyframes tsil-spin { to { transform: rotate(360deg); } }
   #tsil-{{ block.id }} .tsil__result, #tsil-{{ block.id }} .tsil__suggestions, #tsil-{{ block.id }} .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
-  #tsil-{{ block.id }} .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.04em; }
+  #tsil-{{ block.id }} .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.35rem; line-height: 1.15; letter-spacing: -0.04em; }
   #tsil-{{ block.id }} .tsil__refine-hint { margin: -.35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; letter-spacing: -0.04em; }
   #tsil-{{ block.id }} .tsil__confirm-note {
     margin: 0;
@@ -247,8 +262,117 @@
     cursor: pointer;
   }
   #tsil-{{ block.id }} button.tsil__match-card:hover { border-color: var(--tsil-accent); }
-  #tsil-{{ block.id }} .tsil__match-name { font-weight: 700; }
+  #tsil-{{ block.id }} .tsil__match-name { font-weight: 700; font-size: 1.05rem; }
   #tsil-{{ block.id }} .tsil__match-meta { color: var(--tsil-muted); font-size: .9rem; margin-top: .15rem; }
+
+  /* ---- Big result card (confirmation screen) ---- */
+  #tsil-{{ block.id }} .tsil__bigcard {
+    border: 1px solid var(--tsil-border);
+    border-left: 3px solid var(--tsil-accent);
+    background: var(--tsil-soft);
+    padding: 1.1rem 1.15rem;
+    display: grid;
+    gap: .9rem;
+  }
+  #tsil-{{ block.id }} .tsil__bc-primary { display: grid; gap: .8rem; }
+  #tsil-{{ block.id }} .tsil__bc-secondary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .9rem 1.6rem;
+    padding-top: .25rem;
+    border-top: 1px solid var(--tsil-border);
+  }
+  #tsil-{{ block.id }} .tsil__bc-label {
+    font-size: .65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--tsil-muted);
+    margin-bottom: .15rem;
+  }
+  #tsil-{{ block.id }} .tsil__bc-value { font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; }
+  /* Name + time are the heroes of the card. */
+  #tsil-{{ block.id }} .tsil__bc-field--name .tsil__bc-value { font-size: 1.6rem; }
+  #tsil-{{ block.id }} .tsil__bc-field--time .tsil__bc-value { font-size: 1.6rem; color: var(--tsil-accent); }
+  #tsil-{{ block.id }} .tsil__bc-field--muted .tsil__bc-value { font-weight: 500; font-size: 1rem; }
+  /* When "no time" is checked, the time/pace fields read as struck-out/dimmed. */
+  #tsil-{{ block.id }} .tsil__bigcard.is-notime .tsil__bc-field--time .tsil__bc-value,
+  #tsil-{{ block.id }} .tsil__bigcard.is-notime .tsil__bc-field--pace .tsil__bc-value {
+    color: var(--tsil-muted);
+    text-decoration: line-through;
+    font-size: 1.1rem;
+  }
+
+  /* ---- No-time checkbox ---- */
+  #tsil-{{ block.id }} .tsil__notime {
+    display: flex;
+    align-items: flex-start;
+    gap: .55rem;
+    font-size: .85rem;
+    line-height: 1.35;
+    letter-spacing: -0.04em;
+    color: var(--tsil-text);
+    cursor: pointer;
+  }
+  #tsil-{{ block.id }} .tsil__notime-cb { margin-top: .15rem; width: 16px; height: 16px; accent-color: var(--tsil-accent); cursor: pointer; flex: 0 0 auto; }
+
+  /* ---- Minor (secondary) text-link actions ---- */
+  #tsil-{{ block.id }} .tsil__minor { display: flex; flex-wrap: wrap; gap: 1.1rem; margin-top: .15rem; }
+  #tsil-{{ block.id }} .tsil__btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: .8rem;
+    letter-spacing: -0.04em;
+    color: var(--tsil-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  #tsil-{{ block.id }} .tsil__btn-link:hover { color: var(--tsil-text); }
+
+  /* ---- Done / success: green, collapsed, animated checkmark ---- */
+  #tsil-{{ block.id }} .tsil__done-card {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: 1rem 1.1rem;
+    background: #ECFDF3;
+    border: 1px solid #A6F4C5;
+    border-left: 3px solid #12B76A;
+    animation: tsil-done-in .35s ease-out both;
+  }
+  @keyframes tsil-done-in {
+    from { opacity: 0; transform: translateY(6px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  #tsil-{{ block.id }} .tsil__check {
+    flex: 0 0 auto;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: #12B76A;
+    position: relative;
+    transform: scale(0);
+    animation: tsil-pop .35s cubic-bezier(.2,1.3,.5,1) .12s both;
+  }
+  #tsil-{{ block.id }} .tsil__check::after {
+    content: "";
+    position: absolute;
+    left: 9px; top: 5px;
+    width: 6px; height: 11px;
+    border: solid #FFFFFF;
+    border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg) scale(0);
+    transform-origin: center;
+    animation: tsil-check .2s ease-out .32s both;
+  }
+  @keyframes tsil-pop { to { transform: scale(1); } }
+  @keyframes tsil-check { from { transform: rotate(45deg) scale(0); } to { transform: rotate(45deg) scale(1); } }
+  #tsil-{{ block.id }} .tsil__done-text { flex: 1 1 auto; min-width: 0; }
+  #tsil-{{ block.id }} .tsil__done-head { margin: 0; font-weight: 700; font-size: 1rem; letter-spacing: -0.04em; color: #027A48; }
+  #tsil-{{ block.id }} .tsil__done-summary { margin: .1rem 0 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.04em; color: var(--tsil-text); overflow-wrap: anywhere; }
+  #tsil-{{ block.id }} .tsil__done-edit { flex: 0 0 auto; }
 </style>
 
 <script>
@@ -268,6 +392,7 @@
         time: root.getAttribute('data-prop-time'),
         pace: root.getAttribute('data-prop-pace'),
         event: root.getAttribute('data-prop-event'),
+        notime: root.getAttribute('data-prop-notime'),
         verified: root.getAttribute('data-prop-verified')
       }
     };
@@ -316,49 +441,82 @@
       errorEl.textContent = msg;
     }
 
+    // The result currently being confirmed (from a single match, a picked
+    // suggestion, or manual entry). _verified flags whether it came from an
+    // official-results match (true) or was typed manually (false).
+    var pendingResult = null;
+
     // ---- result rendering helpers ----
-    function fmtMeta(r) {
+    // Compact meta for the suggestions LIST — event type + bib only.
+    function fmtListMeta(m) {
       var bits = [];
-      if (r.eventType) bits.push(r.eventType);
-      if (r.bib) bits.push('Bib ' + r.bib);
-      if (r.time) bits.push(r.time);
-      if (r.pace) bits.push(r.pace + ' /mi');
+      if (m.eventType) bits.push(m.eventType);
+      if (m.bib) bits.push('Bib ' + m.bib);
       return bits.join(' · ');
     }
-    function fillCard(container, r) {
-      container.innerHTML = '';
-      var card = document.createElement('div');
-      var nameEl = document.createElement('div');
-      nameEl.className = 'tsil__match-name';
-      nameEl.textContent = r.name || root.querySelector('[name="tsil-name"]').value;
-      var metaEl = document.createElement('div');
-      metaEl.className = 'tsil__match-meta';
-      metaEl.textContent = fmtMeta(r) || 'Result on file';
-      card.appendChild(nameEl);
-      card.appendChild(metaEl);
-      container.appendChild(card);
+
+    // Render the big, labeled confirmation card. `noTime` greys out time/pace.
+    function renderBigCard(r, noTime) {
+      var card = root.querySelector('[data-tsil-found-card]');
+      card.className = 'tsil__bigcard' + (noTime ? ' is-notime' : '');
+      card.innerHTML = '';
+
+      function field(label, value, mods) {
+        var f = document.createElement('div');
+        f.className = 'tsil__bc-field ' + mods;
+        var l = document.createElement('div'); l.className = 'tsil__bc-label'; l.textContent = label;
+        var v = document.createElement('div'); v.className = 'tsil__bc-value'; v.textContent = value;
+        f.appendChild(l); f.appendChild(v);
+        return f;
+      }
+
+      var name = r.name || root.querySelector('[name="tsil-name"]').value;
+
+      // Primary block — name + time are the heroes.
+      var primary = document.createElement('div');
+      primary.className = 'tsil__bc-primary';
+      primary.appendChild(field('Runner', name || '—', 'tsil__bc-field--name'));
+      if (noTime) {
+        primary.appendChild(field('Time', 'No time on poster', 'tsil__bc-field--time'));
+      } else if (r.time) {
+        primary.appendChild(field('Finish time', r.time, 'tsil__bc-field--time'));
+      }
+      card.appendChild(primary);
+
+      // Secondary block — smaller labeled details.
+      var secondary = document.createElement('div');
+      secondary.className = 'tsil__bc-secondary';
+      if (r.bib) secondary.appendChild(field('Bib', r.bib, 'tsil__bc-field--muted tsil__bc-field--bib'));
+      if (!noTime && r.pace) secondary.appendChild(field('Pace', r.pace + ' /mi', 'tsil__bc-field--muted tsil__bc-field--pace'));
+      if (r.eventType) secondary.appendChild(field('Event', r.eventType, 'tsil__bc-field--muted tsil__bc-field--event'));
+      if (secondary.children.length) card.appendChild(secondary);
     }
 
     // ---- write data into the product form ----
     function findProductForm() {
       return document.querySelector('form[action$="/cart/add"], form[action*="/cart/add"]');
     }
+    // Sets (or clears) a line-item property. An EMPTY value removes any hidden
+    // input we injected, so we never ship a stray empty property (important for
+    // the "No time" flag, which the backend treats as present == true).
     function setProp(form, key, value) {
       if (!key) return;
-      var selector = 'input[name="properties[' + key + ']"], textarea[name="properties[' + key + ']"], select[name="properties[' + key + ']"]';
-      var field = form.querySelector(selector);
+      var val = value == null ? '' : String(value);
+      var field = form.querySelector('input[name="properties[' + key + ']"], textarea[name="properties[' + key + ']"], select[name="properties[' + key + ']"]');
       if (field) {
-        field.value = value == null ? '' : String(value);
+        if (val === '' && field.hasAttribute('data-tsil-injected')) { field.remove(); return; }
+        field.value = val;
         field.dispatchEvent(new Event('input', { bubbles: true }));
         field.dispatchEvent(new Event('change', { bubbles: true }));
-      } else {
-        var hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = 'properties[' + key + ']';
-        hidden.value = value == null ? '' : String(value);
-        hidden.setAttribute('data-tsil-injected', key);
-        form.appendChild(hidden);
+        return;
       }
+      if (val === '') return; // nothing to set, nothing to inject
+      var hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'properties[' + key + ']';
+      hidden.value = val;
+      hidden.setAttribute('data-tsil-injected', key);
+      form.appendChild(hidden);
     }
 
     function setSubmitDisabled(disabled) {
@@ -369,27 +527,42 @@
         btn.disabled = disabled;
       });
     }
-    // If lookup is required, lock add-to-cart until a result is attached.
+    // If lookup is required, lock add-to-cart until a result is confirmed.
     setSubmitDisabled(true);
 
-    function attach(result, verified) {
+    // Show the confirmation screen for a chosen result (does NOT write to cart yet).
+    function selectResult(result, verified, heading) {
+      pendingResult = result;
+      pendingResult._verified = verified;
+      var cb = root.querySelector('[data-tsil-notime]');
+      if (cb) cb.checked = false;
+      root.querySelector('[data-tsil-found-head]').textContent = heading;
+      renderBigCard(result, false);
+      show('found');
+    }
+
+    // Final lock-in — write the cart properties and collapse to the green success card.
+    function confirmInfo() {
+      if (!pendingResult) return;
+      var noTime = !!(root.querySelector('[data-tsil-notime]') || {}).checked;
       var form = findProductForm();
       var year = root.querySelector('[name="tsil-year"]').value;
-      var name = result.name || root.querySelector('[name="tsil-name"]').value;
+      var name = pendingResult.name || root.querySelector('[name="tsil-name"]').value;
       if (form) {
         setProp(form, cfg.props.runner, name);
         setProp(form, cfg.props.year, year);
         setProp(form, cfg.props.race, cfg.race);
-        setProp(form, cfg.props.bib, result.bib || '');
-        setProp(form, cfg.props.time, result.time || '');
-        // Pace + event come from the official-results match only. On manual
-        // entry these are blank — the backend falls back to research for them.
-        setProp(form, cfg.props.pace, result.pace || '');
-        setProp(form, cfg.props.event, result.eventType || '');
-        setProp(form, cfg.props.verified, verified ? 'true' : 'false');
+        setProp(form, cfg.props.bib, pendingResult.bib || '');
+        // "No time" omits time + pace from the poster and sends the backend flag.
+        setProp(form, cfg.props.time, noTime ? '' : (pendingResult.time || ''));
+        setProp(form, cfg.props.pace, noTime ? '' : (pendingResult.pace || ''));
+        setProp(form, cfg.props.event, pendingResult.eventType || '');
+        setProp(form, cfg.props.verified, pendingResult._verified ? 'true' : 'false');
+        setProp(form, cfg.props.notime, noTime ? 'Yes' : '');
       }
       setSubmitDisabled(false);
-      fillCard(root.querySelector('[data-tsil-done-card]'), { name: name, bib: result.bib, time: result.time, pace: result.pace, eventType: result.eventType });
+      var summary = name + (noTime ? ' · No time' : (pendingResult.time ? ' · ' + pendingResult.time : ''));
+      root.querySelector('[data-tsil-done-summary]').textContent = summary;
       show('done');
     }
 
@@ -413,9 +586,7 @@
         .then(function (res) {
           var data = res.data || {};
           if (data.found && data.result) {
-            fillCard(root.querySelector('[data-tsil-found-card]'), data.result);
-            root.querySelector('[data-tsil-confirm]').onclick = function () { attach(data.result, true); };
-            show('found');
+            selectResult(data.result, true, 'Is this you?');
             return;
           }
           if (data.suggestions && data.suggestions.length) {
@@ -452,10 +623,11 @@
         nameEl.textContent = m.name || 'Runner';
         var metaEl = document.createElement('div');
         metaEl.className = 'tsil__match-meta';
-        metaEl.textContent = fmtMeta(m) || 'Result on file';
+        metaEl.textContent = fmtListMeta(m) || 'Result on file';
         btn.appendChild(nameEl);
         btn.appendChild(metaEl);
-        btn.onclick = function () { attach(m, true); };
+        // Picking a suggestion goes to the same confirmation screen.
+        btn.onclick = function () { selectResult(m, true, 'Confirm your result'); };
         wrap.appendChild(btn);
       });
     }
@@ -478,15 +650,46 @@
       e.preventDefault();
       var name = root.querySelector('[name="tsil-mname"]').value.trim();
       if (!name) { return; }
-      attach({
+      // Manual entry routes through the same confirmation screen as a match.
+      selectResult({
         name: name,
         bib: root.querySelector('[name="tsil-mbib"]').value.trim(),
         time: root.querySelector('[name="tsil-mtime"]').value.trim()
-      }, false);
+      }, false, 'Confirm your details');
     });
 
+    // Confirm button → lock in.
+    root.querySelector('[data-tsil-confirm]').addEventListener('click', confirmInfo);
+
+    // "Edit" on the success card → back to the confirmation screen (keeps the
+    // selection + no-time choice), and re-locks add-to-cart until re-confirmed.
+    var editBtn = root.querySelector('[data-tsil-edit]');
+    if (editBtn) {
+      editBtn.addEventListener('click', function () {
+        if (!pendingResult) { show('search'); return; }
+        setSubmitDisabled(true);
+        var cb = root.querySelector('[data-tsil-notime]');
+        renderBigCard(pendingResult, cb ? cb.checked : false);
+        show('found');
+      });
+    }
+
+    // No-time checkbox → live-update the card (grey out time/pace).
+    var noTimeCb = root.querySelector('[data-tsil-notime]');
+    if (noTimeCb) {
+      noTimeCb.addEventListener('change', function () {
+        if (pendingResult) renderBigCard(pendingResult, noTimeCb.checked);
+      });
+    }
+
     root.querySelectorAll('[data-tsil-reset]').forEach(function (btn) {
-      btn.addEventListener('click', function () { setError(''); setSubmitDisabled(true); show('search'); });
+      btn.addEventListener('click', function () {
+        setError('');
+        setSubmitDisabled(true);
+        var cb = root.querySelector('[data-tsil-notime]');
+        if (cb) cb.checked = false;
+        show('search');
+      });
     });
     root.querySelectorAll('[data-tsil-manual-link]').forEach(function (link) {
       link.addEventListener('click', function () {
@@ -565,6 +768,7 @@
     { "type": "text", "id": "prop_time", "label": "Time property", "default": "Time" },
     { "type": "text", "id": "prop_pace", "label": "Pace property", "default": "Pace" },
     { "type": "text", "id": "prop_event", "label": "Event property", "default": "Event" },
+    { "type": "text", "id": "prop_notime", "label": "No-time flag property", "default": "No time" },
     { "type": "text", "id": "prop_verified", "label": "Verified flag property", "default": "_lookup_verified" }
   ],
   "presets": [
