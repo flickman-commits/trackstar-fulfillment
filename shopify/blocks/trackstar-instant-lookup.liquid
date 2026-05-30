@@ -73,7 +73,7 @@
     </div>
 
     {%- comment -%} STATE: search form {%- endcomment -%}
-    <form class="tsil__form" data-tsil-state="search" novalidate>
+    <form class="tsil__form" data-tsil-state="search" autocomplete="off" novalidate>
       <div class="tsil__field">
         <label class="tsil__label" for="tsil-name-{{ block.id }}">Runner name</label>
         <input class="tsil__input" id="tsil-name-{{ block.id }}" name="tsil-name"
@@ -112,7 +112,7 @@
     </div>
 
     {%- comment -%} STATE: manual entry fallback {%- endcomment -%}
-    <form class="tsil__form" data-tsil-state="manual" hidden novalidate>
+    <form class="tsil__form" data-tsil-state="manual" autocomplete="off" hidden novalidate>
       <p class="tsil__found-head">Enter your result manually</p>
       <p class="tsil__sub" data-tsil-manual-note>We couldn't find your result automatically — no problem, just type it in.</p>
       <div class="tsil__field">
@@ -275,6 +275,21 @@
     var states = {};
     root.querySelectorAll('[data-tsil-state]').forEach(function (el) {
       states[el.getAttribute('data-tsil-state')] = el;
+    });
+
+    // Disable browser autofill / saved-contact suggestions on our text inputs.
+    // Chrome ignores autocomplete="off" for name-like fields, so we also use the
+    // readonly-until-focus guard: the field is readonly on load (autofill skips
+    // readonly fields) and becomes editable the instant the shopper interacts.
+    root.querySelectorAll('input[type="text"]').forEach(function (el) {
+      el.setAttribute('autocomplete', 'off');
+      el.setAttribute('autocorrect', 'off');
+      el.setAttribute('spellcheck', 'false');
+      el.setAttribute('readonly', 'readonly');
+      var unlock = function () { el.removeAttribute('readonly'); };
+      el.addEventListener('focus', unlock);
+      el.addEventListener('pointerdown', unlock);
+      el.addEventListener('touchstart', unlock);
     });
 
     var headEl = root.querySelector('[data-tsil-head]');

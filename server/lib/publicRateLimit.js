@@ -8,7 +8,7 @@
  * to a shared DB-backed store later is an isolated change.
  */
 
-const RATE_LIMIT_MAX = 10 // lookups allowed per window, per IP
+const RATE_LIMIT_MAX = 20 // lookups allowed per window, per IP
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour — same name+race+year is stable
 
