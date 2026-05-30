@@ -51,6 +51,7 @@
   data-prop-pace="{{ block.settings.prop_pace | escape }}"
   data-prop-event="{{ block.settings.prop_event | escape }}"
   data-prop-notime="{{ block.settings.prop_notime | escape }}"
+  data-prop-gift="{{ block.settings.prop_gift | escape }}"
   data-prop-verified="{{ block.settings.prop_verified | escape }}"
   style="--tsil-accent: {{ block.settings.accent_color | default: '#4600D6' }};"
   {{ block.shopify_attributes }}
@@ -101,6 +102,10 @@
       <label class="tsil__notime">
         <input class="tsil__notime-cb" type="checkbox" data-tsil-notime>
         <span>Don't want your time/pace on it? Check this box</span>
+      </label>
+      <label class="tsil__notime">
+        <input class="tsil__notime-cb" type="checkbox" data-tsil-gift>
+        <span>Is this a gift?</span>
       </label>
       <p class="tsil__confirm-note">These details will be printed on your poster.</p>
       <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>Confirm info</button>
@@ -393,6 +398,7 @@
         pace: root.getAttribute('data-prop-pace'),
         event: root.getAttribute('data-prop-event'),
         notime: root.getAttribute('data-prop-notime'),
+        gift: root.getAttribute('data-prop-gift'),
         verified: root.getAttribute('data-prop-verified')
       }
     };
@@ -536,6 +542,8 @@
       pendingResult._verified = verified;
       var cb = root.querySelector('[data-tsil-notime]');
       if (cb) cb.checked = false;
+      var giftCb = root.querySelector('[data-tsil-gift]');
+      if (giftCb) giftCb.checked = false;
       root.querySelector('[data-tsil-found-head]').textContent = heading;
       renderBigCard(result, false);
       show('found');
@@ -545,6 +553,7 @@
     function confirmInfo() {
       if (!pendingResult) return;
       var noTime = !!(root.querySelector('[data-tsil-notime]') || {}).checked;
+      var isGift = !!(root.querySelector('[data-tsil-gift]') || {}).checked;
       var form = findProductForm();
       var year = root.querySelector('[name="tsil-year"]').value;
       var name = pendingResult.name || root.querySelector('[name="tsil-name"]').value;
@@ -558,10 +567,13 @@
         setProp(form, cfg.props.pace, noTime ? '' : (pendingResult.pace || ''));
         setProp(form, cfg.props.event, pendingResult.eventType || '');
         setProp(form, cfg.props.verified, pendingResult._verified ? 'true' : 'false');
-        setProp(form, cfg.props.notime, noTime ? 'Yes' : '');
+        // Values mirror Easify exactly so the fulfillment pipeline reads them
+        // identically: "No time" => "No time", "Gift" => "This is a gift".
+        setProp(form, cfg.props.notime, noTime ? 'No time' : '');
+        setProp(form, cfg.props.gift, isGift ? 'This is a gift' : '');
       }
       setSubmitDisabled(false);
-      var summary = name + (noTime ? ' · No time' : (pendingResult.time ? ' · ' + pendingResult.time : ''));
+      var summary = name + (noTime ? ' · No time' : (pendingResult.time ? ' · ' + pendingResult.time : '')) + (isGift ? ' · Gift' : '');
       root.querySelector('[data-tsil-done-summary]').textContent = summary;
       show('done');
     }
@@ -688,6 +700,8 @@
         setSubmitDisabled(true);
         var cb = root.querySelector('[data-tsil-notime]');
         if (cb) cb.checked = false;
+        var giftCb = root.querySelector('[data-tsil-gift]');
+        if (giftCb) giftCb.checked = false;
         show('search');
       });
     });
@@ -769,6 +783,7 @@
     { "type": "text", "id": "prop_pace", "label": "Pace property", "default": "Pace" },
     { "type": "text", "id": "prop_event", "label": "Event property", "default": "Event" },
     { "type": "text", "id": "prop_notime", "label": "No-time flag property", "default": "No time" },
+    { "type": "text", "id": "prop_gift", "label": "Gift flag property", "default": "Gift" },
     { "type": "text", "id": "prop_verified", "label": "Verified flag property", "default": "_lookup_verified" }
   ],
   "presets": [

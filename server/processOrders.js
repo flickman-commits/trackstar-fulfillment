@@ -313,7 +313,10 @@ function extractShopifyPersonalization(lineItem) {
         result.creativeDirection = value || null
       }
       else if (name === 'Gift' || name === 'Gift:' || name === 'gift') {
-        result.isGift = value ? (value.toLowerCase() === 'yes' || value.toLowerCase() === 'true') : false
+        // Easify (and the Instant Lookup widget mirroring it) sends the literal
+        // value "This is a gift" when the box is checked; older paths used yes/true.
+        const v = value.toLowerCase()
+        result.isGift = v === 'this is a gift' || v === 'yes' || v === 'true'
       }
       // Instant Lookup widget: pace + event/distance (only present on a verified match)
       else if (name === 'Pace' || name === 'Pace:' || name === 'pace') {
@@ -753,6 +756,8 @@ export async function processOrders(options = {}) {
                   updateData.customerFinishTime = extracted.timeCustomer
                   updateData.customerPace = extracted.customerPace
                   updateData.customerEventType = extracted.customerEventType
+                  // Gift flag applies to ALL orders (Easify + widget both set it).
+                  updateData.isGift = extracted.isGift
 
                   // Classify and extract custom order fields
                   // Check product title for custom order detection, not the extracted raceName
@@ -761,7 +766,6 @@ export async function processOrders(options = {}) {
                     updateData.bibNumberCustomer = extracted.bibNumberCustomer
                     updateData.timeCustomer = extracted.timeCustomer
                     updateData.creativeDirection = extracted.creativeDirection
-                    updateData.isGift = extracted.isGift
 
                     // Compute due date from Shopify order created_at + 14 days
                     const orderCreatedAt = shopifyData.shopifyOrderData?.created_at
@@ -903,6 +907,9 @@ export async function processOrders(options = {}) {
                   customerFinishTime = extracted.timeCustomer
                   customerPace = extracted.customerPace
                   customerEventType = extracted.customerEventType
+                  // Gift flag applies to ALL orders (Easify + widget both set it).
+                  // hadNoTime is already captured above.
+                  isGiftOrder = extracted.isGift
 
                   // Custom order classification — check product title, not extracted raceName
                   // (for custom orders, raceName is the customer-provided race, e.g. "Jfk 50",
@@ -912,7 +919,7 @@ export async function processOrders(options = {}) {
                     bibNumberCustomer = extracted.bibNumberCustomer
                     timeCustomer = extracted.timeCustomer
                     creativeDirection = extracted.creativeDirection
-                    isGiftOrder = extracted.isGift
+                    // isGiftOrder is captured above for all order types.
 
                     // Compute due date: order created_at + 14 days
                     const orderCreatedAt = shopifyData.shopifyOrderData?.created_at
