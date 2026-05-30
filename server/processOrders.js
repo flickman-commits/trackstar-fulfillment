@@ -1063,21 +1063,39 @@ export async function processOrders(options = {}) {
                 }
               })
 
-              if (dbOrder && dbOrder.trackstarOrderType !== 'custom' && hasScraperForRace(dbOrder.raceName)) {
-                log(`[processOrders] Running research for ${dbOrder.orderNumber}...`)
-                try {
-                  const research = await researchService.researchOrder(dbOrder.orderNumber)
-                  if (research.runnerResearch.researchStatus === 'found') {
+              if (dbOrder && dbOrder.trackstarOrderType !== 'custom') {
+                // Customer confirmed an official-results match in the storefront
+                // Instant Lookup widget → trust it and skip the runner scrape.
+                // applyVerifiedResult still fetches race-level data (weather/
+                // location). Manual entry (lookupVerified === false) and orders
+                // without the widget (null) fall through to the normal scrape.
+                if (dbOrder.lookupVerified === true && dbOrder.customerFinishTime) {
+                  log(`[processOrders] ✅ Customer-verified result for ${dbOrder.orderNumber} — skipping runner scrape`)
+                  try {
+                    await researchService.applyVerifiedResult(dbOrder.orderNumber)
                     results.researched++
-                    orderResult.researchStatus = 'found'
-                    log(`[processOrders] ✅ Research found: ${research.runnerResearch.bibNumber}`)
-                  } else {
-                    orderResult.researchStatus = research.runnerResearch.researchStatus
+                    orderResult.researchStatus = 'customer_verified'
+                  } catch (verifyError) {
+                    results.researchFailed++
+                    orderResult.researchStatus = 'error'
+                    log(`[processOrders] ❌ Failed to apply customer-verified result: ${verifyError.message}`)
                   }
-                } catch (researchError) {
-                  results.researchFailed++
-                  orderResult.researchStatus = 'error'
-                  log(`[processOrders] ❌ Research failed: ${researchError.message}`)
+                } else if (hasScraperForRace(dbOrder.raceName)) {
+                  log(`[processOrders] Running research for ${dbOrder.orderNumber}...`)
+                  try {
+                    const research = await researchService.researchOrder(dbOrder.orderNumber)
+                    if (research.runnerResearch.researchStatus === 'found') {
+                      results.researched++
+                      orderResult.researchStatus = 'found'
+                      log(`[processOrders] ✅ Research found: ${research.runnerResearch.bibNumber}`)
+                    } else {
+                      orderResult.researchStatus = research.runnerResearch.researchStatus
+                    }
+                  } catch (researchError) {
+                    results.researchFailed++
+                    orderResult.researchStatus = 'error'
+                    log(`[processOrders] ❌ Research failed: ${researchError.message}`)
+                  }
                 }
               }
             }

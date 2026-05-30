@@ -87,6 +87,95 @@ export class ResearchService {
   }
 
   /**
+   * Apply a CUSTOMER-VERIFIED result instead of scraping the runner.
+   *
+   * When the shopper confirmed an official-results match in the storefront
+   * Instant Lookup widget (Order.lookupVerified === true), we trust their
+   * finish time / bib / pace / event and skip the expensive, ambiguity-prone
+   * runner scrape (Tier 2). We STILL fetch race-level data (Tier 1: date,
+   * location, weather) because the poster needs it and the customer doesn't
+   * provide it — that fetch is best-effort, with a minimal Race fallback so the
+   * verified runner data always lands.
+   *
+   * Produces a RunnerResearch row with researchStatus='found' and
+   * source='customer_verified', and marks the order 'ready' — the same shape
+   * the dashboard already reads, so no UI change is required.
+   *
+   * @param {string} orderNumber
+   * @returns {Promise<Object>} { race, runnerResearch, order }
+   */
+  async applyVerifiedResult(orderNumber) {
+    const order = await prisma.order.findFirst({ where: { orderNumber } })
+    if (!order) throw new Error(`Order not found: ${orderNumber}`)
+
+    const effectiveRaceName = order.raceNameOverride ?? order.raceName
+    const effectiveRaceYear = order.yearOverride ?? order.raceYear
+    const effectiveRunnerName = order.runnerNameOverride ?? order.runnerName
+
+    if (!effectiveRunnerName) throw new Error('Order is missing runner name')
+    if (!effectiveRaceYear) throw new Error('Order is missing race year')
+
+    // TIER 1: race-level data (date/location/weather). Best-effort — a scrape
+    // failure must not block the verified runner data from being recorded.
+    let race = null
+    try {
+      if (hasScraperForRace(effectiveRaceName)) {
+        race = await this.getOrFetchRaceData(effectiveRaceName, effectiveRaceYear)
+      }
+    } catch (err) {
+      console.warn(`[ResearchService] Verified-path race fetch failed for ${orderNumber}: ${err.message}`)
+    }
+    if (!race) {
+      // Minimal race row so RunnerResearch (which requires raceId) can be written.
+      race = await prisma.race.upsert({
+        where: { raceName_year: { raceName: effectiveRaceName, year: effectiveRaceYear } },
+        update: {},
+        create: {
+          raceName: effectiveRaceName,
+          year: effectiveRaceYear,
+          raceDate: new Date(`${effectiveRaceYear}-01-01`),
+          eventTypes: order.customerEventType ? [order.customerEventType] : ['Marathon'],
+        }
+      })
+    }
+
+    // TIER 2 (replaced): write the customer-confirmed result.
+    const researchData = {
+      orderId: order.id,
+      raceId: race.id,
+      runnerName: effectiveRunnerName,
+      bibNumber: order.customerBib || null,
+      officialTime: order.customerFinishTime || null,
+      officialPace: order.customerPace || null,
+      eventType: order.customerEventType || null,
+      yearFound: effectiveRaceYear,
+      researchStatus: 'found',
+      source: 'customer_verified',
+      researchNotes: 'Customer-confirmed via Instant Lookup (matched official results)',
+      resultsUrl: race.resultsUrl || null,
+      possibleMatches: null,
+    }
+
+    const existing = await prisma.runnerResearch.findFirst({
+      where: { orderId: order.id, raceId: race.id }
+    })
+    let runnerResearch
+    if (existing) {
+      runnerResearch = await prisma.runnerResearch.update({ where: { id: existing.id }, data: researchData })
+    } else {
+      runnerResearch = await prisma.runnerResearch.create({ data: researchData })
+    }
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'ready', researchedAt: new Date() }
+    })
+
+    console.log(`[ResearchService] Applied customer-verified result for ${orderNumber} (bib ${researchData.bibNumber}, ${researchData.officialTime})`)
+    return { race, runnerResearch, order }
+  }
+
+  /**
    * TIER 1: Get race-level data from cache or fetch from scraper
    * @param {string} raceName
    * @param {number} year

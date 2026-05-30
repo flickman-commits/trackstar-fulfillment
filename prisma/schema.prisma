@@ -130,6 +130,11 @@ model RunnerResearch {
   eventType      String?  // "Marathon" or "Half Marathon"
   yearFound      Int?
   researchStatus String   @default("pending") // "found", "not_found", "ambiguous", "no_scraper", "year_not_configured", "upstream_error"
+  // How this result was obtained:
+  //   "scraper"          → found by the backend research scrape (default)
+  //   "customer_verified" → customer confirmed an official-results match in the
+  //                         storefront Instant Lookup widget (no runner scrape)
+  source         String   @default("scraper")
   researchNotes  String?
   resultsUrl     String?  // URL where this runner's results were found
   // Candidate matches surfaced when no exact name match was found. Each item:
