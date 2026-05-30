@@ -152,11 +152,10 @@
   #tsil-preview .tsil__bc-field--name .tsil__bc-value { font-size: 1.6rem; }
   #tsil-preview .tsil__bc-field--time .tsil__bc-value { font-size: 1.6rem; color: var(--tsil-accent); }
   #tsil-preview .tsil__bc-field--muted .tsil__bc-value { font-weight: 500; font-size: 1rem; }
-  /* When "no time" is checked, the time/pace fields read as struck-out/dimmed. */
-  #tsil-preview .tsil__bigcard.is-notime .tsil__bc-field--time .tsil__bc-value,
-  #tsil-preview .tsil__bigcard.is-notime .tsil__bc-field--pace .tsil__bc-value {
+  /* When "no time" is checked, the time line reads as a quiet "No time on
+     poster" note — dimmed and smaller, but NOT struck through. */
+  #tsil-preview .tsil__bigcard.is-notime .tsil__bc-field--time .tsil__bc-value {
     color: var(--tsil-muted);
-    text-decoration: line-through;
     font-size: 1.1rem;
   }
 
@@ -480,11 +479,12 @@
     var pendingResult = null;
 
     // ---- result rendering helpers ----
-    // Compact meta for the suggestions LIST — event type + bib only.
+    // Compact meta for the suggestions LIST — event type, bib, and time (no pace).
     function fmtListMeta(m) {
       var bits = [];
       if (m.eventType) bits.push(m.eventType);
       if (m.bib) bits.push('Bib ' + m.bib);
+      if (m.time) bits.push(m.time);
       return bits.join(' · ');
     }
 
