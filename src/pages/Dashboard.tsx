@@ -58,6 +58,11 @@ interface Order {
   officialTime?: string
   officialPace?: string
   researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null
+  // How the result was obtained: scraper vs. customer-confirmed in the widget
+  researchSource?: 'scraper' | 'customer_verified' | null
+  // Instant Lookup widget signal: true = customer confirmed an official match,
+  // false = customer typed it manually, null/undefined = no widget data
+  lookupVerified?: boolean | null
   researchNotes?: string
   // Weather data
   weatherTemp?: string
@@ -1866,6 +1871,9 @@ Thank you!`
   const getStatusDisplay = (order: Order) => {
     if (order.status === 'flagged') return { icon: '⚠️', label: 'Flagged' }
     if (order.status === 'missing_year') return { icon: '📅', label: 'Missing Year' }
+    // Customer confirmed an official-results match in the Instant Lookup widget
+    // — trusted, no scrape needed. Shown ahead of the generic ready/found labels.
+    if (order.researchSource === 'customer_verified') return { icon: '🟣', label: 'Customer-verified' }
     if (order.status === 'ready') return { icon: '✅', label: 'Ready' }
     if (order.researchStatus === 'found') return { icon: '✅', label: 'Researched' }
     if (order.researchStatus === 'no_scraper') return { icon: '🚧', label: 'No scraper for this race' }
@@ -4632,9 +4640,20 @@ Thank you!`
                       selectedOrder.researchStatus === 'found' || selectedOrder.bibNumber || selectedOrder.officialTime || selectedOrder.officialPace ? (
                         /* Results found — show with success styling */
                         <div className="bg-green-50 border border-green-200 rounded-md p-4 space-y-3 animate-[fadeIn_0.4s_ease-out]">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-green-600 text-sm">✓</span>
-                            <h4 className="text-xs font-semibold text-green-700 uppercase tracking-tight">Research Results</h4>
+                            <h4 className="text-xs font-semibold text-green-700 uppercase tracking-tight">
+                              {selectedOrder.researchSource === 'customer_verified' ? 'Customer-Verified Result' : 'Research Results'}
+                            </h4>
+                            {selectedOrder.researchSource === 'customer_verified' && (
+                              <span
+                                className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold"
+                                style={{ background: 'rgba(70,0,214,0.10)', color: '#4600D6', border: '1px solid rgba(70,0,214,0.25)' }}
+                                title="The customer confirmed an official-results match in the Instant Lookup widget before checkout — no scrape needed."
+                              >
+                                🟣 Confirmed by customer
+                              </span>
+                            )}
                           </div>
                           {selectedOrder.bibNumber && (
                             <div className="flex justify-between items-center">
@@ -4901,7 +4920,26 @@ Thank you!`
                   {/* Runner Details — copy-pasteable name + research data, top of stack */}
                   <div className="hidden md:block">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Runner Details</h4>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Runner Details</h4>
+                        {/* Data provenance: where the runner result came from. */}
+                        {selectedOrder.researchSource === 'customer_verified' ? (
+                          <span
+                            className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold"
+                            style={{ background: 'rgba(70,0,214,0.10)', color: '#4600D6', border: '1px solid rgba(70,0,214,0.25)' }}
+                            title="Customer confirmed an official-results match in the Instant Lookup widget before checkout — no scrape needed."
+                          >
+                            🟣 Customer-verified
+                          </span>
+                        ) : selectedOrder.lookupVerified === false ? (
+                          <span
+                            className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold bg-amber-100 text-amber-700 border border-amber-300"
+                            title="Customer typed this manually in the Instant Lookup widget — not matched to official results. Research runs as a cross-check."
+                          >
+                            🟠 Manual entry — verify
+                          </span>
+                        ) : null}
+                      </div>
                       {selectedOrder.resultsUrl && (
                         <a
                           href={selectedOrder.resultsUrl}

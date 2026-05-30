@@ -171,6 +171,9 @@ export default async function handler(req, res) {
         officialPace: formatPace(research?.officialPace),
         eventType: research?.eventType || null,
         researchStatus: research?.researchStatus || null,
+        // How the result was obtained: "scraper" | "customer_verified". Drives
+        // the dashboard's "Customer-verified" vs "Researched" badge.
+        researchSource: research?.source || null,
         researchNotes: research?.researchNotes || null,
         // Persisted candidate matches — populates the dashboard's accept-button
         // picker for ambiguous orders (so it shows even after page reload, not
