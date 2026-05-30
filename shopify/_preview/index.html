@@ -1,247 +1,415 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Trackstar Instant Lookup — Preview</title>
-  <style>
-    body {
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      letter-spacing: -0.04em;
-      color: #1A1A1A;
-      background: #F7F5F0;
-      margin: 0;
-      padding: 2rem 1rem 4rem;
-    }
-    .wrap { max-width: 1040px; margin: 0 auto; }
-    .pagehead { margin-bottom: 1.5rem; }
-    .pagehead h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.04em; margin: 0 0 .25rem; }
-    .pagehead p { color: #666; margin: 0; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
-    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
-    .panel { background: #fff; border: 1px solid #E0E0E0; padding: 1.25rem; }
-    /* Hide the debug-only panels so the preview shows just the storefront widget. */
-    .debug-only { display: none !important; }
-    .grid { grid-template-columns: 1fr !important; }
-    .wrap { max-width: 480px; }
-    .panel > h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: -0.02em; color: #666; margin: 0 0 1rem; font-weight: 700; }
-    /* Mock PDP product form */
-    .pdp-field { display: grid; gap: .3rem; margin-bottom: .75rem; }
-    .pdp-field label { font-size: .8rem; font-weight: 500; color: #666; }
-    .pdp-field input { padding: .5rem .6rem; border: 1px solid #E0E0E0; font: inherit; letter-spacing: -0.04em; }
-    .add-btn {
-      width: 100%; padding: 12px 24px; background: #4600D6; color: #fff; border: none;
-      font-family: inherit; font-weight: 700; letter-spacing: -0.04em; text-transform: uppercase; cursor: pointer;
-    }
-    .add-btn:disabled { opacity: .4; cursor: not-allowed; }
-    /* Live properties readout */
-    #readout { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; letter-spacing: 0; }
-    #readout .row { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem 0; border-bottom: 1px dashed #E0E0E0; }
-    #readout .k { color: #666; }
-    #readout .v { font-weight: 700; text-align: right; }
-    #readout .v.empty { color: #bbb; font-weight: 400; }
-    #readout .injected { color: #4600D6; }
-    .controls { margin-top: 1rem; display: flex; gap: .5rem; flex-wrap: wrap; }
-    .controls button { font: inherit; letter-spacing: -0.04em; padding: .4rem .7rem; border: 1px solid #E0E0E0; background: #F5F5F5; cursor: pointer; }
-    .hint { font-size: .8rem; color: #666; margin-top: .75rem; line-height: 1.5; }
-    .tag { display: inline-block; background: #F5F5F5; border: 1px solid #E0E0E0; padding: .1rem .4rem; font-size: .75rem; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trackstar Instant Lookup — Preview</title>
+<style>
+  body { margin: 0; background: #F7F5F0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.04em; color: #1A1A1A; }
+  .pv-bar { position: sticky; top: 0; z-index: 10; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: .75rem 1rem; background: #1A1A1A; color: #fff; font-size: .85rem; }
+  .pv-bar strong { font-weight: 700; }
+  .pv-bar select, .pv-bar button { font-family: inherit; font-size: .8rem; padding: .35rem .5rem; border-radius: 0; border: 1px solid #555; background: #2a2a2a; color: #fff; }
+  .pv-note { opacity: .7; }
+  .pv-stage { max-width: 460px; margin: 2rem auto; padding: 0 1rem; }
+  .pv-atc { margin-top: 1rem; }
+  .pv-atc button { width: 100%; padding: 14px; border: 0; border-radius: 0; background: #1A1A1A; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: -0.04em; cursor: pointer; }
+  .pv-atc button:disabled { opacity: .4; cursor: not-allowed; }
+  .pv-atc-label { font-size: .7rem; text-transform: uppercase; color: #666; margin: 0 0 .25rem; letter-spacing: 0.02em; }
+
+  #tsil-preview {
+    --tsil-accent-hover: #5A1AE6;
+    --tsil-text: #1A1A1A;
+    --tsil-muted: #666666;
+    --tsil-border: #E0E0E0;
+    --tsil-bg: #FFFFFF;
+    --tsil-soft: #F5F5F5;
+    margin: 1.25rem 0;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--font-body--family, 'Helvetica Neue', Helvetica, Arial, sans-serif);
+    letter-spacing: -0.04em;
+    color: var(--tsil-text);
+  }
+  /* Keep hidden states hidden — class display rules below would otherwise
+     out-specify the browser's default [hidden] rule and show every state. */
+  #tsil-preview [hidden] { display: none !important; }
+  /* When the intro is collapsed (results view), drop the leading gap. */
+  #tsil-preview .tsil__head[hidden] ~ [data-tsil-state] { margin-top: 0; }
+  #tsil-preview .tsil__card {
+    border: 1px solid var(--tsil-border);
+    background: var(--tsil-bg);
+    padding: 1.5rem;
+  }
+  /* Header is left-aligned: logo (or title) sits at the left edge. */
+  #tsil-preview .tsil__head { text-align: left; }
+  #tsil-preview .tsil__logo { display: inline-block; height: 34px; width: auto; max-width: 75%; }
+  #tsil-preview .tsil__title { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
+  #tsil-preview .tsil__sub { margin: .35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; }
+  #tsil-preview .tsil__form { display: grid; gap: .9rem; margin-top: 1.25rem; }
+  #tsil-preview .tsil__row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
+  #tsil-preview .tsil__field { display: grid; gap: .35rem; }
+  #tsil-preview .tsil__label { font-size: .9rem; font-weight: 500; letter-spacing: -0.04em; }
+  #tsil-preview .tsil__opt { font-weight: 400; color: var(--tsil-muted); }
+  #tsil-preview .tsil__input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .7rem .8rem;
+    border: 1px solid var(--tsil-border);
+    border-radius: 0;
+    font-family: inherit;
+    font-size: 1rem;
+    letter-spacing: -0.04em;
+    color: var(--tsil-text);
+    background: var(--tsil-bg);
+  }
+  #tsil-preview .tsil__input:focus {
+    outline: none;
+    border-color: var(--tsil-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tsil-accent) 25%, transparent);
+  }
+  #tsil-preview .tsil__btn {
+    width: 100%;
+    padding: 12px 24px;
+    border-radius: 0;
+    font-family: inherit;
+    font-size: .95rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background-color .15s ease, opacity .15s ease;
+  }
+  #tsil-preview .tsil__btn:disabled { opacity: .55; cursor: progress; }
+  #tsil-preview .tsil__btn--primary { background: var(--tsil-accent); color: #FFFFFF; }
+  #tsil-preview .tsil__btn--primary:hover { background: var(--tsil-accent-hover); }
+  #tsil-preview .tsil__btn--ghost { background: transparent; color: var(--tsil-muted); border-color: var(--tsil-border); }
+  #tsil-preview .tsil__btn--ghost:hover { color: var(--tsil-text); border-color: var(--tsil-text); }
+  #tsil-preview .tsil__error { margin: 0; color: #B42318; font-size: .9rem; letter-spacing: -0.04em; }
+  #tsil-preview .tsil__loading { display: flex; align-items: center; gap: .6rem; margin-top: 1.25rem; color: var(--tsil-muted); font-size: 1rem; }
+  #tsil-preview .tsil__spinner {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--tsil-border);
+    border-top-color: var(--tsil-accent);
+    animation: tsil-spin .7s linear infinite;
+  }
+  @keyframes tsil-spin { to { transform: rotate(360deg); } }
+  #tsil-preview .tsil__result, #tsil-preview .tsil__suggestions, #tsil-preview .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
+  #tsil-preview .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.35rem; line-height: 1.15; letter-spacing: -0.04em; }
+  #tsil-preview .tsil__refine-hint { margin: -.35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; letter-spacing: -0.04em; }
+  #tsil-preview .tsil__confirm-note {
+    margin: 0;
+    padding: .7rem .8rem;
+    background: var(--tsil-soft);
+    border-left: 3px solid var(--tsil-accent);
+    font-size: .85rem;
+    line-height: 1.4;
+    letter-spacing: -0.04em;
+    color: var(--tsil-text);
+  }
+  #tsil-preview .tsil__match, #tsil-preview .tsil__match-list { display: grid; gap: .5rem; }
+  #tsil-preview .tsil__match-card {
+    text-align: left;
+    width: 100%;
+    border: 1px solid var(--tsil-border);
+    border-radius: 0;
+    padding: .75rem .85rem;
+    background: var(--tsil-soft);
+    font-family: inherit;
+    letter-spacing: -0.04em;
+    cursor: pointer;
+  }
+  #tsil-preview button.tsil__match-card:hover { border-color: var(--tsil-accent); }
+  #tsil-preview .tsil__match-name { font-weight: 700; font-size: 1.05rem; }
+  #tsil-preview .tsil__match-meta { color: var(--tsil-muted); font-size: .9rem; margin-top: .15rem; }
+
+  /* ---- Big result card (confirmation screen) ---- */
+  #tsil-preview .tsil__bigcard {
+    border: 1px solid var(--tsil-border);
+    border-left: 3px solid var(--tsil-accent);
+    background: var(--tsil-soft);
+    padding: 1.1rem 1.15rem;
+    display: grid;
+    gap: .9rem;
+  }
+  #tsil-preview .tsil__bc-primary { display: grid; gap: .8rem; }
+  #tsil-preview .tsil__bc-secondary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .9rem 1.6rem;
+    padding-top: .25rem;
+    border-top: 1px solid var(--tsil-border);
+  }
+  #tsil-preview .tsil__bc-label {
+    font-size: .65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--tsil-muted);
+    margin-bottom: .15rem;
+  }
+  #tsil-preview .tsil__bc-value { font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; }
+  /* Name + time are the heroes of the card. */
+  #tsil-preview .tsil__bc-field--name .tsil__bc-value { font-size: 1.6rem; }
+  #tsil-preview .tsil__bc-field--time .tsil__bc-value { font-size: 1.6rem; color: var(--tsil-accent); }
+  #tsil-preview .tsil__bc-field--muted .tsil__bc-value { font-weight: 500; font-size: 1rem; }
+  /* When "no time" is checked, the time/pace fields read as struck-out/dimmed. */
+  #tsil-preview .tsil__bigcard.is-notime .tsil__bc-field--time .tsil__bc-value,
+  #tsil-preview .tsil__bigcard.is-notime .tsil__bc-field--pace .tsil__bc-value {
+    color: var(--tsil-muted);
+    text-decoration: line-through;
+    font-size: 1.1rem;
+  }
+
+  /* ---- No-time checkbox ---- */
+  #tsil-preview .tsil__notime {
+    display: flex;
+    align-items: flex-start;
+    gap: .55rem;
+    font-size: .85rem;
+    line-height: 1.35;
+    letter-spacing: -0.04em;
+    color: var(--tsil-text);
+    cursor: pointer;
+  }
+  #tsil-preview .tsil__notime-cb { margin-top: .15rem; width: 16px; height: 16px; accent-color: var(--tsil-accent); cursor: pointer; flex: 0 0 auto; }
+
+  /* ---- Minor (secondary) text-link actions ---- */
+  #tsil-preview .tsil__minor { display: flex; flex-wrap: wrap; gap: 1.1rem; margin-top: .15rem; }
+  #tsil-preview .tsil__btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: .8rem;
+    letter-spacing: -0.04em;
+    color: var(--tsil-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  #tsil-preview .tsil__btn-link:hover { color: var(--tsil-text); }
+
+  /* ---- Done / success: green, collapsed, animated checkmark ---- */
+  #tsil-preview .tsil__done-card {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: 1rem 1.1rem;
+    background: #ECFDF3;
+    border: 1px solid #A6F4C5;
+    border-left: 3px solid #12B76A;
+    animation: tsil-done-in .35s ease-out both;
+  }
+  @keyframes tsil-done-in {
+    from { opacity: 0; transform: translateY(6px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  #tsil-preview .tsil__check {
+    flex: 0 0 auto;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: #12B76A;
+    position: relative;
+    transform: scale(0);
+    animation: tsil-pop .35s cubic-bezier(.2,1.3,.5,1) .12s both;
+  }
+  #tsil-preview .tsil__check::after {
+    content: "";
+    position: absolute;
+    left: 9px; top: 5px;
+    width: 6px; height: 11px;
+    border: solid #FFFFFF;
+    border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg) scale(0);
+    transform-origin: center;
+    animation: tsil-check .2s ease-out .32s both;
+  }
+  @keyframes tsil-pop { to { transform: scale(1); } }
+  @keyframes tsil-check { from { transform: rotate(45deg) scale(0); } to { transform: rotate(45deg) scale(1); } }
+  #tsil-preview .tsil__done-text { flex: 1 1 auto; min-width: 0; }
+  #tsil-preview .tsil__done-head { margin: 0; font-weight: 700; font-size: 1rem; letter-spacing: -0.04em; color: #027A48; }
+  #tsil-preview .tsil__done-summary { margin: .1rem 0 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.04em; color: var(--tsil-text); overflow-wrap: anywhere; }
+  #tsil-preview .tsil__done-edit { flex: 0 0 auto; }
+
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="pagehead">
-      <h1>Trackstar Instant Lookup — Preview</h1>
-      <p>Live against <span class="tag">fast.trackstar.art</span> · race = <span class="tag">Mesa Marathon</span> · try <strong>Jared Noland / 2026</strong></p>
+  <div class="pv-bar">
+    <strong>Widget Preview</strong>
+    <label>Scenario:
+      <select id="pv-scenario">
+        <option value="single">Single match</option>
+        <option value="multiple">Multiple matches</option>
+        <option value="none">No match (manual)</option>
+        <option value="error">Lookup error (manual)</option>
+        <option value="ratelimited">Rate limited (manual)</option>
+      </select>
+    </label>
+    <span class="pv-note">Search any name → result depends on scenario. Mocked lookup; no network.</span>
+  </div>
+
+  <div class="pv-stage">
+    <div
+  class="tsil"
+  id="tsil-preview"
+  data-race="Memphis Marathon"
+  data-api-base="MOCK"
+  data-require-lookup="true"
+  data-prop-runner="Runner Name (First & Last)"
+  data-prop-year="Race Year"
+  data-prop-race="Race Name"
+  data-prop-bib="Bib #"
+  data-prop-time="Time"
+  data-prop-pace="Pace"
+  data-prop-event="Event"
+  data-prop-notime="No time"
+  data-prop-gift="Gift"
+  data-prop-verified="_lookup_verified"
+  style="--tsil-accent: #4600D6;"
+  
+>
+  <div class="tsil__card">
+    <div class="tsil__head" data-tsil-head>
+      
+        <h3 class="tsil__title">Trackstar Instant Lookup</h3>
+      
+      
+        <p class="tsil__sub">Verify your runner's time.</p>
+      
     </div>
 
-    <div class="grid">
-      <!-- LEFT: the actual widget + a mock PDP product form -->
-      <div>
-        <!-- ============ WIDGET (rendered from the Liquid section, section.id = "test") ============ -->
-        <div
-          class="tsil"
-          id="tsil-test"
-          data-race="Mesa Marathon"
-          data-api-base="https://fast.trackstar.art"
-          data-require-lookup="false"
-          data-prop-runner="Runner Name (First &amp; Last)"
-          data-prop-year="Race Year"
-          data-prop-race="Race Name"
-          data-prop-bib="Bib #"
-          data-prop-time="Time"
-          data-prop-verified="_lookup_verified"
-          style="--tsil-accent: #4600D6;"
-        >
-          <div class="tsil__card">
-            <div class="tsil__head" data-tsil-head>
-              <img class="tsil__logo" src="/trackstar-instant-lookup.png" alt="Trackstar Instant Lookup" width="1226" height="268" loading="lazy">
-              <p class="tsil__sub">Verify your runner's time.</p>
-            </div>
+    
+    <form class="tsil__form" data-tsil-state="search" autocomplete="off" novalidate>
+      <div class="tsil__field">
+        <label class="tsil__label" for="tsil-name-preview">Runner name</label>
+        <input class="tsil__input" id="tsil-name-preview" name="tsil-name"
+               type="text" autocomplete="off" placeholder="First & last name" maxlength="80" required>
+      </div>
+      <div class="tsil__field">
+        <label class="tsil__label" for="tsil-year-preview">Race year</label>
+        <select class="tsil__input" id="tsil-year-preview" name="tsil-year" data-tsil-year required></select>
+      </div>
+      <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-submit>Find my result</button>
+      <p class="tsil__error" data-tsil-error hidden></p>
+    </form>
 
-            <form class="tsil__form" data-tsil-state="search" novalidate>
-              <div class="tsil__field">
-                <label class="tsil__label" for="tsil-name-test">Runner name</label>
-                <input class="tsil__input" id="tsil-name-test" name="tsil-name"
-                       type="text" autocomplete="off" placeholder="First & last name" maxlength="80" required>
-              </div>
-              <div class="tsil__field">
-                <label class="tsil__label" for="tsil-year-test">Race year</label>
-                <select class="tsil__input" id="tsil-year-test" name="tsil-year" data-tsil-year required></select>
-              </div>
-              <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-submit>Find my result</button>
-              <p class="tsil__error" data-tsil-error hidden></p>
-            </form>
+    
+    <div class="tsil__loading" data-tsil-state="loading" hidden>
+      <span class="tsil__spinner" aria-hidden="true"></span>
+      <span data-tsil-loading-text>Searching results…</span>
+    </div>
 
-            <div class="tsil__loading" data-tsil-state="loading" hidden>
-              <span class="tsil__spinner" aria-hidden="true"></span>
-              <span data-tsil-loading-text>Searching results…</span>
-            </div>
+    
+    <div class="tsil__result" data-tsil-state="found" hidden>
+      <p class="tsil__found-head" data-tsil-found-head>Is this you?</p>
+      <div class="tsil__bigcard" data-tsil-found-card></div>
+      <label class="tsil__notime">
+        <input class="tsil__notime-cb" type="checkbox" data-tsil-notime>
+        <span>Don't want your time/pace on it? Check this box</span>
+      </label>
+      <label class="tsil__notime">
+        <input class="tsil__notime-cb" type="checkbox" data-tsil-gift>
+        <span>Is this a gift?</span>
+      </label>
+      <p class="tsil__confirm-note">These details will be printed on your poster.</p>
+      <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>Confirm info</button>
+      <div class="tsil__minor">
+        <button class="tsil__btn-link" type="button" data-tsil-reset>Search again</button>
+        <button class="tsil__btn-link" type="button" data-tsil-manual-link>Enter info manually</button>
+      </div>
+    </div>
 
-            <div class="tsil__result" data-tsil-state="found" hidden>
-              <p class="tsil__found-head">We found your result</p>
-              <div class="tsil__match" data-tsil-found-card></div>
-              <button class="tsil__btn tsil__btn--primary" type="button" data-tsil-confirm>That is correct</button>
-              <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Not the right runner (search again)</button>
-              <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-manual-link>Enter info manually</button>
-            </div>
+    
+    <div class="tsil__suggestions" data-tsil-state="suggestions" hidden>
+      <p class="tsil__found-head">We found multiple results — select the one that's you</p>
+      <p class="tsil__refine-hint" data-tsil-refine-hint hidden>Showing the first 10. Add or correct your first name to narrow it down.</p>
+      <div class="tsil__match-list" data-tsil-suggestion-list></div>
+      <div class="tsil__minor">
+        <button class="tsil__btn-link" type="button" data-tsil-reset>Search again</button>
+        <button class="tsil__btn-link" type="button" data-tsil-manual-link>Enter info manually</button>
+      </div>
+    </div>
 
-            <div class="tsil__suggestions" data-tsil-state="suggestions" hidden>
-              <p class="tsil__found-head">We found a few matches — pick yours:</p>
-              <p class="tsil__refine-hint" data-tsil-refine-hint hidden>Showing the first 10. Add or correct your first name to narrow it down.</p>
-              <div class="tsil__match-list" data-tsil-suggestion-list></div>
-              <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-manual-link>Enter info manually</button>
-              <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Search again</button>
-            </div>
-
-            <form class="tsil__form" data-tsil-state="manual" hidden novalidate>
-              <p class="tsil__found-head">Enter your result manually</p>
-              <p class="tsil__sub" data-tsil-manual-note>We couldn't find your result automatically — no problem, just type it in.</p>
-              <div class="tsil__field">
-                <label class="tsil__label" for="tsil-mname-test">Runner name</label>
-                <input class="tsil__input" id="tsil-mname-test" name="tsil-mname" type="text" maxlength="80" required>
-              </div>
-              <div class="tsil__row">
-                <div class="tsil__field">
-                  <label class="tsil__label" for="tsil-mbib-test">Bib # <span class="tsil__opt">(optional)</span></label>
-                  <input class="tsil__input" id="tsil-mbib-test" name="tsil-mbib" type="text" maxlength="20">
-                </div>
-                <div class="tsil__field">
-                  <label class="tsil__label" for="tsil-mtime-test">Finish time <span class="tsil__opt">(optional)</span></label>
-                  <input class="tsil__input" id="tsil-mtime-test" name="tsil-mtime" type="text" placeholder="3:45:12" maxlength="20">
-                </div>
-              </div>
-              <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-manual-submit>Use these details</button>
-              <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Back to lookup</button>
-            </form>
-
-            <div class="tsil__done" data-tsil-state="done" hidden>
-              <p class="tsil__found-head">Result confirmed</p>
-              <div class="tsil__match" data-tsil-done-card></div>
-              <p class="tsil__confirm-note">These details will be printed on your poster. Click <strong>Add to Cart</strong> below to lock them in.</p>
-              <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Edit details</button>
-            </div>
-          </div>
+    
+    <form class="tsil__form" data-tsil-state="manual" autocomplete="off" hidden novalidate>
+      <p class="tsil__found-head">Enter your result manually</p>
+      <p class="tsil__sub" data-tsil-manual-note>We couldn't find your result automatically — no problem, just type it in.</p>
+      <div class="tsil__field">
+        <label class="tsil__label" for="tsil-mname-preview">Runner name</label>
+        <input class="tsil__input" id="tsil-mname-preview" name="tsil-mname" type="text" maxlength="80" required>
+      </div>
+      <div class="tsil__row">
+        <div class="tsil__field">
+          <label class="tsil__label" for="tsil-mbib-preview">Bib # <span class="tsil__opt">(optional)</span></label>
+          <input class="tsil__input" id="tsil-mbib-preview" name="tsil-mbib" type="text" maxlength="20">
         </div>
-
-        <style>
-          #tsil-test {
-            --tsil-accent-hover: #5A1AE6;
-            --tsil-text: #1A1A1A;
-            --tsil-muted: #666666;
-            --tsil-border: #E0E0E0;
-            --tsil-bg: #FFFFFF;
-            --tsil-soft: #F5F5F5;
-            margin: 0 0 1.25rem;
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            letter-spacing: -0.04em;
-            color: var(--tsil-text);
-          }
-          #tsil-test [hidden] { display: none !important; }
-          #tsil-test .tsil__head[hidden] ~ [data-tsil-state] { margin-top: 0; }
-          #tsil-test .tsil__card { border: 1px solid var(--tsil-border); background: var(--tsil-bg); padding: 1.5rem; }
-          #tsil-test .tsil__head { text-align: left; }
-          #tsil-test .tsil__logo { display: inline-block; height: 34px; width: auto; max-width: 75%; }
-          #tsil-test .tsil__title { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
-          #tsil-test .tsil__sub { margin: .35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; }
-          #tsil-test .tsil__form { display: grid; gap: .9rem; margin-top: 1.25rem; }
-          #tsil-test .tsil__row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
-          #tsil-test .tsil__field { display: grid; gap: .35rem; }
-          #tsil-test .tsil__label { font-size: .9rem; font-weight: 500; letter-spacing: -0.04em; }
-          #tsil-test .tsil__opt { font-weight: 400; color: var(--tsil-muted); }
-          #tsil-test .tsil__input { width: 100%; box-sizing: border-box; padding: .7rem .8rem; border: 1px solid var(--tsil-border); border-radius: 0; font-family: inherit; font-size: 1rem; letter-spacing: -0.04em; color: var(--tsil-text); background: var(--tsil-bg); }
-          #tsil-test .tsil__input:focus { outline: none; border-color: var(--tsil-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--tsil-accent) 25%, transparent); }
-          #tsil-test .tsil__btn { width: 100%; padding: 12px 24px; border-radius: 0; font-family: inherit; font-size: .95rem; font-weight: 700; letter-spacing: -0.04em; text-transform: uppercase; cursor: pointer; border: 1px solid transparent; transition: background-color .15s ease, opacity .15s ease; }
-          #tsil-test .tsil__btn:disabled { opacity: .55; cursor: progress; }
-          #tsil-test .tsil__btn--primary { background: var(--tsil-accent); color: #FFFFFF; }
-          #tsil-test .tsil__btn--primary:hover { background: var(--tsil-accent-hover); }
-          #tsil-test .tsil__btn--ghost { background: transparent; color: var(--tsil-muted); border-color: var(--tsil-border); }
-          #tsil-test .tsil__btn--ghost:hover { color: var(--tsil-text); border-color: var(--tsil-text); }
-          #tsil-test .tsil__error { margin: 0; color: #B42318; font-size: .9rem; letter-spacing: -0.04em; }
-          #tsil-test .tsil__loading { display: flex; align-items: center; gap: .6rem; margin-top: 1.25rem; color: var(--tsil-muted); font-size: 1rem; }
-          #tsil-test .tsil__spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--tsil-border); border-top-color: var(--tsil-accent); animation: tsil-spin .7s linear infinite; }
-          @keyframes tsil-spin { to { transform: rotate(360deg); } }
-          #tsil-test .tsil__result, #tsil-test .tsil__suggestions, #tsil-test .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
-          #tsil-test .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.04em; }
-          #tsil-test .tsil__refine-hint { margin: -.35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; letter-spacing: -0.04em; }
-          #tsil-test .tsil__confirm-note { margin: 0; padding: .7rem .8rem; background: var(--tsil-soft); border-left: 3px solid var(--tsil-accent); font-size: .85rem; line-height: 1.4; letter-spacing: -0.04em; color: var(--tsil-text); }
-          #tsil-test .tsil__match, #tsil-test .tsil__match-list { display: grid; gap: .5rem; }
-          #tsil-test .tsil__match-card { text-align: left; width: 100%; border: 1px solid var(--tsil-border); border-radius: 0; padding: .75rem .85rem; background: var(--tsil-soft); font-family: inherit; letter-spacing: -0.04em; cursor: pointer; }
-          #tsil-test button.tsil__match-card:hover { border-color: var(--tsil-accent); }
-          #tsil-test .tsil__match-name { font-weight: 700; }
-          #tsil-test .tsil__match-meta { color: var(--tsil-muted); font-size: .9rem; margin-top: .15rem; }
-        </style>
-
-        <!-- ============ MOCK PDP PRODUCT FORM (stands in for the real theme's add-to-cart form) ============ -->
-        <div class="panel debug-only">
-          <h2>Mock product form (form[action="/cart/add"])</h2>
-          <form action="/cart/add" method="post" id="mock-form" onsubmit="return false;">
-            <div class="pdp-field">
-              <label>properties[Runner Name (First &amp; Last)]</label>
-              <input type="text" name="properties[Runner Name (First &amp; Last)]">
-            </div>
-            <div class="pdp-field">
-              <label>properties[Race Year]</label>
-              <input type="text" name="properties[Race Year]">
-            </div>
-            <div class="pdp-field">
-              <label>properties[Race Name]</label>
-              <input type="text" name="properties[Race Name]">
-            </div>
-            <div class="pdp-field">
-              <label>properties[Bib #]</label>
-              <input type="text" name="properties[Bib #]">
-            </div>
-            <div class="pdp-field">
-              <label>properties[Time]</label>
-              <input type="text" name="properties[Time]">
-            </div>
-            <button class="add-btn" name="add" type="submit">Add to cart</button>
-          </form>
-          <p class="hint">This mock has matching <code>properties[]</code> inputs, so the widget should <strong>fill</strong> these. On your real theme, if these inputs are JS-rendered or named differently, the widget instead <strong>injects hidden inputs</strong> (shown in purple on the right).</p>
+        <div class="tsil__field">
+          <label class="tsil__label" for="tsil-mtime-preview">Finish time <span class="tsil__opt">(optional)</span></label>
+          <input class="tsil__input" id="tsil-mtime-preview" name="tsil-mtime" type="text" placeholder="3:45:12" maxlength="20">
         </div>
       </div>
+      <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-manual-submit>Use these details</button>
+      <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Back to lookup</button>
+    </form>
 
-      <!-- RIGHT: live readout of what's actually attached to the cart -->
-      <div class="panel debug-only">
-        <h2>Live cart properties (what would post to /cart/add)</h2>
-        <div id="readout"></div>
-        <div class="controls">
-          <button onclick="document.querySelector('#tsil-test [data-tsil-reset]:not([hidden])')?.click() || location.reload()">Reset widget</button>
-          <button onclick="location.reload()">Reload page</button>
+    
+    <div class="tsil__done" data-tsil-state="done" hidden>
+      <div class="tsil__done-card">
+        <span class="tsil__check" aria-hidden="true"></span>
+        <div class="tsil__done-text">
+          <p class="tsil__done-head">Confirmed</p>
+          <p class="tsil__done-summary" data-tsil-done-summary></p>
         </div>
-        <p class="hint">
-          <span class="tag">black</span> = filled an existing form input ·
-          <span class="tag injected" style="color:#4600D6">purple</span> = widget injected a hidden input.<br>
-          Watch this update live when you click <strong>That's me</strong> or submit manual entry.
-        </p>
+        <button class="tsil__btn-link tsil__done-edit" type="button" data-tsil-edit>Edit</button>
       </div>
+      <p class="tsil__confirm-note">Click <strong>Add to Cart</strong> below to lock it in.</p>
+    </div>
+  </div>
+</div>
+
+
+
+    <div class="pv-atc">
+      <p class="pv-atc-label">Mock product form (watch this enable on confirm)</p>
+      <form action="/cart/add" onsubmit="return false">
+        <button type="submit" name="add">Add to cart</button>
+      </form>
     </div>
   </div>
 
-  <!-- ============ WIDGET SCRIPT (verbatim from the Liquid section, section.id = "test") ============ -->
   <script>
+    // ---- Mock the public lookup endpoint so every state is reachable offline.
+    window.__TSIL_SCENARIO = 'single';
+    document.getElementById('pv-scenario').addEventListener('change', function (e) {
+      window.__TSIL_SCENARIO = e.target.value;
+    });
+    var SAMPLE_SINGLE = { name: 'Matt Hickman', bib: '1487', time: '3:45:12', pace: '8:35', eventType: 'Marathon' };
+    var SAMPLE_MULTI = [
+      { name: 'Matt Hickman', bib: '1487', time: '3:45:12', pace: '8:35', eventType: 'Marathon' },
+      { name: 'Matthew Hickman', bib: '2231', time: '1:52:40', pace: '8:36', eventType: 'Half Marathon' },
+      { name: 'Matt Hickmann', bib: '0099', time: '4:10:05', pace: '9:32', eventType: 'Marathon' }
+    ];
+    var _fetch = window.fetch;
+    window.fetch = function (url, opts) {
+      if (typeof url === 'string' && url.indexOf('/api/public/results-lookup') !== -1) {
+        var s = window.__TSIL_SCENARIO;
+        function reply(status, data) {
+          return Promise.resolve({ status: status, json: function () { return Promise.resolve(data); } });
+        }
+        if (s === 'error') return reply(500, {});
+        if (s === 'ratelimited') return reply(429, {});
+        if (s === 'none') return reply(200, { found: false });
+        if (s === 'multiple') return reply(200, { suggestions: SAMPLE_MULTI, truncated: false });
+        return reply(200, { found: true, result: SAMPLE_SINGLE });
+      }
+      return _fetch.apply(this, arguments);
+    };
+  </script>
+
+  <script>
+
   (function () {
-    var root = document.getElementById('tsil-test');
+    var root = document.getElementById('tsil-preview');
     if (!root) return;
 
     var cfg = {
@@ -254,6 +422,10 @@
         race: root.getAttribute('data-prop-race'),
         bib: root.getAttribute('data-prop-bib'),
         time: root.getAttribute('data-prop-time'),
+        pace: root.getAttribute('data-prop-pace'),
+        event: root.getAttribute('data-prop-event'),
+        notime: root.getAttribute('data-prop-notime'),
+        gift: root.getAttribute('data-prop-gift'),
         verified: root.getAttribute('data-prop-verified')
       }
     };
@@ -263,12 +435,29 @@
       states[el.getAttribute('data-tsil-state')] = el;
     });
 
+    // Disable browser autofill / saved-contact suggestions on our text inputs.
+    // Chrome ignores autocomplete="off" for name-like fields, so we also use the
+    // readonly-until-focus guard: the field is readonly on load (autofill skips
+    // readonly fields) and becomes editable the instant the shopper interacts.
+    root.querySelectorAll('input[type="text"]').forEach(function (el) {
+      el.setAttribute('autocomplete', 'off');
+      el.setAttribute('autocorrect', 'off');
+      el.setAttribute('spellcheck', 'false');
+      el.setAttribute('readonly', 'readonly');
+      var unlock = function () { el.removeAttribute('readonly'); };
+      el.addEventListener('focus', unlock);
+      el.addEventListener('pointerdown', unlock);
+      el.addEventListener('touchstart', unlock);
+    });
+
     var headEl = root.querySelector('[data-tsil-head]');
     function show(state) {
       Object.keys(states).forEach(function (k) { states[k].hidden = (k !== state); });
+      // Collapse the heading/subheading intro once we're past the search step.
       if (headEl) headEl.hidden = (state !== 'search');
     }
 
+    // Populate the year dropdown: current year back 15 years, newest first.
     var yearSelect = root.querySelector('[data-tsil-year]');
     var nowYear = new Date().getFullYear();
     for (var y = nowYear; y >= nowYear - 15; y--) {
@@ -285,47 +474,82 @@
       errorEl.textContent = msg;
     }
 
-    function fmtMeta(r) {
+    // The result currently being confirmed (from a single match, a picked
+    // suggestion, or manual entry). _verified flags whether it came from an
+    // official-results match (true) or was typed manually (false).
+    var pendingResult = null;
+
+    // ---- result rendering helpers ----
+    // Compact meta for the suggestions LIST — event type + bib only.
+    function fmtListMeta(m) {
       var bits = [];
-      if (r.eventType) bits.push(r.eventType);
-      if (r.bib) bits.push('Bib ' + r.bib);
-      if (r.time) bits.push(r.time);
-      if (r.pace) bits.push(r.pace + ' /mi');
+      if (m.eventType) bits.push(m.eventType);
+      if (m.bib) bits.push('Bib ' + m.bib);
       return bits.join(' · ');
     }
-    function fillCard(container, r) {
-      container.innerHTML = '';
-      var card = document.createElement('div');
-      var nameEl = document.createElement('div');
-      nameEl.className = 'tsil__match-name';
-      nameEl.textContent = r.name || root.querySelector('[name="tsil-name"]').value;
-      var metaEl = document.createElement('div');
-      metaEl.className = 'tsil__match-meta';
-      metaEl.textContent = fmtMeta(r) || 'Result on file';
-      card.appendChild(nameEl);
-      card.appendChild(metaEl);
-      container.appendChild(card);
+
+    // Render the big, labeled confirmation card. `noTime` greys out time/pace.
+    function renderBigCard(r, noTime) {
+      var card = root.querySelector('[data-tsil-found-card]');
+      card.className = 'tsil__bigcard' + (noTime ? ' is-notime' : '');
+      card.innerHTML = '';
+
+      function field(label, value, mods) {
+        var f = document.createElement('div');
+        f.className = 'tsil__bc-field ' + mods;
+        var l = document.createElement('div'); l.className = 'tsil__bc-label'; l.textContent = label;
+        var v = document.createElement('div'); v.className = 'tsil__bc-value'; v.textContent = value;
+        f.appendChild(l); f.appendChild(v);
+        return f;
+      }
+
+      var name = r.name || root.querySelector('[name="tsil-name"]').value;
+
+      // Primary block — name + time are the heroes.
+      var primary = document.createElement('div');
+      primary.className = 'tsil__bc-primary';
+      primary.appendChild(field('Runner', name || '—', 'tsil__bc-field--name'));
+      if (noTime) {
+        primary.appendChild(field('Time', 'No time on poster', 'tsil__bc-field--time'));
+      } else if (r.time) {
+        primary.appendChild(field('Finish time', r.time, 'tsil__bc-field--time'));
+      }
+      card.appendChild(primary);
+
+      // Secondary block — smaller labeled details.
+      var secondary = document.createElement('div');
+      secondary.className = 'tsil__bc-secondary';
+      if (r.bib) secondary.appendChild(field('Bib', r.bib, 'tsil__bc-field--muted tsil__bc-field--bib'));
+      if (!noTime && r.pace) secondary.appendChild(field('Pace', r.pace + ' /mi', 'tsil__bc-field--muted tsil__bc-field--pace'));
+      if (r.eventType) secondary.appendChild(field('Event', r.eventType, 'tsil__bc-field--muted tsil__bc-field--event'));
+      if (secondary.children.length) card.appendChild(secondary);
     }
 
+    // ---- write data into the product form ----
     function findProductForm() {
       return document.querySelector('form[action$="/cart/add"], form[action*="/cart/add"]');
     }
+    // Sets (or clears) a line-item property. An EMPTY value removes any hidden
+    // input we injected, so we never ship a stray empty property (important for
+    // the "No time" flag, which the backend treats as present == true).
     function setProp(form, key, value) {
       if (!key) return;
-      var selector = 'input[name="properties[' + key + ']"], textarea[name="properties[' + key + ']"], select[name="properties[' + key + ']"]';
-      var field = form.querySelector(selector);
+      var val = value == null ? '' : String(value);
+      var field = form.querySelector('input[name="properties[' + key + ']"], textarea[name="properties[' + key + ']"], select[name="properties[' + key + ']"]');
       if (field) {
-        field.value = value == null ? '' : String(value);
+        if (val === '' && field.hasAttribute('data-tsil-injected')) { field.remove(); return; }
+        field.value = val;
         field.dispatchEvent(new Event('input', { bubbles: true }));
         field.dispatchEvent(new Event('change', { bubbles: true }));
-      } else {
-        var hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = 'properties[' + key + ']';
-        hidden.value = value == null ? '' : String(value);
-        hidden.setAttribute('data-tsil-injected', key);
-        form.appendChild(hidden);
+        return;
       }
+      if (val === '') return; // nothing to set, nothing to inject
+      var hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'properties[' + key + ']';
+      hidden.value = val;
+      hidden.setAttribute('data-tsil-injected', key);
+      form.appendChild(hidden);
     }
 
     function setSubmitDisabled(disabled) {
@@ -336,25 +560,52 @@
         btn.disabled = disabled;
       });
     }
+    // If lookup is required, lock add-to-cart until a result is confirmed.
     setSubmitDisabled(true);
 
-    function attach(result, verified) {
+    // Show the confirmation screen for a chosen result (does NOT write to cart yet).
+    function selectResult(result, verified, heading) {
+      pendingResult = result;
+      pendingResult._verified = verified;
+      var cb = root.querySelector('[data-tsil-notime]');
+      if (cb) cb.checked = false;
+      var giftCb = root.querySelector('[data-tsil-gift]');
+      if (giftCb) giftCb.checked = false;
+      root.querySelector('[data-tsil-found-head]').textContent = heading;
+      renderBigCard(result, false);
+      show('found');
+    }
+
+    // Final lock-in — write the cart properties and collapse to the green success card.
+    function confirmInfo() {
+      if (!pendingResult) return;
+      var noTime = !!(root.querySelector('[data-tsil-notime]') || {}).checked;
+      var isGift = !!(root.querySelector('[data-tsil-gift]') || {}).checked;
       var form = findProductForm();
       var year = root.querySelector('[name="tsil-year"]').value;
-      var name = result.name || root.querySelector('[name="tsil-name"]').value;
+      var name = pendingResult.name || root.querySelector('[name="tsil-name"]').value;
       if (form) {
         setProp(form, cfg.props.runner, name);
         setProp(form, cfg.props.year, year);
         setProp(form, cfg.props.race, cfg.race);
-        setProp(form, cfg.props.bib, result.bib || '');
-        setProp(form, cfg.props.time, result.time || '');
-        setProp(form, cfg.props.verified, verified ? 'true' : 'false');
+        setProp(form, cfg.props.bib, pendingResult.bib || '');
+        // "No time" omits time + pace from the poster and sends the backend flag.
+        setProp(form, cfg.props.time, noTime ? '' : (pendingResult.time || ''));
+        setProp(form, cfg.props.pace, noTime ? '' : (pendingResult.pace || ''));
+        setProp(form, cfg.props.event, pendingResult.eventType || '');
+        setProp(form, cfg.props.verified, pendingResult._verified ? 'true' : 'false');
+        // Values mirror Easify exactly so the fulfillment pipeline reads them
+        // identically: "No time" => "No time", "Gift" => "This is a gift".
+        setProp(form, cfg.props.notime, noTime ? 'No time' : '');
+        setProp(form, cfg.props.gift, isGift ? 'This is a gift' : '');
       }
       setSubmitDisabled(false);
-      fillCard(root.querySelector('[data-tsil-done-card]'), { name: name, bib: result.bib, time: result.time, pace: result.pace, eventType: result.eventType });
+      var summary = name + (noTime ? ' · No time' : (pendingResult.time ? ' · ' + pendingResult.time : '')) + (isGift ? ' · Gift' : '');
+      root.querySelector('[data-tsil-done-summary]').textContent = summary;
       show('done');
     }
 
+    // ---- the lookup call ----
     function doLookup(name, year) {
       setError('');
       show('loading');
@@ -374,9 +625,7 @@
         .then(function (res) {
           var data = res.data || {};
           if (data.found && data.result) {
-            fillCard(root.querySelector('[data-tsil-found-card]'), data.result);
-            root.querySelector('[data-tsil-confirm]').onclick = function () { attach(data.result, true); };
-            show('found');
+            selectResult(data.result, true, 'Is this you?');
             return;
           }
           if (data.suggestions && data.suggestions.length) {
@@ -385,6 +634,7 @@
             show('suggestions');
             return;
           }
+          // Everything else (not found, lookup off/404, error, rate-limited) → manual.
           prefillManual(name);
           if (res.status === 429) {
             root.querySelector('[data-tsil-manual-note]').textContent = 'Lots of lookups right now — please enter your result manually.';
@@ -412,10 +662,11 @@
         nameEl.textContent = m.name || 'Runner';
         var metaEl = document.createElement('div');
         metaEl.className = 'tsil__match-meta';
-        metaEl.textContent = fmtMeta(m) || 'Result on file';
+        metaEl.textContent = fmtListMeta(m) || 'Result on file';
         btn.appendChild(nameEl);
         btn.appendChild(metaEl);
-        btn.onclick = function () { attach(m, true); };
+        // Picking a suggestion goes to the same confirmation screen.
+        btn.onclick = function () { selectResult(m, true, 'Confirm your result'); };
         wrap.appendChild(btn);
       });
     }
@@ -424,6 +675,7 @@
       root.querySelector('[name="tsil-mname"]').value = name || '';
     }
 
+    // ---- wire up events ----
     states.search.addEventListener('submit', function (e) {
       e.preventDefault();
       var name = root.querySelector('[name="tsil-name"]').value.trim();
@@ -437,15 +689,48 @@
       e.preventDefault();
       var name = root.querySelector('[name="tsil-mname"]').value.trim();
       if (!name) { return; }
-      attach({
+      // Manual entry routes through the same confirmation screen as a match.
+      selectResult({
         name: name,
         bib: root.querySelector('[name="tsil-mbib"]').value.trim(),
         time: root.querySelector('[name="tsil-mtime"]').value.trim()
-      }, false);
+      }, false, 'Confirm your details');
     });
 
+    // Confirm button → lock in.
+    root.querySelector('[data-tsil-confirm]').addEventListener('click', confirmInfo);
+
+    // "Edit" on the success card → back to the confirmation screen (keeps the
+    // selection + no-time choice), and re-locks add-to-cart until re-confirmed.
+    var editBtn = root.querySelector('[data-tsil-edit]');
+    if (editBtn) {
+      editBtn.addEventListener('click', function () {
+        if (!pendingResult) { show('search'); return; }
+        setSubmitDisabled(true);
+        var cb = root.querySelector('[data-tsil-notime]');
+        renderBigCard(pendingResult, cb ? cb.checked : false);
+        show('found');
+      });
+    }
+
+    // No-time checkbox → live-update the card (grey out time/pace).
+    var noTimeCb = root.querySelector('[data-tsil-notime]');
+    if (noTimeCb) {
+      noTimeCb.addEventListener('change', function () {
+        if (pendingResult) renderBigCard(pendingResult, noTimeCb.checked);
+      });
+    }
+
     root.querySelectorAll('[data-tsil-reset]').forEach(function (btn) {
-      btn.addEventListener('click', function () { setError(''); setSubmitDisabled(true); show('search'); });
+      btn.addEventListener('click', function () {
+        setError('');
+        setSubmitDisabled(true);
+        var cb = root.querySelector('[data-tsil-notime]');
+        if (cb) cb.checked = false;
+        var giftCb = root.querySelector('[data-tsil-gift]');
+        if (giftCb) giftCb.checked = false;
+        show('search');
+      });
     });
     root.querySelectorAll('[data-tsil-manual-link]').forEach(function (link) {
       link.addEventListener('click', function () {
@@ -457,32 +742,7 @@
 
     show('search');
   })();
-  </script>
 
-  <!-- ============ PREVIEW-ONLY: live readout of the form's cart properties (NOT part of the widget) ============ -->
-  <script>
-  (function () {
-    var readout = document.getElementById('readout');
-    var form = document.getElementById('mock-form');
-    function render() {
-      // Existing form inputs + any hidden inputs the widget injected
-      var fields = form.querySelectorAll('input[name^="properties["]');
-      var html = '';
-      fields.forEach(function (f) {
-        var key = f.name.replace(/^properties\[/, '').replace(/\]$/, '');
-        var injected = f.hasAttribute('data-tsil-injected');
-        var val = f.value;
-        html += '<div class="row">'
-          + '<span class="k' + (injected ? ' injected' : '') + '">' + escapeHtml(key) + (injected ? ' (injected)' : '') + '</span>'
-          + '<span class="v ' + (val ? '' : 'empty') + (injected ? ' injected' : '') + '">' + (val ? escapeHtml(val) : '—') + '</span>'
-          + '</div>';
-      });
-      readout.innerHTML = html || '<div class="row"><span class="k">No properties yet</span></div>';
-    }
-    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]); }); }
-    setInterval(render, 400);
-    render();
-  })();
   </script>
 </body>
 </html>
