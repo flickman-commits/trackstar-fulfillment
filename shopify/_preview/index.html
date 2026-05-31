@@ -96,15 +96,14 @@
   #tsil-preview .tsil__result, #tsil-preview .tsil__suggestions, #tsil-preview .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
   #tsil-preview .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.35rem; line-height: 1.15; letter-spacing: -0.04em; }
   #tsil-preview .tsil__refine-hint { margin: -.35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; letter-spacing: -0.04em; }
+  /* Quiet inline italic note (used in the green success card). No callout box. */
   #tsil-preview .tsil__confirm-note {
     margin: 0;
-    padding: .7rem .8rem;
-    background: var(--tsil-soft);
-    border-left: 3px solid var(--tsil-accent);
-    font-size: .85rem;
+    font-style: italic;
+    font-size: .8rem;
     line-height: 1.4;
     letter-spacing: -0.04em;
-    color: var(--tsil-text);
+    color: var(--tsil-muted);
   }
   #tsil-preview .tsil__match, #tsil-preview .tsil__match-list { display: grid; gap: .5rem; }
   #tsil-preview .tsil__match-card {
