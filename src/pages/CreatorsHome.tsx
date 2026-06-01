@@ -22,6 +22,9 @@ interface Creator {
   email: string | null
   instagramHandle: string | null
   tiktokHandle: string | null
+  // Application questions from the onboarding wizard
+  bestContentLinks: string | null  // legacy — field removed from the wizard
+  whyWorkWithUs: string | null
   raceName: string | null
   raceYear: number | null
   bibNumber: string | null
@@ -355,6 +358,12 @@ export default function CreatorsHome() {
                             </>
                           )}
                         </div>
+                        {c.whyWorkWithUs && (
+                          <div className="mt-2 text-xs text-off-black/70 bg-white/60 border border-amber-200 rounded p-2 leading-relaxed line-clamp-4">
+                            <span className="text-off-black/40">Why us: </span>
+                            {c.whyWorkWithUs}
+                          </div>
+                        )}
                       </button>
                       <div className="flex items-center gap-2">
                         <button
@@ -964,6 +973,23 @@ function CreatorDrawer({
                 </div>
               )}
             </EditableCard>
+
+            <Section title="Application">
+              <div>
+                <Label>Why they want to work with us</Label>
+                {draft.whyWorkWithUs ? (
+                  <p className="text-sm text-off-black/80 whitespace-pre-wrap leading-relaxed">{draft.whyWorkWithUs}</p>
+                ) : (
+                  <p className="text-sm text-off-black/30 italic">No response</p>
+                )}
+              </div>
+              {draft.bestContentLinks && (
+                <div>
+                  <Label>Their best content (legacy)</Label>
+                  <p className="text-sm text-off-black/80 whitespace-pre-wrap break-words leading-relaxed">{draft.bestContentLinks}</p>
+                </div>
+              )}
+            </Section>
 
             <Section title={`Assigned Briefs${(creator.briefAssignments?.length ?? 0) > 0 ? ` (${creator.briefAssignments!.length})` : ''}`}>
               {(creator.briefAssignments?.length ?? 0) === 0 ? (
