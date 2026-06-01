@@ -1349,7 +1349,9 @@ async function handleCreatorHomeMetrics(res) {
     thisMonthApplications,
   ] = await Promise.all([
     prisma.creator.count({ where: { status: 'active' } }),
-    prisma.creator.count({ where: { status: 'invited' } }),
+    // Exclude unfinished public applications (blank rows) from the invited count
+    // so they don't inflate the "total in program" rollup.
+    prisma.creator.count({ where: { status: 'invited', NOT: { source: 'public_apply', onboardedAt: null } } }),
     prisma.creator.count({ where: { status: 'applied' } }),
     prisma.creator.count({ where: { status: 'paused' } }),
     prisma.order.findMany({
@@ -1402,6 +1404,13 @@ async function handleCreatorHomeMetrics(res) {
 // invite date descending so the most recent shows up first.
 async function handleListCreators(res) {
   const creators = await prisma.creator.findMany({
+    // Hide abandoned public applications — someone clicked "Apply" on the public
+    // landing page but never submitted the wizard. They're blank rows (no name,
+    // never onboarded) and only clutter the table. Once they submit, onboardedAt
+    // is set and they reappear in the Applied queue.
+    where: {
+      NOT: { source: 'public_apply', onboardedAt: null },
+    },
     orderBy: { invitedAt: 'desc' },
     include: {
       sampleOrder: {
@@ -1591,6 +1600,7 @@ async function handleCreateCreatorInvite({ name, email, instagramHandle, briefId
   const data = {
     inviteToken: makeInviteToken(),
     status: 'invited',
+    source: 'admin_invite',
   }
   if (name && String(name).trim()) data.name = String(name).trim()
   if (email && String(email).trim()) data.email = String(email).trim()
@@ -1623,6 +1633,7 @@ async function handleCreatePublicInvite(_body, res) {
     data: {
       inviteToken: makeInviteToken(),
       status: 'invited',
+      source: 'public_apply',
     }
   })
 

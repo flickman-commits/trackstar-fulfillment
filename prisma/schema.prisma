@@ -261,6 +261,13 @@ model Creator {
   whitelistingEnabled Boolean   @default(false)
   metaPageId          String?
 
+  // How this row was created:
+  //   "admin_invite" → Matt generated an invite link in /creators
+  //   "public_apply" → minted when someone clicked Apply on the public /apply page
+  // Used to hide abandoned public applications (public_apply + never onboarded)
+  // from the admin table so they don't clutter it with blank rows.
+  source              String    @default("admin_invite")
+
   // Workflow status
   status              String    @default("invited") // "invited" | "applied" | "active" | "paused" | "denied"
 
