@@ -110,42 +110,42 @@ export default function PostApprovalChecklist({
         {/* Winning design — the proof the customer approved */}
         {chosenProof && (
           <div className="bg-subtle-gray border border-border-gray rounded-md p-4">
-            <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-2">Final Design</p>
-            <div className="flex items-center gap-3">
-              {isPdf(chosenProof.imageUrl) ? (
-                <a
-                  href={chosenProof.imageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center h-16 w-16 rounded-md border border-border-gray bg-white text-2xl shrink-0 hover:opacity-90 transition-opacity"
-                  title="Open PDF"
-                >
-                  📄
-                </a>
-              ) : (
-                <a
-                  href={chosenProof.imageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block shrink-0"
-                  title="View full size"
-                >
-                  <img
-                    src={chosenProof.thumbnailUrl || chosenProof.imageUrl}
-                    alt="Final approved design"
-                    className="h-16 w-16 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity"
-                  />
-                </a>
-              )}
+            <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-3">Final Design</p>
+            {isPdf(chosenProof.imageUrl) ? (
+              <a
+                href={chosenProof.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center w-full py-10 rounded-md border border-border-gray bg-white text-5xl hover:opacity-90 transition-opacity"
+                title="Open PDF"
+              >
+                📄
+              </a>
+            ) : (
+              <a
+                href={chosenProof.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
+                title="View full size"
+              >
+                <img
+                  src={chosenProof.imageUrl}
+                  alt="Final approved design"
+                  className="w-full max-h-[28rem] object-contain rounded-md border border-border-gray bg-white hover:opacity-90 transition-opacity"
+                />
+              </a>
+            )}
+            <div className="text-center mt-3">
               <button
                 onClick={downloadMockup}
                 disabled={isDownloading}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-sm text-off-black/60 hover:text-off-black underline underline-offset-2 transition-colors disabled:opacity-50"
               >
                 {isDownloading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Downloading...</>
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Downloading...</>
                 ) : (
-                  <><Download className="w-4 h-4" /> Download Mockup</>
+                  <><Download className="w-3.5 h-3.5" /> Download Mockup</>
                 )}
               </button>
             </div>
