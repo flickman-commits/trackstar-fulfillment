@@ -49,6 +49,11 @@ import bostonConfig from './configs/boston.js'
 import illinoisConfig from './configs/illinois.js'
 import denverColfaxConfig from './configs/denverColfax.js'
 import vermontCityConfig from './configs/vermontCity.js'
+import fortLauderdaleConfig from './configs/fortLauderdale.js'
+import indianapolisMonumentalConfig from './configs/indianapolisMonumental.js'
+import jacksonHoleConfig from './configs/jacksonHole.js'
+import miamiConfig from './configs/miami.js'
+import sanFranciscoConfig from './configs/sanFrancisco.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
 
 /**
@@ -103,6 +108,11 @@ const ALL_CONFIGS = [
   houstonConfig,
   denverColfaxConfig,
   vermontCityConfig,
+  fortLauderdaleConfig,
+  indianapolisMonumentalConfig,
+  jacksonHoleConfig,
+  miamiConfig,
+  sanFranciscoConfig,
 ]
 
 /**
