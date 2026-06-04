@@ -54,6 +54,10 @@ import indianapolisMonumentalConfig from './configs/indianapolisMonumental.js'
 import jacksonHoleConfig from './configs/jacksonHole.js'
 import miamiConfig from './configs/miami.js'
 import sanFranciscoConfig from './configs/sanFrancisco.js'
+import airForceConfig from './configs/airForce.js'
+import armyTenMilerConfig from './configs/armyTenMiler.js'
+import surfCityConfig from './configs/surfCity.js'
+import dallasConfig from './configs/dallas.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
 
 /**
@@ -113,6 +117,10 @@ const ALL_CONFIGS = [
   jacksonHoleConfig,
   miamiConfig,
   sanFranciscoConfig,
+  airForceConfig,
+  armyTenMilerConfig,
+  surfCityConfig,
+  dallasConfig,
 ]
 
 /**
@@ -133,14 +141,22 @@ function buildAliasMap(configs) {
 const ALIAS_MAP = buildAliasMap(ALL_CONFIGS)
 
 /**
- * Create a scraper instance from a config object
+ * Create a scraper instance from a config object.
+ *
+ * Some races live on different platforms in different years (e.g. LA Marathon
+ * is on Xacte for recent years but only on Athlinks for 2018). A config may
+ * declare `yearOverrides: { <year>: { platform, eventIds, ... } }` whose fields
+ * are shallow-merged over the base config for that year only.
  */
 function createScraper(config, year) {
-  const ScraperClass = PLATFORM_MAP[config.platform]
+  const override = config.yearOverrides?.[year]
+  const effectiveConfig = override ? { ...config, ...override } : config
+
+  const ScraperClass = PLATFORM_MAP[effectiveConfig.platform]
   if (!ScraperClass) {
-    throw new Error(`Unknown platform: ${config.platform}`)
+    throw new Error(`Unknown platform: ${effectiveConfig.platform}`)
   }
-  return new ScraperClass(year, config)
+  return new ScraperClass(year, effectiveConfig)
 }
 
 /**

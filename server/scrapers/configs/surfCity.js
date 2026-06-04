@@ -1,0 +1,53 @@
+/**
+ * Surf City Marathon (Huntington Beach, CA) — marathon + half, early February.
+ * Xacte platform for 2024–2025. Results: https://results2.xacte.com/#/e/{id}/searchable
+ *
+ * NOTE: 2026 migrated to Laurel Timing (results.laurelt.com) — add a
+ * yearOverrides[2026] entry once the Laurel adapter lands (Phase C).
+ *
+ * Verified finisher: Alfredo Garcia Jr, bib 20940, 6:28:34 (2025 Marathon,
+ * eventId 2571, subevent 6415).
+ */
+export default {
+  platform: 'xacte',
+  raceName: 'Surf City Marathon',
+  tag: 'SurfCity',
+  location: 'Huntington Beach, CA',
+
+  eventIds: {
+    2024: 2531,
+    2025: 2571,
+  },
+
+  subEvents: {
+    2024: {
+      marathon: { id: 6305, distance: 42195 },
+      half:     { id: 6304, distance: 21097 },
+    },
+    2025: {
+      marathon: { id: 6415, distance: 42195 },
+      half:     { id: 6414, distance: 21097 },
+    },
+  },
+
+  eventTypes: ['Marathon', 'Half Marathon'],
+  defaultEventType: 'Marathon',
+  eventSearchOrder: ['marathon', 'half'],
+  eventLabels: { marathon: 'Marathon', half: 'Half Marathon' },
+
+  aliases: [
+    'Surf City Marathon',
+    'Surf City USA Marathon',
+    'Surf City Half Marathon',
+  ],
+  keywords: ['surf city'],
+  keywordRequiresMarathon: true,
+
+  /** First Sunday of February. */
+  calculateDate(year) {
+    const feb1 = new Date(year, 1, 1)
+    const dow = feb1.getDay()
+    const firstSunday = dow === 0 ? 1 : 1 + (7 - dow)
+    return new Date(year, 1, firstSunday)
+  }
+}

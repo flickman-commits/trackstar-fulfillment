@@ -3,7 +3,7 @@
  * Athlinks platform. Master event: https://www.athlinks.com/event/1403
  *
  * Per-year event IDs (discover via alaska.athlinks.com/MasterEvents/Api/1403):
- *   2022: 1020821  2023: 1052040  2024: 1072999  2025: 1119286
+ *   2022: 1020821  2023: 1052040  2024: 1072999  2025: 1119286  2026: 1137293
  *
  * Course names: full = "Marathon" (2022–24) or "Full Marathon" (2025) — exclude
  * "Ultra Marathon". SF splits the half into TWO courses (1st Half / Bridge Half
@@ -39,6 +39,7 @@ export default {
     2023: 1052040,
     2024: 1072999,
     2025: 1119286,
+    2026: 1137293,
   },
   /** Approx: last Sunday of July. */
   calculateDate(year) {
