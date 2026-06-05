@@ -25,6 +25,11 @@ import {
   getCached,
   setCached,
 } from '../../server/lib/publicRateLimit.js'
+import {
+  logLookup,
+  recordLookup,
+  maybeAlertLookupError,
+} from '../../server/lib/lookupObservability.js'
 
 function getClientIp(req) {
   const fwd = req.headers['x-forwarded-for']
@@ -65,18 +70,32 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  const startMs = Date.now()
+  const ip = getClientIp(req)
   const race = String(req.query.race || '').trim()
   const name = String(req.query.name || '').trim()
   const yearRaw = String(req.query.year || '').trim()
   const year = parseInt(yearRaw, 10)
 
+  // Observability shorthand — emit one structured `[LOOKUP]` log line + ring
+  // buffer entry per request. Always call before returning.
+  const observe = ({ outcome, status, cachedHit, raceForLog }) => {
+    const ms = Date.now() - startMs
+    const ent = { race: raceForLog || race, year, name, outcome, ms, status, ip, cached: !!cachedHit }
+    logLookup(ent)
+    recordLookup(ent)
+  }
+
   if (!race || !name || !yearRaw) {
+    observe({ outcome: 'bad_request', status: 400 })
     return res.status(400).json({ error: 'race, year, and name are required' })
   }
   if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    observe({ outcome: 'bad_request', status: 400 })
     return res.status(400).json({ error: 'year must be a valid 4-digit year' })
   }
   if (name.length > 80 || race.length > 80) {
+    observe({ outcome: 'bad_request', status: 400 })
     return res.status(400).json({ error: 'race and name must be under 80 characters' })
   }
 
@@ -84,12 +103,15 @@ export default async function handler(req, res) {
   // Marathon Poster") instead of a clean race name. Resolve it to the canonical
   // race so the scraper lookup matches. Idempotent on already-clean names.
   const resolvedRace = parseRaceNameFromTitle(race) || race
+  // Canonical race name (e.g. "Personalized Boston Race Print" → "Boston
+  // Marathon"). Used in logs so all observability rolls up by canonical name.
+  const raceCanonical = getCanonicalRaceName(resolvedRace) || resolvedRace
 
   // Rate limit before doing any work.
-  const ip = getClientIp(req)
   const limit = checkRateLimit(ip)
   if (!limit.allowed) {
     res.setHeader('Retry-After', Math.ceil(limit.retryAfterMs / 1000))
+    observe({ outcome: 'rate_limited', status: 429, raceForLog: raceCanonical })
     return res.status(429).json({
       error: 'Too many lookups. Please try again later.',
       ...fallback(),
@@ -98,26 +120,23 @@ export default async function handler(req, res) {
 
   // Races without an HTTP scraper / not in the rollout allowlist → manual fallback.
   if (!isRacePublicSafe(resolvedRace) || !isRaceAllowed(resolvedRace)) {
+    observe({ outcome: 'off', status: 200, raceForLog: raceCanonical })
     return res.status(200).json(fallback({ reason: 'no_instant_lookup' }))
   }
 
   const cacheKey = buildCacheKey({ race: resolvedRace, year, name })
   const cached = getCached(cacheKey)
   if (cached) {
+    observe({ outcome: 'cached', status: 200, cachedHit: true, raceForLog: raceCanonical })
     return res.status(200).json({ ...cached, cached: true })
   }
-
-  // Canonical race name (e.g. "Mesa Marathon Personalized Race Print" →
-  // "Mesa Marathon"). We pass this back to the widget so the cart-line property
-  // it writes matches what the fulfillment pipeline expects, regardless of how
-  // the merchant configured the block.
-  const raceCanonical = getCanonicalRaceName(resolvedRace) || resolvedRace
 
   try {
     const result = await researchService.findRunner(resolvedRace, year, name)
 
-    let payload
+    let payload, outcome
     if (result.found) {
+      outcome = 'found'
       payload = {
         found: true,
         instant: true,
@@ -131,6 +150,7 @@ export default async function handler(req, res) {
         },
       }
     } else if (result.ambiguous || (result.possibleMatches && result.possibleMatches.length > 0)) {
+      outcome = 'suggestions'
       payload = {
         found: false,
         instant: true,
@@ -147,14 +167,34 @@ export default async function handler(req, res) {
           eventType: m.eventType ?? null,
         })),
       }
+    } else if (result.researchStatus === 'upstream_error') {
+      // Scraper reached its retries and the timing site is still down. Surface
+      // this as an alert (throttled) — same UX as not_found for the shopper,
+      // but we want to KNOW about it.
+      outcome = 'upstream_error'
+      maybeAlertLookupError({
+        race: raceCanonical, year,
+        errorType: 'upstream_error',
+        detail: result.researchNotes || null,
+      }).catch(() => {})
+      payload = fallback({ reason: 'upstream_error', instant: true, raceCanonical })
     } else {
+      outcome = 'not_found'
       payload = fallback({ reason: 'not_found', instant: true, raceCanonical })
     }
 
     setCached(cacheKey, payload)
+    observe({ outcome, status: 200, raceForLog: raceCanonical })
     return res.status(200).json(payload)
   } catch (error) {
     console.error('[public/results-lookup] lookup failed:', error.message)
+    // Unhandled exception — alert (throttled).
+    maybeAlertLookupError({
+      race: raceCanonical, year,
+      errorType: 'exception',
+      detail: error.message,
+    }).catch(() => {})
+    observe({ outcome: 'upstream_error', status: 200, raceForLog: raceCanonical })
     return res.status(200).json(fallback({ reason: 'lookup_error' }))
   }
 }
