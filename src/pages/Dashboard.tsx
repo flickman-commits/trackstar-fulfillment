@@ -347,6 +347,45 @@ export default function Dashboard() {
   const [connTestResults, setConnTestResults] = useState<ConnTestResult | null>(null)
   const [isRunningConnTest, setIsRunningConnTest] = useState(false)
   const [showReviewRequest, setShowReviewRequest] = useState(false)
+
+  // Recent Instant Lookup activity (in-memory ring buffer, fetched via
+  // /api/admin/lookups-recent). Used by the "Recent Lookups" card in Settings.
+  type LookupEntry = {
+    at: number
+    race: string | null
+    year: number | null
+    name: string
+    outcome: string
+    status: number | null
+    ms: number | null
+    ip: string
+    cached: boolean
+  }
+  type LookupSummary = { total: number; byOutcome: Record<string, number>; byRace: Record<string, number> }
+  const [showLookupsRecent, setShowLookupsRecent] = useState(false)
+  const [lookupsRecent, setLookupsRecent] = useState<LookupEntry[]>([])
+  const [lookupsSummary, setLookupsSummary] = useState<LookupSummary | null>(null)
+  const [lookupsLoading, setLookupsLoading] = useState(false)
+  const [lookupsError, setLookupsError] = useState<string | null>(null)
+  const [lookupsRaceFilter, setLookupsRaceFilter] = useState<string>('')
+
+  async function fetchLookupsRecent() {
+    setLookupsLoading(true); setLookupsError(null)
+    try {
+      const qs = new URLSearchParams({ limit: '200' })
+      if (lookupsRaceFilter) qs.set('race', lookupsRaceFilter)
+      const r = await apiFetch(`/api/admin/lookups-recent?${qs.toString()}`)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const data = await r.json()
+      setLookupsRecent(data.entries || [])
+      setLookupsSummary(data.summary || null)
+    } catch (e: any) {
+      setLookupsError(e?.message || 'Failed to load')
+      setLookupsRecent([]); setLookupsSummary(null)
+    } finally {
+      setLookupsLoading(false)
+    }
+  }
   const [reviewCopied, setReviewCopied] = useState<string | null>(null)
   const [customersServedCount, setCustomersServedCount] = useState<number | null>(null)
   const [customersServedInput, setCustomersServedInput] = useState('')
@@ -3007,6 +3046,40 @@ Thank you!`
                         </div>
                       </div>
                     </button>
+
+                    {/* Vercel logs — opens in a new tab; permanent record of every [LOOKUP] line. */}
+                    <a
+                      href="https://vercel.com/flickman-media/trackstar-fulfillment/logs?panelState=opened"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-off-black">Check Logs</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Open the Vercel logs to grep [LOOKUP] and trace any request</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs text-off-black/30">vercel.com ↗</span>
+                        </div>
+                      </div>
+                    </a>
+
+                    {/* Recent Instant Lookup attempts (last 200 in-memory). */}
+                    <button
+                      onClick={() => { setShowLookupsRecent(true); fetchLookupsRecent() }}
+                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-off-black">Recent Lookups</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Last 200 Instant Lookup attempts, with outcome breakdown</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
+                        </div>
+                      </div>
+                    </button>
                   </div>
 
                   {/* Customers Served Counter */}
@@ -3192,6 +3265,134 @@ Thank you!`
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Recent Lookups Full-Screen Overlay */}
+        {showLookupsRecent && (
+          <div
+            className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowLookupsRecent(false) }}
+          >
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+              <div className="px-6 py-4 border-b border-border-gray flex-shrink-0 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-base font-semibold text-off-black">Recent Lookups</h2>
+                    <span className="text-xs text-off-black/50">In-memory, last 200, per Vercel instance</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={fetchLookupsRecent}
+                      disabled={lookupsLoading}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors disabled:opacity-50"
+                    >
+                      {lookupsLoading ? 'Loading…' : 'Refresh'}
+                    </button>
+                    <button onClick={() => setShowLookupsRecent(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
+                  </div>
+                </div>
+
+                {/* Filter + summary */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input
+                    type="text"
+                    placeholder="Filter by exact race name (e.g. Boston Marathon)…"
+                    value={lookupsRaceFilter}
+                    onChange={(e) => setLookupsRaceFilter(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') fetchLookupsRecent() }}
+                    className="flex-1 min-w-[240px] px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                  />
+                  {lookupsRaceFilter && (
+                    <button onClick={() => { setLookupsRaceFilter(''); fetchLookupsRecent() }} className="text-xs text-off-black/50 hover:text-off-black underline">
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {lookupsSummary && (
+                  <div className="flex items-center gap-3 flex-wrap text-xs">
+                    <span className="text-off-black/60">Total: <strong className="text-off-black">{lookupsSummary.total}</strong></span>
+                    {Object.entries(lookupsSummary.byOutcome).sort(([, a], [, b]) => b - a).map(([k, v]) => {
+                      const colors: Record<string, string> = {
+                        found:           'bg-green-100 text-green-700 border-green-200',
+                        suggestions:     'bg-blue-100 text-blue-700 border-blue-200',
+                        cached:          'bg-purple-100 text-purple-700 border-purple-200',
+                        not_found:       'bg-off-black/5 text-off-black/60 border-off-black/15',
+                        off:             'bg-off-black/5 text-off-black/40 border-off-black/10',
+                        rate_limited:    'bg-amber-100 text-amber-700 border-amber-300',
+                        upstream_error:  'bg-red-100 text-red-700 border-red-300',
+                        bad_request:     'bg-amber-100 text-amber-700 border-amber-200',
+                      }
+                      const cls = colors[k] || 'bg-off-black/5 text-off-black/60 border-off-black/15'
+                      return (
+                        <span key={k} className={`px-2 py-0.5 rounded border ${cls}`}>
+                          {k}: <strong>{v}</strong>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {lookupsError ? (
+                  <div className="p-6 text-sm text-red-600">{lookupsError}</div>
+                ) : lookupsRecent.length === 0 ? (
+                  <div className="p-12 text-center text-sm text-off-black/50">
+                    {lookupsLoading ? 'Loading…' : 'No lookups recorded in this Vercel instance yet. New requests will appear here.'}
+                  </div>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-white border-b border-border-gray">
+                      <tr className="text-off-black/50 text-left">
+                        <th className="px-4 py-2 font-medium">When</th>
+                        <th className="px-4 py-2 font-medium">Race</th>
+                        <th className="px-4 py-2 font-medium">Year</th>
+                        <th className="px-4 py-2 font-medium">Name</th>
+                        <th className="px-4 py-2 font-medium">Outcome</th>
+                        <th className="px-4 py-2 font-medium text-right">ms</th>
+                        <th className="px-4 py-2 font-medium">IP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lookupsRecent.map((e, i) => {
+                        const dt = new Date(e.at)
+                        const when = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                        const outcomeColors: Record<string, string> = {
+                          found:           'text-green-700',
+                          suggestions:     'text-blue-700',
+                          cached:          'text-purple-700',
+                          not_found:       'text-off-black/60',
+                          off:             'text-off-black/40',
+                          rate_limited:    'text-amber-700',
+                          upstream_error:  'text-red-700',
+                          bad_request:     'text-amber-700',
+                        }
+                        return (
+                          <tr key={i} className="border-b border-border-gray/50 hover:bg-subtle-gray/40">
+                            <td className="px-4 py-2 text-off-black/60 whitespace-nowrap">{when}</td>
+                            <td className="px-4 py-2 text-off-black">{e.race || '—'}</td>
+                            <td className="px-4 py-2 text-off-black/70">{e.year ?? '—'}</td>
+                            <td className="px-4 py-2 font-mono text-off-black/70">{e.name || '—'}</td>
+                            <td className={`px-4 py-2 font-medium ${outcomeColors[e.outcome] || 'text-off-black/60'}`}>
+                              {e.outcome}{e.cached ? ' (cache)' : ''}
+                            </td>
+                            <td className="px-4 py-2 text-off-black/60 text-right tabular-nums">{e.ms ?? '—'}</td>
+                            <td className="px-4 py-2 font-mono text-off-black/50">{e.ip || '—'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <div className="px-6 py-3 border-t border-border-gray text-[11px] text-off-black/40">
+                Names are anonymized (e.g. M.H.(11) = "Matt Hickman"). For permanent records grep <code className="bg-subtle-gray px-1 rounded">[LOOKUP]</code> in Vercel logs.
+              </div>
             </div>
           </div>
         )}
