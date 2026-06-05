@@ -107,6 +107,12 @@ export default async function handler(req, res) {
     return res.status(200).json({ ...cached, cached: true })
   }
 
+  // Canonical race name (e.g. "Mesa Marathon Personalized Race Print" →
+  // "Mesa Marathon"). We pass this back to the widget so the cart-line property
+  // it writes matches what the fulfillment pipeline expects, regardless of how
+  // the merchant configured the block.
+  const raceCanonical = getCanonicalRaceName(resolvedRace) || resolvedRace
+
   try {
     const result = await researchService.findRunner(resolvedRace, year, name)
 
@@ -115,6 +121,7 @@ export default async function handler(req, res) {
       payload = {
         found: true,
         instant: true,
+        raceCanonical,
         result: {
           name,
           bib: result.bibNumber,
@@ -127,6 +134,7 @@ export default async function handler(req, res) {
       payload = {
         found: false,
         instant: true,
+        raceCanonical,
         fallbackRequired: true,
         // The candidate list was trimmed upstream — let the widget prompt the
         // shopper to refine their search rather than hiding matches silently.
@@ -140,7 +148,7 @@ export default async function handler(req, res) {
         })),
       }
     } else {
-      payload = fallback({ reason: 'not_found', instant: true })
+      payload = fallback({ reason: 'not_found', instant: true, raceCanonical })
     }
 
     setCached(cacheKey, payload)

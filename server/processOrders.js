@@ -254,7 +254,8 @@ function extractShopifyPersonalization(lineItem) {
     // no widget data, true = confirmed official match, false = typed manually.
     lookupVerified: null,
     customerPace: null,
-    customerEventType: null
+    customerEventType: null,
+    lookupOutcome: null
   }
 
   if (!lineItem) {
@@ -329,6 +330,11 @@ function extractShopifyPersonalization(lineItem) {
       // "true" = customer confirmed an official-results match; "false" = typed manually.
       else if (name === '_lookup_verified' || name === 'lookup_verified') {
         result.lookupVerified = value ? value.toLowerCase() === 'true' : false
+      }
+      // Instant Lookup widget: outcome — HOW the customer arrived here. See
+      // Order.lookupOutcome in the schema for the enum values.
+      else if (name === '_lookup_outcome' || name === 'lookup_outcome') {
+        result.lookupOutcome = value || null
       }
     }
   }
@@ -756,6 +762,7 @@ export async function processOrders(options = {}) {
                   updateData.customerFinishTime = extracted.timeCustomer
                   updateData.customerPace = extracted.customerPace
                   updateData.customerEventType = extracted.customerEventType
+                  updateData.lookupOutcome = extracted.lookupOutcome
                   // Gift flag applies to ALL orders (Easify + widget both set it).
                   updateData.isGift = extracted.isGift
 
@@ -873,6 +880,7 @@ export async function processOrders(options = {}) {
               let customerFinishTime = null
               let customerPace = null
               let customerEventType = null
+              let lookupOutcome = null
 
               if (isShopify && shopifyData) {
                 log(`[processOrders] Processing Shopify line item ${lineItemIndex} for order ${order.orderId}...`)
@@ -907,6 +915,7 @@ export async function processOrders(options = {}) {
                   customerFinishTime = extracted.timeCustomer
                   customerPace = extracted.customerPace
                   customerEventType = extracted.customerEventType
+                  lookupOutcome = extracted.lookupOutcome
                   // Gift flag applies to ALL orders (Easify + widget both set it).
                   // hadNoTime is already captured above.
                   isGiftOrder = extracted.isGift
@@ -1014,7 +1023,8 @@ export async function processOrders(options = {}) {
                   customerBib,
                   customerFinishTime,
                   customerPace,
-                  customerEventType
+                  customerEventType,
+                  lookupOutcome
                 }
               })
 
@@ -1076,7 +1086,13 @@ export async function processOrders(options = {}) {
                 // applyVerifiedResult still fetches race-level data (weather/
                 // location). Manual entry (lookupVerified === false) and orders
                 // without the widget (null) fall through to the normal scrape.
-                if (dbOrder.lookupVerified === true && dbOrder.customerFinishTime) {
+                //
+                // NOTE: we do NOT require customerFinishTime here. Shoppers who
+                // tick "no time on poster" still verified bib + event against
+                // official results — that's the data worth trusting. The
+                // resulting RunnerResearch row simply has null time/pace, and
+                // the order's hadNoTime flag drives the "No Time" badge.
+                if (dbOrder.lookupVerified === true) {
                   log(`[processOrders] ✅ Customer-verified result for ${dbOrder.orderNumber} — skipping runner scrape`)
                   try {
                     await researchService.applyVerifiedResult(dbOrder.orderNumber)

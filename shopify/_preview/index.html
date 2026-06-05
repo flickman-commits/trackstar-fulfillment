@@ -279,6 +279,7 @@
   data-prop-notime="No time"
   data-prop-gift="Gift"
   data-prop-verified="_lookup_verified"
+  data-prop-outcome="_lookup_outcome"
   style="--tsil-accent: #4600D6;"
   
 >
@@ -442,7 +443,8 @@
         event: root.getAttribute('data-prop-event'),
         notime: root.getAttribute('data-prop-notime'),
         gift: root.getAttribute('data-prop-gift'),
-        verified: root.getAttribute('data-prop-verified')
+        verified: root.getAttribute('data-prop-verified'),
+        outcome: root.getAttribute('data-prop-outcome')
       }
     };
 
@@ -580,10 +582,23 @@
     // If lookup is required, lock add-to-cart until a result is confirmed.
     setSubmitDisabled(true);
 
+    // Race name to write to the cart. The lookup endpoint returns the canonical
+    // race name (e.g. "Mesa Marathon" instead of the product title "Mesa
+    // Marathon Personalized Race Print"). We default to whatever the block was
+    // configured with, then upgrade to the canonical name on a successful API
+    // call. Manual entry keeps the configured value.
+    var pendingRaceName = cfg.race;
+    // How the shopper got here — see the values in confirmInfo's comments.
+    var pendingOutcome = null;
+    // Why the manual-entry form was shown (or null if we never went manual).
+    // Lets us record the outcome when the shopper submits the manual form.
+    var pendingFallbackReason = null;
+
     // Show the confirmation screen for a chosen result (does NOT write to cart yet).
-    function selectResult(result, verified, heading) {
+    function selectResult(result, verified, heading, outcome) {
       pendingResult = result;
       pendingResult._verified = verified;
+      pendingOutcome = outcome || null;
       var cb = root.querySelector('[data-tsil-notime]');
       if (cb) cb.checked = false;
       root.querySelectorAll('[data-tsil-gift]').forEach(function (r) { r.checked = false; });
@@ -616,7 +631,10 @@
       if (form) {
         setProp(form, cfg.props.runner, name);
         setProp(form, cfg.props.year, year);
-        setProp(form, cfg.props.race, cfg.race);
+        // pendingRaceName is the CANONICAL race name (e.g. "Mesa Marathon")
+        // returned by the lookup. Falls back to cfg.race (block setting →
+        // product title) for manual entry or when canonicalization fails.
+        setProp(form, cfg.props.race, pendingRaceName);
         setProp(form, cfg.props.bib, pendingResult.bib || '');
         // "No time" omits time + pace from the poster and sends the backend flag.
         setProp(form, cfg.props.time, noTime ? '' : (pendingResult.time || ''));
@@ -627,6 +645,11 @@
         // identically: "No time" => "No time", "Gift" => "This is a gift".
         setProp(form, cfg.props.notime, noTime ? 'No time' : '');
         setProp(form, cfg.props.gift, isGift ? 'This is a gift' : '');
+        // Hidden outcome flag — tells the fulfillment dashboard HOW the shopper
+        // arrived at this result so we can debug widget behavior per-order.
+        // Values: auto_match, picked_from_list, manual_no_match,
+        //         manual_lookup_error, manual_rate_limited, manual_user_choice.
+        if (pendingOutcome) setProp(form, cfg.props.outcome, pendingOutcome);
       }
       setSubmitDisabled(false);
       var summary = name + (noTime ? ' · No time' : (pendingResult.time ? ' · ' + pendingResult.time : '')) + (isGift ? ' · Gift' : '');
@@ -653,11 +676,15 @@
         })
         .then(function (res) {
           var data = res.data || {};
+          // Capture canonical race name for the cart-property write.
+          if (data.raceCanonical) pendingRaceName = data.raceCanonical;
           if (data.found && data.result) {
-            selectResult(data.result, true, 'Is this you?');
+            selectResult(data.result, true, 'Is this you?', 'auto_match');
             return;
           }
           if (data.suggestions && data.suggestions.length) {
+            // Outcome will be set when the shopper picks one (or falls to manual).
+            pendingFallbackReason = 'manual_no_match';
             renderSuggestions(data.suggestions);
             root.querySelector('[data-tsil-refine-hint]').hidden = !data.truncated;
             show('suggestions');
@@ -667,14 +694,20 @@
           prefillManual(name);
           if (res.status === 429) {
             root.querySelector('[data-tsil-manual-note]').textContent = 'Lots of lookups right now — please enter your result manually.';
+            pendingFallbackReason = 'manual_rate_limited';
+          } else if (res.status >= 500 || res.status === 0) {
+            root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find your result automatically — no problem, just type it in.";
+            pendingFallbackReason = 'manual_lookup_error';
           } else {
             root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find your result automatically — no problem, just type it in.";
+            pendingFallbackReason = 'manual_no_match';
           }
           show('manual');
         })
         .catch(function () {
           prefillManual(name);
           root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't reach the lookup service — please enter your result manually.";
+          pendingFallbackReason = 'manual_lookup_error';
           show('manual');
         });
     }
@@ -695,7 +728,7 @@
         btn.appendChild(nameEl);
         btn.appendChild(metaEl);
         // Picking a suggestion goes to the same confirmation screen.
-        btn.onclick = function () { selectResult(m, true, 'Confirm your result'); };
+        btn.onclick = function () { selectResult(m, true, 'Confirm your result', 'picked_from_list'); };
         wrap.appendChild(btn);
       });
     }
@@ -719,11 +752,13 @@
       var name = root.querySelector('[name="tsil-mname"]').value.trim();
       if (!name) { return; }
       // Manual entry routes through the same confirmation screen as a match.
+      // The outcome reflects WHY we ended up on manual (lookup error, no match,
+      // rate-limited, or the shopper clicked "Enter info manually" themselves).
       selectResult({
         name: name,
         bib: root.querySelector('[name="tsil-mbib"]').value.trim(),
         time: root.querySelector('[name="tsil-mtime"]').value.trim()
-      }, false, 'Confirm your details');
+      }, false, 'Confirm your details', pendingFallbackReason || 'manual_user_choice');
     });
 
     // Confirm button → lock in.
@@ -758,6 +793,9 @@
         if (cb) cb.checked = false;
         root.querySelectorAll('[data-tsil-gift]').forEach(function (r) { r.checked = false; });
         setFoundError('');
+        pendingRaceName = cfg.race;
+        pendingOutcome = null;
+        pendingFallbackReason = null;
         show('search');
       });
     });
@@ -765,6 +803,8 @@
       link.addEventListener('click', function () {
         prefillManual(root.querySelector('[name="tsil-name"]').value.trim());
         root.querySelector('[data-tsil-manual-note]').textContent = 'Enter your result manually.';
+        // The shopper actively chose to type — distinct from "we couldn't find it".
+        pendingFallbackReason = 'manual_user_choice';
         show('manual');
       });
     });

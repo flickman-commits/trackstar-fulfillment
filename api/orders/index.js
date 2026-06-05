@@ -165,8 +165,11 @@ export default async function handler(req, res) {
         hasOverrides,
         // Alert flags for runner name field
         timeFromName,
-        // Runner research data (Tier 2) - formatted for display
-        bibNumber: research?.bibNumber || null,
+        // Runner research data (Tier 2) - formatted for display.
+        // Defense-in-depth: when no research bib exists, fall back to the
+        // customer-confirmed bib from the Instant Lookup widget. Protects
+        // against verified orders where Phase 1 never ran (e.g. older code path).
+        bibNumber: research?.bibNumber || order.customerBib || null,
         officialTime: formatTime(research?.officialTime),
         officialPace: formatPace(research?.officialPace),
         eventType: research?.eventType || null,
@@ -174,6 +177,9 @@ export default async function handler(req, res) {
         // How the result was obtained: "scraper" | "customer_verified". Drives
         // the dashboard's "Customer-verified" vs "Researched" badge.
         researchSource: research?.source || null,
+        // Detailed outcome from the Instant Lookup widget — how the shopper
+        // arrived at this result (auto_match, picked_from_list, manual_*).
+        lookupOutcome: order.lookupOutcome || null,
         researchNotes: research?.researchNotes || null,
         // Persisted candidate matches — populates the dashboard's accept-button
         // picker for ambiguous orders (so it shows even after page reload, not

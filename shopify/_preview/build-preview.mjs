@@ -31,6 +31,7 @@ const PROP_DEFAULTS = {
   prop_notime: 'No time',
   prop_gift: 'Gift',
   prop_verified: '_lookup_verified',
+  prop_outcome: '_lookup_outcome',
 };
 
 let src = fs.readFileSync(LIQUID, 'utf8');

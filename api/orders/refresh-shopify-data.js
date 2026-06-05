@@ -88,6 +88,7 @@ async function handleSingleOrder(req, res, shopifyOrderId) {
           customerPace: lineItemData.customerPace,
           customerEventType: lineItemData.customerEventType,
           lookupVerified: lineItemData.lookupVerified,
+          lookupOutcome: lineItemData.lookupOutcome,
           isGift: lineItemData.isGift
         }
       })
@@ -173,6 +174,7 @@ async function handleBatchRefresh(req, res) {
           customerPace: parsed.customerPace,
           customerEventType: parsed.customerEventType,
           lookupVerified: parsed.lookupVerified,
+          lookupOutcome: parsed.lookupOutcome,
           isGift: parsed.isGift
         }
       })
@@ -208,6 +210,7 @@ function extractShopifyData(lineItems) {
     customerPace: null,
     customerEventType: null,
     lookupVerified: null,
+    lookupOutcome: null,
     isGift: false,
     rawProductTitle: null,
     rawRunnerName: null,
@@ -271,6 +274,9 @@ function extractShopifyData(lineItems) {
       }
       else if (name === '_lookup_verified' || name === 'lookup_verified') {
         result.lookupVerified = value ? value.toLowerCase() === 'true' : false
+      }
+      else if (name === '_lookup_outcome' || name === 'lookup_outcome') {
+        result.lookupOutcome = value || null
       }
     }
   }

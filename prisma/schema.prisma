@@ -72,6 +72,16 @@ model Order {
   customerFinishTime String?   // Finish time from the widget (verified or manual)
   customerPace       String?   // Pace from the widget (only set on a verified match)
   customerEventType  String?   // Event/distance from the widget (e.g. "Marathon")
+  // How the shopper arrived at their confirmed/typed result. Drives the
+  // "outcome" chip on the order detail and helps debug widget behavior.
+  //   "auto_match"          → single official-results match, customer confirmed
+  //   "picked_from_list"    → multiple matches, customer picked one
+  //   "manual_no_match"     → lookup ran, returned nothing → typed it in
+  //   "manual_lookup_error" → endpoint errored / unreachable → typed it in
+  //   "manual_rate_limited" → 429 → typed it in
+  //   "manual_user_choice"  → customer chose "Enter info manually" themselves
+  //   null                  → no widget data (Etsy / pre-widget order)
+  lookupOutcome      String?
 
   // Manual override fields (for customer corrections)
   yearOverride       Int?      // Override for raceYear

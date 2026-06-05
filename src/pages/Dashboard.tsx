@@ -60,6 +60,16 @@ interface Order {
   researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null
   // How the result was obtained: scraper vs. customer-confirmed in the widget
   researchSource?: 'scraper' | 'customer_verified' | null
+  // Detailed Instant Lookup widget outcome — how the shopper arrived at their
+  // result. See server schema Order.lookupOutcome for the enum.
+  lookupOutcome?:
+    | 'auto_match'
+    | 'picked_from_list'
+    | 'manual_no_match'
+    | 'manual_lookup_error'
+    | 'manual_rate_limited'
+    | 'manual_user_choice'
+    | null
   // Instant Lookup widget signal: true = customer confirmed an official match,
   // false = customer typed it manually, null/undefined = no widget data
   lookupVerified?: boolean | null
@@ -1789,12 +1799,17 @@ export default function Dashboard() {
   // currently visible queue and k moves to the previous one. Skipped when
   // the user is typing into a field or in the middle of an inline edit.
   //
-  // navigableOrders = filteredOrders + currently selected order (if not already
-  // in filteredOrders). This allows j/k to keep working after marking an order
-  // complete — you can still navigate away to the next unfulfilled order, but
-  // won't cycle through other completed orders.
+  // navigableOrders = the list j/k cycle through. When the open order is a
+  // completed one (e.g. a custom order sent to production), navigate within the
+  // completed list so j/k scroll through all completed orders. Otherwise use the
+  // active queue (filteredOrders), inserting the selected order if it isn't
+  // already there so j/k keep working right after marking an order complete.
   const navigableOrders = useMemo(() => {
     if (!selectedOrder) return filteredOrders
+    // Completed order open → cycle through the completed list.
+    if (filteredCompletedOrders.some(o => o.id === selectedOrder.id)) {
+      return filteredCompletedOrders
+    }
     const inFiltered = filteredOrders.some(o => o.id === selectedOrder.id)
     if (inFiltered) return filteredOrders
     // Insert selected order at its natural position (by orderNumber) so j/k feel consistent
@@ -1808,7 +1823,7 @@ export default function Dashboard() {
       result.splice(insertIdx, 0, selectedOrder)
     }
     return result
-  }, [filteredOrders, selectedOrder])
+  }, [filteredOrders, filteredCompletedOrders, selectedOrder])
 
   const currentOrderIndex = useMemo(() => {
     if (!selectedOrder) return -1
@@ -3792,7 +3807,7 @@ Thank you!`
                         </button>
                         <button
                           onClick={() => navigateOrder('next')}
-                          disabled={currentOrderIndex >= filteredOrders.length - 1}
+                          disabled={currentOrderIndex >= navigableOrders.length - 1}
                           title="Next order (press K)"
                           className="inline-flex items-center gap-1.5 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -3800,7 +3815,7 @@ Thank you!`
                           <ChevronDownIcon className="w-3.5 h-3.5" />
                         </button>
                         <span className="text-[10px] text-off-black/40 px-1.5 tabular-nums">
-                          {currentOrderIndex + 1} / {filteredOrders.length}
+                          {currentOrderIndex + 1} / {navigableOrders.length}
                         </span>
                       </>
                     )}
@@ -4939,6 +4954,28 @@ Thank you!`
                             🟠 Manual entry — verify
                           </span>
                         ) : null}
+                        {/* Outcome chip — HOW the shopper arrived at this result.
+                            Helps debug widget behavior per-order. */}
+                        {selectedOrder.lookupOutcome ? (() => {
+                          const outcomeMap: Record<string, { label: string; title: string }> = {
+                            auto_match:           { label: '✓ Auto match',         title: 'Single official-results match — customer clicked Confirm.' },
+                            picked_from_list:    { label: '✓ Picked from list',   title: 'Lookup returned multiple matches — customer picked one.' },
+                            manual_no_match:     { label: '✎ Manual: no match',   title: 'Lookup ran but found nothing for this name+year — customer typed it in.' },
+                            manual_lookup_error: { label: '✎ Manual: lookup error', title: 'Lookup endpoint returned an error or was unreachable — customer typed it in.' },
+                            manual_rate_limited: { label: '✎ Manual: rate-limited', title: 'Customer hit the per-IP rate limit — fell back to manual entry.' },
+                            manual_user_choice:  { label: '✎ Manual: chose to type', title: 'Customer clicked "Enter info manually" themselves.' },
+                          }
+                          const meta = outcomeMap[selectedOrder.lookupOutcome]
+                          if (!meta) return null
+                          return (
+                            <span
+                              className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-medium bg-off-black/5 text-off-black/70 border border-off-black/15"
+                              title={meta.title}
+                            >
+                              {meta.label}
+                            </span>
+                          )
+                        })() : null}
                       </div>
                       {selectedOrder.resultsUrl && (
                         <a
