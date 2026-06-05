@@ -18,6 +18,8 @@ import { BrookseeScraper } from './platforms/BrookseeScraper.js'
 import { TokyoMarathonScraper } from './platforms/TokyoMarathonScraper.js'
 import { MultiSportAustraliaScraper } from './platforms/MultiSportAustraliaScraper.js'
 import { AthlinksScraper } from './platforms/AthlinksScraper.js'
+import { MTECResultsScraper } from './platforms/MTECResultsScraper.js'
+import { LaurelTimingScraper } from './platforms/LaurelTimingScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -58,6 +60,9 @@ import airForceConfig from './configs/airForce.js'
 import armyTenMilerConfig from './configs/armyTenMiler.js'
 import surfCityConfig from './configs/surfCity.js'
 import dallasConfig from './configs/dallas.js'
+import grandmasConfig from './configs/grandmas.js'
+import columbusConfig from './configs/columbus.js'
+import stGeorgeConfig from './configs/stGeorge.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
 
 /**
@@ -77,6 +82,8 @@ const PLATFORM_MAP = {
   tokyo: TokyoMarathonScraper,
   'multisport-australia': MultiSportAustraliaScraper,
   athlinks: AthlinksScraper,
+  mtec: MTECResultsScraper,
+  laurel: LaurelTimingScraper,
 }
 
 /**
@@ -121,6 +128,9 @@ const ALL_CONFIGS = [
   armyTenMilerConfig,
   surfCityConfig,
   dallasConfig,
+  grandmasConfig,
+  columbusConfig,
+  stGeorgeConfig,
 ]
 
 /**

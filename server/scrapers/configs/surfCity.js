@@ -30,6 +30,20 @@ export default {
     },
   },
 
+  // 2026 migrated FROM Xacte TO Laurel Timing. The yearOverrides block is
+  // shallow-merged over the base config by the factory, so 2026 lookups go
+  // through the Laurel scraper with these settings; 2024-25 still hit Xacte.
+  yearOverrides: {
+    2026: {
+      platform: 'laurel',
+      slug: 'sur',
+      raceIds: { 2026: 167860 },
+      events: { marathon: 'Marathon', half: 'Half Marathon' },
+      eventSearchOrder: ['marathon', 'half'],
+      distances: { marathon: 26.2, half: 13.1 },
+    },
+  },
+
   eventTypes: ['Marathon', 'Half Marathon'],
   defaultEventType: 'Marathon',
   eventSearchOrder: ['marathon', 'half'],
