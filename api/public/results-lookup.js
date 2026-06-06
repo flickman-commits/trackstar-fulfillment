@@ -62,6 +62,12 @@ function isRaceAllowed(race) {
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS', allowPublic: true })) return
 
+  // Never cache lookup responses at the browser, CDN, or proxy layer. The
+  // widget keeps its own UI state and the server has an in-process result
+  // cache keyed by {race,year,name}; a separate HTTP-cached response could
+  // otherwise serve a stale result when the shopper changes the year.
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0')
+
   // Kill-switch: 404 until explicitly enabled so the endpoint stays invisible.
   if (process.env.PUBLIC_LOOKUP_ENABLED !== 'true') {
     return res.status(404).json({ error: 'Not found' })

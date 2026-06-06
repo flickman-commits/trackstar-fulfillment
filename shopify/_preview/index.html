@@ -66,6 +66,11 @@
     border-color: var(--tsil-accent);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--tsil-accent) 25%, transparent);
   }
+  /* Lighter placeholder so the example text reads as a hint, not real input. */
+  #tsil-preview .tsil__input::placeholder {
+    color: var(--tsil-muted);
+    opacity: .55;
+  }
   #tsil-preview .tsil__btn {
     width: 100%;
     padding: 12px 24px;
@@ -296,7 +301,7 @@
     
     <form class="tsil__form" data-tsil-state="search" autocomplete="off" novalidate>
       <div class="tsil__field">
-        <label class="tsil__label" for="tsil-name-preview">Runner name</label>
+        <label class="tsil__label" for="tsil-name-preview">Runner Name <span class="tsil__opt">(First &amp; Last)</span></label>
         <input class="tsil__input" id="tsil-name-preview" name="tsil-name"
                type="text" autocomplete="off" placeholder="First & last name" maxlength="80" required>
       </div>
@@ -352,17 +357,17 @@
       <p class="tsil__found-head">Enter your result manually</p>
       <p class="tsil__sub" data-tsil-manual-note>We couldn't find your result automatically — no problem, just type it in.</p>
       <div class="tsil__field">
-        <label class="tsil__label" for="tsil-mname-preview">Runner name</label>
+        <label class="tsil__label" for="tsil-mname-preview">Runner Name <span class="tsil__opt">(First &amp; Last)</span></label>
         <input class="tsil__input" id="tsil-mname-preview" name="tsil-mname" type="text" maxlength="80" required>
       </div>
       <div class="tsil__row">
         <div class="tsil__field">
           <label class="tsil__label" for="tsil-mbib-preview">Bib # <span class="tsil__opt">(optional)</span></label>
-          <input class="tsil__input" id="tsil-mbib-preview" name="tsil-mbib" type="text" maxlength="20">
+          <input class="tsil__input" id="tsil-mbib-preview" name="tsil-mbib" type="text" placeholder="Ex: 12345" maxlength="20">
         </div>
         <div class="tsil__field">
           <label class="tsil__label" for="tsil-mtime-preview">Finish time <span class="tsil__opt">(optional)</span></label>
-          <input class="tsil__input" id="tsil-mtime-preview" name="tsil-mtime" type="text" placeholder="3:45:12" maxlength="20">
+          <input class="tsil__input" id="tsil-mtime-preview" name="tsil-mtime" type="text" placeholder="Ex: 3:45.19" maxlength="20">
         </div>
       </div>
       <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-manual-submit>Use these details</button>
@@ -692,7 +697,12 @@
         + '&year=' + encodeURIComponent(year)
         + '&name=' + encodeURIComponent(name);
 
-      fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } })
+      // cache: 'no-store' guarantees the browser/CDN doesn't return a stale
+      // result for an identical-looking URL (some browsers cache GETs more
+      // aggressively than the query-param difference would suggest). Without
+      // this, going back, changing year, and re-searching the same name could
+      // serve the previous response. Server also sets Cache-Control: no-store.
+      fetch(url, { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } })
         .then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (data) {
             return { status: r.status, data: data };
