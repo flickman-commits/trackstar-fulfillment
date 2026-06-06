@@ -370,6 +370,7 @@
           <input class="tsil__input" id="tsil-mtime-preview" name="tsil-mtime" type="text" placeholder="Ex: 3:45.19" maxlength="20">
         </div>
       </div>
+      <p class="tsil__error" data-tsil-manual-error hidden></p>
       <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-manual-submit>Use these details</button>
       <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Back to lookup</button>
     </form>
@@ -772,19 +773,37 @@
     }
 
     // ---- wire up events ----
+    // Most timing platforms (Mika, Xacte, MyChipTime, RaceRoster…) index
+    // results by LAST name. If the shopper types one word ("Sarah"), the
+    // scraper queries that word as a surname and gets ~0 hits — silently
+    // falling to manual entry would feel like a broken lookup. Require
+    // first + last at the widget boundary so the user gets a clear hint.
+    function hasFirstAndLast(s) {
+      return String(s || '').trim().split(/\s+/).filter(Boolean).length >= 2;
+    }
+
     states.search.addEventListener('submit', function (e) {
       e.preventDefault();
       var name = root.querySelector('[name="tsil-name"]').value.trim();
       var year = root.querySelector('[name="tsil-year"]').value;
       if (!name) { setError('Please enter the runner name.'); return; }
       if (name.length > 80) { setError('Name is too long.'); return; }
+      if (!hasFirstAndLast(name)) { setError('Please enter both first and last name.'); return; }
       doLookup(name, year);
     });
 
     states.manual.addEventListener('submit', function (e) {
       e.preventDefault();
       var name = root.querySelector('[name="tsil-mname"]').value.trim();
-      if (!name) { return; }
+      var mErr = root.querySelector('[data-tsil-manual-error]');
+      function mSetErr(msg) {
+        if (!mErr) return;
+        if (!msg) { mErr.hidden = true; mErr.textContent = ''; return; }
+        mErr.hidden = false; mErr.textContent = msg;
+      }
+      mSetErr('');
+      if (!name) { mSetErr('Please enter the runner name.'); return; }
+      if (!hasFirstAndLast(name)) { mSetErr('Please enter both first and last name.'); return; }
       // Manual entry routes through the same confirmation screen as a match.
       // The outcome reflects WHY we ended up on manual (lookup error, no match,
       // rate-limited, or the shopper clicked "Enter info manually" themselves).
