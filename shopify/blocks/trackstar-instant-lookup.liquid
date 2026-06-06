@@ -480,6 +480,25 @@
       return bits.join(' · ');
     }
 
+    // Normalize a runner name to Title Case so the poster never goes out as
+    // "matt hickman" (customer typo) or "ADRIAN GARCIA" (some timing platforms
+    // return all-caps from official results). Handles common edge cases:
+    // McDonnell, O'Brien, hyphenated names. Preserves diacritics.
+    function toTitleCase(name) {
+      if (!name) return name;
+      var out = String(name).toLowerCase();
+      // Capitalize the first letter, and every letter that follows a space,
+      // hyphen, or apostrophe. Unicode letter class keeps diacritics intact.
+      out = out.replace(/(^|[\s\-'])(\p{L})/gu, function (_, sep, ch) {
+        return sep + ch.toUpperCase();
+      });
+      // "Mcdonnell" → "McDonnell", "Mckenna" → "McKenna".
+      out = out.replace(/\bMc(\p{Ll})/gu, function (_, ch) {
+        return 'Mc' + ch.toUpperCase();
+      });
+      return out;
+    }
+
     // Render the big, labeled confirmation card. `noTime` greys out time/pace.
     function renderBigCard(r, noTime) {
       var card = root.querySelector('[data-tsil-found-card]');
@@ -495,7 +514,9 @@
         return f;
       }
 
-      var name = r.name || root.querySelector('[name="tsil-name"]').value;
+      // Title-case the name for display. The cart property is also normalized
+      // (in confirmInfo) so what they see here is exactly what gets printed.
+      var name = toTitleCase(r.name || root.querySelector('[name="tsil-name"]').value);
 
       // Primary block — name + time are the heroes.
       var primary = document.createElement('div');
@@ -600,7 +621,10 @@
       var isGift = giftRadio.value === 'yes';
       var form = findProductForm();
       var year = root.querySelector('[name="tsil-year"]').value;
-      var name = pendingResult.name || root.querySelector('[name="tsil-name"]').value;
+      // Title-case so the poster always reads "Matt Hickman", never the typo
+      // "matt hickman" the customer typed nor "MATT HICKMAN" from some timing
+      // platforms' all-caps result data. Matches the confirm-screen display.
+      var name = toTitleCase(pendingResult.name || root.querySelector('[name="tsil-name"]').value);
       if (form) {
         setProp(form, cfg.props.runner, name);
         setProp(form, cfg.props.year, year);
@@ -694,7 +718,7 @@
         btn.className = 'tsil__match-card';
         var nameEl = document.createElement('div');
         nameEl.className = 'tsil__match-name';
-        nameEl.textContent = m.name || 'Runner';
+        nameEl.textContent = toTitleCase(m.name) || 'Runner';
         var metaEl = document.createElement('div');
         metaEl.className = 'tsil__match-meta';
         metaEl.textContent = fmtListMeta(m) || 'Result on file';
