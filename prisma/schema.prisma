@@ -202,6 +202,29 @@ model Proof {
   @@index([orderId])
 }
 
+// Public Instant Lookup attempts, persisted so the admin "Recent Lookups"
+// panel can see EVERY lookup regardless of which serverless instance handled
+// it. In-memory ring buffers are per-function in Vercel, so they were invisible
+// to the admin endpoint — this table replaces them.
+//
+// Names and IPs are anonymized before write (e.g. "M.H.(11)", "73.21.x.x").
+// No PII stored. Indexed for fast "last N" + "by race" queries.
+model LookupLog {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  race      String?
+  year      Int?
+  name      String   // anonymized: "M.H.(11)"
+  outcome   String   // found | suggestions | not_found | off | upstream_error | rate_limited | bad_request | cached
+  status    Int?
+  ms        Int?
+  ip        String   // anonymized: "73.21.x.x"
+  cached    Boolean  @default(false)
+
+  @@index([createdAt])
+  @@index([race, createdAt])
+}
+
 model SystemConfig {
   key       String   @id
   value     String

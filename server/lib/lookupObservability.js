@@ -7,22 +7,16 @@
  *   2) maybeAlertLookupError() — throttled Slack alert on upstream errors.
  *                     De-duplicated per (race+errorType) for 10 minutes so a
  *                     dead timing site doesn't spam your DMs.
- *   3) recordLookup() / getRecentLookups() — in-memory ring buffer of the
- *                     last 200 lookups. Exposed via /api/admin/lookups-recent
- *                     so you can eyeball every search at a glance without
- *                     crawling Vercel logs.
- *
- * NOTE: like the rate limiter, the ring buffer + Slack dedupe live in a
- * serverless instance's memory — they're per-instance, not global. That's
- * fine for "watch a race during launch" — different instances will each have
- * their own recent list, and the Slack throttle worst-case sends one alert
- * per instance per 10 min, which is still bounded.
+ *   3) recordLookup() / getRecentLookups() — persists each lookup to Postgres
+ *                     (LookupLog table) and exposes the last 200 via
+ *                     /api/admin/lookups-recent. Persists because Vercel runs
+ *                     /api/public/results-lookup and /api/admin/lookups-recent
+ *                     as SEPARATE serverless functions — an in-memory ring
+ *                     buffer in one is invisible to the other.
  */
+import prisma from '../../api/_lib/prisma.js'
 
-const RING_SIZE = 200
 const ALERT_DEDUPE_MS = 10 * 60 * 1000 // 10 minutes per race+errorType
-
-const ring = []  // newest entries pushed at the end; capped at RING_SIZE
 const lastAlertAt = new Map() // key `race::errorType` -> ms timestamp
 
 /**
@@ -70,28 +64,53 @@ export function logLookup({ race, year, name, outcome, ms, status, ip, cached })
 }
 
 /**
- * Record the lookup in the ring buffer (for the admin "recent lookups" view).
- * Same fields as logLookup; we just keep them structured.
+ * Persist the lookup attempt to Postgres (fire-and-forget so we never block
+ * or fail the user request on a DB hiccup). Anonymizes name + IP before
+ * write so the table has no PII.
  */
 export function recordLookup({ race, year, name, outcome, ms, status, ip, cached }) {
-  const entry = {
-    at: Date.now(),
-    race: race || null,
-    year: year ?? null,
-    name: anonName(name),
-    outcome: outcome || 'unknown',
-    status: status ?? null,
-    ms: ms ?? null,
-    ip: anonIp(ip),
-    cached: !!cached,
-  }
-  ring.push(entry)
-  if (ring.length > RING_SIZE) ring.shift()
+  // Fire and forget — never await. If the write fails the user's request is
+  // unaffected; the [LOOKUP] log line already landed in Vercel logs.
+  prisma.lookupLog.create({
+    data: {
+      race: race || null,
+      year: year ?? null,
+      name: anonName(name) || '',
+      outcome: outcome || 'unknown',
+      status: status ?? null,
+      ms: ms ?? null,
+      ip: anonIp(ip),
+      cached: !!cached,
+    }
+  }).catch(err => {
+    console.warn('[lookupObservability] recordLookup write failed:', err.message)
+  })
 }
 
-/** Returns most-recent-first list of the last N lookups. */
-export function getRecentLookups(limit = RING_SIZE) {
-  return ring.slice(-limit).reverse()
+/**
+ * Returns most-recent-first list of the last N lookups from the DB.
+ * @param {number} limit
+ * @param {string} [race] - optional canonical race filter
+ */
+export async function getRecentLookups(limit = 200, race = null) {
+  const rows = await prisma.lookupLog.findMany({
+    where: race ? { race } : undefined,
+    orderBy: { createdAt: 'desc' },
+    take: Math.max(1, Math.min(500, limit)),
+  })
+  // Shape matches the legacy in-memory ring buffer so the admin UI doesn't
+  // need to change.
+  return rows.map(r => ({
+    at: r.createdAt.getTime(),
+    race: r.race,
+    year: r.year,
+    name: r.name,
+    outcome: r.outcome,
+    status: r.status,
+    ms: r.ms,
+    ip: r.ip,
+    cached: r.cached,
+  }))
 }
 
 /**

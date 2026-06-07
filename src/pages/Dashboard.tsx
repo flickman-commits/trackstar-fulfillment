@@ -3280,7 +3280,7 @@ Thank you!`
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <h2 className="text-base font-semibold text-off-black">Recent Lookups</h2>
-                    <span className="text-xs text-off-black/50">In-memory, last 200, per Vercel instance</span>
+                    <span className="text-xs text-off-black/50">Last 200, across all Vercel instances</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
