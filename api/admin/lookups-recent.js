@@ -18,6 +18,10 @@ export default async function handler(req, res) {
   if (!requireAdmin(req, res)) return
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
+  // Always serve fresh — without this Vercel's edge / the browser will hand
+  // back a 304 on every Refresh click and the dashboard table never updates.
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0')
+
   const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 200))
   const raceFilter = (req.query.race || '').toString().trim() || null
 

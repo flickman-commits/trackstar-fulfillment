@@ -374,7 +374,10 @@ export default function Dashboard() {
     try {
       const qs = new URLSearchParams({ limit: '200' })
       if (lookupsRaceFilter) qs.set('race', lookupsRaceFilter)
-      const r = await apiFetch(`/api/admin/lookups-recent?${qs.toString()}`)
+      // `t` busts any HTTP cache; `cache: 'no-store'` is the belt to the
+      // server's no-store header so even an aggressive browser can't 304 us.
+      qs.set('t', String(Date.now()))
+      const r = await apiFetch(`/api/admin/lookups-recent?${qs.toString()}`, { cache: 'no-store' })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const data = await r.json()
       setLookupsRecent(data.entries || [])
@@ -3285,8 +3288,7 @@ Thank you!`
                   <div className="flex items-center gap-3">
                     <button
                       onClick={fetchLookupsRecent}
-                      disabled={lookupsLoading}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors"
                     >
                       {lookupsLoading ? 'Loading…' : 'Refresh'}
                     </button>
