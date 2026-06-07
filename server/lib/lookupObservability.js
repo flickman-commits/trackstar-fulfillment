@@ -56,29 +56,35 @@ export function logLookup({ race, year, name, outcome, ms, status, ip, cached })
 }
 
 /**
- * Persist the lookup attempt to Postgres (fire-and-forget so we never block
- * or fail the user request on a DB hiccup). Anonymizes name + IP before
- * write so the table has no PII.
+ * Persist the lookup attempt to Postgres. Awaited so Vercel doesn't freeze
+ * the serverless function with the write still in flight — fire-and-forget
+ * Promises are silently dropped when the handler returns.
+ *
+ * Caller should `await` this before responding to the request. Returns the
+ * created row's id on success, null on failure (we still log the error but
+ * never throw — the user's request must not fail because observability did).
  */
-export function recordLookup({ race, year, name, outcome, ms, status, ip, cached }) {
-  // Fire and forget — never await. If the write fails the user's request is
-  // unaffected; the [LOOKUP] log line already landed in Vercel logs.
-  prisma.lookupLog.create({
-    data: {
-      race: race || null,
-      year: year ?? null,
-      // Store the actual search query — names are not anonymized so the
-      // admin "Recent Lookups" panel is useful for real debugging.
-      name: (name || '').slice(0, 80),
-      outcome: outcome || 'unknown',
-      status: status ?? null,
-      ms: ms ?? null,
-      ip: anonIp(ip),
-      cached: !!cached,
-    }
-  }).catch(err => {
+export async function recordLookup({ race, year, name, outcome, ms, status, ip, cached }) {
+  try {
+    const row = await prisma.lookupLog.create({
+      data: {
+        race: race || null,
+        year: year ?? null,
+        // Store the actual search query — names are not anonymized so the
+        // admin "Recent Lookups" panel is useful for real debugging.
+        name: (name || '').slice(0, 80),
+        outcome: outcome || 'unknown',
+        status: status ?? null,
+        ms: ms ?? null,
+        ip: anonIp(ip),
+        cached: !!cached,
+      }
+    })
+    return row.id
+  } catch (err) {
     console.warn('[lookupObservability] recordLookup write failed:', err.message)
-  })
+    return null
+  }
 }
 
 /**

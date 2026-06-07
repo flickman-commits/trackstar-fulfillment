@@ -83,25 +83,27 @@ export default async function handler(req, res) {
   const yearRaw = String(req.query.year || '').trim()
   const year = parseInt(yearRaw, 10)
 
-  // Observability shorthand — emit one structured `[LOOKUP]` log line + ring
-  // buffer entry per request. Always call before returning.
-  const observe = ({ outcome, status, cachedHit, raceForLog }) => {
+  // Observability shorthand — emit one structured `[LOOKUP]` log line + a row
+  // in the LookupLog table per request. Always `await` this before returning;
+  // Vercel freezes the serverless function the moment the handler resolves, so
+  // an un-awaited DB write would be silently dropped.
+  const observe = async ({ outcome, status, cachedHit, raceForLog }) => {
     const ms = Date.now() - startMs
     const ent = { race: raceForLog || race, year, name, outcome, ms, status, ip, cached: !!cachedHit }
     logLookup(ent)
-    recordLookup(ent)
+    await recordLookup(ent)
   }
 
   if (!race || !name || !yearRaw) {
-    observe({ outcome: 'bad_request', status: 400 })
+    await observe({ outcome: 'bad_request', status: 400 })
     return res.status(400).json({ error: 'race, year, and name are required' })
   }
   if (!Number.isInteger(year) || year < 2000 || year > 2100) {
-    observe({ outcome: 'bad_request', status: 400 })
+    await observe({ outcome: 'bad_request', status: 400 })
     return res.status(400).json({ error: 'year must be a valid 4-digit year' })
   }
   if (name.length > 80 || race.length > 80) {
-    observe({ outcome: 'bad_request', status: 400 })
+    await observe({ outcome: 'bad_request', status: 400 })
     return res.status(400).json({ error: 'race and name must be under 80 characters' })
   }
 
@@ -117,7 +119,7 @@ export default async function handler(req, res) {
   const limit = checkRateLimit(ip)
   if (!limit.allowed) {
     res.setHeader('Retry-After', Math.ceil(limit.retryAfterMs / 1000))
-    observe({ outcome: 'rate_limited', status: 429, raceForLog: raceCanonical })
+    await observe({ outcome: 'rate_limited', status: 429, raceForLog: raceCanonical })
     return res.status(429).json({
       error: 'Too many lookups. Please try again later.',
       ...fallback(),
@@ -126,14 +128,14 @@ export default async function handler(req, res) {
 
   // Races without an HTTP scraper / not in the rollout allowlist → manual fallback.
   if (!isRacePublicSafe(resolvedRace) || !isRaceAllowed(resolvedRace)) {
-    observe({ outcome: 'off', status: 200, raceForLog: raceCanonical })
+    await observe({ outcome: 'off', status: 200, raceForLog: raceCanonical })
     return res.status(200).json(fallback({ reason: 'no_instant_lookup' }))
   }
 
   const cacheKey = buildCacheKey({ race: resolvedRace, year, name })
   const cached = getCached(cacheKey)
   if (cached) {
-    observe({ outcome: 'cached', status: 200, cachedHit: true, raceForLog: raceCanonical })
+    await observe({ outcome: 'cached', status: 200, cachedHit: true, raceForLog: raceCanonical })
     return res.status(200).json({ ...cached, cached: true })
   }
 
@@ -190,7 +192,7 @@ export default async function handler(req, res) {
     }
 
     setCached(cacheKey, payload)
-    observe({ outcome, status: 200, raceForLog: raceCanonical })
+    await observe({ outcome, status: 200, raceForLog: raceCanonical })
     return res.status(200).json(payload)
   } catch (error) {
     console.error('[public/results-lookup] lookup failed:', error.message)
@@ -200,7 +202,7 @@ export default async function handler(req, res) {
       errorType: 'exception',
       detail: error.message,
     }).catch(() => {})
-    observe({ outcome: 'upstream_error', status: 200, raceForLog: raceCanonical })
+    await observe({ outcome: 'upstream_error', status: 200, raceForLog: raceCanonical })
     return res.status(200).json(fallback({ reason: 'lookup_error' }))
   }
 }
