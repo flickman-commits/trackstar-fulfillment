@@ -403,7 +403,7 @@
           <input class="tsil__input" id="tsil-mtime-preview" name="tsil-mtime" type="text" placeholder="Ex: 3:45.19" maxlength="20">
         </div>
       </div>
-      <p class="tsil__manual-hint">*If you don't know the official time, pace, and bib number, we'll pull them from the official race results.</p>
+      <p class="tsil__manual-hint">*If you don't know the time, pace, and bib number for the runner, we'll pull them from the official race results.</p>
       <p class="tsil__error" data-tsil-manual-error hidden></p>
       <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-manual-submit>Use these details</button>
       <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Back to lookup</button>
@@ -790,10 +790,10 @@
             root.querySelector('[data-tsil-manual-note]').textContent = 'Lots of lookups right now — please enter your result manually.';
             pendingFallbackReason = 'manual_rate_limited';
           } else if (res.status >= 500 || res.status === 0) {
-            root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find your result automatically — no problem, just type it in.";
+            root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find this runner with instant lookup. No problem, just type it in and we'll find it for you.";
             pendingFallbackReason = 'manual_lookup_error';
           } else {
-            root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find your result automatically — no problem, just type it in.";
+            root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find this runner with instant lookup. No problem, just type it in and we'll find it for you.";
             pendingFallbackReason = 'manual_no_match';
           }
           show('manual');
