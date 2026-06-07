@@ -19,18 +19,10 @@ import prisma from '../../api/_lib/prisma.js'
 const ALERT_DEDUPE_MS = 10 * 60 * 1000 // 10 minutes per race+errorType
 const lastAlertAt = new Map() // key `race::errorType` -> ms timestamp
 
-/**
- * Anonymize a name for logging — keep just first initial + last initial + length.
- * Avoids putting raw customer names in logs while still leaving enough to
- * group/sort. "Matt Hickman" -> "M.H.(11)"
+/** IPs are anonymized — useful to spot a single source spamming, but we never
+ * need the raw value. Names are NOT anonymized: this is an internal dashboard
+ * and the full name is what makes the log line actually debuggable.
  */
-function anonName(name) {
-  if (!name) return ''
-  const parts = String(name).trim().split(/\s+/)
-  const initials = parts.map(p => (p[0] || '').toUpperCase()).join('.')
-  return `${initials}.(${name.length})`
-}
-
 function anonIp(ip) {
   if (!ip) return ''
   // IPv4: keep first 2 octets. IPv6: keep first 2 groups. Privacy + still useful for spotting one source spamming.
@@ -56,7 +48,7 @@ function anonIp(ip) {
  */
 export function logLookup({ race, year, name, outcome, ms, status, ip, cached }) {
   const line =
-    `[LOOKUP] race="${race || ''}" year=${year ?? ''} name=${anonName(name)} ` +
+    `[LOOKUP] race="${race || ''}" year=${year ?? ''} name="${name || ''}" ` +
     `outcome=${outcome || 'unknown'} status=${status ?? ''} ms=${ms ?? ''} ` +
     `ip=${anonIp(ip)}${cached ? ' cached=true' : ''}`
   // Plain console.log so it lands in Vercel's request logs and is easy to grep.
@@ -75,7 +67,9 @@ export function recordLookup({ race, year, name, outcome, ms, status, ip, cached
     data: {
       race: race || null,
       year: year ?? null,
-      name: anonName(name) || '',
+      // Store the actual search query — names are not anonymized so the
+      // admin "Recent Lookups" panel is useful for real debugging.
+      name: (name || '').slice(0, 80),
       outcome: outcome || 'unknown',
       status: status ?? null,
       ms: ms ?? null,

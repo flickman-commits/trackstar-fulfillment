@@ -3391,7 +3391,7 @@ Thank you!`
               </div>
 
               <div className="px-6 py-3 border-t border-border-gray text-[11px] text-off-black/40">
-                Names are anonymized (e.g. M.H.(11) = "Matt Hickman"). For permanent records grep <code className="bg-subtle-gray px-1 rounded">[LOOKUP]</code> in Vercel logs.
+                Names show the actual search query. IPs are anonymized. For stdout records grep <code className="bg-subtle-gray px-1 rounded">[LOOKUP]</code> in Vercel logs.
               </div>
             </div>
           </div>
