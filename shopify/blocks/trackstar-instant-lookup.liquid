@@ -59,34 +59,22 @@
 >
   <div class="tsil__card">
     <div class="tsil__head" data-tsil-head>
-      {% if block.settings.logo != blank %}
-        <img
-          class="tsil__logo"
-          src="{{ block.settings.logo | image_url: width: 600 }}"
-          alt="{{ block.settings.heading | escape }}"
-          width="{{ block.settings.logo.width }}"
-          height="{{ block.settings.logo.height }}"
-          loading="lazy">
-      {% else %}
-        <h3 class="tsil__title">{{ block.settings.heading | escape }}</h3>
-      {% endif %}
-      {% if block.settings.subheading != blank %}
-        <p class="tsil__sub">{{ block.settings.subheading | escape }}</p>
-      {% endif %}
+      <h3 class="tsil__title">Runner Lookup</h3>
+      <p class="tsil__sub tsil__sub--verified">Verified by Trackstar Instant Lookup</p>
     </div>
 
     {%- comment -%} STATE: search form {%- endcomment -%}
     <form class="tsil__form" data-tsil-state="search" autocomplete="off" novalidate>
       <div class="tsil__field">
-        <label class="tsil__label" for="tsil-name-{{ block.id }}">Runner Name <span class="tsil__opt">(First &amp; Last)</span></label>
+        <label class="tsil__label" for="tsil-name-{{ block.id }}">Runner Name <span class="tsil__req" aria-hidden="true">*</span> <span class="tsil__opt">(First &amp; Last)</span></label>
         <input class="tsil__input" id="tsil-name-{{ block.id }}" name="tsil-name"
                type="text" autocomplete="off" placeholder="Ex: John Smith" maxlength="80" required>
       </div>
       <div class="tsil__field">
-        <label class="tsil__label" for="tsil-year-{{ block.id }}">Race year</label>
+        <label class="tsil__label" for="tsil-year-{{ block.id }}">Race Year <span class="tsil__req" aria-hidden="true">*</span></label>
         <select class="tsil__input" id="tsil-year-{{ block.id }}" name="tsil-year" data-tsil-year required></select>
       </div>
-      <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-submit>Find my result</button>
+      <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-submit>Find Results</button>
       <p class="tsil__error" data-tsil-error hidden></p>
     </form>
 
@@ -103,7 +91,7 @@
       <p class="tsil__print-note">*These details will be printed on your poster.</p>
       <label class="tsil__notime">
         <input class="tsil__notime-cb" type="checkbox" data-tsil-notime>
-        <span>Don't want your time/pace on it? Check this box</span>
+        <span>Don't want time &amp; pace on it? Check this box</span>
       </label>
       <div class="tsil__giftq">
         <span class="tsil__giftq-label">Is this a gift?</span>
@@ -131,11 +119,14 @@
 
     {%- comment -%} STATE: manual entry fallback {%- endcomment -%}
     <form class="tsil__form" data-tsil-state="manual" autocomplete="off" hidden novalidate>
-      <p class="tsil__found-head">Enter your result manually</p>
-      <p class="tsil__sub" data-tsil-manual-note>We couldn't find your result automatically — no problem, just type it in.</p>
+      <p class="tsil__found-head" data-tsil-manual-note>Enter your result manually</p>
       <div class="tsil__field">
-        <label class="tsil__label" for="tsil-mname-{{ block.id }}">Runner Name <span class="tsil__opt">(First &amp; Last)</span></label>
+        <label class="tsil__label" for="tsil-mname-{{ block.id }}">Runner Name <span class="tsil__req" aria-hidden="true">*</span> <span class="tsil__opt">(First &amp; Last)</span></label>
         <input class="tsil__input" id="tsil-mname-{{ block.id }}" name="tsil-mname" type="text" placeholder="Ex: John Smith" maxlength="80" required>
+      </div>
+      <div class="tsil__field">
+        <label class="tsil__label" for="tsil-myear-{{ block.id }}">Race Year <span class="tsil__req" aria-hidden="true">*</span></label>
+        <select class="tsil__input" id="tsil-myear-{{ block.id }}" name="tsil-myear" data-tsil-myear required></select>
       </div>
       <div class="tsil__row">
         <div class="tsil__field">
@@ -147,6 +138,7 @@
           <input class="tsil__input" id="tsil-mtime-{{ block.id }}" name="tsil-mtime" type="text" placeholder="Ex: 3:45.19" maxlength="20">
         </div>
       </div>
+      <p class="tsil__manual-hint">*If you don't know the official time, pace, and bib number, we'll pull them from the official race results.</p>
       <p class="tsil__error" data-tsil-manual-error hidden></p>
       <button class="tsil__btn tsil__btn--primary" type="submit" data-tsil-manual-submit>Use these details</button>
       <button class="tsil__btn tsil__btn--ghost" type="button" data-tsil-reset>Back to lookup</button>
@@ -186,6 +178,19 @@
   #tsil-{{ block.id }} [hidden] { display: none !important; }
   /* When the intro is collapsed (results view), drop the leading gap. */
   #tsil-{{ block.id }} .tsil__head[hidden] ~ [data-tsil-state] { margin-top: 0; }
+  /* Smooth fade-in between phases of the lookup (search → loading → found /
+     suggestions / manual → done). Quick (.22s) so it never feels laggy. */
+  #tsil-{{ block.id }} [data-tsil-state] {
+    transition: opacity .22s ease, transform .22s ease;
+  }
+  #tsil-{{ block.id }} [data-tsil-state].tsil--entering {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #tsil-{{ block.id }} [data-tsil-state] { transition: none; }
+    #tsil-{{ block.id }} [data-tsil-state].tsil--entering { opacity: 1; transform: none; }
+  }
   #tsil-{{ block.id }} .tsil__card {
     border: 1px solid var(--tsil-border);
     background: var(--tsil-bg);
@@ -194,8 +199,32 @@
   /* Header is left-aligned: logo (or title) sits at the left edge. */
   #tsil-{{ block.id }} .tsil__head { text-align: left; }
   #tsil-{{ block.id }} .tsil__logo { display: inline-block; height: 34px; width: auto; max-width: 75%; }
-  #tsil-{{ block.id }} .tsil__title { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.04em; }
+  #tsil-{{ block.id }} .tsil__title { margin: 0 0 .2rem; font-size: 1.35rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.04em; }
   #tsil-{{ block.id }} .tsil__sub { margin: .35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; }
+  /* "Verified by Trackstar Instant Lookup" — small uppercase brand badge. */
+  #tsil-{{ block.id }} .tsil__sub--verified {
+    margin: .25rem 0 0;
+    font-size: .65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--tsil-muted);
+  }
+  /* Required-field asterisk (after Runner Name / Race Year). */
+  #tsil-{{ block.id }} .tsil__req {
+    color: var(--tsil-accent);
+    font-weight: 700;
+    margin-left: .1rem;
+  }
+  /* Italic "*we'll pull them..." hint under the optional manual fields. */
+  #tsil-{{ block.id }} .tsil__manual-hint {
+    margin: -.2rem 0 0;
+    font-style: italic;
+    font-size: .75rem;
+    line-height: 1.4;
+    letter-spacing: -0.04em;
+    color: var(--tsil-muted);
+  }
   #tsil-{{ block.id }} .tsil__form { display: grid; gap: .9rem; margin-top: 1.25rem; }
   #tsil-{{ block.id }} .tsil__row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
   #tsil-{{ block.id }} .tsil__field { display: grid; gap: .35rem; }
@@ -308,12 +337,9 @@
   #tsil-{{ block.id }} .tsil__bc-field--name .tsil__bc-value { font-size: 1.6rem; }
   #tsil-{{ block.id }} .tsil__bc-field--time .tsil__bc-value { font-size: 1.6rem; color: var(--tsil-accent); }
   #tsil-{{ block.id }} .tsil__bc-field--muted .tsil__bc-value { font-weight: 500; font-size: 1rem; }
-  /* When "no time" is checked, the time line reads as a quiet "No time on
-     poster" note — dimmed and smaller, but NOT struck through. */
-  #tsil-{{ block.id }} .tsil__bigcard.is-notime .tsil__bc-field--time .tsil__bc-value {
-    color: var(--tsil-muted);
-    font-size: 1.1rem;
-  }
+  /* When "no time" is checked, the value reads "No time" / "No pace" in the
+     same big purple style as a real result — visually consistent so the
+     shopper sees exactly what will (and won't) appear on the poster. */
 
   /* Italic "*printed on your poster" note, sits just under the data card. */
   #tsil-{{ block.id }} .tsil__print-note {
@@ -452,17 +478,33 @@
       Object.keys(states).forEach(function (k) { states[k].hidden = (k !== state); });
       // Collapse the heading/subheading intro once we're past the search step.
       if (headEl) headEl.hidden = (state !== 'search');
+      // Fade the newly-visible state in from a few pixels below. The double
+      // requestAnimationFrame lets the browser paint the `.tsil--entering`
+      // class BEFORE we remove it, so the transition triggers.
+      var next = states[state];
+      if (next) {
+        next.classList.add('tsil--entering');
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            next.classList.remove('tsil--entering');
+          });
+        });
+      }
     }
 
-    // Populate the year dropdown: current year back 15 years, newest first.
-    var yearSelect = root.querySelector('[data-tsil-year]');
+    // Populate the year dropdowns (search + manual): current year back 15
+    // years, newest first. Manual mirrors search so the shopper can correct
+    // the year from the manual form too.
     var nowYear = new Date().getFullYear();
-    for (var y = nowYear; y >= nowYear - 15; y--) {
-      var opt = document.createElement('option');
-      opt.value = String(y);
-      opt.textContent = String(y);
-      yearSelect.appendChild(opt);
-    }
+    var yearSelects = root.querySelectorAll('[data-tsil-year], [data-tsil-myear]');
+    yearSelects.forEach(function (sel) {
+      for (var y = nowYear; y >= nowYear - 15; y--) {
+        var opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = String(y);
+        sel.appendChild(opt);
+      }
+    });
 
     var errorEl = root.querySelector('[data-tsil-error]');
     function setError(msg) {
@@ -528,8 +570,11 @@
       var primary = document.createElement('div');
       primary.className = 'tsil__bc-primary';
       primary.appendChild(field('Runner', name || '—', 'tsil__bc-field--name'));
+      // Always show the "Finish time" label. When no-time is ticked, the value
+      // reads "No time" in the same big purple style — visually consistent so
+      // the shopper sees exactly what will / won't appear on the poster.
       if (noTime) {
-        primary.appendChild(field('Time', 'No time on poster', 'tsil__bc-field--time'));
+        primary.appendChild(field('Finish time', 'No time', 'tsil__bc-field--time'));
       } else if (r.time) {
         primary.appendChild(field('Finish time', r.time, 'tsil__bc-field--time'));
       }
@@ -539,7 +584,13 @@
       var secondary = document.createElement('div');
       secondary.className = 'tsil__bc-secondary';
       if (r.bib) secondary.appendChild(field('Bib', r.bib, 'tsil__bc-field--muted tsil__bc-field--bib'));
-      if (!noTime && r.pace) secondary.appendChild(field('Pace', r.pace + ' /mi', 'tsil__bc-field--muted tsil__bc-field--pace'));
+      // Pace: show "No pace" when ticked (mirroring the time treatment) so the
+      // shopper sees both will be omitted, not just hidden from the card.
+      if (noTime) {
+        secondary.appendChild(field('Pace', 'No pace', 'tsil__bc-field--muted tsil__bc-field--pace'));
+      } else if (r.pace) {
+        secondary.appendChild(field('Pace', r.pace + ' /mi', 'tsil__bc-field--muted tsil__bc-field--pace'));
+      }
       if (r.eventType) secondary.appendChild(field('Event', r.eventType, 'tsil__bc-field--muted tsil__bc-field--event'));
       if (secondary.children.length) card.appendChild(secondary);
     }
@@ -743,6 +794,11 @@
 
     function prefillManual(name) {
       root.querySelector('[name="tsil-mname"]').value = name || '';
+      // Also mirror the search year into the manual form so the shopper
+      // doesn't have to re-pick it when they fall through to manual entry.
+      var searchYear = root.querySelector('[name="tsil-year"]');
+      var manualYear = root.querySelector('[name="tsil-myear"]');
+      if (searchYear && manualYear && searchYear.value) manualYear.value = searchYear.value;
     }
 
     // ---- wire up events ----
@@ -768,6 +824,7 @@
     states.manual.addEventListener('submit', function (e) {
       e.preventDefault();
       var name = root.querySelector('[name="tsil-mname"]').value.trim();
+      var myear = root.querySelector('[name="tsil-myear"]').value;
       var mErr = root.querySelector('[data-tsil-manual-error]');
       function mSetErr(msg) {
         if (!mErr) return;
@@ -777,6 +834,12 @@
       mSetErr('');
       if (!name) { mSetErr('Please enter the runner name.'); return; }
       if (!hasFirstAndLast(name)) { mSetErr('Please enter both first and last name.'); return; }
+      if (!myear) { mSetErr('Please select a race year.'); return; }
+      // Sync the manual year back to the search year input so confirmInfo
+      // (which reads from [name="tsil-year"]) writes the correct year to the
+      // cart property, regardless of whether the shopper changed it here.
+      var searchYear = root.querySelector('[name="tsil-year"]');
+      if (searchYear) searchYear.value = myear;
       // Manual entry routes through the same confirmation screen as a match.
       // The outcome reflects WHY we ended up on manual (lookup error, no match,
       // rate-limited, or the shopper clicked "Enter info manually" themselves).
