@@ -185,7 +185,14 @@
         // shopper verifies their result before choosing size/frame. It writes
         // the verified data into the product form (also moved here), so it must
         // live in the same modal DOM as the buy buttons.
-        productInfo.querySelectorAll('.tsil').forEach(function(el) {
+        //
+        // Search the WHOLE document (not just .product-information): different
+        // product templates place the block in different containers, and we'd
+        // rather always-move-it than silently render it inline like Boston did.
+        // The `formTarget.contains` guard prevents re-moving an already-moved
+        // widget (e.g. from the MutationObserver re-firing).
+        document.querySelectorAll('.tsil').forEach(function(el) {
+          if (formTarget.contains(el)) return;
           formTarget.insertBefore(el, formTarget.firstChild);
           el.style.display = '';
           moved++;
