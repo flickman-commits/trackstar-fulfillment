@@ -137,6 +137,9 @@
   @keyframes tsil-spin { to { transform: rotate(360deg); } }
   #tsil-preview .tsil__result, #tsil-preview .tsil__suggestions, #tsil-preview .tsil__done { margin-top: 1.25rem; display: grid; gap: .75rem; }
   #tsil-preview .tsil__found-head { margin: 0; font-weight: 700; font-size: 1.35rem; line-height: 1.15; letter-spacing: -0.04em; }
+  /* Manual-entry heading — smaller/quieter than the result heading so the
+     fallback message reads as a calm instruction, not a big alarm. */
+  #tsil-preview .tsil__manual-head { margin: 0; font-weight: 600; font-size: 1rem; line-height: 1.3; letter-spacing: -0.04em; color: var(--tsil-text); }
   #tsil-preview .tsil__refine-hint { margin: -.35rem 0 0; color: var(--tsil-muted); font-size: .8rem; line-height: 1.4; letter-spacing: -0.04em; }
   /* Quiet inline italic note (used in the green success card). No callout box. */
   #tsil-preview .tsil__confirm-note {
@@ -384,7 +387,7 @@
 
     
     <form class="tsil__form" data-tsil-state="manual" autocomplete="off" hidden novalidate>
-      <p class="tsil__found-head" data-tsil-manual-note>Enter your result manually</p>
+      <p class="tsil__manual-head" data-tsil-manual-note>Enter your result manually</p>
       <div class="tsil__field">
         <label class="tsil__label" for="tsil-mname-preview">Runner Name <span class="tsil__req" aria-hidden="true">*</span> <span class="tsil__opt">(First &amp; Last)</span></label>
         <input class="tsil__input" id="tsil-mname-preview" name="tsil-mname" type="text" placeholder="Ex: John Smith" maxlength="80" required>
@@ -787,20 +790,20 @@
           // Everything else (not found, lookup off/404, error, rate-limited) → manual.
           prefillManual(name);
           if (res.status === 429) {
-            root.querySelector('[data-tsil-manual-note]').textContent = 'Lots of lookups right now — please enter your result manually.';
+            root.querySelector('[data-tsil-manual-note]').textContent = 'Lots of lookups right now — just type it in below.';
             pendingFallbackReason = 'manual_rate_limited';
           } else if (res.status >= 500 || res.status === 0) {
-            root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find this runner with instant lookup. No problem, just type it in and we'll find it for you.";
+            root.querySelector('[data-tsil-manual-note]').textContent = "No instant match — just type it in below.";
             pendingFallbackReason = 'manual_lookup_error';
           } else {
-            root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find this runner with instant lookup. No problem, just type it in and we'll find it for you.";
+            root.querySelector('[data-tsil-manual-note]').textContent = "No instant match — just type it in below.";
             pendingFallbackReason = 'manual_no_match';
           }
           show('manual');
         })
         .catch(function () {
           prefillManual(name);
-          root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't reach the lookup service — please enter your result manually.";
+          root.querySelector('[data-tsil-manual-note]').textContent = "Lookup unavailable — just type it in below.";
           pendingFallbackReason = 'manual_lookup_error';
           show('manual');
         });
@@ -926,7 +929,7 @@
     root.querySelectorAll('[data-tsil-manual-link]').forEach(function (link) {
       link.addEventListener('click', function () {
         prefillManual(root.querySelector('[name="tsil-name"]').value.trim());
-        root.querySelector('[data-tsil-manual-note]').textContent = 'Enter your result manually.';
+        root.querySelector('[data-tsil-manual-note]').textContent = 'Enter your result below.';
         // The shopper actively chose to type — distinct from "we couldn't find it".
         pendingFallbackReason = 'manual_user_choice';
         show('manual');
