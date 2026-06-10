@@ -129,6 +129,9 @@
   #tsil-preview .tsil__error { margin: 0; color: #B42318; font-size: .9rem; letter-spacing: -0.04em; }
   #tsil-preview .tsil__loading { display: flex; align-items: center; gap: .6rem; margin-top: 1.25rem; color: var(--tsil-muted); font-size: 1rem; }
   #tsil-preview .tsil__spinner {
+    display: block;
+    flex: 0 0 auto;      /* don't let flexbox squish the circle into an oval */
+    box-sizing: border-box;
     width: 18px; height: 18px; border-radius: 50%;
     border: 2px solid var(--tsil-border);
     border-top-color: var(--tsil-accent);
@@ -349,7 +352,7 @@
     
     <div class="tsil__loading" data-tsil-state="loading" hidden>
       <span class="tsil__spinner" aria-hidden="true"></span>
-      <span data-tsil-loading-text>Searching results…</span>
+      <span data-tsil-loading-text>Searching official results…</span>
     </div>
 
     
@@ -376,7 +379,7 @@
 
     
     <div class="tsil__suggestions" data-tsil-state="suggestions" hidden>
-      <p class="tsil__found-head">We found multiple results — select the one that's you</p>
+      <p class="tsil__found-head">We found a few matches. Pick the one that's you.</p>
       <p class="tsil__refine-hint" data-tsil-refine-hint hidden>Showing the first 10. Add or correct your first name to narrow it down.</p>
       <div class="tsil__match-list" data-tsil-suggestion-list></div>
       <div class="tsil__minor">
@@ -387,7 +390,7 @@
 
     
     <form class="tsil__form" data-tsil-state="manual" autocomplete="off" hidden novalidate>
-      <p class="tsil__manual-head" data-tsil-manual-note>Enter your result manually</p>
+      <p class="tsil__manual-head" data-tsil-manual-note>Enter your details below and we'll take it from here.</p>
       <div class="tsil__field">
         <label class="tsil__label" for="tsil-mname-preview">Runner Name <span class="tsil__req" aria-hidden="true">*</span> <span class="tsil__opt">(First &amp; Last)</span></label>
         <input class="tsil__input" id="tsil-mname-preview" name="tsil-mname" type="text" placeholder="Ex: John Smith" maxlength="80" required>
@@ -753,7 +756,7 @@
     function doLookup(name, year) {
       setError('');
       show('loading');
-      root.querySelector('[data-tsil-loading-text]').textContent = 'Searching ' + cfg.race + ' results…';
+      root.querySelector('[data-tsil-loading-text]').textContent = 'Searching official results…';
 
       var url = cfg.apiBase + '/api/public/results-lookup'
         + '?race=' + encodeURIComponent(cfg.race)
@@ -790,20 +793,20 @@
           // Everything else (not found, lookup off/404, error, rate-limited) → manual.
           prefillManual(name);
           if (res.status === 429) {
-            root.querySelector('[data-tsil-manual-note]').textContent = 'Lots of lookups right now — just type it in below.';
+            root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
             pendingFallbackReason = 'manual_rate_limited';
           } else if (res.status >= 500 || res.status === 0) {
-            root.querySelector('[data-tsil-manual-note]').textContent = "No instant match — just type it in below.";
+            root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
             pendingFallbackReason = 'manual_lookup_error';
           } else {
-            root.querySelector('[data-tsil-manual-note]').textContent = "No instant match — just type it in below.";
+            root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
             pendingFallbackReason = 'manual_no_match';
           }
           show('manual');
         })
         .catch(function () {
           prefillManual(name);
-          root.querySelector('[data-tsil-manual-note]').textContent = "Lookup unavailable — just type it in below.";
+          root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
           pendingFallbackReason = 'manual_lookup_error';
           show('manual');
         });
@@ -929,7 +932,7 @@
     root.querySelectorAll('[data-tsil-manual-link]').forEach(function (link) {
       link.addEventListener('click', function () {
         prefillManual(root.querySelector('[name="tsil-name"]').value.trim());
-        root.querySelector('[data-tsil-manual-note]').textContent = 'Enter your result below.';
+        root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
         // The shopper actively chose to type — distinct from "we couldn't find it".
         pendingFallbackReason = 'manual_user_choice';
         show('manual');
