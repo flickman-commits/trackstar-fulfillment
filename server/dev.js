@@ -36,6 +36,10 @@ const routes = [
   { method: 'post', path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
   { method: 'delete', path: '/api/orders/comments',          handler: '../api/orders/comments.js' },
   { method: 'get',  path: '/api/etsy/auth',                 handler: '../api/etsy/auth.js' },
+  // Browser auth: login / session-check / logout
+  { method: 'get',    path: '/api/auth/login',             handler: '../api/auth/login.js' },
+  { method: 'post',   path: '/api/auth/login',             handler: '../api/auth/login.js' },
+  { method: 'delete', path: '/api/auth/login',             handler: '../api/auth/login.js' },
   // Proofs & Approval
   { method: 'get',    path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'post',   path: '/api/proofs',                 handler: '../api/proofs/index.js' },
@@ -63,9 +67,12 @@ for (const route of routes) {
   const middleware = [...adapters, handler]
   app[route.method](route.path, ...middleware)
   app.options(route.path, (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    // Echo origin (not '*') + allow credentials so cookie-bearing requests
+    // pass preflight when a developer points VITE_API_URL at this server.
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret, Cookie')
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
     res.status(204).end()
   })
 }

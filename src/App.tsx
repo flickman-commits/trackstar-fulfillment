@@ -10,7 +10,7 @@ import BriefsAdmin from '@/pages/BriefsAdmin'
 import CreatorPortal from '@/pages/CreatorPortal'
 import CreatorApply from '@/pages/CreatorApply'
 
-const PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -58,25 +58,47 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 function PasswordGate({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [checking, setChecking] = useState(true)
   const [password, setPassword] = useState('')
   const [error, setError] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem('trackstar_auth')
-    if (stored === 'true') {
-      setIsAuthenticated(true)
-    }
+    let cancelled = false
+    fetch(`${API_BASE}/api/auth/login`, { credentials: 'include' })
+      .then((res) => {
+        if (!cancelled && res.ok) setIsAuthenticated(true)
+      })
+      .catch(() => { /* treat as unauthenticated */ })
+      .finally(() => { if (!cancelled) setChecking(false) })
+    return () => { cancelled = true }
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (password === PASSWORD) {
-      localStorage.setItem('trackstar_auth', 'true')
-      setIsAuthenticated(true)
-      setError(false)
-    } else {
+    setSubmitting(true)
+    setError(false)
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      if (res.ok) {
+        setIsAuthenticated(true)
+      } else {
+        setError(true)
+      }
+    } catch {
       setError(true)
+    } finally {
+      setSubmitting(false)
     }
+  }
+
+  if (checking) {
+    return <div className="min-h-screen bg-off-white" />
   }
 
   if (isAuthenticated) {
@@ -108,9 +130,10 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
           )}
           <button
             type="submit"
-            className="w-full mt-4 px-4 py-3 text-body-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity"
+            disabled={submitting}
+            className="w-full mt-4 px-4 py-3 text-body-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-50"
           >
-            Enter
+            {submitting ? 'Checking…' : 'Enter'}
           </button>
         </form>
       </div>

@@ -1,18 +1,19 @@
 /**
- * Shared API fetch wrapper that injects the admin secret header.
- * Use this for ALL merchant API calls (not customer-facing approval portal).
+ * Shared API fetch wrapper for merchant API calls (not the customer-facing
+ * approval portal). Auth rides on an httpOnly session cookie set by the login
+ * flow — `credentials: 'include'` sends it. No secret is held in the client.
+ * On 401 we bounce back to the login gate.
  */
-
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || ''
 
 /**
- * Wrapper around fetch that adds the x-admin-secret header.
+ * Wrapper around fetch that includes the session cookie.
  * Same signature as native fetch.
  */
-export function apiFetch(url: string | URL, init?: RequestInit): Promise<Response> {
-  const headers = new Headers(init?.headers)
-  if (ADMIN_SECRET) {
-    headers.set('x-admin-secret', ADMIN_SECRET)
+export async function apiFetch(url: string | URL, init?: RequestInit): Promise<Response> {
+  const response = await fetch(url, { ...init, credentials: 'include' })
+  if (response.status === 401) {
+    // Session expired or missing — reload so the gate re-checks and shows login.
+    window.location.reload()
   }
-  return fetch(url, { ...init, headers })
+  return response
 }
