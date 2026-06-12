@@ -2,11 +2,11 @@
   "name": "fm-turbo-server",
   "version": "1.0.0",
   "description": "Server for FM Turbo",
-  "main": "index.js",
+  "main": "dev.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "start": "node dev.js",
+    "dev": "node --watch dev.js"
   },
   "dependencies": {
     "@prisma/client": "^6.3.0",
