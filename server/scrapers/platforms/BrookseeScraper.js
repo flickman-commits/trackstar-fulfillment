@@ -12,6 +12,7 @@
  *   td.gender, td.age, td.chiptime, td.pace, td.guntime
  */
 import { BaseScraper } from '../BaseScraper.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 export class BrookseeScraper extends BaseScraper {
   constructor(year, config) {
@@ -101,7 +102,7 @@ export class BrookseeScraper extends BaseScraper {
       const lastNameToken = runnerName.trim().split(/\s+/).pop() || runnerName
       const url = `${this.baseUrl}/results?race=${raceId}&event=${encodeURIComponent(event)}&search=${encodeURIComponent(lastNameToken)}`
 
-      const response = await fetch(url, {
+      const response = await fetchWithTimeout(url, {
         headers: {
           'Accept': 'text/html',
           'User-Agent': 'Mozilla/5.0 (compatible; TrackstarBot/1.0)'

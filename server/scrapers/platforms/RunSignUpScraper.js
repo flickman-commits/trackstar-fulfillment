@@ -7,6 +7,7 @@
  */
 import { BaseScraper } from '../BaseScraper.js'
 import { launchBrowser } from '../browserLauncher.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
@@ -100,7 +101,7 @@ export class RunSignUpScraper extends BaseScraper {
 
       console.log(`[${this.tag} ${this.year}] API request: ${apiUrl}`)
 
-      const response = await fetch(apiUrl, {
+      const response = await fetchWithTimeout(apiUrl, {
         headers: { 'User-Agent': USER_AGENT }
       })
 
@@ -253,7 +254,6 @@ export class RunSignUpScraper extends BaseScraper {
       console.log(`[${this.tag} ${this.year}] Found ${results.length} visible results after filtering`)
 
       if (results.length === 0) {
-        await browser.close()
         return this.notFoundResult()
       }
 
@@ -263,7 +263,6 @@ export class RunSignUpScraper extends BaseScraper {
 
       if (matches.length === 0) {
         console.log(`[${this.tag} ${this.year}] No exact match for: ${runnerName}. Surfacing ${Math.min(results.length, 10)} candidates.`)
-        await browser.close()
         return this.notFoundResult(null, results.slice(0, 10).map(r => ({
           name: r.name,
           bib: r.bib,
@@ -280,7 +279,6 @@ export class RunSignUpScraper extends BaseScraper {
         matches.forEach(m => {
           console.log(`  - ${m.name}, Bib: ${m.bib}, Time: ${m.chipTime}`)
         })
-        await browser.close()
         return this.ambiguousResult(matches.map(m => ({
           name: m.name,
           bib: m.bib,
@@ -298,15 +296,20 @@ export class RunSignUpScraper extends BaseScraper {
       console.log(`  Pace: ${match.pace}`)
       console.log(`  Place: ${match.placeOverall}`)
 
-      await browser.close()
       return { ...this.extractRunnerData(match, eventType), resultsUrl }
 
     } catch (error) {
       console.error(`[${this.tag} ${this.year}] Error searching for ${runnerName}:`, error.message)
-      if (browser) await browser.close()
       return {
         ...this.notFoundResult(),
         researchNotes: `Error: ${error.message}`
+      }
+    } finally {
+      // Always release the browser — a leaked Chromium instance (~100MB+)
+      // is an OOM risk on Vercel.
+      if (browser) {
+        await browser.close().catch(e =>
+          console.error(`[${this.tag} ${this.year}] Failed to close browser:`, e.message))
       }
     }
   }

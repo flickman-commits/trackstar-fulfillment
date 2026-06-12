@@ -5,6 +5,7 @@
  * Two-stage: search athletes -> fetch detailed analysis
  */
 import { BaseScraper } from '../BaseScraper.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 export class MyRaceAiScraper extends BaseScraper {
   /**
@@ -48,7 +49,7 @@ export class MyRaceAiScraper extends BaseScraper {
       const searchUrl = `${this.baseUrl}/search-athletes?raceId=${this.raceId}&type=name&value=${encodeURIComponent(runnerName)}`
       console.log(`[${this.tag} ${this.year}] Search URL: ${searchUrl}`)
 
-      const searchResponse = await fetch(searchUrl)
+      const searchResponse = await fetchWithTimeout(searchUrl)
       console.log(`[${this.tag} ${this.year}] Search response status: ${searchResponse.status}`)
 
       if (!searchResponse.ok) {
@@ -96,7 +97,7 @@ export class MyRaceAiScraper extends BaseScraper {
       const detailUrl = `${this.baseUrl}/athlete-analysis-official?raceId=${this.raceId}&pid=${pid}`
       console.log(`[${this.tag} ${this.year}] Fetching details: ${detailUrl}`)
 
-      const detailResponse = await fetch(detailUrl)
+      const detailResponse = await fetchWithTimeout(detailUrl)
 
       if (!detailResponse.ok || !(await detailResponse.clone().json()).athlete) {
         console.log(`[${this.tag} ${this.year}] Detail fetch failed, using search result data`)

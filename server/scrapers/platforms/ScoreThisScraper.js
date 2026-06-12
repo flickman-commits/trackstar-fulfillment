@@ -33,6 +33,7 @@
  * [22] Flag
  */
 import { BaseScraper } from '../BaseScraper.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 // Column indices
 const COL = {
@@ -122,7 +123,7 @@ export class ScoreThisScraper extends BaseScraper {
     try {
       // Fetch the full CSV
       console.log(`[${this.tag}] Fetching CSV: ${csvUrl}`)
-      const response = await fetch(csvUrl)
+      const response = await fetchWithTimeout(csvUrl)
 
       if (!response.ok) {
         if (response.status === 404) {

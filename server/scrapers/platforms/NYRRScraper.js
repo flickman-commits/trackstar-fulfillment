@@ -4,6 +4,7 @@
  * Currently: NYC Marathon
  */
 import { BaseScraper } from '../BaseScraper.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 export class NYRRScraper extends BaseScraper {
   /**
@@ -27,7 +28,7 @@ export class NYRRScraper extends BaseScraper {
 
     // Try to get exact date from NYRR API
     try {
-      const response = await fetch(`${this.baseUrl}/events/details`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/events/details`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventCode: this.eventCode })
@@ -86,7 +87,7 @@ export class NYRRScraper extends BaseScraper {
 
       console.log(`[${this.tag}] API URL: ${this.baseUrl}/runners/finishers-filter`)
 
-      const response = await fetch(`${this.baseUrl}/runners/finishers-filter`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/runners/finishers-filter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)

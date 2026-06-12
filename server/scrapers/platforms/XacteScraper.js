@@ -9,6 +9,7 @@
  * - Distance in meters (42195 = marathon, 21097 = half)
  */
 import { BaseScraper } from '../BaseScraper.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 export class XacteScraper extends BaseScraper {
   /**
@@ -69,7 +70,7 @@ export class XacteScraper extends BaseScraper {
       const url = `${this.baseUrl}?eventId=${this.eventId}&search=${encodeURIComponent(lastName)}`
       console.log(`[${this.tag}] API URL: ${url}`)
 
-      const response = await fetch(url)
+      const response = await fetchWithTimeout(url)
       console.log(`[${this.tag}] Response status: ${response.status}`)
 
       if (!response.ok) {

@@ -19,6 +19,7 @@
  */
 import { BaseScraper } from '../BaseScraper.js'
 import * as cheerio from 'cheerio'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const BASE = 'https://results.laurelt.com'
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -156,7 +157,7 @@ export class LaurelTimingScraper extends BaseScraper {
     const url = `${BASE}/${slug}/results?search=${encodeURIComponent(lastName)}` +
       `&event=${encodeURIComponent(eventLabel)}&race=${raceId}`
     console.log(`[${this.tag}] GET ${url}`)
-    const resp = await fetch(url, {
+    const resp = await fetchWithTimeout(url, {
       headers: { 'User-Agent': UA, 'Accept': 'text/html' }
     })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
@@ -202,7 +203,7 @@ export class LaurelTimingScraper extends BaseScraper {
   async _fetchIndividual(slug, pk) {
     const url = `${BASE}/${slug}/results?pk=${encodeURIComponent(pk)}`
     console.log(`[${this.tag}] GET ${url}`)
-    const resp = await fetch(url, {
+    const resp = await fetchWithTimeout(url, {
       headers: { 'User-Agent': UA, 'Accept': 'text/html' }
     })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)

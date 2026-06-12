@@ -4,6 +4,7 @@
  * Currently: Marine Corps Marathon
  */
 import { BaseScraper } from '../BaseScraper.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
@@ -199,7 +200,7 @@ export class RTRTScraper extends BaseScraper {
 
     console.log(`[${this.tag}] POST ${url}`)
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -234,7 +235,7 @@ export class RTRTScraper extends BaseScraper {
 
     console.log(`[${this.tag}] Fetching splits for PID ${pid}`)
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

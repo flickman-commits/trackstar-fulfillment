@@ -18,6 +18,7 @@
 import { BaseScraper } from '../BaseScraper.js'
 import { launchBrowser } from '../browserLauncher.js'
 import * as cheerio from 'cheerio'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
@@ -29,7 +30,7 @@ const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
  */
 async function smartFetch(url) {
   // First try a simple fetch
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': USER_AGENT,
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',

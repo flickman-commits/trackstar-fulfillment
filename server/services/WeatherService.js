@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
 /**
  * WeatherService - Fetch historical weather data for races
  * Uses Open-Meteo API (free, no API key required)
@@ -56,7 +57,7 @@ export class WeatherService {
 
       console.log(`[WeatherService] Geocoding: ${cleanLocation}`)
 
-      const response = await fetch(url)
+      const response = await fetchWithTimeout(url)
       const data = await response.json()
 
       if (!data.results || data.results.length === 0) {
@@ -125,7 +126,7 @@ export class WeatherService {
 
       const url = `${this.weatherBaseUrl}/archive?${params.toString()}`
 
-      const response = await fetch(url)
+      const response = await fetchWithTimeout(url)
       const data = await response.json()
 
       if (!data.hourly || !data.hourly.temperature_2m || data.hourly.temperature_2m.length === 0) {

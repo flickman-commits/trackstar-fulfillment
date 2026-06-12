@@ -9,6 +9,7 @@
  *   - Sub-event:     GET /v2/api/events/{eventUniqueCode}/sub-events/{subEventId}
  */
 import { BaseScraper } from '../BaseScraper.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 export class RaceRosterScraper extends BaseScraper {
   /**
@@ -224,7 +225,7 @@ export class RaceRosterScraper extends BaseScraper {
    */
   async fetchApi(path) {
     const url = `${this.baseUrl}${path}`
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (compatible; TrackstarBot/1.0)'

@@ -3,6 +3,7 @@
 // Refresh tokens may rotate on each refresh — we persist the latest in the DB
 
 import { PrismaClient } from '@prisma/client'
+import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
 
 let cachedToken = null
 let tokenExpiry = null
@@ -57,7 +58,7 @@ async function refreshAccessToken() {
 
   console.log('[etsyAuth] Refreshing Etsy access token...')
 
-  const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
+  const response = await fetchWithTimeout('https://api.etsy.com/v3/public/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -117,7 +118,7 @@ export async function etsyFetch(endpoint, options = {}) {
 
   const url = `https://openapi.etsy.com/v3/application${endpoint}`
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

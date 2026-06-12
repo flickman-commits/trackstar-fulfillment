@@ -19,6 +19,7 @@
  */
 import { BaseScraper } from '../BaseScraper.js'
 import * as cheerio from 'cheerio'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const BASE = 'https://www.mtecresults.com'
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -169,7 +170,7 @@ export class MTECResultsScraper extends BaseScraper {
   async _participantSearch(query, raceId) {
     const url = `${BASE}/event/participantSearch?nameorbib=${encodeURIComponent(query)}&race=${encodeURIComponent(raceId)}`
     console.log(`[${this.tag}] GET ${url}`)
-    const resp = await fetch(url, {
+    const resp = await fetchWithTimeout(url, {
       headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' }
     })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
@@ -213,7 +214,7 @@ export class MTECResultsScraper extends BaseScraper {
   async _fetchRunnerDetail(rid, raceId) {
     const url = `${BASE}/runner/show?rid=${encodeURIComponent(rid)}&race=${encodeURIComponent(raceId)}`
     console.log(`[${this.tag}] GET ${url}`)
-    const resp = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': 'text/html' } })
+    const resp = await fetchWithTimeout(url, { headers: { 'User-Agent': UA, 'Accept': 'text/html' } })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const html = await resp.text()
     return this._parseRunnerDetail(html)

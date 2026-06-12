@@ -6,6 +6,7 @@
  */
 import { BaseScraper } from '../BaseScraper.js'
 import * as cheerio from 'cheerio'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
@@ -34,7 +35,7 @@ export class MikaTimingScraper extends BaseScraper {
     // Try to scrape the actual race date from the results page
     try {
       const resultsUrl = `${this.baseUrl}/?pid=list&event_main_group=${this.year}`
-      const response = await fetch(resultsUrl, {
+      const response = await fetchWithTimeout(resultsUrl, {
         headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' }
       })
 
@@ -74,7 +75,7 @@ export class MikaTimingScraper extends BaseScraper {
     // Fallback: discover from listing page
     try {
       const url = `${this.baseUrl}/?pid=list&event_main_group=${this.year}`
-      const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' } })
+      const resp = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' } })
       if (!resp.ok) return null
       const html = await resp.text()
       const match = html.match(/event=([A-Z][A-Z0-9_]+)/)
@@ -112,7 +113,7 @@ export class MikaTimingScraper extends BaseScraper {
       const searchUrl = `${this.baseUrl}/?${searchParams.toString()}`
       console.log(`[${this.tag}] Search URL: ${searchUrl}`)
 
-      const response = await fetch(searchUrl, {
+      const response = await fetchWithTimeout(searchUrl, {
         headers: {
           'User-Agent': USER_AGENT,
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',

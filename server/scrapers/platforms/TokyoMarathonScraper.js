@@ -11,6 +11,7 @@
  */
 import { BaseScraper } from '../BaseScraper.js'
 import * as cheerio from 'cheerio'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
@@ -59,7 +60,7 @@ export class TokyoMarathonScraper extends BaseScraper {
       const fullBody = formBody.toString() + '&sex%5B%5D=2&sex%5B%5D=0'
 
       console.log(`[${this.tag}] POST ${this.baseUrl}/index.php (name="${runnerName}")`)
-      const searchResp = await fetch(`${this.baseUrl}/index.php`, {
+      const searchResp = await fetchWithTimeout(`${this.baseUrl}/index.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -99,7 +100,7 @@ export class TokyoMarathonScraper extends BaseScraper {
       // Step 2: Fetch detail page for the matched runner using their bib number
       const match = matches[0]
       console.log(`[${this.tag}] Fetching detail for bib ${match.bib}`)
-      const detailResp = await fetch(`${this.baseUrl}/detail.php`, {
+      const detailResp = await fetchWithTimeout(`${this.baseUrl}/detail.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

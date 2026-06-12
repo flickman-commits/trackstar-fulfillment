@@ -22,6 +22,7 @@ import { hasScraperForRace } from './scrapers/index.js'
 import { parseRaceNameFromTitle } from './scrapers/raceNameNormalization.js'
 import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrderIds, saveCountedOrderIds } from './services/customersServed.js'
 import { isExpeditedShipping, getShippingMethod } from './lib/shipping.js'
+import { fetchWithTimeout } from './lib/fetchWithTimeout.js'
 
 // Artelo API configuration
 const ARTELO_API_URL = 'https://www.artelo.io/api/open/orders/get'
@@ -531,7 +532,7 @@ export async function processOrders(options = {}) {
     }
 
     const params = new URLSearchParams({ limit: '100', allOrders: 'true' })
-    const response = await fetch(`${ARTELO_API_URL}?${params}`, {
+    const response = await fetchWithTimeout(`${ARTELO_API_URL}?${params}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${ARTELO_API_KEY}`,

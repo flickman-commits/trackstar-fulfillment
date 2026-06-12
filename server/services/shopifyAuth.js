@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
 // Shopify Client Credentials OAuth - Token Management
 // Tokens expire every 24 hours, so we cache with a 23-hour safety margin
 
@@ -25,7 +26,7 @@ export async function getShopifyToken() {
     throw new Error('Missing Shopify credentials in environment variables')
   }
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://${store}/admin/oauth/access_token`,
     {
       method: 'POST',
@@ -68,7 +69,7 @@ export async function shopifyFetch(endpoint, options = {}) {
 
   const url = `https://${store}/admin/api/2024-01${endpoint}`
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
