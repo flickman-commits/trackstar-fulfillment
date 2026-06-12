@@ -36,6 +36,7 @@ const routes = [
   { method: 'post', path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
   { method: 'delete', path: '/api/orders/comments',          handler: '../api/orders/comments.js' },
   { method: 'get',  path: '/api/etsy/auth',                 handler: '../api/etsy/auth.js' },
+  { method: 'get',  path: '/api/admin/lookups-recent',     handler: '../api/admin/lookups-recent.js' },
   // Browser auth: login / session-check / logout
   { method: 'get',    path: '/api/auth/login',             handler: '../api/auth/login.js' },
   { method: 'post',   path: '/api/auth/login',             handler: '../api/auth/login.js' },

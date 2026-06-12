@@ -361,7 +361,7 @@ export default function Dashboard() {
     ip: string
     cached: boolean
   }
-  type LookupSummary = { total: number; byOutcome: Record<string, number>; byRace: Record<string, number> }
+  type LookupSummary = { total: number; byOutcome: Record<string, number>; byRace: Record<string, number>; avgMs: number | null }
   const [showLookupsRecent, setShowLookupsRecent] = useState(false)
   const [lookupsRecent, setLookupsRecent] = useState<LookupEntry[]>([])
   const [lookupsSummary, setLookupsSummary] = useState<LookupSummary | null>(null)
@@ -372,7 +372,8 @@ export default function Dashboard() {
   async function fetchLookupsRecent() {
     setLookupsLoading(true); setLookupsError(null)
     try {
-      const qs = new URLSearchParams({ limit: '200' })
+      // Dashboard view: last 7 days, up to the 500-row cap.
+      const qs = new URLSearchParams({ limit: '500', days: '7' })
       if (lookupsRaceFilter) qs.set('race', lookupsRaceFilter)
       // `t` busts any HTTP cache; `cache: 'no-store'` is the belt to the
       // server's no-store header so even an aggressive browser can't 304 us.
@@ -3050,33 +3051,16 @@ Thank you!`
                       </div>
                     </button>
 
-                    {/* Vercel logs — opens in a new tab; permanent record of every [LOOKUP] line. */}
-                    <a
-                      href="https://vercel.com/flickman-media/trackstar-fulfillment/logs?panelState=opened"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Check Logs</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Open the Vercel logs to grep [LOOKUP] and trace any request</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs text-off-black/30">vercel.com ↗</span>
-                        </div>
-                      </div>
-                    </a>
-
-                    {/* Recent Instant Lookup attempts (last 200 in-memory). */}
+                    {/* Instant Lookup — opens a dashboard of the last 7 days of
+                        lookups, with at-a-glance stats and a jump to Vercel logs. */}
                     <button
                       onClick={() => { setShowLookupsRecent(true); fetchLookupsRecent() }}
                       className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Recent Lookups</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Last 200 Instant Lookup attempts, with outcome breakdown</p>
+                          <p className="text-sm font-medium text-off-black">Instant Lookup</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Last 7 days of lookups — success rate, outcomes, and per-request detail</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
@@ -3272,31 +3256,71 @@ Thank you!`
           </div>
         )}
 
-        {/* Recent Lookups Full-Screen Overlay */}
-        {showLookupsRecent && (
+        {/* Instant Lookup Dashboard Overlay — last 7 days of lookups with at-a-glance stats. */}
+        {showLookupsRecent && (() => {
+          const o = lookupsSummary?.byOutcome || {}
+          const total = lookupsSummary?.total || 0
+          const found = (o.found || 0) + (o.cached || 0)
+          const suggestions = o.suggestions || 0
+          const notFound = o.not_found || 0
+          const errors = (o.rate_limited || 0) + (o.upstream_error || 0) + (o.bad_request || 0)
+          const off = o.off || 0
+          // "Attempts" excludes lookups while the feature was off — those aren't real tries.
+          const attempts = Math.max(0, total - off)
+          const successRate = attempts > 0 ? Math.round((found / attempts) * 100) : 0
+          const avgMs = lookupsSummary?.avgMs ?? null
+          const stats: { label: string; value: string; sub?: string; accent?: string }[] = [
+            { label: 'Total lookups', value: String(total), sub: 'last 7 days' },
+            { label: 'Success rate', value: `${successRate}%`, sub: `${found} of ${attempts} attempts`, accent: 'text-green-700' },
+            { label: 'Found', value: String(found), accent: 'text-green-700' },
+            { label: 'Suggestions', value: String(suggestions), accent: 'text-blue-700' },
+            { label: 'Not found', value: String(notFound) },
+            { label: 'Errors', value: String(errors), accent: errors > 0 ? 'text-red-700' : undefined },
+            { label: 'Avg lookup time', value: avgMs != null ? `${avgMs} ms` : '—' },
+          ]
+          return (
           <div
             className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
             onClick={(e) => { if (e.target === e.currentTarget) setShowLookupsRecent(false) }}
           >
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-              <div className="px-6 py-4 border-b border-border-gray flex-shrink-0 space-y-3">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+              <div className="px-6 py-4 border-b border-border-gray flex-shrink-0 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-base font-semibold text-off-black">Recent Lookups</h2>
-                    <span className="text-xs text-off-black/50">Last 200, across all Vercel instances</span>
+                    <h2 className="text-base font-semibold text-off-black">Instant Lookup</h2>
+                    <span className="text-xs text-off-black/50">Last 7 days · across all Vercel instances</span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="https://vercel.com/flickman-media/trackstar-fulfillment/logs?panelState=opened"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border-gray text-off-black/70 hover:bg-subtle-gray transition-colors"
+                    >
+                      View in Vercel ↗
+                    </a>
                     <button
                       onClick={fetchLookupsRecent}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors"
                     >
                       {lookupsLoading ? 'Loading…' : 'Refresh'}
                     </button>
-                    <button onClick={() => setShowLookupsRecent(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
+                    <button onClick={() => setShowLookupsRecent(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none ml-1">×</button>
                   </div>
                 </div>
 
-                {/* Filter + summary */}
+                {/* Stats row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                  {stats.map((s) => (
+                    <div key={s.label} className="rounded-lg border border-border-gray bg-subtle-gray px-3 py-2.5">
+                      <p className="text-[11px] text-off-black/50 leading-tight">{s.label}</p>
+                      <p className={`text-lg font-semibold tabular-nums leading-tight mt-0.5 ${s.accent || 'text-off-black'}`}>{s.value}</p>
+                      {s.sub && <p className="text-[10px] text-off-black/40 leading-tight mt-0.5">{s.sub}</p>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Race filter */}
                 <div className="flex items-center gap-3 flex-wrap">
                   <input
                     type="text"
@@ -3312,30 +3336,6 @@ Thank you!`
                     </button>
                   )}
                 </div>
-
-                {lookupsSummary && (
-                  <div className="flex items-center gap-3 flex-wrap text-xs">
-                    <span className="text-off-black/60">Total: <strong className="text-off-black">{lookupsSummary.total}</strong></span>
-                    {Object.entries(lookupsSummary.byOutcome).sort(([, a], [, b]) => b - a).map(([k, v]) => {
-                      const colors: Record<string, string> = {
-                        found:           'bg-green-100 text-green-700 border-green-200',
-                        suggestions:     'bg-blue-100 text-blue-700 border-blue-200',
-                        cached:          'bg-purple-100 text-purple-700 border-purple-200',
-                        not_found:       'bg-off-black/5 text-off-black/60 border-off-black/15',
-                        off:             'bg-off-black/5 text-off-black/40 border-off-black/10',
-                        rate_limited:    'bg-amber-100 text-amber-700 border-amber-300',
-                        upstream_error:  'bg-red-100 text-red-700 border-red-300',
-                        bad_request:     'bg-amber-100 text-amber-700 border-amber-200',
-                      }
-                      const cls = colors[k] || 'bg-off-black/5 text-off-black/60 border-off-black/15'
-                      return (
-                        <span key={k} className={`px-2 py-0.5 rounded border ${cls}`}>
-                          {k}: <strong>{v}</strong>
-                        </span>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
 
               {/* Body */}
@@ -3344,25 +3344,24 @@ Thank you!`
                   <div className="p-6 text-sm text-red-600">{lookupsError}</div>
                 ) : lookupsRecent.length === 0 ? (
                   <div className="p-12 text-center text-sm text-off-black/50">
-                    {lookupsLoading ? 'Loading…' : 'No lookups recorded in this Vercel instance yet. New requests will appear here.'}
+                    {lookupsLoading ? 'Loading…' : 'No lookups in the last 7 days. New requests will appear here.'}
                   </div>
                 ) : (
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-white border-b border-border-gray">
                       <tr className="text-off-black/50 text-left">
-                        <th className="px-4 py-2 font-medium">When</th>
+                        <th className="px-4 py-2 font-medium">Date &amp; Time</th>
                         <th className="px-4 py-2 font-medium">Race</th>
                         <th className="px-4 py-2 font-medium">Year</th>
                         <th className="px-4 py-2 font-medium">Name</th>
                         <th className="px-4 py-2 font-medium">Outcome</th>
-                        <th className="px-4 py-2 font-medium text-right">ms</th>
-                        <th className="px-4 py-2 font-medium">IP</th>
+                        <th className="px-4 py-2 font-medium text-right">Lookup Time (ms)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {lookupsRecent.map((e, i) => {
                         const dt = new Date(e.at)
-                        const when = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                        const when = dt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
                         const outcomeColors: Record<string, string> = {
                           found:           'text-green-700',
                           suggestions:     'text-blue-700',
@@ -3383,7 +3382,6 @@ Thank you!`
                               {e.outcome}{e.cached ? ' (cache)' : ''}
                             </td>
                             <td className="px-4 py-2 text-off-black/60 text-right tabular-nums">{e.ms ?? '—'}</td>
-                            <td className="px-4 py-2 font-mono text-off-black/50">{e.ip || '—'}</td>
                           </tr>
                         )
                       })}
@@ -3393,11 +3391,12 @@ Thank you!`
               </div>
 
               <div className="px-6 py-3 border-t border-border-gray text-[11px] text-off-black/40">
-                Names show the actual search query. IPs are anonymized. For stdout records grep <code className="bg-subtle-gray px-1 rounded">[LOOKUP]</code> in Vercel logs.
+                Names show the actual search query (anonymized). Success rate = found ÷ attempts (excludes lookups while the feature was off). For raw stdout records grep <code className="bg-subtle-gray px-1 rounded">[LOOKUP]</code> in Vercel logs.
               </div>
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* Race Database Full-Screen Overlay */}
         {showRaceDatabase && (

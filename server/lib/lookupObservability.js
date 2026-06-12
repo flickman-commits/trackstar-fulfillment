@@ -91,10 +91,15 @@ export async function recordLookup({ race, year, name, outcome, ms, status, ip, 
  * Returns most-recent-first list of the last N lookups from the DB.
  * @param {number} limit
  * @param {string} [race] - optional canonical race filter
+ * @param {number} [sinceMs] - optional lower bound (epoch ms); only lookups at
+ *                             or after this time are returned
  */
-export async function getRecentLookups(limit = 200, race = null) {
+export async function getRecentLookups(limit = 200, race = null, sinceMs = null) {
+  const where = {}
+  if (race) where.race = race
+  if (sinceMs) where.createdAt = { gte: new Date(sinceMs) }
   const rows = await prisma.lookupLog.findMany({
-    where: race ? { race } : undefined,
+    where: Object.keys(where).length ? where : undefined,
     orderBy: { createdAt: 'desc' },
     take: Math.max(1, Math.min(500, limit)),
   })
