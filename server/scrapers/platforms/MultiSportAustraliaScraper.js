@@ -62,7 +62,8 @@ async function fetchViaBrowser(url) {
     await new Promise(r => setTimeout(r, 1500))
     return await page.content()
   } finally {
-    if (browser) await browser.close()
+    // .catch so a failed close can't mask the original error
+    if (browser) await browser.close().catch(e => console.error('[MultiSportAustralia] Failed to close browser:', e.message))
   }
 }
 
