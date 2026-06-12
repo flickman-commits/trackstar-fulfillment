@@ -29,6 +29,25 @@ export default {
     },
   },
 
+  /**
+   * Pre-Xacte years live on Athlinks instead (master event 1264 has the full
+   * LA Marathon history). These overrides re-route just those years to the
+   * Athlinks scraper, leaving the current Xacte years untouched.
+   *   2018: raceID 626219 ("Skechers Performance Los Angeles Marathon")
+   */
+  yearOverrides: {
+    2018: {
+      platform: 'athlinks',
+      masterEventId: 1264,
+      eventIds: { 2018: 626219 },
+      courseMap: {
+        marathon: /^(full )?marathon$/i,
+        half: /half marathon/i,
+      },
+      distances: { marathon: 26.2, half: 13.1 },
+    },
+  },
+
   eventTypes: ['Marathon', 'Half Marathon'],
   defaultEventType: 'Marathon',
   eventSearchOrder: ['marathon', 'half'],
