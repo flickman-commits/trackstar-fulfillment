@@ -339,7 +339,9 @@ export default function Dashboard() {
   const [bulkSummary, setBulkSummary] = useState<BulkSummary | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
-  const [healthResults, setHealthResults] = useState<any>(null)
+  type HealthCheck = { status: 'ok' | 'warn' | 'error'; detail?: string | null; latency?: string }
+  type HealthResults = { overall: string; checks: Record<string, HealthCheck>; error?: string }
+  const [healthResults, setHealthResults] = useState<HealthResults | null>(null)
   const [isRunningHealth, setIsRunningHealth] = useState(false)
   type ConnTestStep = { name: string; status: 'ok' | 'warn' | 'error'; message: string; detail?: string | null; latency?: string }
   type ConnTestProvider = { status: 'ok' | 'warn' | 'error' | 'pending'; steps: ConnTestStep[] }
@@ -383,8 +385,8 @@ export default function Dashboard() {
       const data = await r.json()
       setLookupsRecent(data.entries || [])
       setLookupsSummary(data.summary || null)
-    } catch (e: any) {
-      setLookupsError(e?.message || 'Failed to load')
+    } catch (e) {
+      setLookupsError(e instanceof Error ? e.message : 'Failed to load')
       setLookupsRecent([]); setLookupsSummary(null)
     } finally {
       setLookupsLoading(false)
@@ -3194,8 +3196,8 @@ Thank you!`
                               } else {
                                 setHealthResults(data)
                               }
-                            } catch (err: any) {
-                              setHealthResults({ overall: 'error', checks: {}, error: err?.message || 'Failed to run health check' })
+                            } catch (err) {
+                              setHealthResults({ overall: 'error', checks: {}, error: err instanceof Error ? err.message : 'Failed to run health check' })
                             } finally {
                               setIsRunningHealth(false)
                             }
@@ -3216,7 +3218,7 @@ Thank you!`
                           {healthResults.error && (
                             <div className="text-xs text-red-500 mt-1">{healthResults.error}</div>
                           )}
-                          {healthResults.checks && Object.entries(healthResults.checks).map(([name, check]: [string, any]) => (
+                          {healthResults.checks && Object.entries(healthResults.checks).map(([name, check]) => (
                             <div key={name} className="flex items-start gap-2 text-xs">
                               <span className="flex-shrink-0 mt-0.5">{check.status === 'ok' ? '✅' : check.status === 'warn' ? '⚠️' : '❌'}</span>
                               <div className="min-w-0">
