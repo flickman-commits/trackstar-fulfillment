@@ -728,18 +728,28 @@
         + '&year=' + encodeURIComponent(year)
         + '&name=' + encodeURIComponent(name);
 
+      // Hard client-side timeout. A real-results scrape can occasionally be
+      // slow (the timing site is sequential marathon + half fetches), and a
+      // shopper staring at a spinner for 20s reads as broken. Cap it: if the
+      // server hasn't answered in 12s, abort and drop to manual entry — they
+      // can type it in, and the backend still researches it for fulfillment.
+      var ctrl = new AbortController();
+      var timedOut = false;
+      var timer = setTimeout(function () { timedOut = true; ctrl.abort(); }, 12000);
+
       // cache: 'no-store' guarantees the browser/CDN doesn't return a stale
       // result for an identical-looking URL (some browsers cache GETs more
       // aggressively than the query-param difference would suggest). Without
       // this, going back, changing year, and re-searching the same name could
       // serve the previous response. Server also sets Cache-Control: no-store.
-      fetch(url, { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } })
+      fetch(url, { method: 'GET', cache: 'no-store', signal: ctrl.signal, headers: { 'Accept': 'application/json' } })
         .then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (data) {
             return { status: r.status, data: data };
           });
         })
         .then(function (res) {
+          clearTimeout(timer);
           var data = res.data || {};
           // Capture canonical race name for the cart-property write.
           if (data.raceCanonical) pendingRaceName = data.raceCanonical;
@@ -770,9 +780,12 @@
           show('manual');
         })
         .catch(function () {
+          clearTimeout(timer);
           prefillManual(name);
           root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
-          pendingFallbackReason = 'manual_lookup_error';
+          // Distinguish a timeout (slow upstream) from a network/other error so
+          // the order's _lookup_outcome tells us which it was.
+          pendingFallbackReason = timedOut ? 'manual_timeout' : 'manual_lookup_error';
           show('manual');
         });
     }
