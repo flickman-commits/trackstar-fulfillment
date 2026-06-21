@@ -5,8 +5,10 @@
  * Per-year raceIds (Marathon + Half):
  *   2023: M=15218  H=15398
  *   2024: M=17012  H=17022
+ *   2026: M=20331  H=20333
  *
  * Verified finisher: Jay Smith, 3:02:52 (2024 Marathon, raceId 17012, rid=398).
+ * Verified 2026: Amanuel Mesel (Marathon, raceId 20331, rid=21661, race winner).
  */
 export default {
   platform: 'mtec',
@@ -28,6 +30,7 @@ export default {
   raceIds: {
     2023: { marathon: 15218, half: 15398 },
     2024: { marathon: 17012, half: 17022 },
+    2026: { marathon: 20331, half: 20333 },
   },
   raceSlugs: {
     2023: {
@@ -37,6 +40,11 @@ export default {
     2024: {
       marathon: "2024_Grandma%27s_Marathon-Grandma%27s_Marathon",
       half: '2024_Garry_Bjorklund_Half_Marathon-Half_Marathon',
+    },
+    // 2026 leaderboard slugs use the event-prefixed scheme (verified live).
+    2026: {
+      marathon: "2026_Grandma%27s_Marathon-Marathon",
+      half: "2026_Grandma%27s_Marathon-Half_Marathon",
     },
   },
   /** Third Saturday of June. */
