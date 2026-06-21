@@ -68,6 +68,7 @@ interface Order {
     | 'manual_no_match'
     | 'manual_lookup_error'
     | 'manual_rate_limited'
+    | 'manual_timeout'
     | 'manual_user_choice'
     | null
   // Instant Lookup widget signal: true = customer confirmed an official match,
@@ -3239,7 +3240,7 @@ Thank you!`
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-red-700">Clear Runner Research</p>
-                          <p className="text-xs mt-0.5 text-red-500">Deletes all cached bib, time, and pace data. All orders go back to &quot;Ready to research&quot;. Use after fixing a scraper bug.</p>
+                          <p className="text-xs mt-0.5 text-red-500">Deletes cached bib, time, and pace data for orders that haven&apos;t been marked complete, sending them back to &quot;Ready to research&quot;. Completed orders keep their data. Use after fixing a scraper bug.</p>
                         </div>
                         <button
                           onClick={() => runSettingsAction('clear-research')}
@@ -5167,6 +5168,7 @@ Thank you!`
                             manual_no_match:     { label: '✎ Manual: no match',   title: 'Lookup ran but found nothing for this name+year — customer typed it in.' },
                             manual_lookup_error: { label: '✎ Manual: lookup error', title: 'Lookup endpoint returned an error or was unreachable — customer typed it in.' },
                             manual_rate_limited: { label: '✎ Manual: rate-limited', title: 'Customer hit the per-IP rate limit — fell back to manual entry.' },
+                            manual_timeout:      { label: '✎ Manual: timed out', title: 'Lookup took too long (>12s) so the widget dropped to manual entry. Usually a slow timing site.' },
                             manual_user_choice:  { label: '✎ Manual: chose to type', title: 'Customer clicked "Enter info manually" themselves.' },
                           }
                           const meta = outcomeMap[selectedOrder.lookupOutcome]

@@ -292,12 +292,15 @@ async function handleClearRaceCache(res) {
 
 // --- clear-research ---
 async function handleClearResearch({ raceName }, res) {
+  // Only clear research for orders that haven't shipped to production yet.
+  // Completed orders keep their cached result so the finished poster's data
+  // stays intact and auditable.
   if (raceName) {
     const race = await prisma.race.findFirst({ where: { raceName } })
     if (!race) return res.status(404).json({ error: `Race not found: ${raceName}` })
 
     const { count } = await prisma.runnerResearch.deleteMany({
-      where: { raceId: race.id }
+      where: { raceId: race.id, order: { status: { not: 'completed' } } }
     })
 
     await prisma.order.updateMany({
@@ -308,17 +311,19 @@ async function handleClearResearch({ raceName }, res) {
       data: { status: 'pending' }
     })
 
-    console.log(`[actions/clear-research] Deleted ${count} research records for ${raceName}`)
+    console.log(`[actions/clear-research] Deleted ${count} research records for ${raceName} (excluding completed orders)`)
     return res.status(200).json({ success: true, deleted: count, raceName })
   }
 
-  const { count } = await prisma.runnerResearch.deleteMany({})
+  const { count } = await prisma.runnerResearch.deleteMany({
+    where: { order: { status: { not: 'completed' } } }
+  })
   await prisma.order.updateMany({
     where: { status: { in: ['ready', 'flagged'] } },
     data: { status: 'pending' }
   })
 
-  console.log(`[actions/clear-research] Deleted ${count} research records (all races)`)
+  console.log(`[actions/clear-research] Deleted ${count} research records (all races, excluding completed orders)`)
   return res.status(200).json({ success: true, deleted: count })
 }
 
