@@ -53,14 +53,30 @@ const PLATFORM_NAME_ALIASES = {
   'multisportaustralia': 'multisport-australia',
 }
 
-// 3. Verify every platform has at least one fixture
+// Platforms that predate the fixture requirement. These are grandfathered:
+// they only WARN. Every NEW platform must ship with a fixture or the build
+// fails (see the add-race-scraper skill). Backfilling these removes them here.
+// Do NOT add to this list — the whole point is that new scrapers get a fixture.
+const FIXTURE_GRANDFATHERED = new Set([
+  'brooksee', 'laureltiming', 'mtecresults', 'mychiptime', 'myrace',
+  'nyrr', 'runsignup', 'scorethis', 'xacte',
+])
+
+// 3. Verify every platform has at least one fixture.
+// Missing fixture is a hard error for new platforms, a warning for
+// grandfathered ones.
 for (const platformFile of platformFiles) {
   const expectedKey = PLATFORM_NAME_ALIASES[platformFile] || platformFile
   if (!fixturePlatforms.has(expectedKey)) {
-    warnings.push(
+    const msg =
       `Platform "${platformFile}Scraper.js" has no chip-time fixture. ` +
-      `Add one to server/scrapers/__tests__/chip-time-fixtures.js with platform: "${expectedKey}"`
-    )
+      `Add one to server/scrapers/__tests__/chip-time-fixtures.js with platform: "${expectedKey}" ` +
+      `(include an uneven-splits runner — see the add-race-scraper skill).`
+    if (FIXTURE_GRANDFATHERED.has(platformFile) || FIXTURE_GRANDFATHERED.has(expectedKey)) {
+      warnings.push(msg + ' [grandfathered — backfill when possible]')
+    } else {
+      errors.push(msg)
+    }
   } else {
     console.log(`  ✓ ${platformFile.padEnd(15)} has fixture(s)`)
   }
