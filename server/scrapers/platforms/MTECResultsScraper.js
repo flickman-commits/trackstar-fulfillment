@@ -6,16 +6,22 @@
  *        GET /event/participantSearch?nameorbib={query}&race={raceId}
  *      Columns: Name (link → /runner/show?race=...&rid=...), Bib, Age, Sex,
  *               City, State, Race (distance label e.g. "Marathon").
- *   2) Runner detail page (chip time + pace):
+ *   2) Runner detail page (chip Finish time):
  *        GET /runner/show?rid={rid}&race={raceId}
  *
  * Each distance is a separate raceId (config: raceIds[year][distanceKey]).
  *
  * Chip vs gun: the detailed splits table has a row anchored on
  * <th class='pe-3'>Finish</th>; the 1st <td> in that row is the chip Finish
- * time (cumulative), the 3rd <td> is the overall pace. The compact "Splits"
- * card on the same page shows INTERVAL times between splits — not cumulative
- * — so do not extract finish time from it.
+ * time (cumulative). The compact "Splits" card on the same page shows INTERVAL
+ * times between splits — not cumulative — so do not extract finish time from it.
+ *
+ * PACE: we do NOT scrape pace from this page. Its pace column is labeled
+ * "Pace Between" (cumulative table) / "Pace" (segment table) and is the
+ * per-SEGMENT pace — on the Finish row that's the pace over the final segment
+ * only, which is wrong for anyone who didn't run even splits. We compute the
+ * overall pace from chip time ÷ distance instead, which matches the page's own
+ * headline "Pace" value exactly.
  */
 import { BaseScraper } from '../BaseScraper.js'
 import * as cheerio from 'cheerio'
@@ -130,9 +136,9 @@ export class MTECResultsScraper extends BaseScraper {
 
       const formattedTime = this.formatTime(detail.chipTime)
       const distanceMiles = this.config.distances?.[distKey] || 26.2
-      const pace = detail.pace
-        ? this.formatPace(detail.pace)
-        : this.formatPace(this.calculatePace(detail.chipTime, distanceMiles))
+      // Always compute overall pace — the page only exposes per-segment pace
+      // (see file header). Computed pace == the page's headline "Pace" value.
+      const pace = this.formatPace(this.calculatePace(detail.chipTime, distanceMiles))
 
       console.log(`\n[${this.tag}] FOUND RUNNER:`)
       console.log(`  Name: ${match.name}`)
@@ -224,10 +230,11 @@ export class MTECResultsScraper extends BaseScraper {
     const $ = cheerio.load(html)
 
     // Find the detailed splits table by walking every <tr> that has a
-    // <th class='pe-3'>Finish</th> header — the first <td> next to it is
-    // the cumulative chip Finish time, the 3rd <td> is the overall pace.
+    // <th class='pe-3'>Finish</th> header — the first <td> next to it is the
+    // cumulative chip Finish time. We deliberately do NOT read the page's pace
+    // column here (it's per-segment, not overall); pace is computed in
+    // searchRunner from chip time ÷ distance. See the file header.
     let chipTime = null
-    let pace = null
     $('tr').each((_, tr) => {
       const th = $(tr).find('th').first()
       if (!th.length) return
@@ -236,16 +243,10 @@ export class MTECResultsScraper extends BaseScraper {
       if (tds.length === 0) return
       const t = $(tds[0]).text().trim()
       if (/^\d{1,2}:\d{2}:\d{2}/.test(t)) chipTime = t
-      // Pace column (3rd <td>) is e.g. "5:18" — guard against split-interval
-      // times by checking for the m:ss shape.
-      if (tds.length >= 3) {
-        const p = $(tds[2]).text().trim()
-        if (/^\d{1,2}:\d{2}$/.test(p)) pace = p
-      }
       return false // break each loop
     })
 
-    return { chipTime, pace }
+    return { chipTime }
   }
 }
 
