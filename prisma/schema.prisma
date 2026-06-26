@@ -93,6 +93,7 @@ model Order {
   comments         OrderComment[]
   approvalToken    ApprovalToken?
   proofs           Proof[]
+  messages         OrderMessage[]
   creatorSample    Creator?  @relation("CreatorSample") // Set iff this is a creator-program sample order
 
   @@unique([parentOrderNumber, lineItemIndex]) // Each line item is unique within an order
@@ -170,6 +171,24 @@ model OrderComment {
   createdAt DateTime @default(now())
 
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// Two-way Q&A between the designer (Dan) and the customer for a custom order.
+// The designer asks a question in the backend portal → the customer answers in
+// the same token-gated approval portal they use for proofs → Dan gets pinged.
+// No inbound email: the customer's reply is a token-validated POST from the
+// portal, exactly like a proof revision request.
+model OrderMessage {
+  id             String   @id @default(cuid())
+  orderId        String
+  sender         String   // "designer" | "customer"
+  body           String
+  readByDesigner Boolean  @default(false) // false when a customer reply is awaiting Dan
+  createdAt      DateTime @default(now())
+
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
 }

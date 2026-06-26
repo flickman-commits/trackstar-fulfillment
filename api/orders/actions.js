@@ -11,6 +11,7 @@
  *   - complete: Mark an order as completed
  *   - reopen: Un-complete an order — brings it back into the active queue
  *   - design-status: Update design status of a custom order
+ *   - message-customer: Designer asks the customer a question (email + portal Q&A)
  *   - customers-served-info: Get current customers served count
  *   - customers-served-sync: Force sync count to Shopify
  *   - customers-served-set: Manually set the count (for corrections)
@@ -30,6 +31,29 @@ import { shopifyFetch } from '../../server/services/shopifyAuth.js'
 import { getRaceShorthands } from '../../server/scrapers/index.js'
 import { Resend } from 'resend'
 import { runWeeklyAdsDebrief, isFridayFourPmEastern } from '../../server/services/weeklyAdsDebrief.js'
+
+const APPROVAL_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
+
+// Ensure an ApprovalToken exists for an order; create one if missing. Returns
+// the (existing or new) token row. Mirrors the proofs endpoint's token logic.
+async function ensureApprovalToken(orderId) {
+  const existing = await prisma.approvalToken.findUnique({ where: { orderId } })
+  if (existing && new Date() < existing.expiresAt) return existing
+  return prisma.approvalToken.upsert({
+    where: { orderId },
+    create: { orderId, token: crypto.randomUUID(), expiresAt: new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS) },
+    update: { token: crypto.randomUUID(), expiresAt: new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS) },
+  })
+}
+
+// Build the customer-facing approval/portal URL. Prod uses the Vercel
+// production URL; falls back to APP_BASE_URL for other environments.
+function buildPortalUrl(token) {
+  const base = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : (process.env.APP_BASE_URL || 'https://trackstar-fulfillment.vercel.app')
+  return `${base.replace(/\/$/, '')}/approve/${token}`
+}
 
 export default async function handler(req, res) {
   // Public action (no auth, open CORS): ping (UptimeRobot). The storefront
@@ -159,6 +183,8 @@ export default async function handler(req, res) {
         return await handleDesignStatus(body, res)
       case 'notify-custom-delay':
         return await handleNotifyCustomDelay(body, res)
+      case 'message-customer':
+        return await handleMessageCustomer(body, res)
       case 'customers-served-info':
         return await handleCustomersServedInfo(res)
       case 'customers-served-sync':
@@ -413,6 +439,12 @@ async function handleDesignStatus({ orderNumber, designStatus }, res) {
     data: updateData
   })
 
+  // Mint an approval token as soon as design work begins, so Dan can message
+  // the customer (and share the portal) even before any proofs exist.
+  if (designStatus === 'in_progress') {
+    await ensureApprovalToken(existing.id)
+  }
+
   console.log(`[actions/design-status] Order ${orderNumber} design status → ${designStatus}`)
 
   // Slack notification when sent to production
@@ -555,6 +587,114 @@ async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
 
   console.log(`[actions/notify-custom-delay] Order ${orderNumber}: delay email sent (${days} days late)`)
   return res.status(200).json({ success: true, order })
+}
+
+// --- message-customer ---
+// Dan asks a custom-order customer a question. Records the question as an
+// OrderMessage, ensures the order has an approval token, emails the customer a
+// short "your designer has a question — action required" note linking to the
+// portal (where they answer inline), and pings Slack so we have visibility.
+// The customer's reply comes back through api/proofs (action=customer-message).
+async function handleMessageCustomer({ orderId, body }, res) {
+  if (!orderId) return res.status(400).json({ error: 'orderId is required' })
+  const text = (body || '').toString().trim()
+  if (!text) return res.status(400).json({ error: 'Message body is required' })
+  if (text.length > 2000) return res.status(400).json({ error: 'Message is too long (max 2000 chars)' })
+
+  const existing = await prisma.order.findUnique({ where: { id: orderId } })
+  if (!existing) return res.status(404).json({ error: 'Order not found' })
+  if (existing.trackstarOrderType !== 'custom' && existing.trackstarOrderType !== 'race_partner') {
+    return res.status(400).json({ error: 'Messaging is only for custom or race partner orders' })
+  }
+  if (!existing.customerEmail) {
+    return res.status(400).json({ error: 'No customer email on file for this order' })
+  }
+  if (!process.env.RESEND_API_KEY) {
+    return res.status(500).json({ error: 'Email service not configured (RESEND_API_KEY missing)' })
+  }
+
+  // Make sure a portal token exists, then record the designer's question.
+  const approvalToken = await ensureApprovalToken(orderId)
+  const portalUrl = buildPortalUrl(approvalToken.token)
+
+  const message = await prisma.orderMessage.create({
+    data: { orderId, sender: 'designer', body: text, readByDesigner: true },
+  })
+
+  const shopifyData = existing.shopifyOrderData
+  const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
+    ? String(shopifyData.name) : `#${existing.parentOrderNumber}`
+  const firstName = existing.customerName || 'there'
+
+  // On-brand email — mirrors the proof/delay templates (cream bg, purple CTA,
+  // Helvetica Neue). Intentionally does NOT include the question text: we want
+  // the customer to answer in the portal, not reply by email.
+  const emailHtml = `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#F7F5F0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F5F0;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+        <tr><td style="padding:0 0 32px;text-align:center;">
+          <img src="https://www.trackstar.art/cdn/shop/files/Trackstar_Logo_Cropped.png?height=28&v=1757377797" alt="Trackstar" height="28" style="height:28px;" />
+        </td></tr>
+        <tr><td style="padding:32px;background-color:#FFFFFF;border:1px solid #E8E6E1;">
+          <h1 style="margin:0 0 16px;font-size:22px;color:#1A1A1A;font-weight:700;letter-spacing:0.02em;">Your designer has a question</h1>
+          <p style="margin:0 0 14px;font-size:15px;color:#555555;line-height:1.6;">Hey ${firstName},</p>
+          <p style="margin:0 0 24px;font-size:15px;color:#555555;line-height:1.6;">
+            We're working on your custom design for order ${displayNum} and our designer has a quick question for you. Tap below to read it and reply — it only takes a moment, and it helps us get your design just right.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 8px;">
+            <a href="${portalUrl}" style="display:inline-block;background-color:#4600D6;color:#FFFFFF;font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;letter-spacing:0.03em;">VIEW &amp; REPLY</a>
+          </td></tr></table>
+          <p style="margin:20px 0 0;font-size:13px;color:#999999;line-height:1.6;text-align:center;">
+            Please reply in the portal rather than to this email so nothing gets lost.
+          </p>
+        </td></tr>
+        <tr><td style="padding:24px 0 0;text-align:center;">
+          <p style="margin:0;font-size:11px;color:#999999;letter-spacing:0.05em;">Trackstar — Celebrating athletic achievement.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+
+  const resend = new Resend(process.env.RESEND_API_KEY)
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Trackstar <proofs@orders.trackstar.art>'
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to: [existing.customerEmail],
+      subject: `A question about your Trackstar Order ${displayNum} (Action Required)`,
+      html: emailHtml,
+    })
+  } catch (emailErr) {
+    console.error('[actions/message-customer] Email send failed:', emailErr)
+    await alertError('Customer question email', emailErr, { orderId, customerEmail: existing.customerEmail })
+    // Roll back the recorded message so the thread doesn't show a question the
+    // customer never received.
+    await prisma.orderMessage.delete({ where: { id: message.id } }).catch(() => {})
+    return res.status(500).json({ error: 'Failed to send the email. Please try again.' })
+  }
+
+  // Note: we intentionally do NOT change designStatus here. A question is
+  // orthogonal to design progress — the order stays in Dan's queue until he
+  // actually sends proofs.
+  const slackUrl = process.env.SLACK_PROOF_WEBHOOK_URL
+  if (slackUrl) {
+    fetch(slackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: `💬 Question sent to *${existing.customerName || 'customer'}* for order *${displayNum}* — emailed ${existing.customerEmail}. I'll ping you here when they reply.`,
+      }),
+    }).catch(e => console.warn('[actions/message-customer] Slack notify failed:', e.message))
+  }
+
+  console.log(`[actions/message-customer] Order ${existing.orderNumber}: question sent to ${existing.customerEmail}`)
+  return res.status(200).json({ success: true, message, portalUrl })
 }
 
 // --- customers-served-info ---

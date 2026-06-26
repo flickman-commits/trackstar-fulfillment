@@ -160,7 +160,10 @@ export default async function handler(req, res) {
     } catch {}
   }
 
-  const isPublicAction = preAction === 'approve'
+  // Public, token-gated customer actions: reviewing/approving proofs and
+  // replying to a designer's question. Both authenticate via the order's
+  // approval token (checked in their handlers), not the admin secret.
+  const isPublicAction = preAction === 'approve' || preAction === 'customer-message'
 
   if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS', allowPublic: isPublicAction })) return
 
@@ -217,6 +220,12 @@ export default async function handler(req, res) {
           where: { orderId: approvalToken.orderId },
           orderBy: { version: 'asc' }
         })
+        // Designer ↔ customer Q&A thread, oldest first.
+        const messages = await prisma.orderMessage.findMany({
+          where: { orderId: approvalToken.orderId },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, sender: true, body: true, createdAt: true },
+        })
         const shopifyData = approvalToken.order.shopifyOrderData
         const displayOrderNumber = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
           ? String(shopifyData.name).replace('#', '')
@@ -224,7 +233,8 @@ export default async function handler(req, res) {
 
         return res.status(200).json({
           order: { ...approvalToken.order, displayOrderNumber, shopifyOrderData: undefined },
-          proofs
+          proofs,
+          messages
         })
       }
 
@@ -305,6 +315,50 @@ export default async function handler(req, res) {
       }
 
       return res.status(405).json({ error: 'Method not allowed' })
+    }
+
+    // ─── Customer Reply to a Designer Question (public, token-based) ───
+    if (resolvedAction === 'customer-message') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+      const token = req.query.token || body.token
+      if (!token) return res.status(400).json({ error: 'Token is required' })
+
+      const text = (body.body || '').toString().trim()
+      if (!text) return res.status(400).json({ error: 'Message is required' })
+      if (text.length > 2000) return res.status(400).json({ error: 'Message is too long (max 2000 chars)' })
+
+      const approvalToken = await prisma.approvalToken.findUnique({
+        where: { token },
+        include: { order: { select: { id: true, customerName: true, parentOrderNumber: true, shopifyOrderData: true } } }
+      })
+      if (!approvalToken) return res.status(404).json({ error: 'Invalid link. Please contact us for assistance.' })
+      if (new Date() > approvalToken.expiresAt) {
+        return res.status(410).json({ error: 'This link has expired. Please contact us for a new one.' })
+      }
+
+      const message = await prisma.orderMessage.create({
+        data: { orderId: approvalToken.orderId, sender: 'customer', body: text, readByDesigner: false }
+      })
+
+      console.log(`[customer-message] Customer replied on order ${approvalToken.order.parentOrderNumber}`)
+
+      // Ping Dan so he sees the reply without checking the portal.
+      if (process.env.SLACK_PROOF_WEBHOOK_URL) {
+        const shopifyData = approvalToken.order.shopifyOrderData
+        const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
+          ? String(shopifyData.name) : `#${approvalToken.order.parentOrderNumber}`
+        const customerName = approvalToken.order.customerName || 'Customer'
+        fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: `💬 <@U04KBDJH5C3> *${customerName}* replied to your question on order *${displayNum}*:\n> _"${text}"_`
+          })
+        }).catch(e => console.warn('[customer-message] Slack notification failed:', e.message))
+      }
+
+      return res.status(200).json({ success: true, message })
     }
 
     // ─── Approval Token Management (merchant) ───
@@ -531,7 +585,12 @@ export default async function handler(req, res) {
         where: { orderId },
         orderBy: { version: 'asc' }
       })
-      return res.status(200).json({ proofs })
+      const messages = await prisma.orderMessage.findMany({
+        where: { orderId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, sender: true, body: true, createdAt: true },
+      })
+      return res.status(200).json({ proofs, messages })
     }
 
     if (req.method === 'POST') {

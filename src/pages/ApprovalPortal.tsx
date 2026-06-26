@@ -20,6 +20,13 @@ interface Proof {
   updatedAt: string
 }
 
+interface Message {
+  id: string
+  sender: 'designer' | 'customer'
+  body: string
+  createdAt: string
+}
+
 interface OrderInfo {
   id: string
   orderNumber: string
@@ -43,6 +50,9 @@ export default function ApprovalPortal() {
   const [state, setState] = useState<PortalState>('loading')
   const [order, setOrder] = useState<OrderInfo | null>(null)
   const [proofs, setProofs] = useState<Proof[]>([])
+  const [messages, setMessages] = useState<Message[]>([])
+  const [reply, setReply] = useState('')
+  const [sendingReply, setSendingReply] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   // selectedProofId removed — each card now carries its own Approve + Make
   // Revisions buttons, so there's no separate "select a design" step.
@@ -78,6 +88,7 @@ export default function ApprovalPortal() {
       const data = await res.json()
       setOrder(data.order)
       setProofs(data.proofs)
+      setMessages(data.messages || [])
 
       // Show approved screen only if designStatus confirms it AND a proof is approved
       // (prevents stuck "approved" screen after internal unapprove)
@@ -118,6 +129,29 @@ export default function ApprovalPortal() {
       alert('Unable to submit. Please try again.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleSendReply = async () => {
+    if (!token || !reply.trim()) return
+    setSendingReply(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/proofs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'customer-message', token, body: reply.trim() })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || 'Something went wrong')
+        return
+      }
+      setReply('')
+      await fetchData()
+    } catch {
+      alert('Unable to send. Please try again.')
+    } finally {
+      setSendingReply(false)
     }
   }
 
@@ -542,10 +576,66 @@ export default function ApprovalPortal() {
           )}
         </div>
 
-        {proofs.length === 0 ? (
-          <div className="p-8 text-center" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
-            <p style={{ color: '#666666', fontSize: '14px' }}>No designs uploaded yet. Check back soon.</p>
+        {/* Designer ↔ customer Q&A. Shows while we're still gathering info —
+            i.e. before any designs are out for review. Once proofs are pending,
+            the page is about picking/approving a design, so the thread is
+            hidden to keep the focus there (the conversation already did its job
+            of getting us what we needed). */}
+        {messages.length > 0 && !hasPendingProofs && (
+          <div className="mb-4" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', padding: '16px' }}>
+            <p style={{ color: '#666666', fontSize: '12px', fontWeight: 600, marginBottom: '12px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+              Questions from our designer
+            </p>
+            <div className="space-y-3" style={{ marginBottom: '16px' }}>
+              {messages.map(m => {
+                const isDesigner = m.sender === 'designer'
+                return (
+                  <div key={m.id} className="flex" style={{ justifyContent: isDesigner ? 'flex-start' : 'flex-end' }}>
+                    <div style={{
+                      maxWidth: '85%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      backgroundColor: isDesigner ? '#F0EDF9' : '#4600D6',
+                      color: isDesigner ? '#1A1A1A' : '#FFFFFF',
+                    }}>
+                      <p style={{ fontSize: '11px', fontWeight: 600, marginBottom: '3px', opacity: 0.7 }}>
+                        {isDesigner ? 'Trackstar Design' : 'You'}
+                      </p>
+                      <p style={{ fontSize: '14px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const, margin: 0 }}>{m.body}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <label htmlFor="customer-reply" style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 500, display: 'block', marginBottom: '6px' }}>
+              Your reply
+            </label>
+            <textarea
+              id="customer-reply"
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              placeholder="Type your answer here…"
+              className="w-full px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-300"
+              style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0', color: '#1A1A1A' }}
+              rows={3}
+            />
+            <button
+              onClick={handleSendReply}
+              disabled={sendingReply || !reply.trim()}
+              className="w-full mt-2 px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
+              style={{ backgroundColor: '#4600D6', color: '#FFFFFF' }}
+            >
+              {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Reply'}
+            </button>
           </div>
+        )}
+
+        {proofs.length === 0 ? (
+          messages.length === 0 ? (
+            <div className="p-8 text-center" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
+              <p style={{ color: '#666666', fontSize: '14px' }}>No designs uploaded yet. Check back soon.</p>
+            </div>
+          ) : null
         ) : (
           <>
             {/* Current batch of pending proofs — horizontal carousel */}

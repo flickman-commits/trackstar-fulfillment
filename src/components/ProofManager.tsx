@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw } from 'lucide-react'
+import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 
@@ -17,6 +17,13 @@ interface Proof {
   customerFeedback: string | null
   createdAt: string
   updatedAt: string
+}
+
+interface Message {
+  id: string
+  sender: 'designer' | 'customer'
+  body: string
+  createdAt: string
 }
 
 interface ApprovalToken {
@@ -52,6 +59,9 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [sendNote, setSendNote] = useState('')
+  const [messages, setMessages] = useState<Message[]>([])
+  const [question, setQuestion] = useState('')
+  const [isAsking, setIsAsking] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -68,6 +78,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
       if (proofsRes.ok) {
         const data = await proofsRes.json()
         setProofs(data.proofs)
+        setMessages(data.messages || [])
         // Expose latest customer feedback for revision banner
         const revisionProof = [...data.proofs].reverse().find((p: Proof) => p.status === 'revision_requested' && p.customerFeedback)
         onLatestFeedback?.(revisionProof?.customerFeedback || null)
@@ -283,6 +294,36 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
     }
   }
 
+  const askCustomer = async () => {
+    if (!question.trim()) return
+    if (!customerEmail) {
+      toast.error('No customer email on this order')
+      return
+    }
+    setIsAsking(true)
+    try {
+      const res = await apiFetch(`${API_BASE}/api/orders/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'message-customer', orderId, body: question.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to send question')
+        return
+      }
+      setQuestion('')
+      await fetchData()
+      toast.success(`Question emailed to ${customerEmail}`)
+    } catch {
+      toast.error('Failed to send question')
+    } finally {
+      setIsAsking(false)
+    }
+  }
+
+  const awaitingDanReply = messages.length > 0 && messages[messages.length - 1].sender === 'customer'
+
   const hasPendingProofs = proofs.some(p => p.status === 'pending')
   const canSend = hasPendingProofs && customerEmail && !disableEmail
   const showSendButton = canSend && ['in_progress', 'in_revision'].includes(designStatus || '')
@@ -334,6 +375,57 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
     </div>
   )
 
+  // ═══ Designer ↔ customer Q&A — compose a question + see replies ═══
+  // Rendered in both compact and full modes so Dan can always reach the
+  // customer. Disabled (with a hint) when there's no email on the order.
+  const messagingBlock = (
+    <div className="border border-border-gray rounded-md p-3 bg-white space-y-2">
+      <div className="flex items-center gap-1.5">
+        <MessageSquare className="w-3.5 h-3.5 text-off-black/50" />
+        <p className="text-[11px] font-semibold text-off-black/60 uppercase tracking-wider">Message customer</p>
+        {awaitingDanReply && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-100 text-purple-700">New reply</span>
+        )}
+      </div>
+
+      {messages.length > 0 && (
+        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          {messages.map(m => {
+            const isDesigner = m.sender === 'designer'
+            return (
+              <div key={m.id} className="flex" style={{ justifyContent: isDesigner ? 'flex-end' : 'flex-start' }}>
+                <div className={`max-w-[85%] px-2.5 py-1.5 rounded-lg ${isDesigner ? 'bg-off-black text-white' : 'bg-purple-50 text-off-black border border-purple-200'}`}>
+                  <p className="text-[9px] font-semibold opacity-60 mb-0.5">{isDesigner ? 'Dan' : 'Customer'}</p>
+                  <p className="text-xs whitespace-pre-wrap leading-snug">{m.body}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <textarea
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        placeholder={customerEmail ? 'Ask the customer a question…' : 'No customer email on this order'}
+        disabled={!customerEmail || isAsking}
+        className="w-full px-3 py-2 border border-border-gray rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white disabled:opacity-50"
+        rows={2}
+      />
+      <button
+        onClick={askCustomer}
+        disabled={isAsking || !question.trim() || !customerEmail}
+        className="w-full px-3 py-2 text-xs font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
+      >
+        {isAsking ? (
+          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending…</>
+        ) : (
+          <><Send className="w-3.5 h-3.5" /> Email question to customer</>
+        )}
+      </button>
+    </div>
+  )
+
   // ═══ COMPACT MODE: just thumbnails for reference ═══
   if (isCompact && proofs.length > 0) {
     return (
@@ -372,6 +464,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
             {copied ? 'Copied approval link' : 'Copy approval link'}
           </button>
         )}
+        {messagingBlock}
       </div>
     )
   }
@@ -380,6 +473,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   return (
     <div className="space-y-3" onPaste={handlePaste}>
       {lightbox}
+      {messagingBlock}
       {/* Approval Link — compact inline */}
       {approvalUrl ? (
         <div className="flex items-center gap-2">
