@@ -123,19 +123,21 @@ function PaceConverter() {
         )}
       </div>
 
-      {/* Result — pace per mile (centered), copy button pinned right */}
-      <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-2.5 text-center relative">
+      {/* Result — pace per mile centered, copy button just to its right */}
+      <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-2.5 text-center">
         <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Pace per mile</p>
-        <p className="text-2xl font-bold text-off-black tabular-nums">{pacePerMile ?? '—'}</p>
-        {pacePerMile && (
-          <button
-            onClick={copyPace}
-            title="Copy pace"
-            className="absolute right-2 bottom-2 p-1.5 rounded-md text-off-black/40 hover:text-off-black hover:bg-gray-200 transition-colors"
-          >
-            {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-          </button>
-        )}
+        <span className="relative inline-block">
+          <span className="text-2xl font-bold text-off-black tabular-nums">{pacePerMile ?? '—'}</span>
+          {pacePerMile && (
+            <button
+              onClick={copyPace}
+              title="Copy pace"
+              className="absolute left-full top-1/2 -translate-y-1/2 ml-1 p-1.5 rounded-md text-off-black/40 hover:text-off-black hover:bg-gray-200 transition-colors"
+            >
+              {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+            </button>
+          )}
+        </span>
       </div>
     </div>
   )
