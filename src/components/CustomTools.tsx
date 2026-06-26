@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Calculator, CloudSun, X } from 'lucide-react'
+import { Calculator, CloudSun, X, Copy, Check } from 'lucide-react'
 
 // Two desktop-only helper tiles for the custom-order workflow, pinned to the
 // bottom-left of the Custom view:
@@ -36,6 +36,7 @@ function PaceConverter() {
   const [minutes, setMinutes] = useState('')
   const [seconds, setSeconds] = useState('')
   const [distance, setDistance] = useState<DistanceKey>('marathon')
+  const [copied, setCopied] = useState(false)
 
   const h = parseField(hours, 23)
   const m = parseField(minutes, 59)
@@ -46,6 +47,25 @@ function PaceConverter() {
 
   const totalSeconds = valid ? h! * 3600 + m! * 60 + s! : null
   const pacePerMile = totalSeconds != null ? formatPace(totalSeconds / DISTANCES[distance].miles) : null
+
+  const copyPace = async () => {
+    if (!pacePerMile) return
+    try {
+      await navigator.clipboard.writeText(pacePerMile)
+    } catch {
+      // Fallback for insecure contexts where the clipboard API is blocked
+      const ta = document.createElement('textarea')
+      ta.value = pacePerMile
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   const fieldClass = `w-full px-2 py-2 border rounded-md text-sm text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-off-black/20 ${
     showError ? 'border-red-300' : 'border-border-gray'
@@ -103,10 +123,21 @@ function PaceConverter() {
         )}
       </div>
 
-      {/* Result — pace per mile */}
-      <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-2.5 text-center">
+      {/* Result — pace per mile, with copy button */}
+      <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-2.5 text-center relative">
         <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Pace per mile</p>
-        <p className="text-2xl font-bold text-off-black tabular-nums">{pacePerMile ?? '—'}</p>
+        <div className="flex items-center justify-center gap-2">
+          <p className="text-2xl font-bold text-off-black tabular-nums">{pacePerMile ?? '—'}</p>
+          {pacePerMile && (
+            <button
+              onClick={copyPace}
+              title="Copy pace"
+              className="p-1.5 rounded-md text-off-black/40 hover:text-off-black hover:bg-gray-200 transition-colors"
+            >
+              {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
