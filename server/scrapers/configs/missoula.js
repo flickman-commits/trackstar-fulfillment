@@ -21,6 +21,8 @@ export default {
   raceName: 'Missoula Marathon',
   tag: 'Missoula',
   raceId: 8029,
+  // Competitive Timing slug (used by the 2026 yearOverride below).
+  raceSlug: 'missoula-marathon',
   location: 'Missoula, MT',
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
@@ -43,6 +45,12 @@ export default {
     2023: { marathon: 389373, half: 389374 },
     2024: { marathon: 469183, half: 469182 },
     2025: { marathon: 562587, half: 562511 },
+  },
+  // 2026 hasn't synced to RunSignUp yet, but it's live on Competitive Timing's
+  // own site — pull it from there. Event ids resolve automatically off the
+  // raceSlug, so no per-event config is needed.
+  yearOverrides: {
+    2026: { platform: 'competitivetiming' },
   },
   /** Last Sunday of June. */
   calculateDate(year) {

@@ -20,6 +20,7 @@ import { MultiSportAustraliaScraper } from './platforms/MultiSportAustraliaScrap
 import { AthlinksScraper } from './platforms/AthlinksScraper.js'
 import { MTECResultsScraper } from './platforms/MTECResultsScraper.js'
 import { LaurelTimingScraper } from './platforms/LaurelTimingScraper.js'
+import { CompetitiveTimingScraper } from './platforms/CompetitiveTimingScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -85,6 +86,7 @@ const PLATFORM_MAP = {
   athlinks: AthlinksScraper,
   mtec: MTECResultsScraper,
   laurel: LaurelTimingScraper,
+  competitivetiming: CompetitiveTimingScraper,
 }
 
 /**

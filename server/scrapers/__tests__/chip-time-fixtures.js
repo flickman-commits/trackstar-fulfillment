@@ -161,6 +161,28 @@ export const CHIP_TIME_FIXTURES = [
     notes: 'Missoula 2025 Half Marathon — verifies half pace is computed against 13.1, not 26.2. Chip 1:10:52.48 → 1:10:52. https://runsignup.com/Race/Results/8029/562511',
   },
 
+  // ── Competitive Timing (LivePlanIt) — Missoula 2026 (not yet on RunSignUp) ──
+  {
+    platform: 'competitivetiming',
+    race: 'Missoula Marathon',
+    year: 2026,
+    runner: 'Luke Hurd',
+    expectedChipTime: '4:26:50',
+    expectedChipPace: '10:11',
+    expectedBib: '2346',
+    notes: 'Missoula 2026 Marathon (Competitive Timing API). Big positive split (slowed ~71 min in the 2nd half) so OVERALL pace (10:11) ≠ final-segment pace — confirms we compute from chip ÷ 26.2. finish_time_seconds 16010.28 → 4:26:50. https://competitivetiming.com/events/missoula-marathon/2026/marathon/results',
+  },
+  {
+    platform: 'competitivetiming',
+    race: 'Missoula Marathon',
+    year: 2026,
+    runner: 'James Settles',
+    expectedChipTime: '1:06:21',
+    expectedChipPace: '5:04',
+    expectedBib: '53',
+    notes: 'Missoula 2026 Half Marathon (Competitive Timing) — verifies half pace computes against 13.1. finish_time_seconds 3981.26 → 1:06:21. https://competitivetiming.com/events/missoula-marathon/2026/half-marathon/results',
+  },
+
   // ── NYRR ──────────────────────────────────────────────────────────────
   // (NYC Marathon — add when verified)
 
