@@ -63,6 +63,7 @@ import dallasConfig from './configs/dallas.js'
 import grandmasConfig from './configs/grandmas.js'
 import columbusConfig from './configs/columbus.js'
 import stGeorgeConfig from './configs/stGeorge.js'
+import missoulaConfig from './configs/missoula.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
 
 /**
@@ -131,6 +132,7 @@ const ALL_CONFIGS = [
   grandmasConfig,
   columbusConfig,
   stGeorgeConfig,
+  missoulaConfig,
 ]
 
 /**

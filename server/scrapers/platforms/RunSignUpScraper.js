@@ -318,9 +318,15 @@ export class RunSignUpScraper extends BaseScraper {
    * Extract standardized data from RunSignUp result object
    */
   extractRunnerData(result, eventType = 'Marathon') {
-    const time = this.formatTime(result.chipTime)
+    // Some RunSignUp timers (e.g. Competitive Timing / Missoula) report chip
+    // times with hundredths ("2:45:55.71") — round to the nearest second.
+    const time = this.formatTime(this.roundTime(result.chipTime))
     const bib = result.bib || null
-    const pace = this.formatPace(result.pace)
+    // Compute overall pace from chip time ÷ distance rather than trusting the
+    // scraped pace column (per the add-race-scraper skill). Distance comes from
+    // the matched event so half-marathon paces aren't computed against 26.2.
+    const distanceMiles = /half/i.test(eventType) ? 13.1 : 26.2
+    const pace = this.calculatePace(time, distanceMiles)
 
     return {
       found: true,

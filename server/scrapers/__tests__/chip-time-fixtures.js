@@ -140,6 +140,26 @@ export const CHIP_TIME_FIXTURES = [
   // ── RunSignUp ─────────────────────────────────────────────────────────
   // Note: Eugene moved off RunSignUp to Brooksee in 2026.
   // Add a verified Kiawah/Louisiana fixture once eventIds are configured for past years.
+  {
+    platform: 'runsignup',
+    race: 'Missoula Marathon',
+    year: 2025,
+    runner: 'Jacob Verrue',
+    expectedChipTime: '2:45:56',
+    expectedChipPace: '6:20',
+    expectedBib: '178',
+    notes: 'Missoula 2025 Marathon (RunSignUp/Competitive Timing). Positive split — 1st half 5:55/mi, 2nd half 6:45/mi — so the OVERALL pace (6:20) ≠ final-segment pace. Chip 2:45:55.71 rounds to 2:45:56. https://runsignup.com/Race/Results/8029/562587',
+  },
+  {
+    platform: 'runsignup',
+    race: 'Missoula Marathon',
+    year: 2025,
+    runner: 'Brett Rosauer',
+    expectedChipTime: '1:10:52',
+    expectedChipPace: '5:25',
+    expectedBib: '55',
+    notes: 'Missoula 2025 Half Marathon — verifies half pace is computed against 13.1, not 26.2. Chip 1:10:52.48 → 1:10:52. https://runsignup.com/Race/Results/8029/562511',
+  },
 
   // ── NYRR ──────────────────────────────────────────────────────────────
   // (NYC Marathon — add when verified)
