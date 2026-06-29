@@ -1599,6 +1599,8 @@ const CREATOR_EDITABLE_FIELDS = [
   'commissionModel', 'commissionConfig', 'commissionNotes',
   'whitelistingEnabled', 'metaPageId',
   'status', 'contentStatus',
+  // Free-form admin notes
+  'notes',
 ]
 
 // Shipping-field subset — used to detect when we also need to mirror the

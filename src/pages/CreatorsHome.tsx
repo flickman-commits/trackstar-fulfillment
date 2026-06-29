@@ -44,6 +44,7 @@ interface Creator {
   commissionNotes: string | null
   whitelistingEnabled: boolean
   metaPageId: string | null
+  notes: string | null
   status: CreatorStatus
   sampleOrderId: string | null
   sampleOrder?: {
@@ -786,6 +787,14 @@ function CreatorDrawer({
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(creator)
 
+  // Progressive disclosure by lifecycle status — show each section only once
+  // it's relevant. Driven off draft.status so changing the status dropdown
+  // reveals/hides sections live. An invited creator who's done nothing yet sees
+  // just the essentials; commission/whitelisting appear once they're active.
+  const st = draft.status
+  const showSample = st !== 'invited'
+  const showShipping = st !== 'invited'
+
   const handleCopyInvite = async () => {
     const url = `${window.location.origin}/creator/${creator.inviteToken}`
     try {
@@ -798,7 +807,7 @@ function CreatorDrawer({
   }
 
   const handleDelete = async () => {
-    const shippedOrCompleted = !!(creator.sampleOrder?.trackingNumber || creator.sampleOrder?.shippedAt || creator.sampleOrder?.status === 'completed')
+    const shippedOrCompleted = !!(creator.sampleOrder?.shippedAt || creator.sampleOrder?.status === 'completed')
     const orderNote = creator.sampleOrder
       ? shippedOrCompleted
         ? `\n\nThe linked sample order ${creator.sampleOrder.orderNumber} has already shipped/completed — it will stay in the fulfillment queue.`
@@ -848,14 +857,10 @@ function CreatorDrawer({
         shippingState: draft.shippingState,
         shippingZip: draft.shippingZip,
         shippingCountry: draft.shippingCountry,
-        // Commission + lifecycle
-        commissionModel: draft.commissionModel,
-        commissionConfig: draft.commissionConfig,
-        commissionNotes: draft.commissionNotes,
-        whitelistingEnabled: draft.whitelistingEnabled,
-        metaPageId: draft.metaPageId,
+        // Lifecycle + free-form notes
         status: draft.status,
         contentStatus: draft.contentStatus,
+        notes: draft.notes,
       }
       const res = await apiFetch('/api/orders/actions', {
         method: 'POST',
@@ -972,46 +977,43 @@ function CreatorDrawer({
                   />
                 </div>
               )}
-            </EditableCard>
 
-            <Section title="Application">
-              <div>
-                <Label>Why they want to work with us</Label>
-                {draft.whyWorkWithUs ? (
+              {/* Why they want to work with us — folded into Profile (only when
+                  they actually gave a reason). */}
+              {draft.whyWorkWithUs && (
+                <div className="mt-3 pt-3 border-t border-border-gray">
+                  <Label>Why they want to work with us</Label>
                   <p className="text-sm text-off-black/80 whitespace-pre-wrap leading-relaxed">{draft.whyWorkWithUs}</p>
+                </div>
+              )}
+
+              {/* Assigned briefs — also folded into Profile. */}
+              <div className="mt-3 pt-3 border-t border-border-gray">
+                <Label>{`Assigned Briefs${(creator.briefAssignments?.length ?? 0) > 0 ? ` (${creator.briefAssignments!.length})` : ''}`}</Label>
+                {(creator.briefAssignments?.length ?? 0) === 0 ? (
+                  <p className="text-xs text-off-black/40 italic">No briefs assigned yet.</p>
                 ) : (
-                  <p className="text-sm text-off-black/30 italic">No response</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {creator.briefAssignments!.map(a => (
+                      <span
+                        key={a.brief.id}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-off-black/5 text-off-black/70 text-xs rounded"
+                      >
+                        {a.brief.title}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
-              {draft.bestContentLinks && (
-                <div>
-                  <Label>Their best content (legacy)</Label>
-                  <p className="text-sm text-off-black/80 whitespace-pre-wrap break-words leading-relaxed">{draft.bestContentLinks}</p>
-                </div>
-              )}
-            </Section>
+            </EditableCard>
 
-            <Section title={`Assigned Briefs${(creator.briefAssignments?.length ?? 0) > 0 ? ` (${creator.briefAssignments!.length})` : ''}`}>
-              {(creator.briefAssignments?.length ?? 0) === 0 ? (
-                <p className="text-xs text-off-black/40 italic">No briefs assigned yet.</p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {creator.briefAssignments!.map(a => (
-                    <span
-                      key={a.brief.id}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-off-black/5 text-off-black/70 text-xs rounded"
-                    >
-                      {a.brief.title}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </Section>
-
+            {showSample && (
             <EditableCard
               title="Sample Details"
               isEditing={isEditingSample}
               onToggle={() => setIsEditingSample(v => !v)}
+              collapsible
+              defaultCollapsed
             >
               {isEditingSample ? (
                 <div className="space-y-2.5">
@@ -1036,6 +1038,7 @@ function CreatorDrawer({
                   <ProfileRow label="Frame" value={draft.frameType} />
                 </div>
               )}
+              {creator.sampleOrder && (
               <div className="mt-3 pt-3 border-t border-border-gray space-y-2">
                 <ProfileRow
                   label="Cost (COGS)"
@@ -1043,19 +1046,24 @@ function CreatorDrawer({
                 />
                 <ProfileRow
                   label="Order"
-                  value={creator.sampleOrder?.orderNumber || 'Not yet created'}
+                  value={creator.sampleOrder.orderNumber}
                 />
                 <ProfileRow
                   label="Status"
-                  value={sampleStatusLabel(creator.sampleOrder?.status).label}
+                  value={sampleStatusLabel(creator.sampleOrder.status).label}
                 />
               </div>
+              )}
             </EditableCard>
+            )}
 
+            {showShipping && (
             <EditableCard
-              title="Shipping & Tracking"
+              title="Shipping"
               isEditing={isEditingShipping}
               onToggle={() => setIsEditingShipping(v => !v)}
+              collapsible
+              defaultCollapsed
             >
               {isEditingShipping ? (
                 <div className="space-y-2.5">
@@ -1083,83 +1091,18 @@ function CreatorDrawer({
                   country={draft.shippingCountry}
                 />
               )}
-              {creator.sampleOrder && (
-                <div className="mt-3 pt-3 border-t border-border-gray">
-                  <TrackingField
-                    creatorId={creator.id}
-                    initialNumber={creator.sampleOrder.trackingNumber || ''}
-                    initialCarrier={creator.sampleOrder.trackingCarrier || ''}
-                    shippedAt={creator.sampleOrder.shippedAt || null}
-                    onSaved={(updated) => onSaved({
-                      ...creator,
-                      sampleOrder: creator.sampleOrder ? { ...creator.sampleOrder, ...updated } : creator.sampleOrder,
-                    })}
-                  />
-                </div>
-              )}
             </EditableCard>
+            )}
 
-            <Section title="Commission">
-              <div>
-                <Label>Model</Label>
-                <select
-                  value={draft.commissionModel}
-                  onChange={(e) => setDraft({ ...draft, commissionModel: e.target.value as CommissionModel })}
-                  className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-                >
-                  <option value="free_product">Free product only</option>
-                  <option value="flat_per_asset">Flat per asset</option>
-                  <option value="rev_share">Revenue share</option>
-                  <option value="hybrid">Hybrid (base + %)</option>
-                </select>
-              </div>
-              {draft.commissionModel === 'flat_per_asset' && (
-                <NumberField
-                  label="$ per approved asset"
-                  value={(draft.commissionConfig as { per_asset_usd?: number })?.per_asset_usd ?? null}
-                  onChange={(v) => setDraft({ ...draft, commissionConfig: { ...draft.commissionConfig, per_asset_usd: v } })}
-                />
-              )}
-              {draft.commissionModel === 'rev_share' && (
-                <NumberField
-                  label="% of attributed revenue"
-                  value={(draft.commissionConfig as { percent?: number })?.percent ?? null}
-                  onChange={(v) => setDraft({ ...draft, commissionConfig: { ...draft.commissionConfig, percent: v } })}
-                  suffix="%"
-                />
-              )}
-              {draft.commissionModel === 'hybrid' && (
-                <>
-                  <NumberField
-                    label="Base $ per asset"
-                    value={(draft.commissionConfig as { per_asset_usd?: number })?.per_asset_usd ?? null}
-                    onChange={(v) => setDraft({ ...draft, commissionConfig: { ...draft.commissionConfig, per_asset_usd: v } })}
-                  />
-                  <NumberField
-                    label="+ % of attributed revenue"
-                    value={(draft.commissionConfig as { percent?: number })?.percent ?? null}
-                    onChange={(v) => setDraft({ ...draft, commissionConfig: { ...draft.commissionConfig, percent: v } })}
-                    suffix="%"
-                  />
-                </>
-              )}
-              <TextField label="Notes" value={draft.commissionNotes} onChange={(v) => setDraft({ ...draft, commissionNotes: v })} placeholder="e.g. negotiated rate, special terms" multiline />
-            </Section>
-
-            <Section title="Whitelisting (Meta Partnership Ads)">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="whitelisting"
-                  checked={draft.whitelistingEnabled}
-                  onChange={(e) => setDraft({ ...draft, whitelistingEnabled: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <label htmlFor="whitelisting" className="text-sm text-off-black">Enable for this creator</label>
-              </div>
-              {draft.whitelistingEnabled && (
-                <TextField label="Meta Page ID" value={draft.metaPageId} onChange={(v) => setDraft({ ...draft, metaPageId: v })} placeholder="Creator's IG/FB page ID" />
-              )}
+            {/* Notes — free-form admin notes, always available. */}
+            <Section title="Notes">
+              <TextField
+                label=""
+                value={draft.notes}
+                onChange={(v) => setDraft({ ...draft, notes: v })}
+                placeholder="Anything worth remembering about this creator…"
+                multiline
+              />
             </Section>
 
           </div>
@@ -1224,25 +1167,44 @@ function socialHandle(raw: string | null): string | null {
 
 // Card with a title row and an Edit/Done toggle in the corner. Children
 // decide what to render in each mode — the card just owns the chrome.
-function EditableCard({ title, isEditing, onToggle, children }: {
+function EditableCard({ title, isEditing, onToggle, children, collapsible = false, defaultCollapsed = false }: {
   title: string
   isEditing: boolean
   onToggle: () => void
   children: React.ReactNode
+  // When collapsible, the card starts closed (if defaultCollapsed) and the
+  // title row toggles open/closed. Used for low-priority sections like Sample
+  // Details / Shipping that are rarely needed once a creator is set up.
+  collapsible?: boolean
+  defaultCollapsed?: boolean
 }) {
+  const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed)
   return (
     <div className="bg-white border border-border-gray rounded-md p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">{title}</h4>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors"
-        >
-          {isEditing ? <><Check className="w-3 h-3" /> Done</> : <><Pencil className="w-3 h-3" /> Edit</>}
-        </button>
+      <div className={`flex items-center justify-between ${collapsed ? '' : 'mb-3'}`}>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setCollapsed(c => !c)}
+            className="flex items-center gap-1.5 flex-1 text-left group"
+          >
+            <ChevronDown className={`w-3.5 h-3.5 text-off-black/40 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+            <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider group-hover:text-off-black/70">{title}</h4>
+          </button>
+        ) : (
+          <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">{title}</h4>
+        )}
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors"
+          >
+            {isEditing ? <><Check className="w-3 h-3" /> Done</> : <><Pencil className="w-3 h-3" /> Edit</>}
+          </button>
+        )}
       </div>
-      {children}
+      {!collapsed && children}
     </div>
   )
 }
@@ -1410,85 +1372,3 @@ function NumberField({ label, value, onChange, suffix }: {
 // Inline tracking-number editor in the creator drawer. Saving a non-empty
 // number sets `shippedAt` server-side and lights up the "Shipped" stage in
 // the creator portal. Clearing the number reverts to "Approved".
-function TrackingField({
-  creatorId,
-  initialNumber,
-  initialCarrier,
-  shippedAt,
-  onSaved,
-}: {
-  creatorId: string
-  initialNumber: string
-  initialCarrier: string
-  shippedAt: string | null
-  onSaved: (updated: { trackingNumber: string | null; trackingCarrier: string | null; shippedAt: string | null }) => void
-}) {
-  const [number, setNumber] = useState(initialNumber)
-  const [carrier, setCarrier] = useState(initialCarrier)
-  const [isSaving, setIsSaving] = useState(false)
-
-  const isDirty = number !== initialNumber || carrier !== initialCarrier
-
-  const handleSave = async () => {
-    setIsSaving(true)
-    try {
-      const res = await apiFetch('/api/orders/actions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'set-creator-sample-tracking',
-          creatorId,
-          trackingNumber: number,
-          trackingCarrier: carrier,
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || `Save failed: ${res.status}`)
-      }
-      const { order } = await res.json()
-      onSaved({
-        trackingNumber: order.trackingNumber,
-        trackingCarrier: order.trackingCarrier,
-        shippedAt: order.shippedAt,
-      })
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to save tracking')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  return (
-    <div className="pt-2 border-t border-border-gray">
-      <Label>Tracking{shippedAt && <span className="text-emerald-700 ml-2 normal-case">· marked shipped {new Date(shippedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}</Label>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={carrier}
-          onChange={(e) => setCarrier(e.target.value)}
-          placeholder="Carrier (USPS, UPS…)"
-          className="w-32 px-2.5 py-1.5 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-        />
-        <input
-          type="text"
-          value={number}
-          onChange={(e) => setNumber(e.target.value)}
-          placeholder="Tracking number"
-          className="flex-1 px-2.5 py-1.5 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-        />
-        <button
-          onClick={handleSave}
-          disabled={!isDirty || isSaving}
-          className="px-3 py-1.5 bg-off-black text-white text-xs font-medium rounded hover:opacity-90 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center gap-1"
-        >
-          {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-          Save
-        </button>
-      </div>
-      <p className="text-[10px] text-off-black/40 mt-1">
-        Saving a tracking number marks the sample as <strong>Shipped</strong> in the creator's portal.
-      </p>
-    </div>
-  )
-}

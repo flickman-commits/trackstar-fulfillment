@@ -309,6 +309,9 @@ model Creator {
   commissionConfig    Json      @default("{}")
   commissionNotes     String?
 
+  // Free-form admin notes about the creator (anything Matt wants to jot down).
+  notes               String?
+
   // Whitelisting (Meta Partnership Ads). Optional — off by default.
   whitelistingEnabled Boolean   @default(false)
   metaPageId          String?
