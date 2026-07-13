@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Ticket, X, Copy, Check, Loader2, Percent, DollarSign } from 'lucide-react'
+import { Ticket, X, Copy, Check, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 
@@ -61,17 +61,17 @@ function DiscountForm({ onCreated }: { onCreated: (d: CreatedDiscount) => void }
       {/* Type toggle */}
       <div className="flex gap-1.5">
         {([
-          { key: 'percentage', label: '% off', Icon: Percent },
-          { key: 'fixed_amount', label: '$ off', Icon: DollarSign },
-        ] as const).map(({ key, label, Icon }) => (
+          { key: 'percentage', label: '% off' },
+          { key: 'fixed_amount', label: '$ off' },
+        ] as const).map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setValueType(key)}
-            className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+            className={`flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
               valueType === key ? 'bg-off-black text-white' : 'bg-gray-100 text-off-black/60 hover:bg-gray-200'
             }`}
           >
-            <Icon className="w-3 h-3" /> {label}
+            {label}
           </button>
         ))}
       </div>
