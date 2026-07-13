@@ -5478,8 +5478,18 @@ Thank you!`
                                   <Info className="w-3 h-3" /> How this was determined
                                 </button>
                                 {showWeatherInfo && (
-                                  <div className="absolute left-0 top-full mt-1 z-20 w-72 bg-white border border-border-gray rounded-md shadow-lg p-3 text-left">
-                                    <p className="text-[11px] text-off-black/60 leading-snug mb-2">
+                                  <>
+                                    {/* Click-away backdrop — clicking anywhere else closes the popover */}
+                                    <div className="fixed inset-0 z-10" onClick={() => setShowWeatherInfo(false)} />
+                                  <div className="absolute left-0 top-full mt-1 z-20 w-72 bg-white border border-border-gray rounded-md shadow-lg p-3 text-left" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      onClick={() => setShowWeatherInfo(false)}
+                                      className="absolute top-2 right-2 text-off-black/30 hover:text-off-black/70 transition-colors"
+                                      title="Close"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                    <p className="text-[11px] text-off-black/60 leading-snug mb-2 pr-5">
                                       {b.method} {b.place ? `· ${b.place}` : ''}{b.date ? ` · ${b.date}` : ''}
                                     </p>
                                     <p className="text-xs font-medium text-off-black mb-1.5">
@@ -5494,6 +5504,7 @@ Thank you!`
                                       ))}
                                     </div>
                                   </div>
+                                  </>
                                 )}
                               </div>
                             )
