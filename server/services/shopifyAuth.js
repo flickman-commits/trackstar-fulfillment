@@ -87,6 +87,40 @@ export async function shopifyFetch(endpoint, options = {}) {
 }
 
 /**
+ * Make an authenticated GraphQL request to the Shopify Admin API.
+ * @param {string} query - GraphQL query/mutation
+ * @param {object} variables - GraphQL variables
+ * @returns {object} the `data` object from the response
+ */
+export async function shopifyGraphQL(query, variables = {}) {
+  const token = await getShopifyToken()
+  const store = process.env.SHOPIFY_STORE
+
+  const response = await fetchWithTimeout(
+    `https://${store}/admin/api/2024-01/graphql.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': token,
+      },
+      body: JSON.stringify({ query, variables }),
+    }
+  )
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Shopify GraphQL error (${response.status}): ${errorText}`)
+  }
+
+  const json = await response.json()
+  if (json.errors) {
+    throw new Error(`Shopify GraphQL errors: ${JSON.stringify(json.errors)}`)
+  }
+  return json.data
+}
+
+/**
  * Clear the cached token (useful for testing or forced refresh)
  */
 export function clearTokenCache() {

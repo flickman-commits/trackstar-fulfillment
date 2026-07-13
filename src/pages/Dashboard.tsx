@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
+import StandardTools from '@/components/StandardTools'
 
 /** Collapsible section with header + chevron toggle */
 function CollapsibleSection({ title, defaultOpen = true, children, badge }: {
@@ -2029,6 +2030,8 @@ Thank you!`
     <div className="h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
       {/* Desktop-only helper tiles (pace converter + weather), Custom view only */}
       {activeView === 'custom' && <CustomTools />}
+      {/* Desktop-only discount-code generator, Standard view only */}
+      {activeView === 'standard' && <StandardTools />}
       <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 w-full flex flex-col h-full">
         {/* Header - Compact bar on mobile, full greeting on desktop */}
         <div className="pt-4 md:pt-8 lg:pt-10 pb-3 md:pb-6 flex items-center md:items-end justify-between gap-3 md:gap-6 flex-shrink-0">

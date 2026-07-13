@@ -12,6 +12,7 @@
  *   - reopen: Un-complete an order — brings it back into the active queue
  *   - design-status: Update design status of a custom order
  *   - message-customer: Designer asks the customer a question (email + portal Q&A)
+ *   - create-discount: Create a one-time Shopify discount code ($ or % off)
  *   - customers-served-info: Get current customers served count
  *   - customers-served-sync: Force sync count to Shopify
  *   - customers-served-set: Manually set the count (for corrections)
@@ -27,7 +28,7 @@ import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
-import { shopifyFetch } from '../../server/services/shopifyAuth.js'
+import { shopifyFetch, shopifyGraphQL } from '../../server/services/shopifyAuth.js'
 import { getRaceShorthands } from '../../server/scrapers/index.js'
 import { Resend } from 'resend'
 import { runWeeklyAdsDebrief, isFridayFourPmEastern } from '../../server/services/weeklyAdsDebrief.js'
@@ -185,6 +186,8 @@ export default async function handler(req, res) {
         return await handleNotifyCustomDelay(body, res)
       case 'message-customer':
         return await handleMessageCustomer(body, res)
+      case 'create-discount':
+        return await handleCreateDiscount(body, res)
       case 'customers-served-info':
         return await handleCustomersServedInfo(res)
       case 'customers-served-sync':
@@ -695,6 +698,97 @@ async function handleMessageCustomer({ orderId, body }, res) {
 
   console.log(`[actions/message-customer] Order ${existing.orderNumber}: question sent to ${existing.customerEmail}`)
   return res.status(200).json({ success: true, message, portalUrl })
+}
+
+// --- create-discount ---
+// Creates a one-time ($ off or % off) Shopify discount code so customer support
+// can quickly comp a customer. Uses the GraphQL discountCodeBasicCreate mutation
+// (needs the write_discounts scope). Not logged locally — the record lives in
+// Shopify (Discounts admin).
+function generateDiscountCode() {
+  // Readable random suffix — no ambiguous chars (0/O/1/I).
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let suffix = ''
+  const bytes = crypto.randomBytes(6)
+  for (let i = 0; i < 6; i++) suffix += alphabet[bytes[i] % alphabet.length]
+  return `TS-${suffix}`
+}
+
+async function handleCreateDiscount({ valueType, value, code, expiresInDays }, res) {
+  if (!['percentage', 'fixed_amount'].includes(valueType)) {
+    return res.status(400).json({ error: "valueType must be 'percentage' or 'fixed_amount'" })
+  }
+  const amount = Number(value)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'value must be a positive number' })
+  }
+  if (valueType === 'percentage' && amount > 100) {
+    return res.status(400).json({ error: 'Percentage cannot exceed 100' })
+  }
+
+  const days = Number.isFinite(Number(expiresInDays)) && Number(expiresInDays) > 0
+    ? Math.min(Number(expiresInDays), 365)
+    : 30
+
+  // Custom code (uppercased, sanitized) or an auto-generated one.
+  const finalCode = (typeof code === 'string' && code.trim())
+    ? code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '')
+    : generateDiscountCode()
+  if (!finalCode) return res.status(400).json({ error: 'Invalid code' })
+
+  const startsAt = new Date().toISOString()
+  const endsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+
+  // customerGets.value differs by type: percentage is a 0–1 decimal;
+  // fixed_amount is a money amount off the order total.
+  const valueField = valueType === 'percentage'
+    ? { percentage: amount / 100 }
+    : { discountAmount: { amount: amount.toFixed(2), appliesOnEachItem: false } }
+
+  const mutation = `
+    mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
+      discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
+        codeDiscountNode { id }
+        userErrors { field message }
+      }
+    }`
+
+  const input = {
+    title: finalCode,
+    code: finalCode,
+    startsAt,
+    endsAt,
+    usageLimit: 1, // one-time use
+    customerSelection: { all: true },
+    customerGets: {
+      value: valueField,
+      items: { all: true }, // applies to the whole order
+    },
+  }
+
+  try {
+    const data = await shopifyGraphQL(mutation, { basicCodeDiscount: input })
+    const userErrors = data?.discountCodeBasicCreate?.userErrors || []
+    if (userErrors.length > 0) {
+      const msg = userErrors.map(e => e.message).join('; ')
+      // A duplicate code is the common one — surface it cleanly.
+      return res.status(400).json({ error: msg })
+    }
+
+    const label = valueType === 'percentage' ? `${amount}% off` : `$${amount.toFixed(2)} off`
+    console.log(`[actions/create-discount] Created ${finalCode} (${label}, expires ${endsAt})`)
+    return res.status(200).json({
+      success: true,
+      code: finalCode,
+      valueType,
+      value: amount,
+      label,
+      endsAt,
+    })
+  } catch (err) {
+    console.error('[actions/create-discount] Failed:', err.message)
+    return res.status(500).json({ error: `Failed to create discount: ${err.message}` })
+  }
 }
 
 // --- customers-served-info ---
