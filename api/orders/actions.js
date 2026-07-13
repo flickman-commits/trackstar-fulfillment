@@ -13,6 +13,7 @@
  *   - design-status: Update design status of a custom order
  *   - message-customer: Designer asks the customer a question (email + portal Q&A)
  *   - create-discount: Create a one-time Shopify discount code ($ or % off)
+ *   - calculate-weather: Compute race-day weather (avg 7am–1pm) via Open-Meteo
  *   - customers-served-info: Get current customers served count
  *   - customers-served-sync: Force sync count to Shopify
  *   - customers-served-set: Manually set the count (for corrections)
@@ -30,6 +31,7 @@ import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
 import { shopifyFetch, shopifyGraphQL } from '../../server/services/shopifyAuth.js'
 import { getRaceShorthands } from '../../server/scrapers/index.js'
+import WeatherService from '../../server/services/WeatherService.js'
 import { Resend } from 'resend'
 import { runWeeklyAdsDebrief, isFridayFourPmEastern } from '../../server/services/weeklyAdsDebrief.js'
 
@@ -188,6 +190,8 @@ export default async function handler(req, res) {
         return await handleMessageCustomer(body, res)
       case 'create-discount':
         return await handleCreateDiscount(body, res)
+      case 'calculate-weather':
+        return await handleCalculateWeather(body, res)
       case 'customers-served-info':
         return await handleCustomersServedInfo(res)
       case 'customers-served-sync':
@@ -789,6 +793,56 @@ async function handleCreateDiscount({ valueType, value, code, expiresInDays }, r
     console.error('[actions/create-discount] Failed:', err.message)
     return res.status(500).json({ error: `Failed to create discount: ${err.message}` })
   }
+}
+
+// --- calculate-weather ---
+// Computes race-window weather (avg temp 7am–1pm + dominant condition) for a
+// date + city via Open-Meteo, and — when a raceId is given — saves it to the
+// Race so the poster's weather + the info breakdown persist.
+async function handleCalculateWeather({ raceId, city, date }, res) {
+  const cityStr = (city || '').toString().trim()
+  const dateStr = (date || '').toString().trim()
+  if (!cityStr) return res.status(400).json({ error: 'city is required' })
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return res.status(400).json({ error: 'date must be YYYY-MM-DD' })
+
+  const weatherService = new WeatherService()
+  let result
+  try {
+    result = await weatherService.calculateRaceWeather(dateStr, cityStr)
+  } catch (err) {
+    console.error('[actions/calculate-weather] Error:', err.message)
+    return res.status(500).json({ error: `Weather lookup failed: ${err.message}` })
+  }
+
+  if (!result.temp || !result.condition) {
+    return res.status(422).json({ error: result.error || 'Could not determine weather for that date and city' })
+  }
+
+  // Persist to the race (so the poster weather + info breakdown stick).
+  if (raceId) {
+    try {
+      await prisma.race.update({
+        where: { id: parseInt(raceId, 10) },
+        data: {
+          weatherTemp: result.temp,
+          weatherCondition: result.condition,
+          weatherFetchedAt: new Date(),
+          weatherDetails: JSON.stringify(result.breakdown),
+        },
+      })
+    } catch (err) {
+      console.error('[actions/calculate-weather] Save failed:', err.message)
+      // Still return the computed result even if the save failed.
+    }
+  }
+
+  console.log(`[actions/calculate-weather] ${cityStr} ${dateStr} → ${result.temp}, ${result.condition}`)
+  return res.status(200).json({
+    success: true,
+    temp: result.temp,
+    condition: result.condition,
+    breakdown: result.breakdown,
+  })
 }
 
 // --- customers-served-info ---

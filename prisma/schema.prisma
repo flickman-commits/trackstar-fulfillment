@@ -117,9 +117,10 @@ model Race {
   resultsUrl       String?
   resultsSiteType  String?
   location         String?
-  weatherCondition String?   // "sunny", "cloudy", or "rainy"
+  weatherCondition String?   // "sunny", "cloudy", "rainy", or "snowy"
   weatherTemp      String?
   weatherFetchedAt DateTime?
+  weatherDetails   String?   // JSON breakdown of how the weather was calculated (for the info popover)
   createdAt        DateTime  @default(now())
 
   // Relations

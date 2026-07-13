@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import ProofManager from '@/components/ProofManager'
@@ -80,6 +80,7 @@ interface Order {
   // Weather data
   weatherTemp?: string
   weatherCondition?: string
+  weatherDetails?: string | null  // JSON breakdown of how weather was calculated
   raceId?: number | null
   // Scraper availability
   hasScraperAvailable?: boolean
@@ -481,6 +482,7 @@ export default function Dashboard() {
           // Weather
           weatherTemp: order.weatherTemp as string | undefined,
           weatherCondition: order.weatherCondition as string | undefined,
+          weatherDetails: order.weatherDetails as string | null | undefined,
           raceId: order.raceId as number | null | undefined,
           // Scraper
           hasScraperAvailable: order.hasScraperAvailable as boolean | undefined,
@@ -1211,6 +1213,59 @@ export default function Dashboard() {
     weatherTemp: string
   }>({ raceDate: '', weatherCondition: '', weatherTemp: '' })
   const [isSavingWeather, setIsSavingWeather] = useState(false)
+
+  // Weather calculator — micro-modal (date + city) that computes race-window
+  // weather (avg 7am–1pm) via Open-Meteo and saves it to the race.
+  const [showWeatherCalc, setShowWeatherCalc] = useState(false)
+  const [weatherCalcCity, setWeatherCalcCity] = useState('')
+  const [weatherCalcDate, setWeatherCalcDate] = useState('')
+  const [isCalculatingWeather, setIsCalculatingWeather] = useState(false)
+  // Which weather field's info popover is open (order-scoped; null = none).
+  const [showWeatherInfo, setShowWeatherInfo] = useState(false)
+
+  const openWeatherCalc = (order: Order) => {
+    setWeatherCalcCity(order.raceLocation || order.raceName || '')
+    setWeatherCalcDate(order.raceDateIso || '')
+    setShowWeatherCalc(true)
+  }
+
+  const calculateWeather = async (order: Order) => {
+    if (!weatherCalcCity.trim() || !weatherCalcDate) {
+      setToast({ message: 'Enter a city and date', type: 'error' })
+      return
+    }
+    setIsCalculatingWeather(true)
+    try {
+      const res = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'calculate-weather',
+          raceId: order.raceId,
+          city: weatherCalcCity.trim(),
+          date: weatherCalcDate,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setToast({ message: data.error || 'Could not calculate weather', type: 'error' })
+        return
+      }
+      setToast({ message: `Weather: ${data.condition} · ${data.temp}`, type: 'success' })
+      setShowWeatherCalc(false)
+      // Refresh the order so the new weather + info breakdown show.
+      const refreshed = await apiFetch(`/api/orders?type=${activeView}`).then(r => r.json())
+      const updated = refreshed.orders?.find((o: { orderNumber: string }) => o.orderNumber === order.orderNumber)
+      if (updated) {
+        setSelectedOrder({ ...selectedOrder!, ...updated, displayOrderNumber: updated.displayOrderNumber || updated.orderNumber })
+      }
+      await fetchOrders()
+    } catch {
+      setToast({ message: 'Failed to calculate weather', type: 'error' })
+    } finally {
+      setIsCalculatingWeather(false)
+    }
+  }
 
   // Start editing mode
   const startEditing = (order: Order) => {
@@ -3733,6 +3788,7 @@ Thank you!`
                                   <option value="Sunny">Sunny</option>
                                   <option value="Cloudy">Cloudy</option>
                                   <option value="Rainy">Rainy</option>
+                                  <option value="Snowy">Snowy</option>
                                 </select>
                               </div>
                               <div>
@@ -5255,19 +5311,74 @@ Thank you!`
                     </div>
                   </div>
 
+                  {/* Weather calculator micro-modal */}
+                  {showWeatherCalc && (
+                    <div
+                      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+                      style={{ backgroundColor: 'rgba(26,26,26,0.5)' }}
+                      onClick={(e) => { if (e.target === e.currentTarget) setShowWeatherCalc(false) }}
+                    >
+                      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-1.5">
+                            <CloudSun className="w-4 h-4 text-off-black/60" />
+                            <h3 className="text-sm font-semibold text-off-black">Calculate Weather</h3>
+                          </div>
+                          <button onClick={() => setShowWeatherCalc(false)} className="text-off-black/40 hover:text-off-black">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-off-black/50 mb-3 leading-snug">
+                          Averages the hourly temps from 7am–1pm and picks the dominant condition (sunny / cloudy / rainy / snowy).
+                        </p>
+                        <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">City</label>
+                        <input
+                          value={weatherCalcCity}
+                          onChange={(e) => setWeatherCalcCity(e.target.value)}
+                          placeholder="Boston, MA"
+                          className="w-full mb-3 px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                        />
+                        <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Date</label>
+                        <input
+                          type="date"
+                          value={weatherCalcDate}
+                          onChange={(e) => setWeatherCalcDate(e.target.value)}
+                          className="w-full mb-4 px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                        />
+                        <button
+                          onClick={() => calculateWeather(selectedOrder)}
+                          disabled={isCalculatingWeather || !weatherCalcCity.trim() || !weatherCalcDate}
+                          className="w-full px-3 py-2.5 text-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-40 flex items-center justify-center gap-1.5"
+                        >
+                          {isCalculatingWeather ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating…</> : 'Calculate & save'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Race Info, Research, Notes — desktop only */}
                   <div className="hidden md:block space-y-5">
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Race Data</h4>
                       {!isEditingWeather && selectedOrder.raceId && (
-                        <button
-                          onClick={() => startEditingWeather(selectedOrder)}
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                          <Pencil className="w-3 h-3" />
-                          Edit
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => openWeatherCalc(selectedOrder)}
+                            className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black transition-colors"
+                            title="Calculate weather from date + city"
+                          >
+                            <CloudSun className="w-3 h-3" />
+                            Calculate weather
+                          </button>
+                          <button
+                            onClick={() => startEditingWeather(selectedOrder)}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Edit
+                          </button>
+                        </div>
                       )}
                       {isEditingWeather && (
                         <div className="flex items-center gap-2">
@@ -5347,10 +5458,47 @@ Thank you!`
                             <option value="Sunny">Sunny</option>
                             <option value="Cloudy">Cloudy</option>
                             <option value="Rainy">Rainy</option>
+                            <option value="Snowy">Snowy</option>
                           </select>
                         </div>
                       ) : selectedOrder.weatherCondition ? (
-                        <CopyableField label="Weather" value={selectedOrder.weatherCondition} />
+                        <div>
+                          <CopyableField label="Weather" value={selectedOrder.weatherCondition} />
+                          {selectedOrder.weatherDetails && (() => {
+                            let b: { method?: string; place?: string; date?: string; avgTempF?: number; counts?: Record<string, number>; hours?: { hour: number; tempF: number; condition: string }[] } | null = null
+                            try { b = JSON.parse(selectedOrder.weatherDetails) } catch { b = null }
+                            if (!b) return null
+                            return (
+                              <div className="relative mt-1">
+                                <button
+                                  onClick={() => setShowWeatherInfo(v => !v)}
+                                  className="inline-flex items-center gap-1 text-[10px] text-off-black/40 hover:text-off-black/70 transition-colors"
+                                  title="How this weather was determined"
+                                >
+                                  <Info className="w-3 h-3" /> How this was determined
+                                </button>
+                                {showWeatherInfo && (
+                                  <div className="absolute left-0 top-full mt-1 z-20 w-72 bg-white border border-border-gray rounded-md shadow-lg p-3 text-left">
+                                    <p className="text-[11px] text-off-black/60 leading-snug mb-2">
+                                      {b.method} {b.place ? `· ${b.place}` : ''}{b.date ? ` · ${b.date}` : ''}
+                                    </p>
+                                    <p className="text-xs font-medium text-off-black mb-1.5">
+                                      Avg {b.avgTempF}°F · {(['sunny','cloudy','rainy','snowy'] as const).filter(k => b!.counts?.[k]).map(k => `${b!.counts![k]} ${k}`).join(', ')}
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                                      {(b.hours || []).map(h => (
+                                        <div key={h.hour} className="flex justify-between text-[10px] text-off-black/60">
+                                          <span>{h.hour}:00</span>
+                                          <span>{h.tempF}° · {h.condition}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })()}
+                        </div>
                       ) : (
                         <PendingField label="Weather" />
                       )}

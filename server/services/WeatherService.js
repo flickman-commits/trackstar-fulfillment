@@ -158,6 +158,118 @@ export class WeatherService {
   }
 
   /**
+   * Calculate race-window weather for a specific date + location.
+   * Temp = average of the hourly temperatures 7am–1pm (local time).
+   * Condition = the dominant of {sunny, rainy, cloudy, snowy} over that window
+   * (most frequent, ties broken by severity snowy > rainy > cloudy > sunny).
+   *
+   * @param {string} dateStr - YYYY-MM-DD
+   * @param {string} location - City / "City, ST"
+   * @returns {Promise<{temp:string|null, condition:string|null, breakdown:object|null}>}
+   */
+  async calculateRaceWeather(dateStr, location) {
+    const coords = await this.geocodeLocation(location)
+    if (!coords) {
+      return { temp: null, condition: null, breakdown: null, error: `Couldn't find "${location}"` }
+    }
+
+    const hourly = await this.fetchHourly(dateStr, coords.lat, coords.lon)
+    if (!hourly) {
+      return { temp: null, condition: null, breakdown: null, error: 'No weather data for that date' }
+    }
+
+    // Window: 7:00 through 13:00 inclusive (indices 7..13 of the 0–23 hourly arrays).
+    const START_HOUR = 7
+    const END_HOUR = 13
+    const hours = []
+    let tempSum = 0
+    let tempCount = 0
+    const counts = { sunny: 0, cloudy: 0, rainy: 0, snowy: 0 }
+
+    for (let h = START_HOUR; h <= END_HOUR; h++) {
+      const t = hourly.temperature_2m?.[h]
+      const code = hourly.weather_code?.[h]
+      const precip = hourly.precipitation?.[h]
+      if (t == null || code == null) continue
+      const condition = this.mapWeatherCodeTo4(code, precip)
+      counts[condition]++
+      tempSum += t
+      tempCount++
+      hours.push({ hour: h, tempF: Math.round(t), condition, code })
+    }
+
+    if (tempCount === 0) {
+      return { temp: null, condition: null, breakdown: null, error: 'No hourly data in the 7am–1pm window' }
+    }
+
+    const avgTempF = Math.round(tempSum / tempCount)
+    // Dominant condition: most frequent, ties broken by severity.
+    const severity = ['snowy', 'rainy', 'cloudy', 'sunny'] // most → least severe
+    const condition = Object.keys(counts)
+      .filter(c => counts[c] > 0)
+      .sort((a, b) => counts[b] - counts[a] || severity.indexOf(a) - severity.indexOf(b))[0]
+
+    const breakdown = {
+      method: 'Average of hourly temps 7am–1pm; dominant condition over the same window.',
+      place: coords.name,
+      date: dateStr,
+      avgTempF,
+      condition,
+      counts,
+      hours,
+    }
+
+    return { temp: `${avgTempF}°F`, condition, breakdown }
+  }
+
+  /**
+   * Fetch the hourly temperature/weather-code/precipitation arrays for a date.
+   * Tries the historical archive first; falls back to the forecast API (which
+   * covers recent past + near future) if the archive has no data yet.
+   * @returns {Promise<object|null>} the `hourly` object, or null
+   */
+  async fetchHourly(dateStr, lat, lon) {
+    const build = (base) => `${base}?` + new URLSearchParams({
+      latitude: lat,
+      longitude: lon,
+      start_date: dateStr,
+      end_date: dateStr,
+      hourly: 'temperature_2m,weather_code,precipitation',
+      temperature_unit: 'fahrenheit',
+      timezone: 'auto',
+    }).toString()
+
+    for (const base of [`${this.weatherBaseUrl}/archive`, 'https://api.open-meteo.com/v1/forecast']) {
+      try {
+        const resp = await fetchWithTimeout(build(base))
+        const data = await resp.json()
+        if (data?.hourly?.temperature_2m?.some(v => v != null)) return data.hourly
+      } catch (err) {
+        console.warn(`[WeatherService] fetchHourly ${base} failed: ${err.message}`)
+      }
+    }
+    return null
+  }
+
+  /**
+   * Map an Open-Meteo WMO code to one of four buckets: sunny | cloudy | rainy | snowy.
+   * @param {number} code - WMO weather code
+   * @param {number} [precipitation] - mm (tiebreaker toward rainy)
+   * @returns {'sunny'|'cloudy'|'rainy'|'snowy'}
+   */
+  mapWeatherCodeTo4(code, precipitation) {
+    // Snow: 71/73/75 snowfall, 77 grains, 85/86 snow showers
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snowy'
+    // Rain / drizzle / freezing / thunderstorm
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return 'rainy'
+    if (precipitation && precipitation > 0.5) return 'rainy'
+    // Clear / mainly clear / partly cloudy
+    if (code === 0 || code === 1 || code === 2) return 'sunny'
+    // Overcast (3), fog (45/48), or anything else
+    return 'cloudy'
+  }
+
+  /**
    * Map Open-Meteo weather code to simplified condition
    * Weather codes: https://open-meteo.com/en/docs
    *
