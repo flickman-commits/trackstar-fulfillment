@@ -24,12 +24,13 @@ const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 
 /**
  * Fetch with Cloudflare-aware fallback. MultiSport Australia is behind
- * Cloudflare's bot challenge. Most of the time plain fetch works, but if
- * we hit a 403 with "Just a moment..." we transparently retry via headless
- * browser to clear the challenge.
+ * Cloudflare. Plain `fetch` is now blocked at the edge on a TLS/header
+ * fingerprint — the site returns a 403 ("Request Blocked" WAF page, or the
+ * "Just a moment..." JS challenge). A real headless-browser fingerprint
+ * clears both, so on ANY 403 we transparently retry via Puppeteer.
  */
 async function smartFetch(url) {
-  // First try a simple fetch
+  // First try a simple fetch — cheap when it works.
   const resp = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': USER_AGENT,
@@ -40,13 +41,11 @@ async function smartFetch(url) {
   })
   if (resp.ok) return await resp.text()
 
-  // 403 with "Just a moment..." indicates Cloudflare challenge — fall back to Puppeteer
+  // Cloudflare blocks plain fetch — both the "Just a moment" JS challenge and
+  // the hard "Request Blocked" WAF page come back as 403. The headless browser
+  // clears both (verified: same IP, real Chrome fingerprint -> HTTP 200).
   if (resp.status === 403) {
-    const text = await resp.text()
-    if (text.includes('Just a moment')) {
-      return await fetchViaBrowser(url)
-    }
-    throw new Error(`HTTP 403 (non-Cloudflare): ${text.slice(0, 200)}`)
+    return await fetchViaBrowser(url)
   }
   throw new Error(`HTTP ${resp.status}`)
 }
