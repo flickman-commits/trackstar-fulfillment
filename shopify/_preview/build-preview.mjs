@@ -17,7 +17,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LIQUID = path.join(__dirname, '..', 'blocks', 'trackstar-instant-lookup.liquid');
+// The block lives in the theme repo (github.com/flickman-commits/trackstar-theme),
+// not here. Read it from there so this preview always reflects the real source.
+// Override with TRACKSTAR_THEME_DIR if your checkout is elsewhere.
+const THEME_DIR = process.env.TRACKSTAR_THEME_DIR
+  || path.join(__dirname, '..', '..', '..', 'trackstar-art');
+const LIQUID = path.join(THEME_DIR, 'blocks', 'trackstar-instant-lookup.liquid');
 const OUT = path.join(__dirname, 'index.html');
 
 const PROP_DEFAULTS = {
