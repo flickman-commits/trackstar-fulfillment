@@ -390,3 +390,18 @@ model BriefAssignment {
   @@index([creatorId])
   @@index([briefId])
 }
+
+// One row per rate-limited request. Durable because Vercel runs each API route
+// as a SEPARATE serverless instance — an in-memory counter in one is invisible
+// to the others, so an attacker spreading requests across instances never trips
+// the limit. (Same lesson as LookupLog: process memory is not shared state.)
+//
+// Rows are swept opportunistically on write; there's no need to keep them past
+// the widest rate-limit window.
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  key       String   // "<bucket>:<ip>", e.g. "photo_upload:203.0.113"
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}

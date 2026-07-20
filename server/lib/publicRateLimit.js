@@ -92,3 +92,71 @@ export function setCached(key, value) {
 }
 
 export const RATE_LIMIT = { max: RATE_LIMIT_MAX, windowMs: RATE_LIMIT_WINDOW_MS }
+
+// ---------------------------------------------------------------------------
+// Durable rate limiting
+// ---------------------------------------------------------------------------
+
+/**
+ * DB-backed rate limit. Use this for anything where the in-memory limiter above
+ * is not good enough — i.e. where being bypassed actually costs us something
+ * (writes, storage, spend) rather than just a wasted read.
+ *
+ * WHY THIS EXISTS
+ *   Vercel runs each API route as a separate serverless instance, and instances
+ *   come and go. A Map in one process is invisible to every other one, so an
+ *   attacker who simply keeps issuing requests lands on fresh counters and the
+ *   in-memory limit never trips. We learned this the hard way with the lookup
+ *   ring buffer, which was silently empty for the same reason.
+ *
+ * Two queries per call (count, then insert). That's fine for upload-minting;
+ * do not put it on a hot read path.
+ *
+ * FAILS CLOSED. If the DB is unreachable we deny rather than allow, because the
+ * whole point is to protect a resource that costs us money to give away.
+ *
+ * @param {string} ip
+ * @param {Object} [opts]
+ * @param {string} [opts.bucket='default'] - namespace, so limits don't collide
+ * @param {number} [opts.max]
+ * @param {number} [opts.windowMs]
+ * @returns {Promise<{ allowed: boolean, remaining: number, retryAfterMs: number }>}
+ */
+export async function checkRateLimitDurable(ip, { bucket = 'default', max = RATE_LIMIT_MAX, windowMs = RATE_LIMIT_WINDOW_MS } = {}) {
+  const { default: prisma } = await import('../../api/_lib/prisma.js')
+  const key = `${bucket}:${ip}`
+  const now = Date.now()
+  const since = new Date(now - windowMs)
+
+  try {
+    const used = await prisma.rateLimitHit.count({ where: { key, createdAt: { gte: since } } })
+
+    if (used >= max) {
+      // Oldest hit still inside the window determines when a slot frees up.
+      const oldest = await prisma.rateLimitHit.findFirst({
+        where: { key, createdAt: { gte: since } },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      })
+      const retryAfterMs = oldest
+        ? Math.max(0, oldest.createdAt.getTime() + windowMs - now)
+        : windowMs
+      return { allowed: false, remaining: 0, retryAfterMs }
+    }
+
+    await prisma.rateLimitHit.create({ data: { key } })
+
+    // Opportunistic sweep (~2% of allowed calls) so the table can't grow without
+    // bound. Cheap, indexed, and avoids needing a dedicated cron for this.
+    if (Math.random() < 0.02) {
+      prisma.rateLimitHit
+        .deleteMany({ where: { createdAt: { lt: new Date(now - windowMs * 2) } } })
+        .catch(err => console.warn('[publicRateLimit] sweep failed:', err.message))
+    }
+
+    return { allowed: true, remaining: max - used - 1, retryAfterMs: 0 }
+  } catch (err) {
+    console.error('[publicRateLimit] durable check failed, denying:', err.message)
+    return { allowed: false, remaining: 0, retryAfterMs: windowMs }
+  }
+}
