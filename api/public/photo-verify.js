@@ -22,6 +22,7 @@ import { createClient } from '@supabase/supabase-js'
 import { setCors } from '../_lib/auth.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
 import { validateImageBytes } from '../../server/lib/imageValidation.js'
+import { stripMetadata } from '../../server/lib/photoSanitize.js'
 
 const BUCKET = 'personalization-photos'
 
@@ -97,16 +98,74 @@ export default async function handler(req, res) {
       })
     }
 
+    // ---- strip metadata before these bytes are allowed to persist ----
+    // Phone photos carry EXIF GPS. We do this here, synchronously, rather than
+    // in a later job because this is the gate that decides whether a path may
+    // enter the cart: anything that gets past this point is durable, and an
+    // async sweep would leave a window where real coordinates sit in the
+    // bucket, plus a failure mode where they stay there forever.
+    //
+    // Unlike the check above, this needs the WHOLE file, so it is the one
+    // expensive step in the flow. Photos are typically 3-12MB.
+    const { data: full, error: dlErr } = await supabase.storage.from(BUCKET).download(path)
+    if (dlErr || !full) {
+      await purge('download_failed')
+      return res.status(500).json({ error: 'verify_failed' })
+    }
+
+    const original = Buffer.from(await full.arrayBuffer())
+    const cleaned = await stripMetadata(original, contentType)
+    if (!cleaned.ok) {
+      await purge(cleaned.reason)
+      return res.status(400).json({ error: cleaned.reason, message: cleaned.message })
+    }
+
+    // HEIC comes back as JPEG (see photoSanitize), so the extension has to
+    // follow the bytes. Writing JPEG under a .heic path would leave the stored
+    // path lying about its contents for everything downstream.
+    const finalPath = cleaned.converted
+      ? path.replace(/\.[^.]+$/, '.' + cleaned.ext)
+      : path
+
+    const { error: upErr } = await supabase.storage.from(BUCKET).upload(finalPath, cleaned.buffer, {
+      contentType: cleaned.contentType,
+      upsert: true,
+    })
+    if (upErr) {
+      // The sanitized copy failed to land, so the original (with its EXIF) is
+      // still what is stored. Refuse it rather than keep a photo we promised
+      // to strip.
+      await purge('sanitize_upload_failed')
+      console.error(`[PHOTO_VERIFY] sanitize upload FAILED path="${path}":`, upErr.message)
+      return res.status(500).json({ error: 'verify_failed' })
+    }
+
+    // Converted: the original HEIC still sits at the old path, and it is the
+    // copy that still has the EXIF. It must not survive.
+    if (finalPath !== path) {
+      try {
+        await supabase.storage.from(BUCKET).remove([path])
+      } catch (err) {
+        console.error(`[PHOTO_VERIFY] could not remove pre-conversion original "${path}":`, err.message)
+      }
+    }
+
     console.log(
-      `[PHOTO_VERIFY] ok path="${path}" type=${verdict.type} ` +
-      `dims=${verdict.width || '?'}x${verdict.height || '?'}`
+      `[PHOTO_VERIFY] ok path="${finalPath}" type=${cleaned.format} ` +
+      `dims=${cleaned.width || '?'}x${cleaned.height || '?'} ` +
+      `stripped=${original.length}->${cleaned.bytesAfter}b` +
+      (cleaned.converted ? ` converted_from=${verdict.type}` : '')
     )
 
     return res.status(200).json({
       ok: true,
-      type: verdict.type,
-      width: verdict.width || null,
-      height: verdict.height || null,
+      type: cleaned.format,
+      // The caller must store THIS path, not the one it was given: a converted
+      // photo lives somewhere new.
+      path: finalPath,
+      // Dimensions from the decoded image, not the header guess.
+      width: cleaned.width,
+      height: cleaned.height,
     })
   } catch (err) {
     console.error('[photo-verify] failed:', err.message)
