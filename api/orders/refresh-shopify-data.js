@@ -89,6 +89,7 @@ async function handleSingleOrder(req, res, shopifyOrderId) {
           customerEventType: lineItemData.customerEventType,
           lookupVerified: lineItemData.lookupVerified,
           lookupOutcome: lineItemData.lookupOutcome,
+          photoPath: lineItemData.photoPath,
           isGift: lineItemData.isGift
         }
       })
@@ -175,6 +176,7 @@ async function handleBatchRefresh(req, res) {
           customerEventType: parsed.customerEventType,
           lookupVerified: parsed.lookupVerified,
           lookupOutcome: parsed.lookupOutcome,
+          photoPath: parsed.photoPath,
           isGift: parsed.isGift
         }
       })
@@ -211,6 +213,7 @@ function extractShopifyData(lineItems) {
     customerEventType: null,
     lookupVerified: null,
     lookupOutcome: null,
+    photoPath: null,
     isGift: false,
     rawProductTitle: null,
     rawRunnerName: null,
@@ -277,6 +280,9 @@ function extractShopifyData(lineItems) {
       }
       else if (name === '_lookup_outcome' || name === 'lookup_outcome') {
         result.lookupOutcome = value || null
+      }
+      else if (name === '_photo_path' || name === 'photo_path') {
+        result.photoPath = value || null
       }
     }
   }

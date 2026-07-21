@@ -72,7 +72,17 @@ interface Order {
     | 'manual_rate_limited'
     | 'manual_timeout'
     | 'manual_user_choice'
+    // Personalization wizard only: it turns a failed lookup into "we'll research
+    // it for you" rather than a dead end, so these orders arrive with NO runner
+    // data and always need research.
+    | 'async_no_match'
+    | 'async_timeout'
+    | 'async_lookup_error'
     | null
+  // Supabase Storage path of the customer's uploaded photo, or null for the
+  // overwhelming majority of orders. Not openable directly: the bucket is
+  // private and the dashboard mints a signed URL on demand.
+  photoPath?: string | null
   // Instant Lookup widget signal: true = customer confirmed an official match,
   // false = customer typed it manually, null/undefined = no widget data
   lookupVerified?: boolean | null
@@ -374,6 +384,42 @@ export default function Dashboard() {
   const [lookupsLoading, setLookupsLoading] = useState(false)
   const [lookupsError, setLookupsError] = useState<string | null>(null)
   const [lookupsRaceFilter, setLookupsRaceFilter] = useState<string>('')
+
+  // Personalization photo: opened on demand, never held as a durable link.
+  const [photoOpening, setPhotoOpening] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+
+  /**
+   * Exchange the stored path for a short-lived signed URL and open it.
+   *
+   * The bucket is private, so there is no URL to render in an <img> or an
+   * href up front — and deliberately so: a durable link to a customer's photo
+   * is a privacy problem we could not walk back once it is in a Slack thread.
+   * The URL is minted per click and expires in 15 minutes.
+   *
+   * The window is opened synchronously and navigated after the fetch, because
+   * a window.open() that happens after an await is treated as a popup and gets
+   * blocked in Safari.
+   */
+  async function openPersonalizationPhoto(path: string) {
+    setPhotoOpening(true); setPhotoError(null)
+    const tab = window.open('', '_blank')
+    try {
+      const r = await apiFetch(`/api/admin/photo-signed-url?path=${encodeURIComponent(path)}`, { cache: 'no-store' })
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}))
+        throw new Error(body.message || `HTTP ${r.status}`)
+      }
+      const data = await r.json()
+      if (tab) tab.location.href = data.url
+      else window.location.href = data.url  // popup blocked: fall back in-place
+    } catch (err) {
+      if (tab) tab.close()
+      setPhotoError(err instanceof Error ? err.message : 'Could not open photo')
+    } finally {
+      setPhotoOpening(false)
+    }
+  }
 
   async function fetchLookupsRecent() {
     setLookupsLoading(true); setLookupsError(null)
@@ -5232,6 +5278,12 @@ Thank you!`
                             manual_rate_limited: { label: '✎ Manual: rate-limited', title: 'Customer hit the per-IP rate limit — fell back to manual entry.' },
                             manual_timeout:      { label: '✎ Manual: timed out', title: 'Lookup took too long (>12s) so the widget dropped to manual entry. Usually a slow timing site.' },
                             manual_user_choice:  { label: '✎ Manual: chose to type', title: 'Customer clicked "Enter info manually" themselves.' },
+                            // Personalization wizard: lookup failed, so it offered
+                            // "we'll research it for you" instead of a dead end.
+                            // These orders have NO runner data and always need research.
+                            async_no_match:      { label: '🔎 We research: no match', title: 'Wizard found nothing for this name+year and the customer asked us to research it. No runner data on this order.' },
+                            async_timeout:       { label: '🔎 We research: timed out', title: 'Wizard lookup timed out and the customer asked us to research it. No runner data on this order.' },
+                            async_lookup_error:  { label: '🔎 We research: lookup error', title: 'Wizard lookup errored and the customer asked us to research it. No runner data on this order.' },
                           }
                           const meta = outcomeMap[selectedOrder.lookupOutcome]
                           if (!meta) return null
@@ -5244,18 +5296,48 @@ Thank you!`
                             </span>
                           )
                         })() : null}
+                        {/* Photo add-on. This changes what gets printed, so it
+                            needs to be visible at a glance, not buried in the
+                            raw properties. */}
+                        {selectedOrder.photoPath ? (
+                          <span
+                            className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold"
+                            style={{ background: 'rgba(70,0,214,0.10)', color: '#4600D6', border: '1px solid rgba(70,0,214,0.25)' }}
+                            title="Customer added a photo to this print. Open it with View Photo — the link expires after 15 minutes."
+                          >
+                            📷 Photo on print
+                          </span>
+                        ) : null}
                       </div>
-                      {selectedOrder.resultsUrl && (
-                        <a
-                          href={selectedOrder.resultsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                          View Results ↗
-                        </a>
-                      )}
+                      <div className="flex items-center gap-3">
+                        {/* No href: the bucket is private, so the URL has to be
+                            minted per click rather than rendered up front. */}
+                        {selectedOrder.photoPath && (
+                          <button
+                            type="button"
+                            onClick={() => openPersonalizationPhoto(selectedOrder.photoPath!)}
+                            disabled={photoOpening}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-50"
+                            title="Opens a signed link that expires after 15 minutes"
+                          >
+                            {photoOpening ? 'Opening…' : 'View Photo ↗'}
+                          </button>
+                        )}
+                        {selectedOrder.resultsUrl && (
+                          <a
+                            href={selectedOrder.resultsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                          >
+                            View Results ↗
+                          </a>
+                        )}
+                      </div>
                     </div>
+                    {photoError && (
+                      <p className="text-[11px] text-red-600 mb-2">Photo: {photoError}</p>
+                    )}
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                       {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
                         <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />

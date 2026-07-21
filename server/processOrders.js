@@ -256,7 +256,8 @@ function extractShopifyPersonalization(lineItem) {
     lookupVerified: null,
     customerPace: null,
     customerEventType: null,
-    lookupOutcome: null
+    lookupOutcome: null,
+    photoPath: null
   }
 
   if (!lineItem) {
@@ -336,6 +337,12 @@ function extractShopifyPersonalization(lineItem) {
       // Order.lookupOutcome in the schema for the enum values.
       else if (name === '_lookup_outcome' || name === 'lookup_outcome') {
         result.lookupOutcome = value || null
+      }
+      // Personalization wizard: storage path of the customer's uploaded photo.
+      // Blank string means the wizard ran but they declined a photo, which is
+      // not the same as the property being absent — both land as null here.
+      else if (name === '_photo_path' || name === 'photo_path') {
+        result.photoPath = value || null
       }
     }
   }
@@ -764,6 +771,7 @@ export async function processOrders(options = {}) {
                   updateData.customerPace = extracted.customerPace
                   updateData.customerEventType = extracted.customerEventType
                   updateData.lookupOutcome = extracted.lookupOutcome
+                  updateData.photoPath = extracted.photoPath
                   // Gift flag applies to ALL orders (Easify + widget both set it).
                   updateData.isGift = extracted.isGift
 
@@ -882,6 +890,7 @@ export async function processOrders(options = {}) {
               let customerPace = null
               let customerEventType = null
               let lookupOutcome = null
+              let photoPath = null
 
               if (isShopify && shopifyData) {
                 log(`[processOrders] Processing Shopify line item ${lineItemIndex} for order ${order.orderId}...`)
@@ -917,6 +926,7 @@ export async function processOrders(options = {}) {
                   customerPace = extracted.customerPace
                   customerEventType = extracted.customerEventType
                   lookupOutcome = extracted.lookupOutcome
+                  photoPath = extracted.photoPath
                   // Gift flag applies to ALL orders (Easify + widget both set it).
                   // hadNoTime is already captured above.
                   isGiftOrder = extracted.isGift
@@ -1025,7 +1035,8 @@ export async function processOrders(options = {}) {
                   customerFinishTime,
                   customerPace,
                   customerEventType,
-                  lookupOutcome
+                  lookupOutcome,
+                  photoPath
                 }
               })
 

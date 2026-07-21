@@ -180,6 +180,10 @@ export default async function handler(req, res) {
         // Detailed outcome from the Instant Lookup widget — how the shopper
         // arrived at this result (auto_match, picked_from_list, manual_*).
         lookupOutcome: order.lookupOutcome || null,
+        // Storage path only — the dashboard exchanges it for a short-lived
+        // signed URL via /api/admin/photo-signed-url when a designer asks. The
+        // bucket is private, so this path is not openable on its own.
+        photoPath: order.photoPath || null,
         researchNotes: research?.researchNotes || null,
         // Persisted candidate matches — populates the dashboard's accept-button
         // picker for ambiguous orders (so it shows even after page reload, not

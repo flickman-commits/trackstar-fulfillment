@@ -83,6 +83,14 @@ model Order {
   //   null                  → no widget data (Etsy / pre-widget order)
   lookupOutcome      String?
 
+  // Personalization photo, captured by the storefront wizard's photo step.
+  // Stores the Supabase Storage PATH, never a URL: the bucket is private and a
+  // durable public link to a customer's photo is a privacy problem we could not
+  // walk back. The dashboard mints a short-lived signed URL on demand via
+  // /api/admin/photo-signed-url when a designer opens the order.
+  //   null → no photo on this order (the overwhelming majority)
+  photoPath          String?
+
   // Manual override fields (for customer corrections)
   yearOverride       Int?      // Override for raceYear
   raceNameOverride   String?   // Override for raceName
