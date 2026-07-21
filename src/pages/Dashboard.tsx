@@ -606,6 +606,17 @@ export default function Dashboard() {
           // Custom-order delay notice — drives the "delay notice sent" badge
           delayNoticeSentAt: order.delayNoticeSentAt as string | null | undefined,
           delayNoticeDaysLate: order.delayNoticeDaysLate as number | null | undefined,
+          // Instant Lookup / wizard provenance. This transform is a whitelist,
+          // not a spread, so anything missing here is silently dropped no matter
+          // what the API returns — these drive the "Customer-verified" badge and
+          // the outcome chip, which is why neither had ever appeared.
+          researchSource: order.researchSource as Order['researchSource'],
+          lookupVerified: order.lookupVerified as boolean | null | undefined,
+          lookupOutcome: order.lookupOutcome as Order['lookupOutcome'],
+          // Personalization photo — drives the photo chip, View Photo and the
+          // placement sign-off that gates completion.
+          photoPath: order.photoPath as string | null | undefined,
+          photoPlacedAt: order.photoPlacedAt as string | null | undefined,
         }
       })
 
