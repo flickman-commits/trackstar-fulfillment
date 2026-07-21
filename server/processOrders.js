@@ -49,6 +49,17 @@ const CUSTOM_ORDER_RACE_NAMES = ['Custom Trackstar Print (Any Race)']
 const PHOTO_ADDON_PRODUCT_ID = Number(process.env.PHOTO_ADDON_PRODUCT_ID || 10329625723163)
 const PHOTO_ADDON_TITLE_RE = /^photo add-?on$/i
 
+/**
+ * Is a cart-property flag actually set? Blank means "not set" — the
+ * personalization wizard writes its flag properties unconditionally and leaves
+ * the value empty when the answer is no.
+ */
+function isTruthyFlag(value) {
+  const v = String(value || '').trim().toLowerCase()
+  if (!v) return false
+  return v !== 'false' && v !== 'no' && v !== '0' && v !== 'off'
+}
+
 function isPhotoAddonLineItem(lineItem) {
   if (!lineItem) return false
   if (Number(lineItem.product_id) === PHOTO_ADDON_PRODUCT_ID) return true
@@ -298,9 +309,15 @@ function extractShopifyPersonalization(lineItem) {
       const name = (prop.name || '').trim()
       const value = (prop.value || '').trim()
 
-      // "No time" checkbox — Shopify passes this as a property when checked
+      // "No time" checkbox.
+      //
+      // Presence is NOT the signal. The personalization wizard writes this
+      // property on every order and leaves the VALUE blank when the shopper
+      // did not tick the box, so treating presence as true flagged every
+      // wizard order as "no time" even when a real finish time was captured
+      // right alongside it. Only a meaningful value counts.
       if (name === 'No time' || name === 'no time' || name === 'no_time') {
-        result.hadNoTime = true
+        if (isTruthyFlag(value)) result.hadNoTime = true
       }
       // Standardized property name: "Runner Name" (works for both normal and custom orders)
       // Matches: "Runner Name (First & Last)", "Runner Name", "runner name", "runner_name"

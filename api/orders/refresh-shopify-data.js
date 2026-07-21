@@ -236,9 +236,14 @@ function extractShopifyData(lineItems) {
       const name = (prop.name || '').trim()
       const value = (prop.value || '').trim()
 
-      // "No time" checkbox property
+      // "No time" checkbox. Presence is NOT the signal — the personalization
+      // wizard always writes this property and leaves the value blank when the
+      // shopper did not tick the box. See processOrders.isTruthyFlag.
       if (name === 'No time' || name === 'no time' || name === 'no_time') {
-        result.hadNoTime = true
+        const v = String(value || '').trim().toLowerCase()
+        if (v && v !== 'false' && v !== 'no' && v !== '0' && v !== 'off') {
+          result.hadNoTime = true
+        }
       }
       else if (name === 'Runner Name (First & Last)' ||
           name === 'Runner Name' ||
