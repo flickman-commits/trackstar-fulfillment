@@ -34,6 +34,27 @@ const ACTIONABLE_STATUSES = ['PendingFulfillmentAction', 'AwaitingPayment']
 // Race name strings that indicate a custom order (customer provides their own data)
 const CUSTOM_ORDER_RACE_NAMES = ['Custom Trackstar Print (Any Race)']
 
+/**
+ * The $15 photo upcharge is its own Shopify product, so a photo order arrives
+ * as TWO line items: the poster and the add-on. Only the poster is a print.
+ *
+ * The add-on carries requires_shipping: false, so it should never reach Artelo
+ * and therefore should never become an order row. This guard exists because
+ * "should" is doing a lot of work in that sentence — if it ever does come
+ * through, it would create a row with no race, no runner and no size that
+ * looks like a broken order to whoever opens the dashboard.
+ *
+ * Matched on product id first (exact, survives renaming) with a title fallback.
+ */
+const PHOTO_ADDON_PRODUCT_ID = Number(process.env.PHOTO_ADDON_PRODUCT_ID || 10329625723163)
+const PHOTO_ADDON_TITLE_RE = /^photo add-?on$/i
+
+function isPhotoAddonLineItem(lineItem) {
+  if (!lineItem) return false
+  if (Number(lineItem.product_id) === PHOTO_ADDON_PRODUCT_ID) return true
+  return PHOTO_ADDON_TITLE_RE.test(String(lineItem.title || '').trim())
+}
+
 // -----------------------------------------------------------------------------
 // Multi-line-item matcher (Artelo ↔ Shopify / Etsy)
 // -----------------------------------------------------------------------------
@@ -720,6 +741,25 @@ export async function processOrders(options = {}) {
             const rawSize = arteloItem?.product?.size || 'Unknown'
             const productSize = rawSize.startsWith('x') ? rawSize.slice(1) : rawSize
             const frameType = arteloItem?.product?.frameColor || 'Unknown'
+
+            // The $15 photo upcharge is not a print. If it ever reaches Artelo
+            // it would import as a row with no race, runner or size, which
+            // reads as a broken order rather than an add-on. Skip it, but only
+            // when we have not already created a row for it — an existing row
+            // is someone's real data and is not ours to silently drop.
+            if (!existing && isShopify) {
+              const shopifyIdxForSkip = shopifyMatchMap?.[lineItemIndex] ?? -1
+              const matchedLine = shopifyIdxForSkip >= 0
+                ? shopifyData?.shopifyOrderData?.line_items?.[shopifyIdxForSkip]
+                : null
+              if (isPhotoAddonLineItem(matchedLine)) {
+                log(`[processOrders] Skipping photo add-on line item ${lineItemIndex} on order ${order.orderId} (not a print)`)
+                results.skipped++
+                orderResult.action = 'skipped'
+                results.orders.push(orderResult)
+                continue
+              }
+            }
 
             // If order exists, check for updates
             if (existing) {

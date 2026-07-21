@@ -184,6 +184,8 @@ export default async function handler(req, res) {
         // signed URL via /api/admin/photo-signed-url when a designer asks. The
         // bucket is private, so this path is not openable on its own.
         photoPath: order.photoPath || null,
+        // When a designer confirmed the photo is on the artwork. Gates completion.
+        photoPlacedAt: order.photoPlacedAt ? order.photoPlacedAt.toISOString() : null,
         researchNotes: research?.researchNotes || null,
         // Persisted candidate matches — populates the dashboard's accept-button
         // picker for ambiguous orders (so it shows even after page reload, not

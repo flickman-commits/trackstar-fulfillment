@@ -83,6 +83,9 @@ interface Order {
   // overwhelming majority of orders. Not openable directly: the bucket is
   // private and the dashboard mints a signed URL on demand.
   photoPath?: string | null
+  // When a designer confirmed the photo is on the artwork. Completing a photo
+  // order is blocked until this is set.
+  photoPlacedAt?: string | null
   // Instant Lookup widget signal: true = customer confirmed an official match,
   // false = customer typed it manually, null/undefined = no widget data
   lookupVerified?: boolean | null
@@ -418,6 +421,33 @@ export default function Dashboard() {
       setPhotoError(err instanceof Error ? err.message : 'Could not open photo')
     } finally {
       setPhotoOpening(false)
+    }
+  }
+
+  const [photoConfirming, setPhotoConfirming] = useState(false)
+
+  /** Toggle the "photo is on the artwork" confirmation for a photo order. */
+  async function setPhotoPlaced(orderNumber: string, placed: boolean) {
+    setPhotoConfirming(true); setPhotoError(null)
+    try {
+      const r = await apiFetch('/api/orders/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'photo-placed', orderNumber, placed }),
+      })
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}))
+        throw new Error(body.message || `HTTP ${r.status}`)
+      }
+      const { order } = await r.json()
+      const placedAt = order?.photoPlacedAt ?? null
+      // Patch both the list and the open order so the gate updates immediately.
+      setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, photoPlacedAt: placedAt } : o))
+      setSelectedOrder(prev => prev && prev.orderNumber === orderNumber ? { ...prev, photoPlacedAt: placedAt } : prev)
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Could not update photo confirmation')
+    } finally {
+      setPhotoConfirming(false)
     }
   }
 
@@ -1155,7 +1185,13 @@ export default function Dashboard() {
         body: JSON.stringify({ action: 'complete', orderNumber })
       })
 
-      if (!response.ok) throw new Error('Failed to mark as completed')
+      if (!response.ok) {
+        // The server refuses to complete a photo order until the photo is
+        // confirmed placed. Surface that reason instead of a generic failure,
+        // otherwise the button just appears to do nothing.
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.message || 'Failed to mark as completed')
+      }
 
       setToast({ message: 'Order marked as completed!', type: 'success' })
       // Optimistically reflect the new status without closing the modal
@@ -1164,7 +1200,10 @@ export default function Dashboard() {
       await fetchOrders()
     } catch (error) {
       if (import.meta.env.DEV) console.error('Error completing order:', error)
-      setToast({ message: 'Failed to complete order', type: 'error' })
+      setToast({
+        message: error instanceof Error ? error.message : 'Failed to complete order',
+        type: 'error',
+      })
     }
   }
 
@@ -5337,6 +5376,48 @@ Thank you!`
                     </div>
                     {photoError && (
                       <p className="text-[11px] text-red-600 mb-2">Photo: {photoError}</p>
+                    )}
+                    {/* Photo orders get an explicit sign-off. The photo is the
+                        one element a normal proof does not show, and a print
+                        that ships without it is a reprint and a refund. The
+                        order cannot be completed until this is checked. */}
+                    {selectedOrder.photoPath && (
+                      <div
+                        className={`mb-3 rounded-md border p-3 ${
+                          selectedOrder.photoPlacedAt
+                            ? 'bg-green-50 border-green-300'
+                            : 'bg-amber-50 border-amber-400'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-amber-900'}`}>
+                              {selectedOrder.photoPlacedAt
+                                ? '✅ Photo confirmed on artwork'
+                                : '⚠️ This print includes a customer photo'}
+                            </p>
+                            <p className={`text-[11px] mt-0.5 ${selectedOrder.photoPlacedAt ? 'text-green-700' : 'text-amber-800'}`}>
+                              {selectedOrder.photoPlacedAt
+                                ? `Confirmed ${new Date(selectedOrder.photoPlacedAt).toLocaleString()}`
+                                : 'Open the photo, place it on the print, then confirm. This order cannot be completed until you do.'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPhotoPlaced(selectedOrder.orderNumber, !selectedOrder.photoPlacedAt)}
+                            disabled={photoConfirming}
+                            className={`flex-none text-[11px] font-semibold px-3 py-1.5 rounded transition-colors disabled:opacity-50 ${
+                              selectedOrder.photoPlacedAt
+                                ? 'bg-white text-green-800 border border-green-300 hover:bg-green-100'
+                                : 'bg-amber-500 text-white hover:bg-amber-600'
+                            }`}
+                          >
+                            {photoConfirming
+                              ? 'Saving…'
+                              : selectedOrder.photoPlacedAt ? 'Undo' : 'Confirm photo placed'}
+                          </button>
+                        </div>
+                      </div>
                     )}
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                       {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (

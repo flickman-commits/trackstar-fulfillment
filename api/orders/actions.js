@@ -9,6 +9,7 @@
  *   - clear-race-cache: Clear race-level cached data
  *   - clear-research: Delete runner research records
  *   - complete: Mark an order as completed
+ *   - photo-placed: Confirm the customer's photo is placed on the artwork
  *   - reopen: Un-complete an order — brings it back into the active queue
  *   - design-status: Update design status of a custom order
  *   - message-customer: Designer asks the customer a question (email + portal Q&A)
@@ -180,6 +181,8 @@ export default async function handler(req, res) {
         return await handleClearResearch(body, res)
       case 'complete':
         return await handleComplete(body, res)
+      case 'photo-placed':
+        return await handlePhotoPlaced(body, res)
       case 'reopen':
         return await handleReopen(body, res)
       case 'design-status':
@@ -367,12 +370,44 @@ async function handleComplete({ orderNumber }, res) {
   const existing = await prisma.order.findFirst({ where: { orderNumber } })
   if (!existing) return res.status(404).json({ error: 'Order not found' })
 
+  // A photo order that ships without the photo is a reprint and a refund, and
+  // it is invisible on a normal proof. Refuse to complete until someone has
+  // actually confirmed the photo is on the artwork.
+  if (existing.photoPath && !existing.photoPlacedAt) {
+    return res.status(409).json({
+      error: 'photo_not_confirmed',
+      message: 'This print includes a customer photo. Confirm the photo is placed before completing the order.',
+    })
+  }
+
   const order = await prisma.order.update({
     where: { id: existing.id },
     data: { status: 'completed', researchedAt: new Date() }
   })
 
   console.log(`[actions/complete] Order ${orderNumber} marked as completed`)
+  return res.status(200).json({ success: true, order })
+}
+
+// --- photo-placed ---
+// Designer confirms the customer's uploaded photo is actually on the artwork.
+// Toggleable: unchecking is how you correct a misclick, and it re-arms the
+// completion gate rather than leaving a wrong confirmation standing.
+async function handlePhotoPlaced({ orderNumber, placed = true }, res) {
+  if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
+
+  const existing = await prisma.order.findFirst({ where: { orderNumber } })
+  if (!existing) return res.status(404).json({ error: 'Order not found' })
+  if (!existing.photoPath) {
+    return res.status(400).json({ error: 'no_photo', message: 'This order has no customer photo.' })
+  }
+
+  const order = await prisma.order.update({
+    where: { id: existing.id },
+    data: { photoPlacedAt: placed ? new Date() : null },
+  })
+
+  console.log(`[actions/photo-placed] Order ${orderNumber} photo ${placed ? 'confirmed placed' : 'unconfirmed'}`)
   return res.status(200).json({ success: true, order })
 }
 
