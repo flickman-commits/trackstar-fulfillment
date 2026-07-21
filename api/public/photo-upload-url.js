@@ -40,16 +40,24 @@ const BUCKET = 'personalization-photos'
 const MAX_BYTES = 25 * 1024 * 1024
 
 /**
- * HEIC is included because iPhones default to it. We convert to JPEG during
- * fulfillment; accepting it here avoids a dead end for a large share of
- * customers whose phone gives them no other option.
+ * HEIC is deliberately EXCLUDED, despite iPhones shooting it by default.
+ *
+ * sharp cannot decode it in this deployment: a real iPhone HEIC fails with
+ * "Support for this compression format has not been built in", because the
+ * prebuilt binaries omit the HEVC codec for patent reasons. sharp.format
+ * reports heif input/output support, which is misleading — that only says the
+ * format is compiled in, not that a codec plugin exists. Accepting HEIC here
+ * would mean taking the upload and then purging it during verification, which
+ * is a worse dead end than not offering it.
+ *
+ * The storefront's file input omits HEIC too, and iOS transcodes to JPEG when
+ * the picker is not offered HEIC. So iPhone customers still get through; they
+ * just arrive as JPEG.
  */
 const ALLOWED_TYPES = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
-  'image/heic': 'heic',
-  'image/heif': 'heif',
 }
 
 function clientIp(req) {
@@ -101,7 +109,7 @@ export default async function handler(req, res) {
   if (!ext) {
     return res.status(400).json({
       error: 'unsupported_type',
-      message: 'Please upload a JPG, PNG, WEBP, or HEIC image.',
+      message: 'Please upload a JPG or PNG image.',
     })
   }
 
