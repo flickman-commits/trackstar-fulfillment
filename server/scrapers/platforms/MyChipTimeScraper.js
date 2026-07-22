@@ -415,14 +415,19 @@ export class MyChipTimeScraper extends BaseScraper {
    * Extract standardized result from a match
    */
   _extractResult(match, eventLabel, searchUrl) {
-    // Column-mode results have chipTime + pace directly
+    // Column-mode results have chipTime directly. Pace is COMPUTED from chip
+    // time ÷ matched distance, not scraped — the page's pace column carries a
+    // "/M" unit suffix and isn't guaranteed to be the overall average (see the
+    // add-race-scraper skill's "compute, don't scrape" rule).
     if (match.chipTime) {
+      const distanceMiles = /half/i.test(eventLabel) ? 13.1 : 26.2
+      const computedPace = this.calculatePace(this.normalizeTime(match.chipTime), distanceMiles)
       return {
         found: true,
         eventType: eventLabel,
         bibNumber: match.bib ? String(match.bib) : null,
         officialTime: match.chipTime,
-        officialPace: match.pace || null,
+        officialPace: computedPace,
         gunTime: match.gunTime || null,
         overallPlace: match.overallPlace || null,
         genPlace: match.genPlace || null,
