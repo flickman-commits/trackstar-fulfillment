@@ -78,6 +78,12 @@ interface Order {
     | 'async_no_match'
     | 'async_timeout'
     | 'async_lookup_error'
+    // No scraper exists for this race, so the wizard never searched — it took
+    // the shopper's details and moved on. Always needs research.
+    | 'no_lookup_available'
+    // Shopper hand-edited time / pace / bib on the review screen, so the values
+    // are theirs, not an official-results match.
+    | 'edited_by_customer'
     | null
   // Supabase Storage path of the customer's uploaded photo, or null for the
   // overwhelming majority of orders. Not openable directly: the bucket is
@@ -5334,6 +5340,8 @@ Thank you!`
                             async_no_match:      { label: '🔎 We research: no match', title: 'Wizard found nothing for this name+year and the customer asked us to research it. No runner data on this order.' },
                             async_timeout:       { label: '🔎 We research: timed out', title: 'Wizard lookup timed out and the customer asked us to research it. No runner data on this order.' },
                             async_lookup_error:  { label: '🔎 We research: lookup error', title: 'Wizard lookup errored and the customer asked us to research it. No runner data on this order.' },
+                            no_lookup_available: { label: '🔎 We research: no scraper', title: 'This race has no instant lookup configured, so the wizard never searched. Only the name and year are customer-supplied — time, pace and bib still need research.' },
+                            edited_by_customer:  { label: '✎ Customer edited', title: 'Customer hand-edited time, pace or bib on the review screen. These values are theirs, not an official-results match — worth a sanity check.' },
                           }
                           const meta = outcomeMap[selectedOrder.lookupOutcome]
                           if (!meta) return null
