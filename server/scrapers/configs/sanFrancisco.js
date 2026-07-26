@@ -41,6 +41,22 @@ export default {
     2025: 1119286,
     2026: 1137293,
   },
+  /**
+   * ChronoTrack times this race; Athlinks only mirrors it, and the mirror lags.
+   * On race day 2026 the Athlinks Search API timed out for EVERY year while
+   * ChronoTrack served complete results for the race that had just finished —
+   * which is precisely when customers are on the site ordering posters.
+   *
+   * So Athlinks stays primary (mature, all years backfilled) and ChronoTrack
+   * catches the race-day gap. eventIds here are ChronoTrack's, from the results
+   * URL: live.chronotrack.com/event/{id}/results
+   */
+  fallback: {
+    platform: 'chronotrack',
+    eventIds: {
+      2026: 91608,
+    },
+  },
   /** Approx: last Sunday of July. */
   calculateDate(year) {
     const jul31 = new Date(year, 6, 31)

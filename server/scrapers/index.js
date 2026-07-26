@@ -18,6 +18,7 @@ import { BrookseeScraper } from './platforms/BrookseeScraper.js'
 import { TokyoMarathonScraper } from './platforms/TokyoMarathonScraper.js'
 import { MultiSportAustraliaScraper } from './platforms/MultiSportAustraliaScraper.js'
 import { AthlinksScraper } from './platforms/AthlinksScraper.js'
+import { ChronoTrackScraper } from './platforms/ChronoTrackScraper.js'
 import { MTECResultsScraper } from './platforms/MTECResultsScraper.js'
 import { LaurelTimingScraper } from './platforms/LaurelTimingScraper.js'
 import { CompetitiveTimingScraper } from './platforms/CompetitiveTimingScraper.js'
@@ -84,6 +85,7 @@ const PLATFORM_MAP = {
   tokyo: TokyoMarathonScraper,
   'multisport-australia': MultiSportAustraliaScraper,
   athlinks: AthlinksScraper,
+  chronotrack: ChronoTrackScraper,
   mtec: MTECResultsScraper,
   laurel: LaurelTimingScraper,
   competitivetiming: CompetitiveTimingScraper,
@@ -170,7 +172,67 @@ function createScraper(config, year) {
   if (!ScraperClass) {
     throw new Error(`Unknown platform: ${effectiveConfig.platform}`)
   }
-  return new ScraperClass(year, effectiveConfig)
+  const primary = new ScraperClass(year, effectiveConfig)
+
+  // Optional fallback platform, tried when the primary finds nothing.
+  //
+  // The case this exists for: a race is timed by one provider and MIRRORED to
+  // another. The mirror lags. On race day — exactly when customers are
+  // ordering — the timer's own site has results while the mirror still 404s,
+  // 500s or returns an empty set. SF Marathon is Athlinks-mirrored but
+  // ChronoTrack-timed, and on race day 2026 Athlinks was timing out for every
+  // year while ChronoTrack served complete results.
+  const fb = effectiveConfig.fallback
+  if (!fb?.platform) return primary
+
+  const FallbackClass = PLATFORM_MAP[fb.platform]
+  if (!FallbackClass) {
+    console.warn(`[scrapers] Unknown fallback platform "${fb.platform}" for ${config.raceName}; ignoring`)
+    return primary
+  }
+  const fallback = new FallbackClass(year, { ...effectiveConfig, ...fb })
+  return wrapWithFallback(primary, fallback, config.tag || config.raceName)
+}
+
+/**
+ * Run `primary`, and fall back to `fallback` when the primary did not produce a
+ * usable result.
+ *
+ * We only fall back on "no data" outcomes — not_found, upstream_error,
+ * year_not_configured, or a thrown error. A found result, or a deliberate
+ * `ambiguous` (the runner IS there, a human just needs to pick), is returned
+ * as-is: retrying those on another source would risk answering a question the
+ * primary already answered correctly.
+ */
+function wrapWithFallback(primary, fallback, tag) {
+  const originalSearch = primary.searchRunner.bind(primary)
+
+  primary.searchRunner = async (runnerName) => {
+    let result
+    try {
+      result = await originalSearch(runnerName)
+    } catch (err) {
+      console.log(`[${tag}] Primary scraper threw (${err.message}) — trying fallback`)
+      return fallback.searchRunner(runnerName)
+    }
+
+    if (result?.found || result?.ambiguous) return result
+
+    console.log(`[${tag}] Primary returned "${result?.researchStatus || 'nothing'}" — trying fallback`)
+    try {
+      const fbResult = await fallback.searchRunner(runnerName)
+      // Only prefer the fallback if it actually did better. Otherwise keep the
+      // primary's result, whose researchStatus is the more familiar signal in
+      // the dashboard.
+      if (fbResult?.found || fbResult?.ambiguous) return fbResult
+      return result || fbResult
+    } catch (err) {
+      console.log(`[${tag}] Fallback scraper threw (${err.message}) — keeping primary result`)
+      return result
+    }
+  }
+
+  return primary
 }
 
 /**

@@ -91,6 +91,41 @@ export const CHIP_TIME_FIXTURES = [
     notes: 'OC 2025 men\'s winner — verifies Athlinks Search API + course filter (marathon vs half)',
   },
 
+  // ── ChronoTrack Live ──────────────────────────────────────────────────
+  // SF Marathon is Athlinks-primary with a ChronoTrack fallback. On race day
+  // 2026 Athlinks timed out for every year, so these exercise the fallback
+  // path end to end. All three verified against live.chronotrack.com/event/91608.
+  {
+    platform: 'chronotrack',
+    race: 'San Francisco Marathon',
+    year: 2026,
+    runner: 'Garrett Patrick',
+    expectedChipTime: '2:26:25',
+    expectedChipPace: '5:35',
+    expectedBib: '8',
+    notes: 'SF 2026 overall winner. Page shows 2:26:25 / 5:35/mi. Full course = 42195m; verifies distance is read as METRES despite the payload\'s sibling "units":"mi" hint.',
+  },
+  {
+    platform: 'chronotrack',
+    race: 'San Francisco Marathon',
+    year: 2026,
+    runner: 'Qiongfeng Pan',
+    expectedChipTime: '3:49:04',
+    expectedChipPace: '8:44',
+    expectedBib: '10776',
+    notes: 'UNEVEN SPLITS + large gun/chip gap: gun 3:54:03 vs chip 3:49:04 (299s apart). A gun-time regression fails here. Last split is the 24-mile mark, so a split-interval regression also fails.',
+  },
+  {
+    platform: 'chronotrack',
+    race: 'San Francisco Marathon',
+    year: 2026,
+    runner: 'Jonah Ilao',
+    expectedChipTime: '1:55:39',
+    expectedChipPace: '8:49',
+    expectedBib: '15275',
+    notes: 'HALF distance (21098m = 13.11mi), gun 2:03:30 vs chip 1:55:39 (472s apart). Pacing this against 26.2 would give ~4:24/mi, so this fixture catches a wrong-distance regression.',
+  },
+
   // ── MultiSport Australia (Sydney) ─────────────────────────────────────
   {
     platform: 'multisport-australia',
