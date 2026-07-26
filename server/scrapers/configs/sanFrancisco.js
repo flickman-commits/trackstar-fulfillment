@@ -12,7 +12,15 @@
  * 2:54:19 (2025 Full Marathon).
  */
 export default {
-  platform: 'athlinks',
+  // ChronoTrack TIMES this race; Athlinks only mirrors it, and the mirror lags
+  // by at least a day. So we read the timer directly and keep Athlinks as the
+  // fallback for older years ChronoTrack no longer serves.
+  //
+  // Order matters for more than freshness: a dead primary is expensive. The
+  // storefront wizard aborts at 12s, while Athlinks burns ~26s before giving up
+  // (12s timeout + 1.5s backoff + 12s retry). With Athlinks first, race-day
+  // lookups took 27s and every shopper timed out before the fallback answered.
+  platform: 'chronotrack',
   raceName: 'San Francisco Marathon',
   tag: 'SF',
   location: 'San Francisco, CA',
@@ -34,27 +42,28 @@ export default {
   ],
   keywords: ['san francisco', 'sf marathon'],
   keywordRequiresMarathon: false,
+  /**
+   * ChronoTrack event ids, from the results URL:
+   *   live.chronotrack.com/event/{id}/results
+   * A year absent here returns year_not_configured, which drops through to the
+   * Athlinks fallback below — that is how older years keep working.
+   */
   eventIds: {
-    2022: 1020821,
-    2023: 1052040,
-    2024: 1072999,
-    2025: 1119286,
-    2026: 1137293,
+    2026: 91608,
   },
   /**
-   * ChronoTrack times this race; Athlinks only mirrors it, and the mirror lags.
-   * On race day 2026 the Athlinks Search API timed out for EVERY year while
-   * ChronoTrack served complete results for the race that had just finished —
-   * which is precisely when customers are on the site ordering posters.
-   *
-   * So Athlinks stays primary (mature, all years backfilled) and ChronoTrack
-   * catches the race-day gap. eventIds here are ChronoTrack's, from the results
-   * URL: live.chronotrack.com/event/{id}/results
+   * Athlinks fallback. Backfilled for every prior year, so it answers anything
+   * ChronoTrack no longer serves. `eventIds` here are Athlinks' own, discovered
+   * via alaska.athlinks.com/MasterEvents/Api/1403.
    */
   fallback: {
-    platform: 'chronotrack',
+    platform: 'athlinks',
     eventIds: {
-      2026: 91608,
+      2022: 1020821,
+      2023: 1052040,
+      2024: 1072999,
+      2025: 1119286,
+      2026: 1137293,
     },
   },
   /** Approx: last Sunday of July. */

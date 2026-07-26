@@ -203,6 +203,13 @@ function createScraper(config, year) {
  * `ambiguous` (the runner IS there, a human just needs to pick), is returned
  * as-is: retrying those on another source would risk answering a question the
  * primary already answered correctly.
+ *
+ * ORDER MATTERS ON THE PUBLIC ENDPOINT. Falling back is not free: the storefront
+ * wizard aborts its own request at 12s, while a dead primary can burn ~26s
+ * (12s timeout + 1.5s backoff + 12s retry) before the fallback even starts. The
+ * shopper is long gone. So when a source is known to be down for a given year,
+ * put the working one first with `fallback.preferFallback` rather than paying
+ * the timeout on every single lookup.
  */
 function wrapWithFallback(primary, fallback, tag) {
   const originalSearch = primary.searchRunner.bind(primary)
@@ -221,10 +228,15 @@ function wrapWithFallback(primary, fallback, tag) {
     console.log(`[${tag}] Primary returned "${result?.researchStatus || 'nothing'}" — trying fallback`)
     try {
       const fbResult = await fallback.searchRunner(runnerName)
-      // Only prefer the fallback if it actually did better. Otherwise keep the
-      // primary's result, whose researchStatus is the more familiar signal in
-      // the dashboard.
       if (fbResult?.found || fbResult?.ambiguous) return fbResult
+
+      // Neither found anything. Prefer whichever status is actually actionable.
+      // `year_not_configured` from the primary is expected by design when a
+      // year is deliberately served by the fallback — reporting it would send
+      // someone off to add event IDs that are not the problem. The fallback's
+      // status (e.g. upstream_error: "the timing site is down") describes what
+      // really happened.
+      if (result?.researchStatus === 'year_not_configured' && fbResult) return fbResult
       return result || fbResult
     } catch (err) {
       console.log(`[${tag}] Fallback scraper threw (${err.message}) — keeping primary result`)
