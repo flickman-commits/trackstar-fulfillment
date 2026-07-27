@@ -4215,7 +4215,7 @@ Thank you!`
                         </div>
 
                         {/* Order details card */}
-                        <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                        <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                           {selectedOrder.trackstarOrderType === 'race_partner' ? (
                             <>
                               <div className="flex justify-between items-center">
@@ -4298,7 +4298,7 @@ Thank you!`
 
                         {selectedOrder.creativeDirection && (
                           <div>
-                            <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Creative Direction</h4>
+                            <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">Creative Direction</h4>
                             <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
                               <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
                             </div>
@@ -4366,7 +4366,7 @@ Thank you!`
 
                         {/* Proofs & Approval (Mobile) */}
                         <div>
-                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Proofs & Approval</h4>
+                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">Proofs & Approval</h4>
                           <ProofManager
                             orderId={selectedOrder.id}
                             orderNumber={selectedOrder.orderNumber}
@@ -4381,7 +4381,7 @@ Thank you!`
 
                         {/* Comments (Mobile) */}
                         <div>
-                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">
+                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">
                             Comments {orderComments.length > 0 && `(${orderComments.length})`}
                           </h4>
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-2">
@@ -4654,7 +4654,7 @@ Thank you!`
 
                       {/* Design Info — always visible, Dan needs filename at every stage */}
                         <CollapsibleSection title={selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Info' : 'Design Info'} defaultOpen={ds === 'not_started' || ds === 'in_progress'}>
-                          <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                          <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                             {selectedOrder.trackstarOrderType === 'race_partner' ? (
                               <>
                                 <CopyableField label="Partner" value={selectedOrder.partnerName || selectedOrder.raceName || 'Race Partner'} />
@@ -4711,7 +4711,7 @@ Thank you!`
                           defaultOpen={false}
                           badge={orderComments.length > 0 ? <span className="text-[10px] font-medium text-off-black/30">({orderComments.length})</span> : undefined}
                         >
-                          <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3 mb-3">
+                          <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-3">
                             <textarea
                               value={newCommentText}
                               onChange={(e) => setNewCommentText(e.target.value)}
@@ -4843,18 +4843,7 @@ Thank you!`
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product Details</div>
-                          {!isEditing && selectedOrder.status !== 'completed' && (
-                            <button
-                              onClick={() => startEditing(selectedOrder)}
-                              className="flex-none inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                            >
-                              <Pencil className="w-3 h-3" />
-                              Edit
-                            </button>
-                          )}
-                        </div>
+                        <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product Details</div>
                         {/* The label exists to tell near-identical variants apart
                             (Chicago World Majors vs Chicago Race). When it just
                             repeats the race name it adds nothing, so hide it and
@@ -5009,7 +4998,7 @@ Thank you!`
                             <p className={`text-[11px] mt-0.5 ${selectedOrder.photoPlacedAt ? 'text-green-700' : 'text-amber-800'}`}>
                               {selectedOrder.photoPlacedAt
                                 ? `Confirmed ${new Date(selectedOrder.photoPlacedAt).toLocaleString()}`
-                                : 'Place this photo on the print, then tick the box. This order cannot be completed until you do.'}
+                                : 'Place this photo on the print before completing this order.'}
                             </p>
                             <label className={`mt-2 inline-flex items-center gap-2 cursor-pointer select-none ${photoConfirming ? 'opacity-50' : ''}`}>
                               <input
@@ -5144,7 +5133,7 @@ Thank you!`
                     {/* Notes - only show if there are notes */}
                     {selectedOrder.notes && (
                       <div>
-                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Notes</h4>
+                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">Notes</h4>
                         <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                           <p className="text-body-sm text-blue-800 whitespace-pre-wrap">{selectedOrder.notes}</p>
                         </div>
@@ -5155,7 +5144,7 @@ Thank you!`
                   {/* === MOBILE COMPACT SUMMARY === */}
                   <div className="md:hidden space-y-3">
                     {/* Key details card */}
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-body-sm text-off-black/60">Runner</span>
                         <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRunnerName || selectedOrder.runnerName}</span>
@@ -5256,7 +5245,7 @@ Thank you!`
                       )
                     ) : (selectedOrder.bibNumber || selectedOrder.officialTime || selectedOrder.officialPace) ? (
                       /* Results exist but no scraper (e.g. manually entered) */
-                      <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                         <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Race Results</h4>
                         {selectedOrder.bibNumber && (
                           <div className="flex justify-between items-center">
@@ -5288,7 +5277,7 @@ Thank you!`
 
                     {/* Comments (Mobile) */}
                     <div>
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">
+                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">
                         Comments {orderComments.length > 0 && `(${orderComments.length})`}
                       </h4>
                       <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-2">
@@ -5386,7 +5375,7 @@ Thank you!`
                           </button>
                         </div>
                       </div>
-                      <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-body-sm text-off-black/60">Runner</span>
                           <input
@@ -5425,8 +5414,6 @@ Thank you!`
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Runner Details</h4>
                       <div className="flex items-center gap-3">
-                        {/* The photo now has its own block below with a live
-                            thumbnail and a download, so no link is needed here. */}
                         {selectedOrder.resultsUrl && (
                           <a
                             href={selectedOrder.resultsUrl}
@@ -5437,9 +5424,20 @@ Thank you!`
                             View Results ↗
                           </a>
                         )}
+                        {/* Edits runner name, race and year, so it belongs with
+                            the runner data rather than the product card. */}
+                        {!isEditing && selectedOrder.status !== 'completed' && (
+                          <button
+                            onClick={() => startEditing(selectedOrder)}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Edit
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                       {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
                         <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
                       ) : (
@@ -5583,7 +5581,7 @@ Thank you!`
                         </div>
                       )}
                     </div>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                       {selectedOrder.eventType ? (
                         // Flag non-marathon events so the designer doesn't
                         // assume "Marathon" by default — Half, 10K, 5K, etc.
@@ -5715,20 +5713,20 @@ Thank you!`
                     </div>
                   </div>
 
-                  {/* Filename — last step before exporting. Copy-pasteable. */}
+                  {/* Filename. One value, so it gets one row rather than a
+                      section header wrapping a card wrapping a label. */}
                   <div className="hidden md:block">
-                    <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Filename</h4>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4">
-                      <CopyableField label="File" value={generateFilename(selectedOrder)} />
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+                      <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
                     </div>
                   </div>
 
                   {/* Comments */}
                   <div>
-                    <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">
+                    <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">
                       Comments {orderComments.length > 0 && `(${orderComments.length})`}
                     </h4>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3 mb-3">
+                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-3">
                       <textarea
                         value={newCommentText}
                         onChange={(e) => setNewCommentText(e.target.value)}
