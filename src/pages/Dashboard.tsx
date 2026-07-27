@@ -2142,9 +2142,10 @@ Thank you!`
     if (order.researchStatus === 'race_not_run' || (order.researchStatus === 'not_found' && raceNotRunYet(order))) {
       return { icon: '🗓️', label: 'Race has not happened yet' }
     }
-    // ❌ not 🔎: the two magnifying glasses were mirror images of each other and
-    // impossible to tell apart at a glance in the status column.
-    if (order.researchStatus === 'not_found') return { icon: '❌', label: 'Runner not found' }
+    // 🕵️ rather than ❌ or 🔎. A cross reads as "cancelled, ignore this", and the
+    // second magnifying glass was a mirror image of the one below. Not found
+    // means someone has to go dig, so the icon should point at the work.
+    if (order.researchStatus === 'not_found') return { icon: '🕵️', label: 'Not found, needs a manual lookup' }
     if (order.hasScraperAvailable) return { icon: '🔍', label: 'Ready to research' }
     return { icon: '⏳', label: 'Pending' }
   }
