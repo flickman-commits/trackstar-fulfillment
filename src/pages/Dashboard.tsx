@@ -2133,11 +2133,19 @@ Thank you!`
     if (order.status === 'ready') return { icon: '✅', label: 'Ready' }
     if (order.researchStatus === 'found') return { icon: '✅', label: 'Researched' }
     if (order.researchStatus === 'no_scraper') return { icon: '🚧', label: 'No scraper for this race' }
-    if (order.researchStatus === 'year_not_configured') return { icon: '🗓️', label: 'Year not configured' }
-    if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site unreachable — retry' }
+    // 🛠️ not 🗓️: a calendar here was indistinguishable from the 📅 used for a
+    // missing year, and this is a dev gap rather than a date problem.
+    if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Year not configured' }
+    if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site unreachable, retry' }
     if (order.researchStatus === 'ambiguous') return { icon: '❓', label: 'Multiple matches' }
-    if (order.researchStatus === 'not_found') return { icon: '🔎', label: 'Runner not found' }
-    if (order.hasScraperAvailable) return { icon: '🔍', label: 'Can Research' }
+    // A future race is a wait, not a failure.
+    if (order.researchStatus === 'race_not_run' || (order.researchStatus === 'not_found' && raceNotRunYet(order))) {
+      return { icon: '🗓️', label: 'Race has not happened yet' }
+    }
+    // ❌ not 🔎: the two magnifying glasses were mirror images of each other and
+    // impossible to tell apart at a glance in the status column.
+    if (order.researchStatus === 'not_found') return { icon: '❌', label: 'Runner not found' }
+    if (order.hasScraperAvailable) return { icon: '🔍', label: 'Ready to research' }
     return { icon: '⏳', label: 'Pending' }
   }
 
@@ -4092,11 +4100,8 @@ Thank you!`
                     <span className="text-xl">
                       {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner')
                         ? (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).icon
-                        : selectedOrder.status === 'flagged' ? '⚠️' :
-                          selectedOrder.status === 'completed' ? '✅' :
-                          selectedOrder.status === 'missing_year' ? '📅' :
-                          selectedOrder.status === 'ready' ? '✅' :
-                          selectedOrder.researchStatus === 'found' ? '✅' : '⏳'}
+                        : selectedOrder.status === 'completed' ? '✅'
+                        : getStatusDisplay(selectedOrder).icon}
                     </span>
                     <h3 className="text-heading-md text-off-black">
                       {selectedOrder.trackstarOrderType === 'race_partner'

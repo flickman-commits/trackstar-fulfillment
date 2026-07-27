@@ -262,7 +262,9 @@ function extractShopifyData(lineItems) {
       }
       else if (name === 'Race Name' || name === 'race name' || name === 'race_name') {
         result.rawRaceName = value
-        if (value) result.raceName = value
+        // Parsed, not trusted raw: the wizard sometimes puts the full product
+        // title in this property. See the matching note in processOrders.js.
+        if (value) result.raceName = parseRaceNameFromTitle(value) || value
       }
       else if (name === 'Bib #' || name === 'Bib #:' || name === 'bib_number') {
         result.customerBib = value || null

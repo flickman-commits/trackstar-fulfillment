@@ -340,7 +340,13 @@ function extractShopifyPersonalization(lineItem) {
       // Race name (override product title if provided — e.g. custom orders provide the actual race)
       else if (name === 'Race Name' || name === 'race name' || name === 'race_name') {
         if (value) {
-          result.raceName = value
+          // Run it through the same parser as the product title. The wizard
+          // sometimes writes the full product title into this property
+          // ("San Francisco Marathon Personalized Race Print"), and taking it
+          // raw put the print suffix into the race name, which then failed to
+          // match any scraper config. Parsing here strips the suffix either way
+          // and leaves genuine custom race names untouched.
+          result.raceName = parseRaceNameFromTitle(value) || value
         }
       }
       // Custom order fields
