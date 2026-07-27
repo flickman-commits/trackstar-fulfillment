@@ -417,6 +417,8 @@ export default function Dashboard() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [photoLoading, setPhotoLoading] = useState(false)
 
+  useEffect(() => { setShowCommentBox(false) }, [selectedOrder?.orderNumber])
+
   useEffect(() => {
     const path = selectedOrder?.photoPath
     setPhotoUrl(null)
@@ -536,6 +538,9 @@ export default function Dashboard() {
   const [orderComments, setOrderComments] = useState<OrderComment[]>([])
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [newCommentText, setNewCommentText] = useState('')
+  // Comment composer stays collapsed until asked for. Auto-opens when the
+  // order already has a thread worth replying to.
+  const [showCommentBox, setShowCommentBox] = useState(false)
   const [commentImageFile, setCommentImageFile] = useState<File | null>(null)
   const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
@@ -2646,10 +2651,10 @@ Thank you!`
                             onClick={() => setSelectedOrder(order)}
                             className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
                           >
-                            <td className="pl-6 pr-2 py-5 text-center">
+                            <td className="pl-6 pr-2 py-4 text-center">
                               <OrderSourceMark source={order.source} />
                             </td>
-                            <td className="px-3 py-5">
+                            <td className="px-3 py-4">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                 {itemCount > 1 && (
@@ -2659,7 +2664,7 @@ Thank you!`
                                 )}
                               </div>
                             </td>
-                            <td className="px-3 py-5 text-center">
+                            <td className="px-3 py-4 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <span className="text-lg" title={statusDisplay.label}>
                                   {statusDisplay.icon}
@@ -2669,7 +2674,7 @@ Thank you!`
                                 )}
                               </div>
                             </td>
-                            <td className="px-3 py-5">
+                            <td className="px-3 py-4">
                               <div className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</div>
                               <div className="text-xs text-off-black/50 mt-0.5">
                                 {order.effectiveRaceName || order.raceName} {order.effectiveRaceYear || order.raceYear}
@@ -2682,7 +2687,7 @@ Thank you!`
                                 </div>
                               )}
                             </td>
-                            <td className="px-3 pr-6 py-5 hidden md:table-cell align-middle">
+                            <td className="px-3 pr-6 py-4 hidden md:table-cell align-middle">
                               <OrderTags order={order} />
                             </td>
                           </tr>
@@ -2704,10 +2709,10 @@ Thank you!`
                                 onClick={() => setSelectedOrder(order)}
                                 className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
                               >
-                                <td className="pl-6 pr-2 py-5 text-center">
+                                <td className="pl-6 pr-2 py-4 text-center">
                                   <OrderSourceMark source={order.source} />
                                 </td>
-                                <td className="px-3 py-5">
+                                <td className="px-3 py-4">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                     {itemCount > 1 && (
@@ -2717,16 +2722,16 @@ Thank you!`
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-3 py-5 text-center">
+                                <td className="px-3 py-4 text-center">
                                   <span className="text-lg">✅</span>
                                 </td>
-                                <td className="px-3 py-5">
+                                <td className="px-3 py-4">
                                   <div className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</div>
                                   <div className="text-xs text-off-black/50 mt-0.5">
                                     {order.effectiveRaceName || order.raceName} {order.effectiveRaceYear || order.raceYear}
                                   </div>
                                 </td>
-                                <td className="px-3 pr-6 py-5 hidden md:table-cell align-middle">
+                                <td className="px-3 pr-6 py-4 hidden md:table-cell align-middle">
                                   <OrderTags order={order} />
                                 </td>
                               </tr>
@@ -2757,13 +2762,13 @@ Thank you!`
                             onClick={() => setSelectedOrder(order)}
                             className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
                           >
-                            <td className="pl-6 pr-3 py-5">
+                            <td className="pl-6 pr-3 py-4">
                               <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
                                 <span>{designConfig.icon}</span>
                                 {designConfig.label}
                               </span>
                             </td>
-                            <td className="px-3 py-5">
+                            <td className="px-3 py-4">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-off-black">{order.partnerName || order.raceName || 'Race Partner'}</span>
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
@@ -2771,13 +2776,13 @@ Thank you!`
                                 )}
                               </div>
                             </td>
-                            <td className="px-3 py-5">
+                            <td className="px-3 py-4">
                               <span className="text-sm text-off-black/70">{order.raceYear || '—'}</span>
                             </td>
-                            <td className="px-3 py-5 hidden md:table-cell">
+                            <td className="px-3 py-4 hidden md:table-cell">
                               <span className="text-sm text-off-black/70">{order.partnerContactName || order.customerEmail || '—'}</span>
                             </td>
-                            <td className="px-3 pr-6 py-5 text-sm text-off-black/60 hidden lg:table-cell">
+                            <td className="px-3 pr-6 py-4 text-sm text-off-black/60 hidden lg:table-cell">
                               {(order.proofCount ?? 0) > 0 ? (
                                 <span className="px-2 py-0.5 bg-off-black/5 rounded text-xs font-medium">{order.proofCount} proof{order.proofCount === 1 ? '' : 's'}</span>
                               ) : (
@@ -2812,7 +2817,7 @@ Thank you!`
                             onClick={() => setSelectedOrder(order)}
                             className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
                           >
-                            <td className="pl-6 pr-2 py-5 text-center">
+                            <td className="pl-6 pr-2 py-4 text-center">
                               <img
                                 src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
                                 alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
@@ -2820,13 +2825,13 @@ Thank you!`
                                 className="w-5 h-5 inline-block"
                               />
                             </td>
-                            <td className="px-3 py-5">
+                            <td className="px-3 py-4">
                               <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
                                 <span>{designConfig.icon}</span>
                                 {designConfig.label}
                               </span>
                             </td>
-                            <td className="px-3 py-5">
+                            <td className="px-3 py-4">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                 {itemCount > 1 && (
@@ -2842,15 +2847,15 @@ Thank you!`
                                 )}
                               </div>
                             </td>
-                            <td className="px-3 py-5">
+                            <td className="px-3 py-4">
                               <span className={`text-sm ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black'}`}>
                                 {formatDueDate(order.dueDate)}
                               </span>
                             </td>
-                            <td className="px-3 py-5 hidden md:table-cell">
+                            <td className="px-3 py-4 hidden md:table-cell">
                               <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
                             </td>
-                            <td className="px-3 pr-6 py-5 text-sm text-off-black/60 hidden lg:table-cell">
+                            <td className="px-3 pr-6 py-4 text-sm text-off-black/60 hidden lg:table-cell">
                               <span className="line-clamp-1">{order.effectiveRaceName || order.raceName || '—'}</span>
                             </td>
                           </tr>
@@ -2873,7 +2878,7 @@ Thank you!`
                                 onClick={() => setSelectedOrder(order)}
                                 className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
                               >
-                                <td className="pl-6 pr-2 py-5 text-center">
+                                <td className="pl-6 pr-2 py-4 text-center">
                                   <img
                                     src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
                                     alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
@@ -2881,13 +2886,13 @@ Thank you!`
                                     className="w-5 h-5 inline-block"
                                   />
                                 </td>
-                                <td className="px-3 py-5">
+                                <td className="px-3 py-4">
                                   <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
                                     <span>{designConfig.icon}</span>
                                     {designConfig.label}
                                   </span>
                                 </td>
-                                <td className="px-3 py-5">
+                                <td className="px-3 py-4">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                     {itemCount > 1 && (
@@ -2897,13 +2902,13 @@ Thank you!`
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-3 py-5">
+                                <td className="px-3 py-4">
                                   <span className="text-sm text-off-black/40">—</span>
                                 </td>
-                                <td className="px-3 py-5 hidden md:table-cell">
+                                <td className="px-3 py-4 hidden md:table-cell">
                                   <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
                                 </td>
-                                <td className="px-3 pr-6 py-5 text-sm text-off-black/60 hidden lg:table-cell">
+                                <td className="px-3 pr-6 py-4 text-sm text-off-black/60 hidden lg:table-cell">
                                   <span className="line-clamp-1">{order.effectiveRaceName || order.raceName || '—'}</span>
                                 </td>
                               </tr>
@@ -3026,7 +3031,7 @@ Thank you!`
                         onClick={() => setSelectedOrder(order)}
                         className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
                       >
-                        <td className="pl-6 pr-2 py-5 text-center">
+                        <td className="pl-6 pr-2 py-4 text-center">
                           <img
                             src={order.source === 'shopify' ? '/shopify-icon.png' : '/etsy-icon.png'}
                             alt={order.source === 'shopify' ? 'Shopify' : 'Etsy'}
@@ -3034,16 +3039,16 @@ Thank you!`
                             className="w-5 h-5 inline-block"
                           />
                         </td>
-                        <td className="px-3 py-5">
+                        <td className="px-3 py-4">
                           <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                         </td>
-                        <td className="px-3 py-5 text-center">
+                        <td className="px-3 py-4 text-center">
                           <span className="text-lg">✅</span>
                         </td>
-                        <td className="px-3 py-5 text-sm text-off-black">
+                        <td className="px-3 py-4 text-sm text-off-black">
                           {order.runnerName}
                         </td>
-                        <td className="px-3 pr-6 py-5 text-sm text-off-black/60">
+                        <td className="px-3 pr-6 py-4 text-sm text-off-black/60">
                           {order.raceName} {order.raceYear}
                         </td>
                       </tr>
@@ -4076,7 +4081,7 @@ Thank you!`
               }
             }}
           >
-            <div className="bg-white rounded-none md:rounded-md max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-none md:rounded-md max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -4832,13 +4837,13 @@ Thank you!`
                           href={selectedOrder.productInfo.heroImageUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-shrink-0 block w-14 h-14 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90 transition-opacity"
+                          className="flex-shrink-0 block w-16 h-16 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90 transition-opacity"
                           title="Click to view full size"
                         >
                           <img src={selectedOrder.productInfo.heroImageUrl} alt={selectedOrder.productInfo.label || 'Product'} className="w-full h-full object-cover" />
                         </a>
                       ) : (
-                        <div className="flex-shrink-0 w-14 h-14 rounded border border-border-gray bg-white flex items-center justify-center text-2xl text-off-black/30">
+                        <div className="flex-shrink-0 w-16 h-16 rounded border border-border-gray bg-white flex items-center justify-center text-2xl text-off-black/30">
                           📄
                         </div>
                       )}
@@ -5015,13 +5020,13 @@ Thank you!`
                           </div>
 
                           {/* Photo sits on the right with its download directly beneath. */}
-                          <div className="flex-none w-24">
+                          <div className="flex-none w-20">
                             <button
                               type="button"
                               onClick={() => photoUrl && window.open(photoUrl, '_blank')}
                               disabled={!photoUrl}
                               title={photoUrl ? 'Open full size' : undefined}
-                              className="w-24 h-24 rounded border border-black/10 bg-white overflow-hidden flex items-center justify-center disabled:cursor-default"
+                              className="w-20 h-20 rounded border border-black/10 bg-white overflow-hidden flex items-center justify-center disabled:cursor-default"
                             >
                               {photoLoading ? (
                                 <Loader2 className="w-5 h-5 animate-spin text-off-black/30" />
@@ -5035,7 +5040,7 @@ Thank you!`
                               type="button"
                               onClick={() => downloadPersonalizationPhoto(selectedOrder)}
                               disabled={!photoUrl}
-                              className="mt-1.5 w-24 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded bg-off-black text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+                              className="mt-1.5 w-20 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded bg-off-black text-white hover:opacity-90 transition-opacity disabled:opacity-40"
                             >
                               <Download className="w-3 h-3" />
                               Download
@@ -5412,7 +5417,7 @@ Thank you!`
                   {/* Runner Details — copy-pasteable name + research data, top of stack */}
                   <div className="hidden md:block">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Runner Details</h4>
+                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Design Data</h4>
                       <div className="flex items-center gap-3">
                         {selectedOrder.resultsUrl && (
                           <a
@@ -5489,99 +5494,52 @@ Thank you!`
                       ) : (
                         <NotAvailableField label="Pace" />
                       )}
-                    </div>
-                  </div>
-
-                  {/* Weather calculator micro-modal */}
-                  {showWeatherCalc && (
-                    <div
-                      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-                      style={{ backgroundColor: 'rgba(26,26,26,0.5)' }}
-                      onClick={(e) => { if (e.target === e.currentTarget) setShowWeatherCalc(false) }}
-                    >
-                      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-1.5">
-                            <CloudSun className="w-4 h-4 text-off-black/60" />
-                            <h3 className="text-sm font-semibold text-off-black">Calculate Weather</h3>
-                          </div>
-                          <button onClick={() => setShowWeatherCalc(false)} className="text-off-black/40 hover:text-off-black">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <p className="text-[11px] text-off-black/50 mb-3 leading-snug">
-                          Averages the hourly temps from 7am–1pm and picks the dominant condition (sunny / cloudy / rainy / snowy).
-                        </p>
-                        <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">City</label>
-                        <input
-                          value={weatherCalcCity}
-                          onChange={(e) => setWeatherCalcCity(e.target.value)}
-                          placeholder="Boston, MA"
-                          className="w-full mb-3 px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-                        />
-                        <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Date</label>
-                        <input
-                          type="date"
-                          value={weatherCalcDate}
-                          onChange={(e) => setWeatherCalcDate(e.target.value)}
-                          className="w-full mb-4 px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-                        />
-                        <button
-                          onClick={() => calculateWeather(selectedOrder)}
-                          disabled={isCalculatingWeather || !weatherCalcCity.trim() || !weatherCalcDate}
-                          className="w-full px-3 py-2.5 text-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-40 flex items-center justify-center gap-1.5"
-                        >
-                          {isCalculatingWeather ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating…</> : 'Calculate & save'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Race Info, Research, Notes — desktop only */}
-                  <div className="hidden md:block space-y-5">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Race Data</h4>
-                      {!isEditingWeather && selectedOrder.raceId && (
+                      {/* Race data lives in the same card, split by a rule.
+                          It is all one thing: the data that goes on the print. */}
+                      <div className="flex items-center justify-between pt-2 mt-1 border-t border-border-gray">
+                        <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Race</span>
                         <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => openWeatherCalc(selectedOrder)}
-                            className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black transition-colors"
-                            title="Calculate weather from date + city"
-                          >
-                            <CloudSun className="w-3 h-3" />
-                            Calculate weather
-                          </button>
-                          <button
-                            onClick={() => startEditingWeather(selectedOrder)}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                          >
-                            <Pencil className="w-3 h-3" />
-                            Edit
-                          </button>
+                      {!isEditingWeather && selectedOrder.raceId && (
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => openWeatherCalc(selectedOrder)}
+                                className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black transition-colors"
+                                title="Calculate weather from date + city"
+                              >
+                                <CloudSun className="w-3 h-3" />
+                                Calculate weather
+                              </button>
+                              <button
+                                onClick={() => startEditingWeather(selectedOrder)}
+                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                              >
+                                <Pencil className="w-3 h-3" />
+                                Edit
+                              </button>
+                            </div>
+                          )}
+                          {isEditingWeather && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => saveWeather(selectedOrder)}
+                                disabled={isSavingWeather}
+                                className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                              >
+                                {isSavingWeather ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                Save
+                              </button>
+                              <button
+                                onClick={cancelEditingWeather}
+                                className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+
                         </div>
-                      )}
-                      {isEditingWeather && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => saveWeather(selectedOrder)}
-                            disabled={isSavingWeather}
-                            className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
-                          >
-                            {isSavingWeather ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                            Save
-                          </button>
-                          <button
-                            onClick={cancelEditingWeather}
-                            className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
+                      </div>
                       {selectedOrder.eventType ? (
                         // Flag non-marathon events so the designer doesn't
                         // assume "Marathon" by default — Half, 10K, 5K, etc.
@@ -5713,6 +5671,54 @@ Thank you!`
                     </div>
                   </div>
 
+                  {/* Weather calculator micro-modal */}
+                  {showWeatherCalc && (
+                    <div
+                      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+                      style={{ backgroundColor: 'rgba(26,26,26,0.5)' }}
+                      onClick={(e) => { if (e.target === e.currentTarget) setShowWeatherCalc(false) }}
+                    >
+                      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-1.5">
+                            <CloudSun className="w-4 h-4 text-off-black/60" />
+                            <h3 className="text-sm font-semibold text-off-black">Calculate Weather</h3>
+                          </div>
+                          <button onClick={() => setShowWeatherCalc(false)} className="text-off-black/40 hover:text-off-black">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-off-black/50 mb-3 leading-snug">
+                          Averages the hourly temps from 7am–1pm and picks the dominant condition (sunny / cloudy / rainy / snowy).
+                        </p>
+                        <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">City</label>
+                        <input
+                          value={weatherCalcCity}
+                          onChange={(e) => setWeatherCalcCity(e.target.value)}
+                          placeholder="Boston, MA"
+                          className="w-full mb-3 px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                        />
+                        <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Date</label>
+                        <input
+                          type="date"
+                          value={weatherCalcDate}
+                          onChange={(e) => setWeatherCalcDate(e.target.value)}
+                          className="w-full mb-4 px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                        />
+                        <button
+                          onClick={() => calculateWeather(selectedOrder)}
+                          disabled={isCalculatingWeather || !weatherCalcCity.trim() || !weatherCalcDate}
+                          className="w-full px-3 py-2.5 text-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-40 flex items-center justify-center gap-1.5"
+                        >
+                          {isCalculatingWeather ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating…</> : 'Calculate & save'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Race Info, Research, Notes — desktop only */}
+                  <div className="hidden md:block space-y-5">
+
                   {/* Filename. One value, so it gets one row rather than a
                       section header wrapping a card wrapping a label. */}
                   <div className="hidden md:block">
@@ -5721,11 +5727,24 @@ Thank you!`
                     </div>
                   </div>
 
-                  {/* Comments */}
+                  {/* Comments. The composer is a lot of furniture for an order
+                      with nothing to say, so it stays collapsed behind a link
+                      until it is wanted. */}
                   <div>
-                    <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">
-                      Comments {orderComments.length > 0 && `(${orderComments.length})`}
-                    </h4>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">
+                        Comments {orderComments.length > 0 && `(${orderComments.length})`}
+                      </h4>
+                      {!showCommentBox && (
+                        <button
+                          onClick={() => setShowCommentBox(true)}
+                          className="text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                        >
+                          + Add comment
+                        </button>
+                      )}
+                    </div>
+                    {showCommentBox && (
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-3">
                       <textarea
                         value={newCommentText}
@@ -5762,11 +5781,10 @@ Thank you!`
                         </button>
                       </div>
                     </div>
+                    )}
                     {isLoadingComments ? (
                       <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
-                    ) : orderComments.length === 0 ? (
-                      <p className="text-xs text-off-black/40 text-center py-3">No comments yet</p>
-                    ) : (
+                    ) : orderComments.length === 0 ? null : (
                       <div className="space-y-3 max-h-64 overflow-y-auto">
                         {orderComments.map(comment => (
                           <div key={comment.id} className="bg-white border border-border-gray rounded-md p-3 group">
