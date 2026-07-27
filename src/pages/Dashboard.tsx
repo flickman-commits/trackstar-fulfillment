@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
+import OrderTags from '@/components/OrderTags'
 
 /** Collapsible section with header + chevron toggle */
 function CollapsibleSection({ title, defaultOpen = true, children, badge }: {
@@ -395,7 +396,6 @@ export default function Dashboard() {
   const [lookupsRaceFilter, setLookupsRaceFilter] = useState<string>('')
 
   // Personalization photo: opened on demand, never held as a durable link.
-  const [photoOpening, setPhotoOpening] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
 
   /**
@@ -410,23 +410,51 @@ export default function Dashboard() {
    * a window.open() that happens after an await is treated as a popup and gets
    * blocked in Safari.
    */
-  async function openPersonalizationPhoto(path: string) {
-    setPhotoOpening(true); setPhotoError(null)
-    const tab = window.open('', '_blank')
+
+  // Inline preview of the customer photo. The bucket is private, so we mint a
+  // signed URL as soon as a photo order is opened. Seeing the actual image
+  // beats a link Eli has to remember to click.
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [photoLoading, setPhotoLoading] = useState(false)
+
+  useEffect(() => {
+    const path = selectedOrder?.photoPath
+    setPhotoUrl(null)
+    if (!path) return
+    let cancelled = false
+    setPhotoLoading(true)
+    setPhotoError(null)
+    apiFetch(`/api/admin/photo-signed-url?path=${encodeURIComponent(path)}`, { cache: 'no-store' })
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}))
+          throw new Error(body.message || `HTTP ${r.status}`)
+        }
+        return r.json()
+      })
+      .then((data) => { if (!cancelled) setPhotoUrl(data.url) })
+      .catch((err) => { if (!cancelled) setPhotoError(err instanceof Error ? err.message : 'Could not load photo') })
+      .finally(() => { if (!cancelled) setPhotoLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedOrder?.photoPath])
+
+  /** Save the customer photo to disk. Falls back to opening it if the fetch is blocked. */
+  async function downloadPersonalizationPhoto(order: Order) {
+    if (!photoUrl) return
     try {
-      const r = await apiFetch(`/api/admin/photo-signed-url?path=${encodeURIComponent(path)}`, { cache: 'no-store' })
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}))
-        throw new Error(body.message || `HTTP ${r.status}`)
-      }
-      const data = await r.json()
-      if (tab) tab.location.href = data.url
-      else window.location.href = data.url  // popup blocked: fall back in-place
-    } catch (err) {
-      if (tab) tab.close()
-      setPhotoError(err instanceof Error ? err.message : 'Could not open photo')
-    } finally {
-      setPhotoOpening(false)
+      const res = await fetch(photoUrl)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const ext = (order.photoPath?.split('.').pop() || 'jpg').split('?')[0]
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `${order.displayOrderNumber}_photo.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000)
+    } catch {
+      window.open(photoUrl, '_blank')
     }
   }
 
@@ -2397,23 +2425,6 @@ Thank you!`
                                   {order.lineItemIndex + 1}/{itemCount}
                                 </span>
                               )}
-                              {order.hadNoTime && (
-                                <span className="px-1 py-0.5 bg-warning-amber/10 text-warning-amber text-[9px] rounded border border-warning-amber/20">NO TIME</span>
-                              )}
-                              {order.timeFromName && (
-                                <span className="px-1 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] rounded border border-blue-500/20">⏱ {order.timeFromName}</span>
-                              )}
-                              {order.isExpedited && order.trackstarOrderType === 'standard' && (
-                                <span className="px-1.5 py-0.5 bg-red-500/10 text-red-600 text-[9px] font-bold rounded border border-red-500/30 whitespace-nowrap">🚀 EXPEDITED</span>
-                              )}
-                              {order.isBigSpender && order.trackstarOrderType === 'standard' && (
-                                <span
-                                  className="px-1.5 py-0.5 bg-amber-500/10 text-amber-700 text-[9px] font-bold rounded border border-amber-500/30 whitespace-nowrap"
-                                  title={order.orderTotalUsd ? `Customer spent $${Math.round(order.orderTotalUsd)} — prioritize` : 'Big spender — prioritize'}
-                                >
-                                  💰 BIG SPENDER
-                                </span>
-                              )}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               <span className="text-base" title={statusDisplay.label}>{statusDisplay.icon}</span>
@@ -2422,35 +2433,22 @@ Thank you!`
                               )}
                             </div>
                           </div>
-                          {/* Row 2: Runner name */}
+                          {/* Row 2: Runner, then race underneath */}
                           <div className="mt-1">
-                            <span className="text-sm text-off-black">
+                            <div className="text-sm text-off-black">
                               {order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}
-                            </span>
-                            {order.hasOverrides && (
-                              <span className="ml-1.5 px-1 py-0.5 bg-blue-100 text-blue-600 text-[9px] rounded">edited</span>
+                            </div>
+                            <div className="text-xs text-off-black/50 mt-0.5">
+                              {order.effectiveRaceName || order.raceName} {order.effectiveRaceYear || order.raceYear}
+                            </div>
+                            {order.status === 'ready' && order.bibNumber && (
+                              <div className="text-xs text-green-600 mt-0.5">
+                                Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime}
+                              </div>
                             )}
                           </div>
-                          {/* Row 3: Status subtitle + Race */}
-                          <div className="mt-0.5 flex items-center justify-between gap-2">
-                            <span className="text-xs text-off-black/40">
-                              {order.status === 'flagged' && order.flagReason ? order.flagReason
-                                : (order.effectiveRaceName || order.raceName) === 'Unknown Race' ? 'Unknown race — needs assistance'
-                                : order.status === 'missing_year' && !order.yearOverride ? 'Year Missing'
-                                : order.status === 'ready' && order.bibNumber ? `Bib: ${order.bibNumber} · ${order.hadNoTime ? 'No Time' : order.officialTime}`
-                                : order.researchStatus === 'not_found' ? 'Not found — manual lookup needed'
-                                : order.researchStatus === 'ambiguous' ? 'Multiple matches — review needed'
-                                : order.researchStatus === 'upstream_error' ? 'Timing site unreachable — retry'
-                                : order.researchStatus === 'no_scraper' ? 'Manual research needed'
-                                : order.researchStatus === 'year_not_configured' ? 'Year not yet configured'
-                                : order.status === 'pending' && order.hasScraperAvailable && !order.researchStatus && (order.effectiveRaceYear || order.raceYear) ? 'Ready to research'
-                                : order.status === 'pending' && !order.hasScraperAvailable ? 'Manual research needed'
-                                : statusDisplay.label}
-                            </span>
-                            <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
-                              {order.effectiveRaceName || order.raceName}
-                            </span>
-                          </div>
+                          {/* Row 3: Tags */}
+                          <OrderTags order={order} className="mt-1.5" />
                         </div>
                       )
                     })}
@@ -2634,8 +2632,8 @@ Thank you!`
                         <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-12">Src</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Order #</th>
                         <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20">Status</th>
-                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Runner</th>
-                        <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Race</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Details</th>
+                        <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Tags</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-gray">
@@ -2672,66 +2670,20 @@ Thank you!`
                               </div>
                             </td>
                             <td className="px-3 py-5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
-                                {order.hasOverrides && (
-                                  <span className="px-1 py-0.5 bg-blue-100 text-blue-600 text-[9px] rounded">edited</span>
-                                )}
-                                {order.hadNoTime && (
-                                  <span className="px-1 py-0.5 bg-warning-amber/10 text-warning-amber text-[9px] rounded border border-warning-amber/20" title='Customer entered "no time"'>NO TIME</span>
-                                )}
-                                {order.timeFromName && (
-                                  <span className="px-1 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] rounded border border-blue-500/20" title={`Customer time: ${order.timeFromName}`}>⏱ {order.timeFromName}</span>
-                                )}
-                                {order.isExpedited && order.trackstarOrderType === 'standard' && (
-                                  <span className="px-1.5 py-0.5 bg-red-500/10 text-red-600 text-[9px] font-bold rounded border border-red-500/30 whitespace-nowrap" title={`Customer paid for ${order.shippingMethod || 'expedited'} shipping — prioritize`}>🚀 EXPEDITED</span>
-                                )}
-                                {order.isBigSpender && order.trackstarOrderType === 'standard' && (
-                                  <span
-                                    className="px-1.5 py-0.5 bg-amber-500/10 text-amber-700 text-[9px] font-bold rounded border border-amber-500/30 whitespace-nowrap"
-                                    title={order.orderTotalUsd ? `Customer spent $${Math.round(order.orderTotalUsd)} — prioritize` : 'Big spender — prioritize'}
-                                  >
-                                    💰 BIG SPENDER
-                                  </span>
-                                )}
+                              <div className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</div>
+                              <div className="text-xs text-off-black/50 mt-0.5">
+                                {order.effectiveRaceName || order.raceName} {order.effectiveRaceYear || order.raceYear}
                               </div>
-                              {order.status === 'flagged' && order.flagReason && (
-                                <p className="text-xs text-warning-amber mt-1 leading-tight">{order.flagReason}</p>
-                              )}
-                              {(order.effectiveRaceName || order.raceName) === 'Unknown Race' && (
-                                <p className="text-xs text-warning-amber mt-1 leading-tight">Unknown race — needs assistance</p>
-                              )}
-                              {order.status === 'missing_year' && !order.yearOverride && (
-                                <p className="text-xs text-warning-amber mt-1 leading-tight">Year Missing</p>
-                              )}
+                              {/* Result data once research lands. Everything else
+                                  that used to live here is now a tag. */}
                               {order.status === 'ready' && order.bibNumber && (
-                                <p className="text-xs text-green-600 mt-1 leading-tight">Bib: {order.bibNumber} • {order.hadNoTime ? 'No Time' : order.officialTime}</p>
-                              )}
-                              {/* Research-attempted-but-incomplete states. These
-                                  preempt "Ready to research" so a queue that's
-                                  been through bulk research shows real status. */}
-                              {order.researchStatus === 'not_found' && (
-                                <p className="text-xs text-warning-amber mt-1 leading-tight">Not found — manual lookup needed</p>
-                              )}
-                              {order.researchStatus === 'ambiguous' && (
-                                <p className="text-xs text-warning-amber mt-1 leading-tight">Multiple matches — review needed</p>
-                              )}
-                              {order.researchStatus === 'upstream_error' && (
-                                <p className="text-xs text-warning-amber mt-1 leading-tight">Timing site unreachable — retry</p>
-                              )}
-                              {order.researchStatus === 'year_not_configured' && (
-                                <p className="text-xs text-red-600 mt-1 leading-tight">Year not yet configured</p>
-                              )}
-                              {/* "Ready to research" only shows if research has NOT been attempted yet */}
-                              {order.status === 'pending' && order.hasScraperAvailable && !order.researchStatus && (order.effectiveRaceYear || order.raceYear) && (
-                                <p className="text-xs text-blue-600 mt-1 leading-tight">Ready to research</p>
-                              )}
-                              {order.status === 'pending' && !order.hasScraperAvailable && (
-                                <p className="text-xs text-off-black/40 mt-1 leading-tight">Manual research needed</p>
+                                <div className="text-xs text-green-600 mt-1 leading-tight">
+                                  Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime}
+                                </div>
                               )}
                             </td>
-                            <td className="px-3 pr-6 py-5 text-sm text-off-black/60 hidden md:table-cell">
-                              {order.effectiveRaceName || order.raceName} {order.effectiveRaceYear || order.raceYear}
+                            <td className="px-3 pr-6 py-5 hidden md:table-cell align-middle">
+                              <OrderTags order={order} />
                             </td>
                           </tr>
                         )
@@ -2769,10 +2721,13 @@ Thank you!`
                                   <span className="text-lg">✅</span>
                                 </td>
                                 <td className="px-3 py-5">
-                                  <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
+                                  <div className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</div>
+                                  <div className="text-xs text-off-black/50 mt-0.5">
+                                    {order.effectiveRaceName || order.raceName} {order.effectiveRaceYear || order.raceYear}
+                                  </div>
                                 </td>
-                                <td className="px-3 pr-6 py-5 text-sm text-off-black/60 hidden md:table-cell">
-                                  {order.effectiveRaceName || order.raceName} {order.effectiveRaceYear || order.raceYear}
+                                <td className="px-3 pr-6 py-5 hidden md:table-cell align-middle">
+                                  <OrderTags order={order} />
                                 </td>
                               </tr>
                             )
@@ -4864,14 +4819,15 @@ Thank you!`
                     <>
                   {/* ========== STANDARD ORDER DETAIL VIEW ========== */}
 
-                  {/* Product / design-variant identifier — keyed off the stable
-                      Shopify product_id (NOT the title). Shows the hero image so
-                      Eli can recognize at a glance which design template to use.
-                      Falls back to the raw title for any product not in the
-                      catalog (server/lib/productCatalog.js). */}
-                  {selectedOrder.productInfo && (
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-3 flex items-center gap-3">
-                      {selectedOrder.productInfo.heroImageUrl ? (
+                  {/* Product details. The thumbnail is keyed off the stable
+                      Shopify product_id so Eli can tell near-identical designs
+                      apart at a glance (Chicago World Majors vs Chicago Race).
+                      The ID itself drives the lookup but is not worth showing.
+                      Race, year, size and order date live here too, so the
+                      cheat-sheet facts are all in one card. */}
+                  <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-3">
+                    <div className="flex items-start gap-3">
+                      {selectedOrder.productInfo?.heroImageUrl ? (
                         <a
                           href={selectedOrder.productInfo.heroImageUrl}
                           target="_blank"
@@ -4887,62 +4843,90 @@ Thank you!`
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product / Design Variant</div>
-                        <div className="text-sm font-medium text-off-black truncate">
-                          {selectedOrder.productInfo.label || 'Unknown product'}
-                        </div>
-                        <div className="text-[10px] text-off-black/40 mt-0.5">
-                          {selectedOrder.productInfo.productIdLabel || 'Product ID'}: <span className="font-mono">{selectedOrder.productInfo.productId || '—'}</span>
-                          {selectedOrder.productInfo.catalogRequired && !selectedOrder.productInfo.inCatalog && (
-                            <span
-                              className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium"
-                              title="This Shopify product isn't in server/lib/productCatalog.js. Add it to lock in the design variant + hero image."
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product Details</div>
+                          {!isEditing && selectedOrder.status !== 'completed' && (
+                            <button
+                              onClick={() => startEditing(selectedOrder)}
+                              className="flex-none inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
                             >
-                              not in catalog
+                              <Pencil className="w-3 h-3" />
+                              Edit
+                            </button>
+                          )}
+                        </div>
+                        {/* The label exists to tell near-identical variants apart
+                            (Chicago World Majors vs Chicago Race). When it just
+                            repeats the race name it adds nothing, so hide it and
+                            let the race chip below carry it. */}
+                        {selectedOrder.productInfo && (() => {
+                          const label = selectedOrder.productInfo.label || ''
+                          const race = selectedOrder.effectiveRaceName || selectedOrder.raceName || ''
+                          const sameAsRace = label.trim().toLowerCase() === race.trim().toLowerCase()
+                          const notInCatalog = selectedOrder.productInfo.catalogRequired && !selectedOrder.productInfo.inCatalog
+                          if (sameAsRace && !notInCatalog) return null
+                          return (
+                          <div className="text-sm font-medium text-off-black truncate">
+                            {sameAsRace ? null : (label || 'Unknown product')}
+                            {selectedOrder.productInfo.catalogRequired && !selectedOrder.productInfo.inCatalog && (
+                              <span
+                                className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium align-middle"
+                                title="This Shopify product isn't in server/lib/productCatalog.js. Add it to lock in the design variant and hero image."
+                              >
+                                not in catalog
+                              </span>
+                            )}
+                          </div>
+                          )
+                        })()}
+                        {/* Desktop only: mobile has its own summary card below. */}
+                        <div className="hidden md:flex flex-wrap items-center gap-1.5 mt-1.5">
+                          <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">
+                            {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Unknown Race'}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-1 border rounded text-xs font-semibold ${
+                            (selectedOrder.effectiveRaceYear || selectedOrder.raceYear)
+                              ? 'bg-white border-border-gray text-off-black'
+                              : 'bg-amber-50 border-amber-200 text-warning-amber'
+                          }`}>
+                            {selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'Year?'}
+                          </span>
+                          <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">
+                            {selectedOrder.productSize}
+                          </span>
+                          {selectedOrder.orderPlacedAt && (
+                            <span
+                              className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs text-off-black/60"
+                              title={`Ordered on ${new Date(selectedOrder.orderPlacedAt).toLocaleString('en-US', { timeZone: TZ })}`}
+                            >
+                              📅 Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
 
-                  {/* Big-spender callout — order total ≥ $300. Soft priority: get
-                      to this before normal standard orders. Doesn't have a hard
-                      deadline like Expedited so we show it as amber, not red. */}
-                  {selectedOrder.isBigSpender && (
-                    <div className="bg-amber-50 border-2 border-amber-300 rounded-md p-4 mb-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-base">💰</span>
-                        <span className="text-sm font-bold text-amber-800 uppercase tracking-wide">
-                          Big Spender — Prioritize this order
-                        </span>
-                      </div>
-                      <div className="text-xs text-amber-900/90 leading-relaxed">
-                        <p>
-                          Customer spent{' '}
-                          <strong>
-                            ${selectedOrder.orderTotalUsd ? Math.round(selectedOrder.orderTotalUsd).toLocaleString() : '—'}
-                          </strong>
-                          {' '}on this order. Move it ahead of the regular queue so they get their print quickly.
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                  {/* ── TAG STRIP ──────────────────────────────────────────
+                      Same vocabulary as the dashboard table. Anything that
+                      needs more than a word or two gets its own block below;
+                      everything else lives here and nowhere else. */}
+                  <OrderTags order={selectedOrder} size="md" className="mb-3" />
 
-                  {/* Expedited shipping callout — Eli's instructions for prioritizing
-                      and pinging Artelo after sending to production. Only shown when
-                      the customer paid for expedited shipping (Standard orders only). */}
+                  {/* Expedited shipping steps. The tag says it is expedited,
+                      this block exists only for the instructions and the exact
+                      message Eli sends to Artelo. */}
                   {selectedOrder.isExpedited && (
                     <div className="bg-red-50 border-2 border-red-300 rounded-md p-4 mb-3">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-base">🚀</span>
-                        <span className="text-sm font-bold text-red-800 uppercase tracking-wide">Expedited Shipping — Eli, prioritize this</span>
+                        <span className="text-sm font-bold text-red-800 uppercase tracking-wide">Get this out the door fast</span>
                       </div>
                       <div className="text-xs text-red-900/90 leading-relaxed space-y-1.5">
-                        <p>The customer paid for <strong>{selectedOrder.shippingMethod || 'expedited'}</strong> shipping. Get this out the door fast:</p>
+                        <p>The customer paid for <strong>{selectedOrder.shippingMethod || 'expedited'}</strong> shipping.</p>
                         <ol className="list-decimal list-inside space-y-1 pl-1">
                           <li>Double-check that all personalization fields are filled in correctly.</li>
-                          <li>Send it to production yourself — no need to wait for Matt's approval.</li>
+                          <li>Send it to production yourself. No need to wait for Matt's approval.</li>
                           <li>
                             After submitting to production, ping Artelo via customer support with this exact message:
                             <div className="mt-1.5 p-2 bg-white border border-red-200 rounded text-xs text-off-black italic font-mono">
@@ -4994,6 +4978,179 @@ Thank you!`
                       )}
                     </div>
                   )}
+
+                  {/* ── ACTION ZONE ─────────────────────────────────────────
+                      Anything that needs a decision, or gives context Eli has
+                      to act on, lives here directly under the tags. Ordered by
+                      urgency. The bottom of the modal is reference data only. */}
+                  <div className="hidden md:block space-y-3 mb-3">
+                    {photoError && (
+                      <p className="text-[11px] text-red-600">Photo: {photoError}</p>
+                    )}
+                    {/* Photo orders get an explicit sign-off. The photo is the
+                        one element a normal proof does not show, and a print
+                        that ships without it is a reprint and a refund. The
+                        order cannot be completed until the box is ticked. */}
+                    {selectedOrder.photoPath && (
+                      <div
+                        className={`rounded-md border p-3 ${
+                          selectedOrder.photoPlacedAt
+                            ? 'bg-green-50 border-green-300'
+                            : 'bg-amber-50 border-amber-400'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-amber-900'}`}>
+                              {selectedOrder.photoPlacedAt
+                                ? 'Photo confirmed on artwork'
+                                : 'This print includes a customer photo'}
+                            </p>
+                            <p className={`text-[11px] mt-0.5 ${selectedOrder.photoPlacedAt ? 'text-green-700' : 'text-amber-800'}`}>
+                              {selectedOrder.photoPlacedAt
+                                ? `Confirmed ${new Date(selectedOrder.photoPlacedAt).toLocaleString()}`
+                                : 'Place this photo on the print, then tick the box. This order cannot be completed until you do.'}
+                            </p>
+                            <label className={`mt-2 inline-flex items-center gap-2 cursor-pointer select-none ${photoConfirming ? 'opacity-50' : ''}`}>
+                              <input
+                                type="checkbox"
+                                checked={!!selectedOrder.photoPlacedAt}
+                                disabled={photoConfirming}
+                                onChange={() => setPhotoPlaced(selectedOrder.orderNumber, !selectedOrder.photoPlacedAt)}
+                                className="w-4 h-4 accent-green-600 cursor-pointer"
+                              />
+                              <span className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-amber-900'}`}>
+                                {photoConfirming ? 'Saving...' : 'Photo placed on artwork'}
+                              </span>
+                            </label>
+                          </div>
+
+                          {/* Photo sits on the right with its download directly beneath. */}
+                          <div className="flex-none w-24">
+                            <button
+                              type="button"
+                              onClick={() => photoUrl && window.open(photoUrl, '_blank')}
+                              disabled={!photoUrl}
+                              title={photoUrl ? 'Open full size' : undefined}
+                              className="w-24 h-24 rounded border border-black/10 bg-white overflow-hidden flex items-center justify-center disabled:cursor-default"
+                            >
+                              {photoLoading ? (
+                                <Loader2 className="w-5 h-5 animate-spin text-off-black/30" />
+                              ) : photoUrl ? (
+                                <img src={photoUrl} alt="Customer photo" className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-[10px] text-off-black/40 px-2 text-center">No preview</span>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadPersonalizationPhoto(selectedOrder)}
+                              disabled={!photoUrl}
+                              className="mt-1.5 w-24 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded bg-off-black text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+                            >
+                              <Download className="w-3 h-3" />
+                              Download
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* Research Status */}
+                    {selectedOrder.researchStatus && selectedOrder.researchStatus !== 'found' && (
+                      <div>
+                        {(() => {
+                          const status = selectedOrder.researchStatus
+                          // Different visual treatment per status:
+                          //   - no_scraper / year_not_configured = red (config gap, blocks fulfillment, dev needed)
+                          //   - upstream_error / not_found / ambiguous = amber (transient or resolvable via manual verification)
+                          const isConfigGap = status === 'no_scraper' || status === 'year_not_configured'
+                          const boxClasses = isConfigGap
+                            ? 'bg-red-50 border border-red-200 rounded-md p-4'
+                            : 'bg-amber-50 border border-amber-200 rounded-md p-4'
+                          const textPrimary = isConfigGap ? 'text-red-800' : 'text-amber-800'
+
+                          // The tag at the top already says WHAT happened, so this
+                          // block only says what to DO about it. One sentence, once.
+                          // Raw scraper notes stay on the tooltip for debugging.
+                          const raceLabel = `${selectedOrder.effectiveRaceName || selectedOrder.raceName} ${selectedOrder.effectiveRaceYear || selectedOrder.raceYear}`
+                          const fix = (
+                            status === 'no_scraper'
+                              ? `We have no scraper for "${selectedOrder.effectiveRaceName || selectedOrder.raceName}". A developer needs to add one, or alias this race onto an existing scraper. Research it by hand in the meantime.`
+                            : status === 'year_not_configured'
+                              ? `The scraper works but ${raceLabel} is not wired up yet. A developer needs to add this year's event IDs. Research it by hand in the meantime.`
+                            : status === 'upstream_error'
+                              ? 'The timing site is slow or down right now. Nothing is wrong with this order. Retry the lookup in a couple of minutes.'
+                            : status === 'not_found'
+                              ? 'Check the runner name and year are right, then research again. If it still comes up empty, look it up by hand.'
+                            : status === 'ambiguous'
+                              ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
+                                  ? 'Pick the right runner from the matches below.'
+                                  : 'Several runners share this name. Look them up on the results site to confirm which one is right.')
+                            : null
+                          )
+                          if (!fix) return null
+
+                          return (
+                            <div className={boxClasses} title={selectedOrder.researchNotes || undefined}>
+                              <p className={`text-body-sm ${textPrimary}`}>{fix}</p>
+                            </div>
+                          )
+                        })()}
+
+                        {/* Suggested matches with Accept buttons */}
+                        {possibleMatchesMap[selectedOrder.orderNumber]?.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {possibleMatchesMap[selectedOrder.orderNumber].map((match, idx) => (
+                              <div key={idx} className="flex items-center justify-between bg-white border border-amber-200 rounded-md p-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-body-sm font-medium text-off-black">{match.name}</p>
+                                  <p className="text-xs text-off-black/60">
+                                    {[
+                                      match.bib && `Bib: ${match.bib}`,
+                                      match.time && `Time: ${match.time}`,
+                                      match.pace && `Pace: ${match.pace}`,
+                                      match.city && match.state && `${match.city}, ${match.state}`
+                                    ].filter(Boolean).join(' · ')}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => acceptMatch(selectedOrder.orderNumber, match)}
+                                  className="ml-3 flex items-center gap-1.5 px-3 py-1.5 bg-success-green/10 text-success-green border border-success-green/30 rounded-md hover:bg-success-green/20 transition-colors text-xs font-medium"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  Accept
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Missing year. The tag says it, this says what to do. */}
+                    {selectedOrder.status === 'missing_year' && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+                        <p className="text-body-sm text-amber-800">Contact the customer to confirm which year they ran this race.</p>
+                      </div>
+                    )}
+                    {/* Flag Reason - only for flagged orders */}
+                    {selectedOrder.status === 'flagged' && selectedOrder.flagReason && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-warning-amber uppercase tracking-tight mb-2">Flag Reason</h4>
+                        <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+                          <p className="text-body-sm text-amber-800">{selectedOrder.flagReason}</p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Notes - only show if there are notes */}
+                    {selectedOrder.notes && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Notes</h4>
+                        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                          <p className="text-body-sm text-blue-800 whitespace-pre-wrap">{selectedOrder.notes}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* === MOBILE COMPACT SUMMARY === */}
                   <div className="md:hidden space-y-3">
@@ -5203,46 +5360,8 @@ Thank you!`
                   </div>
 
                   {/* === DESKTOP FULL DETAIL VIEW === */}
-                  {/* Top badges — race · year · size. These are the cheat-sheet
-                      for "which template and artboard do I open?" Edit pencil
-                      opens an inline form to override race / year / runner name. */}
-                  {!isEditing && (
-                    <div className="hidden md:flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center px-3 py-1.5 bg-off-black/5 border border-border-gray rounded-md text-sm font-semibold text-off-black">
-                        {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Unknown Race'}
-                      </span>
-                      <span className={`inline-flex items-center px-3 py-1.5 border rounded-md text-sm font-semibold ${
-                        (selectedOrder.effectiveRaceYear || selectedOrder.raceYear)
-                          ? 'bg-off-black/5 border-border-gray text-off-black'
-                          : 'bg-amber-50 border-amber-200 text-warning-amber'
-                      }`}>
-                        {selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'Year?'}
-                      </span>
-                      <span className="inline-flex items-center px-3 py-1.5 bg-off-black/5 border border-border-gray rounded-md text-sm font-semibold text-off-black">
-                        {selectedOrder.productSize}
-                      </span>
-                      {selectedOrder.orderPlacedAt && (
-                        <span
-                          className="inline-flex items-center px-3 py-1.5 bg-off-black/5 border border-border-gray rounded-md text-xs text-off-black/60"
-                          title={`Ordered on ${new Date(selectedOrder.orderPlacedAt).toLocaleString('en-US', { timeZone: TZ })}`}
-                        >
-                          📅 Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}
-                        </span>
-                      )}
-                      {selectedOrder.hasOverrides && (
-                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[10px] rounded">edited</span>
-                      )}
-                      {selectedOrder.status !== 'completed' && (
-                        <button
-                          onClick={() => startEditing(selectedOrder)}
-                          className="ml-auto inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                          <Pencil className="w-3 h-3" />
-                          Edit
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  {/* Race, year, size, ordered date and the Edit pencil all moved
+                      into the Product Details card above. */}
 
                   {/* Edit form — only when isEditing. Replaces the badges row. */}
                   {isEditing && (
@@ -5304,83 +5423,10 @@ Thank you!`
                   {/* Runner Details — copy-pasteable name + research data, top of stack */}
                   <div className="hidden md:block">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Runner Details</h4>
-                        {/* Data provenance: where the runner result came from. */}
-                        {selectedOrder.researchSource === 'customer_verified' ? (
-                          <span
-                            className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold"
-                            style={{ background: 'rgba(70,0,214,0.10)', color: '#4600D6', border: '1px solid rgba(70,0,214,0.25)' }}
-                            title="Customer confirmed an official-results match in the Instant Lookup widget before checkout — no scrape needed."
-                          >
-                            🟣 Customer-verified
-                          </span>
-                        ) : selectedOrder.lookupVerified === false ? (
-                          <span
-                            className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold bg-amber-100 text-amber-700 border border-amber-300"
-                            title="Customer typed this manually in the Instant Lookup widget — not matched to official results. Research runs as a cross-check."
-                          >
-                            🟠 Manual entry — verify
-                          </span>
-                        ) : null}
-                        {/* Outcome chip — HOW the shopper arrived at this result.
-                            Helps debug widget behavior per-order. */}
-                        {selectedOrder.lookupOutcome ? (() => {
-                          const outcomeMap: Record<string, { label: string; title: string }> = {
-                            auto_match:           { label: '✓ Auto match',         title: 'Single official-results match — customer clicked Confirm.' },
-                            picked_from_list:    { label: '✓ Picked from list',   title: 'Lookup returned multiple matches — customer picked one.' },
-                            manual_no_match:     { label: '✎ Manual: no match',   title: 'Lookup ran but found nothing for this name+year — customer typed it in.' },
-                            manual_lookup_error: { label: '✎ Manual: lookup error', title: 'Lookup endpoint returned an error or was unreachable — customer typed it in.' },
-                            manual_rate_limited: { label: '✎ Manual: rate-limited', title: 'Customer hit the per-IP rate limit — fell back to manual entry.' },
-                            manual_timeout:      { label: '✎ Manual: timed out', title: 'Lookup took too long (>12s) so the widget dropped to manual entry. Usually a slow timing site.' },
-                            manual_user_choice:  { label: '✎ Manual: chose to type', title: 'Customer clicked "Enter info manually" themselves.' },
-                            // Personalization wizard: lookup failed, so it offered
-                            // "we'll research it for you" instead of a dead end.
-                            // These orders have NO runner data and always need research.
-                            async_no_match:      { label: '🔎 We research: no match', title: 'Wizard found nothing for this name+year and the customer asked us to research it. No runner data on this order.' },
-                            async_timeout:       { label: '🔎 We research: timed out', title: 'Wizard lookup timed out and the customer asked us to research it. No runner data on this order.' },
-                            async_lookup_error:  { label: '🔎 We research: lookup error', title: 'Wizard lookup errored and the customer asked us to research it. No runner data on this order.' },
-                            no_lookup_available: { label: '🔎 We research: no scraper', title: 'This race has no instant lookup configured, so the wizard never searched. Only the name and year are customer-supplied — time, pace and bib still need research.' },
-                            edited_by_customer:  { label: '✎ Customer edited', title: 'Customer hand-edited time, pace or bib on the review screen. These values are theirs, not an official-results match — worth a sanity check.' },
-                          }
-                          const meta = outcomeMap[selectedOrder.lookupOutcome]
-                          if (!meta) return null
-                          return (
-                            <span
-                              className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-medium bg-off-black/5 text-off-black/70 border border-off-black/15"
-                              title={meta.title}
-                            >
-                              {meta.label}
-                            </span>
-                          )
-                        })() : null}
-                        {/* Photo add-on. This changes what gets printed, so it
-                            needs to be visible at a glance, not buried in the
-                            raw properties. */}
-                        {selectedOrder.photoPath ? (
-                          <span
-                            className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold"
-                            style={{ background: 'rgba(70,0,214,0.10)', color: '#4600D6', border: '1px solid rgba(70,0,214,0.25)' }}
-                            title="Customer added a photo to this print. Open it with View Photo — the link expires after 15 minutes."
-                          >
-                            📷 Photo on print
-                          </span>
-                        ) : null}
-                      </div>
+                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Runner Details</h4>
                       <div className="flex items-center gap-3">
-                        {/* No href: the bucket is private, so the URL has to be
-                            minted per click rather than rendered up front. */}
-                        {selectedOrder.photoPath && (
-                          <button
-                            type="button"
-                            onClick={() => openPersonalizationPhoto(selectedOrder.photoPath!)}
-                            disabled={photoOpening}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-50"
-                            title="Opens a signed link that expires after 15 minutes"
-                          >
-                            {photoOpening ? 'Opening…' : 'View Photo ↗'}
-                          </button>
-                        )}
+                        {/* The photo now has its own block below with a live
+                            thumbnail and a download, so no link is needed here. */}
                         {selectedOrder.resultsUrl && (
                           <a
                             href={selectedOrder.resultsUrl}
@@ -5393,51 +5439,6 @@ Thank you!`
                         )}
                       </div>
                     </div>
-                    {photoError && (
-                      <p className="text-[11px] text-red-600 mb-2">Photo: {photoError}</p>
-                    )}
-                    {/* Photo orders get an explicit sign-off. The photo is the
-                        one element a normal proof does not show, and a print
-                        that ships without it is a reprint and a refund. The
-                        order cannot be completed until this is checked. */}
-                    {selectedOrder.photoPath && (
-                      <div
-                        className={`mb-3 rounded-md border p-3 ${
-                          selectedOrder.photoPlacedAt
-                            ? 'bg-green-50 border-green-300'
-                            : 'bg-amber-50 border-amber-400'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-amber-900'}`}>
-                              {selectedOrder.photoPlacedAt
-                                ? '✅ Photo confirmed on artwork'
-                                : '⚠️ This print includes a customer photo'}
-                            </p>
-                            <p className={`text-[11px] mt-0.5 ${selectedOrder.photoPlacedAt ? 'text-green-700' : 'text-amber-800'}`}>
-                              {selectedOrder.photoPlacedAt
-                                ? `Confirmed ${new Date(selectedOrder.photoPlacedAt).toLocaleString()}`
-                                : 'Open the photo, place it on the print, then confirm. This order cannot be completed until you do.'}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setPhotoPlaced(selectedOrder.orderNumber, !selectedOrder.photoPlacedAt)}
-                            disabled={photoConfirming}
-                            className={`flex-none text-[11px] font-semibold px-3 py-1.5 rounded transition-colors disabled:opacity-50 ${
-                              selectedOrder.photoPlacedAt
-                                ? 'bg-white text-green-800 border border-green-300 hover:bg-green-100'
-                                : 'bg-amber-500 text-white hover:bg-amber-600'
-                            }`}
-                          >
-                            {photoConfirming
-                              ? 'Saving…'
-                              : selectedOrder.photoPlacedAt ? 'Undo' : 'Confirm photo placed'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-4 space-y-3">
                       {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
                         <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
@@ -5714,99 +5715,6 @@ Thank you!`
                     </div>
                   </div>
 
-                  {/* Research Status */}
-                  {selectedOrder.researchStatus && selectedOrder.researchStatus !== 'found' && (
-                    <div>
-                      {(() => {
-                        const status = selectedOrder.researchStatus
-                        // Different visual treatment per status:
-                        //   - no_scraper / year_not_configured = red (config gap, blocks fulfillment, dev needed)
-                        //   - upstream_error / not_found / ambiguous = amber (transient or resolvable via manual verification)
-                        const isConfigGap = status === 'no_scraper' || status === 'year_not_configured'
-                        const labelColor = isConfigGap ? 'text-red-700' : 'text-warning-amber'
-                        const boxClasses = isConfigGap
-                          ? 'bg-red-50 border border-red-200 rounded-md p-4'
-                          : 'bg-amber-50 border border-amber-200 rounded-md p-4'
-                        const textPrimary = isConfigGap ? 'text-red-800' : 'text-amber-800'
-                        const textSecondary = isConfigGap ? 'text-red-700' : 'text-amber-700'
-
-                        const heading = (status === 'no_scraper'
-                          ? '🚧 No scraper for this race'
-                          : status === 'year_not_configured'
-                            ? `🗓️ ${selectedOrder.effectiveRaceName || selectedOrder.raceName} ${selectedOrder.effectiveRaceYear || selectedOrder.raceYear} not configured yet`
-                          : status === 'upstream_error'
-                            ? '🌐 Timing site unreachable — try again in a few minutes'
-                          : 'Research Status')
-
-                        const message = (
-                          status === 'no_scraper'
-                            ? `We don't have a scraper for "${selectedOrder.effectiveRaceName || selectedOrder.raceName}". A developer needs to add one — or add this name as an alias to an existing scraper config if it should map to one.`
-                          : status === 'year_not_configured'
-                            ? `The scraper exists, but this year's event/result IDs aren't wired up yet. A developer needs to update the config so this year's runners can be looked up.`
-                          : status === 'upstream_error'
-                            ? `The timing site (e.g. Athlinks, RTRT, RaceRoster) is slow or down right now. This isn't a problem with our app or the runner's data — just retry the lookup in a couple minutes.`
-                          : status === 'not_found'
-                            ? 'Runner not found in race results. Please verify the name and year.'
-                          : status === 'ambiguous'
-                            ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
-                                ? 'Possible matches found. Is this the right runner?'
-                                : 'Multiple runners found with this name. Manual verification needed.')
-                          : null
-                        )
-
-                        return (
-                          <>
-                            <h4 className={`text-xs font-semibold ${labelColor} uppercase tracking-tight mb-2`}>{heading}</h4>
-                            <div className={boxClasses}>
-                              <p className={`text-body-sm ${textPrimary}`}>{message}</p>
-                              {selectedOrder.researchNotes && !possibleMatchesMap[selectedOrder.orderNumber]?.length && (
-                                <p className={`text-body-sm ${textSecondary} mt-2`}>{selectedOrder.researchNotes}</p>
-                              )}
-                            </div>
-                          </>
-                        )
-                      })()}
-
-                      {/* Suggested matches with Accept buttons */}
-                      {possibleMatchesMap[selectedOrder.orderNumber]?.length > 0 && (
-                        <div className="mt-3 space-y-2">
-                          {possibleMatchesMap[selectedOrder.orderNumber].map((match, idx) => (
-                            <div key={idx} className="flex items-center justify-between bg-white border border-amber-200 rounded-md p-3">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-body-sm font-medium text-off-black">{match.name}</p>
-                                <p className="text-xs text-off-black/60">
-                                  {[
-                                    match.bib && `Bib: ${match.bib}`,
-                                    match.time && `Time: ${match.time}`,
-                                    match.pace && `Pace: ${match.pace}`,
-                                    match.city && match.state && `${match.city}, ${match.state}`
-                                  ].filter(Boolean).join(' · ')}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => acceptMatch(selectedOrder.orderNumber, match)}
-                                className="ml-3 flex items-center gap-1.5 px-3 py-1.5 bg-success-green/10 text-success-green border border-success-green/30 rounded-md hover:bg-success-green/20 transition-colors text-xs font-medium"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                Accept
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Notes - only show if there are notes */}
-                  {selectedOrder.notes && (
-                    <div>
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Notes</h4>
-                      <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                        <p className="text-body-sm text-blue-800 whitespace-pre-wrap">{selectedOrder.notes}</p>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Filename — last step before exporting. Copy-pasteable. */}
                   <div className="hidden md:block">
                     <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Filename</h4>
@@ -5887,40 +5795,11 @@ Thank you!`
                     )}
                   </div>
 
-                  {/* Flag Reason - only for flagged orders */}
-                  {selectedOrder.status === 'flagged' && selectedOrder.flagReason && (
-                    <div>
-                      <h4 className="text-xs font-semibold text-warning-amber uppercase tracking-tight mb-2">Flag Reason</h4>
-                      <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
-                        <p className="text-body-sm text-amber-800">{selectedOrder.flagReason}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Missing Year Warning */}
-                  {selectedOrder.status === 'missing_year' && (
-                    <div>
-                      <h4 className="text-xs font-semibold text-warning-amber uppercase tracking-tight mb-2">Action Required</h4>
-                      <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
-                        <p className="text-body-sm text-amber-800">This order is missing the race year. Please contact the customer to confirm which year they ran the race.</p>
-                      </div>
-                    </div>
-                  )}
                   </div>{/* end hidden md:block wrapper */}
 
-                  {/* Scraper Not Available Warning — desktop only */}
+                  {/* The "Research by hand" tag covers the no-scraper case now,
+                      so the old duplicate warning box is gone. */}
                   <div className="hidden md:block">
-                  {!selectedOrder.hasScraperAvailable && selectedOrder.status !== 'completed' && (
-                    <div>
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-2">Manual Research Required</h4>
-                      <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-                        <p className="text-body-sm text-gray-600">
-                          Auto-research is not yet available for {selectedOrder.effectiveRaceName || selectedOrder.raceName}.
-                          Please manually look up the runner's bib number, time, and pace.
-                        </p>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Actions */}
                   <div className="flex gap-3 pt-3">
