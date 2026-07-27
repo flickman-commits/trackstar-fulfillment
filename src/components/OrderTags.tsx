@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 /**
  * One shared tag vocabulary for orders.
  *
@@ -254,13 +256,38 @@ const TONE_CLASS: Record<TagTone, string> = {
 }
 
 /**
- * A single tag chip. Label is bold, any short reason rides along in lighter
- * text, and the full explanation appears in a hover card. Native title is not
- * used because it is slow to appear and cannot be styled.
+ * Hover card. Waits before appearing so it does not flash while someone is
+ * scanning a list, and disappears immediately on leave. Native title is not
+ * used because it cannot be styled and its timing is inconsistent.
  */
+export function HoverTip({
+  text, children, align = 'left', className = '',
+}: {
+  text?: string
+  children: ReactNode
+  align?: 'left' | 'center'
+  className?: string
+}) {
+  if (!text) return <>{children}</>
+  return (
+    <span className={`relative inline-flex group ${className}`}>
+      {children}
+      <span
+        role="tooltip"
+        className={`pointer-events-none invisible absolute top-full z-50 mt-1 w-max max-w-[15rem] whitespace-normal rounded-md bg-off-black px-2.5 py-2 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-[opacity,visibility] duration-150 group-hover:visible group-hover:opacity-100 group-hover:delay-700 ${
+          align === 'center' ? 'left-1/2 -translate-x-1/2' : 'left-0'
+        }`}
+      >
+        {text}
+      </span>
+    </span>
+  )
+}
+
+/** A single tag chip. Label is bold, any short reason rides along in lighter text. */
 export function TagChip({ tag, size = 'sm' }: { tag: OrderTag; size?: 'sm' | 'md' }) {
   return (
-    <span className="relative inline-flex group">
+    <HoverTip text={tag.title}>
       <span
         className={`inline-flex items-baseline gap-1 rounded border whitespace-nowrap ${TONE_CLASS[tag.tone]} ${
           size === 'md' ? 'px-2 py-0.5 text-[11px]' : 'px-1.5 py-0.5 text-[10px]'
@@ -269,15 +296,7 @@ export function TagChip({ tag, size = 'sm' }: { tag: OrderTag; size?: 'sm' | 'md
         <span className="font-semibold">{tag.label}</span>
         {tag.sublabel && <span className="font-normal opacity-70">{tag.sublabel}</span>}
       </span>
-      {tag.title && (
-        <span
-          role="tooltip"
-          className="pointer-events-none invisible absolute left-0 top-full z-50 mt-1 w-60 whitespace-normal rounded-md bg-off-black px-2.5 py-2 text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-[opacity,visibility] duration-150 group-hover:visible group-hover:opacity-100 group-hover:delay-700"
-        >
-          {tag.title}
-        </span>
-      )}
-    </span>
+    </HoverTip>
   )
 }
 

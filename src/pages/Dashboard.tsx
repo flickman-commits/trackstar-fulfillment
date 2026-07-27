@@ -6,7 +6,7 @@ import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
-import OrderTags, { raceNotRunYet } from '@/components/OrderTags'
+import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
 
 /** Collapsible section with header + chevron toggle */
 function CollapsibleSection({ title, defaultOpen = true, children, badge }: {
@@ -2444,9 +2444,9 @@ Thank you!`
                               )}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
-                              <span className="text-base" title={statusDisplay.label}>{statusDisplay.icon}</span>
+                              <HoverTip text={statusDisplay.label} align="center"><span className="text-base cursor-help">{statusDisplay.icon}</span></HoverTip>
                               {(order.notes || (order.commentCount ?? 0) > 0) && (
-                                <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
+                                <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                               )}
                             </div>
                           </div>
@@ -2544,7 +2544,7 @@ Thank you!`
                                 </>
                               )}
                               {(order.notes || (order.commentCount ?? 0) > 0) && (
-                                <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
+                                <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                               )}
                             </div>
                           </div>
@@ -2678,11 +2678,11 @@ Thank you!`
                             </td>
                             <td className="px-3 py-4 text-center">
                               <div className="flex items-center justify-center gap-1">
-                                <span className="text-lg" title={statusDisplay.label}>
-                                  {statusDisplay.icon}
-                                </span>
+                                <HoverTip text={statusDisplay.label} align="center">
+                                  <span className="text-lg cursor-help">{statusDisplay.icon}</span>
+                                </HoverTip>
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
-                                  <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
+                                  <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
                               </div>
                             </td>
@@ -2735,7 +2735,7 @@ Thank you!`
                                   </div>
                                 </td>
                                 <td className="px-3 py-4 text-center">
-                                  <span className="text-lg">✅</span>
+                                  <HoverTip text="Completed" align="center"><span className="text-lg cursor-help">✅</span></HoverTip>
                                 </td>
                                 <td className="px-3 py-4">
                                   <div className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</div>
@@ -2784,7 +2784,7 @@ Thank you!`
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-off-black">{order.partnerName || order.raceName || 'Race Partner'}</span>
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
-                                  <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
+                                  <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
                               </div>
                             </td>
@@ -2855,7 +2855,7 @@ Thank you!`
                                   <span className="px-1.5 py-0.5 bg-pink-50 text-pink-600 text-[10px] font-medium rounded">🎁 Gift</span>
                                 )}
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
-                                  <span title="Has notes/comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500" /></span>
+                                  <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
                               </div>
                             </td>
@@ -3055,7 +3055,7 @@ Thank you!`
                           <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                         </td>
                         <td className="px-3 py-4 text-center">
-                          <span className="text-lg">✅</span>
+                          <HoverTip text="Completed" align="center"><span className="text-lg cursor-help">✅</span></HoverTip>
                         </td>
                         <td className="px-3 py-4 text-sm text-off-black">
                           {order.runnerName}
@@ -4125,7 +4125,7 @@ Thank you!`
                       </span>
                     )}
                     {(selectedOrder.notes || (selectedOrder.commentCount ?? 0) > 0) && (
-                      <span title="Has notes/comments"><MessageSquareText className="w-4 h-4 text-amber-500" /></span>
+                      <HoverTip text="Has notes or comments"><MessageSquareText className="w-4 h-4 text-amber-500 cursor-help" /></HoverTip>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
