@@ -5357,63 +5357,6 @@ Thank you!`
                   {/* Race, year, size, ordered date and the Edit pencil all moved
                       into the Product Details card above. */}
 
-                  {/* Edit form — only when isEditing. Replaces the badges row. */}
-                  {isEditing && (
-                    <div className="hidden md:block">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Edit Order</h4>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => saveOverrides(selectedOrder.orderNumber, selectedOrder)}
-                            disabled={isSaving}
-                            className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
-                          >
-                            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                            Save
-                          </button>
-                          <button
-                            onClick={cancelEditing}
-                            className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-body-sm text-off-black/60">Runner</span>
-                          <input
-                            type="text"
-                            value={editValues.runnerNameOverride}
-                            onChange={(e) => setEditValues({ ...editValues, runnerNameOverride: e.target.value })}
-                            className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-48 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-body-sm text-off-black/60">Race</span>
-                          <input
-                            type="text"
-                            value={editValues.raceNameOverride}
-                            onChange={(e) => setEditValues({ ...editValues, raceNameOverride: e.target.value })}
-                            className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-48 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-body-sm text-off-black/60">Year</span>
-                          <input
-                            type="number"
-                            value={editValues.yearOverride}
-                            onChange={(e) => setEditValues({ ...editValues, yearOverride: e.target.value })}
-                            className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            min="2000"
-                            max="2030"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Runner Details — copy-pasteable name + research data, top of stack */}
                   <div className="hidden md:block">
                     <div className="flex items-center justify-between mb-2">
@@ -5429,17 +5372,6 @@ Thank you!`
                             View Results ↗
                           </a>
                         )}
-                        {/* Edits runner name, race and year, so it belongs with
-                            the runner data rather than the product card. */}
-                        {!isEditing && selectedOrder.status !== 'completed' && (
-                          <button
-                            onClick={() => startEditing(selectedOrder)}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                          >
-                            <Pencil className="w-3 h-3" />
-                            Edit
-                          </button>
-                        )}
                       </div>
                     </div>
                     {/* Runner and race side by side on desktop. Stacks on
@@ -5448,9 +5380,70 @@ Thank you!`
                       <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
                           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Runner</span>
+                          {/* Edits in place, the same way the Race card does. */}
+                          {!isEditing && selectedOrder.status !== 'completed' && (
+                            <button
+                              onClick={() => startEditing(selectedOrder)}
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                            >
+                              <Pencil className="w-3 h-3" />
+                              Edit
+                            </button>
+                          )}
+                          {isEditing && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => saveOverrides(selectedOrder.orderNumber, selectedOrder)}
+                                disabled={isSaving}
+                                className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                              >
+                                {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                Save
+                              </button>
+                              <button
+                                onClick={cancelEditing}
+                                className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                                Cancel
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-2">
-                          {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
+                          {isEditing ? (
+                            <>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Name</span>
+                                <input
+                                  type="text"
+                                  value={editValues.runnerNameOverride}
+                                  onChange={(e) => setEditValues({ ...editValues, runnerNameOverride: e.target.value })}
+                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Race</span>
+                                <input
+                                  type="text"
+                                  value={editValues.raceNameOverride}
+                                  onChange={(e) => setEditValues({ ...editValues, raceNameOverride: e.target.value })}
+                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Year</span>
+                                <input
+                                  type="number"
+                                  value={editValues.yearOverride}
+                                  onChange={(e) => setEditValues({ ...editValues, yearOverride: e.target.value })}
+                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  min="2000"
+                                  max="2030"
+                                />
+                              </div>
+                            </>
+                          ) : (selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
                             <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
                           ) : (
                             <PendingField label="Name" />
@@ -5623,10 +5616,10 @@ Thank you!`
                                         {b && (
                                           <button
                                             onClick={() => setShowWeatherInfo(v => !v)}
-                                            className="inline-flex items-center gap-0.5 text-[10px] text-off-black/40 hover:text-off-black/70 transition-colors"
+                                            className="inline-flex items-center text-off-black/35 hover:text-off-black/70 transition-colors"
                                             title="How this weather was determined"
                                           >
-                                            <Info className="w-3 h-3" /> Explanation
+                                            <Info className="w-3.5 h-3.5" />
                                           </button>
                                         )}
                                       </span>
