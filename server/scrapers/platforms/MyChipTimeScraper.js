@@ -35,7 +35,11 @@ export class MyChipTimeScraper extends BaseScraper {
     console.log(`[${this.tag} ${this.year}] Fetching race info...`)
 
     const eventIds = this.config.eventIds?.[this.year]
-    const eventId = eventIds?.marathon || eventIds?.halfMarathon || this.config.defaultEventId
+    // Only this year's event. defaultEventId points at the most recent edition,
+    // so using it here scraped that edition's date and stamped it on whatever
+    // year was asked for. That is how Philadelphia 2026 ended up dated Nov 2025,
+    // which in turn made a race that has not happened look like "runner not found".
+    const eventId = eventIds?.marathon || eventIds?.halfMarathon || null
     const eventUrl = eventId
       ? `${this.baseUrl}/searchevent.php?id=${eventId}`
       : null
@@ -50,8 +54,11 @@ export class MyChipTimeScraper extends BaseScraper {
         })
         if (response.ok) {
           const html = await response.text()
-          raceDate = this.extractRaceDateFromHtml(html)
-          if (raceDate) {
+          const scraped = this.extractRaceDateFromHtml(html)
+          if (scraped && scraped.getFullYear() !== this.year) {
+            console.warn(`[${this.tag} ${this.year}] Ignoring scraped date ${scraped.toDateString()}: wrong year`)
+          } else if (scraped) {
+            raceDate = scraped
             console.log(`[${this.tag} ${this.year}] Scraped race date: ${raceDate.toDateString()}`)
           }
         }
@@ -121,7 +128,8 @@ export class MyChipTimeScraper extends BaseScraper {
     const eventIds = this.config.eventIds?.[this.year]
     if (!eventIds) {
       console.log(`[${this.tag}] No event IDs configured for year ${this.year}`)
-      return this._notFound(`No results available for ${this.year} yet`)
+      // Distinct from "we searched and this runner is not there".
+      return this.yearNotConfiguredResult('missing eventIds entry')
     }
 
     // Try marathon first, then half marathon

@@ -41,7 +41,13 @@ export class MikaTimingScraper extends BaseScraper {
 
       if (response.ok) {
         const html = await response.text()
-        raceDate = this._extractRaceDateFromHtml(html)
+        const scraped = this._extractRaceDateFromHtml(html)
+        // A date outside the requested year means we read the wrong edition.
+        if (scraped && scraped.getFullYear() !== this.year) {
+          console.warn(`[${this.tag} ${this.year}] Ignoring scraped date ${scraped.toDateString()}: wrong year`)
+        } else {
+          raceDate = scraped
+        }
       }
     } catch (error) {
       console.log(`[${this.tag} ${this.year}] Failed to scrape race date:`, error.message)
