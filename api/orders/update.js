@@ -16,7 +16,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { orderNumber, yearOverride, raceNameOverride, runnerNameOverride, raceId, weatherTemp, weatherCondition, raceDate, raceAction, raceData } = req.body
+    const { orderNumber, yearOverride, raceNameOverride, runnerNameOverride, raceId, weatherTemp, weatherCondition, raceDate, raceAction, raceData,
+      // Manual corrections to the result itself. Elí sometimes needs to use the
+      // runner's own watch time rather than the official one we scraped.
+      bibNumber, officialTime, officialPace } = req.body
 
     // Race-specific operations (no orderNumber required)
     if (raceAction === 'update' && raceId) {
@@ -118,6 +121,57 @@ export default async function handler(req, res) {
         data: raceUpdate
       })
       console.log(`[API /orders/update] Race ${raceId} updated:`, raceUpdate)
+    }
+
+    // Manual corrections to bib / time / pace. These live on RunnerResearch,
+    // not the Order, so they get written through to the latest research row.
+    // A hand-entered value is authoritative: we mark it found and record the
+    // source as manual_entry so the provenance stays honest.
+    if (bibNumber !== undefined || officialTime !== undefined || officialPace !== undefined) {
+      const researchData = {}
+      if (bibNumber !== undefined) researchData.bibNumber = bibNumber || null
+      if (officialTime !== undefined) researchData.officialTime = officialTime || null
+      if (officialPace !== undefined) researchData.officialPace = officialPace || null
+
+      const latest = await prisma.runnerResearch.findFirst({
+        where: { orderId: existingOrder.id },
+        orderBy: { id: 'desc' }
+      })
+
+      if (latest) {
+        await prisma.runnerResearch.update({
+          where: { id: latest.id },
+          data: {
+            ...researchData,
+            researchStatus: 'found',
+            source: 'manual_entry',
+            researchNotes: 'Manually entered in the dashboard.',
+            possibleMatches: null,
+          }
+        })
+      } else if (raceId) {
+        // No research row yet (never researched, or no scraper). Create one so
+        // the hand-entered values have somewhere to live.
+        await prisma.runnerResearch.create({
+          data: {
+            orderId: existingOrder.id,
+            raceId,
+            runnerName: updateData.runnerNameOverride || existingOrder.runnerNameOverride || existingOrder.runnerName,
+            ...researchData,
+            researchStatus: 'found',
+            source: 'manual_entry',
+            researchNotes: 'Manually entered in the dashboard.',
+          }
+        })
+      } else {
+        console.warn(`[API /orders/update] ${orderNumber}: no research row and no raceId, skipped bib/time/pace`)
+      }
+
+      // A hand-entered result makes the order fulfillable.
+      if (latest || raceId) {
+        updateData.status = 'ready'
+        updateData.researchedAt = new Date()
+      }
     }
 
     // Update the order

@@ -1331,11 +1331,15 @@ export default function Dashboard() {
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
+  // Runner edit covers the name plus the result itself. Race name and year are
+  // no longer editable: they come straight off the order and the wizard now
+  // collects the year, so the old override escape hatch is not needed.
   const [editValues, setEditValues] = useState<{
-    yearOverride: string
-    raceNameOverride: string
     runnerNameOverride: string
-  }>({ yearOverride: '', raceNameOverride: '', runnerNameOverride: '' })
+    bibNumber: string
+    officialTime: string
+    officialPace: string
+  }>({ runnerNameOverride: '', bibNumber: '', officialTime: '', officialPace: '' })
   const [isSaving, setIsSaving] = useState(false)
 
   // Race Data edit mode state — covers date, weather, temp on the Race record.
@@ -1405,9 +1409,10 @@ export default function Dashboard() {
   // Start editing mode
   const startEditing = (order: Order) => {
     setEditValues({
-      yearOverride: order.yearOverride?.toString() || order.raceYear?.toString() || '',
-      raceNameOverride: order.raceNameOverride || order.raceName || '',
-      runnerNameOverride: order.runnerNameOverride || order.runnerName || ''
+      runnerNameOverride: order.runnerNameOverride || order.runnerName || '',
+      bibNumber: order.bibNumber || '',
+      officialTime: order.officialTime || '',
+      officialPace: order.officialPace || '',
     })
     setIsEditing(true)
   }
@@ -1415,7 +1420,7 @@ export default function Dashboard() {
   // Cancel editing
   const cancelEditing = () => {
     setIsEditing(false)
-    setEditValues({ yearOverride: '', raceNameOverride: '', runnerNameOverride: '' })
+    setEditValues({ runnerNameOverride: '', bibNumber: '', officialTime: '', officialPace: '' })
   }
 
   // Start editing race data (date, weather, temp)
@@ -1480,21 +1485,8 @@ export default function Dashboard() {
   const saveOverrides = async (orderNumber: string, originalOrder: Order) => {
     setIsSaving(true)
     try {
-      // Determine what changed (only send overrides if different from original)
+      // Only send what actually changed.
       const updates: Record<string, string | number | null> = {}
-
-      const newYear = editValues.yearOverride ? parseInt(editValues.yearOverride, 10) : null
-      if (newYear !== originalOrder.raceYear) {
-        updates.yearOverride = newYear
-      } else if (originalOrder.yearOverride !== null) {
-        updates.yearOverride = null // Clear override if matches original
-      }
-
-      if (editValues.raceNameOverride !== originalOrder.raceName) {
-        updates.raceNameOverride = editValues.raceNameOverride || null
-      } else if (originalOrder.raceNameOverride !== null) {
-        updates.raceNameOverride = null
-      }
 
       if (editValues.runnerNameOverride !== originalOrder.runnerName) {
         updates.runnerNameOverride = editValues.runnerNameOverride || null
@@ -1502,10 +1494,21 @@ export default function Dashboard() {
         updates.runnerNameOverride = null
       }
 
+      // Result fields write through to the research record.
+      if (editValues.bibNumber !== (originalOrder.bibNumber || '')) {
+        updates.bibNumber = editValues.bibNumber || null
+      }
+      if (editValues.officialTime !== (originalOrder.officialTime || '')) {
+        updates.officialTime = editValues.officialTime || null
+      }
+      if (editValues.officialPace !== (originalOrder.officialPace || '')) {
+        updates.officialPace = editValues.officialPace || null
+      }
+
       const response = await apiFetch(`/api/orders/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderNumber, ...updates })
+        body: JSON.stringify({ orderNumber, raceId: originalOrder.raceId, ...updates })
       })
 
       if (!response.ok) throw new Error('Failed to save changes')
@@ -1536,7 +1539,7 @@ export default function Dashboard() {
   const closeModal = () => {
     setSelectedOrder(null)
     setIsEditing(false)
-    setEditValues({ yearOverride: '', raceNameOverride: '', runnerNameOverride: '' })
+    setEditValues({ runnerNameOverride: '', bibNumber: '', officialTime: '', officialPace: '' })
   }
 
   // Fetch orders on mount and when view changes
@@ -2074,7 +2077,7 @@ export default function Dashboard() {
     if (target < 0 || target >= navigableOrders.length) return
     setSelectedOrder(navigableOrders[target])
     setIsEditing(false)
-    setEditValues({ yearOverride: '', raceNameOverride: '', runnerNameOverride: '' })
+    setEditValues({ runnerNameOverride: '', bibNumber: '', officialTime: '', officialPace: '' })
   }, [currentOrderIndex, navigableOrders])
 
   useEffect(() => {
@@ -4827,9 +4830,9 @@ Thank you!`
                   {/* Product details. The thumbnail is keyed off the stable
                       Shopify product_id so Eli can tell near-identical designs
                       apart at a glance (Chicago World Majors vs Chicago Race).
-                      The ID itself drives the lookup but is not worth showing.
-                      Race, year, size and order date live here too, so the
-                      cheat-sheet facts are all in one card. */}
+                      The ID drives the lookup but is not worth showing.
+                      Race, year, size, the photo add-on and the order date are
+                      all product facts, so they all live in this one card. */}
                   <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-3">
                     <div className="flex items-start gap-3">
                       {selectedOrder.productInfo?.heroImageUrl ? (
@@ -4848,11 +4851,22 @@ Thank you!`
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product Details</div>
-                        {/* The label exists to tell near-identical variants apart
-                            (Chicago World Majors vs Chicago Race). When it just
-                            repeats the race name it adds nothing, so hide it and
-                            let the race chip below carry it. */}
+                        <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-0.5">Product Details</div>
+                        {/* Race leads as the headline, year rides beside it. */}
+                        <div className="flex items-baseline gap-2 min-w-0">
+                          <h3 className="text-lg font-bold text-off-black truncate leading-tight">
+                            {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Unknown Race'}
+                          </h3>
+                          <span className={`flex-none inline-flex items-center px-2 py-0.5 border rounded text-xs font-semibold ${
+                            (selectedOrder.effectiveRaceYear || selectedOrder.raceYear)
+                              ? 'bg-white border-border-gray text-off-black'
+                              : 'bg-amber-50 border-amber-200 text-warning-amber'
+                          }`}>
+                            {selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'Year?'}
+                          </span>
+                        </div>
+                        {/* Variant name, only when it says something the race
+                            name does not. */}
                         {selectedOrder.productInfo && (() => {
                           const label = selectedOrder.productInfo.label || ''
                           const race = selectedOrder.effectiveRaceName || selectedOrder.raceName || ''
@@ -4860,40 +4874,37 @@ Thank you!`
                           const notInCatalog = selectedOrder.productInfo.catalogRequired && !selectedOrder.productInfo.inCatalog
                           if (sameAsRace && !notInCatalog) return null
                           return (
-                          <div className="text-sm font-medium text-off-black truncate">
-                            {sameAsRace ? null : (label || 'Unknown product')}
-                            {selectedOrder.productInfo.catalogRequired && !selectedOrder.productInfo.inCatalog && (
-                              <span
-                                className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium align-middle"
-                                title="This Shopify product isn't in server/lib/productCatalog.js. Add it to lock in the design variant and hero image."
-                              >
-                                not in catalog
-                              </span>
-                            )}
-                          </div>
+                            <div className="text-xs text-off-black/50 truncate mt-0.5">
+                              {sameAsRace ? null : (label || 'Unknown product')}
+                              {notInCatalog && (
+                                <span
+                                  className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium align-middle"
+                                  title="This Shopify product isn't in server/lib/productCatalog.js. Add it to lock in the design variant and hero image."
+                                >
+                                  not in catalog
+                                </span>
+                              )}
+                            </div>
                           )
                         })()}
-                        {/* Desktop only: mobile has its own summary card below. */}
-                        <div className="hidden md:flex flex-wrap items-center gap-1.5 mt-1.5">
-                          <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">
-                            {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Unknown Race'}
-                          </span>
-                          <span className={`inline-flex items-center px-2 py-1 border rounded text-xs font-semibold ${
-                            (selectedOrder.effectiveRaceYear || selectedOrder.raceYear)
-                              ? 'bg-white border-border-gray text-off-black'
-                              : 'bg-amber-50 border-amber-200 text-warning-amber'
-                          }`}>
-                            {selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'Year?'}
-                          </span>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                           <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">
                             {selectedOrder.productSize}
                           </span>
+                          {/* The photo add-on changes what gets printed, so it
+                              belongs with the product facts. */}
+                          {selectedOrder.photoPath && (
+                            <span className="inline-flex items-center px-2 py-1 rounded border text-xs font-semibold bg-[#4600D6]/10 text-[#4600D6] border-[#4600D6]/25">
+                              Photo on print
+                            </span>
+                          )}
                           {selectedOrder.orderPlacedAt && (
                             <span
-                              className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs text-off-black/60"
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-border-gray rounded text-xs text-off-black/60"
                               title={`Ordered on ${new Date(selectedOrder.orderPlacedAt).toLocaleString('en-US', { timeZone: TZ })}`}
                             >
-                              📅 Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}
+                              <span>📅</span>
+                              <span>Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}</span>
                             </span>
                           )}
                         </div>
@@ -4905,7 +4916,7 @@ Thank you!`
                       Same vocabulary as the dashboard table. Anything that
                       needs more than a word or two gets its own block below;
                       everything else lives here and nowhere else. */}
-                  <OrderTags order={selectedOrder} size="md" className="mb-3" />
+                  <OrderTags order={selectedOrder} size="md" className="mb-3" exclude={['photo']} />
 
                   {/* Expedited shipping steps. The tag says it is expedited,
                       this block exists only for the instructions and the exact
@@ -4990,17 +5001,17 @@ Thank you!`
                         className={`rounded-md border p-3 ${
                           selectedOrder.photoPlacedAt
                             ? 'bg-green-50 border-green-300'
-                            : 'bg-amber-50 border-amber-400'
+                            : 'bg-[#4600D6]/5 border-[#4600D6]/40'
                         }`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-amber-900'}`}>
+                            <p className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-[#4600D6]'}`}>
                               {selectedOrder.photoPlacedAt
                                 ? 'Photo confirmed on artwork'
                                 : 'This print includes a customer photo'}
                             </p>
-                            <p className={`text-[11px] mt-0.5 ${selectedOrder.photoPlacedAt ? 'text-green-700' : 'text-amber-800'}`}>
+                            <p className={`text-[11px] mt-0.5 ${selectedOrder.photoPlacedAt ? 'text-green-700' : 'text-[#4600D6]/80'}`}>
                               {selectedOrder.photoPlacedAt
                                 ? `Confirmed ${new Date(selectedOrder.photoPlacedAt).toLocaleString()}`
                                 : 'Place this photo on the print before completing this order.'}
@@ -5011,9 +5022,9 @@ Thank you!`
                                 checked={!!selectedOrder.photoPlacedAt}
                                 disabled={photoConfirming}
                                 onChange={() => setPhotoPlaced(selectedOrder.orderNumber, !selectedOrder.photoPlacedAt)}
-                                className="w-4 h-4 accent-green-600 cursor-pointer"
+                                className={`w-4 h-4 cursor-pointer ${selectedOrder.photoPlacedAt ? 'accent-green-600' : 'accent-[#4600D6]'}`}
                               />
-                              <span className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-amber-900'}`}>
+                              <span className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-[#4600D6]'}`}>
                                 {photoConfirming ? 'Saving...' : 'Photo placed on artwork'}
                               </span>
                             </label>
@@ -5412,6 +5423,9 @@ Thank you!`
                         </div>
                         <div className="space-y-2">
                           {isEditing ? (
+                            /* Everything on this card is editable. Official
+                               results are a starting point, not gospel: runners
+                               sometimes want their own watch time on the print. */
                             <>
                               <div className="flex justify-between items-center">
                                 <span className="text-body-sm text-off-black/60">Name</span>
@@ -5422,57 +5436,89 @@ Thank you!`
                                   className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Bib</span>
+                                <input
+                                  type="text"
+                                  value={editValues.bibNumber}
+                                  onChange={(e) => setEditValues({ ...editValues, bibNumber: e.target.value })}
+                                  placeholder="1234"
+                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Time</span>
+                                <input
+                                  type="text"
+                                  value={editValues.officialTime}
+                                  onChange={(e) => setEditValues({ ...editValues, officialTime: e.target.value })}
+                                  placeholder="3:42:18"
+                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Pace</span>
+                                <input
+                                  type="text"
+                                  value={editValues.officialPace}
+                                  onChange={(e) => setEditValues({ ...editValues, officialPace: e.target.value })}
+                                  placeholder="8:29"
+                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
                             </>
-                          ) : (selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
-                            <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
                           ) : (
-                            <PendingField label="Name" />
-                          )}
-                          {selectedOrder.bibNumber ? (
-                            <CopyableField label="Bib" value={selectedOrder.bibNumber} />
-                          ) : selectedOrder.hasScraperAvailable ? (
-                            <PendingField label="Bib" />
-                          ) : (
-                            <NotAvailableField label="Bib" />
-                          )}
-                          {/* hadNoTime is the customer's explicit "no time on the
-                              poster" opt-in — it must win over any research result. */}
-                          {selectedOrder.hadNoTime ? (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-off-black/40 w-16">Time</span>
-                              <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
-                                ⚠️ No Time
-                              </span>
-                            </div>
-                          ) : selectedOrder.officialTime ? (
-                            <CopyableField label="Time" value={selectedOrder.officialTime} />
-                          ) : selectedOrder.timeFromName ? (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-off-black/40 w-16">Time</span>
-                              <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">
-                                ⏱ {selectedOrder.timeFromName}
-                              </span>
-                            </div>
-                          ) : selectedOrder.hasScraperAvailable ? (
-                            <PendingField label="Time" />
-                          ) : (
-                            <NotAvailableField label="Time" />
-                          )}
-                          {/* Pace is suppressed alongside Time when the customer
-                              opted out — a poster without a time shouldn't show a pace. */}
-                          {selectedOrder.hadNoTime ? (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-off-black/40 w-16">Pace</span>
-                              <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
-                                ⚠️ No Pace
-                              </span>
-                            </div>
-                          ) : selectedOrder.officialPace ? (
-                            <CopyableField label="Pace" value={selectedOrder.officialPace} />
-                          ) : selectedOrder.hasScraperAvailable ? (
-                            <PendingField label="Pace" />
-                          ) : (
-                            <NotAvailableField label="Pace" />
+                            <>
+                              {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
+                                <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
+                              ) : (
+                                <PendingField label="Name" />
+                              )}
+                              {selectedOrder.bibNumber ? (
+                                <CopyableField label="Bib" value={selectedOrder.bibNumber} />
+                              ) : selectedOrder.hasScraperAvailable ? (
+                                <PendingField label="Bib" />
+                              ) : (
+                                <NotAvailableField label="Bib" />
+                              )}
+                              {/* hadNoTime is the customer's explicit "no time on
+                                  the poster" opt-in. It wins over any result. */}
+                              {selectedOrder.hadNoTime ? (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-off-black/40 w-16">Time</span>
+                                  <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
+                                    ⚠️ No Time
+                                  </span>
+                                </div>
+                              ) : selectedOrder.officialTime ? (
+                                <CopyableField label="Time" value={selectedOrder.officialTime} />
+                              ) : selectedOrder.timeFromName ? (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-off-black/40 w-16">Time</span>
+                                  <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">
+                                    ⏱ {selectedOrder.timeFromName}
+                                  </span>
+                                </div>
+                              ) : selectedOrder.hasScraperAvailable ? (
+                                <PendingField label="Time" />
+                              ) : (
+                                <NotAvailableField label="Time" />
+                              )}
+                              {selectedOrder.hadNoTime ? (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-off-black/40 w-16">Pace</span>
+                                  <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
+                                    ⚠️ No Pace
+                                  </span>
+                                </div>
+                              ) : selectedOrder.officialPace ? (
+                                <CopyableField label="Pace" value={selectedOrder.officialPace} />
+                              ) : selectedOrder.hasScraperAvailable ? (
+                                <PendingField label="Pace" />
+                              ) : (
+                                <NotAvailableField label="Pace" />
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -5480,29 +5526,7 @@ Thank you!`
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
                           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Race</span>
                           <div className="flex items-center gap-3">
-                            {/* Race name and year are part of the same override
-                                save as the runner name, so the controls appear
-                                on both cards. */}
-                            {isEditing && (
-                              <>
-                                <button
-                                  onClick={() => saveOverrides(selectedOrder.orderNumber, selectedOrder)}
-                                  disabled={isSaving}
-                                  className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
-                                >
-                                  {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                                  Save
-                                </button>
-                                <button
-                                  onClick={cancelEditing}
-                                  className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
-                                >
-                                  <X className="w-3 h-3" />
-                                  Cancel
-                                </button>
-                              </>
-                            )}
-                          {!isEditing && !isEditingWeather && selectedOrder.raceId && (
+                          {!isEditingWeather && selectedOrder.raceId && (
                                 <div className="flex items-center gap-3">
                                   <button
                                     onClick={() => openWeatherCalc(selectedOrder)}
@@ -5543,30 +5567,6 @@ Thank you!`
                           </div>
                         </div>
                         <div className="space-y-2">
-                          {isEditing && (
-                            <>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Race</span>
-                                <input
-                                  type="text"
-                                  value={editValues.raceNameOverride}
-                                  onChange={(e) => setEditValues({ ...editValues, raceNameOverride: e.target.value })}
-                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Year</span>
-                                <input
-                                  type="number"
-                                  value={editValues.yearOverride}
-                                  onChange={(e) => setEditValues({ ...editValues, yearOverride: e.target.value })}
-                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  min="2000"
-                                  max="2030"
-                                />
-                              </div>
-                            </>
-                          )}
                           {selectedOrder.eventType ? (
                             // Flag non-marathon events so the designer doesn't
                             // assume "Marathon" by default — Half, 10K, 5K, etc.
