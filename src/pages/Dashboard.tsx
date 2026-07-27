@@ -6,7 +6,7 @@ import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
-import OrderTags from '@/components/OrderTags'
+import OrderTags, { raceNotRunYet } from '@/components/OrderTags'
 
 /** Collapsible section with header + chevron toggle */
 function CollapsibleSection({ title, defaultOpen = true, children, badge }: {
@@ -60,7 +60,7 @@ interface Order {
   bibNumber?: string
   officialTime?: string
   officialPace?: string
-  researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null
+  researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null
   // How the result was obtained: scraper vs. customer-confirmed in the widget
   researchSource?: 'scraper' | 'customer_verified' | null
   // Detailed Instant Lookup widget outcome — how the shopper arrived at their
@@ -591,7 +591,7 @@ export default function Dashboard() {
           officialTime: order.officialTime as string | undefined,
           officialPace: order.officialPace as string | undefined,
           eventType: order.eventType as string | undefined,
-          researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null,
+          researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null,
           researchNotes: order.researchNotes as string | undefined,
           resultsUrl: order.resultsUrl as string | undefined,
           // Weather
@@ -1078,7 +1078,7 @@ export default function Dashboard() {
             officialTime: order.officialTime as string | undefined,
             officialPace: order.officialPace as string | undefined,
             eventType: order.eventType as string | undefined,
-            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null,
+            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null,
             researchNotes: order.researchNotes as string | undefined,
             resultsUrl: order.resultsUrl as string | undefined,
             weatherTemp: order.weatherTemp as string | undefined,
@@ -1183,7 +1183,7 @@ export default function Dashboard() {
             officialTime: order.officialTime as string | undefined,
             officialPace: order.officialPace as string | undefined,
             eventType: order.eventType as string | undefined,
-            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | null,
+            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null,
             researchNotes: order.researchNotes as string | undefined,
             resultsUrl: order.resultsUrl as string | undefined,
             weatherTemp: order.weatherTemp as string | undefined,
@@ -5069,38 +5069,61 @@ Thank you!`
                           //   - no_scraper / year_not_configured = red (config gap, blocks fulfillment, dev needed)
                           //   - upstream_error / not_found / ambiguous = amber (transient or resolvable via manual verification)
                           const isConfigGap = status === 'no_scraper' || status === 'year_not_configured'
-                          const boxClasses = isConfigGap
+                        // A future race is not a problem, just a wait, so it
+                        // reads calm rather than amber.
+                        const notRun = status === 'race_not_run' || (status === 'not_found' && raceNotRunYet(selectedOrder))
+                        const boxClasses = notRun
+                          ? 'bg-blue-50 border border-blue-200 rounded-md p-4'
+                          : isConfigGap
                             ? 'bg-red-50 border border-red-200 rounded-md p-4'
                             : 'bg-amber-50 border border-amber-200 rounded-md p-4'
-                          const textPrimary = isConfigGap ? 'text-red-800' : 'text-amber-800'
+                        const textPrimary = notRun ? 'text-blue-900' : isConfigGap ? 'text-red-800' : 'text-amber-800'
+                        const headingColor = notRun ? 'text-blue-800' : isConfigGap ? 'text-red-700' : 'text-amber-700'
 
-                          // The tag at the top already says WHAT happened, so this
-                          // block only says what to DO about it. One sentence, once.
-                          // Raw scraper notes stay on the tooltip for debugging.
-                          const raceLabel = `${selectedOrder.effectiveRaceName || selectedOrder.raceName} ${selectedOrder.effectiveRaceYear || selectedOrder.raceYear}`
-                          const fix = (
-                            status === 'no_scraper'
-                              ? `We have no scraper for "${selectedOrder.effectiveRaceName || selectedOrder.raceName}". A developer needs to add one, or alias this race onto an existing scraper. Research it by hand in the meantime.`
-                            : status === 'year_not_configured'
-                              ? `The scraper works but ${raceLabel} is not wired up yet. A developer needs to add this year's event IDs. Research it by hand in the meantime.`
-                            : status === 'upstream_error'
-                              ? 'The timing site is slow or down right now. Nothing is wrong with this order. Retry the lookup in a couple of minutes.'
-                            : status === 'not_found'
-                              ? 'Check the runner name and year are right, then research again. If it still comes up empty, look it up by hand.'
-                            : status === 'ambiguous'
-                              ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
-                                  ? 'Pick the right runner from the matches below.'
-                                  : 'Several runners share this name. Look them up on the results site to confirm which one is right.')
-                            : null
-                          )
-                          if (!fix) return null
+                        const heading = notRun
+                          ? 'Race has not happened yet'
+                          : status === 'no_scraper'
+                            ? 'No scraper for this race'
+                          : status === 'year_not_configured'
+                            ? 'Year not configured'
+                          : status === 'upstream_error'
+                            ? 'Timing site is down'
+                          : status === 'not_found'
+                            ? 'Runner not found'
+                          : status === 'ambiguous'
+                            ? 'More than one match'
+                          : null
 
-                          return (
-                            <div className={boxClasses} title={selectedOrder.researchNotes || undefined}>
-                              <p className={`text-body-sm ${textPrimary}`}>{fix}</p>
-                            </div>
-                          )
-                        })()}
+                        // The tag at the top already says WHAT happened, so this
+                        // block only says what to DO about it. One sentence, once.
+                        // Raw scraper notes stay on the tooltip for debugging.
+                        const raceLabel = `${selectedOrder.effectiveRaceName || selectedOrder.raceName} ${selectedOrder.effectiveRaceYear || selectedOrder.raceYear}`
+                        const fix = notRun
+                          ? `${raceLabel} has not been run yet, so there are no results to find. Come back after race day.`
+                          : status === 'no_scraper'
+                            ? `We have no scraper for "${selectedOrder.effectiveRaceName || selectedOrder.raceName}". A developer needs to add one, or alias this race onto an existing scraper. Research it by hand in the meantime.`
+                          : status === 'year_not_configured'
+                            ? `The scraper works but ${raceLabel} is not wired up yet. A developer needs to add this year's event IDs. Research it by hand in the meantime.`
+                          : status === 'upstream_error'
+                            ? 'The timing site is slow or down right now. Nothing is wrong with this order. Retry the lookup in a couple of minutes.'
+                          : status === 'not_found'
+                            ? 'Check the runner name and year are right, then research again. If it still comes up empty, look it up by hand.'
+                          : status === 'ambiguous'
+                            ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
+                                ? 'Pick the right runner from the matches below.'
+                                : 'Several runners share this name. Look them up on the results site to confirm which one is right.')
+                          : null
+                        if (!fix) return null
+
+                        return (
+                          <div className={boxClasses} title={selectedOrder.researchNotes || undefined}>
+                            {heading && (
+                              <h4 className={`text-xs font-semibold ${headingColor} uppercase tracking-tight mb-1.5`}>{heading}</h4>
+                            )}
+                            <p className={`text-body-sm ${textPrimary}`}>{fix}</p>
+                          </div>
+                        )
+                      })()}
 
                         {/* Suggested matches with Accept buttons */}
                         {possibleMatchesMap[selectedOrder.orderNumber]?.length > 0 && (

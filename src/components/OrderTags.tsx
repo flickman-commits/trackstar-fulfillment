@@ -55,6 +55,7 @@ export interface TaggableOrder {
   effectiveRaceName?: string
   raceYear?: number | null
   effectiveRaceYear?: number | null
+  raceDateIso?: string | null
   yearOverride?: number | null
 }
 
@@ -122,8 +123,21 @@ const TRUST_TAGS: Record<string, { label: string; sublabel?: string; tone: TagTo
   },
 }
 
+/** True when the race is still in the future, so no results can exist yet. */
+export function raceNotRunYet(o: TaggableOrder): boolean {
+  if (!o.raceDateIso) return false
+  const d = new Date(`${o.raceDateIso}T23:59:59Z`)
+  return !isNaN(d.valueOf()) && d.getTime() > Date.now()
+}
+
 /** Research outcomes from our own scrapers. */
 function researchTag(o: TaggableOrder): OrderTag | null {
+  // A future race has no results to find. This also rescues orders that were
+  // researched before we checked for it and got stamped "not found".
+  if (o.researchStatus === 'race_not_run' || (o.researchStatus === 'not_found' && raceNotRunYet(o))) {
+    return { key: 'race-not-run', label: 'Race not run yet', tone: 'blue',
+      title: 'This race has not happened yet, so there are no results to look up. Come back after race day.' }
+  }
   switch (o.researchStatus) {
     case 'not_found':
       return { key: 'not-found', label: 'Not found', sublabel: 'manual lookup', tone: 'amber',
@@ -258,7 +272,7 @@ export function TagChip({ tag, size = 'sm' }: { tag: OrderTag; size?: 'sm' | 'md
       {tag.title && (
         <span
           role="tooltip"
-          className="pointer-events-none absolute left-0 top-full z-50 mt-1 hidden w-60 whitespace-normal rounded-md bg-off-black px-2.5 py-2 text-[11px] font-normal leading-snug text-white shadow-lg group-hover:block"
+          className="pointer-events-none invisible absolute left-0 top-full z-50 mt-1 w-60 whitespace-normal rounded-md bg-off-black px-2.5 py-2 text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-[opacity,visibility] duration-150 group-hover:visible group-hover:opacity-100 group-hover:delay-700"
         >
           {tag.title}
         </span>

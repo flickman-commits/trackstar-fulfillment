@@ -72,6 +72,34 @@ export class ResearchService {
     // TIER 1: Get or fetch race-level data (use effective values)
     const race = await this.getOrFetchRaceData(effectiveRaceName, effectiveRaceYear)
 
+    // The race has not been run yet, so no results can exist. Record that
+    // plainly instead of scraping and coming back "not found", which reads like
+    // a data problem and sends someone hunting for a result that cannot exist.
+    if (race?.raceDate && new Date(race.raceDate) > new Date()) {
+      const raceDay = new Date(race.raceDate).toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+      })
+      console.log(`[ResearchService] ${effectiveRaceName} ${effectiveRaceYear} is on ${raceDay}, skipping runner scrape`)
+
+      const notRunData = {
+        orderId: order.id,
+        raceId: race.id,
+        runnerName: effectiveRunnerName,
+        bibNumber: null, officialTime: null, officialPace: null,
+        researchStatus: 'race_not_run',
+        researchNotes: `${effectiveRaceName} ${effectiveRaceYear} takes place on ${raceDay}. Results will not exist until after race day.`,
+        possibleMatches: null,
+      }
+      const existing = await prisma.runnerResearch.findFirst({
+        where: { orderId: order.id, raceId: race.id }
+      })
+      const runnerResearch = existing
+        ? await prisma.runnerResearch.update({ where: { id: existing.id }, data: notRunData })
+        : await prisma.runnerResearch.create({ data: notRunData })
+
+      return { race, runnerResearch, order }
+    }
+
     // TIER 2: Get or fetch runner-level data (pass effective values)
     const runnerResearch = await this.getOrFetchRunnerData(order, race, {
       effectiveRaceName,
