@@ -5422,26 +5422,6 @@ Thank you!`
                                   className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Race</span>
-                                <input
-                                  type="text"
-                                  value={editValues.raceNameOverride}
-                                  onChange={(e) => setEditValues({ ...editValues, raceNameOverride: e.target.value })}
-                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Year</span>
-                                <input
-                                  type="number"
-                                  value={editValues.yearOverride}
-                                  onChange={(e) => setEditValues({ ...editValues, yearOverride: e.target.value })}
-                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  min="2000"
-                                  max="2030"
-                                />
-                              </div>
                             </>
                           ) : (selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
                             <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
@@ -5500,7 +5480,29 @@ Thank you!`
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
                           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Race</span>
                           <div className="flex items-center gap-3">
-                          {!isEditingWeather && selectedOrder.raceId && (
+                            {/* Race name and year are part of the same override
+                                save as the runner name, so the controls appear
+                                on both cards. */}
+                            {isEditing && (
+                              <>
+                                <button
+                                  onClick={() => saveOverrides(selectedOrder.orderNumber, selectedOrder)}
+                                  disabled={isSaving}
+                                  className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                                >
+                                  {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                  Save
+                                </button>
+                                <button
+                                  onClick={cancelEditing}
+                                  className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                          {!isEditing && !isEditingWeather && selectedOrder.raceId && (
                                 <div className="flex items-center gap-3">
                                   <button
                                     onClick={() => openWeatherCalc(selectedOrder)}
@@ -5541,6 +5543,30 @@ Thank you!`
                           </div>
                         </div>
                         <div className="space-y-2">
+                          {isEditing && (
+                            <>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Race</span>
+                                <input
+                                  type="text"
+                                  value={editValues.raceNameOverride}
+                                  onChange={(e) => setEditValues({ ...editValues, raceNameOverride: e.target.value })}
+                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Year</span>
+                                <input
+                                  type="number"
+                                  value={editValues.yearOverride}
+                                  onChange={(e) => setEditValues({ ...editValues, yearOverride: e.target.value })}
+                                  className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  min="2000"
+                                  max="2030"
+                                />
+                              </div>
+                            </>
+                          )}
                           {selectedOrder.eventType ? (
                             // Flag non-marathon events so the designer doesn't
                             // assume "Marathon" by default — Half, 10K, 5K, etc.
