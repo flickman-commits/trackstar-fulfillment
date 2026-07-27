@@ -226,6 +226,108 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
 }
 
 // Copyable field component
+/**
+ * Map one raw API order onto the Order shape.
+ *
+ * There is exactly one of these on purpose. This mapping used to be copy
+ * pasted into fetchOrders and both research handlers, and the copies drifted:
+ * the research ones silently dropped photoPath, productInfo, lookupOutcome,
+ * raceId and 19 other fields, so finishing research wiped the photo callout,
+ * the tags and half the product card off the open modal. Add new fields here
+ * and every caller gets them.
+ */
+function mapOrder(order: Record<string, unknown>): Order {
+  return {
+    id: order.id as string,
+    orderNumber: order.orderNumber as string,
+    parentOrderNumber: order.parentOrderNumber as string,
+    lineItemIndex: order.lineItemIndex as number,
+    displayOrderNumber: (order.displayOrderNumber as string) || (order.parentOrderNumber as string),
+    source: order.source as 'shopify' | 'etsy',
+    raceName: order.raceName as string,
+    raceYear: order.raceYear as number | null,
+    raceDate: order.raceDate as string | undefined,
+    raceDateIso: order.raceDateIso as string | null | undefined,
+    raceLocation: order.raceLocation as string | undefined,
+    runnerName: order.runnerName as string,
+    productSize: order.productSize as string,
+    notes: order.notes as string | undefined,
+    status: order.status as 'pending' | 'ready' | 'flagged' | 'completed' | 'missing_year',
+    createdAt: order.createdAt as string,
+    completedAt: order.researchedAt as string | undefined,
+    // Research data
+    bibNumber: order.bibNumber as string | undefined,
+    officialTime: order.officialTime as string | undefined,
+    officialPace: order.officialPace as string | undefined,
+    eventType: order.eventType as string | undefined,
+    researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null,
+    researchNotes: order.researchNotes as string | undefined,
+    resultsUrl: order.resultsUrl as string | undefined,
+    // Weather
+    weatherTemp: order.weatherTemp as string | undefined,
+    weatherCondition: order.weatherCondition as string | undefined,
+    weatherDetails: order.weatherDetails as string | null | undefined,
+    raceId: order.raceId as number | null | undefined,
+    // Scraper
+    hasScraperAvailable: order.hasScraperAvailable as boolean | undefined,
+    // Override fields
+    yearOverride: order.yearOverride as number | null | undefined,
+    raceNameOverride: order.raceNameOverride as string | null | undefined,
+    runnerNameOverride: order.runnerNameOverride as string | null | undefined,
+    // Effective values
+    effectiveRaceYear: order.effectiveRaceYear as number | null | undefined,
+    effectiveRaceName: order.effectiveRaceName as string | undefined,
+    effectiveRunnerName: order.effectiveRunnerName as string | undefined,
+    hasOverrides: order.hasOverrides as boolean | undefined,
+    // Custom order fields
+    trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | undefined,
+    designStatus: order.designStatus as DesignStatus | undefined,
+    dueDate: order.dueDate as string | undefined,
+    customerEmail: order.customerEmail as string | undefined,
+    customerName: order.customerName as string | undefined,
+    bibNumberCustomer: order.bibNumberCustomer as string | undefined,
+    timeCustomer: order.timeCustomer as string | undefined,
+    creativeDirection: order.creativeDirection as string | undefined,
+    isGift: order.isGift as boolean | undefined,
+    partnerName: order.partnerName as string | null | undefined,
+    partnerContactName: order.partnerContactName as string | null | undefined,
+    creatorShipping: order.creatorShipping as Order['creatorShipping'],
+    creatorSampleCreatorId: order.creatorSampleCreatorId as string | null | undefined,
+    // Frame type — only surfaced in the creator-sample callout. For regular
+    // orders Artelo has it baked in, so we don't show it elsewhere.
+    frameType: order.frameType as string | null | undefined,
+    // Alert flags
+    hadNoTime: order.hadNoTime as boolean | undefined,
+    timeFromName: order.timeFromName as string | null | undefined,
+    // Marketplace order date for sorting
+    shopifyCreatedAt: order.shopifyCreatedAt as string | null | undefined,
+    orderPlacedAt: order.orderPlacedAt as string | null | undefined,
+    // Shipping (for expedited badge / callout)
+    shippingMethod: order.shippingMethod as string | null | undefined,
+    isExpedited: order.isExpedited as boolean | undefined,
+    // Big-spender (>= $300) badge + prioritize callout
+    orderTotalUsd: order.orderTotalUsd as number | null | undefined,
+    isBigSpender: order.isBigSpender as boolean | undefined,
+    bigSpenderThresholdUsd: order.bigSpenderThresholdUsd as number | undefined,
+    // Which product was ordered → drives design variant
+    productInfo: order.productInfo as Order['productInfo'],
+    // Custom-order delay notice — drives the "delay notice sent" badge
+    delayNoticeSentAt: order.delayNoticeSentAt as string | null | undefined,
+    delayNoticeDaysLate: order.delayNoticeDaysLate as number | null | undefined,
+    // Instant Lookup / wizard provenance. This transform is a whitelist,
+    // not a spread, so anything missing here is silently dropped no matter
+    // what the API returns — these drive the "Customer-verified" badge and
+    // the outcome chip, which is why neither had ever appeared.
+    researchSource: order.researchSource as Order['researchSource'],
+    lookupVerified: order.lookupVerified as boolean | null | undefined,
+    lookupOutcome: order.lookupOutcome as Order['lookupOutcome'],
+    // Personalization photo — drives the photo chip, View Photo and the
+    // placement sign-off that gates completion.
+    photoPath: order.photoPath as string | null | undefined,
+    photoPlacedAt: order.photoPlacedAt as string | null | undefined,
+  }
+}
+
 function CopyableField({ label, value }: { label: React.ReactNode; value: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -568,95 +670,7 @@ export default function Dashboard() {
 
       // Transform database orders to match our Order interface
       const transformedOrders: Order[] = (data.orders || []).map((order: Record<string, unknown>) => {
-        return {
-          id: order.id as string,
-          orderNumber: order.orderNumber as string,
-          parentOrderNumber: order.parentOrderNumber as string,
-          lineItemIndex: order.lineItemIndex as number,
-          displayOrderNumber: (order.displayOrderNumber as string) || (order.parentOrderNumber as string),
-          source: order.source as 'shopify' | 'etsy',
-          raceName: order.raceName as string,
-          raceYear: order.raceYear as number | null,
-          raceDate: order.raceDate as string | undefined,
-          raceDateIso: order.raceDateIso as string | null | undefined,
-          raceLocation: order.raceLocation as string | undefined,
-          runnerName: order.runnerName as string,
-          productSize: order.productSize as string,
-          notes: order.notes as string | undefined,
-          status: order.status as 'pending' | 'ready' | 'flagged' | 'completed' | 'missing_year',
-          createdAt: order.createdAt as string,
-          completedAt: order.researchedAt as string | undefined,
-          // Research data
-          bibNumber: order.bibNumber as string | undefined,
-          officialTime: order.officialTime as string | undefined,
-          officialPace: order.officialPace as string | undefined,
-          eventType: order.eventType as string | undefined,
-          researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null,
-          researchNotes: order.researchNotes as string | undefined,
-          resultsUrl: order.resultsUrl as string | undefined,
-          // Weather
-          weatherTemp: order.weatherTemp as string | undefined,
-          weatherCondition: order.weatherCondition as string | undefined,
-          weatherDetails: order.weatherDetails as string | null | undefined,
-          raceId: order.raceId as number | null | undefined,
-          // Scraper
-          hasScraperAvailable: order.hasScraperAvailable as boolean | undefined,
-          // Override fields
-          yearOverride: order.yearOverride as number | null | undefined,
-          raceNameOverride: order.raceNameOverride as string | null | undefined,
-          runnerNameOverride: order.runnerNameOverride as string | null | undefined,
-          // Effective values
-          effectiveRaceYear: order.effectiveRaceYear as number | null | undefined,
-          effectiveRaceName: order.effectiveRaceName as string | undefined,
-          effectiveRunnerName: order.effectiveRunnerName as string | undefined,
-          hasOverrides: order.hasOverrides as boolean | undefined,
-          // Custom order fields
-          trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | undefined,
-          designStatus: order.designStatus as DesignStatus | undefined,
-          dueDate: order.dueDate as string | undefined,
-          customerEmail: order.customerEmail as string | undefined,
-          customerName: order.customerName as string | undefined,
-          bibNumberCustomer: order.bibNumberCustomer as string | undefined,
-          timeCustomer: order.timeCustomer as string | undefined,
-          creativeDirection: order.creativeDirection as string | undefined,
-          isGift: order.isGift as boolean | undefined,
-          partnerName: order.partnerName as string | null | undefined,
-          partnerContactName: order.partnerContactName as string | null | undefined,
-          creatorShipping: order.creatorShipping as Order['creatorShipping'],
-          creatorSampleCreatorId: order.creatorSampleCreatorId as string | null | undefined,
-          // Frame type — only surfaced in the creator-sample callout. For regular
-          // orders Artelo has it baked in, so we don't show it elsewhere.
-          frameType: order.frameType as string | null | undefined,
-          // Alert flags
-          hadNoTime: order.hadNoTime as boolean | undefined,
-          timeFromName: order.timeFromName as string | null | undefined,
-          // Marketplace order date for sorting
-          shopifyCreatedAt: order.shopifyCreatedAt as string | null | undefined,
-          orderPlacedAt: order.orderPlacedAt as string | null | undefined,
-          // Shipping (for expedited badge / callout)
-          shippingMethod: order.shippingMethod as string | null | undefined,
-          isExpedited: order.isExpedited as boolean | undefined,
-          // Big-spender (>= $300) badge + prioritize callout
-          orderTotalUsd: order.orderTotalUsd as number | null | undefined,
-          isBigSpender: order.isBigSpender as boolean | undefined,
-          bigSpenderThresholdUsd: order.bigSpenderThresholdUsd as number | undefined,
-          // Which product was ordered → drives design variant
-          productInfo: order.productInfo as Order['productInfo'],
-          // Custom-order delay notice — drives the "delay notice sent" badge
-          delayNoticeSentAt: order.delayNoticeSentAt as string | null | undefined,
-          delayNoticeDaysLate: order.delayNoticeDaysLate as number | null | undefined,
-          // Instant Lookup / wizard provenance. This transform is a whitelist,
-          // not a spread, so anything missing here is silently dropped no matter
-          // what the API returns — these drive the "Customer-verified" badge and
-          // the outcome chip, which is why neither had ever appeared.
-          researchSource: order.researchSource as Order['researchSource'],
-          lookupVerified: order.lookupVerified as boolean | null | undefined,
-          lookupOutcome: order.lookupOutcome as Order['lookupOutcome'],
-          // Personalization photo — drives the photo chip, View Photo and the
-          // placement sign-off that gates completion.
-          photoPath: order.photoPath as string | null | undefined,
-          photoPlacedAt: order.photoPlacedAt as string | null | undefined,
-        }
+        return mapOrder(order)
       })
 
       setOrders(transformedOrders)
@@ -1056,54 +1070,7 @@ export default function Dashboard() {
       const freshResponse = await apiFetch(`/api/orders`)
       if (freshResponse.ok) {
         const freshData = await freshResponse.json()
-        const freshOrders: Order[] = (freshData.orders || []).map((order: Record<string, unknown>) => {
-          return {
-            id: order.id as string,
-            orderNumber: order.orderNumber as string,
-            parentOrderNumber: order.parentOrderNumber as string,
-            lineItemIndex: order.lineItemIndex as number,
-            displayOrderNumber: (order.displayOrderNumber as string) || (order.parentOrderNumber as string),
-            source: order.source as 'shopify' | 'etsy',
-            raceName: order.raceName as string,
-            raceYear: order.raceYear as number | null,
-            raceDate: order.raceDate as string | undefined,
-            raceLocation: order.raceLocation as string | undefined,
-            runnerName: order.runnerName as string,
-            productSize: order.productSize as string,
-            notes: order.notes as string | undefined,
-            status: order.status as 'pending' | 'ready' | 'flagged' | 'completed' | 'missing_year',
-            createdAt: order.createdAt as string,
-            completedAt: order.researchedAt as string | undefined,
-            bibNumber: order.bibNumber as string | undefined,
-            officialTime: order.officialTime as string | undefined,
-            officialPace: order.officialPace as string | undefined,
-            eventType: order.eventType as string | undefined,
-            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null,
-            researchNotes: order.researchNotes as string | undefined,
-            resultsUrl: order.resultsUrl as string | undefined,
-            weatherTemp: order.weatherTemp as string | undefined,
-            weatherCondition: order.weatherCondition as string | undefined,
-            hasScraperAvailable: order.hasScraperAvailable as boolean | undefined,
-            yearOverride: order.yearOverride as number | null | undefined,
-            raceNameOverride: order.raceNameOverride as string | null | undefined,
-            runnerNameOverride: order.runnerNameOverride as string | null | undefined,
-            effectiveRaceYear: order.effectiveRaceYear as number | null | undefined,
-            effectiveRaceName: order.effectiveRaceName as string | undefined,
-            effectiveRunnerName: order.effectiveRunnerName as string | undefined,
-            hasOverrides: order.hasOverrides as boolean | undefined,
-            trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | undefined,
-            designStatus: order.designStatus as DesignStatus | undefined,
-            dueDate: order.dueDate as string | undefined,
-            customerEmail: order.customerEmail as string | undefined,
-            customerName: order.customerName as string | undefined,
-            bibNumberCustomer: order.bibNumberCustomer as string | undefined,
-            timeCustomer: order.timeCustomer as string | undefined,
-            creativeDirection: order.creativeDirection as string | undefined,
-            isGift: order.isGift as boolean | undefined,
-            hadNoTime: order.hadNoTime as boolean | undefined,
-            timeFromName: order.timeFromName as string | null | undefined
-          }
-        })
+        const freshOrders: Order[] = (freshData.orders || []).map(mapOrder)
 
         // Update orders list
         setOrders(freshOrders)
@@ -1161,54 +1128,7 @@ export default function Dashboard() {
       const freshResponse = await apiFetch(`/api/orders`)
       if (freshResponse.ok) {
         const freshData = await freshResponse.json()
-        const freshOrders: Order[] = (freshData.orders || []).map((order: Record<string, unknown>) => {
-          return {
-            id: order.id as string,
-            orderNumber: order.orderNumber as string,
-            parentOrderNumber: order.parentOrderNumber as string,
-            lineItemIndex: order.lineItemIndex as number,
-            displayOrderNumber: (order.displayOrderNumber as string) || (order.parentOrderNumber as string),
-            source: order.source as 'shopify' | 'etsy',
-            raceName: order.raceName as string,
-            raceYear: order.raceYear as number | null,
-            raceDate: order.raceDate as string | undefined,
-            raceLocation: order.raceLocation as string | undefined,
-            runnerName: order.runnerName as string,
-            productSize: order.productSize as string,
-            notes: order.notes as string | undefined,
-            status: order.status as 'pending' | 'ready' | 'flagged' | 'completed' | 'missing_year',
-            createdAt: order.createdAt as string,
-            completedAt: order.researchedAt as string | undefined,
-            bibNumber: order.bibNumber as string | undefined,
-            officialTime: order.officialTime as string | undefined,
-            officialPace: order.officialPace as string | undefined,
-            eventType: order.eventType as string | undefined,
-            researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null,
-            researchNotes: order.researchNotes as string | undefined,
-            resultsUrl: order.resultsUrl as string | undefined,
-            weatherTemp: order.weatherTemp as string | undefined,
-            weatherCondition: order.weatherCondition as string | undefined,
-            hasScraperAvailable: order.hasScraperAvailable as boolean | undefined,
-            yearOverride: order.yearOverride as number | null | undefined,
-            raceNameOverride: order.raceNameOverride as string | null | undefined,
-            runnerNameOverride: order.runnerNameOverride as string | null | undefined,
-            effectiveRaceYear: order.effectiveRaceYear as number | null | undefined,
-            effectiveRaceName: order.effectiveRaceName as string | undefined,
-            effectiveRunnerName: order.effectiveRunnerName as string | undefined,
-            hasOverrides: order.hasOverrides as boolean | undefined,
-            trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | undefined,
-            designStatus: order.designStatus as DesignStatus | undefined,
-            dueDate: order.dueDate as string | undefined,
-            customerEmail: order.customerEmail as string | undefined,
-            customerName: order.customerName as string | undefined,
-            bibNumberCustomer: order.bibNumberCustomer as string | undefined,
-            timeCustomer: order.timeCustomer as string | undefined,
-            creativeDirection: order.creativeDirection as string | undefined,
-            isGift: order.isGift as boolean | undefined,
-            hadNoTime: order.hadNoTime as boolean | undefined,
-            timeFromName: order.timeFromName as string | null | undefined
-          }
-        })
+        const freshOrders: Order[] = (freshData.orders || []).map(mapOrder)
         setOrders(freshOrders)
         const updatedOrder = freshOrders.find(o => o.orderNumber === orderNumber)
         if (updatedOrder) {
