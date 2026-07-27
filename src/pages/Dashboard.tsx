@@ -226,7 +226,7 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
 }
 
 // Copyable field component
-function CopyableField({ label, value }: { label: string; value: string }) {
+function CopyableField({ label, value }: { label: React.ReactNode; value: string }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
@@ -5417,7 +5417,7 @@ Thank you!`
                   {/* Runner Details — copy-pasteable name + research data, top of stack */}
                   <div className="hidden md:block">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Design Data</h4>
+                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Details</h4>
                       <div className="flex items-center gap-3">
                         {selectedOrder.resultsUrl && (
                           <a
@@ -5442,232 +5442,250 @@ Thank you!`
                         )}
                       </div>
                     </div>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
-                      {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
-                        <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
-                      ) : (
-                        <PendingField label="Name" />
-                      )}
-                      {selectedOrder.bibNumber ? (
-                        <CopyableField label="Bib" value={selectedOrder.bibNumber} />
-                      ) : selectedOrder.hasScraperAvailable ? (
-                        <PendingField label="Bib" />
-                      ) : (
-                        <NotAvailableField label="Bib" />
-                      )}
-                      {/* hadNoTime is the customer's explicit "no time on the
-                          poster" opt-in — it must win over any research result. */}
-                      {selectedOrder.hadNoTime ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-off-black/40 w-16">Time</span>
-                          <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
-                            ⚠️ No Time
-                          </span>
+                    {/* Runner and race side by side on desktop. Stacks on
+                        narrow screens. Same data, half the vertical space. */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+                        <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
+                          <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Runner</span>
                         </div>
-                      ) : selectedOrder.officialTime ? (
-                        <CopyableField label="Time" value={selectedOrder.officialTime} />
-                      ) : selectedOrder.timeFromName ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-off-black/40 w-16">Time</span>
-                          <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">
-                            ⏱ {selectedOrder.timeFromName}
-                          </span>
-                        </div>
-                      ) : selectedOrder.hasScraperAvailable ? (
-                        <PendingField label="Time" />
-                      ) : (
-                        <NotAvailableField label="Time" />
-                      )}
-                      {/* Pace is suppressed alongside Time when the customer
-                          opted out — a poster without a time shouldn't show a pace. */}
-                      {selectedOrder.hadNoTime ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-off-black/40 w-16">Pace</span>
-                          <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
-                            ⚠️ No Pace
-                          </span>
-                        </div>
-                      ) : selectedOrder.officialPace ? (
-                        <CopyableField label="Pace" value={selectedOrder.officialPace} />
-                      ) : selectedOrder.hasScraperAvailable ? (
-                        <PendingField label="Pace" />
-                      ) : (
-                        <NotAvailableField label="Pace" />
-                      )}
-                      {/* Race data lives in the same card, split by a rule.
-                          It is all one thing: the data that goes on the print. */}
-                      <div className="flex items-center justify-between pt-2 mt-1 border-t border-border-gray">
-                        <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Race</span>
-                        <div className="flex items-center gap-3">
-                      {!isEditingWeather && selectedOrder.raceId && (
-                            <div className="flex items-center gap-3">
-                              <button
-                                onClick={() => openWeatherCalc(selectedOrder)}
-                                className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black transition-colors"
-                                title="Calculate weather from date + city"
-                              >
-                                <CloudSun className="w-3 h-3" />
-                                Calculate weather
-                              </button>
-                              <button
-                                onClick={() => startEditingWeather(selectedOrder)}
-                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                              >
-                                <Pencil className="w-3 h-3" />
-                                Edit
-                              </button>
-                            </div>
+                        <div className="space-y-2">
+                          {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) ? (
+                            <CopyableField label="Name" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName} />
+                          ) : (
+                            <PendingField label="Name" />
                           )}
-                          {isEditingWeather && (
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => saveWeather(selectedOrder)}
-                                disabled={isSavingWeather}
-                                className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
-                              >
-                                {isSavingWeather ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                                Save
-                              </button>
-                              <button
-                                onClick={cancelEditingWeather}
-                                className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
-                              >
-                                <X className="w-3 h-3" />
-                                Cancel
-                              </button>
-                            </div>
+                          {selectedOrder.bibNumber ? (
+                            <CopyableField label="Bib" value={selectedOrder.bibNumber} />
+                          ) : selectedOrder.hasScraperAvailable ? (
+                            <PendingField label="Bib" />
+                          ) : (
+                            <NotAvailableField label="Bib" />
                           )}
-
+                          {/* hadNoTime is the customer's explicit "no time on the
+                              poster" opt-in — it must win over any research result. */}
+                          {selectedOrder.hadNoTime ? (
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-off-black/40 w-16">Time</span>
+                              <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
+                                ⚠️ No Time
+                              </span>
+                            </div>
+                          ) : selectedOrder.officialTime ? (
+                            <CopyableField label="Time" value={selectedOrder.officialTime} />
+                          ) : selectedOrder.timeFromName ? (
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-off-black/40 w-16">Time</span>
+                              <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">
+                                ⏱ {selectedOrder.timeFromName}
+                              </span>
+                            </div>
+                          ) : selectedOrder.hasScraperAvailable ? (
+                            <PendingField label="Time" />
+                          ) : (
+                            <NotAvailableField label="Time" />
+                          )}
+                          {/* Pace is suppressed alongside Time when the customer
+                              opted out — a poster without a time shouldn't show a pace. */}
+                          {selectedOrder.hadNoTime ? (
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-off-black/40 w-16">Pace</span>
+                              <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">
+                                ⚠️ No Pace
+                              </span>
+                            </div>
+                          ) : selectedOrder.officialPace ? (
+                            <CopyableField label="Pace" value={selectedOrder.officialPace} />
+                          ) : selectedOrder.hasScraperAvailable ? (
+                            <PendingField label="Pace" />
+                          ) : (
+                            <NotAvailableField label="Pace" />
+                          )}
                         </div>
                       </div>
-                      {selectedOrder.eventType ? (
-                        // Flag non-marathon events so the designer doesn't
-                        // assume "Marathon" by default — Half, 10K, 5K, etc.
-                        // use different templates.
-                        (() => {
-                          const isMarathon = /^marathon$/i.test(selectedOrder.eventType.trim())
-                          return (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-off-black/60">Event</span>
-                              <div className="flex items-center gap-2">
-                                {!isMarathon && (
-                                  <span
-                                    className="inline-flex items-center px-1.5 py-0.5 bg-warning-amber/15 text-warning-amber border border-warning-amber/30 text-[10px] font-bold rounded leading-none"
-                                    title="Not the full marathon — double-check the template"
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+                        <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
+                          <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Race</span>
+                          <div className="flex items-center gap-3">
+                          {!isEditingWeather && selectedOrder.raceId && (
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => openWeatherCalc(selectedOrder)}
+                                    className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black transition-colors"
+                                    title="Calculate weather from date + city"
                                   >
-                                    !!
-                                  </span>
-                                )}
-                                <span className={`text-body-sm font-medium ${isMarathon ? 'text-off-black' : 'text-warning-amber'}`}>{selectedOrder.eventType}</span>
-                              </div>
-                            </div>
-                          )
-                        })()
-                      ) : selectedOrder.hasScraperAvailable ? (
-                        <PendingField label="Event" />
-                      ) : (
-                        <NotAvailableField label="Event" />
-                      )}
-                      {isEditingWeather ? (
-                        <div className="flex justify-between items-center">
-                          <span className="text-body-sm text-off-black/60">Date</span>
-                          <input
-                            type="date"
-                            value={weatherEditValues.raceDate}
-                            onChange={(e) => setWeatherEditValues(prev => ({ ...prev, raceDate: e.target.value }))}
-                            className="w-40 px-2 py-1 text-sm text-right border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                          />
+                                    <CloudSun className="w-3 h-3" />
+                                    Calculate weather
+                                  </button>
+                                  <button
+                                    onClick={() => startEditingWeather(selectedOrder)}
+                                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                    Edit
+                                  </button>
+                                </div>
+                              )}
+                              {isEditingWeather && (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => saveWeather(selectedOrder)}
+                                    disabled={isSavingWeather}
+                                    className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                                  >
+                                    {isSavingWeather ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEditingWeather}
+                                    className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
+                                  >
+                                    <X className="w-3 h-3" />
+                                    Cancel
+                                  </button>
+                                </div>
+                              )}
+                          </div>
                         </div>
-                      ) : selectedOrder.raceDate ? (
-                        <CopyableField label="Date" value={selectedOrder.raceDate} />
-                      ) : selectedOrder.hasScraperAvailable ? (
-                        <PendingField label="Date" />
-                      ) : (
-                        <NotAvailableField label="Date" />
-                      )}
-                      {isEditingWeather ? (
-                        <div className="flex justify-between items-center">
-                          <span className="text-body-sm text-off-black/60">Weather</span>
-                          <select
-                            value={weatherEditValues.weatherCondition}
-                            onChange={(e) => setWeatherEditValues(prev => ({ ...prev, weatherCondition: e.target.value }))}
-                            className="w-40 px-2 py-1 text-sm text-right border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                          >
-                            <option value="">--</option>
-                            <option value="Sunny">Sunny</option>
-                            <option value="Cloudy">Cloudy</option>
-                            <option value="Rainy">Rainy</option>
-                            <option value="Snowy">Snowy</option>
-                          </select>
-                        </div>
-                      ) : selectedOrder.weatherCondition ? (
-                        <div>
-                          <CopyableField label="Weather" value={selectedOrder.weatherCondition} />
-                          {selectedOrder.weatherDetails && (() => {
-                            let b: { method?: string; place?: string; date?: string; avgTempF?: number; counts?: Record<string, number>; hours?: { hour: number; tempF: number; condition: string }[] } | null = null
-                            try { b = JSON.parse(selectedOrder.weatherDetails) } catch { b = null }
-                            if (!b) return null
-                            return (
-                              <div className="relative mt-1">
-                                <button
-                                  onClick={() => setShowWeatherInfo(v => !v)}
-                                  className="inline-flex items-center gap-1 text-[10px] text-off-black/40 hover:text-off-black/70 transition-colors"
-                                  title="How this weather was determined"
-                                >
-                                  <Info className="w-3 h-3" /> How this was determined
-                                </button>
-                                {showWeatherInfo && (
-                                  <>
-                                    {/* Click-away backdrop — clicking anywhere else closes the popover */}
-                                    <div className="fixed inset-0 z-10" onClick={() => setShowWeatherInfo(false)} />
-                                  <div className="absolute left-0 top-full mt-1 z-20 w-72 bg-white border border-border-gray rounded-md shadow-lg p-3 text-left" onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                      onClick={() => setShowWeatherInfo(false)}
-                                      className="absolute top-2 right-2 text-off-black/30 hover:text-off-black/70 transition-colors"
-                                      title="Close"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                    <p className="text-[11px] text-off-black/60 leading-snug mb-2 pr-5">
-                                      {b.method} {b.place ? `· ${b.place}` : ''}{b.date ? ` · ${b.date}` : ''}
-                                    </p>
-                                    <p className="text-xs font-medium text-off-black mb-1.5">
-                                      Avg {b.avgTempF}°F · {(['sunny','cloudy','rainy','snowy'] as const).filter(k => b!.counts?.[k]).map(k => `${b!.counts![k]} ${k}`).join(', ')}
-                                    </p>
-                                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-                                      {(b.hours || []).map(h => (
-                                        <div key={h.hour} className="flex justify-between text-[10px] text-off-black/60">
-                                          <span>{h.hour}:00</span>
-                                          <span>{h.tempF}° · {h.condition}</span>
-                                        </div>
-                                      ))}
-                                    </div>
+                        <div className="space-y-2">
+                          {selectedOrder.eventType ? (
+                            // Flag non-marathon events so the designer doesn't
+                            // assume "Marathon" by default — Half, 10K, 5K, etc.
+                            // use different templates.
+                            (() => {
+                              const isMarathon = /^marathon$/i.test(selectedOrder.eventType.trim())
+                              return (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-body-sm text-off-black/60">Event</span>
+                                  <div className="flex items-center gap-2">
+                                    {!isMarathon && (
+                                      <span
+                                        className="inline-flex items-center px-1.5 py-0.5 bg-warning-amber/15 text-warning-amber border border-warning-amber/30 text-[10px] font-bold rounded leading-none"
+                                        title="Not the full marathon — double-check the template"
+                                      >
+                                        !!
+                                      </span>
+                                    )}
+                                    <span className={`text-body-sm font-medium ${isMarathon ? 'text-off-black' : 'text-warning-amber'}`}>{selectedOrder.eventType}</span>
                                   </div>
-                                  </>
-                                )}
-                              </div>
-                            )
-                          })()}
+                                </div>
+                              )
+                            })()
+                          ) : selectedOrder.hasScraperAvailable ? (
+                            <PendingField label="Event" />
+                          ) : (
+                            <NotAvailableField label="Event" />
+                          )}
+                          {isEditingWeather ? (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-off-black/60">Date</span>
+                              <input
+                                type="date"
+                                value={weatherEditValues.raceDate}
+                                onChange={(e) => setWeatherEditValues(prev => ({ ...prev, raceDate: e.target.value }))}
+                                className="w-40 px-2 py-1 text-sm text-right border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                              />
+                            </div>
+                          ) : selectedOrder.raceDate ? (
+                            <CopyableField label="Date" value={selectedOrder.raceDate} />
+                          ) : selectedOrder.hasScraperAvailable ? (
+                            <PendingField label="Date" />
+                          ) : (
+                            <NotAvailableField label="Date" />
+                          )}
+                          {isEditingWeather ? (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-off-black/60">Weather</span>
+                              <select
+                                value={weatherEditValues.weatherCondition}
+                                onChange={(e) => setWeatherEditValues(prev => ({ ...prev, weatherCondition: e.target.value }))}
+                                className="w-40 px-2 py-1 text-sm text-right border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                              >
+                                <option value="">--</option>
+                                <option value="Sunny">Sunny</option>
+                                <option value="Cloudy">Cloudy</option>
+                                <option value="Rainy">Rainy</option>
+                                <option value="Snowy">Snowy</option>
+                              </select>
+                            </div>
+                          ) : selectedOrder.weatherCondition ? (
+                            (() => {
+                              let b: { method?: string; place?: string; date?: string; avgTempF?: number; counts?: Record<string, number>; hours?: { hour: number; tempF: number; condition: string }[] } | null = null
+                              try { b = selectedOrder.weatherDetails ? JSON.parse(selectedOrder.weatherDetails) : null } catch { b = null }
+                              return (
+                                <div className="relative">
+                                  {/* Explanation sits inline with the label so it
+                                      does not cost its own row. */}
+                                  <CopyableField
+                                    label={
+                                      <span className="inline-flex items-center gap-1.5">
+                                        Weather
+                                        {b && (
+                                          <button
+                                            onClick={() => setShowWeatherInfo(v => !v)}
+                                            className="inline-flex items-center gap-0.5 text-[10px] text-off-black/40 hover:text-off-black/70 transition-colors"
+                                            title="How this weather was determined"
+                                          >
+                                            <Info className="w-3 h-3" /> Explanation
+                                          </button>
+                                        )}
+                                      </span>
+                                    }
+                                    value={selectedOrder.weatherCondition}
+                                  />
+                                  {b && showWeatherInfo && (
+                                      <>
+                                        {/* Click-away backdrop — clicking anywhere else closes the popover */}
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowWeatherInfo(false)} />
+                                      <div className="absolute left-0 top-full mt-1 z-20 w-72 bg-white border border-border-gray rounded-md shadow-lg p-3 text-left" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                          onClick={() => setShowWeatherInfo(false)}
+                                          className="absolute top-2 right-2 text-off-black/30 hover:text-off-black/70 transition-colors"
+                                          title="Close"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                        <p className="text-[11px] text-off-black/60 leading-snug mb-2 pr-5">
+                                          {b.method} {b.place ? `· ${b.place}` : ''}{b.date ? ` · ${b.date}` : ''}
+                                        </p>
+                                        <p className="text-xs font-medium text-off-black mb-1.5">
+                                          Avg {b.avgTempF}°F · {(['sunny','cloudy','rainy','snowy'] as const).filter(k => b!.counts?.[k]).map(k => `${b!.counts![k]} ${k}`).join(', ')}
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                                          {(b.hours || []).map(h => (
+                                            <div key={h.hour} className="flex justify-between text-[10px] text-off-black/60">
+                                              <span>{h.hour}:00</span>
+                                              <span>{h.tempF}° · {h.condition}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      </>
+                                  )}
+                                </div>
+                              )
+                            })()
+                          ) : (
+                            <PendingField label="Weather" />
+                          )}
+                          {isEditingWeather ? (
+                            <div className="flex justify-between items-center">
+                              <span className="text-body-sm text-off-black/60">Temp</span>
+                              <input
+                                type="text"
+                                value={weatherEditValues.weatherTemp}
+                                onChange={(e) => setWeatherEditValues(prev => ({ ...prev, weatherTemp: e.target.value }))}
+                                placeholder="e.g. 65°F"
+                                className="w-40 px-2 py-1 text-sm text-right border border-border-gray rounded focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                              />
+                            </div>
+                          ) : selectedOrder.weatherTemp ? (
+                            <CopyableField label="Temp" value={selectedOrder.weatherTemp} />
+                          ) : (
+                            <PendingField label="Temp" />
+                          )}
                         </div>
-                      ) : (
-                        <PendingField label="Weather" />
-                      )}
-                      {isEditingWeather ? (
-                        <div className="flex justify-between items-center">
-                          <span className="text-body-sm text-off-black/60">Temp</span>
-                          <input
-                            type="text"
-                            value={weatherEditValues.weatherTemp}
-                            onChange={(e) => setWeatherEditValues(prev => ({ ...prev, weatherTemp: e.target.value }))}
-                            placeholder="e.g. 65°F"
-                            className="w-40 px-2 py-1 text-sm text-right border border-border-gray rounded focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                          />
-                        </div>
-                      ) : selectedOrder.weatherTemp ? (
-                        <CopyableField label="Temp" value={selectedOrder.weatherTemp} />
-                      ) : (
-                        <PendingField label="Temp" />
-                      )}
+                      </div>
                     </div>
                   </div>
 
