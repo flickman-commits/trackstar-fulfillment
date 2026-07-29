@@ -372,17 +372,15 @@ function StaticField({ label, value, flag }: { label: string; value: string; fla
 }
 
 /**
- * "How do I know whether to trust this?" reference, parked next to the runner
- * data it describes.
+ * "Can I trust these numbers?" reference, parked next to the runner data.
  *
- * The question it answers came from fulfillment: a customer typed a time that
- * did not match the official results, and there was no way to tell whether the
- * order had been checked against anything. That distinction lives in one field
- * (_lookup_verified); the outcome only explains how the shopper got there. So
- * the panel leads with the rule and treats the value list as reference.
+ * Deliberately short. The first version listed all eleven outcome values with a
+ * sentence each, which buried the answer: the five manual_* values mean the
+ * same thing operationally (they typed it), so spelling each one out was noise.
+ * Only the outcomes that change what you should DO earn a line.
  *
- * Click rather than hover: this is read, not glanced at, and hover cards cannot
- * be opened on a touchscreen.
+ * Click, not hover: read rather than glanced at, and a hover card cannot be
+ * opened on a touchscreen.
  */
 function LookupLegend() {
   const [open, setOpen] = useState(false)
@@ -394,29 +392,10 @@ function LookupLegend() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  const trusted: [string, string][] = [
-    ['auto_match', 'One runner matched the name. They confirmed it was theirs.'],
-    ['picked_from_list', 'Several runners matched. They picked which one was theirs.'],
-  ]
-  const typed: [string, string][] = [
-    ['manual_user_choice', 'They chose to type it instead of searching.'],
-    ['manual_no_match', 'We searched, found nothing for that name and year, so they typed it.'],
-    ['manual_lookup_error', 'The timing site was down, so they typed it.'],
-    ['manual_timeout', 'The timing site was too slow, so they typed it.'],
-    ['manual_rate_limited', 'They hit our lookup limit, so they typed it.'],
-    ['edited_by_customer', 'They had a result, then hand-edited the time, pace or bib.'],
-    ['no_lookup_available', 'We have no results scraper for this race, so nothing was searched. Only the name and year came from them.'],
-  ]
-  const research: [string, string][] = [
-    ['async_no_match', 'Nothing found. They asked us to track it down.'],
-    ['async_timeout', 'Lookup timed out. They asked us to track it down.'],
-    ['async_lookup_error', 'Lookup errored. They asked us to track it down.'],
-  ]
-
-  const Row = ({ code, meaning }: { code: string; meaning: string }) => (
-    <div className="grid grid-cols-[minmax(9rem,auto)_1fr] gap-x-3 gap-y-0.5 py-1 border-b border-off-black/5 last:border-0">
-      <code className="text-[11px] font-mono text-off-black/80 break-all">{code}</code>
-      <span className="text-[11px] text-off-black/60 leading-snug">{meaning}</span>
+  const Note = ({ code, meaning }: { code: string; meaning: string }) => (
+    <div className="py-1.5 border-b border-off-black/5 last:border-0">
+      <code className="text-[13px] font-mono text-off-black/80">{code}</code>
+      <span className="text-sm text-off-black/60"> {meaning}</span>
     </div>
   )
 
@@ -427,66 +406,65 @@ function LookupLegend() {
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         className="text-xs text-blue-600 hover:text-blue-700 transition-colors"
-        title="What do verified and outcome mean?"
+        title="What the lookup codes on this order mean"
       >
-        Trust guide
+        Lookup Codes
       </button>
 
       {open && (
         <>
-          {/* Click-away. Sits under the panel, over everything else. */}
           <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setOpen(false)} />
           {/* Centred and FIXED, not anchored to the button. The order modal is
               max-h-[90vh] overflow-y-auto, so an absolutely positioned panel
               gets clipped the moment it opens below the fold on a long order. */}
           <div
-            className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[30rem] max-w-[92vw] max-h-[80vh] overflow-y-auto rounded-md border border-border-gray bg-white p-4 shadow-xl text-left"
+            className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[30rem] max-w-[92vw] max-h-[85vh] overflow-y-auto rounded-md border border-border-gray bg-white p-5 shadow-xl text-left"
             role="dialog"
             aria-modal="true"
-            aria-label="How to read verified and outcome"
+            aria-label="Can I trust these numbers?"
           >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <h5 className="text-xs font-semibold text-off-black uppercase tracking-tight">Can I trust these numbers?</h5>
-              <button type="button" onClick={() => setOpen(false)} className="text-off-black/40 hover:text-off-black leading-none text-lg" aria-label="Close">&times;</button>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <h5 className="text-base font-semibold text-off-black">Can I trust these numbers?</h5>
+              <button type="button" onClick={() => setOpen(false)} className="text-off-black/40 hover:text-off-black leading-none text-xl" aria-label="Close">&times;</button>
             </div>
 
-            {/* The rule first. Everything below is reference. */}
-            <div className="space-y-2 mb-4">
-              <div className="rounded border border-green-200 bg-green-50 p-2.5">
-                <p className="text-[11px] font-semibold text-green-800">verified: true &rarr; use what is on the order</p>
-                <p className="text-[11px] text-green-800/70 leading-snug mt-0.5">
-                  The shopper was shown official race results and confirmed that runner was theirs. The time, pace and bib came from the timing company, not from them typing.
+            <div className="space-y-2.5 mb-5">
+              <div className="rounded border border-green-200 bg-green-50 p-3">
+                <p className="text-sm font-semibold text-green-800">verified: true &rarr; use it</p>
+                <p className="text-sm text-green-800/75 leading-snug mt-1">
+                  Confirmed against official race results. The numbers came from the timing company.
                 </p>
               </div>
-              <div className="rounded border border-amber-300 bg-amber-50 p-2.5">
-                <p className="text-[11px] font-semibold text-amber-900">verified: false &rarr; check it against the results</p>
-                <p className="text-[11px] text-amber-900/70 leading-snug mt-0.5">
-                  They typed the numbers themselves. Nothing has been checked. A blank Event is a quick tell, it only fills in on a confirmed match.
+              <div className="rounded border border-amber-300 bg-amber-50 p-3">
+                <p className="text-sm font-semibold text-amber-900">verified: false &rarr; check it</p>
+                <p className="text-sm text-amber-900/75 leading-snug mt-1">
+                  They typed it themselves. A blank Event is the quick tell.
                 </p>
               </div>
             </div>
 
-            <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1">Checked against official results</p>
-            <div className="mb-3">{trusted.map(([c, m]) => <Row key={c} code={c} meaning={m} />)}</div>
-
-            <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1">Typed by the customer</p>
-            <div className="mb-3">{typed.map(([c, m]) => <Row key={c} code={c} meaning={m} />)}</div>
-
-            <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1">Nothing submitted, needs research</p>
-            <div className="mb-4">{research.map(([c, m]) => <Row key={c} code={c} meaning={m} />)}</div>
-
-            <div className="rounded border border-border-gray bg-subtle-gray p-2.5">
-              <p className="text-[11px] font-semibold text-off-black mb-1">When their numbers disagree with the results site</p>
-              <p className="text-[11px] text-off-black/70 leading-snug mb-2">
-                Official results usually win, but check these three first. All are cases where the customer is right and the search was wrong:
+            <p className="text-xs font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Outcomes worth a second look</p>
+            <div className="mb-5">
+              <Note code="edited_by_customer" meaning="had a real result, then changed it by hand." />
+              <Note code="no_lookup_available" meaning="no scraper for this race. Only the name and year are theirs." />
+              <Note code="async_*" meaning="nothing submitted. Needs research." />
+              <p className="text-sm text-off-black/50 leading-snug pt-2">
+                Everything else just restates the flag: <code className="text-[13px] font-mono">auto_match</code> and <code className="text-[13px] font-mono">picked_from_list</code> were checked, every <code className="text-[13px] font-mono">manual_*</code> was typed.
               </p>
-              <ol className="text-[11px] text-off-black/70 leading-snug space-y-1 list-decimal pl-4">
-                <li>They registered under a different name (maiden name, Nick vs Nicholas). Search by bib instead.</li>
-                <li>They want a different number on purpose, such as their watch time rather than chip time, or a half split off a full.</li>
-                <li>The results site is wrong or incomplete, which happens with smaller races.</li>
-              </ol>
-              <p className="text-[11px] text-off-black/70 leading-snug mt-2">
-                If it is still unclear, ask before printing. The proof email is already going out, so one line settles it: &ldquo;Official results show 3:41:12, you entered 3:42:59. Which should we print?&rdquo;
+            </div>
+
+            <div className="rounded border border-border-gray bg-subtle-gray p-3">
+              <p className="text-sm font-semibold text-off-black mb-1.5">If their numbers disagree with the results site</p>
+              <p className="text-sm text-off-black/70 leading-snug mb-2">
+                Official results usually win. The exceptions, where they are right and our search was wrong:
+              </p>
+              <ul className="text-sm text-off-black/70 leading-snug space-y-1 list-disc pl-5">
+                <li>They registered under another name. Search by bib.</li>
+                <li>They want a different number on purpose, like watch time.</li>
+                <li>The results site is incomplete, common at small races.</li>
+              </ul>
+              <p className="text-sm text-off-black/70 leading-snug mt-2.5">
+                Still unclear? Ask in the proof email before printing.
               </p>
             </div>
           </div>
