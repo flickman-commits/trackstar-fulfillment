@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
 import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
@@ -374,10 +374,9 @@ function StaticField({ label, value, flag }: { label: string; value: string; fla
 /**
  * "Can I trust these numbers?" reference, parked next to the runner data.
  *
- * Deliberately short. The first version listed all eleven outcome values with a
- * sentence each, which buried the answer: the five manual_* values mean the
- * same thing operationally (they typed it), so spelling each one out was noise.
- * Only the outcomes that change what you should DO earn a line.
+ * Every outcome is listed, because someone reading a code off an order wants to
+ * find that exact code. What is kept short is each MEANING: a few words, laid
+ * out as a table, so the list scans instead of reading like prose.
  *
  * Click, not hover: read rather than glanced at, and a hover card cannot be
  * opened on a touchscreen.
@@ -392,10 +391,36 @@ function LookupLegend() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  const Note = ({ code, meaning }: { code: string; meaning: string }) => (
-    <div className="py-1.5 border-b border-off-black/5 last:border-0">
-      <code className="text-[13px] font-mono text-off-black/80">{code}</code>
-      <span className="text-sm text-off-black/60"> {meaning}</span>
+  const CHECKED: [string, string][] = [
+    ['auto_match', 'one match, they confirmed it'],
+    ['picked_from_list', 'several matches, they picked theirs'],
+  ]
+  const TYPED: [string, string][] = [
+    ['manual_user_choice', 'chose to type instead of searching'],
+    ['manual_no_match', 'search found nothing'],
+    ['manual_lookup_error', 'timing site was down'],
+    ['manual_timeout', 'timing site was too slow'],
+    ['manual_rate_limited', 'hit our lookup limit'],
+    ['edited_by_customer', 'had a result, then hand-edited it'],
+    ['no_lookup_available', 'no scraper for this race, only name and year are theirs'],
+  ]
+  const RESEARCH: [string, string][] = [
+    ['async_no_match', 'nothing found'],
+    ['async_timeout', 'lookup timed out'],
+    ['async_lookup_error', 'lookup errored'],
+  ]
+
+  const Group = ({ label, rows }: { label: string; rows: [string, string][] }) => (
+    <div className="mb-3.5">
+      <p className="text-xs font-semibold text-off-black/40 uppercase tracking-wider mb-1">{label}</p>
+      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 items-baseline">
+        {rows.map(([code, meaning]) => (
+          <Fragment key={code}>
+            <code className="text-[13px] font-mono text-off-black/85 whitespace-nowrap">{code}</code>
+            <span className="text-sm text-off-black/60 leading-snug">{meaning}</span>
+          </Fragment>
+        ))}
+      </div>
     </div>
   )
 
@@ -418,13 +443,13 @@ function LookupLegend() {
               max-h-[90vh] overflow-y-auto, so an absolutely positioned panel
               gets clipped the moment it opens below the fold on a long order. */}
           <div
-            className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[30rem] max-w-[92vw] max-h-[85vh] overflow-y-auto rounded-md border border-border-gray bg-white p-5 shadow-xl text-left"
+            className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] max-w-[92vw] max-h-[85vh] overflow-y-auto rounded-md border border-border-gray bg-white p-5 shadow-xl text-left"
             role="dialog"
             aria-modal="true"
-            aria-label="Can I trust these numbers?"
+            aria-label="Lookup codes"
           >
             <div className="flex items-start justify-between gap-3 mb-4">
-              <h5 className="text-base font-semibold text-off-black">Can I trust these numbers?</h5>
+              <h5 className="text-base font-semibold text-off-black">Lookup Codes</h5>
               <button type="button" onClick={() => setOpen(false)} className="text-off-black/40 hover:text-off-black leading-none text-xl" aria-label="Close">&times;</button>
             </div>
 
@@ -443,28 +468,14 @@ function LookupLegend() {
               </div>
             </div>
 
-            <p className="text-xs font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Outcomes worth a second look</p>
-            <div className="mb-5">
-              <Note code="edited_by_customer" meaning="had a real result, then changed it by hand." />
-              <Note code="no_lookup_available" meaning="no scraper for this race. Only the name and year are theirs." />
-              <Note code="async_*" meaning="nothing submitted. Needs research." />
-              <p className="text-sm text-off-black/50 leading-snug pt-2">
-                Everything else just restates the flag: <code className="text-[13px] font-mono">auto_match</code> and <code className="text-[13px] font-mono">picked_from_list</code> were checked, every <code className="text-[13px] font-mono">manual_*</code> was typed.
-              </p>
-            </div>
+            <Group label="Checked against official results" rows={CHECKED} />
+            <Group label="Typed by the customer" rows={TYPED} />
+            <Group label="Nothing submitted, needs research" rows={RESEARCH} />
 
             <div className="rounded border border-border-gray bg-subtle-gray p-3">
-              <p className="text-sm font-semibold text-off-black mb-1.5">If their numbers disagree with the results site</p>
-              <p className="text-sm text-off-black/70 leading-snug mb-2">
-                Official results usually win. The exceptions, where they are right and our search was wrong:
-              </p>
-              <ul className="text-sm text-off-black/70 leading-snug space-y-1 list-disc pl-5">
-                <li>They registered under another name. Search by bib.</li>
-                <li>They want a different number on purpose, like watch time.</li>
-                <li>The results site is incomplete, common at small races.</li>
-              </ul>
-              <p className="text-sm text-off-black/70 leading-snug mt-2.5">
-                Still unclear? Ask in the proof email before printing.
+              <p className="text-sm text-off-black/75 leading-snug">
+                <span className="font-semibold text-off-black">Numbers disagree with the results site?</span>{' '}
+                Email the customer to confirm before printing.
               </p>
             </div>
           </div>
