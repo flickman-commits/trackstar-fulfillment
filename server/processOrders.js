@@ -23,6 +23,7 @@ import { parseRaceNameFromTitle } from './scrapers/raceNameNormalization.js'
 import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrderIds, saveCountedOrderIds } from './services/customersServed.js'
 import { isExpeditedShipping, getShippingMethod } from './lib/shipping.js'
 import { fetchWithTimeout } from './lib/fetchWithTimeout.js'
+import { buildShopifyMatchMap, buildEtsyMatchMap } from './lib/lineItemMatching.js'
 
 // Artelo API configuration
 const ARTELO_API_URL = 'https://www.artelo.io/api/open/orders/get'
@@ -35,21 +36,6 @@ const ACTIONABLE_STATUSES = ['PendingFulfillmentAction', 'AwaitingPayment']
 const CUSTOM_ORDER_RACE_NAMES = ['Custom Trackstar Print (Any Race)']
 
 /**
- * The $15 photo upcharge is its own Shopify product, so a photo order arrives
- * as TWO line items: the poster and the add-on. Only the poster is a print.
- *
- * The add-on carries requires_shipping: false, so it should never reach Artelo
- * and therefore should never become an order row. This guard exists because
- * "should" is doing a lot of work in that sentence — if it ever does come
- * through, it would create a row with no race, no runner and no size that
- * looks like a broken order to whoever opens the dashboard.
- *
- * Matched on product id first (exact, survives renaming) with a title fallback.
- */
-const PHOTO_ADDON_PRODUCT_ID = Number(process.env.PHOTO_ADDON_PRODUCT_ID || 10329625723163)
-const PHOTO_ADDON_TITLE_RE = /^photo add-?on$/i
-
-/**
  * Is a cart-property flag actually set? Blank means "not set" — the
  * personalization wizard writes its flag properties unconditionally and leaves
  * the value empty when the answer is no.
@@ -60,111 +46,6 @@ function isTruthyFlag(value) {
   return v !== 'false' && v !== 'no' && v !== '0' && v !== 'off'
 }
 
-function isPhotoAddonLineItem(lineItem) {
-  if (!lineItem) return false
-  if (Number(lineItem.product_id) === PHOTO_ADDON_PRODUCT_ID) return true
-  return PHOTO_ADDON_TITLE_RE.test(String(lineItem.title || '').trim())
-}
-
-// -----------------------------------------------------------------------------
-// Multi-line-item matcher (Artelo ↔ Shopify / Etsy)
-// -----------------------------------------------------------------------------
-// CRITICAL: Artelo's `orderItems[]` array is NOT guaranteed to be in the same
-// order as Shopify's `line_items[]`. We observed a real mix-up on order #3348
-// where Artelo flipped the items — the customer ordered 12x18 (Victor) +
-// 8x10 (Hannah), but Artelo returned them as 8x10 first then 12x18, and our
-// old positional `[lineItemIndex]` lookup glued Victor's name onto the 8x10
-// print and Hannah's onto the 12x18.
-//
-// This helper builds a stable mapping artelo[i] → shopify[j] (or -1 if none)
-// by matching on the print size (and frame as a tiebreaker for duplicates),
-// then falling back to positional for any leftovers. It's used everywhere we
-// pair an Artelo line item with its Shopify counterpart.
-
-function normalizePrintSize(raw) {
-  if (!raw) return ''
-  // Artelo prefixes with "x" (e.g. "x8x10"); strip it. Lowercase + trim.
-  return String(raw).replace(/^x/i, '').toLowerCase().trim()
-}
-
-function shopifySkuContainsSize(sku, size) {
-  if (!sku || !size) return false
-  // SKUs look like "eugene-s1p-12x18-bl-pok-am" — size is a hyphen-bounded token
-  return new RegExp(`(^|[-_])${size}([-_]|$)`, 'i').test(sku)
-}
-
-/**
- * Score-based stable matching. We compute a score for every (artelo[i],
- * upstream[j]) pair, then greedily assign highest-scoring pairs first.
- * Positional alignment is a tiebreaker (small penalty for index distance) —
- * this means when sizes don't disambiguate (e.g. two 8x10s), positional
- * stays put. Swaps only happen when size info clearly points to a different
- * pairing.
- */
-function buildMatchMapByScore(arteloItems, upstreamItems, scoreSizeMatchFns) {
-  const n = arteloItems?.length || 0
-  const result = new Array(n).fill(-1)
-  if (!upstreamItems?.length || !n) return result
-
-  const candidates = []
-  for (let i = 0; i < n; i++) {
-    const aSize = normalizePrintSize(arteloItems[i]?.product?.size)
-    for (let j = 0; j < upstreamItems.length; j++) {
-      let score = 0
-      if (aSize) {
-        for (const fn of scoreSizeMatchFns) {
-          score += fn(upstreamItems[j], aSize)
-        }
-      }
-      // Positional tiebreaker — small penalty for index distance. Keeps
-      // positional matching when no size info disambiguates.
-      score -= Math.abs(i - j)
-      candidates.push({ i, j, score })
-    }
-  }
-  // Highest score first; deterministic tiebreak by i then j
-  candidates.sort((a, b) => b.score - a.score || a.i - b.i || a.j - b.j)
-  const usedI = new Set()
-  const usedJ = new Set()
-  for (const c of candidates) {
-    if (usedI.has(c.i) || usedJ.has(c.j)) continue
-    result[c.i] = c.j
-    usedI.add(c.i)
-    usedJ.add(c.j)
-  }
-  return result
-}
-
-/**
- * Build mapping from Artelo line-item index → Shopify line-item index.
- * Returns an array `map` where `map[arteloIdx] = shopifyIdx | -1`.
- */
-function buildShopifyMatchMap(arteloItems, shopifyLineItems) {
-  return buildMatchMapByScore(arteloItems, shopifyLineItems, [
-    // SKU containing the size token is the strongest signal (SKU encodes
-    // the actual variant, while variant_title is display text that can be
-    // misleading — e.g. "Black Oak" used as a label for "Black Premium Oak").
-    (li, size) => shopifySkuContainsSize(li?.sku, size) ? 100 : 0,
-    // variant_title is a weaker signal but still useful
-    (li, size) => (li?.variant_title || '').toLowerCase().includes(size) ? 50 : 0,
-  ])
-}
-
-/**
- * Same idea for Etsy transactions. SKU first, then variations text.
- */
-function buildEtsyMatchMap(arteloItems, etsyTransactions) {
-  return buildMatchMapByScore(arteloItems, etsyTransactions, [
-    (t, size) => shopifySkuContainsSize(t?.sku, size) ? 100 : 0,
-    (t, size) => {
-      const haystacks = [
-        t?.title || '',
-        ...(t?.variations || []).map(v => `${v?.formatted_name || ''} ${v?.formatted_value || ''}`)
-      ].join(' ').toLowerCase()
-      return haystacks.includes(size) ? 50 : 0
-    },
-  ])
-}
 
 /**
  * Check if a race name indicates a custom order
@@ -765,18 +646,17 @@ export async function processOrders(options = {}) {
             const productSize = rawSize.startsWith('x') ? rawSize.slice(1) : rawSize
             const frameType = arteloItem?.product?.frameColor || 'Unknown'
 
-            // The $15 photo upcharge is not a print. If it ever reaches Artelo
-            // it would import as a row with no race, runner or size, which
-            // reads as a broken order rather than an add-on. Skip it, but only
-            // when we have not already created a row for it — an existing row
-            // is someone's real data and is not ours to silently drop.
-            if (!existing && isShopify) {
-              const shopifyIdxForSkip = shopifyMatchMap?.[lineItemIndex] ?? -1
-              const matchedLine = shopifyIdxForSkip >= 0
-                ? shopifyData?.shopifyOrderData?.line_items?.[shopifyIdxForSkip]
-                : null
-              if (isPhotoAddonLineItem(matchedLine)) {
-                log(`[processOrders] Skipping photo add-on line item ${lineItemIndex} on order ${order.orderId} (not a print)`)
+            // The $15 photo upcharge is not a print, but Artelo still returns a
+            // line item for it. buildShopifyMatchMap pairs Artelo items against
+            // the PRINTS only, so an item left unmatched (-1) has no print to
+            // describe: it is the add-on. Importing it would create a row with
+            // no race, runner or size that reads as a broken order.
+            //
+            // Only skip when we have not already created a row for it — an
+            // existing row is someone's real data and is not ours to drop.
+            if (!existing && isShopify && shopifyData?.shopifyOrderData?.line_items?.length) {
+              if ((shopifyMatchMap?.[lineItemIndex] ?? -1) < 0) {
+                log(`[processOrders] Skipping line item ${lineItemIndex} on order ${order.orderId} (no print to match, treating as photo add-on)`)
                 results.skipped++
                 orderResult.action = 'skipped'
                 results.orders.push(orderResult)

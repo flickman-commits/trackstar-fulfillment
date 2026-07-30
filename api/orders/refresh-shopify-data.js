@@ -12,6 +12,7 @@ import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { shopifyFetch } from '../../server/services/shopifyAuth.js'
 import { parseRaceNameFromTitle } from '../../server/scrapers/raceNameNormalization.js'
+import { resolveShopifyLineIndex } from '../../server/lib/lineItemMatching.js'
 
 // Fallback for batch mode (uses direct token auth)
 const SHOPIFY_SHOP_URL = process.env.SHOPIFY_SHOP_URL
@@ -66,8 +67,11 @@ async function handleSingleOrder(req, res, shopifyOrderId) {
   })
 
   for (const existing of existingOrders) {
-    const lineItemIndex = existing.lineItemIndex
-    const lineItem = shopifyOrder.line_items?.[lineItemIndex]
+    // `existing.lineItemIndex` indexes ARTELO's items, not Shopify's. Using it
+    // directly against line_items could land on the photo add-on and overwrite
+    // the row's personalization with the add-on's (empty) properties.
+    const shopifyIdx = resolveShopifyLineIndex({ ...existing, shopifyOrderData: shopifyOrder })
+    const lineItem = shopifyIdx >= 0 ? shopifyOrder.line_items?.[shopifyIdx] : null
 
     if (lineItem) {
       const lineItemData = extractShopifyData([lineItem])

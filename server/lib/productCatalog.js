@@ -9,6 +9,8 @@
  * The Dashboard reads `productInfo` off the order and renders the hero image + label.
  */
 
+import { resolveShopifyLineIndex, resolveEtsyTxIndex } from './lineItemMatching.js'
+
 // Lookup by Shopify product_id (legacy entries that have known IDs)
 const SHOPIFY_PRODUCTS_BY_ID = {
   '10155461378331': { handle: 'boston' },
@@ -311,7 +313,10 @@ export function getProductInfo(order) {
 
   // Shopify
   if (order.source === 'shopify') {
-    const li = order.shopifyOrderData?.line_items?.[order.lineItemIndex || 0]
+    // NOT line_items[lineItemIndex] — that index belongs to Artelo's item list,
+    // and indexing Shopify with it made photo orders show "Photo Add-On" as the
+    // product whenever the add-on happened to sit at that position.
+    const li = order.shopifyOrderData?.line_items?.[resolveShopifyLineIndex(order)]
     if (!li) return null
 
     const productId = String(li.product_id || '')
@@ -358,7 +363,7 @@ export function getProductInfo(order) {
 
   // Etsy
   if (order.source === 'etsy') {
-    const tx = order.etsyOrderData?.transactions?.[order.lineItemIndex || 0]
+    const tx = order.etsyOrderData?.transactions?.[resolveEtsyTxIndex(order)]
     if (!tx) return null
     const listingId = String(tx.listing_id || '')
     const fromCatalog = ETSY_LISTINGS[listingId]
