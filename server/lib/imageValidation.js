@@ -39,6 +39,11 @@ export const MIN_SHORT_EDGE = 1200
  * and be refused. Accepted to catch the far more common case, a screenshot or
  * a social media re-download, which is what actually prints soft. Resolution
  * itself is still checked separately against MIN_SHORT_EDGE.
+ *
+ * Applies ONLY to the file the customer picked, never to what gets uploaded.
+ * The storefront crops to a square and re-encodes first, so the uploaded bytes
+ * are our own JPEG and their size carries no signal about the original. The
+ * single consumer is photo-upload-url, reading `sourceBytes`.
  */
 export const MIN_BYTES = 1024 * 1024
 

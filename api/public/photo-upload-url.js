@@ -104,7 +104,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'rate_limited', retryAfterMs: limit.retryAfterMs })
   }
 
-  const { contentType, size, width, height, filename } = req.body || {}
+  const { contentType, size, width, height, filename, sourceBytes } = req.body || {}
 
   const ext = ALLOWED_TYPES[String(contentType || '').toLowerCase()]
   if (!ext) {
@@ -118,7 +118,15 @@ export default async function handler(req, res) {
   if (!Number.isFinite(bytes) || bytes <= 0) {
     return res.status(400).json({ error: 'bad_request', message: 'Missing file size.' })
   }
-  if (bytes < MIN_BYTES) {
+  // Applied to the PRE-CROP original, not to `size`. The browser uploads a
+  // square re-encode, so `size` is a product of our own JPEG quality setting
+  // and says nothing about whether the customer picked a screenshot.
+  //
+  // Absent on purpose when the client could not report it; this was always a
+  // hint (the number is client-supplied either way). Resolution is the check
+  // that actually holds, and it runs on real pixels in photo-verify.
+  const srcBytes = Number(sourceBytes)
+  if (Number.isFinite(srcBytes) && srcBytes > 0 && srcBytes < MIN_BYTES) {
     return res.status(400).json({
       error: 'too_compressed',
       minBytes: MIN_BYTES,

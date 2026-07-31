@@ -21,7 +21,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { setCors } from '../_lib/auth.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
-import { validateImageBytes, MIN_BYTES } from '../../server/lib/imageValidation.js'
+import { validateImageBytes } from '../../server/lib/imageValidation.js'
 import { stripMetadata } from '../../server/lib/photoSanitize.js'
 
 const BUCKET = 'personalization-photos'
@@ -115,16 +115,18 @@ export default async function handler(req, res) {
 
     const original = Buffer.from(await full.arrayBuffer())
 
-    // The size gate on photo-upload-url trusts a client-supplied number, so it
-    // is a hint rather than enforcement. These are the real bytes, which makes
-    // this the check that actually holds.
-    if (original.length < MIN_BYTES) {
-      await purge('too_compressed')
-      return res.status(400).json({
-        error: 'too_compressed',
-        message: 'That file looks compressed (under 1MB), which prints soft. Please upload the original photo from your phone or camera.',
-      })
-    }
+    // NOTE: there is deliberately no minimum-bytes check here.
+    //
+    // The browser now crops to a square and re-encodes before uploading, so
+    // these bytes are OUR JPEG, not the customer's file. Its size reflects the
+    // quality setting we chose, and a legitimately sharp crop of a smooth
+    // scene lands well under 1MB. Measuring it would reject good photos.
+    //
+    // What the byte floor was really proxying for is resolution, and that is
+    // enforced properly a few lines up: validateImageBytes reads the actual
+    // dimensions out of the header and holds them to MIN_SHORT_EDGE. The
+    // remaining "is this a screenshot" hint lives in photo-upload-url, applied
+    // to the size of the pre-crop original.
     const cleaned = await stripMetadata(original, contentType)
     if (!cleaned.ok) {
       await purge(cleaned.reason)
