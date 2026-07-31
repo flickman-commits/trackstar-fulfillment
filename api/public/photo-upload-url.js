@@ -33,6 +33,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { setCors } from '../_lib/auth.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
+import { MIN_BYTES } from '../../server/lib/imageValidation.js'
 
 const BUCKET = 'personalization-photos'
 
@@ -116,6 +117,13 @@ export default async function handler(req, res) {
   const bytes = Number(size)
   if (!Number.isFinite(bytes) || bytes <= 0) {
     return res.status(400).json({ error: 'bad_request', message: 'Missing file size.' })
+  }
+  if (bytes < MIN_BYTES) {
+    return res.status(400).json({
+      error: 'too_compressed',
+      minBytes: MIN_BYTES,
+      message: 'That file looks compressed (under 1MB), which prints soft. Please upload the original photo from your phone or camera.',
+    })
   }
   if (bytes > MAX_BYTES) {
     return res.status(413).json({

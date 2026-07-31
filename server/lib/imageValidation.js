@@ -31,6 +31,17 @@ export const MAX_PIXELS = 100_000_000
  */
 export const MIN_SHORT_EDGE = 1200
 
+/**
+ * 1MB floor, as a proxy for "this file has not been through compression".
+ *
+ * Blunt on purpose: file size does not track resolution once JPEG quality
+ * varies, so a well-compressed but genuinely sharp photo can fall under this
+ * and be refused. Accepted to catch the far more common case, a screenshot or
+ * a social media re-download, which is what actually prints soft. Resolution
+ * itself is still checked separately against MIN_SHORT_EDGE.
+ */
+export const MIN_BYTES = 1024 * 1024
+
 const startsWith = (buf, bytes, offset = 0) =>
   bytes.every((b, i) => buf[offset + i] === b)
 
