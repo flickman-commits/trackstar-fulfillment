@@ -118,15 +118,21 @@ export default async function handler(req, res) {
   if (!Number.isFinite(bytes) || bytes <= 0) {
     return res.status(400).json({ error: 'bad_request', message: 'Missing file size.' })
   }
-  // Applied to the PRE-CROP original, not to `size`. The browser uploads a
-  // square re-encode, so `size` is a product of our own JPEG quality setting
-  // and says nothing about whether the customer picked a screenshot.
+  // Applied to the PRE-CROP original where we have it, not to `size`. A
+  // cropping client uploads a square re-encode, so `size` is a product of our
+  // own JPEG quality setting and says nothing about whether the customer
+  // picked a screenshot: a 4MB original zoomed into a tight crop lands well
+  // under 1MB and is not remotely "compressed".
   //
-  // Absent on purpose when the client could not report it; this was always a
-  // hint (the number is client-supplied either way). Resolution is the check
+  // Falls back to `size` when sourceBytes is absent, which is a storefront
+  // that does not crop. Without the fallback the gate would silently vanish
+  // for those clients for as long as the two deploys are out of step.
+  //
+  // Client-supplied either way, so this is a hint. Resolution is the check
   // that actually holds, and it runs on real pixels in photo-verify.
-  const srcBytes = Number(sourceBytes)
-  if (Number.isFinite(srcBytes) && srcBytes > 0 && srcBytes < MIN_BYTES) {
+  const reported = Number(sourceBytes)
+  const srcBytes = Number.isFinite(reported) && reported > 0 ? reported : bytes
+  if (srcBytes < MIN_BYTES) {
     return res.status(400).json({
       error: 'too_compressed',
       minBytes: MIN_BYTES,
