@@ -25,9 +25,6 @@ export default {
   eventLabels: { half: 'Half Marathon' },
   courseMap: { half: 'halfmarathon' },
   distances: { half: 13.1 },
-  // Public RTRT credentials — same as Marine Corps Marathon (same organization)
-  appId: '64f230702a503f51752733e3',
-  appToken: '2A421DFAE46EE7F78E1B',
   aliases: [
     'Marine Corps Historic Half',
     'Marine Corps Historic Half Marathon',

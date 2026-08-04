@@ -2,7 +2,8 @@
  * Marine Corps 17.75K - RTRT platform
  * Results: https://track.rtrt.me/e/MCM-1775K-{year}
  *
- * Same RTRT organization as Marine Corps Marathon, shares appId/appToken.
+ * Same RTRT organization as Marine Corps Marathon. Credentials are shared
+ * across all RTRT races and live in RTRTScraper.
  * Event ID format: MCM-1775K-{year}
  *
  * 17.75K = 11.03 miles. Race is typically held in late March.
@@ -16,9 +17,6 @@ export default {
   eventTypes: ['17.75K'],
   defaultEventType: '17.75K',
   distanceMiles: 11.03,
-  // Same RTRT app credentials as MCM Marathon
-  appId: '64f230702a503f51752733e3',
-  appToken: '2A421DFAE46EE7F78E1B',
   aliases: [
     'Marine Corps 17.75K',
     'MCM 17.75K',

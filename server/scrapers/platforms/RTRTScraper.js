@@ -9,6 +9,30 @@ import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 /**
+ * Shared RTRT web-tracker credentials.
+ *
+ * These are NOT per race. RTRT addresses a race by its event id (IL-2026,
+ * MCM-2025); the appid/token pair only identifies the public web tracker
+ * client, and one pair works across every event. Verified against Illinois
+ * 2025/2026 and Marine Corps 2025 with the same values.
+ *
+ * They lived in each race config before, which is how they rotted: races
+ * accumulated mismatched pairs (Illinois carried its own appId against the
+ * Marine Corps token, which RTRT rejects because the pair must match), and a
+ * pair that expired had to be fixed in as many places as it was copied. One
+ * definition means one place to re-pull.
+ *
+ * TO RE-PULL when these expire: open https://app.rtrt.me/<EVENT-ID> directly
+ * (not track.rtrt.me, which frames it cross-origin) and read appid and token
+ * off any api.rtrt.me request in performance.getEntriesByType('resource').
+ * The token is a device uuid the tracker mints on load.
+ *
+ * A config may still override via appId/appToken if a race ever needs its own.
+ */
+const WEBTRACKER_APP_ID = '52139b797871851e0800638e'
+const WEBTRACKER_TOKEN  = '43AEB9E2E4D44BF7145A'
+
+/**
  * RTRT reports failures as HTTP 200 with an {error:{type,msg}} body.
  *
  * That has to be unpacked explicitly, because the obvious reading of a
@@ -63,8 +87,8 @@ export class RTRTScraper extends BaseScraper {
       ? config.buildEventId(year)
       : `${config.eventPrefix}-${year}`
 
-    this.appId = config.appId
-    this.token = config.appToken
+    this.appId = config.appId || WEBTRACKER_APP_ID
+    this.token = config.appToken || WEBTRACKER_TOKEN
   }
 
   async getRaceInfo() {

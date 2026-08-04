@@ -12,8 +12,6 @@ export default {
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
   // Public app identifiers observed from the web tracker
-  appId: '64f230702a503f51752733e3',
-  appToken: '2A421DFAE46EE7F78E1B',
   aliases: [
     'Marine Corps Marathon',
     'MCM Marathon',

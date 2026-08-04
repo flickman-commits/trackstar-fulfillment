@@ -37,9 +37,6 @@ export default {
   // Default if courseMap resolution fails
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
-  // Public RTRT web-tracker credentials for Jersey City
-  appId: '52139b797871851e0800638e',
-  appToken: '165EBC01C2D358F00790',
   aliases: [
     'Jersey City Marathon',
     'Jersey City Half Marathon',

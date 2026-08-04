@@ -35,9 +35,6 @@ export default {
   },
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
-  // Public RTRT web-tracker credentials for Illinois Marathon
-  appId: '62363ca2cc24e159f40994d4',
-  appToken: '2A421DFAE46EE7F78E1B',
   aliases: [
     'Illinois Marathon',
     'Christie Clinic Illinois Marathon',
