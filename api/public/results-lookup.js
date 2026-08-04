@@ -52,11 +52,24 @@ function isRaceAllowed(race) {
   const requested = getCanonicalRaceName(race)
   if (!requested) return false
 
-  return raw
-    .split(',')
-    .map(r => getCanonicalRaceName(r.trim()))
-    .filter(Boolean)
-    .includes(requested)
+  const entries = raw.split(',').map(r => r.trim()).filter(Boolean)
+  const resolved = entries.map(getCanonicalRaceName)
+
+  // An entry that does not resolve is a typo or an incomplete name, and it was
+  // being dropped without a trace — the race simply stayed off with no way to
+  // tell that from "never added it". Names must match a config's aliases, and
+  // some are stricter than they look: "Mesa" resolves to nothing because that
+  // config sets keywordRequiresMarathon, so only "Mesa Marathon" works.
+  const unresolved = entries.filter((_, i) => !resolved[i])
+  if (unresolved.length) {
+    console.warn(
+      `[PUBLIC_LOOKUP_RACES] ignoring ${unresolved.length} unrecognised entr` +
+      `${unresolved.length === 1 ? 'y' : 'ies'}: ${unresolved.map(e => `"${e}"`).join(', ')}` +
+      ' — these races stay OFF. Use the full race name as spelled in its config aliases.'
+    )
+  }
+
+  return resolved.filter(Boolean).includes(requested)
 }
 
 export default async function handler(req, res) {
