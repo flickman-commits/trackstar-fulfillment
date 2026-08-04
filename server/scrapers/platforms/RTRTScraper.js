@@ -8,6 +8,37 @@ import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
+/**
+ * RTRT reports failures as HTTP 200 with an {error:{type,msg}} body.
+ *
+ * That has to be unpacked explicitly, because the obvious reading of a
+ * response — status is ok, `list` is missing, therefore zero results — turns
+ * every outage, expired credential and bad event id into "runner not found".
+ * That failure is invisible in exactly the way that matters: the shopper is
+ * told their result does not exist, the dashboard logs not_found rather than
+ * upstream_error, and no alert fires. Expired tokens sat undetected across
+ * every RTRT race until someone checked by hand.
+ *
+ * Throwing instead routes these through the normal upstream-error path, which
+ * is alerted on and visibly distinct from a genuine miss.
+ *
+ * @param {any} data Parsed JSON body
+ * @param {string} tag Race tag, for the message
+ * @param {string} what Which call failed, for the message
+ */
+function assertNoRtrtError(data, tag, what) {
+  const err = data && data.error
+  if (!err) return
+  const type = err.type || 'unknown'
+  const msg = err.msg || JSON.stringify(err)
+  // Credential problems are the ones worth naming outright: they are silent,
+  // permanent until someone re-pulls a token, and not self-healing.
+  const hint = type === 'not_authorized'
+    ? ' (appId/appToken pair is invalid or expired for this event — re-pull them from the tracker)'
+    : ''
+  throw new Error(`RTRT ${what} failed for ${tag}: ${type} - ${msg}${hint}`)
+}
+
 export class RTRTScraper extends BaseScraper {
   /**
    * @param {number} year
@@ -177,10 +208,12 @@ export class RTRTScraper extends BaseScraper {
       }
     } catch (error) {
       console.error(`[${this.tag}] Error searching for ${runnerName}:`, error.message)
-      return {
-        ...this.notFoundResult(),
-        researchNotes: `Error: ${error.message}`
-      }
+      // An exception here means the lookup could not be completed — network,
+      // auth, or a malformed response. It does NOT mean the runner is absent;
+      // a genuine miss returns notFoundResult() from the path above. Reporting
+      // it as not_found told shoppers their result did not exist and kept the
+      // outcome out of the upstream_error bucket that gets alerted on.
+      return this.upstreamErrorResult(error.message)
     }
   }
 
@@ -217,6 +250,7 @@ export class RTRTScraper extends BaseScraper {
     }
 
     const data = await response.json()
+    assertNoRtrtError(data, this.tag, 'profile search')
     return Array.isArray(data.list) ? data.list : []
   }
 
@@ -247,6 +281,7 @@ export class RTRTScraper extends BaseScraper {
     if (!response.ok) throw new Error(`RTRT splits error ${response.status}`)
 
     const data = await response.json()
+    assertNoRtrtError(data, this.tag, 'splits fetch')
     return Array.isArray(data.list) ? data.list : []
   }
 }
