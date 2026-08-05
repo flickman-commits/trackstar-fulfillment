@@ -26,20 +26,41 @@
  * snapshot. A sales page that renders blank mid-pitch is worse than one showing
  * data an hour stale.
  */
-import { readRanges } from './googleSheets.js'
+import { readRanges, listTabTitles } from './googleSheets.js'
 import { FALLBACK } from '../data/monopolyFallback.js'
 
 // Not sensitive — it's the file Matt already shares by link. It must also be
 // shared with GOOGLE_SERVICE_ACCOUNT_EMAIL as Viewer for this to work.
 const SHEET_ID = process.env.MONOPOLY_SHEET_ID || '12EZc3RaxkY0Ye_nfeQzAya-5eCO764TVe3SBbNd1Ma8'
 
-const TAB_BOARD = 'WEB — Board'
-const TAB_PACKAGES = 'WEB — Packages'
-const TAB_TOKENS = 'WEB — Tokens'
-const TAB_SETTINGS = 'WEB — Settings'
-const TAB_INTERNAL = 'INTERNAL — Economics'
+// Plain hyphens. Google names an imported sheet after the file, and a filename
+// cannot reasonably carry an em dash, so hyphens are what actually end up in the
+// spreadsheet. resolveTab() below accepts either style regardless.
+const TAB_BOARD = 'WEB - Board'
+const TAB_PACKAGES = 'WEB - Packages'
+const TAB_TOKENS = 'WEB - Tokens'
+const TAB_SETTINGS = 'WEB - Settings'
+const TAB_INTERNAL = 'INTERNAL - Economics'
 
 const CACHE_TTL_MS = 5 * 60 * 1000
+
+/**
+ * Match a tab regardless of which dash it was typed with.
+ *
+ * "WEB - Board" and "WEB — Board" are indistinguishable at a glance and trivial
+ * to mix, and getting it wrong reads as an empty tab rather than an error. An
+ * exact title always wins, so a deliberate duplicate is never shadowed by a
+ * fuzzy match.
+ */
+function normaliseTitle(title) {
+  return String(title).toLowerCase().replace(/[\u2010-\u2015-]+/g, '-').replace(/\s+/g, ' ').trim()
+}
+
+function resolveTab(wanted, actualTitles) {
+  if (actualTitles.includes(wanted)) return wanted
+  const target = normaliseTitle(wanted)
+  return actualTitles.find((t) => normaliseTitle(t) === target) || wanted
+}
 
 let cache = null // { at: number, value: { publicPayload, gatedPayload } }
 
@@ -300,12 +321,13 @@ export async function getBoardData({ refresh = false } = {}) {
 
   let built
   try {
+    const titles = await listTabTitles(SHEET_ID)
     const [boardRows, packageRows, tokenRows, settingRows] = await readRanges(
       [
-        `'${TAB_BOARD}'!A1:Z60`,
-        `'${TAB_PACKAGES}'!A1:Z40`,
-        `'${TAB_TOKENS}'!A1:Z40`,
-        `'${TAB_SETTINGS}'!A1:B120`,
+        `'${resolveTab(TAB_BOARD, titles)}'!A1:Z60`,
+        `'${resolveTab(TAB_PACKAGES, titles)}'!A1:Z40`,
+        `'${resolveTab(TAB_TOKENS, titles)}'!A1:Z40`,
+        `'${resolveTab(TAB_SETTINGS, titles)}'!A1:B120`,
       ],
       { spreadsheetId: SHEET_ID },
     )
@@ -508,7 +530,10 @@ export function resolvePersonalization(publicPayload, slug) {
 export async function getInternalEconomics() {
   let internalRows = []
   try {
-    ;[internalRows] = await readRanges([`'${TAB_INTERNAL}'!A1:Z60`], { spreadsheetId: SHEET_ID })
+    const titles = await listTabTitles(SHEET_ID)
+    ;[internalRows] = await readRanges([`'${resolveTab(TAB_INTERNAL, titles)}'!A1:Z60`], {
+      spreadsheetId: SHEET_ID,
+    })
   } catch (err) {
     // The INTERNAL tab may simply not exist yet. Fall through to the quoted
     // defaults rather than failing — the model is most useful *before* the

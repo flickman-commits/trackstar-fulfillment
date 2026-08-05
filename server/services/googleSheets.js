@@ -91,6 +91,15 @@ export async function readRange(a1, { spreadsheetId = FINANCIAL_TRACKER_SHEET_ID
  * @param {string} [opts.spreadsheetId] - defaults to the financial tracker.
  * @returns {Promise<any[][][]>} one 2D array per requested range
  */
+export async function listTabTitles(spreadsheetId) {
+  const sheets = getSheetsClient()
+  const res = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: 'sheets.properties.title',
+  })
+  return (res.data.sheets || []).map((s) => s.properties?.title).filter(Boolean)
+}
+
 export async function readRanges(a1List, { spreadsheetId = FINANCIAL_TRACKER_SHEET_ID } = {}) {
   const sheets = getSheetsClient()
   const res = await sheets.spreadsheets.values.batchGet({
