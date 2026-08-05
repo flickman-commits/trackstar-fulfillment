@@ -320,12 +320,40 @@ export async function getBoardData({ refresh = false } = {}) {
   } catch (err) {
     // Any Sheets problem — auth, sharing, a renamed tab — degrades to the
     // snapshot rather than failing the request.
-    console.warn('[monopoly] sheet read failed, serving snapshot:', err?.message || err)
+    const message = err?.message || String(err)
+    console.warn('[monopoly] sheet read failed, serving snapshot:', message)
     built = assemble({ ...FALLBACK, stale: true })
+    // Kept off the public payload; the admin endpoint surfaces it so a failure
+    // can be diagnosed without shell access to production logs.
+    built.staleReason = classifySheetError(message)
   }
 
   cache = { at: Date.now(), value: built }
   return built
+}
+
+/**
+ * Turn a Sheets error into something actionable.
+ *
+ * "stale: true" only says the read failed. The three real causes need very
+ * different fixes, and telling them apart from a raw Google error message is
+ * not obvious, so do it once here.
+ */
+function classifySheetError(message) {
+  const m = String(message).toLowerCase()
+  if (m.includes('missing google_service_account')) {
+    return { cause: 'no_credentials', fix: 'GOOGLE_SERVICE_ACCOUNT_EMAIL / _KEY are not set in this environment.', detail: message }
+  }
+  if (m.includes('unable to parse range') || m.includes('not found')) {
+    return { cause: 'missing_tab', fix: `The sheet is readable but a tab is missing. Expected: '${TAB_BOARD}', '${TAB_PACKAGES}', '${TAB_TOKENS}', '${TAB_SETTINGS}'.`, detail: message }
+  }
+  if (m.includes('permission') || m.includes('403') || m.includes('caller does not have')) {
+    return { cause: 'not_shared', fix: 'Share the sheet with the service-account email as Viewer.', detail: message }
+  }
+  if (m.includes('decoder') || m.includes('invalid_grant') || m.includes('unsupported') || m.includes('jwt')) {
+    return { cause: 'bad_key', fix: 'The private key is malformed. Its newlines were probably mangled on paste.', detail: message }
+  }
+  return { cause: 'unknown', fix: 'See detail.', detail: message }
 }
 
 /**

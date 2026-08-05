@@ -28,10 +28,11 @@ export default async function handler(req, res) {
 
   try {
     const refresh = req.query.refresh === '1'
-    const [{ publicPayload, gatedPayload }, economics] = await Promise.all([
+    const [board, economics] = await Promise.all([
       getBoardData({ refresh }),
       getInternalEconomics(),
     ])
+    const { publicPayload, gatedPayload } = board
 
     // Tier economics: label and slot count are public, fee and allocation come
     // from the gated half. Joined here because the model needs both.
@@ -57,6 +58,10 @@ export default async function handler(req, res) {
       tiers,
       committed: Object.entries(committedByTier).map(([tierKey, count]) => ({ tierKey, count })),
       stale: publicPayload.stale,
+      // Admin-only, and deliberately not on publicPayload: the raw Sheets error
+      // can name the spreadsheet and the service account, so it stays behind
+      // requireAdmin rather than riding along on the public response.
+      staleReason: board.staleReason,
     })
   } catch (err) {
     console.error('[monopoly-model] request failed:', err)
