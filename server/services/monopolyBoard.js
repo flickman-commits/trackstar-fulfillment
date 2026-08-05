@@ -310,13 +310,59 @@ export async function getBoardData({ refresh = false } = {}) {
       { spreadsheetId: SHEET_ID },
     )
 
+    // Fill section by section, falling back to the snapshot wherever the sheet
+    // has nothing to say.
+    //
+    // A tab that exists but is empty reads as a *successful* API call returning
+    // zero rows, so without this an unfilled sheet would serve a hollow page —
+    // no tiers, no tokens, no timeline, no FAQ — and report itself as fresh.
+    // That is strictly worse than showing the snapshot, and it fails silently.
+    // Filling one tab at a time is also the natural way to populate the sheet,
+    // so partial data has to work rather than being all-or-nothing.
+    const sheetSpaceSales = mapSpaceSales(boardRows)
+    const sheetTiers = mapTiers(packageRows)
+    const sheetTokens = mapTokens(tokenRows)
+    const sheetSettings = mapSettings(settingRows)
+
+    const usedFallbackFor = []
+    const pick = (name, fromSheet, fromSnapshot) => {
+      const empty = !fromSheet || (Array.isArray(fromSheet) ? fromSheet.length === 0 : Object.keys(fromSheet).length === 0)
+      if (empty) usedFallbackFor.push(name)
+      return empty ? fromSnapshot : fromSheet
+    }
+
+    // Settings is a bag of independent keys, not one value, so it merges per key
+    // rather than all-or-nothing. A tab holding only a header row parses to a
+    // single junk key, which is "non-empty" but defines none of the copy — and
+    // that would silently blank the timeline, FAQ, terms and sales plan while
+    // reporting the read as fresh.
+    const mergedSettings = { ...FALLBACK.settings }
+    let settingsFromSheet = 0
+    for (const [key, value] of Object.entries(sheetSettings || {})) {
+      if (key in FALLBACK.settings && String(value ?? '').trim()) {
+        mergedSettings[key] = value
+        settingsFromSheet++
+      }
+    }
+    if (!settingsFromSheet) usedFallbackFor.push('settings')
+
     built = assemble({
-      spaceSales: mapSpaceSales(boardRows),
-      tiers: mapTiers(packageRows),
-      tokens: mapTokens(tokenRows),
-      settings: mapSettings(settingRows),
-      stale: false,
+      spaceSales: pick('board', sheetSpaceSales, FALLBACK.spaceSales),
+      tiers: pick('packages', sheetTiers, FALLBACK.tiers),
+      tokens: pick('tokens', sheetTokens, FALLBACK.tokens),
+      settings: mergedSettings,
+      // "Fresh" means at least one tab actually contributed something.
+      stale: usedFallbackFor.length === 4,
     })
+
+    if (usedFallbackFor.length) {
+      built.staleReason = {
+        cause: usedFallbackFor.length === 4 ? 'empty_tabs' : 'partial_tabs',
+        fix: `The sheet is readable but these tabs are empty, so the snapshot is filling in: ${usedFallbackFor.join(', ')}.`,
+        detail: `Empty: ${usedFallbackFor.join(', ')}`,
+      }
+      console.warn('[monopoly] empty sheet tabs, using snapshot for:', usedFallbackFor.join(', '))
+    }
   } catch (err) {
     // Any Sheets problem — auth, sharing, a renamed tab — degrades to the
     // snapshot rather than failing the request.
