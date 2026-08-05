@@ -1,0 +1,65 @@
+/**
+ * Cost, margin and committed-deal data for the internal Marathon Monopoly
+ * model at /monopoly/model.
+ *
+ *   GET /api/admin/monopoly-model
+ *
+ * ⚠️ This is the only endpoint that emits true unit cost and per-tier margin.
+ * Those figures would undercut every partnership negotiation if a race director
+ * ever saw them, so this route sits behind requireAdmin — the same gate as the
+ * rest of the merchant API — and nothing under api/public/ imports from it.
+ *
+ * It reads the same sheet as the partner page, so the model always starts from
+ * the real board rather than a blank scenario: deals already sold or on hold
+ * pre-fill the inputs, and Matt layers hypotheticals on top of reality.
+ */
+import { setCors, requireAdmin } from '../_lib/auth.js'
+import { getBoardData, getInternalEconomics } from '../../server/services/monopolyBoard.js'
+
+export default async function handler(req, res) {
+  if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
+  if (!requireAdmin(req, res)) return
+
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0')
+
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  try {
+    const refresh = req.query.refresh === '1'
+    const [{ publicPayload, gatedPayload }, economics] = await Promise.all([
+      getBoardData({ refresh }),
+      getInternalEconomics(),
+    ])
+
+    // Tier economics: label and slot count are public, fee and allocation come
+    // from the gated half. Joined here because the model needs both.
+    const tiers = publicPayload.tiers.map((tier) => ({
+      tierKey: tier.tierKey,
+      label: tier.label,
+      fee: gatedPayload.tiers[tier.tierKey]?.fee ?? 0,
+      unitsIncluded: gatedPayload.tiers[tier.tierKey]?.unitsIncluded ?? 0,
+    }))
+
+    // What's actually spoken for right now, per tier — the model's starting
+    // point. `hold` counts as committed here because Matt is modelling the
+    // pipeline he's working, not only the ink that's dry.
+    const committedByTier = {}
+    for (const sale of Object.values(publicPayload.spaceSales)) {
+      if (!sale.tierKey) continue
+      if (sale.status !== 'sold' && sale.status !== 'reserved' && sale.status !== 'hold') continue
+      committedByTier[sale.tierKey] = (committedByTier[sale.tierKey] || 0) + 1
+    }
+
+    return res.status(200).json({
+      ...economics,
+      tiers,
+      committed: Object.entries(committedByTier).map(([tierKey, count]) => ({ tierKey, count })),
+      stale: publicPayload.stale,
+    })
+  } catch (err) {
+    console.error('[monopoly-model] request failed:', err)
+    return res.status(500).json({ error: 'Unable to load model data' })
+  }
+}

@@ -9,6 +9,8 @@ import CreatorsHome from '@/pages/CreatorsHome'
 import BriefsAdmin from '@/pages/BriefsAdmin'
 import CreatorPortal from '@/pages/CreatorPortal'
 import CreatorApply from '@/pages/CreatorApply'
+import Monopoly from '@/pages/Monopoly'
+import MonopolyModel from '@/pages/MonopolyModel'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -150,6 +152,7 @@ export default function App() {
           <Route path="/approve/:token" element={<ApprovalPortal />} />
           <Route path="/creator/:token" element={<CreatorPortal />} />
           <Route path="/apply" element={<CreatorApply />} />
+          <Route path="/monopoly" element={<Monopoly />} />
 
           {/* Protected routes */}
           <Route path="/*" element={
@@ -159,6 +162,7 @@ export default function App() {
                 <Route path="/orders/:orderId" element={<OrderDetails />} />
                 <Route path="/creators" element={<CreatorsHome />} />
                 <Route path="/briefs" element={<BriefsAdmin />} />
+                <Route path="/monopoly/model" element={<MonopolyModel />} />
               </Routes>
             </PasswordGate>
           } />

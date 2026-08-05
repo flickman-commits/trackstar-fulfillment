@@ -33,31 +33,41 @@ function pruneIfNeeded(map) {
 
 /**
  * Record a request from an IP and report whether it's allowed.
+ * The default 20/hour is sized for the results lookup, where each request can
+ * trigger a live scrape. Cheap cached reads should pass their own, much higher
+ * `max` — sharing the scraper's budget means a handful of colleagues behind one
+ * office NAT can exhaust it just by reading a page.
+ *
  * @param {string} ip
+ * @param {{ bucket?: string, max?: number, windowMs?: number }} [options]
+ *   bucket keeps each endpoint's budget separate, so heavy use of one never
+ *   starves another.
  * @returns {{ allowed: boolean, remaining: number, retryAfterMs: number }}
  */
-export function checkRateLimit(ip) {
+export function checkRateLimit(ip, options = {}) {
+  const { bucket = 'lookup', max = RATE_LIMIT_MAX, windowMs = RATE_LIMIT_WINDOW_MS } = options
   const now = Date.now()
-  const cutoff = now - RATE_LIMIT_WINDOW_MS
+  const cutoff = now - windowMs
+  const key = `${bucket}:${ip}`
 
-  const timestamps = (requestLog.get(ip) || []).filter(t => t > cutoff)
+  const timestamps = (requestLog.get(key) || []).filter(t => t > cutoff)
 
-  if (timestamps.length >= RATE_LIMIT_MAX) {
+  if (timestamps.length >= max) {
     const oldest = timestamps[0]
     return {
       allowed: false,
       remaining: 0,
-      retryAfterMs: Math.max(0, oldest + RATE_LIMIT_WINDOW_MS - now),
+      retryAfterMs: Math.max(0, oldest + windowMs - now),
     }
   }
 
   timestamps.push(now)
-  requestLog.set(ip, timestamps)
+  requestLog.set(key, timestamps)
   pruneIfNeeded(requestLog)
 
   return {
     allowed: true,
-    remaining: RATE_LIMIT_MAX - timestamps.length,
+    remaining: max - timestamps.length,
     retryAfterMs: 0,
   }
 }

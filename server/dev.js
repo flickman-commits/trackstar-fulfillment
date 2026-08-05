@@ -48,6 +48,9 @@ const routes = [
   { method: 'delete', path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   // Public storefront results lookup (gated behind PUBLIC_LOOKUP_ENABLED).
   { method: 'get',    path: '/api/public/results-lookup',  handler: '../api/public/results-lookup.js' },
+  // Marathon Monopoly proposal page (gated behind MONOPOLY_PAGE_ENABLED).
+  { method: 'get',    path: '/api/public/monopoly',        handler: '../api/public/monopoly.js' },
+  { method: 'get',    path: '/api/admin/monopoly-model',   handler: '../api/admin/monopoly-model.js' },
 ]
 
 // Load all handlers and register routes

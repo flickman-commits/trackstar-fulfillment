@@ -1,0 +1,11 @@
+# The Marathon Monopoly partnership pages are unlisted, not secret: Matt shares
+# them by link with named races and brands. Keeping them out of search means a
+# competitor, a journalist, or a race that hasn't been approached yet doesn't
+# find the offer and the live availability board before he's ready to show them.
+#
+# The pages also send `robots: noindex, nofollow` in their own head, which is
+# what actually removes them from an index. This file just stops the crawl.
+
+User-agent: *
+Disallow: /monopoly
+Disallow: /monopoly/model
