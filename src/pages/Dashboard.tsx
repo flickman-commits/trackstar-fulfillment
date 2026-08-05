@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, Tags, DollarSign } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
+import ArteloCosts from '@/components/ArteloCosts'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
 
 /** Collapsible section with header + chevron toggle */
@@ -578,6 +579,7 @@ export default function Dashboard() {
   const bulkStopRef = useRef(false)
   const [bulkSummary, setBulkSummary] = useState<BulkSummary | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showArteloCosts, setShowArteloCosts] = useState(false)
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
   type HealthCheck = { status: 'ok' | 'warn' | 'error'; detail?: string | null; latency?: string }
   type HealthResults = { overall: string; checks: Record<string, HealthCheck>; error?: string }
@@ -2323,6 +2325,13 @@ Thank you!`
             </div>
             <div className="hidden md:flex items-end">
               <Link
+                to="/products"
+                className="inline-flex items-center gap-1.5 px-3 py-2 mr-2 text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
+              >
+                <Tags className="w-4 h-4" />
+                Products
+              </Link>
+              <Link
                 to="/creators"
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
               >
@@ -3119,7 +3128,26 @@ Thank you!`
             onClick={(e) => { if (e.target === e.currentTarget) { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) } }}
           >
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md md:max-w-2xl max-h-[85vh] overflow-hidden">
-              {showReviewRequest ? (
+              {showArteloCosts ? (
+                /* Artelo cost matrix */
+                <div className="flex flex-col h-full max-h-[85vh]" style={{ animation: 'slideInRight 200ms ease-out' }}>
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setShowArteloCosts(false)}
+                        className="text-off-black/40 hover:text-off-black/70 transition-colors"
+                      >
+                        <ChevronRight className="w-4 h-4 rotate-180" />
+                      </button>
+                      <h2 className="text-base font-semibold text-off-black">Artelo Costs</h2>
+                    </div>
+                    <button onClick={() => { setShowSettings(false); setShowArteloCosts(false) }} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
+                  </div>
+                  <div className="p-6 flex-1 overflow-y-auto">
+                    <ArteloCosts />
+                  </div>
+                </div>
+              ) : showReviewRequest ? (
                 /* Review Request panel */
                 <div className="flex flex-col h-full max-h-[85vh]" style={{ animation: 'slideInRight 200ms ease-out' }}>
                   <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray flex-shrink-0">
@@ -3202,6 +3230,22 @@ Thank you!`
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className="text-xs text-off-black/30">{scraperResults.length} {scraperResults.length === 1 ? 'scraper' : 'scrapers'}</span>
+                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => setShowArteloCosts(true)}
+                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-off-black">Artelo Costs</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Production and shipping cost per size and frame</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <DollarSign className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
                           <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
                         </div>
                       </div>

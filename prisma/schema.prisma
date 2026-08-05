@@ -419,3 +419,24 @@ model RateLimitHit {
 
   @@index([key, createdAt])
 }
+
+// One row per bulk product edit applied from the /products view.
+//
+// Every batch stores the BEFORE value of each variant it touched, which is the
+// whole point: a bulk price change is trivially easy to fire at a slightly
+// wrong filter, and without the previous values a mistake means hand-fixing
+// every affected variant in the Shopify admin. `changes` makes undo a
+// mechanical replay rather than an archaeology project.
+model ProductEditBatch {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  // Human summary shown in the batch list, e.g. "Set price to $100.00"
+  description String
+  // The filter state that produced the selection, kept for auditing
+  filters     Json?
+  // [{ variantId, productId, productTitle, size, frame, before, after }]
+  changes     Json
+  undoneAt    DateTime?
+
+  @@index([createdAt])
+}

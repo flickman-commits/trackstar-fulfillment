@@ -11,6 +11,7 @@ import CreatorPortal from '@/pages/CreatorPortal'
 import CreatorApply from '@/pages/CreatorApply'
 import Monopoly from '@/pages/Monopoly'
 import MonopolyModel from '@/pages/MonopolyModel'
+import ProductsBulkEdit from '@/pages/ProductsBulkEdit'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -161,6 +162,7 @@ export default function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/orders/:orderId" element={<OrderDetails />} />
                 <Route path="/creators" element={<CreatorsHome />} />
+                <Route path="/products" element={<ProductsBulkEdit />} />
                 <Route path="/briefs" element={<BriefsAdmin />} />
                 <Route path="/monopoly/model" element={<MonopolyModel />} />
               </Routes>
