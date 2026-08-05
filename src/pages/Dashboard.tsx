@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, Tags, DollarSign } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import ProofManager from '@/components/ProofManager'
@@ -2324,13 +2324,6 @@ Thank you!`
               )}
             </div>
             <div className="hidden md:flex items-end">
-              <Link
-                to="/products"
-                className="inline-flex items-center gap-1.5 px-3 py-2 mr-2 text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
-              >
-                <Tags className="w-4 h-4" />
-                Products
-              </Link>
               <Link
                 to="/creators"
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
