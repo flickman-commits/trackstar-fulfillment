@@ -251,7 +251,7 @@ export default function Monopoly() {
       {/* ═══ WHY YOU SHOULD CARE ═══ */}
       <Section dark>
         <Tag dark>Why you should care</Tag>
-        <H2 dark>What a space on the board actually does for your race.</H2>
+        <H2 dark>What a space does for your race.</H2>
         <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <Beat
             dark
@@ -279,7 +279,7 @@ export default function Monopoly() {
       {/* ═══ HOW IT GETS SOLD ═══ */}
       <Section>
         <Tag>How we're going to sell it</Tag>
-        <H2>The distribution and sales plan.</H2>
+        <H2>We already know who buys this.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
           A partnership is only worth what the edition sells. Here's the plan behind the print run.
         </p>
@@ -483,7 +483,7 @@ export default function Monopoly() {
       {/* ═══ FAQ ═══ */}
       <Section muted>
         <Tag>FAQ</Tag>
-        <H2>The rest of it.</H2>
+        <H2>Everything else.</H2>
         <div className="mt-8 flex flex-col gap-px" style={{ backgroundColor: MONOPOLY.black }}>
           {data.faq.map((item) => (
             <details key={item.question} className="group px-5 py-4" style={{ backgroundColor: MONOPOLY.paper }}>

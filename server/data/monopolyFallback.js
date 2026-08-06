@@ -179,12 +179,11 @@ const SETTINGS = {
 
   faq: [
     'Is this actually official? | Yes. A fully licensed edition, made through the same programme behind the football club, national attraction and global brand editions.',
-    'Do we have to sell or store anything? | No. You pay a fee. That is the whole commitment. We produce, warehouse, sell and ship every unit.',
+    'Who decides which race gets which space? | Position is assigned in the order spaces are committed. Nobody is ranked, and nobody is bumped for a bigger name later.',
     'What does a 5-year deal mean if the board is printed once? | Your space is printed, so it is permanent. The 5-year term covers category exclusivity and first refusal on your space in any future edition.',
-    'Will this compromise our existing sponsors? | No footwear or apparel brand appears anywhere on the board or box, and you approve every brand that does.',
-    'Who controls how our race appears? | You do. Approval rights on your name, marks and course representation before design locks.',
-    'What if you do not fill the board? | Every deposit is refundable in full. Nothing prints until the board is committed and funded.',
+    'Can we buy copies to sell at our expo? | Yes, at wholesale, for the full 5-year term. It is optional and separate from the partnership fee.',
     'Where does the charity money go? | 5% of all proceeds. The partner races help choose the cause, and the total raised is reported back to everyone on the board.',
+    'What happens to our deposit if this does not go ahead? | Refunded in full. Nothing prints until the board is committed and funded.',
   ].join('\n'),
 }
 
