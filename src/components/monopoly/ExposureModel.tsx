@@ -91,8 +91,8 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
       </div>
 
       <p className="mt-5" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '48rem' }}>
-        Not impressions in the advertising sense, where somebody scrolls past you. Every one is a
-        person who chose to sit down at a table for two hours with your race name in front of them.
+        Nobody scrolls past a board game. Every one of these is a person who sat down at a table
+        with your name in front of them.
       </p>
 
       {/* ── The comparison ──────────────────────────────────────────────

@@ -242,9 +242,8 @@ export default function Monopoly() {
             So why isn't there a Marathon Monopoly?
           </p>
           <p className="mt-4" style={{ fontSize: 16, color: 'rgba(255,255,255,0.9)', lineHeight: 1.6, maxWidth: '44rem' }}>
-            Running has the audience, the obsession and the gift problem every December. It has
-            never had the board. This is the edition where the properties are not streets, they are
-            the world's great marathons, and it is being made now.
+            Running has the audience, the obsession, and the gift problem every December. It has
+            never had the board. That changes now.
           </p>
         </div>
       </Section>
@@ -257,12 +256,12 @@ export default function Monopoly() {
           <Beat
             dark
             title="It legitimises you"
-            body="Twenty-two races define this edition. Being one of them puts your race in the same sentence as the majors, permanently, in a format nobody can argue with."
+            body="Twenty-two races define this edition. Being one of them says where your race sits. Permanently."
           />
           <Beat
             dark
             title="A marathon-obsessed audience"
-            body="Every household that owns this board sees your name a hundred times over, and a runner who has done four of the twenty-two spends the game looking at the other eighteen. That is discovery from people already committed to the sport."
+            body="3.2 million times your name is seen. And a runner who has done four of the twenty-two spends the whole game looking at the other eighteen."
           />
           <Beat
             dark
@@ -272,7 +271,7 @@ export default function Monopoly() {
           <Beat
             dark
             title="It gives something back"
-            body="5% of all proceeds go to charity, chosen with the partner races. Every race on the board can point at what it raised."
+            body="5% of all proceeds go to charity, chosen together with the partner races."
           />
         </div>
       </Section>
@@ -299,9 +298,9 @@ export default function Monopoly() {
         <Tag>Ways to get on the board</Tag>
         <H2>What's available, and what it costs.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          Race spaces go to races. Railroads, utilities, tokens and the box lid go to brands. You can
-          buy your space outright, or fund one and put a partner or charity on it instead. The four
-          corners are fixed by the licence and cannot be sold.
+          Race spaces go to races. Railroads, utilities, tokens and the box lid go to brands. Buy
+          your own space, or fund one for a partner or charity. The four corners are fixed by the
+          licence.
         </p>
 
         <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-5" style={{ backgroundColor: MONOPOLY.black }}>
@@ -321,8 +320,7 @@ export default function Monopoly() {
             Race space pricing
           </h3>
           <p className="mb-6" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-            Position is tiered, from Boardwalk and Park Place down to Light Blue and Brown. One fee,
-            paid in cash. No product to take, hold or sell.
+            One fee, paid in cash. Nothing to take, hold or sell.
           </p>
           <PackageTiers
             tiers={data.tiers}
@@ -363,8 +361,7 @@ export default function Monopoly() {
         <Tag>Return on investment</Tag>
         <H2>What that buys, in impressions.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          A board game is media, and it should be priced like media. Every assumption below is set
-          low on purpose, at the smallest run the manufacturer will print. A full board prints more.
+          A board game is media. Price it like media.
         </p>
         <ExposureModel tiers={data.tiers} initialTierKey={personalizedTierKey} />
       </Section>
@@ -374,29 +371,28 @@ export default function Monopoly() {
         <Tag dark>Why Trackstar</Tag>
         <H2 dark>We already do this. Just not in a box yet.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, maxWidth: '46rem' }}>
-          A licensed edition only works if whoever runs it can fill the board, produce it, and then
-          actually sell it. That is the job Trackstar already does every day.
+          This only works if whoever runs it can fill the board, produce it, and sell it.
         </p>
         <div className="grid gap-8 md:grid-cols-2">
           <Beat
             dark
             title="We are already inside the marathon world"
-            body="Twenty race partnerships are live right now on our other products, among them the Marine Corps Marathon, the California International Marathon and the Eugene Marathon. Filling this board is not a cold start for us, it is a conversation with people we already work with."
+            body="Twenty race partnerships are live today, among them the Marine Corps Marathon, California International and Eugene. Filling this board is not a cold start."
           />
           <Beat
             dark
             title="Ecommerce and design are our operations"
-            body="Producing, warehousing, selling and shipping a physical product is not a new capability we would be standing up for this. It is what the company already runs on."
+            body="Producing, warehousing, selling and shipping physical product is what the company already runs on."
           />
           <Beat
             dark
             title="Marketing is what we are best at"
-            body="Paid social, partnership sales and a proven audience of running gift buyers. We do not need to learn how to sell this once it exists."
+            body="Paid social and partnership sales are the core of the business. We do not need to learn how to sell this."
           />
           <Beat
             dark
             title="Customer service that partners can point at"
-            body="Every unit that reaches a runner is backed by the same support operation our race partners already trust with their own runners."
+            body="The same support operation our race partners already trust with their own runners."
           />
         </div>
       </Section>
@@ -407,9 +403,8 @@ export default function Monopoly() {
           <Tag>How you lock in</Tag>
           <H2>A $500 deposit holds your space.</H2>
           <p className="mb-10 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-            You are not writing a big cheque to find out whether this happens. $500 reserves your
-            space, and it is fully refundable. You only commit real money once the board is full and
-            you can see exactly who is on it.
+            $500 reserves your space, fully refundable. You commit real money only once the board is
+            full and you can see exactly who is on it.
           </p>
 
           <ol className="grid gap-px sm:grid-cols-2 lg:grid-cols-4" style={{ backgroundColor: MONOPOLY.black }}>
@@ -550,8 +545,7 @@ function HeroActions() {
       <ClickPrompt className="order-3 mt-8 hidden lg:-mr-24 lg:flex" />
 
       <p className="order-2" style={{ fontSize: 17, lineHeight: 1.6, color: MONOPOLY.inkMuted }}>
-        Marathon Monopoly puts the world's great races on the most recognisable board game ever
-        made. Printed once. Your race is on it permanently.
+        The world's great marathons, on the most famous board game ever made.
       </p>
 
       <div className="order-2 mt-6">

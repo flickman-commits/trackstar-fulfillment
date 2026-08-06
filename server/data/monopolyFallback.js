@@ -139,21 +139,21 @@ const SETTINGS = {
   // How a partner goes from interested to on the board: $500 refundable to
   // reserve, 50% (less the $500) once every space is committed, 50% on delivery.
   commitSteps: [
-    '$500 reserves your space | Fully refundable. It takes your space off the board while we go and fill the rest of it, and it is the only money you put up until the board is real.',
-    'We fill the board | 22 race spaces plus brand partners. Nothing more is asked of you while that happens, and your $500 is refundable the entire time.',
-    '50% when the board is full | Once every space is committed we come back with the finished board so you can see exactly who you are on it with. Your 50% deposit is due then, less the $500 you already paid.',
-    'The balance on delivery | The final 50% is due when the product ships. Nothing goes to print until the board is full and the run is funded.',
+    '$500 reserves your space | Fully refundable. It is the only money you put up until the board is real.',
+    'We fill the board | 22 race spaces plus brand partners. Nothing more is asked of you while that happens.',
+    '50% when the board is full | You see the finished board first, then your 50% is due, less the $500 you already paid.',
+    'The balance on delivery | The final 50% is due when the product ships.',
   ].join('\n'),
 
   salesPlan: [
-    'Trackstar already owns the buyer | We have a 10,000 person list of people who have already bought a running gift from us. Not a cold audience, a proven one, and it is exactly the person who buys this.',
-    '22 race partners promoting at once | Every race on the board has a reason to tell their runners about it. That is 22 lists pointing at one product inside the same gifting window.',
+    'Trackstar already owns the buyer | 10,000 people have already bought a running gift from us. Not a cold audience. Exactly the person who buys this.',
+    '22 race partners promoting at once | Every race on the board has a reason to tell their runners. That is 22 lists on one product, in one gifting window.',
     'Direct to consumer | Sold through Trackstar year round, with the marketing weight concentrated on the holiday window.',
-    'Seeded to running influencers | Physical units into the hands of the creators the running audience already follows, ahead of launch.',
+    'Seeded to running influencers | Units in the hands of the creators runners already follow, ahead of launch.',
     'Gifted to media | Units to running and lifestyle outlets early enough to make their holiday coverage.',
-    '2027 holiday gift guides | We are pursuing gift guide placement now. A licensed board game for a sport that has never had one is an easy story to place.',
-    'Our own content | A full photo shoot and original organic content produced in house, and handed to every partner to use however they want.',
-    '5% of proceeds go to charity | Chosen with the partner races, reported back to everyone on the board. A licensed game for the sport that also gives something back is a much easier story to tell, and a much easier thing to promote.',
+    '2027 holiday gift guides | Placement is being pursued now. A licensed board game for a sport that has never had one is an easy story to place.',
+    'Our own content | A full photo shoot and original organic content, handed to every partner to use however they want.',
+    '5% of proceeds go to charity | Chosen with the partner races and reported back. A game that gives something back is a far easier story to promote.',
   ].join('\n'),
 
   brandPricing: [
@@ -178,13 +178,13 @@ const SETTINGS = {
   ].join('\n'),
 
   faq: [
-    'Is this actually official? | Yes. A fully licensed Monopoly edition, produced through the official custom edition programme that has made editions for major football clubs, national attractions and global brands.',
-    'Do we have to sell or store anything? | No. You pay a fee and that is the whole commitment. We produce, warehouse, sell and ship every unit ourselves.',
-    'What does a 5-year deal mean if the board is printed once? | Your space is printed, so it is permanent. The 5-year term covers category exclusivity in your market and right of first refusal on your space in any future edition.',
-    'Will this compromise our existing sponsors? | No footwear or apparel brand appears anywhere on the board or box. You hold approval rights over every brand partner, and we clear categories against your exclusivities before anything is sold.',
+    'Is this actually official? | Yes. A fully licensed edition, made through the same programme behind the football club, national attraction and global brand editions.',
+    'Do we have to sell or store anything? | No. You pay a fee. That is the whole commitment. We produce, warehouse, sell and ship every unit.',
+    'What does a 5-year deal mean if the board is printed once? | Your space is printed, so it is permanent. The 5-year term covers category exclusivity and first refusal on your space in any future edition.',
+    'Will this compromise our existing sponsors? | No footwear or apparel brand appears anywhere on the board or box, and you approve every brand that does.',
     'Who controls how our race appears? | You do. Approval rights on your name, marks and course representation before design locks.',
-    'What if you do not fill the board? | Every deposit is refundable in full. Nothing goes to print until the board is committed and the run is funded.',
-    'Where does the charity money go? | 5% of all proceeds go to charity. The partner races help choose it, and the total raised is reported back to everyone on the board.',
+    'What if you do not fill the board? | Every deposit is refundable in full. Nothing prints until the board is committed and funded.',
+    'Where does the charity money go? | 5% of all proceeds. The partner races help choose the cause, and the total raised is reported back to everyone on the board.',
   ].join('\n'),
 }
 

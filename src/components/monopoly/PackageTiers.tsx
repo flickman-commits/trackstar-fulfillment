@@ -96,9 +96,8 @@ export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
             ))}
           </div>
           <p className="mt-4" style={{ fontSize: 13, color: '#666666', lineHeight: 1.6 }}>
-            Railroads and tokens are open to wearables, recovery tech, running media, travel and
-            destination marketing. Footwear and apparel are excluded from the board entirely, and
-            every race partner holds approval rights over the brands that appear alongside them.
+            Open to wearables, recovery tech, running media and destination marketing. Footwear and
+            apparel are excluded entirely, and every race partner approves the brands beside them.
           </p>
         </div>
       )}
