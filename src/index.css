@@ -1,4 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Caveat: the handwritten voice on /monopoly, used only for the pointer note
+   beside the hand-drawn arrow so the two read as the same gesture. */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap');
 
 @tailwind base;
 @tailwind components;

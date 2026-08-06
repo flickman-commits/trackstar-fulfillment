@@ -82,60 +82,50 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
 
   return (
     <div>
-      {/* ── Assumptions ─────────────────────────────────────────────────── */}
-      <div
-        className="mb-8 px-5 py-6 sm:px-7"
-        style={{
-          backgroundColor: MONOPOLY.mintPale,
-          border: CARD_OUTLINE,
-          borderRadius: UI_RADIUS,
-          ...guilloche('rgba(35,31,32,0.05)', 22),
-        }}
-      >
-        <div
-          className="mb-5"
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: MONOPOLY.inkMuted,
-          }}
-        >
-          Change anything you disagree with
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <Stepper label="Boxes printed" value={input.units} step={500} min={2000} max={10000} onChange={set('units')} />
-          <Stepper label="Players per game" value={input.playersPerGame} step={1} min={2} max={8} onChange={set('playersPerGame')} />
-          <Stepper label="Games played per box" value={input.gamesPerBox} step={1} min={1} max={40} onChange={set('gamesPerBox')} suffix=" over 10 yrs" />
-          <Stepper label="Hours per game" value={input.hoursPerGame} step={0.5} min={0.5} max={5} onChange={set('hoursPerGame')} suffix=" hrs" />
-        </div>
-      </div>
-
+      {/* ── Headline numbers first, assumptions second ────────────────── */}
       {/* ── Reach, ungated ──────────────────────────────────────────────── */}
-      <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-4" style={{ backgroundColor: MONOPOLY.black }}>
-        <BigStat value={fmt(result.sessions)} label="games played" sub="Across every box in the run" />
+      <div className="grid gap-px sm:grid-cols-3" style={{ backgroundColor: MONOPOLY.black }}>
         <BigStat value={fmt(result.playerSessions)} label="people at the table" sub="One person, one game" />
-        <BigStat value={fmt(Math.round(result.attentionHours))} label="hours of attention" sub="Seated, with the board in front of them" />
-        <BigStat value={fmt(result.impressions)} label="brand impressions" sub={`At ${input.glancesPerPlayerHour} looks per hour, once every ${Math.round(60 / input.glancesPerPlayerHour)} minutes`} accent />
+        <BigStat value={fmt(Math.round(result.attentionHours))} label="hours of attention" sub="Seated, board in front of them" />
+        <BigStat value={fmt(result.impressions)} label="brand impressions" sub="Times an eye lands on your name" accent />
       </div>
 
-      <p className="mt-5" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '48rem' }}>
-        Those are not impressions in the advertising sense, where a person scrolls past you. Every
-        one of them is somebody who chose to sit down at a table for two hours with your race name
-        printed in front of them. Nobody has ever opted in to an Instagram ad.
+      <p className="mt-5" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '48rem' }}>
+        Not impressions in the advertising sense, where somebody scrolls past you. Every one is a
+        person who chose to sit down at a table for two hours with your race name in front of them.
       </p>
 
-      {/* ── The rate card ───────────────────────────────────────────────── */}
-      <div className="mt-10">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <h3 style={{ fontSize: 20, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
-            What that costs, against what you already buy
-          </h3>
+      {/* ── The comparison ──────────────────────────────────────────────
+          Led with the single number that matters. The full rate card is real
+          and defensible, but a five-row table is something to study; the
+          headline is something to react to, so the table waits until asked. */}
+      {hasPricing && perHour > 0 && (
+        <div
+          className="mt-10 px-6 py-7 sm:px-8"
+          style={{ backgroundColor: MONOPOLY.red, borderRadius: UI_RADIUS, border: CARD_OUTLINE }}
+        >
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                One hour of a person's attention
+              </div>
+              <div className="mt-2 flex items-baseline gap-4">
+                <span style={{ fontSize: 46, fontWeight: 700, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.03em' }}>
+                  ${perHour.toFixed(2)}
+                </span>
+                <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)' }}>
+                  vs <strong>${benchmarkCostPerHour(MEDIA_BENCHMARKS[0]).toFixed(2)}</strong> on Instagram
+                </span>
+              </div>
+            </div>
 
-          {hasPricing && pricedTiers.length > 0 && (
-            <label className="flex items-center gap-2" style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>
+            <div style={{ fontSize: 34, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.03em' }}>
+              {Math.round(benchmarkCostPerHour(MEDIA_BENCHMARKS[0]) / perHour)}x cheaper
+            </div>
+          </div>
+
+          {pricedTiers.length > 0 && (
+            <label className="mt-5 flex flex-wrap items-center gap-2" style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
               Priced at
               <select
                 value={tierKey}
@@ -158,8 +148,38 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
             </label>
           )}
         </div>
+      )}
 
-        <div style={{ border: CARD_OUTLINE, borderRadius: UI_RADIUS, overflow: 'hidden', backgroundColor: '#FFFFFF' }}>
+      {/* ── Everything a sceptic needs, folded away until they ask ─────── */}
+      <details className="mt-6">
+        <summary
+          className="cursor-pointer list-none"
+          style={{ fontSize: 14, fontWeight: 700, color: MONOPOLY.ink }}
+        >
+          Show the assumptions and the full rate card
+        </summary>
+
+        <div
+          className="mt-5 px-5 py-6 sm:px-7"
+          style={{
+            backgroundColor: MONOPOLY.mintPale,
+            border: CARD_OUTLINE,
+            borderRadius: UI_RADIUS,
+            ...guilloche('rgba(35,31,32,0.05)', 22),
+          }}
+        >
+          <div className="mb-5" style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: MONOPOLY.inkMuted }}>
+            Change anything you disagree with
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <Stepper label="Boxes printed" value={input.units} step={500} min={2000} max={10000} onChange={set('units')} />
+            <Stepper label="Players per game" value={input.playersPerGame} step={1} min={2} max={8} onChange={set('playersPerGame')} />
+            <Stepper label="Games per box" value={input.gamesPerBox} step={1} min={1} max={40} onChange={set('gamesPerBox')} suffix=" over 10 yrs" />
+            <Stepper label="Hours per game" value={input.hoursPerGame} step={0.5} min={0.5} max={5} onChange={set('hoursPerGame')} suffix=" hrs" />
+          </div>
+        </div>
+
+        <div className="mt-5 overflow-hidden" style={{ border: CARD_OUTLINE, borderRadius: UI_RADIUS, backgroundColor: '#FFFFFF' }}>
           <div className="overflow-x-auto">
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
               <thead>
@@ -167,7 +187,7 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
                   <Th>Channel</Th>
                   <Th align="right">CPM</Th>
                   <Th align="right">Seconds you get</Th>
-                  <Th align="right">Cost per hour of attention</Th>
+                  <Th align="right">Cost per hour</Th>
                 </tr>
               </thead>
               <tbody>
@@ -190,9 +210,8 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
                       </Td>
                       <Td align="right">{masked ? <Locked /> : `$${row.cpm.toFixed(2)}`}</Td>
                       <Td align="right">
-                        {/* For us, the board is physically present for the whole
-                            interval between glances, so the seconds bought by one
-                            impression is the gap itself. */}
+                        {/* The board is physically present for the whole interval
+                            between glances, so one impression buys that gap. */}
                         {row.isUs
                           ? `${Math.round(3600 / input.glancesPerPlayerHour)}s`
                           : `${MEDIA_BENCHMARKS.find((b) => b.channel === row.channel)?.secondsPerImpression ?? 0}s`}
@@ -213,24 +232,7 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
             </table>
           </div>
         </div>
-
-        {hasPricing && perHour > 0 && (
-          <div
-            className="mt-6 px-6 py-5"
-            style={{ backgroundColor: MONOPOLY.red, borderRadius: UI_RADIUS, border: CARD_OUTLINE }}
-          >
-            <p style={{ fontSize: 17, lineHeight: 1.55, color: '#FFFFFF', fontWeight: 500 }}>
-              A {tier?.label} space holds a person's attention for an hour at{' '}
-              <strong>${perHour.toFixed(2)}</strong>. The same hour on Instagram costs{' '}
-              <strong>${benchmarkCostPerHour(MEDIA_BENCHMARKS[0]).toFixed(2)}</strong>. That is{' '}
-              <strong>{Math.round(benchmarkCostPerHour(MEDIA_BENCHMARKS[0]) / perHour)}x</strong> cheaper,
-              and it is attention nobody scrolled past.
-            </p>
-          </div>
-        )}
-
-
-      </div>
+      </details>
     </div>
   )
 }

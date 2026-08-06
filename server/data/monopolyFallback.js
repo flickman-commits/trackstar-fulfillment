@@ -15,11 +15,10 @@
  */
 
 /** The three targets already ring-fenced in the licensor sheet's EDIT BELOW column. */
-const HOLDS = {
-  'GREEN 3': { displayName: 'Chicago Marathon', status: 'hold', tierKey: 'green', raceSlug: 'chicago' },
-  'DARK BLUE 1': { displayName: 'New York City Marathon', status: 'hold', tierKey: 'boardwalk', raceSlug: 'nyc' },
-  'DARK BLUE 2': { displayName: 'Boston Marathon', status: 'hold', tierKey: 'boardwalk', raceSlug: 'boston' },
-}
+// Empty on purpose. Naming a race here puts it on a page real race directors
+// read, which claims a commitment that does not exist. Only add a race once it
+// has actually committed.
+const HOLDS = {}
 
 const TIERS = [
   {
@@ -131,7 +130,7 @@ const SETTINGS = {
   ].join('\n'),
 
   timeline: [
-    'Locking in races | Now to October 2026 | Every space must be committed before design can start',
+    'Locking in races | Closes September 30, 2026 | Every space must be committed before design can start',
     'Design | October to December 2026 | Twelve weeks. Board composition locks the day it begins',
     'Production | January to October 2027 | Nine months, costed at the long end of the quote with a month of slack',
     'On shelves | Holiday 2027 | Delivered with the gifting window still ahead of it',
@@ -146,11 +145,6 @@ const SETTINGS = {
     'The balance on delivery | The final 50% is due when the product ships. Nothing goes to print until the board is full and the run is funded.',
   ].join('\n'),
 
-  paymentOptions: [
-    'All cash | Pay the partnership in full, take no product. | We produce, store, sell and ship every unit. You have no inventory to hold, nothing to fulfil and nothing to sell. Best if you want the board position and none of the operations.',
-    'Cash plus units | A lower cash number, plus a unit allocation. | You take a share of the partnership in product rather than cash. Sell it at your expo or race store, gift it to VIPs and sponsors, or seed it to media. Best if you already move merchandise and want the upside.',
-  ].join('\n'),
-
   salesPlan: [
     'Trackstar already owns the buyer | We have a 10,000 person list of people who have already bought a running gift from us. Not a cold audience, a proven one, and it is exactly the person who buys this.',
     '22 race partners promoting at once | Every race on the board has a reason to tell their runners about it. That is 22 lists pointing at one product inside the same gifting window.',
@@ -159,7 +153,7 @@ const SETTINGS = {
     'Gifted to media | Units to running and lifestyle outlets early enough to make their holiday coverage.',
     '2027 holiday gift guides | We are pursuing gift guide placement now. A licensed board game for a sport that has never had one is an easy story to place.',
     'Our own content | A full photo shoot and original organic content produced in house, and handed to every partner to use however they want.',
-    'Print run set by commitments | We do not guess. The run is sized from the allocations partners actually take, plus our own direct to consumer forecast, a media hold and a buffer, then rounded up to the next manufacturing tier. Partners on the all cash structure take no units, so we carry and sell their share ourselves.',
+    '5% of proceeds go to charity | Chosen with the partner races, reported back to everyone on the board. A licensed game for the sport that also gives something back is a much easier story to tell, and a much easier thing to promote.',
   ].join('\n'),
 
   brandPricing: [
@@ -184,13 +178,13 @@ const SETTINGS = {
   ].join('\n'),
 
   faq: [
-    'Is this actually official? | Yes. This is a fully licensed Monopoly edition produced through the official custom edition programme. The same programme has produced editions for major football clubs, national attractions and global brands.',
-    'What does a 5-year deal mean if the board is printed once? | Your presence in Edition One is permanent, because it is printed. The 5-year term covers category exclusivity in your market, right of first refusal on your space in any future edition, and wholesale reorder rights.',
-    'Do we have to hold or sell inventory? | Only if you want to. If you take the all cash option you receive no product at all and we handle every unit. If you take units, they are yours outright to sell at your expo, gift to VIPs, or seed to media. Nothing obligates you to move a single box.',
-    'What if we cannot sell at the expo price? | The expo price is where there is no competing product on the shelf and buyers are in the moment. At a lower shelf price the included allocation still returns most of the fee. The math works at either price.',
-    'Will this compromise our existing sponsors? | No competing footwear or apparel brand appears anywhere on the board or box. You hold approval rights over every brand partner, and we clear categories against your exclusivities before anything is sold.',
-    'Who controls how our race appears? | You do. Every partner has approval rights on their name, marks and course representation before design locks.',
-    'What if you do not fill the board? | All deposits are fully refundable if we do not reach minimum partnership thresholds by the design deadline. You carry no risk.',
+    'Is this actually official? | Yes. A fully licensed Monopoly edition, produced through the official custom edition programme that has made editions for major football clubs, national attractions and global brands.',
+    'Do we have to sell or store anything? | No. You pay a fee and that is the whole commitment. We produce, warehouse, sell and ship every unit ourselves.',
+    'What does a 5-year deal mean if the board is printed once? | Your space is printed, so it is permanent. The 5-year term covers category exclusivity in your market and right of first refusal on your space in any future edition.',
+    'Will this compromise our existing sponsors? | No footwear or apparel brand appears anywhere on the board or box. You hold approval rights over every brand partner, and we clear categories against your exclusivities before anything is sold.',
+    'Who controls how our race appears? | You do. Approval rights on your name, marks and course representation before design locks.',
+    'What if you do not fill the board? | Every deposit is refundable in full. Nothing goes to print until the board is committed and the run is funded.',
+    'Where does the charity money go? | 5% of all proceeds go to charity. The partner races help choose it, and the total raised is reported back to everyone on the board.',
   ].join('\n'),
 }
 

@@ -16,11 +16,10 @@ import { SpaceDetail } from '@/components/monopoly/SpaceDetail'
 import { InventoryTable } from '@/components/monopoly/InventoryTable'
 import { TokenGallery } from '@/components/monopoly/TokenGallery'
 import { PackageTiers } from '@/components/monopoly/PackageTiers'
-import { OffsetCalculator } from '@/components/monopoly/OffsetCalculator'
 import { STATUS_COLORS, legendFor } from '@/components/monopoly/boardView'
 import { ExposureModel } from '@/components/monopoly/ExposureModel'
 import { BrandLockup } from '@/components/monopoly/BrandLockup'
-import { MONOPOLY, UI_RADIUS, guilloche } from '@/components/monopoly/monopolyTheme'
+import { MONOPOLY, UI_RADIUS, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import { mergeSalesData } from '@/lib/monopolyMerge'
 import type { BoardSpace, MonopolyPublicPayload, MonopolySalesResponse } from '@/lib/monopolyTypes'
@@ -35,6 +34,15 @@ const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif"
  * measured. The hero subtracts the header so it fills exactly one screen.
  */
 const HEADER_HEIGHT_FALLBACK = 72
+
+/**
+ * The row-by-row availability table, off for now.
+ *
+ * With most spaces unsold it read as an empty warehouse rather than as
+ * scarcity, and the board already shows the same thing far better. Kept behind
+ * a flag rather than deleted because it earns its place once the board fills up.
+ */
+const SHOW_AVAILABILITY_TABLE = false
 const CTA_EMAIL = 'matt@trackstar.art'
 
 export default function Monopoly() {
@@ -144,7 +152,7 @@ export default function Monopoly() {
         style={{ ...guilloche('rgba(35,31,32,0.045)', 30), ['--monopoly-header-h' as string]: `${headerHeight}px` }}
       >
         <div className="order-2 lg:order-1 lg:max-w-[27rem] lg:shrink-0">
-          <SpacesRemaining remaining={counts.raceSpacesRemaining} total={counts.raceSpacesTotal} />
+          <CommitmentDeadline remaining={counts.raceSpacesRemaining} total={counts.raceSpacesTotal} />
 
           <h1
             className="mt-4"
@@ -196,232 +204,167 @@ export default function Monopoly() {
       </section>
 
       {/* ═══ WHAT IT IS ═══
-          Not everyone who opens this link knows what a custom Monopoly edition
-          is. Explain the product before asking anyone to buy into it. */}
+          Lead with editions people already know exist, then the gap. Naming
+          the absence is a stronger opening than describing the product. */}
       <Section>
         <Tag>What it is</Tag>
-        <H2>An official Monopoly edition, about running.</H2>
-        <div className="mt-8 grid gap-10 lg:grid-cols-2">
-          <div>
-            <p style={{ fontSize: 17, lineHeight: 1.65, color: MONOPOLY.ink }}>
-              Marathon Monopoly is a fully licensed custom edition of Monopoly where the properties
-              are not streets. They are the world's great marathons. Same game, same rules, same box
-              on the shelf at Christmas, with the sport of running on every square.
-            </p>
-            <p className="mt-4" style={{ fontSize: 15, lineHeight: 1.65, color: MONOPOLY.inkMuted }}>
-              Custom editions like this already exist for football clubs, cities and national
-              attractions. There has never been one for running.
-            </p>
-          </div>
+        <H2>There is a Monopoly for almost everything.</H2>
+        <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
+          Over 300 officially licensed editions have been printed. Football clubs, cities, national
+          parks, film franchises, theme parks, universities.
+        </p>
 
-          <div>
-            <div
-              className="mb-4"
-              style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: MONOPOLY.inkMuted, fontWeight: 700 }}
+        <div className="mb-10 flex flex-wrap gap-2">
+          {['Star Wars', 'Premier League clubs', 'National Parks', 'Game of Thrones', 'Dollywood',
+            'NFL teams', 'Cities and regions', 'Universities', 'The Beatles'].map((label) => (
+            <span
+              key={label}
+              style={{
+                fontSize: 14,
+                padding: '8px 14px',
+                backgroundColor: MONOPOLY.paper,
+                border: `1.5px solid ${MONOPOLY.black}`,
+                borderRadius: UI_RADIUS,
+                color: MONOPOLY.ink,
+                fontWeight: 500,
+              }}
             >
-              Who buys it
-            </div>
-            <ul className="flex flex-col gap-3">
-              {[
-                'Runners who want the races they have run, and the ones they are chasing, on their own shelf.',
-                'Parents who want to put the sport in front of their kids in a way that is not a lecture.',
-                'Gift givers with a runner in their life and no idea what to buy them, every single December.',
-                'Anyone who is simply obsessed with running.',
-              ].map((line) => (
-                <li key={line} className="flex gap-3" style={{ fontSize: 15, lineHeight: 1.6, color: MONOPOLY.ink }}>
-                  <span style={{ color: MONOPOLY.red, fontWeight: 700, flexShrink: 0 }}>+</span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </Section>
-
-      {/* ═══ HOW TO GET INVOLVED ═══ */}
-      <Section dark>
-        <Tag dark>How to get involved</Tag>
-        <H2 dark>Take a space on the board.</H2>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, maxWidth: '46rem' }}>
-          There are two ways a race joins Edition One, and both end the same way: your name printed
-          on a square of the most recognisable board game ever made.
-        </p>
-        <div className="grid gap-8 md:grid-cols-2">
-          <Beat
-            dark
-            title="Buy your space outright"
-            body="You take a property on the board under your own name. The tier decides the position, the position decides the fee, and that is the whole transaction."
-          />
-          <Beat
-            dark
-            title="Sponsor a space"
-            body="Fund a space and put a partner, a charity or a cause on it instead of yourself. The same board position, pointed at whoever you want it pointed at."
-          />
-        </div>
-        <div className="mt-10 grid gap-8 md:grid-cols-2">
-          <Beat
-            dark
-            title="This is the first print run"
-            body="Edition One is the first Monopoly board the sport has ever had. Whoever is on it is on the original, and that is a thing you can only be once."
-          />
-          <Beat
-            dark
-            title="No renewal to miss"
-            body="An expo banner is gone Sunday night. A board game sits on a shelf for twenty years. Once this edition is printed your race is on it for the life of the edition, with no campaign to renew and no impression that expires."
-          />
-        </div>
-      </Section>
-
-      {/* ═══ AD INVENTORY ═══
-          Board spaces, tokens and card decks in one place: everything that can
-          actually be bought, with the parts that cannot made explicit. */}
-      <Section>
-        <Tag>Ad inventory</Tag>
-        <H2>Everything on the board that can be bought.</H2>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          Race spaces go to races. Railroads, utilities, tokens and the box lid go to brands. The
-          four corners cannot be sold at all.
-        </p>
-
-        <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-5" style={{ backgroundColor: MONOPOLY.black }}>
-          <InventoryStat count={counts.raceSpacesTotal} label="Race spaces" note="The 22 coloured properties" />
-          {data.brandSlots.map((slot) => (
-            <InventoryStat key={slot.label} count={slot.total} label={slot.label} />
+              {label}
+            </span>
           ))}
         </div>
 
-        <p className="mt-6" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          Board position is tiered. Boardwalk and Park Place carry the largest name treatment, down
-          through Green, Yellow/Red, Orange/Pink and Light Blue/Brown. Spaces are assigned in order
-          of commitment, and no footwear or apparel brand appears anywhere on the board or box.
-        </p>
-
         <div
-          className="mt-6 px-5 py-4"
-          style={{ backgroundColor: MONOPOLY.mint, border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
+          className="px-6 py-7 sm:px-9 sm:py-9"
+          style={{ backgroundColor: MONOPOLY.red, border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
         >
-          <p style={{ fontSize: 14, color: MONOPOLY.ink, lineHeight: 1.65 }}>
-            <strong>What cannot be changed.</strong> GO, Jail, Free Parking and Go To Jail are fixed
-            by the Monopoly licence. They keep their original names and artwork on every edition
-            ever printed, so they are not for sale and cannot be renamed. Chance and Community Chest
-            keep their names too, though the cards inside them are written for this edition.
+          <p style={{ fontSize: 'clamp(22px, 3vw, 34px)', fontWeight: 700, color: '#FFFFFF', lineHeight: 1.15, letterSpacing: '-0.02em' }}>
+            So why isn't there a Marathon Monopoly?
           </p>
-        </div>
-
-        <div className="mt-14">
-          <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
-            The playing pieces
-          </h3>
-          <p className="mb-8" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-            Custom-molded tokens, open to gear, nutrition, timing and wearable brands. Renders below
-            are indicative. Final tooling is set during design.
+          <p className="mt-4" style={{ fontSize: 16, color: 'rgba(255,255,255,0.9)', lineHeight: 1.6, maxWidth: '44rem' }}>
+            Running has the audience, the obsession and the gift problem every December. It has
+            never had the board. This is the edition where the properties are not streets, they are
+            the world's great marathons, and it is being made now.
           </p>
-          <TokenGallery tokens={data.tokens} />
         </div>
       </Section>
 
-      {/* ═══ WHAT'S AVAILABLE ═══ */}
-      <Section muted>
-        <Tag>What's open</Tag>
-        <H2>
-          {counts.raceSpacesRemaining} of {counts.raceSpacesTotal} race spaces are still available.
-        </H2>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-          {takenCount > 0
-            ? `${takenCount} spoken for. Position is assigned in the order it is committed, so the tier you want is the tier that is still open when you sign.`
-            : 'Every space is open. The first three races to commit take Founding Partner terms.'}
-        </p>
-        <InventoryTable spaces={data.spaces} tiers={data.tiers} onSelectSpace={handleSelect} />
-
-        <div className="mt-10">
-          <h3 className="mb-4" style={{ fontSize: 18, fontWeight: 700, color: MONOPOLY.ink }}>
-            Brand inventory still open
-          </h3>
-          <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-4" style={{ backgroundColor: MONOPOLY.black }}>
-            {data.brandSlots.map((slot) => (
-              <div key={slot.label} className="px-5 py-5" style={{ backgroundColor: MONOPOLY.paper }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.03em', lineHeight: 1 }}>
-                  {slot.available}
-                  <span style={{ fontSize: 16, color: MONOPOLY.inkMuted, fontWeight: 400 }}> of {slot.total}</span>
-                </div>
-                <div className="mt-2" style={{ fontSize: 14, color: MONOPOLY.inkMuted }}>
-                  {slot.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Section>
-
-      {/* ═══ WHY RACES SAY YES ═══ */}
-      <Section muted>
-        <Tag>Why this makes sense</Tag>
-        <H2>The objections, answered.</H2>
-        <div className="mt-8 grid gap-x-10 gap-y-8 md:grid-cols-2">
+      {/* ═══ WHY YOU SHOULD CARE ═══ */}
+      <Section dark>
+        <Tag dark>Why you should care</Tag>
+        <H2 dark>What a space on the board actually does for your race.</H2>
+        <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <Beat
-            title="You hold no inventory"
-            body="If you take units they are yours outright, and nothing obligates you to move a single box. Sell them at your expo, gift them to VIPs, seed them to media, or take the all cash option and hold nothing at all."
+            dark
+            title="It legitimises you"
+            body="Twenty-two races define this edition. Being one of them puts your race in the same sentence as the majors, permanently, in a format nobody can argue with."
           />
           <Beat
-            title="It can cost a lot less than the fee"
-            body="If you take the cash plus units structure, the allocation recovers most of the fee at expo pricing and additional units at wholesale narrow it further. If you would rather not touch product, take the all cash option instead and the fee is simply the fee. Both are on the table."
+            dark
+            title="A marathon-obsessed audience"
+            body="Every household that owns this board sees your name a hundred times over, and a runner who has done four of the twenty-two spends the game looking at the other eighteen. That is discovery from people already committed to the sport."
           />
           <Beat
-            title="It won't compromise your sponsors"
-            body="No competing footwear or apparel brand appears on the board or box. You hold approval rights over every brand partner, and we clear categories against your exclusivities before anything is sold."
+            dark
+            title="Be part of history"
+            body="There is only ever one first edition. This is it."
           />
           <Beat
-            title="You control how you appear"
-            body="Full creative approval on your name, marks and course representation before design locks. Nothing goes to print that you haven't signed off."
-          />
-          <Beat
-            title="We handle everything"
-            body="Design, licensing, manufacturing, fulfilment. You approve your marks and promote once."
-          />
-          <Beat
-            title="It's a seat at the table of the sport"
-            body="Twenty-two races define this edition. Being one of them is a statement about where your race sits, permanently, in print."
+            dark
+            title="It gives something back"
+            body="5% of all proceeds go to charity, chosen with the partner races. Every race on the board can point at what it raised."
           />
         </div>
       </Section>
 
       {/* ═══ HOW IT GETS SOLD ═══ */}
-      <Section dark>
-        <Tag dark>How we're going to sell it</Tag>
-        <H2 dark>The sales and marketing plan.</H2>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, maxWidth: '44rem' }}>
+      <Section>
+        <Tag>How we're going to sell it</Tag>
+        <H2>The distribution and sales plan.</H2>
+        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
           A partnership is only worth what the edition sells. Here's the plan behind the print run.
         </p>
         <div className="grid gap-8 md:grid-cols-2">
           {data.salesPlan.map((item) => (
-            <Beat key={item.title} dark title={item.title} body={item.body} />
+            <Beat key={item.title} title={item.title} body={item.body} />
           ))}
         </div>
       </Section>
 
-      {/* ═══ WHAT IT IS WORTH ═══ */}
-      <Section>
-        <Tag>Impressions</Tag>
-        <H2>How many people actually see it.</H2>
-        <div className="mb-10 mt-6 grid gap-8 md:grid-cols-2">
-          <Beat
-            title="It reaches people who aren't your runners yet"
-            body="Every household that owns this board sees your race name a hundred times over. That is aspiration marketing you cannot buy anywhere else, in front of people who have never entered one of your races."
+      {/* ═══ WAYS TO GET ON THE BOARD ═══
+          One section for the whole commercial picture: what exists, what is
+          still open, and what it costs. Splitting these made a reader hold
+          three separate tables in their head to answer one question. */}
+      <Section muted>
+        <Tag>Ways to get on the board</Tag>
+        <H2>What's available, and what it costs.</H2>
+        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          Race spaces go to races. Railroads, utilities, tokens and the box lid go to brands. You can
+          buy your space outright, or fund one and put a partner or charity on it instead. The four
+          corners are fixed by the licence and cannot be sold.
+        </p>
+
+        <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-5" style={{ backgroundColor: MONOPOLY.black }}>
+          <InventoryStat
+            count={counts.raceSpacesRemaining}
+            total={counts.raceSpacesTotal}
+            label="Race spaces"
+            note="The 22 coloured properties"
           />
-          <Beat
-            title="Runners find races through it"
-            body="A marathoner who has run four of the twenty-two spends the game looking at the other eighteen. Your race gets discovered by people already committed to the sport."
+          {data.brandSlots.map((slot) => (
+            <InventoryStat key={slot.label} count={slot.available} total={slot.total} label={slot.label} />
+          ))}
+        </div>
+
+        <div className="mt-12">
+          <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+            Race space pricing
+          </h3>
+          <p className="mb-6" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
+            Position is tiered, from Boardwalk and Park Place down to Light Blue and Brown. One fee,
+            paid in cash. No product to take, hold or sell.
+          </p>
+          <PackageTiers
+            tiers={data.tiers}
+            brandPricing={data.brandPricing}
+            highlightTierKey={personalizedTierKey}
           />
         </div>
-        <p className="mb-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          A board game is not a nice gesture, it is media, and it should be priced like media. Here
-          is the arithmetic, with every assumption set low enough that you can argue it down and
-          still come out ahead.
-        </p>
-        <p className="mb-8" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          It runs at 2,000 boxes because that is the smallest run the manufacturer will print. A
-          full board takes more than that before a single copy is sold to the public, so treat every
-          figure below as a floor rather than a forecast.
+
+        {SHOW_AVAILABILITY_TABLE && (
+        <div className="mt-14">
+          <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+            Which spaces are still open
+          </h3>
+          <p className="mb-6" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6 }}>
+            {takenCount > 0
+              ? `${takenCount} of ${counts.raceSpacesTotal} spoken for. Position is assigned in the order it is committed.`
+              : 'Every space is open. Position is assigned in the order it is committed.'}
+          </p>
+          <InventoryTable spaces={data.spaces} tiers={data.tiers} onSelectSpace={handleSelect} />
+        </div>
+        )}
+
+        <div className="mt-14">
+          <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+            The playing pieces
+          </h3>
+          <p className="mb-6" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
+            Custom-molded tokens, open to gear, nutrition, timing and wearable brands. Renders are
+            indicative. Final tooling is set during design.
+          </p>
+          <TokenGallery tokens={data.tokens} />
+        </div>
+
+      </Section>
+
+      {/* ═══ RETURN ON INVESTMENT ═══ */}
+      <Section>
+        <Tag>Return on investment</Tag>
+        <H2>What that buys, in impressions.</H2>
+        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          A board game is media, and it should be priced like media. Every assumption below is set
+          low on purpose, at the smallest run the manufacturer will print. A full board prints more.
         </p>
         <ExposureModel tiers={data.tiers} initialTierKey={personalizedTierKey} />
       </Section>
@@ -460,10 +403,10 @@ export default function Monopoly() {
 
       {/* ═══ HOW YOU LOCK IN ═══ */}
       {data.commitSteps.length > 0 && (
-        <Section>
+        <Section muted>
           <Tag>How you lock in</Tag>
           <H2>A $500 deposit holds your space.</H2>
-          <p className="mb-10 mt-3" style={{ fontSize: 15, color: '#666666', lineHeight: 1.6, maxWidth: '44rem' }}>
+          <p className="mb-10 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
             You are not writing a big cheque to find out whether this happens. $500 reserves your
             space, and it is fully refundable. You only commit real money once the board is full and
             you can see exactly who is on it.
@@ -486,106 +429,16 @@ export default function Monopoly() {
                 >
                   {i + 1}
                 </div>
-                <h3 className="mb-2" style={{ fontSize: 16, fontWeight: 700, color: '#1A1A1A' }}>
+                <h3 className="mb-2" style={{ fontSize: 16, fontWeight: 700, color: MONOPOLY.ink }}>
                   {step.title}
                 </h3>
-                <p style={{ fontSize: 14, lineHeight: 1.6, color: '#666666' }}>{step.body}</p>
+                <p style={{ fontSize: 14, lineHeight: 1.6, color: MONOPOLY.inkMuted }}>{step.body}</p>
               </li>
             ))}
           </ol>
 
-          {data.paymentOptions.length > 0 && (
-            <div className="mt-14">
-              <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: '#1A1A1A', letterSpacing: '-0.02em' }}>
-                Two ways to pay for it
-              </h3>
-              <p className="mb-6" style={{ fontSize: 15, color: '#666666', lineHeight: 1.6, maxWidth: '44rem' }}>
-                Some races want product to sell. Some want nothing to do with inventory. Pick the one
-                that fits how you actually operate.
-              </p>
-
-              <div className="grid gap-5 md:grid-cols-2">
-                {data.paymentOptions.map((option, i) => (
-                  <div
-                    key={option.label}
-                    className="flex flex-col px-6 py-6"
-                    style={{
-                      backgroundColor: MONOPOLY.paper,
-                      border: i === 0 ? `2px solid ${MONOPOLY.black}` : `2px solid ${MONOPOLY.red}`,
-                      borderRadius: UI_RADIUS,
-                    }}
-                  >
-                    <div
-                      className="mb-3 inline-block self-start px-2.5 py-1"
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        color: i === 0 ? '#666666' : '#ED1C24',
-                        border: `1px solid ${i === 0 ? '#E0E0E0' : 'rgba(237,28,36,0.3)'}`,
-                      }}
-                    >
-                      Option {i + 1}
-                    </div>
-                    <h4 style={{ fontSize: 20, fontWeight: 700, color: '#1A1A1A', letterSpacing: '-0.02em' }}>
-                      {option.label}
-                    </h4>
-                    <p className="mb-3 mt-1" style={{ fontSize: 15, fontWeight: 500, color: '#1A1A1A' }}>
-                      {option.summary}
-                    </p>
-                    <p style={{ fontSize: 14, lineHeight: 1.65, color: '#666666' }}>{option.body}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </Section>
       )}
-
-      {/* ═══ WHAT YOU INVEST ═══ */}
-      <Section muted>
-        <Tag>What you invest</Tag>
-        <H2>Position is priced. Value is not.</H2>
-        <p className="mb-3 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-          The fee below buys the board position. What you do about product is a separate choice, and
-          it changes what the partnership actually costs you.
-        </p>
-        <p className="mb-8" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-          <strong style={{ color: MONOPOLY.ink }}>Taking the all cash option</strong>, your cost is
-          the fee, full stop. No units, nothing to store or sell.{' '}
-          <strong style={{ color: MONOPOLY.ink }}>Taking cash plus units</strong>, an allocation
-          comes with the fee, and the resale and net cost columns below are what that is worth if
-          you sell it. Those two columns only apply to the second structure.
-        </p>
-        <PackageTiers
-          tiers={data.tiers}
-          brandPricing={data.brandPricing}
-          retailPrice={data.retailPrice ?? 65}
-          highlightTierKey={personalizedTierKey}
-        />
-      </Section>
-
-      {/* ═══ OFFSET CALCULATOR ═══ */}
-      <Section>
-        <Tag>Run your own numbers</Tag>
-        <H2>What the units are actually worth.</H2>
-        <p className="mb-3 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-          Add units at wholesale, resell at your price. Drag the sliders. This is your math, not
-          ours, and depending on the tier and how many units you move it can land either side of
-          zero.
-        </p>
-        <p className="mb-8" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-          This only applies to the cash plus units structure. On the all cash option there is no
-          allocation to resell and your cost is the fee.
-        </p>
-        <OffsetCalculator
-          tiers={data.tiers}
-          wholesalePrice={data.wholesalePrice ?? 30}
-          retailPrice={data.retailPrice ?? 65}
-          initialTierKey={personalizedTierKey}
-        />
-      </Section>
 
       {/* ═══ TIMELINE ═══ */}
       <Section muted>
@@ -608,26 +461,34 @@ export default function Monopoly() {
         </div>
       </Section>
 
-      {/* ═══ TERMS 🔒 ═══ */}
-      {data.terms && data.terms.length > 0 && (
-        <Section>
-          <Tag>Terms</Tag>
-          <H2>What you're actually signing.</H2>
-          <ul className="mt-8 grid gap-x-10 gap-y-4 md:grid-cols-2">
-            {data.terms.map((term) => (
-              <li key={term} className="flex gap-3" style={{ fontSize: 15, color: '#1A1A1A', lineHeight: 1.6 }}>
-                <span style={{ color: '#ED1C24', fontWeight: 700, flexShrink: 0 }}>+</span>
-                <span>{term}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
+      {/* ═══ OBJECTIONS ═══ */}
+      <Section>
+        <Tag>What you're probably thinking</Tag>
+        <H2>The short answers.</H2>
+        <div className="mt-8 grid gap-x-10 gap-y-8 md:grid-cols-2">
+          <Beat
+            title="You never touch product"
+            body="No inventory, no fulfilment, nothing to sell. We produce, store, ship and support every unit."
+          />
+          <Beat
+            title="It won't compromise your sponsors"
+            body="No footwear or apparel brand appears anywhere on the board or box. You approve every brand that does."
+          />
+          <Beat
+            title="You control how you appear"
+            body="Full creative approval on your name and marks. Nothing prints that you haven't signed off."
+          />
+          <Beat
+            title="No risk if it doesn't fill"
+            body="Every deposit is refundable if we don't hit minimum commitments. Nothing prints until the board is full and funded."
+          />
+        </div>
+      </Section>
 
       {/* ═══ FAQ ═══ */}
       <Section muted>
         <Tag>FAQ</Tag>
-        <H2>The things people ask.</H2>
+        <H2>The rest of it.</H2>
         <div className="mt-8 flex flex-col gap-px" style={{ backgroundColor: MONOPOLY.black }}>
           {data.faq.map((item) => (
             <details key={item.question} className="group px-5 py-4" style={{ backgroundColor: MONOPOLY.paper }}>
@@ -650,8 +511,7 @@ export default function Monopoly() {
         <div className="mx-auto max-w-2xl text-center">
           <H2 dark>Twenty-two spaces. Printed once.</H2>
           <p className="mt-4" style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
-            Spaces are assigned in the order they are committed, and the board locks when design
-            begins in October.
+            Commitments close September 30. The board locks when design begins, and it prints once.
           </p>
           <CtaButton large />
         </div>
@@ -711,11 +571,14 @@ function ClickPrompt({ className }: { className?: string }) {
       <PointerArrowMobile />
       <span
         style={{
-          fontSize: 18,
+          fontFamily: HAND_FONT,
+          // Caveat runs small for its point size, so it needs more than the
+          // 18px the surrounding UI type uses to read at the same weight.
+          fontSize: 27,
           fontWeight: 700,
           color: MONOPOLY.red,
-          lineHeight: 1.25,
-          letterSpacing: '-0.01em',
+          lineHeight: 1.05,
+          letterSpacing: '0.01em',
         }}
       >
         Click any space to
@@ -727,12 +590,23 @@ function ClickPrompt({ className }: { className?: string }) {
   )
 }
 
-/** One inventory line: how many of a thing exist to be bought. */
-function InventoryStat({ count, label, note }: { count: number; label: string; note?: string }) {
+/** One inventory line: how many are left, out of how many exist. */
+function InventoryStat({
+  count,
+  total,
+  label,
+  note,
+}: {
+  count: number
+  total: number
+  label: string
+  note?: string
+}) {
   return (
     <div className="px-5 py-6" style={{ backgroundColor: MONOPOLY.paper }}>
       <div style={{ fontSize: 34, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.03em', lineHeight: 1 }}>
         {count}
+        <span style={{ fontSize: 17, color: MONOPOLY.inkMuted, fontWeight: 400 }}> of {total}</span>
       </div>
       <div className="mt-2" style={{ fontSize: 14, color: MONOPOLY.ink, fontWeight: 500 }}>
         {label}
@@ -862,41 +736,34 @@ function CtaButton({ large }: { large?: boolean }) {
 }
 
 /**
- * Spaces remaining as a progress bar above the headline. A count in a sentence
- * is a fact; a bar that is visibly filling is scarcity.
+ * The deadline, above the headline.
+ *
+ * This replaced a "19 of 22 spaces open" progress bar. That is the wrong
+ * scarcity to lead with while most of the board is unsold: a bar sitting at 14%
+ * reads as "nobody is buying this". A date is a wall, and unlike a fill gauge it
+ * does not get weaker the emptier the board is.
  */
-function SpacesRemaining({ remaining, total }: { remaining: number; total: number }) {
-  const taken = total - remaining
-  const pct = total > 0 ? (taken / total) * 100 : 0
-
+function CommitmentDeadline({ remaining, total }: { remaining: number; total: number }) {
   return (
-    <div>
-      <div className="mb-2 flex items-baseline gap-2">
-        <span style={{ fontSize: 15, fontWeight: 700, color: MONOPOLY.ink }}>
-          {remaining} of {total} race spaces open
-        </span>
-      </div>
-      <div
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span
         style={{
-          height: 8,
-          borderRadius: 999,
-          backgroundColor: '#FFFFFF',
-          border: `1.5px solid ${MONOPOLY.black}`,
-          overflow: 'hidden',
+          fontSize: 13,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color: '#FFFFFF',
+          backgroundColor: MONOPOLY.red,
+          border: `2px solid ${MONOPOLY.black}`,
+          borderRadius: UI_RADIUS,
+          padding: '6px 12px',
         }}
       >
-        <div
-          style={{
-            width: `${pct}%`,
-            height: '100%',
-            backgroundColor: MONOPOLY.red,
-            transition: 'width 400ms ease',
-          }}
-        />
-      </div>
-      <div className="mt-1.5" style={{ fontSize: 12, color: '#8A857C' }}>
-        {taken} spoken for
-      </div>
+        Commitments close September 30
+      </span>
+      <span style={{ fontSize: 14, color: MONOPOLY.inkMuted }}>
+        {remaining} of {total} race spaces left
+      </span>
     </div>
   )
 }

@@ -18,11 +18,9 @@ import type { MonopolyPublicPayload, MonopolySalesResponse } from './monopolyTyp
 
 /** Mirrors the `[HOLD]` entries in the licensor sheet's EDIT BELOW column. */
 const FIXTURE_SALES: MonopolySalesResponse = {
-  spaceSales: {
-    'GREEN 3': { displayName: 'Chicago Marathon', status: 'hold', raceSlug: 'chicago' },
-    'DARK BLUE 1': { displayName: 'New York City Marathon', status: 'hold', raceSlug: 'nyc' },
-    'DARK BLUE 2': { displayName: 'Boston Marathon', status: 'hold', raceSlug: 'boston' },
-  },
+  // Empty on purpose. Naming a race here claims a commitment that does not
+  // exist, on a page real race directors read.
+  spaceSales: {},
 
   tiers: [
     {
@@ -106,7 +104,7 @@ const FIXTURE_SALES: MonopolySalesResponse = {
   ],
 
   timeline: [
-    { phase: 'Locking in races', window: 'Now to October 2026', note: 'Every space must be committed before design can start' },
+    { phase: 'Locking in races', window: 'Closes September 30, 2026', note: 'Every space must be committed before design can start' },
     { phase: 'Design', window: 'October to December 2026', note: 'Twelve weeks. Board composition locks the day it begins' },
     { phase: 'Production', window: 'January to October 2027', note: 'Nine months, costed at the long end of the quote with a month of slack' },
     { phase: 'On shelves', window: 'Holiday 2027', note: 'Delivered with the gifting window still ahead of it' },
@@ -131,18 +129,7 @@ const FIXTURE_SALES: MonopolySalesResponse = {
     },
   ],
 
-  paymentOptions: [
-    {
-      label: 'All cash',
-      summary: 'Pay the partnership in full, take no product.',
-      body: 'We produce, store, sell and ship every unit. You have no inventory to hold, nothing to fulfil and nothing to sell. Best if you want the board position and none of the operations.',
-    },
-    {
-      label: 'Cash plus units',
-      summary: 'A lower cash number, plus a unit allocation.',
-      body: 'You take a share of the partnership in product rather than cash. Sell it at your expo or race store, gift it to VIPs and sponsors, or seed it to media. Best if you already move merchandise and want the upside.',
-    },
-  ],
+  paymentOptions: [],
 
   salesPlan: [
     {
@@ -174,8 +161,8 @@ const FIXTURE_SALES: MonopolySalesResponse = {
       body: 'A full photo shoot and original organic content produced in house, and handed to every partner to use however they want.',
     },
     {
-      title: 'Print run set by commitments',
-      body: 'We do not guess. The run is sized from the allocations partners actually take, plus our own direct to consumer forecast, a media hold and a buffer, then rounded up to the next manufacturing tier. Partners on the all cash structure take no units, so we carry and sell their share ourselves.',
+      title: '5% of proceeds go to charity',
+      body: 'Chosen with the partner races, reported back to everyone on the board. A licensed game for the sport that also gives something back is a much easier story to tell, and a much easier thing to promote.',
     },
   ],
 

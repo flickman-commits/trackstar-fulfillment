@@ -36,10 +36,13 @@ interface Props {
   space: BoardSpaceData
   isSelected: boolean
   isHighlighted: boolean
+  isHovered: boolean
   onSelect: (position: number) => void
+  /** null when the pointer leaves. The tooltip lives on Board, not here. */
+  onHover: (position: number | null) => void
 }
 
-function BoardSpaceImpl({ space, isSelected, isHighlighted, onSelect }: Props) {
+function BoardSpaceImpl({ space, isSelected, isHighlighted, isHovered, onSelect, onHover }: Props) {
   const edge = edgeFor(space.position)
   const { row, col } = gridPosition(space.position)
   const isCorner = edge === 'corner'
@@ -76,6 +79,10 @@ function BoardSpaceImpl({ space, isSelected, isHighlighted, onSelect }: Props) {
     <button
       type="button"
       onClick={() => onSelect(space.position)}
+      onMouseEnter={() => onHover(space.position)}
+      onMouseLeave={() => onHover(null)}
+      onFocus={() => onHover(space.position)}
+      onBlur={() => onHover(null)}
       aria-label={`${space.displayName}${sellable ? `, ${space.status}` : ''}`}
       className="relative overflow-hidden transition-[filter,transform] duration-150 hover:z-10 focus:z-10 focus:outline-none"
       style={{
@@ -84,12 +91,14 @@ function BoardSpaceImpl({ space, isSelected, isHighlighted, onSelect }: Props) {
         backgroundColor: fill,
         border: '0.09cqw solid rgba(35,31,32,0.6)',
         cursor: sellable ? 'pointer' : 'default',
-        filter: isSelected ? 'brightness(1.08)' : undefined,
+        filter: isSelected || isHovered ? 'brightness(1.08)' : undefined,
         boxShadow: isSelected
           ? 'inset 0 0 0 0.35cqw #ED1C24'
           : isHighlighted
             ? 'inset 0 0 0 0.35cqw #ED1C24, 0 0 2cqw rgba(237,28,36,0.55)'
-            : undefined,
+            : isHovered
+              ? 'inset 0 0 0 0.28cqw rgba(237,28,36,0.75)'
+              : undefined,
       }}
     >
       <div style={innerStyle} className="flex flex-col">

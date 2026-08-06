@@ -12,12 +12,11 @@ import { formatMoney } from '@/lib/monopolyMath'
 interface Props {
   tiers: PackageTier[]
   brandPricing?: BrandPrice[]
-  retailPrice: number
   /** Highlighted when the visitor arrived on a personalised link. */
   highlightTierKey?: string
 }
 
-export function PackageTiers({ tiers, brandPricing, retailPrice, highlightTierKey }: Props) {
+export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
   return (
     <div className="flex flex-col gap-10">
       <div className="overflow-x-auto">
@@ -26,9 +25,6 @@ export function PackageTiers({ tiers, brandPricing, retailPrice, highlightTierKe
             <tr style={{ borderBottom: '2px solid #1A1A1A' }}>
               <Th>Tier</Th>
               <Th align="right">Fee</Th>
-              <Th align="right">Units included</Th>
-              <Th align="right">Resale value</Th>
-              <Th align="right">Net cost</Th>
               <Th align="right">Open</Th>
             </tr>
           </thead>
@@ -60,14 +56,9 @@ export function PackageTiers({ tiers, brandPricing, retailPrice, highlightTierKe
                       </span>
                     )}
                   </Td>
-                  <Td align="right">{tier.fee != null ? formatMoney(tier.fee) : 'n/a'}</Td>
-                  <Td align="right">{tier.unitsIncluded ?? 'n/a'}</Td>
-                  <Td align="right" muted>
-                    {tier.resaleValue != null ? formatMoney(tier.resaleValue) : 'n/a'}
-                  </Td>
                   <Td align="right">
                     <strong style={{ color: '#1A1A1A', fontSize: 16 }}>
-                      {tier.netCost != null ? formatMoney(tier.netCost) : 'n/a'}
+                      {tier.fee != null ? formatMoney(tier.fee) : 'n/a'}
                     </strong>
                   </Td>
                   <Td align="right" muted>
@@ -81,12 +72,8 @@ export function PackageTiers({ tiers, brandPricing, retailPrice, highlightTierKe
       </div>
 
       <p style={{ fontSize: 13, color: '#666666', lineHeight: 1.6 }}>
-        Units included, resale value and net cost apply to the cash plus units structure only. On
-        the all cash option you take no allocation and your cost is the fee. Resale value assumes
-        the allocation sells at {formatMoney(retailPrice)}, the expo and race-store price, where
-        there is no competing product on the shelf. Every tier includes 5-year category exclusivity,
-        creative approval on your marks, right of first refusal on your space in any future edition,
-        and wholesale reorder rights, whichever structure you choose.
+        Every tier includes 5-year category exclusivity, creative approval on your marks, and right
+        of first refusal on your space in any future edition.
       </p>
 
       {brandPricing && brandPricing.length > 0 && (

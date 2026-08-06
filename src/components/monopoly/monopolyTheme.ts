@@ -53,6 +53,9 @@ export function chevron(color = 'rgba(35,31,32,0.05)'): React.CSSProperties {
  * are printed objects with a real border, and the weight of that border is a
  * large part of why the brand reads as physical rather than digital.
  */
+/** Handwriting face, paired with the hand-drawn arrow. */
+export const HAND_FONT = "'Caveat', 'Bradley Hand', cursive"
+
 export const CARD_OUTLINE = `2px solid ${MONOPOLY.black}`
 
 /**
