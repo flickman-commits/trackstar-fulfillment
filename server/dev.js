@@ -29,8 +29,6 @@ const routes = [
   { method: 'post', path: '/api/orders/update',              handler: '../api/orders/update.js' },
   { method: 'post', path: '/api/orders/refresh-weather',     handler: '../api/orders/refresh-weather.js' },
   { method: 'post', path: '/api/orders/refresh-shopify-data', handler: '../api/orders/refresh-shopify-data.js' },
-  { method: 'get',  path: '/api/orders/test-scrapers',      handler: '../api/orders/test-scrapers.js' },
-  { method: 'post', path: '/api/orders/test-scrapers',      handler: '../api/orders/test-scrapers.js' },
   { method: 'post', path: '/api/orders/refresh-etsy-data',  handler: '../api/orders/refresh-etsy-data.js' },
   { method: 'get',  path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
   { method: 'post', path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
@@ -40,6 +38,9 @@ const routes = [
   { method: 'post', path: '/api/products/bulk-edit',       handler: '../api/products/bulk-edit.js' },
   { method: 'get',  path: '/api/etsy/auth',                 handler: '../api/etsy/auth.js' },
   { method: 'get',  path: '/api/admin/lookups-recent',     handler: '../api/admin/lookups-recent.js' },
+  // Consolidated Instant Lookup + scraper health (replaces the two panels).
+  { method: 'get',  path: '/api/admin/lookup-health',      handler: '../api/admin/lookup-health.js' },
+  { method: 'post', path: '/api/admin/lookup-health',      handler: '../api/admin/lookup-health.js' },
   { method: 'get',  path: '/api/admin/photo-signed-url',   handler: '../api/admin/photo-signed-url.js' },
   // Browser auth: login / session-check / logout
   { method: 'get',    path: '/api/auth/login',             handler: '../api/auth/login.js' },

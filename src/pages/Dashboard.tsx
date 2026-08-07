@@ -7,6 +7,7 @@ import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
 import ArteloCosts from '@/components/ArteloCosts'
+import LookupHealthPanel from '@/components/LookupHealthPanel'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
 
 /** Collapsible section with header + chevron toggle */
@@ -592,26 +593,10 @@ export default function Dashboard() {
   const [isRunningConnTest, setIsRunningConnTest] = useState(false)
   const [showReviewRequest, setShowReviewRequest] = useState(false)
 
-  // Recent Instant Lookup activity (in-memory ring buffer, fetched via
-  // /api/admin/lookups-recent). Used by the "Recent Lookups" card in Settings.
-  type LookupEntry = {
-    at: number
-    race: string | null
-    year: number | null
-    name: string
-    outcome: string
-    status: number | null
-    ms: number | null
-    ip: string
-    cached: boolean
-  }
-  type LookupSummary = { total: number; byOutcome: Record<string, number>; byRace: Record<string, number>; avgMs: number | null }
-  const [showLookupsRecent, setShowLookupsRecent] = useState(false)
-  const [lookupsRecent, setLookupsRecent] = useState<LookupEntry[]>([])
-  const [lookupsSummary, setLookupsSummary] = useState<LookupSummary | null>(null)
-  const [lookupsLoading, setLookupsLoading] = useState(false)
-  const [lookupsError, setLookupsError] = useState<string | null>(null)
-  const [lookupsRaceFilter, setLookupsRaceFilter] = useState<string>('')
+  // One flag for the consolidated Instant Lookup + Scraper Health panel. All
+  // of its data fetching lives inside the component now, rather than being
+  // threaded through this already-oversized page.
+  const [showLookupHealth, setShowLookupHealth] = useState(false)
 
   // Personalization photo: opened on demand, never held as a durable link.
   const [photoError, setPhotoError] = useState<string | null>(null)
@@ -705,33 +690,10 @@ export default function Dashboard() {
     }
   }
 
-  async function fetchLookupsRecent() {
-    setLookupsLoading(true); setLookupsError(null)
-    try {
-      // Dashboard view: last 7 days, up to the 500-row cap.
-      const qs = new URLSearchParams({ limit: '500', days: '7' })
-      if (lookupsRaceFilter) qs.set('race', lookupsRaceFilter)
-      // `t` busts any HTTP cache; `cache: 'no-store'` is the belt to the
-      // server's no-store header so even an aggressive browser can't 304 us.
-      qs.set('t', String(Date.now()))
-      const r = await apiFetch(`/api/admin/lookups-recent?${qs.toString()}`, { cache: 'no-store' })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const data = await r.json()
-      setLookupsRecent(data.entries || [])
-      setLookupsSummary(data.summary || null)
-    } catch (e) {
-      setLookupsError(e instanceof Error ? e.message : 'Failed to load')
-      setLookupsRecent([]); setLookupsSummary(null)
-    } finally {
-      setLookupsLoading(false)
-    }
-  }
   const [reviewCopied, setReviewCopied] = useState<string | null>(null)
   const [customersServedCount, setCustomersServedCount] = useState<number | null>(null)
   const [customersServedInput, setCustomersServedInput] = useState('')
   const [isLoadingCounter, setIsLoadingCounter] = useState(false)
-  const [scraperResults, setScraperResults] = useState<{ raceName: string; status: 'untested' | 'pass' | 'fail'; raceInfoStatus?: string; runnerSearchStatus?: string; durationMs?: number; error?: string; runnerSearchError?: string; testRunnerName?: string }[]>([])
-  const [isTestingScrapers, setIsTestingScrapers] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   // Store possible matches per order for ambiguous results (not persisted to DB)
@@ -745,7 +707,6 @@ export default function Dashboard() {
   const [showAddRace, setShowAddRace] = useState(false)
   const [newRaceValues, setNewRaceValues] = useState({ raceName: '', year: new Date().getFullYear().toString(), raceDate: '', location: '' })
   const [showRaceDatabase, setShowRaceDatabase] = useState(false)
-  const [showScraperStatus, setShowScraperStatus] = useState(false)
   // Tab switcher: standard vs custom order view
   const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner'>('standard')
   // "New Race Partner" modal state
@@ -1092,38 +1053,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!showSettings) return
-    apiFetch('/api/orders/test-scrapers')
-      .then(res => res.json())
-      .then(data => {
-        if (data.races && scraperResults.length === 0) {
-          setScraperResults(data.races.map((r: string) => ({ raceName: r, status: 'untested' as const })))
-        }
-      })
-      .catch(() => {})
     fetchRaces()
   }, [showSettings])
-
-  const testScrapers = async () => {
-    setIsTestingScrapers(true)
-    try {
-      const response = await apiFetch('/api/orders/test-scrapers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      })
-      if (!response.ok) throw new Error(`Test failed (${response.status})`)
-      const data = await response.json()
-      setScraperResults(data.results)
-      setToast({
-        message: `Scrapers tested: ${data.passed} passed, ${data.failed} failed`,
-        type: data.failed > 0 ? 'error' : 'success'
-      })
-    } catch (error) {
-      setToast({ message: error instanceof Error ? error.message : 'Scraper test failed', type: 'error' })
-    } finally {
-      setIsTestingScrapers(false)
-    }
-  }
 
   // Research a single order
   const researchOrder = async (orderNumber: string) => {
@@ -3213,22 +3144,6 @@ Thank you!`
                     </button>
 
                     <button
-                      onClick={() => setShowScraperStatus(true)}
-                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Scraper Status</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Test and monitor race result scrapers</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs text-off-black/30">{scraperResults.length} {scraperResults.length === 1 ? 'scraper' : 'scrapers'}</span>
-                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
-                        </div>
-                      </div>
-                    </button>
-
-                    <button
                       onClick={() => setShowArteloCosts(true)}
                       className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
                     >
@@ -3260,16 +3175,19 @@ Thank you!`
                       </div>
                     </button>
 
-                    {/* Instant Lookup — opens a dashboard of the last 7 days of
-                        lookups, with at-a-glance stats and a jump to Vercel logs. */}
+                    {/* Instant Lookup & Scraper Health — one card. These were two
+                        (Scraper Status, Instant Lookup), each blind exactly where
+                        the other could see: traffic data says nothing about a race
+                        nobody visited, and the scraper test said nothing about real
+                        outcomes and only ever checked the current year. */}
                     <button
-                      onClick={() => { setShowLookupsRecent(true); fetchLookupsRecent() }}
+                      onClick={() => setShowLookupHealth(true)}
                       className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Instant Lookup</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Last 7 days of lookups — success rate, outcomes, and per-request detail</p>
+                          <p className="text-sm font-medium text-off-black">Instant Lookup &amp; Scraper Health</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Which races work, which need help, and every lookup behind it</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
@@ -3465,147 +3383,9 @@ Thank you!`
           </div>
         )}
 
-        {/* Instant Lookup Dashboard Overlay — last 7 days of lookups with at-a-glance stats. */}
-        {showLookupsRecent && (() => {
-          const o = lookupsSummary?.byOutcome || {}
-          const total = lookupsSummary?.total || 0
-          const found = (o.found || 0) + (o.cached || 0)
-          const suggestions = o.suggestions || 0
-          const notFound = o.not_found || 0
-          const errors = (o.rate_limited || 0) + (o.upstream_error || 0) + (o.bad_request || 0)
-          const off = o.off || 0
-          // "Attempts" excludes lookups while the feature was off — those aren't real tries.
-          const attempts = Math.max(0, total - off)
-          const successRate = attempts > 0 ? Math.round((found / attempts) * 100) : 0
-          const avgMs = lookupsSummary?.avgMs ?? null
-          const stats: { label: string; value: string; sub?: string; accent?: string }[] = [
-            { label: 'Total lookups', value: String(total), sub: 'last 7 days' },
-            { label: 'Success rate', value: `${successRate}%`, sub: `${found} of ${attempts} attempts`, accent: 'text-green-700' },
-            { label: 'Found', value: String(found), accent: 'text-green-700' },
-            { label: 'Suggestions', value: String(suggestions), accent: 'text-blue-700' },
-            { label: 'Not found', value: String(notFound) },
-            { label: 'Errors', value: String(errors), accent: errors > 0 ? 'text-red-700' : undefined },
-            { label: 'Avg lookup time', value: avgMs != null ? `${avgMs} ms` : '—' },
-          ]
-          return (
-          <div
-            className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowLookupsRecent(false) }}
-          >
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
-              <div className="px-6 py-4 border-b border-border-gray flex-shrink-0 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-base font-semibold text-off-black">Instant Lookup</h2>
-                    <span className="text-xs text-off-black/50">Last 7 days · across all Vercel instances</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <a
-                      href="https://vercel.com/flickman-media/trackstar-fulfillment/logs?panelState=opened"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border-gray text-off-black/70 hover:bg-subtle-gray transition-colors"
-                    >
-                      View in Vercel ↗
-                    </a>
-                    <button
-                      onClick={fetchLookupsRecent}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors"
-                    >
-                      {lookupsLoading ? 'Loading…' : 'Refresh'}
-                    </button>
-                    <button onClick={() => setShowLookupsRecent(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none ml-1">×</button>
-                  </div>
-                </div>
 
-                {/* Stats row */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                  {stats.map((s) => (
-                    <div key={s.label} className="rounded-lg border border-border-gray bg-subtle-gray px-3 py-2.5">
-                      <p className="text-[11px] text-off-black/50 leading-tight">{s.label}</p>
-                      <p className={`text-lg font-semibold tabular-nums leading-tight mt-0.5 ${s.accent || 'text-off-black'}`}>{s.value}</p>
-                      {s.sub && <p className="text-[10px] text-off-black/40 leading-tight mt-0.5">{s.sub}</p>}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Race filter */}
-                <div className="flex items-center gap-3 flex-wrap">
-                  <input
-                    type="text"
-                    placeholder="Filter by exact race name (e.g. Boston Marathon)…"
-                    value={lookupsRaceFilter}
-                    onChange={(e) => setLookupsRaceFilter(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') fetchLookupsRecent() }}
-                    className="flex-1 min-w-[240px] px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                  />
-                  {lookupsRaceFilter && (
-                    <button onClick={() => { setLookupsRaceFilter(''); fetchLookupsRecent() }} className="text-xs text-off-black/50 hover:text-off-black underline">
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Body */}
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                {lookupsError ? (
-                  <div className="p-6 text-sm text-red-600">{lookupsError}</div>
-                ) : lookupsRecent.length === 0 ? (
-                  <div className="p-12 text-center text-sm text-off-black/50">
-                    {lookupsLoading ? 'Loading…' : 'No lookups in the last 7 days. New requests will appear here.'}
-                  </div>
-                ) : (
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-white border-b border-border-gray">
-                      <tr className="text-off-black/50 text-left">
-                        <th className="px-4 py-2 font-medium">Date &amp; Time</th>
-                        <th className="px-4 py-2 font-medium">Race</th>
-                        <th className="px-4 py-2 font-medium">Year</th>
-                        <th className="px-4 py-2 font-medium">Name</th>
-                        <th className="px-4 py-2 font-medium">Outcome</th>
-                        <th className="px-4 py-2 font-medium text-right">Lookup Time (ms)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lookupsRecent.map((e, i) => {
-                        const dt = new Date(e.at)
-                        const when = dt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                        const outcomeColors: Record<string, string> = {
-                          found:           'text-green-700',
-                          suggestions:     'text-blue-700',
-                          cached:          'text-purple-700',
-                          not_found:       'text-off-black/60',
-                          off:             'text-off-black/40',
-                          rate_limited:    'text-amber-700',
-                          upstream_error:  'text-red-700',
-                          bad_request:     'text-amber-700',
-                        }
-                        return (
-                          <tr key={i} className="border-b border-border-gray/50 hover:bg-subtle-gray/40">
-                            <td className="px-4 py-2 text-off-black/60 whitespace-nowrap">{when}</td>
-                            <td className="px-4 py-2 text-off-black">{e.race || '—'}</td>
-                            <td className="px-4 py-2 text-off-black/70">{e.year ?? '—'}</td>
-                            <td className="px-4 py-2 font-mono text-off-black/70">{e.name || '—'}</td>
-                            <td className={`px-4 py-2 font-medium ${outcomeColors[e.outcome] || 'text-off-black/60'}`}>
-                              {e.outcome}{e.cached ? ' (cache)' : ''}
-                            </td>
-                            <td className="px-4 py-2 text-off-black/60 text-right tabular-nums">{e.ms ?? '—'}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              <div className="px-6 py-3 border-t border-border-gray text-[11px] text-off-black/40">
-                Names show the actual search query (anonymized). Success rate = found ÷ attempts (excludes lookups while the feature was off). For raw stdout records grep <code className="bg-subtle-gray px-1 rounded">[LOOKUP]</code> in Vercel logs.
-              </div>
-            </div>
-          </div>
-          )
-        })()}
+        {/* Instant Lookup & Scraper Health — the consolidated panel. */}
+        {showLookupHealth && <LookupHealthPanel onClose={() => setShowLookupHealth(false)} />}
 
         {/* Race Database Full-Screen Overlay */}
         {showRaceDatabase && (
@@ -3980,90 +3760,6 @@ Thank you!`
           </div>
         )}
 
-        {/* Scraper Status Full-Screen Overlay */}
-        {showScraperStatus && (
-          <div
-            className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowScraperStatus(false) }}
-          >
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray flex-shrink-0">
-                <h2 className="text-base font-semibold text-off-black">Scraper Status</h2>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={testScrapers}
-                    disabled={isTestingScrapers || settingsAction !== null}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isTestingScrapers && <Loader2 className="w-3 h-3 animate-spin" />}
-                    {isTestingScrapers ? 'Testing...' : 'Test All Scrapers'}
-                  </button>
-                  <button onClick={() => setShowScraperStatus(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6">
-                {/* Legend */}
-                <div className="flex items-center gap-4 mb-4 text-[11px] text-off-black/50">
-                  <span>Each scraper is tested in two stages:</span>
-                  <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Race Info</span>
-                  <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-400 inline-block" /> Runner Lookup</span>
-                </div>
-                <div className="space-y-2">
-                  {scraperResults.map((result) => (
-                    <div key={result.raceName} className="py-3 px-4 rounded-lg bg-subtle-gray border border-border-gray">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-off-black">{result.raceName}</span>
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                          result.status === 'pass' ? 'text-green-600' :
-                          result.status === 'fail' ? 'text-red-600' :
-                          'text-off-black/40'
-                        }`}>
-                          {result.status === 'pass' && <Check className="w-3.5 h-3.5" />}
-                          {result.status === 'fail' && <X className="w-3.5 h-3.5" />}
-                          {result.status === 'untested' ? 'Not tested' : `${((result.durationMs || 0) / 1000).toFixed(1)}s`}
-                        </span>
-                      </div>
-                      {/* Detail row — only shown after test runs */}
-                      {result.status !== 'untested' && (
-                        <div className="flex items-center gap-4 mt-2 text-[11px]">
-                          <span className={`inline-flex items-center gap-1 ${
-                            result.raceInfoStatus === 'pass' ? 'text-green-600' :
-                            result.raceInfoStatus === 'fail' ? 'text-red-600' : 'text-off-black/40'
-                          }`}>
-                            {result.raceInfoStatus === 'pass' ? <Check className="w-3 h-3" /> : result.raceInfoStatus === 'fail' ? <X className="w-3 h-3" /> : null}
-                            Race Info
-                            {result.raceInfoStatus === 'fail' && result.error && (
-                              <span className="text-red-400 ml-1">— {result.error.substring(0, 30)}</span>
-                            )}
-                          </span>
-                          <span className={`inline-flex items-center gap-1 ${
-                            result.runnerSearchStatus === 'pass' ? 'text-green-600' :
-                            result.runnerSearchStatus === 'fail' ? 'text-red-600' :
-                            result.runnerSearchStatus === 'skipped' ? 'text-amber-500' : 'text-off-black/40'
-                          }`}>
-                            {result.runnerSearchStatus === 'pass' ? <Check className="w-3 h-3" /> :
-                             result.runnerSearchStatus === 'fail' ? <X className="w-3 h-3" /> : null}
-                            Runner Lookup
-                            {result.runnerSearchStatus === 'skipped' && (
-                              <span className="text-amber-400 ml-1">— no test runner in DB</span>
-                            )}
-                            {result.runnerSearchStatus === 'fail' && result.runnerSearchError && (
-                              <span className="text-red-400 ml-1">— {result.runnerSearchError.substring(0, 40)}</span>
-                            )}
-                            {result.runnerSearchStatus === 'pass' && result.testRunnerName && (
-                              <span className="text-off-black/30 ml-1">({result.testRunnerName})</span>
-                            )}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Loading State */}
         {isLoading && (

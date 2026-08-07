@@ -385,6 +385,44 @@ export function getSupportedRaces() {
 }
 
 /**
+ * Per-race config summary for the scraper-health view.
+ *
+ * The health dashboard needs to answer "is this race wired up for THIS year",
+ * and the honest answer depends on how the config resolves a year. Two shapes:
+ *
+ *   - `eventIds: { 2026: … }` — an explicit per-year map. A year that is not a
+ *     key genuinely does not work, and that is a config gap someone can go fix
+ *     in about five minutes. 15 configs look like this.
+ *   - a `{year}` URL/code pattern and no eventIds — any year is derivable, so
+ *     coverage is unknown until something actually probes it. 27 look like this.
+ *
+ * Reporting those two as the same "supported" was what made the old Scraper
+ * Status panel misleading: it tested `new Date().getFullYear()` against configs
+ * that in several cases have no ids for the current year at all.
+ *
+ * @returns {Array<{raceName, platform, publicSafe, explicitYears, fallbackYears, hasYearPattern}>}
+ */
+export function getRaceConfigSummaries() {
+  return ALL_CONFIGS.map(config => {
+    const explicitYears = config.eventIds ? Object.keys(config.eventIds).map(Number).sort() : []
+    const fallbackYears = config.fallback?.eventIds
+      ? Object.keys(config.fallback.eventIds).map(Number).sort()
+      : []
+    return {
+      raceName: config.raceName,
+      platform: config.platform,
+      fallbackPlatform: config.fallback?.platform || null,
+      publicSafe: !PUPPETEER_PLATFORMS.has(config.platform),
+      explicitYears,
+      fallbackYears,
+      // No explicit ids means the scraper builds its URL from the year itself,
+      // so there is no such thing as an unconfigured year for this race.
+      hasYearPattern: explicitYears.length === 0,
+    }
+  })
+}
+
+/**
  * Get race name → shorthand map from all configs.
  * Maps every alias to its tag so the frontend can generate filenames.
  * @returns {Object} e.g. { "Chicago Marathon": "Chicago", "London Marathon": "London", ... }

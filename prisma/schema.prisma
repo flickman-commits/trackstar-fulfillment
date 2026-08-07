@@ -259,6 +259,50 @@ model LookupLog {
   @@index([race, createdAt])
 }
 
+// One probe result per race+year. Written by the scraper-health probe, which
+// runs on a cron and does NOT wait for a shopper to stumble onto a broken race.
+//
+// This is the supply side of scraper visibility. LookupLog is the demand side:
+// it only ever records races somebody actually shopped, so a race with no
+// traffic and a race that works look identical there (both blank). At four
+// live races that was survivable. With every HTTP-safe race live it is not,
+// because traffic concentrates on a handful of products and the rest go dark.
+//
+// Keyed by race AND year because "does this scraper work" has no single
+// answer: Austin has event ids for 2026 only, SF serves 2026 from ChronoTrack
+// and 2022-2025 from an Athlinks fallback. A race is not healthy or broken, a
+// race-year is.
+model ScraperHealth {
+  id        Int      @id @default(autoincrement())
+  race      String   // canonical race name, e.g. "Boston Marathon"
+  year      Int
+  checkedAt DateTime @default(now())
+
+  // live      → probe found the known runner and the bib matched
+  // drifted   → probe found the runner but the bib did NOT match. The site is
+  //             up and parsing "succeeds", so nothing else catches this, and
+  //             it is the failure that reaches a printed poster.
+  // broken    → scraper threw, timed out, or the timing site errored
+  // no_year   → config has no event id for this year (a config gap, not a bug)
+  // no_probe  → configured and reachable, but we have no known finisher to
+  //             assert against, so this is "untested", not "passing"
+  // ineligible→ Puppeteer platform; cannot run on the public endpoint at all
+  status    String
+
+  // What we asserted against, so a failure is debuggable without a re-run.
+  probeName String?
+  expectBib String?
+  actualBib String?
+
+  ms        Int?
+  detail    String?  // error message / notes
+  platform  String?  // which scraper ran, incl. whether a fallback was used
+
+  @@unique([race, year])
+  @@index([status])
+  @@index([checkedAt])
+}
+
 model SystemConfig {
   key       String   @id
   value     String
