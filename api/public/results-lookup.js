@@ -41,6 +41,11 @@ function fallback(extra = {}) {
   return { found: false, fallbackRequired: true, instant: false, ...extra }
 }
 
+// Hard ceiling on a single lookup. Deliberately a second under the widget's
+// 10s AbortController: we want to answer the shopper rather than have them
+// hang up on us, because an answer gets logged and an abort doesn't.
+const SERVER_LOOKUP_TIMEOUT_MS = 9000
+
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS', allowPublic: true })) return
 
@@ -128,7 +133,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await researchService.findRunner(resolvedRace, year, name)
+    // The widget aborts at 10s (see the wizard block's AbortController), but
+    // findRunner has its own retry budget and can run for a minute against a
+    // sick timing site. Vercel keeps the function alive the whole time because
+    // we're awaiting it, so we were paying for up to 300s of scraping that no
+    // shopper was still waiting on — one logged run hit 64s.
+    //
+    // Cap just UNDER the widget's abort so the shopper gets a real JSON
+    // response instead of a client-side abort, and so this lands in LookupLog
+    // as a timeout we can see rather than a request that simply vanished.
+    // Promise.race doesn't cancel the scrape, but returning does: Vercel
+    // freezes the function the moment the handler resolves.
+    const result = await Promise.race([
+      researchService.findRunner(resolvedRace, year, name),
+      new Promise(resolve =>
+        setTimeout(
+          () => resolve({
+            found: false,
+            researchStatus: 'upstream_error',
+            researchNotes: `Lookup exceeded ${SERVER_LOOKUP_TIMEOUT_MS}ms and was cut off server-side.`,
+          }),
+          SERVER_LOOKUP_TIMEOUT_MS
+        )
+      ),
+    ])
 
     let payload, outcome
     if (result.found) {
@@ -179,7 +207,14 @@ export default async function handler(req, res) {
       payload = fallback({ reason: 'not_found', instant: true, raceCanonical })
     }
 
-    setCached(cacheKey, payload)
+    // Never cache a failure. `found`, `suggestions` and `not_found` are facts
+    // about the results themselves and hold for the hour; `upstream_error` is
+    // a fact about the timing site being unwell right now. Caching it pinned
+    // the error in place for an hour per name+race+year, so a site that
+    // recovered in two minutes still looked broken to the next shopper who
+    // searched the same runner. The 9s server cap above makes that much easier
+    // to trip, since "slow" now lands here too.
+    if (outcome !== 'upstream_error') setCached(cacheKey, payload)
     await observe({ outcome, status: 200, raceForLog: raceCanonical })
     return res.status(200).json(payload)
   } catch (error) {
