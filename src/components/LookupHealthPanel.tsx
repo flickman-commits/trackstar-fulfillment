@@ -1,5 +1,5 @@
 /**
- * Instant Lookup & Scraper Health — one panel, replacing two.
+ * Instant Lookup Dashboard — one panel, replacing two.
  *
  * "Scraper Status" tested whether scrapers worked but only for the current
  * year, and only reported pass/fail with nothing persisted. "Instant Lookup"
@@ -209,7 +209,7 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
         <div className="px-6 py-4 border-b border-border-gray flex-shrink-0 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h2 className="text-base font-semibold text-off-black">Instant Lookup &amp; Scraper Health</h2>
+              <h2 className="text-base font-semibold text-off-black">Instant Lookup Dashboard</h2>
               <span className="text-xs text-off-black/50">
                 Traffic: last 7 days · Probe: {fmtAgo(s?.lastProbeAt ?? null)}
               </span>

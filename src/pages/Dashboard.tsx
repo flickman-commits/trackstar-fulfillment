@@ -593,7 +593,7 @@ export default function Dashboard() {
   const [isRunningConnTest, setIsRunningConnTest] = useState(false)
   const [showReviewRequest, setShowReviewRequest] = useState(false)
 
-  // One flag for the consolidated Instant Lookup + Scraper Health panel. All
+  // One flag for the consolidated Instant Lookup Dashboard. All
   // of its data fetching lives inside the component now, rather than being
   // threaded through this already-oversized page.
   const [showLookupHealth, setShowLookupHealth] = useState(false)
@@ -3175,7 +3175,7 @@ Thank you!`
                       </div>
                     </button>
 
-                    {/* Instant Lookup & Scraper Health — one card. These were two
+                    {/* Instant Lookup Dashboard — one card. These were two
                         (Scraper Status, Instant Lookup), each blind exactly where
                         the other could see: traffic data says nothing about a race
                         nobody visited, and the scraper test said nothing about real
@@ -3186,7 +3186,7 @@ Thank you!`
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Instant Lookup &amp; Scraper Health</p>
+                          <p className="text-sm font-medium text-off-black">Instant Lookup Dashboard</p>
                           <p className="text-xs mt-0.5 text-off-black/50">Which races work, which need help, and every lookup behind it</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -3384,7 +3384,7 @@ Thank you!`
         )}
 
 
-        {/* Instant Lookup & Scraper Health — the consolidated panel. */}
+        {/* Instant Lookup Dashboard — the consolidated panel. */}
         {showLookupHealth && <LookupHealthPanel onClose={() => setShowLookupHealth(false)} />}
 
         {/* Race Database Full-Screen Overlay */}
