@@ -39,7 +39,7 @@ function anonIp(ip) {
  *   found              - returned a single confirmed match
  *   suggestions        - returned candidates (ambiguous-style)
  *   not_found          - lookup ran cleanly, runner not in results
- *   off                - PUBLIC_LOOKUP_ENABLED=false OR race not in allowlist
+ *   off                - PUBLIC_LOOKUP_ENABLED=false (master kill switch)
  *   no_scraper         - race lookup unsupported / not public-safe
  *   rate_limited       - 429 from rate limiter
  *   bad_request        - 400 (validation)

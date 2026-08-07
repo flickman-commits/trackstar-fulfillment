@@ -7,10 +7,9 @@
  * writes to the DB. Gated behind PUBLIC_LOOKUP_ENABLED so it stays dark until
  * we explicitly turn it on. Rate-limited per IP and cached per name+race+year.
  *
- * Only races backed by HTTP scrapers (and in the optional PUBLIC_LOOKUP_RACES
- * rollout allowlist) are searched live. Everything else — unsupported race,
- * no match, or any error — returns fallbackRequired:true so the widget shows a
- * manual-entry form. No dead ends.
+ * Every race backed by an HTTP scraper is searched live. Everything else —
+ * unsupported race, no match, or any error — returns fallbackRequired:true so
+ * the widget shows a manual-entry form. No dead ends.
  *
  * Shares the search core (researchService.findRunner) with admin order
  * research, so both paths get the same matching + last-name fallback quality.
@@ -40,36 +39,6 @@ function getClientIp(req) {
 // Manual-entry fallback response — always a valid, dead-end-free path.
 function fallback(extra = {}) {
   return { found: false, fallbackRequired: true, instant: false, ...extra }
-}
-
-// Per-race rollout gate. PUBLIC_LOOKUP_RACES = comma-separated allowlist.
-// When set, only those races get instant lookup; everything else falls back to
-// manual entry. When unset, all HTTP-safe races are allowed.
-function isRaceAllowed(race) {
-  const raw = (process.env.PUBLIC_LOOKUP_RACES || '').trim()
-  if (!raw) return true
-
-  const requested = getCanonicalRaceName(race)
-  if (!requested) return false
-
-  const entries = raw.split(',').map(r => r.trim()).filter(Boolean)
-  const resolved = entries.map(getCanonicalRaceName)
-
-  // An entry that does not resolve is a typo or an incomplete name, and it was
-  // being dropped without a trace — the race simply stayed off with no way to
-  // tell that from "never added it". Names must match a config's aliases, and
-  // some are stricter than they look: "Mesa" resolves to nothing because that
-  // config sets keywordRequiresMarathon, so only "Mesa Marathon" works.
-  const unresolved = entries.filter((_, i) => !resolved[i])
-  if (unresolved.length) {
-    console.warn(
-      `[PUBLIC_LOOKUP_RACES] ignoring ${unresolved.length} unrecognised entr` +
-      `${unresolved.length === 1 ? 'y' : 'ies'}: ${unresolved.map(e => `"${e}"`).join(', ')}` +
-      ' — these races stay OFF. Use the full race name as spelled in its config aliases.'
-    )
-  }
-
-  return resolved.filter(Boolean).includes(requested)
 }
 
 export default async function handler(req, res) {
@@ -139,8 +108,14 @@ export default async function handler(req, res) {
     })
   }
 
-  // Races without an HTTP scraper / not in the rollout allowlist → manual fallback.
-  if (!isRacePublicSafe(resolvedRace) || !isRaceAllowed(resolvedRace)) {
+  // No HTTP scraper for this race → manual fallback. There used to be a second
+  // gate here, a PUBLIC_LOOKUP_RACES allowlist, on the theory that a race
+  // should be vetted before going live. It was removed: a race with a broken
+  // scraper lands the shopper in manual entry, which is exactly where an
+  // unlisted race starts, so the gate never protected an outcome. It only made
+  // every rollout wait on an encrypted env var and a redeploy. Scraper health
+  // is now a thing we measure and show, not a thing we gate on.
+  if (!isRacePublicSafe(resolvedRace)) {
     await observe({ outcome: 'off', status: 200, raceForLog: raceCanonical })
     return res.status(200).json(fallback({ reason: 'no_instant_lookup' }))
   }

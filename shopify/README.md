@@ -21,6 +21,6 @@ production, and a sync deleted the live block outright.
 
 The lookup API that the theme block calls:
 
-    /api/public/results-lookup   (gated by PUBLIC_LOOKUP_ENABLED + PUBLIC_LOOKUP_RACES)
+    /api/public/results-lookup   (gated by PUBLIC_LOOKUP_ENABLED, the master kill switch)
 
 The block's front-end code is theme code. It lives in the theme repo.
