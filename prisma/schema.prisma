@@ -303,6 +303,43 @@ model ScraperHealth {
   @@index([checkedAt])
 }
 
+// The store's product catalog, synced from Shopify. ONE source of truth for
+// "what do we sell".
+//
+// This replaces a 250-line hand-maintained map in server/lib/productCatalog.js.
+// That map had already drifted: four live products missing (both triathlon
+// prints, Missoula, Relay for America) and stale entries for products since
+// renamed. Every drift showed up as a missing hero image on Eli's queue and as
+// a tooltip asking a human to go edit a source file.
+//
+// It is also the denominator the scraper-health view was missing. Coverage
+// measured against scraper configs answers "of the races we built scrapers
+// for, how many work", which silently excludes every race we sell and never
+// wrote a scraper for. There are seven of those today (Memphis, Honolulu, San
+// Antonio, Las Vegas, Detroit, Palm Beaches, Baltimore) and nothing in the
+// system said so.
+model ShopifyProduct {
+  id             Int      @id @default(autoincrement())
+  productId      String   @unique // Shopify numeric id, as it appears on line items
+  handle         String   @unique
+  title          String
+  status         String?  // ACTIVE | DRAFT | ARCHIVED
+  templateSuffix String?  // which PDP template — tells us if the wizard is on it
+  featuredImage  String?
+  tags           Json?
+
+  // Canonical race this product sells, resolved through the same chain the
+  // storefront lookup uses (parseRaceNameFromTitle → getCanonicalRaceName).
+  // Null means either a non-race product (gift card, Custom) or a race we sell
+  // with no scraper — the panel distinguishes those, since only one is a gap.
+  raceCanonical  String?
+
+  syncedAt       DateTime @updatedAt
+
+  @@index([raceCanonical])
+  @@index([status])
+}
+
 model SystemConfig {
   key       String   @id
   value     String

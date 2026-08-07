@@ -15,7 +15,14 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ChevronRight, AlertTriangle, RefreshCw } from 'lucide-react'
 import { apiFetch } from '../lib/api'
 
-type Status = 'live' | 'drifted' | 'broken' | 'no_year' | 'no_probe' | 'ineligible'
+type Status = 'live' | 'drifted' | 'broken' | 'no_year' | 'no_probe' | 'ineligible' | 'not_run_yet'
+
+interface CatalogProduct {
+  productId: string
+  handle: string
+  title: string
+  templateSuffix: string | null
+}
 
 interface YearRow {
   year: number
@@ -72,6 +79,11 @@ interface HealthPayload {
     racesLive: number
     racesEligible: number
     racesTotal: number
+    soldLive: number
+    soldTotal: number
+    needsScraper: number
+    activeProducts: number
+    onWizardTemplate: number
     lastProbeAt: string | null
   }
   needsHelp: Array<{
@@ -79,6 +91,8 @@ interface HealthPayload {
     platform: string | null; expectBib: string | null; actualBib: string | null; probeName: string | null
   }>
   needsHelpByCause: Record<string, Array<{ race: string; year: number; detail: string | null }>>
+  needsScraper: CatalogProduct[]
+  notARace: CatalogProduct[]
   races: RaceRow[]
 }
 
@@ -102,10 +116,11 @@ const STATUS_META: Record<Status, { label: string; dot: string; text: string; bl
   no_year:    { label: 'No year',     dot: 'bg-transparent border-2 border-orange-400', text: 'text-orange-700',   blurb: 'No event id configured for this year' },
   no_probe:   { label: 'Untested',    dot: 'bg-transparent border border-off-black/25', text: 'text-off-black/50', blurb: 'No confirmed finisher on record to test against' },
   ineligible: { label: 'Manual only', dot: 'bg-off-black/10',                           text: 'text-off-black/40', blurb: 'Browser-based scraper; cannot run on the storefront' },
+  not_run_yet:{ label: 'Not run yet',  dot: 'bg-transparent border border-blue-300',     text: 'text-blue-700',     blurb: 'Race has not happened yet, so there are no results to configure' },
 }
 
 // Order matters: defects first, because they are what the panel is for.
-const LEGEND: Status[] = ['live', 'drifted', 'broken', 'no_year', 'no_probe', 'ineligible']
+const LEGEND: Status[] = ['live', 'drifted', 'broken', 'no_year', 'no_probe', 'not_run_yet', 'ineligible']
 
 // A scraper defect outranks a config gap regardless of how many years it
 // spans. Four missing event ids on a race nobody buys is not more urgent than
@@ -145,6 +160,8 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
   const [probing, setProbing] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showNeedsHelp, setShowNeedsHelp] = useState(false)
+  const [showNeedsScraper, setShowNeedsScraper] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [filter, setFilter] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -171,6 +188,25 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
       setError(e instanceof Error ? e.message : 'Probe failed')
     } finally {
       setProbing(false)
+    }
+  }
+
+  // Re-sync the Shopify catalog, then reload. This is what makes a newly added
+  // race product appear as "needs a scraper" without anyone editing code.
+  const syncCatalog = async () => {
+    setSyncing(true); setError(null)
+    try {
+      const r = await apiFetch('/api/admin/lookup-health', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync-catalog' }),
+      })
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Catalog sync failed')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -215,6 +251,14 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
               </span>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={syncCatalog}
+                disabled={syncing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border-gray text-off-black/70 hover:bg-subtle-gray transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing…' : 'Sync catalog'}
+              </button>
               <button
                 onClick={runProbe}
                 disabled={probing}
@@ -263,11 +307,23 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
                 </p>
               </button>
 
-              <div className="rounded-lg border border-border-gray p-3">
+              {/* Coverage is measured against races we SELL. Against configs
+                  it read 20/38 and could not see a race we sell and never
+                  wrote a scraper for, which is the worst category of all. */}
+              <button
+                onClick={() => setShowNeedsScraper(v => !v)}
+                className={`rounded-lg border p-3 text-left transition-colors ${
+                  s.needsScraper > 0
+                    ? 'border-orange-200 bg-orange-50/40 hover:bg-orange-50'
+                    : 'border-border-gray hover:bg-subtle-gray'
+                }`}
+              >
                 <p className="text-xs text-off-black/50">Coverage</p>
-                <p className="text-2xl font-semibold text-off-black">{s.racesLive}<span className="text-base text-off-black/40">/{s.racesEligible}</span></p>
-                <p className="text-[11px] text-off-black/40 mt-0.5">races with a working year</p>
-              </div>
+                <p className="text-2xl font-semibold text-off-black">{s.soldLive}<span className="text-base text-off-black/40">/{s.soldTotal}</span></p>
+                <p className="text-[11px] text-off-black/40 mt-0.5">
+                  races we sell · {s.needsScraper} with no scraper
+                </p>
+              </button>
 
               <div className="rounded-lg border border-border-gray p-3" title={`p95 ${fmtMs(s.p95Ms)} — the tail the 10s cap has to absorb`}>
                 <p className="text-xs text-off-black/50">Median lookup</p>
@@ -299,6 +355,31 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
               ))}
               {!CAUSE_ORDER.some(c => data.needsHelpByCause[c]?.length) && (
                 <p className="text-xs text-off-black/50">Nothing needs attention.</p>
+              )}
+            </div>
+          )}
+
+          {/* Races we SELL with no scraper at all. These can never appear in
+              the table below, because that table is built from configs — which
+              is exactly why they went unnoticed. */}
+          {showNeedsScraper && data && (
+            <div className="rounded-lg border border-orange-200 bg-orange-50/40 p-3 space-y-2 max-h-64 overflow-y-auto">
+              <p className="text-xs font-semibold text-orange-700">
+                Selling with no scraper · {data.needsScraper.length}
+                <span className="font-normal text-off-black/50"> — shoppers on these pages only get manual entry</span>
+              </p>
+              <ul className="space-y-0.5">
+                {data.needsScraper.map(p => (
+                  <li key={p.productId} className="text-xs text-off-black/70 flex gap-2">
+                    <span className="font-medium min-w-[260px]">{p.title}</span>
+                    <span className="text-off-black/40">{p.handle}</span>
+                  </li>
+                ))}
+              </ul>
+              {data.notARace.length > 0 && (
+                <p className="text-[11px] text-off-black/40 pt-1 border-t border-orange-200/60">
+                  Excluded as non-race products: {data.notARace.map(p => p.title).join(', ')}
+                </p>
               )}
             </div>
           )}

@@ -402,13 +402,29 @@ export function getSupportedRaces() {
  *
  * @returns {Array<{raceName, platform, publicSafe, explicitYears, fallbackYears, hasYearPattern}>}
  */
-export function getRaceConfigSummaries() {
+export function getRaceConfigSummaries(years = []) {
   return ALL_CONFIGS.map(config => {
     const explicitYears = config.eventIds ? Object.keys(config.eventIds).map(Number).sort() : []
     const fallbackYears = config.fallback?.eventIds
       ? Object.keys(config.fallback.eventIds).map(Number).sort()
       : []
+
+    // When each covered year's race actually happens. A race that has not run
+    // yet has no results to configure or scrape, so reporting it as a gap is
+    // noise: Jackson Hole 2026 is in September and was being counted as work
+    // to do. Every config carries calculateDate for exactly this reason.
+    const raceDates = {}
+    for (const year of years) {
+      try {
+        const d = config.calculateDate?.(year)
+        raceDates[year] = d instanceof Date && !isNaN(d.valueOf()) ? d.toISOString() : null
+      } catch {
+        raceDates[year] = null
+      }
+    }
+
     return {
+      raceDates,
       raceName: config.raceName,
       platform: config.platform,
       fallbackPlatform: config.fallback?.platform || null,

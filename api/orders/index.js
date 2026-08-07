@@ -3,7 +3,7 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { hasScraperForRace } from '../../server/scrapers/index.js'
 import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
 import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
-import { getProductInfo } from '../../server/lib/productCatalog.js'
+import { getProductInfo, loadProductCatalog } from '../../server/lib/productCatalog.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 
 
@@ -133,6 +133,10 @@ export default async function handler(req, res) {
       }
     })
 
+    // Product catalog is synced from Shopify and lives in the DB, so load it
+    // once here rather than per order.
+    const productCatalog = await loadProductCatalog()
+
     // Transform orders to include flattened research data
     const transformedOrders = orders.map(order => {
       // Get the best research record: prefer 'found', then most recent
@@ -250,7 +254,7 @@ export default async function handler(req, res) {
         // Which product/design variant Eli should use. Keyed off the stable
         // Shopify product_id (or Etsy listing_id), not the rename-able title.
         // See server/lib/productCatalog.js for the catalog.
-        productInfo: getProductInfo(order),
+        productInfo: getProductInfo(order, productCatalog),
         // Original order date from marketplace (for sorting by when customer placed order)
         orderPlacedAt: order.shopifyOrderData?.created_at
           || (order.etsyOrderData?.create_timestamp

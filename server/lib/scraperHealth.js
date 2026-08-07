@@ -54,6 +54,7 @@ export const STATUS = {
   NO_YEAR: 'no_year',
   NO_PROBE: 'no_probe',
   INELIGIBLE: 'ineligible',
+  NOT_RUN_YET: 'not_run_yet',
 }
 
 /** Years the grid covers, newest first. */
@@ -71,7 +72,7 @@ export function coveredYears(now = new Date()) {
  */
 export function buildCoverageGrid(now = new Date()) {
   const years = coveredYears(now)
-  const configs = getRaceConfigSummaries()
+  const configs = getRaceConfigSummaries(years)
 
   return configs.map(cfg => {
     const cells = years.map(year => {
@@ -85,6 +86,18 @@ export function buildCoverageGrid(now = new Date()) {
           detail: `${cfg.platform} requires a browser; not available to the storefront`,
         }
       }
+      // Ahead of the year check: a race that has not happened yet cannot have
+      // an event id or results, so calling it a gap invents work. This was
+      // inflating the "needs help" count with things nobody could act on.
+      const raceDate = cfg.raceDates?.[year]
+      if (raceDate && new Date(raceDate).getTime() > now.getTime()) {
+        return {
+          year,
+          status: STATUS.NOT_RUN_YET,
+          detail: `Race is ${new Date(raceDate).toISOString().slice(0, 10)}; no results yet`,
+        }
+      }
+
       const viaPrimary = cfg.hasYearPattern || cfg.explicitYears.includes(year)
       const viaFallback = cfg.fallbackYears.includes(year)
       if (!viaPrimary && !viaFallback) {
@@ -337,3 +350,56 @@ export async function runProbe({ races = null, now = new Date() } = {}) {
 
 /** Statuses that mean a human should go do something. */
 export const NEEDS_HELP = new Set([STATUS.BROKEN, STATUS.DRIFTED, STATUS.NO_YEAR])
+
+/**
+ * Coverage against the real catalog: what we SELL versus what we can scrape.
+ *
+ * The health grid on its own answers "of the races we wrote scrapers for, how
+ * many work". That is the wrong denominator, and it hides the worst category
+ * entirely: a race we sell today with no scraper at all. There are seven of
+ * those (Memphis, Honolulu, San Antonio, Las Vegas, Detroit, Palm Beaches,
+ * Baltimore) and nothing in the system said so, because a race with no config
+ * never appears in a list built from configs.
+ *
+ * Products resolve through the SAME chain the storefront lookup uses, so a
+ * product counted as covered here is genuinely covered at lookup time.
+ *
+ * Three buckets, because they are three different jobs:
+ *   covered    — sells, resolves to a config
+ *   needsScraper — sells, resolves to nothing, and the title looks like a race
+ *   notARace   — Gift Card, Custom, and anything else with no race to scrape
+ */
+const NON_RACE_HINTS = [/gift\s*card/i, /^custom\b/i, /\(any race\)/i]
+
+export async function buildCatalogCoverage() {
+  const { default: prisma } = await import('../../api/_lib/prisma.js')
+  const products = await prisma.shopifyProduct.findMany({
+    where: { status: 'ACTIVE' },
+    select: { productId: true, handle: true, title: true, raceCanonical: true, templateSuffix: true },
+    orderBy: { title: 'asc' },
+  })
+
+  const covered = []
+  const needsScraper = []
+  const notARace = []
+
+  for (const p of products) {
+    if (p.raceCanonical) { covered.push(p); continue }
+    if (NON_RACE_HINTS.some(re => re.test(p.title))) { notARace.push(p); continue }
+    needsScraper.push(p)
+  }
+
+  // Races we sell, deduplicated — several products can point at one race.
+  const racesSold = new Set(covered.map(p => p.raceCanonical))
+
+  return {
+    products: products.length,
+    racesSold: [...racesSold].sort(),
+    covered,
+    needsScraper,
+    notARace,
+    // The wizard rollout question, answered from the same sync rather than by
+    // hand-checking templates in the Shopify admin.
+    onWizardTemplate: products.filter(p => p.templateSuffix === 'pdp-personalization-test').length,
+  }
+}

@@ -21,11 +21,13 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import prisma from '../_lib/prisma.js'
 import {
   buildCoverageGrid,
+  buildCatalogCoverage,
   coveredYears,
   runProbe,
   STATUS,
   NEEDS_HELP,
 } from '../../server/lib/scraperHealth.js'
+import { syncProductCatalog } from '../../server/services/shopifyProducts.js'
 
 const ERROR_OUTCOMES = new Set(['upstream_error', 'rate_limited', 'bad_request'])
 const SUCCESS_OUTCOMES = new Set(['found', 'cached'])
@@ -73,6 +75,13 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store, max-age=0')
 
   if (req.method === 'POST') {
+    // Two jobs behind one endpoint. Syncing the catalog is what makes a newly
+    // added Shopify product show up as "needs a scraper" without anyone
+    // remembering to tell the dashboard about it.
+    if (req.body?.action === 'sync-catalog') {
+      const result = await syncProductCatalog()
+      return res.status(200).json({ success: true, ...result })
+    }
     const races = Array.isArray(req.body?.races) ? req.body.races : null
     const result = await runProbe({ races })
     return res.status(200).json({ success: true, ...result })
@@ -86,13 +95,14 @@ export default async function handler(req, res) {
     ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
     : undefined
 
-  const [entries, health] = await Promise.all([
+  const [entries, health, catalog] = await Promise.all([
     prisma.lookupLog.findMany({
       where: since ? { createdAt: { gte: since } } : {},
       orderBy: { createdAt: 'desc' },
       take: limit,
     }),
     prisma.scraperHealth.findMany({ orderBy: [{ race: 'asc' }, { year: 'desc' }] }),
+    buildCatalogCoverage(),
   ])
 
   const grid = buildCoverageGrid()
@@ -198,6 +208,13 @@ export default async function handler(req, res) {
   const racesNeedingHelp = new Set(needsHelp.map(n => n.race)).size
 
   const eligible = races.filter(r => r.publicSafe)
+
+  // Coverage is measured against what we SELL, not what we have configs for.
+  // The old denominator (configs) could not see a race we sell and never wrote
+  // a scraper for, which is the worst category and the one worth surfacing.
+  const soldSet = new Set(catalog.racesSold)
+  const soldRaces = races.filter(r => soldSet.has(r.race))
+  const soldLive = soldRaces.filter(r => (r.healthTally[STATUS.LIVE] || 0) > 0).length
   const racesLive = eligible.filter(r => (r.healthTally[STATUS.LIVE] || 0) > 0).length
 
   return res.status(200).json({
@@ -215,12 +232,22 @@ export default async function handler(req, res) {
       racesLive,
       racesEligible: eligible.length,
       racesTotal: races.length,
+      // Headline coverage numbers, catalog-based.
+      soldLive,
+      soldTotal: soldRaces.length,
+      needsScraper: catalog.needsScraper.length,
+      activeProducts: catalog.products,
+      onWizardTemplate: catalog.onWizardTemplate,
       lastProbeAt: health.length
         ? health.reduce((max, h) => (h.checkedAt > max ? h.checkedAt : max), health[0].checkedAt)
         : null,
     },
     needsHelp,
     needsHelpByCause,
+    // Products we sell that resolve to no scraper at all. These never appear
+    // in `races` because that list is built from configs.
+    needsScraper: catalog.needsScraper,
+    notARace: catalog.notARace,
     races,
   })
 }

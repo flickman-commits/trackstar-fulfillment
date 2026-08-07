@@ -164,3 +164,94 @@ export async function applyVariantPrices(updates) {
 
   return { updated, failures }
 }
+
+// ---------------------------------------------------------------------------
+// Product-level catalog sync
+// ---------------------------------------------------------------------------
+
+/**
+ * Product-level fields, as opposed to CATALOG_QUERY above which flattens down
+ * to variants for the price editor. `templateSuffix` is here because it tells
+ * us which PDP template a product uses, which is how we know whether the
+ * personalization wizard is on it.
+ */
+const PRODUCT_QUERY = `
+  query Products($cursor: String) {
+    products(first: 100, after: $cursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id
+        legacyResourceId
+        title
+        handle
+        status
+        templateSuffix
+        tags
+        featuredImage { url }
+      }
+    }
+  }
+`
+
+/** Every product in the store. */
+export async function fetchProductCatalog() {
+  const out = []
+  let cursor = null
+  while (true) {
+    const data = await shopifyGraphql(PRODUCT_QUERY, { cursor })
+    for (const p of data.products.nodes) {
+      out.push({
+        // Line items carry the numeric id, so that is what we key on.
+        productId: String(p.legacyResourceId || p.id.split('/').pop()),
+        handle: p.handle,
+        title: p.title,
+        status: p.status || null,
+        templateSuffix: p.templateSuffix || null,
+        featuredImage: p.featuredImage?.url || null,
+        tags: p.tags || [],
+      })
+    }
+    if (!data.products.pageInfo.hasNextPage) break
+    cursor = data.products.pageInfo.endCursor
+  }
+  return out
+}
+
+/**
+ * Sync Shopify into the ShopifyProduct table and resolve each product to a
+ * canonical race.
+ *
+ * Resolution deliberately reuses the SAME chain the storefront lookup uses
+ * (parseRaceNameFromTitle then getCanonicalRaceName) rather than inventing a
+ * second matcher. A product that resolves differently here than it does at
+ * lookup time would be worse than no coverage data at all, because it would
+ * report a race as covered while shoppers on that page get nothing.
+ */
+export async function syncProductCatalog() {
+  const [{ default: prisma }, norm, scrapers] = await Promise.all([
+    import('../../api/_lib/prisma.js'),
+    import('../scrapers/raceNameNormalization.js'),
+    import('../scrapers/index.js'),
+  ])
+
+  const products = await fetchProductCatalog()
+
+  for (const p of products) {
+    const parsed = norm.parseRaceNameFromTitle(p.title) || p.title
+    const raceCanonical = scrapers.getCanonicalRaceName(parsed)
+    const row = { ...p, tags: p.tags, raceCanonical: raceCanonical || null }
+    await prisma.shopifyProduct.upsert({
+      where: { productId: p.productId },
+      create: row,
+      update: row,
+    })
+  }
+
+  // Products deleted from Shopify should stop counting as gaps here.
+  const seen = products.map(p => p.productId)
+  const removed = await prisma.shopifyProduct.deleteMany({
+    where: { productId: { notIn: seen } },
+  })
+
+  return { synced: products.length, removed: removed.count }
+}
