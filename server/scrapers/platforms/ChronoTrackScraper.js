@@ -167,17 +167,28 @@ export class ChronoTrackScraper extends BaseScraper {
     // Only individual entries — relay/team rows have their own entry type and
     // no personal finish time.
     const individuals = entries.filter(e => !e.entryType || e.entryType === 'IND')
-    const matches = individuals.filter(e => this.namesMatch(runnerName, e.displayName || ''))
+    const matches = this.filterNameMatches(runnerName, individuals, e => e.displayName || '')
     console.log(`[${this.tag}] ${matches.length} name match(es)`)
 
     if (matches.length === 0) {
       // Surface what we did find so the dashboard can offer a manual pick.
+      //
+      // No `time` and no `eventType` on these, and both omissions are honest:
+      // the search payload is name/bib/entry-id only (no time field exists on
+      // it), and azpEventCourseId is an opaque per-year id with no label
+      // anywhere in the response. Resolving either costs one request PER
+      // candidate, which the storefront's 10s budget cannot absorb ten times
+      // over — so the wizard re-runs the lookup on whichever row the shopper
+      // picks and takes the matched path below.
+      //
+      // This used to read `this.config.raceLabels?.[...]`, a key no config file
+      // in this repo has ever defined, so it evaluated to null every time.
       return this.notFoundResult(
         `No exact name match among ${individuals.length} search result(s)`,
         individuals.slice(0, 10).map(e => ({
           name: e.displayName,
           bib: e.bib ? String(e.bib) : null,
-          eventType: this.config.raceLabels?.[e.azpEventCourseId] || null,
+          eventType: null,
           resultsUrl: this._resultsUrl(e.azpEventCourseId),
         }))
       )

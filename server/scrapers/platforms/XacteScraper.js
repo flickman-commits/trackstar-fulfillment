@@ -97,10 +97,8 @@ export class XacteScraper extends BaseScraper {
       })
 
       // Filter for exact name matches
-      const matches = results.filter(r => {
-        const fullName = `${r.firstname} ${r.lastname}`
-        return this.namesMatch(runnerName, fullName)
-      })
+      const matches = this.filterNameMatches(runnerName, results,
+        r => `${r.firstname} ${r.lastname}`)
 
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 

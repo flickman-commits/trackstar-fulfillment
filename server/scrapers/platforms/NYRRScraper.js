@@ -118,10 +118,8 @@ export class NYRRScraper extends BaseScraper {
       })
 
       // Filter for exact name matches
-      const matches = results.filter(r => {
-        const fullName = `${r.firstName} ${r.lastName}`
-        return this.namesMatch(runnerName, fullName)
-      })
+      const matches = this.filterNameMatches(runnerName, results,
+        r => `${r.firstName} ${r.lastName}`)
 
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 

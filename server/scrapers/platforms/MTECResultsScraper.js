@@ -99,7 +99,7 @@ export class MTECResultsScraper extends BaseScraper {
       console.log(`[${this.tag}] ${eventLabel} (race ${raceId}): ${searchRows.length} search row(s)`)
 
       // Name-match within this distance only.
-      const matches = searchRows.filter(r => this.namesMatch(runnerName, r.name))
+      const matches = this.filterNameMatches(runnerName, searchRows, r => r.name)
       console.log(`[${this.tag}] ${eventLabel}: ${matches.length} name-match(es)`)
 
       if (matches.length === 0) {

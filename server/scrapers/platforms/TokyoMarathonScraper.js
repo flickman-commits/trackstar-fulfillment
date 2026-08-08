@@ -82,7 +82,7 @@ export class TokyoMarathonScraper extends BaseScraper {
       if (candidates.length === 0) return this.notFoundResult()
 
       // Filter by name match
-      const matches = candidates.filter(c => this.namesMatch(runnerName, c.name))
+      const matches = this.filterNameMatches(runnerName, candidates, c => c.name)
       console.log(`[${this.tag}] Exact matches: ${matches.length}`)
 
       if (matches.length === 0) {
@@ -94,7 +94,10 @@ export class TokyoMarathonScraper extends BaseScraper {
         })))
       }
       if (matches.length > 1) {
-        return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: m.bib, time: null })))
+        // No time: the search table carries place/bib/name only, and the net
+        // time needs a detail.php POST per runner. Absent, not zero — consumers
+        // must not render this as "no finish time recorded".
+        return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: m.bib })))
       }
 
       // Step 2: Fetch detail page for the matched runner using their bib number

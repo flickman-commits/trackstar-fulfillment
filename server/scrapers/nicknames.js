@@ -23,6 +23,14 @@ const RAW = {
   charles:   ['charlie', 'chuck', 'chas'],
   christopher: ['chris', 'topher'],
   christina: ['chris', 'tina', 'christy'],
+  // Christian was missing here while Christopher was present, which is how the
+  // London 2025 "Chris Baxter" order got Christopher Baxter's finish time: only
+  // one of the two Baxters on the page survived the name filter, so it looked
+  // unambiguous. BaseScraper.nameMatchTier now treats any first-name prefix as
+  // a weak match so the table no longer has to be exhaustive, but these belong
+  // here regardless.
+  christian: ['chris'],
+  christine: ['chris', 'chrissy', 'tina'],
   daniel:    ['dan', 'danny'],
   david:     ['dave', 'davey'],
   deborah:   ['deb', 'debbie'],

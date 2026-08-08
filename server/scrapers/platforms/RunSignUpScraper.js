@@ -143,7 +143,7 @@ export class RunSignUpScraper extends BaseScraper {
       })
 
       // Filter for exact name matches
-      const matches = results.filter(r => this.namesMatch(runnerName, r.name))
+      const matches = this.filterNameMatches(runnerName, results, r => r.name)
       console.log(`[${this.tag} ${this.year}] Exact matches: ${matches.length}`)
 
       if (matches.length === 0) {
@@ -258,7 +258,7 @@ export class RunSignUpScraper extends BaseScraper {
       }
 
       // Filter for exact name matches
-      const matches = results.filter(r => this.namesMatch(runnerName, r.name))
+      const matches = this.filterNameMatches(runnerName, results, r => r.name)
       console.log(`[${this.tag} ${this.year}] Exact matches after name filtering: ${matches.length}`)
 
       if (matches.length === 0) {

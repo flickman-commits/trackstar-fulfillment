@@ -127,7 +127,7 @@ export class CompetitiveTimingScraper extends BaseScraper {
 
     const resultsUrl = `https://competitivetiming.com/events/${this.raceSlug}/${this.year}/${distSlug}/results`
 
-    const matches = rows.filter(r => this.namesMatch(runnerName, r.name))
+    const matches = this.filterNameMatches(runnerName, rows, r => r.name)
     if (matches.length === 0) {
       // surface up to 10 candidates so the dashboard can offer Accept buttons
       const candidates = rows.slice(0, 10).map(r => this.toCandidate(r, distanceMiles, eventLabel))

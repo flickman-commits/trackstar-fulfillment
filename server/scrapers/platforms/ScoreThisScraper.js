@@ -155,10 +155,8 @@ export class ScoreThisScraper extends BaseScraper {
       console.log(`[${this.tag}] Last name "${searchLastName}" matches: ${lastNameMatches.length}`)
 
       // Now filter for full name match
-      const nameMatches = lastNameMatches.filter(r => {
-        const fullName = `${r.firstName} ${r.lastName}`
-        return this.namesMatch(runnerName, fullName)
-      })
+      const nameMatches = this.filterNameMatches(runnerName, lastNameMatches,
+        r => `${r.firstName} ${r.lastName}`)
 
       console.log(`[${this.tag}] Full name matches: ${nameMatches.length}`)
 

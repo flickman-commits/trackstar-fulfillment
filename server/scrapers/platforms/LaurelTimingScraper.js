@@ -88,7 +88,7 @@ export class LaurelTimingScraper extends BaseScraper {
       }
       console.log(`[${this.tag}] ${eventLabel} (race ${raceId}): ${rows.length} row(s)`)
 
-      const matches = rows.filter(r => this.namesMatch(runnerName, r.fullName))
+      const matches = this.filterNameMatches(runnerName, rows, r => r.fullName)
       console.log(`[${this.tag}] ${eventLabel}: ${matches.length} name-match(es)`)
 
       if (matches.length === 0) {

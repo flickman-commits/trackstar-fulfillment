@@ -207,10 +207,8 @@ export class MyChipTimeScraper extends BaseScraper {
       if (results.length === 0) return this._notFound()
 
       // Filter for name matches
-      const matches = results.filter(r => {
-        const fullName = r.fullName || r.name || `${r.firstName || ''} ${r.lastName || ''}`.trim()
-        return this.namesMatch(runnerName, fullName)
-      })
+      const matches = this.filterNameMatches(runnerName, results,
+        r => r.fullName || r.name || `${r.firstName || ''} ${r.lastName || ''}`.trim())
 
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 

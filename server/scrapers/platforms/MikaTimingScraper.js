@@ -155,7 +155,7 @@ export class MikaTimingScraper extends BaseScraper {
       })
 
       // Filter for name matches
-      const matches = results.filter(r => this.namesMatch(runnerName, r.name))
+      const matches = this.filterNameMatches(runnerName, results, r => r.name)
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 
       if (matches.length === 0) {

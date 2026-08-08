@@ -67,7 +67,7 @@ export class MyRaceAiScraper extends BaseScraper {
       if (results.length === 0) return this.notFoundResult()
 
       // Filter for exact name matches
-      const matches = results.filter(r => this.namesMatch(runnerName, r.name))
+      const matches = this.filterNameMatches(runnerName, results, r => r.name)
       console.log(`[${this.tag} ${this.year}] Exact matches after filtering: ${matches.length}`)
 
       if (matches.length === 0) {

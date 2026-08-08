@@ -123,7 +123,7 @@ export class MultiSportAustraliaScraper extends BaseScraper {
 
       if (candidates.length === 0) return this.notFoundResult()
 
-      const matches = candidates.filter(c => this.namesMatch(runnerName, c.name))
+      const matches = this.filterNameMatches(runnerName, candidates, c => c.name)
       console.log(`[${this.tag}] Exact matches: ${matches.length}`)
 
       if (matches.length === 0) {
@@ -134,7 +134,9 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         })))
       }
       if (matches.length > 1) {
-        return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: null, time: null })))
+        // No time or bib: the search page yields name + detail URL only, and
+        // both live behind a per-runner detail fetch. Absent, not zero.
+        return this.ambiguousResult(matches.map(m => ({ name: m.name })))
       }
 
       // Step 3: Fetch detail page for the matched runner

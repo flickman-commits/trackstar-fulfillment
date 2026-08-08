@@ -106,6 +106,82 @@ export class RTRTScraper extends BaseScraper {
     }
   }
 
+  /**
+   * Human label for a profile's `course` field.
+   *
+   * RTRT reports every event a runner is registered for as a comma list
+   * ("5k", "1mile,5k,10k", "5k,halfmarathon"). A configured event wins, since
+   * that is what this race sells posters for; otherwise we name the longest
+   * distance rather than silently calling a 5K a marathon.
+   */
+  _labelForCourse(course) {
+    const fallback = this.config.defaultEventType || 'Marathon'
+    if (!course) return fallback
+
+    const tokens = String(course).toLowerCase().split(',').map(t => t.trim()).filter(Boolean)
+    if (!tokens.length) return fallback
+
+    for (const key of (this.config.eventSearchOrder || [])) {
+      const id = (this.config.courseMap?.[key] || '').toLowerCase()
+      if (id && tokens.includes(id)) return this.config.eventLabels?.[key] || fallback
+    }
+
+    const KNOWN = [
+      [/^(full)?marathon$/, 'Marathon', 26.2],
+      [/^half(\s*|-)?marathon$/, 'Half Marathon', 13.1],
+      [/^(30|25|20|15)k$/, null, 0],
+      [/^10k$/, '10K', 6.2],
+      [/^8k$/, '8K', 5.0],
+      [/^5k$/, '5K', 3.1],
+      [/^10\s*mile[rs]?$/, '10 Mile', 10],
+      [/^5\s*mile[rs]?$/, '5 Mile', 5],
+      [/^1\s*mile$/, '1 Mile', 1],
+    ]
+    let best = null
+    for (const t of tokens) {
+      for (const [re, label, miles] of KNOWN) {
+        if (!re.test(t)) continue
+        const name = label || t.toUpperCase()
+        const dist = label ? miles : parseFloat(t) || 0
+        if (!best || dist > best.dist) best = { name, dist }
+        break
+      }
+    }
+    return best ? best.name : fallback
+  }
+
+  /**
+   * Turn a profile id into a finish time and pace. The profile search payload
+   * carries neither, so this second call is the only way to get them.
+   *
+   * @returns {Promise<{time: string|null, pace: string|null}>} nulls when the
+   *   runner has no finish split, or the call failed — never throws, because a
+   *   missing time must not take down a lookup that otherwise succeeded.
+   */
+  async _resolveFinish(pid, distanceMiles) {
+    if (!pid) return { time: null, pace: null }
+    try {
+      const splits = await this._fetchSplits(pid)
+      const finishSplit = splits.find(s =>
+        s.isFinish === '1' || (s.point || '').toUpperCase().includes('FINISH')
+      )
+      if (!finishSplit) return { time: null, pace: null }
+
+      const rawTime = finishSplit.netTime || finishSplit.time
+      const cleanTime = rawTime ? this.roundTime(rawTime) : null
+      const time = this.formatTime(cleanTime ? this.normalizeTime(cleanTime) : null)
+
+      const rawPace = finishSplit.paceAvg?.replace(/\s*min\/mile$/i, '') || null
+      const pace = rawPace || this.formatPace(
+        cleanTime ? this.calculatePace(this.normalizeTime(cleanTime), distanceMiles) : null
+      )
+      return { time, pace }
+    } catch (err) {
+      console.log(`[${this.tag}] Could not fetch splits for ${pid}: ${err.message}`)
+      return { time: null, pace: null }
+    }
+  }
+
   async searchRunner(runnerName) {
     console.log(`\n${'='.repeat(50)}`)
     console.log(`[${this.tag} ${this.year}] Searching for: "${runnerName}"`)
@@ -124,19 +200,28 @@ export class RTRTScraper extends BaseScraper {
         console.log(`  ${idx + 1}. ${p.name || `${p.fname} ${p.lname}`} - Bib: ${p.bib || 'N/A'}`)
       })
 
-      let matches = searchResults.filter(p => {
-        const fullName = p.name || `${p.fname || ''} ${p.lname || ''}`.trim()
-        return this.namesMatch(runnerName, fullName)
-      })
+      let matches = this.filterNameMatches(runnerName, searchResults,
+        p => p.name || `${p.fname || ''} ${p.lname || ''}`.trim())
 
       console.log(`[${this.tag}] Exact matches after filtering: ${matches.length}`)
 
       if (matches.length === 0) {
         console.log(`[${this.tag}] No name match. Surfacing ${Math.min(searchResults.length, 10)} candidates.`)
+        // No `time` on these: RTRT's profile search returns roster rows only
+        // (name, bib, pid, course) and the finish lives behind a per-runner
+        // splits call we are not going to make ten times. Consumers must treat
+        // a missing time here as "not looked up", never as "did not finish" —
+        // the storefront wizard re-runs the lookup on the row the shopper
+        // picks, which goes down the matched path below and resolves it.
         return this.notFoundResult(null, searchResults.slice(0, 10).map(p => ({
           name: p.name || `${p.fname || ''} ${p.lname || ''}`.trim(),
           bib: p.bib,
-          eventType: this.config.defaultEventType || 'Marathon',
+          // The row states which course they actually ran. Stamping every
+          // candidate with the race's default said "Marathon" next to 5K and
+          // 1-mile entrants on Illinois 2026.
+          eventType: this._labelForCourse(p.course),
+          // Lets the fulfillment dashboard resolve a pick without re-searching.
+          pid: p.pid || null,
         })))
       }
 
@@ -151,8 +236,11 @@ export class RTRTScraper extends BaseScraper {
         for (const eventKey of eventOrder) {
           const courseId = (this.config.courseMap[eventKey] || '').toLowerCase()
           if (!courseId) continue
+          // `course` is a comma list for anyone registered in more than one
+          // event ("5k,halfmarathon"), so an equality test missed them and
+          // silently fell through to the race's default distance.
           const courseMatches = matches.filter(p =>
-            (p.course || '').toLowerCase() === courseId
+            String(p.course || '').toLowerCase().split(',').map(t => t.trim()).includes(courseId)
           )
           if (courseMatches.length > 0) {
             matches = courseMatches
@@ -170,11 +258,22 @@ export class RTRTScraper extends BaseScraper {
       }
 
       if (matches.length > 1) {
-        return this.ambiguousResult(matches.map(m => ({
-          name: m.name || `${m.fname || ''} ${m.lname || ''}`.trim(),
-          bib: m.bib || null,
-          time: null
-        })))
+        // Same name, several entrants. This list is what the shopper picks
+        // from, so it has to carry real times — `time: null` here used to make
+        // every one of them look like a DNF. There are only ever a handful of
+        // exact-name collisions, so resolving them in parallel is cheap.
+        const resolved = await Promise.all(matches.map(async m => {
+          const { time, pace } = await this._resolveFinish(m.pid, resolvedDistance)
+          return {
+            name: m.name || `${m.fname || ''} ${m.lname || ''}`.trim(),
+            bib: m.bib || null,
+            time,
+            pace,
+            eventType: this._labelForCourse(m.course),
+            pid: m.pid || null,
+          }
+        }))
+        return this.ambiguousResult(resolved)
       }
 
       const profile = matches[0]
@@ -187,32 +286,10 @@ export class RTRTScraper extends BaseScraper {
       console.log(`  PID: ${pid || 'N/A'}`)
       console.log(`  Event: ${resolvedEventType}`)
 
-      // Fetch splits for finish time and pace
-      let time = null
-      let pace = null
-
-      if (pid) {
-        try {
-          const splits = await this._fetchSplits(pid)
-          const finishSplit = splits.find(s =>
-            s.isFinish === '1' || (s.point || '').toUpperCase().includes('FINISH')
-          )
-          if (finishSplit) {
-            const rawTime = finishSplit.netTime || finishSplit.time
-            const cleanTime = rawTime ? this.roundTime(rawTime) : null
-            time = this.formatTime(cleanTime ? this.normalizeTime(cleanTime) : null)
-
-            const rawPace = finishSplit.paceAvg?.replace(/\s*min\/mile$/i, '') || null
-            pace = rawPace || this.formatPace(
-              cleanTime ? this.calculatePace(this.normalizeTime(cleanTime), resolvedDistance) : null
-            )
-
-            console.log(`  Time: ${time}`)
-            console.log(`  Pace: ${pace}`)
-          }
-        } catch (err) {
-          console.log(`[${this.tag}] Could not fetch splits: ${err.message}`)
-        }
+      const { time, pace } = await this._resolveFinish(pid, resolvedDistance)
+      if (time) {
+        console.log(`  Time: ${time}`)
+        console.log(`  Pace: ${pace}`)
       }
 
       const resultsUrl = pid

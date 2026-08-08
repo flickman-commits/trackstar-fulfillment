@@ -130,8 +130,8 @@ export class AthlinksScraper extends BaseScraper {
 
         for (const course of matchingCourses) {
           const results = course.results || []
-          const matches = results.filter(r =>
-            this.namesMatch(runnerName, r.displayName || `${r.firstName} ${r.lastName}`)
+          const matches = this.filterNameMatches(runnerName, results,
+            r => r.displayName || `${r.firstName} ${r.lastName}`
           )
           console.log(`[${this.tag}] Course "${course.courseName}" (${distKey}): ${matches.length} name match(es)`)
 

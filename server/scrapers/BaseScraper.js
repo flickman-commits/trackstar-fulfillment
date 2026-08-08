@@ -162,42 +162,95 @@ export class BaseScraper {
   }
 
   /**
+   * How strongly does a candidate name match the search query?
+   *
+   *   0 = STRONG. The first name matches outright (exact full string, or
+   *       first+last exact ignoring middle names).
+   *   1 = WEAK. The last name matches exactly but the first name only matches
+   *       as a SHORT FORM — either a curated nickname (Mike→Michael) or a
+   *       plain prefix (Chris→Christopher, Chris→Christian).
+   *   null = no match.
+   *
+   * The prefix rule is what stops a repeat of the London 2025 "Chris Baxter"
+   * incident. That page listed both Christopher Baxter and Christian Baxter.
+   * "chris"→"christopher" was in the nickname table, "chris"→"christian" was
+   * not, so exactly one candidate survived the filter and the scraper
+   * auto-accepted the wrong runner's finish time. A short first name that
+   * prefixes a longer one is inherently ambiguous, and it is not the nickname
+   * table's job to enumerate every long form — the ambiguity has to be visible
+   * to the caller so a human can pick.
+   *
+   * Minimum 3 characters, so "Jo Smith" does not sweep in every Joseph,
+   * Joanna and Jonathan in the field.
+   *
+   * @param {string} query - what the customer entered
+   * @param {string} candidate - a name from the results page
+   * @returns {0|1|null}
+   */
+  nameMatchTier(query, candidate) {
+    const n1 = this.normalizeName(query)
+    const n2 = this.normalizeName(candidate)
+    if (!n1 || !n2) return null
+
+    if (n1 === n2) return 0
+
+    const parts1 = n1.split(' ')
+    const parts2 = n2.split(' ')
+    if (parts1.length < 2 || parts2.length < 2) return null
+
+    const first1 = parts1[0]
+    const last1 = parts1[parts1.length - 1]
+    const first2 = parts2[0]
+    const last2 = parts2[parts2.length - 1]
+
+    // Last name must match exactly no matter what.
+    if (last1 !== last2) return null
+
+    if (first1 === first2) return 0
+    if (firstNamesEquivalent(first1, first2)) return 1
+    if (first1.length >= 3 && first2.startsWith(first1)) return 1
+
+    return null
+  }
+
+  /**
    * Check if two names match (fuzzy comparison).
    *
-   * Match types (in order of preference):
-   *   1. Exact match after normalization (lowercase, "Last, First" reorder)
-   *   2. First+last with middle names ignored
-   *   3. First+last with nickname expansion (Mike↔Michael, Liz↔Elizabeth)
+   * Kept as a boolean convenience over nameMatchTier. Prefer
+   * filterNameMatches() when choosing among several candidates — this cannot
+   * tell a confident match from an ambiguous short form.
    *
    * @param {string} name1 - the search query (what the customer entered)
    * @param {string} name2 - the candidate from the results page
    * @returns {boolean}
    */
   namesMatch(name1, name2) {
-    const n1 = this.normalizeName(name1)
-    const n2 = this.normalizeName(name2)
-    if (!n1 || !n2) return false
+    return this.nameMatchTier(name1, name2) !== null
+  }
 
-    // Exact match
-    if (n1 === n2) return true
-
-    const parts1 = n1.split(' ')
-    const parts2 = n2.split(' ')
-
-    if (parts1.length >= 2 && parts2.length >= 2) {
-      const first1 = parts1[0]
-      const last1  = parts1[parts1.length - 1]
-      const first2 = parts2[0]
-      const last2  = parts2[parts2.length - 1]
-
-      // Last name must match exactly. First name can match exactly OR via nickname.
-      if (last1 === last2) {
-        if (first1 === first2) return true
-        if (firstNamesEquivalent(first1, first2)) return true
-      }
+  /**
+   * Narrow a candidate list to the ones worth considering for a search query.
+   *
+   * Strong matches win outright: if the field contains a literal "Dan Smith"
+   * then "Daniel Smith" is not a competing candidate and we should not make
+   * the operator choose between them. Only when nothing matches strongly do
+   * the short-form matches come back — and if more than one of those survives,
+   * the caller's own "ambiguous" branch fires and a human decides.
+   *
+   * @param {string} query - what the customer entered
+   * @param {Array} items - candidate rows from the results page
+   * @param {(item: any) => string} nameOf - pulls the display name off a row
+   * @returns {Array} the surviving candidates (possibly empty)
+   */
+  filterNameMatches(query, items, nameOf) {
+    const strong = []
+    const weak = []
+    for (const item of items || []) {
+      const tier = this.nameMatchTier(query, nameOf(item))
+      if (tier === 0) strong.push(item)
+      else if (tier === 1) weak.push(item)
     }
-
-    return false
+    return strong.length > 0 ? strong : weak
   }
 
   /**
@@ -271,17 +324,26 @@ export class BaseScraper {
    * Return standardized "ambiguous" result (multiple matches)
    */
   ambiguousResult(matches) {
+    const list = Array.isArray(matches) ? matches : []
     return {
       found: false,
       ambiguous: true,
-      matches: matches,
+      matches: list,
+      // ResearchService persists `possibleMatches`, not `matches`, and that is
+      // what the dashboard reads to render the picker. Populating only
+      // `matches` produced an order flagged ambiguous with no candidates
+      // attached — the operator was told to choose but shown nothing to
+      // choose between. Both are set so either reader works.
+      possibleMatches: list.length > 0 ? list : null,
       bibNumber: null,
       officialTime: null,
       officialPace: null,
       eventType: null,
       yearFound: this.year,
       researchStatus: 'ambiguous',
-      researchNotes: `Multiple matches found: ${matches.length} runners with similar names`
+      researchNotes: list.length > 0
+        ? `Multiple matches found: ${list.map(m => m.name).filter(Boolean).join(', ')} — please pick the right runner`
+        : 'Multiple matches found — please pick the right runner'
     }
   }
 }

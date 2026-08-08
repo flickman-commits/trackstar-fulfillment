@@ -123,8 +123,8 @@ export class BrookseeScraper extends BaseScraper {
       }
 
       // Filter to name matches
-      const matches = rows.filter(r =>
-        this.namesMatch(runnerName, `${r.firstName} ${r.lastName}`)
+      const matches = this.filterNameMatches(runnerName, rows,
+        r => `${r.firstName} ${r.lastName}`
       )
 
       console.log(`[${this.tag} ${this.year}] Name matches in ${eventLabel}: ${matches.length}`)
@@ -145,9 +145,15 @@ export class BrookseeScraper extends BaseScraper {
       if (matches.length > 1) {
         console.log(`[${this.tag} ${this.year}] Multiple matches:`)
         matches.forEach(r => console.log(`  - ${r.firstName} ${r.lastName}, Bib: ${r.bib}`))
+        // Same fields the no-match branch above surfaces. Dropping them here
+        // left the picker showing bare names, and any consumer that reads a
+        // missing time as "no result" would mark real finishers as DNFs.
         return this.ambiguousResult(matches.map(r => ({
           name: `${r.firstName} ${r.lastName}`,
           bib: r.bib,
+          time: r.chipTime || r.finishTime,
+          pace: r.pace,
+          eventType: eventLabel,
         })))
       }
 

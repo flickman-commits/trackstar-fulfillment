@@ -119,9 +119,10 @@ export class RaceRosterScraper extends BaseScraper {
       }
 
       // Filter to matches in this sub-event AND matching name
-      const eventMatches = allMatches.filter(m =>
-        String(m.resultSubEventId) === String(subEventId) &&
-        this.namesMatch(runnerName, m.name)
+      const eventMatches = this.filterNameMatches(
+        runnerName,
+        allMatches.filter(m => String(m.resultSubEventId) === String(subEventId)),
+        m => m.name
       )
 
       console.log(`[${this.tag} ${this.year}] Matches in ${eventLabel} with name match: ${eventMatches.length}`)
