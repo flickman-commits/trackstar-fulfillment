@@ -67,6 +67,7 @@ import columbusConfig from './configs/columbus.js'
 import stGeorgeConfig from './configs/stGeorge.js'
 import missoulaConfig from './configs/missoula.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
+import { applyOverride } from './scraperOverrides.js'
 
 /**
  * Map platform identifier -> platform scraper class
@@ -166,7 +167,13 @@ const ALIAS_MAP = buildAliasMap(ALL_CONFIGS)
  */
 function createScraper(config, year) {
   const override = config.yearOverrides?.[year]
-  const effectiveConfig = override ? { ...config, ...override } : config
+  const fileConfig = override ? { ...config, ...override } : config
+  // DB-backed event ids from the dashboard, layered last so a human fixing a
+  // gap in the UI beats whatever the file happens to say. Reads a cache, so
+  // callers must have awaited ensureOverridesLoaded(); when they have not,
+  // this is a no-op and the file config applies — old behaviour, not a wrong
+  // one.
+  const effectiveConfig = applyOverride(fileConfig, year)
 
   const ScraperClass = PLATFORM_MAP[effectiveConfig.platform]
   if (!ScraperClass) {
@@ -428,6 +435,10 @@ export function getRaceConfigSummaries(years = []) {
       raceName: config.raceName,
       platform: config.platform,
       fallbackPlatform: config.fallback?.platform || null,
+      // Athlinks' MasterEvents API is keyed on this, and it is the only
+      // platform we can enumerate, so it is what makes a race auto-fixable.
+      masterEventId: config.masterEventId || null,
+      fallbackMasterEventId: config.fallback?.masterEventId || null,
       publicSafe: !PUPPETEER_PLATFORMS.has(config.platform),
       explicitYears,
       fallbackYears,

@@ -340,6 +340,65 @@ model ShopifyProduct {
   @@index([status])
 }
 
+// Per-race-year scraper config the dashboard can write.
+//
+// Event ids live in git-tracked files under server/scrapers/configs, and
+// Vercel's filesystem is read-only, so a "fix this" button in the dashboard
+// physically cannot edit them. These rows layer on top instead: they are
+// merged into the config at scraper-construction time, through the
+// yearOverrides hook createScraper already had.
+//
+// Only event ids. Anything structural (a new platform, new parsing) is still
+// a code change, and should be — a button that could invent a scraper would
+// be a button that could quietly invent wrong results.
+model ScraperOverride {
+  id         Int      @id @default(autoincrement())
+  race       String   // canonical race name
+  year       Int
+  // Platform-shaped, matching what the config would have held: a bare id for
+  // Athlinks/Xacte, { marathon, halfMarathon } for MyChipTime.
+  eventIds   Json
+  // Which scraper this applies to. Null means the primary; set it to target a
+  // config's `fallback` instead.
+  platform   String?
+  source     String   // discovered | manual
+  note       String?
+  // Set once a probe has confirmed the id actually returns the runner we
+  // expect. An unverified override is a guess, and the panel says so.
+  verifiedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([race, year])
+  @@index([race])
+}
+
+// Known finishers to assert probes against.
+//
+// RunnerResearch already supplies these for races we have SOLD, which is where
+// the probe's fixtures come from today. It cannot supply them for a race we
+// just added, and 17 races were reporting "untested" forever as a result.
+// Capturing one finisher from a live search fills that gap: the capture itself
+// proves the scraper works right now, and every probe after it proves the
+// scraper has not drifted since.
+// Not every platform exposes a bib. Berlin (Mika) returns finishers with an
+// empty bib field and a valid finish time, so a bib-only fixture could never
+// be captured there. Assert on whichever identifier the platform actually
+// gives us; a wrong time is just as good a drift signal as a wrong bib.
+model ScraperFixture {
+  id           Int      @id @default(autoincrement())
+  race         String
+  year         Int
+  runnerName   String
+  bib          String?
+  officialTime String?
+  source       String   // captured | manual
+  capturedAt   DateTime @default(now())
+
+  @@unique([race, year])
+  @@index([race])
+}
+
 model SystemConfig {
   key       String   @id
   value     String

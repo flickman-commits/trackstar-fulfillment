@@ -28,6 +28,7 @@ import {
   NEEDS_HELP,
 } from '../../server/lib/scraperHealth.js'
 import { syncProductCatalog } from '../../server/services/shopifyProducts.js'
+import { proposeEventIds, saveOverride, captureFixture, repairPlan } from '../../server/lib/scraperRepair.js'
 
 const ERROR_OUTCOMES = new Set(['upstream_error', 'rate_limited', 'bad_request'])
 const SUCCESS_OUTCOMES = new Set(['found', 'cached'])
@@ -78,9 +79,47 @@ export default async function handler(req, res) {
     // Two jobs behind one endpoint. Syncing the catalog is what makes a newly
     // added Shopify product show up as "needs a scraper" without anyone
     // remembering to tell the dashboard about it.
-    if (req.body?.action === 'sync-catalog') {
+    const action = req.body?.action
+
+    if (action === 'sync-catalog') {
       const result = await syncProductCatalog()
       return res.status(200).json({ success: true, ...result })
+    }
+
+    // Look up missing event ids on the timing platform. `apply` is what turns
+    // it from a preview into a fix.
+    if (action === 'discover-ids') {
+      const { race, years, apply } = req.body || {}
+      if (!race) return res.status(400).json({ error: 'race is required' })
+      const result = await proposeEventIds({
+        race,
+        years: Array.isArray(years) && years.length ? years : coveredYears(),
+        apply: !!apply,
+      })
+      return res.status(200).json({ success: true, ...result })
+    }
+
+    // Manual id entry, for platforms with no listing we can query. Verified
+    // before it is trusted.
+    if (action === 'save-override') {
+      const { race, year, eventIds, platform } = req.body || {}
+      if (!race || !year || eventIds === undefined) {
+        return res.status(400).json({ error: 'race, year and eventIds are required' })
+      }
+      const result = await saveOverride({ race, year: Number(year), eventIds, platform: platform || null })
+      return res.status(200).json({ success: true, ...result })
+    }
+
+    // Grab a real finisher so this race-year stops reporting untested.
+    if (action === 'capture-fixture') {
+      const { race, year, searchName } = req.body || {}
+      if (!race || !year) return res.status(400).json({ error: 'race and year are required' })
+      const result = await captureFixture({ race, year: Number(year), searchName: searchName || null })
+      return res.status(200).json({ success: result.ok, ...result })
+    }
+
+    if (action === 'repair-plan') {
+      return res.status(200).json({ success: true, plan: await repairPlan(coveredYears()) })
     }
     const races = Array.isArray(req.body?.races) ? req.body.races : null
     const result = await runProbe({ races })

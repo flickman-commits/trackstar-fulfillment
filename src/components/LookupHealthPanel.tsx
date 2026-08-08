@@ -96,6 +96,21 @@ interface HealthPayload {
   races: RaceRow[]
 }
 
+/** Anything the repair endpoints can hand back. Every field optional, since
+ *  which ones appear depends on the action and whether it succeeded. */
+interface RepairResponse {
+  ok?: boolean
+  discoverable?: boolean
+  reason?: string
+  error?: string
+  verified?: boolean
+  runnerName?: string
+  bib?: string | null
+  officialTime?: string | null
+  verification?: { error?: string }
+  proposals?: Array<{ year: number; eventId: number; usable: boolean; verified?: boolean }>
+}
+
 // Colour and copy per status.
 //
 // Two things this encoding has to get right, both learned from looking at the
@@ -162,6 +177,13 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
   const [showNeedsHelp, setShowNeedsHelp] = useState(false)
   const [showNeedsScraper, setShowNeedsScraper] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  // Which repair is in flight, as `action:race[:year]`. One at a time on
+  // purpose: these all hit live timing sites, and firing a dozen at once is
+  // how you get rate-limited by the very platform you are trying to fix.
+  const [busy, setBusy] = useState<string | null>(null)
+  const [repairMsg, setRepairMsg] = useState<{ race: string; ok: boolean; text: string } | null>(null)
+  const [idPrompt, setIdPrompt] = useState<{ race: string; year: number; platform: string } | null>(null)
+  const [idValue, setIdValue] = useState('')
   const [filter, setFilter] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -210,6 +232,68 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
     }
   }
 
+  // Only Athlinks publishes an event listing we can query, so only Athlinks
+  // races get the automatic route. Everything else needs the id pasted.
+  const isAthlinks = (r: RaceRow) => r.platform === 'athlinks' || r.fallbackPlatform === 'athlinks'
+
+  const repair = async (
+    key: string,
+    race: string,
+    body: Record<string, unknown>,
+    describe: (d: RepairResponse) => { ok: boolean; text: string },
+  ) => {
+    setBusy(key); setRepairMsg(null)
+    try {
+      const res = await apiFetch('/api/admin/lookup-health', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const d = await res.json().catch(() => ({}))
+      const { ok, text } = describe(d)
+      setRepairMsg({ race, ok, text })
+      if (ok) await load()
+    } catch (e) {
+      setRepairMsg({ race, ok: false, text: e instanceof Error ? e.message : 'Failed' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const discoverIds = (race: string) =>
+    repair(`discover:${race}`, race, { action: 'discover-ids', race, apply: true }, d => {
+      if (!d?.discoverable) return { ok: false, text: d?.reason || 'Not discoverable' }
+      const applied = (d.proposals || []).filter(p => p.usable)
+      if (!applied.length) return { ok: false, text: 'Nothing to apply — no published results for the missing years' }
+      const verified = applied.filter(p => p.verified).length
+      return {
+        ok: true,
+        text: `Added ${applied.length} event id${applied.length === 1 ? '' : 's'} (${applied.map(p => p.year).join(', ')}) · ${verified} verified against live results`,
+      }
+    })
+
+  const capture = (race: string, year: number) =>
+    repair(`capture:${race}:${year}`, race, { action: 'capture-fixture', race, year }, d =>
+      d?.ok
+        ? { ok: true, text: `Captured ${d.runnerName}${d.bib ? ` #${d.bib}` : ''}${d.officialTime ? ` (${d.officialTime})` : ''} for ${year} — probes can now assert against it` }
+        : { ok: false, text: d?.error || 'Could not capture a finisher' }
+    )
+
+  const submitId = async () => {
+    if (!idPrompt) return
+    const { race, year } = idPrompt
+    const raw = idValue.trim()
+    if (!raw) return
+    // MyChipTime keys ids by event type; everything else takes a bare id.
+    const eventIds = idPrompt.platform === 'mychiptime' ? { marathon: raw } : (Number(raw) || raw)
+    setIdPrompt(null); setIdValue('')
+    await repair(`saveid:${race}:${year}`, race, { action: 'save-override', race, year, eventIds }, d =>
+      d?.verified
+        ? { ok: true, text: `Saved and verified event id for ${year}` }
+        : { ok: false, text: `Saved for ${year}, but could NOT verify it: ${d?.verification?.error || 'no finisher returned'}. Check the id.` }
+    )
+  }
+
   useEffect(() => { load() }, [])
 
   const races = useMemo(() => {
@@ -240,7 +324,7 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
       className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-border-gray flex-shrink-0 space-y-4">
           <div className="flex items-center justify-between">
@@ -453,9 +537,24 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
                       <tr className="bg-subtle-gray/40">
                         <td colSpan={6} className="px-6 py-4">
                           <div className="grid md:grid-cols-2 gap-6">
-                            {/* Per-year health */}
+                            {/* Per-year health, with the repair affordance for
+                                each row that has one. Which action shows up is
+                                driven by the CAUSE: an untested year needs a
+                                finisher captured, a missing event id needs
+                                either a lookup (Athlinks) or a pasted value. */}
                             <div>
-                              <p className="text-xs font-semibold text-off-black/70 mb-2">Scraper health by year</p>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-semibold text-off-black/70">Scraper health by year</p>
+                                {r.needsHelp > 0 && isAthlinks(r) && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); void discoverIds(r.race) }}
+                                    disabled={!!busy}
+                                    className="text-[11px] px-2 py-0.5 rounded border border-border-gray hover:bg-white transition-colors disabled:opacity-50"
+                                  >
+                                    {busy === `discover:${r.race}` ? 'Looking up…' : 'Find missing event ids'}
+                                  </button>
+                                )}
+                              </div>
                               <div className="space-y-1">
                                 {r.years.map(y => (
                                   <div key={y.year} className="flex items-start gap-2 text-xs">
@@ -465,12 +564,37 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
                                     <span className="text-off-black/50 flex-1">
                                       {y.detail || STATUS_META[y.status].blurb}
                                       {y.probeName && y.status === 'live' && (
-                                        <span className="text-off-black/40"> · verified {y.probeName} #{y.expectBib} in {fmtMs(y.ms)}</span>
+                                        <span className="text-off-black/40">
+                                          {' '}· verified {y.probeName}{y.expectBib ? ` #${y.expectBib}` : ''} in {fmtMs(y.ms)}
+                                        </span>
                                       )}
                                     </span>
+                                    {y.status === 'no_probe' && (
+                                      <button
+                                        onClick={e => { e.stopPropagation(); void capture(r.race, y.year) }}
+                                        disabled={!!busy}
+                                        className="text-[11px] px-2 py-0.5 rounded border border-border-gray hover:bg-white flex-shrink-0 disabled:opacity-50"
+                                      >
+                                        {busy === `capture:${r.race}:${y.year}` ? 'Capturing…' : 'Capture finisher'}
+                                      </button>
+                                    )}
+                                    {y.status === 'no_year' && !isAthlinks(r) && (
+                                      <button
+                                        onClick={e => { e.stopPropagation(); setIdPrompt({ race: r.race, year: y.year, platform: r.platform }) }}
+                                        disabled={!!busy}
+                                        className="text-[11px] px-2 py-0.5 rounded border border-border-gray hover:bg-white flex-shrink-0 disabled:opacity-50"
+                                      >
+                                        Add event id
+                                      </button>
+                                    )}
                                   </div>
                                 ))}
                               </div>
+                              {repairMsg?.race === r.race && (
+                                <p className={`text-[11px] mt-2 ${repairMsg.ok ? 'text-green-700' : 'text-red-700'}`}>
+                                  {repairMsg.text}
+                                </p>
+                              )}
                             </div>
 
                             {/* Individual inquiries */}
@@ -513,6 +637,40 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
             <p className="text-sm text-off-black/40 text-center py-10">No races match that filter.</p>
           )}
         </div>
+
+        {/* Manual event-id entry, for platforms with no listing we can query.
+            Deliberately not a free-for-all: the value is verified against live
+            results before it is trusted, so a typo cannot move a race from an
+            honest "no event id" to a dishonest "configured". */}
+        {idPrompt && (
+          <div className="absolute inset-0 bg-off-black/40 flex items-center justify-center z-10 rounded-xl" onClick={() => setIdPrompt(null)}>
+            <div className="bg-white rounded-lg shadow-xl p-5 w-[420px]" onClick={e => e.stopPropagation()}>
+              <p className="text-sm font-semibold text-off-black">
+                Event id for {idPrompt.race} {idPrompt.year}
+              </p>
+              <p className="text-xs text-off-black/50 mt-1">
+                {idPrompt.platform} publishes no event listing we can query, so this has to come from the
+                timing site. It is checked against live results before being saved.
+              </p>
+              <input
+                autoFocus
+                value={idValue}
+                onChange={e => setIdValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') void submitId() }}
+                placeholder="e.g. 17035"
+                className="mt-3 w-full px-3 py-2 rounded border border-border-gray text-sm focus:outline-none focus:ring-1 focus:ring-off-black/20"
+              />
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => { setIdPrompt(null); setIdValue('') }} className="text-xs px-3 py-1.5 rounded border border-border-gray hover:bg-subtle-gray">
+                  Cancel
+                </button>
+                <button onClick={() => void submitId()} disabled={!idValue.trim()} className="text-xs px-3 py-1.5 rounded bg-off-black text-white hover:opacity-80 disabled:opacity-40">
+                  Save &amp; verify
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="px-6 py-3 border-t border-border-gray flex-shrink-0 space-y-2">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

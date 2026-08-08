@@ -164,8 +164,25 @@ export async function loadProbeFixtures() {
       name: r.runnerName,
       bib: r.bibNumber,
       time: r.officialTime || null,
+      origin: 'order-history',
     }
   }
+
+  // Fixtures captured from the dashboard, layered on top. Order history can
+  // only ever cover races we have SOLD, which left 17 races permanently
+  // untested; these fill exactly that gap. They win over order history because
+  // they were captured deliberately and more recently.
+  const captured = await prisma.scraperFixture.findMany()
+  for (const c of captured) {
+    const canonical = getCanonicalRaceName(c.race) || c.race
+    fixtures[`${canonical}::${c.year}`] = {
+      name: c.runnerName,
+      bib: c.bib || null,
+      time: c.officialTime || null,
+      origin: 'captured',
+    }
+  }
+
   return fixtures
 }
 
@@ -174,6 +191,32 @@ function sameBib(a, b) {
   const norm = v => String(v ?? '').trim().replace(/^0+/, '').toLowerCase()
   const na = norm(a)
   return na !== '' && na === norm(b)
+}
+
+/** "2:23:01" and "02:23:01" are the same finish. */
+function sameTime(a, b) {
+  const norm = v => String(v ?? '').trim().replace(/^0+(?=\d:)/, '')
+  const na = norm(a)
+  return na !== '' && na === norm(b)
+}
+
+/**
+ * Does this candidate match the fixture?
+ *
+ * Bib when we have one, finish time otherwise. Mika-timed races (Berlin)
+ * return finishers with an EMPTY bib field and a valid time, so a bib-only
+ * assertion could never pass there — the race would report drifted forever
+ * while being perfectly healthy.
+ */
+function matchesFixture(fixture, candidate) {
+  if (fixture.bib) return sameBib(fixture.bib, candidate.bib)
+  if (fixture.time) return sameTime(fixture.time, candidate.time)
+  return false
+}
+
+/** What we asserted on, for the panel's detail line. */
+function fixtureIdentity(fixture) {
+  return fixture.bib ? `bib ${fixture.bib}` : `time ${fixture.time}`
 }
 
 /**
@@ -201,30 +244,30 @@ export async function probeOne(race, year, fixture) {
     const ms = Date.now() - started
 
     if (result?.found) {
-      const actualBib = result.bibNumber ?? null
-      if (sameBib(fixture.bib, actualBib)) {
-        return { ...base, status: STATUS.LIVE, actualBib, ms }
+      const actual = { bib: result.bibNumber ?? null, time: result.officialTime ?? null }
+      if (matchesFixture(fixture, actual)) {
+        return { ...base, status: STATUS.LIVE, actualBib: actual.bib, ms }
       }
       return {
         ...base,
         status: STATUS.DRIFTED,
-        actualBib,
+        actualBib: actual.bib,
         ms,
-        detail: `Found "${fixture.name}" but bib was ${actualBib ?? 'null'}, expected ${fixture.bib}`,
+        detail: `Found "${fixture.name}" but ${fixture.bib ? `bib was ${actual.bib ?? 'null'}` : `time was ${actual.time ?? 'null'}`}, expected ${fixtureIdentity(fixture)}`,
       }
     }
 
     // Ambiguous means the scraper is working and just cannot disambiguate a
-    // common name. If our known bib is among the candidates, the data is fine.
+    // common name. If our known runner is among the candidates, data is fine.
     const candidates = result?.possibleMatches || []
     if (result?.ambiguous || candidates.length) {
-      const hit = candidates.find(m => sameBib(fixture.bib, m.bib))
-      if (hit) return { ...base, status: STATUS.LIVE, actualBib: hit.bib, ms }
+      const hit = candidates.find(m => matchesFixture(fixture, m))
+      if (hit) return { ...base, status: STATUS.LIVE, actualBib: hit.bib ?? null, ms }
       return {
         ...base,
         status: STATUS.DRIFTED,
         ms,
-        detail: `${candidates.length} candidate(s) returned, none carrying bib ${fixture.bib}`,
+        detail: `${candidates.length} candidate(s) returned, none carrying ${fixtureIdentity(fixture)}`,
       }
     }
 
@@ -369,7 +412,17 @@ export const NEEDS_HELP = new Set([STATUS.BROKEN, STATUS.DRIFTED, STATUS.NO_YEAR
  *   needsScraper — sells, resolves to nothing, and the title looks like a race
  *   notARace   — Gift Card, Custom, and anything else with no race to scrape
  */
-const NON_RACE_HINTS = [/gift\s*card/i, /^custom\b/i, /\(any race\)/i]
+// Products that will never have a scraper, so listing them as gaps is noise.
+// Gift cards and Custom prints have no race at all. Triathlon and Relay for
+// America are real events but not ones we look results up for, so they stay
+// manual-entry by choice rather than by omission — Matt's call.
+const NON_RACE_HINTS = [
+  /gift\s*card/i,
+  /^custom\b/i,
+  /\(any race\)/i,
+  /triathlon/i,
+  /relay for america/i,
+]
 
 export async function buildCatalogCoverage() {
   const { default: prisma } = await import('../../api/_lib/prisma.js')
