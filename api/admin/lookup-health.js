@@ -288,5 +288,11 @@ export default async function handler(req, res) {
     needsScraper: catalog.needsScraper,
     notARace: catalog.notARace,
     races,
+    // Flat, newest-first, for the chronological view. Deliberately separate
+    // from races[].entries: rows whose race could not be resolved are nested
+    // under "(unknown)" and would simply vanish from a view assembled by
+    // flattening the per-race lists — and an unresolvable race name is exactly
+    // the kind of thing worth seeing in a raw log.
+    entries,
   })
 }

@@ -94,6 +94,7 @@ interface HealthPayload {
   needsScraper: CatalogProduct[]
   notARace: CatalogProduct[]
   races: RaceRow[]
+  entries: LogEntry[]
 }
 
 /** Anything the repair endpoints can hand back. Every field optional, since
@@ -185,6 +186,10 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
   const [idPrompt, setIdPrompt] = useState<{ race: string; year: number; platform: string } | null>(null)
   const [idValue, setIdValue] = useState('')
   const [filter, setFilter] = useState('')
+  // Race grouping is the default because the usual question is "which race do
+  // I fix". The raw log is the second view for when the question is instead
+  // "what just happened", which grouping genuinely obscures.
+  const [view, setView] = useState<'races' | 'log'>('races')
   const [error, setError] = useState<string | null>(null)
 
   const load = async () => {
@@ -315,6 +320,18 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
       if (b.traffic.total !== a.traffic.total) return b.traffic.total - a.traffic.total
       return b.needsHelp - a.needsHelp
     })
+  }, [data, filter])
+
+  const logEntries = useMemo(() => {
+    if (!data) return []
+    const q = filter.trim().toLowerCase()
+    if (!q) return data.entries
+    return data.entries.filter(e =>
+      (e.race || '').toLowerCase().includes(q) ||
+      (e.name || '').toLowerCase().includes(q) ||
+      e.outcome.toLowerCase().includes(q) ||
+      String(e.year || '').includes(q)
+    )
   }, [data, filter])
 
   const s = data?.stats
@@ -468,16 +485,80 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
             </div>
           )}
 
-          <input
-            value={filter}
-            onChange={e => setFilter(e.target.value)}
-            placeholder="Filter races…"
-            className="w-full px-3 py-2 rounded-lg border border-border-gray text-sm placeholder:text-off-black/30 focus:outline-none focus:ring-1 focus:ring-off-black/20"
-          />
+          <div className="flex items-center gap-2">
+            {/* Two views of the same data. Grouping answers "which race do I
+                fix"; the raw log answers "what just happened", which grouping
+                genuinely hides. Neither replaces the other. */}
+            <div className="inline-flex rounded-lg border border-border-gray overflow-hidden flex-shrink-0">
+              {([['races', 'By race'], ['log', 'Log']] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setView(key)}
+                  className={`px-3 py-2 text-xs font-medium transition-colors ${
+                    view === key ? 'bg-off-black text-white' : 'text-off-black/60 hover:bg-subtle-gray'
+                  }`}
+                >
+                  {label}
+                  {key === 'log' && data ? ` (${data.entries.length})` : ''}
+                </button>
+              ))}
+            </div>
+            <input
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              placeholder={view === 'races' ? 'Filter races…' : 'Filter by race, name, year or outcome…'}
+              className="flex-1 px-3 py-2 rounded-lg border border-border-gray text-sm placeholder:text-off-black/30 focus:outline-none focus:ring-1 focus:ring-off-black/20"
+            />
+          </div>
           {error && <p className="text-xs text-red-700">{error}</p>}
         </div>
 
+        {/* Chronological log — the old flat view, kept because grouping by race
+            hides ordering, and "what happened at 09:32" is a real question. */}
+        {view === 'log' && (
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white border-b border-border-gray">
+                <tr className="text-left text-off-black/50 text-xs">
+                  <th className="px-6 py-2 font-normal">Date &amp; Time</th>
+                  <th className="px-3 py-2 font-normal">Race</th>
+                  <th className="px-3 py-2 font-normal">Year</th>
+                  <th className="px-3 py-2 font-normal">Name</th>
+                  <th className="px-3 py-2 font-normal">Outcome</th>
+                  <th className="px-6 py-2 font-normal text-right">Lookup Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logEntries.map(e => (
+                  <tr key={e.id} className="border-b border-border-gray/60 hover:bg-subtle-gray/60">
+                    <td className="px-6 py-2 text-off-black/60 whitespace-nowrap">
+                      {new Date(e.createdAt).toLocaleString(undefined, {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
+                      })}
+                    </td>
+                    <td className="px-3 py-2 text-off-black/80">
+                      {e.race || <span className="text-off-black/30 italic">unresolved</span>}
+                    </td>
+                    <td className="px-3 py-2 text-off-black/60">{e.year ?? '—'}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-off-black/80">{e.name}</td>
+                    <td className={`px-3 py-2 ${OUTCOME_COLOR[e.outcome] || 'text-off-black/60'}`}>
+                      {e.outcome}{e.cached ? ' (cache)' : ''}
+                    </td>
+                    <td className="px-6 py-2 text-right text-off-black/60">{fmtMs(e.ms)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {logEntries.length === 0 && (
+              <p className="text-sm text-off-black/40 text-center py-10">
+                {loading ? 'Loading…' : filter ? 'Nothing matches that filter.' : 'No lookups in the last 7 days.'}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Race rows */}
+        {view === 'races' && (
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white border-b border-border-gray">
@@ -637,6 +718,7 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
             <p className="text-sm text-off-black/40 text-center py-10">No races match that filter.</p>
           )}
         </div>
+        )}
 
         {/* Manual event-id entry, for platforms with no listing we can query.
             Deliberately not a free-for-all: the value is verified against live
