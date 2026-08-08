@@ -107,6 +107,43 @@ export class RTRTScraper extends BaseScraper {
   }
 
   /**
+   * Does this race run more than one event on the weekend? Only then is there
+   * anything to disambiguate — a single-distance race should keep the label
+   * its config declares (Marine Corps 17.75K calls itself "17.75K", and no
+   * amount of parsing a timing point improves on that).
+   */
+  get _isMultiEvent() {
+    return (this.config.eventSearchOrder?.length || 0) > 1
+      || Object.keys(this.config.courseMap || {}).length > 1
+  }
+
+  /**
+   * Parse one distance token into a label and a length in miles.
+   * Understands the vocabulary RTRT uses in both `course` values ("halfmarathon",
+   * "5k", "1mile") and timing-point names ("HM", "MAR", "5K", "1M").
+   *
+   * @returns {{label: string, miles: number}|null} null when unrecognised.
+   */
+  _parseDistanceToken(token) {
+    const t = String(token || '').trim().toLowerCase().replace(/[\s_-]/g, '')
+    if (!t) return null
+    if (/^(full)?marathon$|^mar$|^m$/.test(t)) {
+      return { label: this.config.eventLabels?.marathon || 'Marathon', miles: 26.2 }
+    }
+    if (/^half(marathon)?$|^hm$/.test(t)) {
+      return { label: this.config.eventLabels?.half || 'Half Marathon', miles: 13.1 }
+    }
+    const k = t.match(/^(\d+(?:\.\d+)?)k$/)
+    if (k) return { label: `${k[1]}K`, miles: parseFloat(k[1]) * 0.621371 }
+    const mi = t.match(/^(\d+(?:\.\d+)?)mi(?:le[rs]?)?$/) || t.match(/^(\d+(?:\.\d+)?)m$/)
+    if (mi) {
+      const n = parseFloat(mi[1])
+      return { label: n === 1 ? '1 Mile' : `${n} Mile`, miles: n }
+    }
+    return null
+  }
+
+  /**
    * Human label for a profile's `course` field.
    *
    * RTRT reports every event a runner is registered for as a comma list
@@ -126,46 +163,57 @@ export class RTRTScraper extends BaseScraper {
       if (id && tokens.includes(id)) return this.config.eventLabels?.[key] || fallback
     }
 
-    const KNOWN = [
-      [/^(full)?marathon$/, 'Marathon', 26.2],
-      [/^half(\s*|-)?marathon$/, 'Half Marathon', 13.1],
-      [/^(30|25|20|15)k$/, null, 0],
-      [/^10k$/, '10K', 6.2],
-      [/^8k$/, '8K', 5.0],
-      [/^5k$/, '5K', 3.1],
-      [/^10\s*mile[rs]?$/, '10 Mile', 10],
-      [/^5\s*mile[rs]?$/, '5 Mile', 5],
-      [/^1\s*mile$/, '1 Mile', 1],
-    ]
     let best = null
     for (const t of tokens) {
-      for (const [re, label, miles] of KNOWN) {
-        if (!re.test(t)) continue
-        const name = label || t.toUpperCase()
-        const dist = label ? miles : parseFloat(t) || 0
-        if (!best || dist > best.dist) best = { name, dist }
-        break
-      }
+      const parsed = this._parseDistanceToken(t)
+      if (parsed && (!best || parsed.miles > best.miles)) best = parsed
     }
-    return best ? best.name : fallback
+    return best ? best.label : fallback
   }
 
   /**
-   * Turn a profile id into a finish time and pace. The profile search payload
-   * carries neither, so this second call is the only way to get them.
+   * Which event does a finish split belong to? RTRT names the timing point
+   * after the course ("FINISH-5K", "FINISH-HM", "FINISH-MAR", "FINISH-1M").
    *
-   * @returns {Promise<{time: string|null, pace: string|null}>} nulls when the
-   *   runner has no finish split, or the call failed — never throws, because a
-   *   missing time must not take down a lookup that otherwise succeeded.
+   * This is the ONLY authoritative source for what a runner actually ran.
+   * `course` on the profile lists everything they REGISTERED for, so a
+   * 5K-plus-half entrant reports both and the poster ends up captioned with
+   * the wrong distance next to a time from the other race.
+   *
+   * Order matters: HM has to be tested before the bare-M marathon pattern.
+   */
+  _labelForFinishPoint(point) {
+    // Only the suffix carries the course: "FINISH-5K" -> "5K". A bare "FINISH"
+    // says nothing, and neither does a race that only runs one distance.
+    if (!this._isMultiEvent) return null
+    const suffix = String(point || '').toUpperCase().match(/^FINISH[-_\s]+(.+)$/)
+    return suffix ? this._parseDistanceToken(suffix[1]) : null
+  }
+
+  /**
+   * Turn a profile id into a finish time, pace, and the event actually run.
+   * The profile search payload carries none of them, so this second call is
+   * the only way to get them.
+   *
+   * @returns {Promise<{time: string|null, pace: string|null, label: string|null}>}
+   *   nulls when the runner has no finish split, or the call failed — never
+   *   throws, because a missing time must not take down a lookup that
+   *   otherwise succeeded.
    */
   async _resolveFinish(pid, distanceMiles) {
-    if (!pid) return { time: null, pace: null }
+    const EMPTY = { time: null, pace: null, label: null }
+    if (!pid) return EMPTY
     try {
       const splits = await this._fetchSplits(pid)
       const finishSplit = splits.find(s =>
         s.isFinish === '1' || (s.point || '').toUpperCase().includes('FINISH')
       )
-      if (!finishSplit) return { time: null, pace: null }
+      if (!finishSplit) return EMPTY
+
+      // Pace the time against the distance actually finished, not the race's
+      // headline distance, or a 5K gets a marathon's pace math.
+      const actual = this._labelForFinishPoint(finishSplit.point)
+      const miles = actual?.miles || distanceMiles
 
       const rawTime = finishSplit.netTime || finishSplit.time
       const cleanTime = rawTime ? this.roundTime(rawTime) : null
@@ -173,12 +221,12 @@ export class RTRTScraper extends BaseScraper {
 
       const rawPace = finishSplit.paceAvg?.replace(/\s*min\/mile$/i, '') || null
       const pace = rawPace || this.formatPace(
-        cleanTime ? this.calculatePace(this.normalizeTime(cleanTime), distanceMiles) : null
+        cleanTime ? this.calculatePace(this.normalizeTime(cleanTime), miles) : null
       )
-      return { time, pace }
+      return { time, pace, label: actual?.label || null }
     } catch (err) {
       console.log(`[${this.tag}] Could not fetch splits for ${pid}: ${err.message}`)
-      return { time: null, pace: null }
+      return EMPTY
     }
   }
 
@@ -263,13 +311,13 @@ export class RTRTScraper extends BaseScraper {
         // every one of them look like a DNF. There are only ever a handful of
         // exact-name collisions, so resolving them in parallel is cheap.
         const resolved = await Promise.all(matches.map(async m => {
-          const { time, pace } = await this._resolveFinish(m.pid, resolvedDistance)
+          const { time, pace, label } = await this._resolveFinish(m.pid, resolvedDistance)
           return {
             name: m.name || `${m.fname || ''} ${m.lname || ''}`.trim(),
             bib: m.bib || null,
             time,
             pace,
-            eventType: this._labelForCourse(m.course),
+            eventType: label || this._labelForCourse(m.course),
             pid: m.pid || null,
           }
         }))
@@ -280,13 +328,20 @@ export class RTRTScraper extends BaseScraper {
       const fullName = profile.name || `${profile.fname || ''} ${profile.lname || ''}`.trim()
       const pid = profile.pid
 
+      const { time, pace, label } = await this._resolveFinish(pid, resolvedDistance)
+      // The finish split names the course they actually crossed. It overrides
+      // the registration-derived guess above, which is wrong for anyone signed
+      // up for more than one event that weekend.
+      if (label && label !== resolvedEventType) {
+        console.log(`[${this.tag}] Finish split says ${label}, not ${resolvedEventType} — trusting the split`)
+        resolvedEventType = label
+      }
+
       console.log(`\n[${this.tag}] FOUND RUNNER:`)
       console.log(`  Name: ${fullName}`)
       console.log(`  Bib: ${profile.bib || 'N/A'}`)
       console.log(`  PID: ${pid || 'N/A'}`)
       console.log(`  Event: ${resolvedEventType}`)
-
-      const { time, pace } = await this._resolveFinish(pid, resolvedDistance)
       if (time) {
         console.log(`  Time: ${time}`)
         console.log(`  Pace: ${pace}`)
