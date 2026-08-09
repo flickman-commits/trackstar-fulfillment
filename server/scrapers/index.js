@@ -62,6 +62,7 @@ import airForceConfig from './configs/airForce.js'
 import armyTenMilerConfig from './configs/armyTenMiler.js'
 import surfCityConfig from './configs/surfCity.js'
 import dallasConfig from './configs/dallas.js'
+import detroitConfig from './configs/detroit.js'
 import grandmasConfig from './configs/grandmas.js'
 import columbusConfig from './configs/columbus.js'
 import stGeorgeConfig from './configs/stGeorge.js'
@@ -134,6 +135,7 @@ const ALL_CONFIGS = [
   armyTenMilerConfig,
   surfCityConfig,
   dallasConfig,
+  detroitConfig,
   grandmasConfig,
   columbusConfig,
   stGeorgeConfig,

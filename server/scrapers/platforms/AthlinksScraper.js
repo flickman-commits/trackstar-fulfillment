@@ -36,7 +36,9 @@ export class AthlinksScraper extends BaseScraper {
 
   async getRaceInfo() {
     return {
-      raceDate: this.config.calculateDate(this.year),
+      // Deliberately NOT the master API's raceDate: that field is the event
+      // weekend start (Saturday) while the marathon runs Sunday.
+      raceDate: this.resolveRaceDate(),
       location: this.config.location,
       eventTypes: this.config.eventTypes || ['Marathon', 'Half Marathon'],
       resultsUrl: this.eventId

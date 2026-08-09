@@ -107,6 +107,54 @@ export class BaseScraper {
    * @param {number} distanceMiles - Distance in miles (26.2 for marathon, 13.1 for half)
    * @returns {string} Pace in m:ss format (without " / mi" suffix - use formatPace for display)
    */
+  /**
+   * The date this race was actually run, in order of trustworthiness:
+   *
+   *   1. A date scraped from the results page for THIS year.
+   *   2. `config.raceDates[year]` — a date someone verified against a real
+   *      source and wrote down.
+   *   3. `config.calculateDate(year)` — a guess from a recurrence rule.
+   *
+   * Race date drives the weather printed on the poster, so a guess that looks
+   * plausible is worse than an obvious gap. Rule 3 is a migration crutch, not
+   * a design: every config should grow a `raceDates` entry for the years it
+   * supports, and the fallback logs when it is doing the work so the gaps are
+   * visible rather than silent.
+   *
+   * Two traps worth knowing, both real:
+   *   - A scraped date from the WRONG year (a fallback event id pointing at the
+   *     most recent edition) is rejected here by the year check.
+   *   - A timer's own date field may be the event WEEKEND, not race day.
+   *     Athlinks reports Detroit as the Saturday; the marathon is Sunday.
+   *     Verify which day a source means before trusting it.
+   *
+   * @param {Date|null} scrapedDate - date read off the results page, if any
+   * @returns {Date|null}
+   */
+  resolveRaceDate(scrapedDate = null) {
+    if (scrapedDate instanceof Date && !isNaN(scrapedDate.valueOf())) {
+      if (scrapedDate.getFullYear() === this.year) return scrapedDate
+      console.warn(`[${this.tag || this.raceName} ${this.year}] Ignoring scraped date ${scrapedDate.toDateString()}: wrong year`)
+    }
+
+    const configured = this.config?.raceDates?.[this.year]
+    if (configured) {
+      // Build from parts. `new Date('2024-10-20')` is parsed as UTC midnight,
+      // which renders as the 19th anywhere west of Greenwich.
+      const [y, m, d] = String(configured).split('-').map(Number)
+      if (y && m && d) return new Date(y, m - 1, d)
+      console.warn(`[${this.tag || this.raceName} ${this.year}] Unparseable raceDates entry: ${configured}`)
+    }
+
+    if (typeof this.config?.calculateDate === 'function') {
+      const guessed = this.config.calculateDate(this.year)
+      console.warn(`[${this.tag || this.raceName} ${this.year}] No verified date — falling back to a computed one (${guessed?.toDateString?.()}). Add a raceDates entry.`)
+      return guessed
+    }
+
+    return null
+  }
+
   calculatePace(time, distanceMiles = 26.2) {
     if (!time) return null
 

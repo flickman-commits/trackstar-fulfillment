@@ -126,6 +126,33 @@ export const CHIP_TIME_FIXTURES = [
     notes: 'HALF distance (21098m = 13.11mi), gun 2:03:30 vs chip 1:55:39 (472s apart). Pacing this against 26.2 would give ~4:24/mi, so this fixture catches a wrong-distance regression.',
   },
 
+  // ── Athlinks (Detroit) ────────────────────────────────────────────────
+  // Detroit's Athlinks feed exposes a single run leg with no intermediate
+  // splits, so the per-segment pace trap cannot bite here. The live risks are
+  // course selection and distance, which is what these two cover: the event
+  // also lists "Marathon Relay" and "Kids Marathon", and the half has been
+  // renamed three times across the years we support.
+  {
+    platform: 'athlinks',
+    race: 'Detroit Marathon',
+    year: 2024,
+    runner: 'David Wilson',
+    expectedChipTime: '3:08:30',
+    expectedChipPace: '7:12',
+    expectedBib: '1895',
+    notes: 'Detroit 2024 Marathon (event 1093379). 11310s ÷ 26.2 = 7:11.7 → 7:12. Athlinks prints 07:11 because it paces against the exact 42195m (26.2188mi); ours is correct for the 26.2 in the config, so do NOT "fix" this to 7:11. Same runner also has an International Half entry (2:36:47, bib 12158) — this fixture confirms eventSearchOrder picks the marathon.',
+  },
+  {
+    platform: 'athlinks',
+    race: 'Detroit Marathon',
+    year: 2024,
+    runner: 'Katie Moore',
+    expectedChipTime: '1:51:30',
+    expectedChipPace: '8:31',
+    expectedBib: '11732',
+    notes: 'Detroit 2024 International Half-Marathon (half-only entrant, so it exercises the half fall-through). 6690s ÷ 13.1 = 8:30.7 → 8:31; pacing this against 26.2 would give ~4:15/mi, so it catches a wrong-distance regression. Also proves the half courseMap matches "International Half-Marathon" rather than a single brand name.',
+  },
+
   // ── MyChipTime (Dallas) ───────────────────────────────────────────────
   // This platform had NO fixtures at all until Dallas 2025 was added, despite
   // backing Dallas, Philadelphia and Austin. Both entries below are from the
