@@ -51,6 +51,43 @@ The rules below exist specifically to catch this class of bug. Do not skip them.
 - New timing platform → add a `<Platform>Scraper.js`, register it in
   `index.js` `PLATFORM_MAP`, then add the config.
 
+### 1b. Cover the last 4 years by default — REQUIRED
+Customers order prints of races they ran years ago, not just the most recent
+edition. A config wired up for only the current year sends every older order to
+manual research.
+
+So whenever you add or touch a race config, populate `eventIds` for **the last
+4 completed years** (plus the current year if its results are published). Adding
+a single year to an existing config is the moment to backfill the rest — you
+already have the discovery method open.
+
+Rules that matter more than the count:
+
+- **Never guess or extrapolate an id.** Ids are not sequential and offsets are
+  not stable. Dallas's per-distance child ids sit +127, +56 and +117 from their
+  landing ids in consecutive years. Look each one up.
+- **Verify each year resolves to that year.** Open the event and confirm the
+  title/date is the year you think it is. A fallback id that pointed at "the
+  most recent edition" is what stamped Philadelphia 2026 with a Nov 2025 date
+  and turned a not-yet-run race into "runner not found".
+- **Never add a `defaultEventId`-style catch-all.** An unconfigured year must
+  fail loudly (`yearNotConfiguredResult`), never silently borrow another year.
+- **Stop when the platform genuinely lacks the year.** If the timer only has
+  2024+, say so in the config header and leave the older years out. Philadelphia
+  pre-2024 is not on MyChipTime at all; inventing ids for it would be worse than
+  no coverage.
+- **A future year needs no ids.** If the race has not run, leave it out and let
+  `calculateDate` drive the date. Which means:
+- **Check `calculateDate` against real dates while you're here.** For any year
+  with no scrapeable page, this computed date is the one that sticks, and race
+  date drives the weather printed on the poster. Verify it against every edition
+  you can confirm. Philadelphia's "third Sunday of November" rule was a week off
+  for 2026; the real rule is the Sunday before Thanksgiving.
+
+Record the discovery method in the config header (e.g. "read the per-distance
+child ids off the per-year landing page") so the next person backfilling a year
+does not have to rediscover it.
+
 ### 2. Pace: compute, don't scrape (default rule)
 Always derive pace with `this.calculatePace(chipTime, distanceMiles)` unless you
 have **proven** the page exposes a true *overall average* pace. Page pace columns
@@ -109,6 +146,12 @@ If the scraper launches a browser, close it in a `finally` block with
 Vercel. See `MultiSportAustraliaScraper.js` / `RunSignUpScraper.js`.
 
 ## Definition of done
+- [ ] `eventIds` covers the last 4 completed years (or the config header
+      explains which years the platform genuinely does not host).
+- [ ] Every configured year was looked up, not extrapolated, and verified to
+      resolve to that year. No `defaultEventId`-style catch-all.
+- [ ] `calculateDate` checked against every edition whose real date you can
+      confirm — it is the date of record for any year with no results page.
 - [ ] Pace is computed from chip time ÷ matched distance (or scraped pace proven
       equal to it for an uneven-splits runner).
 - [ ] ≥1 fixture per distance, including ≥1 uneven-splits runner.

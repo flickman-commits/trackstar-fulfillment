@@ -126,6 +126,32 @@ export const CHIP_TIME_FIXTURES = [
     notes: 'HALF distance (21098m = 13.11mi), gun 2:03:30 vs chip 1:55:39 (472s apart). Pacing this against 26.2 would give ~4:24/mi, so this fixture catches a wrong-distance regression.',
   },
 
+  // ── MyChipTime (Dallas) ───────────────────────────────────────────────
+  // This platform had NO fixtures at all until Dallas 2025 was added, despite
+  // backing Dallas, Philadelphia and Austin. Both entries below are from the
+  // 2025 Dallas event, whose result rows carry Gun Time and Chip Time as
+  // ADJACENT columns — the easiest possible place to grab the wrong one.
+  {
+    platform: 'mychiptime',
+    race: 'Dallas Marathon',
+    year: 2025,
+    runner: 'Michael Smith',
+    expectedChipTime: '3:23:06',
+    expectedChipPace: '7:45',
+    expectedBib: '477',
+    notes: 'Dallas 2025 Marathon (eID 16993). Gun 3:25:02 vs chip 3:23:06, so a gun-time regression fails here. POSITIVE SPLIT: held 7:38/mi through the 2:51:56 mark then faded, so the final-segment pace is well off the overall 7:45/mi — a split-interval pace regression also fails. Page prints 7:45/M as the overall pace.',
+  },
+  {
+    platform: 'mychiptime',
+    race: 'Dallas Marathon',
+    year: 2025,
+    runner: 'Hadley Smith',
+    expectedChipTime: '2:12:20',
+    expectedChipPace: '10:06',
+    expectedBib: '16943',
+    notes: 'Dallas 2025 HALF (eID 16991) — verifies pace is computed against 13.1, not 26.2 (26.2 would give ~5:03/mi). Gun 2:47:21 vs chip 2:12:20, a 35-minute gap, so this is the strongest gun-time catch we have. NEGATIVE SPLIT: 11:17 → 10:50 → 10:28 → 10:26 per-segment against a 10:06/M overall. Page prints 10:06/M.',
+  },
+
   // ── MultiSport Australia (Sydney) ─────────────────────────────────────
   {
     platform: 'multisport-australia',
