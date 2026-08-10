@@ -126,6 +126,31 @@ export const CHIP_TIME_FIXTURES = [
     notes: 'HALF distance (21098m = 13.11mi), gun 2:03:30 vs chip 1:55:39 (472s apart). Pacing this against 26.2 would give ~4:24/mi, so this fixture catches a wrong-distance regression.',
   },
 
+  // ── SVE Timing (Baltimore) ────────────────────────────────────────────
+  // This site puts "Gun Elapsed" and "Chip Elapsed" in adjacent columns, so
+  // both fixtures are chosen for a wide gun/chip gap: an off-by-one column
+  // read fails loudly instead of returning a plausible time.
+  {
+    platform: 'svetiming',
+    race: 'Baltimore Marathon',
+    year: 2025,
+    runner: 'Brijesh Patel',
+    expectedChipTime: '04:49:20',
+    expectedChipPace: '11:03',
+    expectedBib: '1770',
+    notes: 'Baltimore 2025 MARATHON. Gun 04:51:59 vs chip 04:49:20 (159s apart) — reading the gun column fails. 17360s ÷ 26.2 = 662.6 → 11:03. Division must match /^MARATHON$/ and not MARATHON RIM or MARATHON HANDCYCLE. https://results.svetiming.com/Corrigan-Sports-Enterprises/events/2025/baltimore-running-festival/results',
+  },
+  {
+    platform: 'svetiming',
+    race: 'Baltimore Marathon',
+    year: 2025,
+    runner: 'Jan Nguyen',
+    expectedChipTime: '02:46:49',
+    expectedChipPace: '12:44',
+    expectedBib: '40257',
+    notes: 'Baltimore 2025 HALF MARATHON — verifies pace uses 13.1, not 26.2 (26.2 would give ~6:22). Gun 03:04:58 vs chip 02:46:49 is an 18-minute gap, the widest we have, so a gun-time regression is unmissable. 10009s ÷ 13.1 = 764.0 → 12:44.',
+  },
+
   // ── Athlinks (Detroit) ────────────────────────────────────────────────
   // Detroit's Athlinks feed exposes a single run leg with no intermediate
   // splits, so the per-segment pace trap cannot bite here. The live risks are
