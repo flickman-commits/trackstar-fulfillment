@@ -44,12 +44,25 @@ export const FIXED_COSTS = {
   customPiecePerUnit: 5,
 }
 
-/** Where units get sold, and what each channel nets after shipping. */
+/**
+ * Where units get sold, and what each channel nets after shipping.
+ *
+ * Expo is the highest price and carries no shipping: there is no competing
+ * product on the shelf and the buyer is already in the moment. DTC is lower and
+ * absorbs fulfilment, so it nets the least of the three per unit.
+ *
+ * The first entry is the reference retail price, and the DTC entry seeds the
+ * model's default scenario.
+ */
 export const CHANNELS = [
-  { channel: 'Race expo / race store', price: 65, shippingCost: 0 },
-  { channel: 'Trackstar DTC', price: 59.99, shippingCost: 10 },
+  { channel: 'Race expo / race store', price: 55, shippingCost: 0 },
+  { channel: 'Trackstar DTC', price: 45, shippingCost: 10 },
   { channel: 'Amazon', price: 54.99, shippingCost: 10 },
 ]
+
+/** Convenience accessors so callers don't index the array by position. */
+export const EXPO_PRICE = CHANNELS[0].price
+export const DTC_CHANNEL = CHANNELS[1]
 
 /** What a partner or retailer pays per unit at wholesale. */
 export const WHOLESALE_PRICE = 30

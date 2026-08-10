@@ -483,14 +483,20 @@ function seedFromCommitted(data: MonopolyInternalPayload): ScenarioInput {
   for (const tier of data.tiers) racesByTier[tier.tierKey] = 0
   for (const c of data.committed) racesByTier[c.tierKey] = c.count
 
+  const dtcChannel = data.channels.find((c) => /dtc|direct/i.test(c.channel))
+
   return {
     racesByTier,
-    printRunUnits: 5000,
+    // Snap to a real quoted run rather than a round number, so the print-run
+    // buttons highlight instead of silently falling through to nearest-match.
+    printRunUnits: data.printRuns.find((r) => r.units === 5004)?.units ?? data.printRuns[0].units,
     offsetUnitsSold: 0,
     brandRevenue: 0,
     dtcUnits: 0,
-    dtcPrice: 59.99,
-    dtcShippingCost: 10,
+    // From the channel table rather than hardcoded, so a repricing lands here
+    // too instead of leaving the model quoting a number nobody sells at.
+    dtcPrice: dtcChannel?.price ?? 45,
+    dtcShippingCost: dtcChannel?.shippingCost ?? 10,
     wholesalePrice: data.wholesalePrice,
     customPieces: true,
   }
