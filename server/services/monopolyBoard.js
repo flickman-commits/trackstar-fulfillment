@@ -28,6 +28,7 @@
  */
 import { readRanges, listTabTitles } from './googleSheets.js'
 import { FALLBACK } from '../data/monopolyFallback.js'
+import { ECONOMICS } from '../data/monopolyEconomics.js'
 
 // Not sensitive — it's the file Matt already shares by link. It must also be
 // shared with GOOGLE_SERVICE_ACCOUNT_EMAIL as Viewer for this to work.
@@ -39,7 +40,6 @@ const SHEET_ID = process.env.MONOPOLY_SHEET_ID || '12EZc3RaxkY0Ye_nfeQzAya-5eCO7
 const TAB_BOARD = 'WEB - Board'
 const TAB_PACKAGES = 'WEB - Packages'
 const TAB_TOKENS = 'WEB - Tokens'
-const TAB_INTERNAL = 'INTERNAL - Economics'
 
 const CACHE_TTL_MS = 5 * 60 * 1000
 
@@ -410,72 +410,13 @@ export function resolvePersonalization(publicPayload, slug) {
 /**
  * Cost and margin assumptions for the internal deal model.
  *
- * ⚠️ Admin endpoints only. These are true unit costs — the numbers that would
- * undercut every partnership negotiation if they appeared on the partner page.
- * There is no code path from api/public/* to this function, and there must not
- * be one.
+ * These lived in an "INTERNAL — Economics" sheet tab. They now live in
+ * server/data/monopolyEconomics.js, because a manufacturing quote changes about
+ * as often as the offer itself and keeping it next to the arithmetic means the
+ * model cannot disagree with the quote it is based on.
+ *
+ * Still async so the admin endpoint's Promise.all keeps working unchanged.
  */
 export async function getInternalEconomics() {
-  let internalRows = []
-  try {
-    const titles = await listTabTitles(SHEET_ID)
-    ;[internalRows] = await readRanges([`'${resolveTab(TAB_INTERNAL, titles)}'!A1:Z60`], {
-      spreadsheetId: SHEET_ID,
-    })
-  } catch (err) {
-    // The INTERNAL tab may simply not exist yet. Fall through to the quoted
-    // defaults rather than failing — the model is most useful *before* the
-    // sheet is filled in, when Matt is still deciding a print run.
-    console.warn('[monopoly] internal tab unreadable, using defaults:', err?.message || err)
-  }
-
-  // The tab holds a print-run table (headed by a "units" column) and a set of
-  // loose key/value assumptions below it. Read both off the same rows.
-  const printRuns = toObjects(internalRows)
-    .filter((r) => int(r.units))
-    .map((r) => ({
-      units: int(r.units),
-      unitCost: money(r.unitcost) ?? 0,
-      freight: money(r.freight) ?? undefined,
-    }))
-    .sort((a, b) => a.units - b.units)
-
-  const settings = {}
-  for (const row of internalRows || []) {
-    const key = str(row[0])
-    if (key) settings[key] = row[1]
-  }
-
-  return {
-    printRuns: printRuns.length ? printRuns : DEFAULT_PRINT_RUNS,
-    fixedCosts: {
-      legal: money(settings.legal) ?? 10000,
-      freightPerThousand: money(settings.freightPerThousand) ?? 2000,
-      // Custom playing pieces are quoted per unit, not as one-off tooling, so
-      // they scale with the run and change the wholesale break-even directly.
-      customPiecePerUnit: money(settings.customPiecePerUnit) ?? 5,
-    },
-    channels: [
-      { channel: 'Race expo / race store', price: 65, shippingCost: 0 },
-      { channel: 'Trackstar DTC', price: 59.99, shippingCost: 10 },
-      { channel: 'Amazon', price: 54.99, shippingCost: 10 },
-    ],
-    wholesalePrice: money(settings.wholesalePrice) ?? 30,
-  }
+  return ECONOMICS
 }
-
-/**
- * Quoted manufacturing costs by run size.
- *
- * These are the real numbers from the manufacturer, including their odd run
- * sizes (2004, 5004, 10002) which come from case-pack quantities rather than
- * round numbers. `unitCost` is the base board only; custom playing pieces add
- * a further $5.00/unit and are applied separately so the model can show what
- * that decision actually costs.
- */
-const DEFAULT_PRINT_RUNS = [
-  { units: 2004, unitCost: 22.5, freight: 4000 },
-  { units: 3000, unitCost: 21.8, freight: 6000 },
-  { units: 5004, unitCost: 19.45, freight: 9000 },
-  { units: 10002, unitCost: 18.22, freight: 16000 },
-]
