@@ -21,6 +21,14 @@ import { ExposureModel } from '@/components/monopoly/ExposureModel'
 import { BrandLockup } from '@/components/monopoly/BrandLockup'
 import { MONOPOLY, UI_RADIUS, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
 import { buildFixturePayload } from '@/lib/monopolyFixture'
+import {
+  BRAND_PRICING,
+  BRAND_SLOTS,
+  COMMIT_STEPS,
+  FAQ,
+  SALES_PLAN,
+  TIMELINE,
+} from '@/lib/monopolyCopy'
 import { mergeSalesData } from '@/lib/monopolyMerge'
 import type { BoardSpace, MonopolyPublicPayload, MonopolySalesResponse } from '@/lib/monopolyTypes'
 import { useDocumentHead } from '@/lib/useDocumentHead'
@@ -284,7 +292,7 @@ export default function Monopoly() {
           A partnership is only worth what the edition sells. Here's the plan behind the print run.
         </p>
         <div className="grid gap-8 md:grid-cols-2">
-          {data.salesPlan.map((item) => (
+          {SALES_PLAN.map((item) => (
             <Beat key={item.title} title={item.title} body={item.body} />
           ))}
         </div>
@@ -310,7 +318,7 @@ export default function Monopoly() {
             label="Race spaces"
             note="The 22 coloured properties"
           />
-          {data.brandSlots.map((slot) => (
+          {BRAND_SLOTS.map((slot) => (
             <InventoryStat key={slot.label} count={slot.available} total={slot.total} label={slot.label} />
           ))}
         </div>
@@ -324,7 +332,7 @@ export default function Monopoly() {
           </p>
           <PackageTiers
             tiers={data.tiers}
-            brandPricing={data.brandPricing}
+            brandPricing={BRAND_PRICING}
             highlightTierKey={personalizedTierKey}
           />
         </div>
@@ -398,7 +406,7 @@ export default function Monopoly() {
       </Section>
 
       {/* ═══ HOW YOU LOCK IN ═══ */}
-      {data.commitSteps.length > 0 && (
+      {COMMIT_STEPS.length > 0 && (
         <Section muted>
           <Tag>How you lock in</Tag>
           <H2>A $500 deposit holds your space.</H2>
@@ -408,7 +416,7 @@ export default function Monopoly() {
           </p>
 
           <ol className="grid gap-px sm:grid-cols-2 lg:grid-cols-4" style={{ backgroundColor: MONOPOLY.black }}>
-            {data.commitSteps.map((step, i) => (
+            {COMMIT_STEPS.map((step, i) => (
               <li key={step.title} className="px-5 py-6" style={{ backgroundColor: MONOPOLY.paper }}>
                 <div
                   className="mb-3 flex items-center justify-center"
@@ -440,7 +448,7 @@ export default function Monopoly() {
         <Tag>Timeline</Tag>
         <H2>Board composition locks when design begins.</H2>
         <div className="mt-8" style={{ borderTop: `2px solid ${MONOPOLY.black}` }}>
-          {data.timeline.map((phase) => (
+          {TIMELINE.map((phase) => (
             <div
               key={phase.phase}
               className="flex flex-col gap-1 py-5 sm:flex-row sm:items-baseline sm:gap-8"
@@ -485,7 +493,7 @@ export default function Monopoly() {
         <Tag>FAQ</Tag>
         <H2>Everything else.</H2>
         <div className="mt-8 flex flex-col gap-px" style={{ backgroundColor: MONOPOLY.black }}>
-          {data.faq.map((item) => (
+          {FAQ.map((item) => (
             <details key={item.question} className="group px-5 py-4" style={{ backgroundColor: MONOPOLY.paper }}>
               <summary
                 className="cursor-pointer list-none"

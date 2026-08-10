@@ -57,13 +57,6 @@ export function mergeSalesData(sales: MonopolySalesResponse): MonopolyPublicPayl
     spaces,
     tiers,
     tokens: sales.tokens ?? [],
-    brandSlots: sales.brandSlots ?? [],
-    timeline: sales.timeline ?? [],
-    faq: sales.faq ?? [],
-    salesPlan: sales.salesPlan ?? [],
-    commitSteps: sales.commitSteps ?? [],
-    paymentOptions: sales.paymentOptions ?? [],
-    settings: sales.settings ?? {},
     counts: {
       raceSpacesTotal: raceSpaces.length,
       raceSpacesRemaining: raceSpaces.filter((s) => s.status === 'available').length,
@@ -73,10 +66,6 @@ export function mergeSalesData(sales: MonopolySalesResponse): MonopolyPublicPayl
     unlocked: Boolean(sales.unlocked),
     stale: sales.stale,
     personalizedFor: resolvePersonalization(spaces, sales),
-    brandPricing: sales.brandPricing,
-    terms: sales.terms,
-    wholesalePrice: sales.wholesalePrice,
-    retailPrice: sales.retailPrice,
   }
 }
 

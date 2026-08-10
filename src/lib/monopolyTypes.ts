@@ -155,17 +155,6 @@ export interface CommitStep {
   body: string
 }
 
-/**
- * A way to settle the partnership: all cash, or cash plus a unit allocation.
- * Some races want the board position and none of the inventory operations;
- * others already move merchandise and want the upside. Both are offered.
- */
-export interface PaymentOption {
-  label: string
-  summary: string
-  body: string
-}
-
 /** Brand slot pricing — gated, so only present on an unlocked response. */
 export interface BrandPrice {
   label: string
@@ -176,10 +165,12 @@ export interface BrandPrice {
 /**
  * The wire format of GET /api/public/monopoly.
  *
- * Note what is NOT here: board geometry. The server knows nothing about
- * positions, colour groups or rent ladders — it sends only the sales layer,
- * keyed by spaceKey, and the client merges it onto BOARD_LAYOUT. One copy of
- * the board, in one language.
+ * Two things are deliberately absent. Board geometry, because the server knows
+ * nothing about positions, colour groups or rent ladders — it sends the sales
+ * layer keyed by spaceKey and the client merges it onto BOARD_LAYOUT. And all
+ * page prose, which lives in monopolyCopy.ts: it only changes when the offer
+ * changes, so routing it through a spreadsheet added a sync step and a way for
+ * the page and the code to disagree.
  */
 export interface MonopolySalesResponse {
   /** Per-space sales data, keyed by spaceKey ("GREEN 3", "STATION 2"). */
@@ -187,22 +178,10 @@ export interface MonopolySalesResponse {
   /** Tiers without slot counts — the client derives those from the board. */
   tiers: Omit<PackageTier, 'slotsTotal' | 'slotsRemaining'>[]
   tokens: TokenSlot[]
-  brandSlots: BrandSlot[]
-  timeline: TimelinePhase[]
-  faq: FaqItem[]
-  salesPlan: SalesPlanItem[]
-  commitSteps: CommitStep[]
-  paymentOptions: PaymentOption[]
-  settings: Record<string, string>
   unlocked: boolean
   stale?: boolean
   /** Present when the request carried a recognised ?p= slug. */
   personalizedFor?: { raceSlug: string; displayName: string; spaceKey: string }
-  // Gated — present only on an unlocked response.
-  brandPricing?: BrandPrice[]
-  terms?: string[]
-  wholesalePrice?: number
-  retailPrice?: number
 }
 
 /** What the page actually renders, after the sales layer is merged onto the board. */
@@ -210,13 +189,6 @@ export interface MonopolyPublicPayload {
   spaces: BoardSpace[]
   tiers: PackageTier[]
   tokens: TokenSlot[]
-  brandSlots: BrandSlot[]
-  timeline: TimelinePhase[]
-  faq: FaqItem[]
-  salesPlan: SalesPlanItem[]
-  commitSteps: CommitStep[]
-  paymentOptions: PaymentOption[]
-  settings: Record<string, string>
   /** Headline counts for the availability section. */
   counts: {
     raceSpacesTotal: number
@@ -235,10 +207,6 @@ export interface MonopolyPublicPayload {
   }
   /** True when Sheets was unreachable and this came from the committed snapshot. */
   stale?: boolean
-  brandPricing?: BrandPrice[]
-  terms?: string[]
-  wholesalePrice?: number
-  retailPrice?: number
 }
 
 /** Cost and margin data. Admin endpoint only — never in a /api/public/* body. */

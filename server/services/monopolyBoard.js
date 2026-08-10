@@ -39,7 +39,6 @@ const SHEET_ID = process.env.MONOPOLY_SHEET_ID || '12EZc3RaxkY0Ye_nfeQzAya-5eCO7
 const TAB_BOARD = 'WEB - Board'
 const TAB_PACKAGES = 'WEB - Packages'
 const TAB_TOKENS = 'WEB - Tokens'
-const TAB_SETTINGS = 'WEB - Settings'
 const TAB_INTERNAL = 'INTERNAL - Economics'
 
 const CACHE_TTL_MS = 5 * 60 * 1000
@@ -124,23 +123,6 @@ function toObjects(rows) {
     })
     return obj
   })
-}
-
-/** Settings values holding lists use "a | b | c" per line. */
-function parseRows(value, fields) {
-  if (!value) return []
-  return str(value)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parts = line.split('|').map((p) => p.trim())
-      const obj = {}
-      fields.forEach((f, i) => {
-        obj[f] = parts[i] || ''
-      })
-      return obj
-    })
 }
 
 function lines(value) {
@@ -263,50 +245,6 @@ function mapTokens(rows) {
     .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
-/** The settings tab is flat key/value pairs — copy, toggles, list content. */
-function mapSettings(rows) {
-  const out = {}
-  for (const row of rows || []) {
-    const key = str(row[0])
-    if (key) out[key] = str(row[1])
-  }
-  return out
-}
-
-/**
- * Settings keys allowed into the public payload.
- *
- * An allowlist, not a blocklist, and deliberately so: the settings tab also
- * holds the raw source for terms, brand pricing and the wholesale/retail
- * prices, all of which are gated. Passing the object through wholesale shipped
- * every one of them to un-unlocked visitors — the gate looked fine because the
- * tier objects were correctly stripped, while the same numbers went out the
- * side door as strings.
- *
- * A new gated setting added to the sheet is invisible here by default. A new
- * public one has to be named. That's the right way round.
- */
-const PUBLIC_SETTING_KEYS = new Set([
-  'heroEyebrow',
-  'heroHeadline',
-  'heroSubhead',
-  'editionLabel',
-  'ctaEmail',
-  'ctaLabel',
-  'availabilityNote',
-  'footerNote',
-  'boardNote',
-  'tokensNote',
-])
-
-function publicSettings(settings) {
-  const out = {}
-  for (const key of PUBLIC_SETTING_KEYS) {
-    if (settings[key]) out[key] = settings[key]
-  }
-  return out
-}
-
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -322,12 +260,11 @@ export async function getBoardData({ refresh = false } = {}) {
   let built
   try {
     const titles = await listTabTitles(SHEET_ID)
-    const [boardRows, packageRows, tokenRows, settingRows] = await readRanges(
+    const [boardRows, packageRows, tokenRows] = await readRanges(
       [
         `'${resolveTab(TAB_BOARD, titles)}'!A1:Z60`,
         `'${resolveTab(TAB_PACKAGES, titles)}'!A1:Z40`,
         `'${resolveTab(TAB_TOKENS, titles)}'!A1:Z40`,
-        `'${resolveTab(TAB_SETTINGS, titles)}'!A1:B120`,
       ],
       { spreadsheetId: SHEET_ID },
     )
@@ -344,7 +281,6 @@ export async function getBoardData({ refresh = false } = {}) {
     const sheetSpaceSales = mapSpaceSales(boardRows)
     const sheetTiers = mapTiers(packageRows)
     const sheetTokens = mapTokens(tokenRows)
-    const sheetSettings = mapSettings(settingRows)
 
     const usedFallbackFor = []
     const pick = (name, fromSheet, fromSnapshot) => {
@@ -353,33 +289,17 @@ export async function getBoardData({ refresh = false } = {}) {
       return empty ? fromSnapshot : fromSheet
     }
 
-    // Settings is a bag of independent keys, not one value, so it merges per key
-    // rather than all-or-nothing. A tab holding only a header row parses to a
-    // single junk key, which is "non-empty" but defines none of the copy — and
-    // that would silently blank the timeline, FAQ, terms and sales plan while
-    // reporting the read as fresh.
-    const mergedSettings = { ...FALLBACK.settings }
-    let settingsFromSheet = 0
-    for (const [key, value] of Object.entries(sheetSettings || {})) {
-      if (key in FALLBACK.settings && String(value ?? '').trim()) {
-        mergedSettings[key] = value
-        settingsFromSheet++
-      }
-    }
-    if (!settingsFromSheet) usedFallbackFor.push('settings')
-
     built = assemble({
       spaceSales: pick('board', sheetSpaceSales, FALLBACK.spaceSales),
       tiers: pick('packages', sheetTiers, FALLBACK.tiers),
       tokens: pick('tokens', sheetTokens, FALLBACK.tokens),
-      settings: mergedSettings,
       // "Fresh" means at least one tab actually contributed something.
-      stale: usedFallbackFor.length === 4,
+      stale: usedFallbackFor.length === 3,
     })
 
     if (usedFallbackFor.length) {
       built.staleReason = {
-        cause: usedFallbackFor.length === 4 ? 'empty_tabs' : 'partial_tabs',
+        cause: usedFallbackFor.length === 3 ? 'empty_tabs' : 'partial_tabs',
         fix: `The sheet is readable but these tabs are empty, so the snapshot is filling in: ${usedFallbackFor.join(', ')}.`,
         detail: `Empty: ${usedFallbackFor.join(', ')}`,
       }
@@ -413,7 +333,7 @@ function classifySheetError(message) {
     return { cause: 'no_credentials', fix: 'GOOGLE_SERVICE_ACCOUNT_EMAIL / _KEY are not set in this environment.', detail: message }
   }
   if (m.includes('unable to parse range') || m.includes('not found')) {
-    return { cause: 'missing_tab', fix: `The sheet is readable but a tab is missing. Expected: '${TAB_BOARD}', '${TAB_PACKAGES}', '${TAB_TOKENS}', '${TAB_SETTINGS}'.`, detail: message }
+    return { cause: 'missing_tab', fix: `The sheet is readable but a tab is missing. Expected: '${TAB_BOARD}', '${TAB_PACKAGES}', '${TAB_TOKENS}'.`, detail: message }
   }
   if (m.includes('permission') || m.includes('403') || m.includes('caller does not have')) {
     return { cause: 'not_shared', fix: 'Share the sheet with the service-account email as Viewer.', detail: message }
@@ -431,34 +351,14 @@ function classifySheetError(message) {
  * response carries no `fee` key at all, so there is nothing to un-hide in
  * devtools and nothing to leak through a serialisation mistake.
  */
-function assemble({ spaceSales, tiers, tokens, settings, stale }) {
+function assemble({ spaceSales, tiers, tokens, stale }) {
   const publicTiers = tiers.map(({ fee, unitsIncluded, resaleValue, netCost, ...rest }) => rest)
   const publicTokens = tokens.map(({ price, ...rest }) => rest)
-
-  const brandSlots = parseRows(settings.brandSlots, ['label', 'available', 'total']).map((r) => ({
-    label: r.label,
-    available: Number(r.available) || 0,
-    total: Number(r.total) || 0,
-  }))
-  const timeline = parseRows(settings.timeline, ['phase', 'window', 'note'])
-  const faq = parseRows(settings.faq, ['question', 'answer'])
-  const salesPlan = parseRows(settings.salesPlan, ['title', 'body'])
-  // How a partner commits, and the two ways they can settle it. Public on
-  // purpose: the process is the reassurance, and it costs nothing to show.
-  const commitSteps = parseRows(settings.commitSteps, ['title', 'body'])
-  const paymentOptions = parseRows(settings.paymentOptions, ['label', 'summary', 'body'])
 
   const publicPayload = {
     spaceSales,
     tiers: publicTiers,
     tokens: publicTokens,
-    brandSlots,
-    timeline,
-    faq,
-    salesPlan,
-    commitSteps,
-    paymentOptions,
-    settings: publicSettings(settings),
     unlocked: false,
     stale: Boolean(stale),
   }
@@ -472,14 +372,6 @@ function assemble({ spaceSales, tiers, tokens, settings, stale }) {
       ]),
     ),
     tokens: Object.fromEntries(tokens.map((t) => [t.name, { price: t.price }])),
-    brandPricing: parseRows(settings.brandPricing, ['label', 'feeLow', 'feeHigh']).map((r) => ({
-      label: r.label,
-      feeLow: money(r.feeLow),
-      feeHigh: money(r.feeHigh),
-    })),
-    terms: lines(settings.terms),
-    wholesalePrice: money(settings.wholesalePrice) ?? 30,
-    retailPrice: money(settings.retailPrice) ?? 65,
   }
 
   return { publicPayload, gatedPayload }
@@ -495,10 +387,6 @@ export function mergeGated(publicPayload, gatedPayload) {
     unlocked: true,
     tiers: publicPayload.tiers.map((t) => ({ ...t, ...(gatedPayload.tiers[t.tierKey] || {}) })),
     tokens: publicPayload.tokens.map((t) => ({ ...t, ...(gatedPayload.tokens[t.name] || {}) })),
-    brandPricing: gatedPayload.brandPricing,
-    terms: gatedPayload.terms,
-    wholesalePrice: gatedPayload.wholesalePrice,
-    retailPrice: gatedPayload.retailPrice,
   }
 }
 

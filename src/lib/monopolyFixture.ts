@@ -96,110 +96,11 @@ const FIXTURE_SALES: MonopolySalesResponse = {
     { name: 'The Stopwatch', status: 'available', sortOrder: 6, description: 'Every PR starts and ends here.' },
   ],
 
-  brandSlots: [
-    { label: 'Brand spaces (4 railroads, 2 utilities)', available: 6, total: 6 },
-    { label: 'Box lid, title partner', available: 1, total: 1 },
-    { label: 'Custom tokens', available: 6, total: 6 },
-    { label: 'Chance / Community Chest cards', available: 32, total: 32 },
-  ],
 
-  timeline: [
-    { phase: 'Locking in races', window: 'Closes September 30, 2026', note: 'Every space must be committed before design can start' },
-    { phase: 'Design', window: 'October to December 2026', note: 'Twelve weeks. Board composition locks the day it begins' },
-    { phase: 'Production', window: 'January to October 2027', note: 'Nine months, costed at the long end of the quote with a month of slack' },
-    { phase: 'On shelves', window: 'Holiday 2027', note: 'Delivered with the gifting window still ahead of it' },
-  ],
 
-  commitSteps: [
-    {
-      title: '$500 reserves your space',
-      body: 'Fully refundable. It takes your space off the board while we go and fill the rest of it, and it is the only money you put up until the board is real.',
-    },
-    {
-      title: 'We fill the board',
-      body: '22 race spaces plus brand partners. Nothing more is asked of you while that happens, and your $500 is refundable the entire time.',
-    },
-    {
-      title: '50% when the board is full',
-      body: 'Once every space is committed we come back with the finished board so you can see exactly who you are on it with. Your 50% deposit is due then, less the $500 you already paid.',
-    },
-    {
-      title: 'The balance on delivery',
-      body: 'The final 50% is due when the product ships. Nothing goes to print until the board is full and the run is funded.',
-    },
-  ],
 
-  paymentOptions: [],
 
-  salesPlan: [
-    {
-      title: 'Trackstar already owns the buyer',
-      body: 'We have a 10,000 person list of people who have already bought a running gift from us. Not a cold audience, a proven one, and it is exactly the person who buys this.',
-    },
-    {
-      title: '22 race partners promoting at once',
-      body: 'Every race on the board has a reason to tell their runners about it. That is 22 lists pointing at one product inside the same gifting window.',
-    },
-    {
-      title: 'Direct to consumer',
-      body: 'Sold through Trackstar year round, with the marketing weight concentrated on the holiday window.',
-    },
-    {
-      title: 'Seeded to running influencers',
-      body: 'Physical units into the hands of the creators the running audience already follows, ahead of launch.',
-    },
-    {
-      title: 'Gifted to media',
-      body: 'Units to running and lifestyle outlets early enough to make their holiday coverage.',
-    },
-    {
-      title: '2027 holiday gift guides',
-      body: 'We are pursuing gift guide placement now. A licensed board game for a sport that has never had one is an easy story to place.',
-    },
-    {
-      title: 'Our own content',
-      body: 'A full photo shoot and original organic content produced in house, and handed to every partner to use however they want.',
-    },
-    {
-      title: '5% of proceeds go to charity',
-      body: 'Chosen with the partner races, reported back to everyone on the board. A licensed game for the sport that also gives something back is a much easier story to tell, and a much easier thing to promote.',
-    },
-  ],
 
-  faq: [
-    {
-      question: 'Is this actually official?',
-      answer:
-        "Yes. We're working with the company that holds the sole rights from Hasbro to create official custom editions of MONOPOLY.",
-    },
-    {
-      question: 'What does a 5-year deal mean if the board is printed once?',
-      answer:
-        'Your presence in Edition One is permanent, because it is printed. The 5-year term covers category exclusivity in your market, right of first refusal on your space in any future edition, and wholesale reorder rights.',
-    },
-    {
-      question: 'Do we have to hold or sell inventory?',
-      answer:
-        'Only if you want to. If you take the all cash option you receive no product at all and we handle every unit. If you take units, they are yours outright to sell at your expo, gift to VIPs, or seed to media. Nothing obligates you to move a single box.',
-    },
-    {
-      question: 'Will this compromise our existing sponsors?',
-      answer:
-        'No competing footwear or apparel brand appears anywhere on the board or box. You hold approval rights over every brand partner, and we clear categories against your exclusivities before anything is sold.',
-    },
-    {
-      question: 'Who controls how our race appears?',
-      answer:
-        'You do. Every partner has approval rights on their name, marks and course representation before design locks.',
-    },
-    {
-      question: 'What if you do not fill the board?',
-      answer:
-        'All deposits are fully refundable if we do not reach minimum partnership thresholds by the design deadline. You carry no risk.',
-    },
-  ],
-
-  settings: {},
   unlocked: false,
 }
 
