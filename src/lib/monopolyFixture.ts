@@ -170,7 +170,7 @@ const FIXTURE_SALES: MonopolySalesResponse = {
     {
       question: 'Is this actually official?',
       answer:
-        'Yes. This is a fully licensed Monopoly edition produced through the official custom edition programme. The same programme has produced editions for major football clubs, national attractions and global brands.',
+        "Yes. We're working with the company that holds the sole rights from Hasbro to create official custom editions of MONOPOLY.",
     },
     {
       question: 'What does a 5-year deal mean if the board is printed once?',

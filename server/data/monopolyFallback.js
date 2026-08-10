@@ -178,7 +178,7 @@ const SETTINGS = {
   ].join('\n'),
 
   faq: [
-    'Is this actually official? | Yes. A fully licensed edition, made through the same programme behind the football club, national attraction and global brand editions.',
+    "Is this actually official? | Yes. We're working with the company that holds the sole rights from Hasbro to create official custom editions of MONOPOLY.",
     'Who decides which race gets which space? | Position is assigned in the order spaces are committed. Nobody is ranked, and nobody is bumped for a bigger name later.',
     'What does a 5-year deal mean if the board is printed once? | Your space is printed, so it is permanent. The 5-year term covers category exclusivity and first refusal on your space in any future edition.',
     'Can we buy copies to sell at our expo? | Yes, at wholesale, for the full 5-year term. It is optional and separate from the partnership fee.',
