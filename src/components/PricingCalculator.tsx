@@ -8,21 +8,30 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
  * Pricing calculator: what a print costs us, what we charge, and what is left.
  *
  * Costs are live from Artelo and retail prices are live from Shopify, so the
- * only numbers typed in by hand are the ones that are genuinely a negotiation
- * (wholesale discount, charity terms).
+ * only number typed in by hand is the discount, which is genuinely a
+ * negotiation.
  *
  * The channel tabs are not cosmetic. They change how the unit is shipped:
  *
  *   Retail DTC — one print per order, so shipping, package branding and the
- *                flat 30c payment fee are carried by that single unit. Quantity
- *                is fixed at 1 because a busy month is still one box per order.
- *   Wholesale / Charity — one consignment, so those same per-order costs divide
- *                across the run. This is where the margin comes from at volume:
- *                Artelo gives no production discount at all, so a bulk quote
- *                built on retail's per-unit shipping is simply wrong.
+ *                flat 30c processing fee are carried by that single unit.
+ *                Quantity is fixed at 1 because a busy month is still one box
+ *                per order.
+ *   Wholesale  — charities and race partners alike: one consignment, so those
+ *                same per-order costs divide across the run. This is where the
+ *                margin comes from at volume, because Artelo gives no
+ *                production discount at all — a bulk quote built on retail's
+ *                per-unit shipping is simply wrong. The two used to be
+ *                separate tabs and differed only by discount percentage, which
+ *                is an input, not a channel.
+ *
+ * The Shipping column carries package branding as well as freight. Both are
+ * billed per ORDER rather than per print, so they amortize together, and
+ * folding them into one column keeps the row arithmetic honest: price minus
+ * production minus shipping minus processing fees is exactly gross profit.
  */
 
-type Channel = 'retail' | 'wholesale' | 'charity'
+type Channel = 'retail' | 'wholesale'
 
 interface Row {
   key: string
@@ -52,8 +61,11 @@ interface PricingData {
 
 const CHANNELS: { id: Channel; label: string; blurb: string }[] = [
   { id: 'retail', label: 'Retail (DTC)', blurb: 'One print per order, shipped on its own.' },
-  { id: 'wholesale', label: 'Wholesale', blurb: 'One consignment — shipping and fees split across the run.' },
-  { id: 'charity', label: 'Charity partner', blurb: 'One consignment at partner pricing.' },
+  {
+    id: 'wholesale',
+    label: 'Wholesale (Charities, Race Partners)',
+    blurb: 'One consignment — shipping, branding and the flat processing fee split across the run.',
+  },
 ]
 
 const money = (n: number) => `$${n.toFixed(2)}`
@@ -77,7 +89,6 @@ export default function PricingCalculator() {
   const [includePhoto, setIncludePhoto] = useState(false)
   // Channel pricing levers. Percentages are off retail.
   const [wholesaleDiscount, setWholesaleDiscount] = useState('50')
-  const [charityDiscount, setCharityDiscount] = useState('40')
 
   // Retail always ships one at a time; bulk channels ship as one consignment.
   const effectiveQty = channel === 'retail' ? 1 : Math.max(1, Number(quantity) || 1)
@@ -99,8 +110,7 @@ export default function PricingCalculator() {
 
   useEffect(() => { load(effectiveQty) }, [load, effectiveQty])
 
-  const discountPct = channel === 'wholesale' ? Number(wholesaleDiscount)
-    : channel === 'charity' ? Number(charityDiscount) : 0
+  const discountPct = channel === 'wholesale' ? Number(wholesaleDiscount) : 0
 
   const computed = useMemo(() => {
     if (!data) return []
@@ -180,15 +190,12 @@ export default function PricingCalculator() {
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">
-                {channel === 'wholesale' ? 'Wholesale' : 'Partner'} discount
+                Discount off retail
               </label>
               <div className="relative w-24">
                 <input
-                  value={channel === 'wholesale' ? wholesaleDiscount : charityDiscount}
-                  onChange={e => {
-                    const v = e.target.value.replace(/[^0-9.]/g, '')
-                    channel === 'wholesale' ? setWholesaleDiscount(v) : setCharityDiscount(v)
-                  }}
+                  value={wholesaleDiscount}
+                  onChange={e => setWholesaleDiscount(e.target.value.replace(/[^0-9.]/g, ''))}
                   inputMode="decimal"
                   className="w-full pl-2.5 pr-6 py-1.5 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
                 />
@@ -227,7 +234,8 @@ export default function PricingCalculator() {
                   <th className="px-3 py-2 font-semibold">Size</th>
                   <th className="px-3 py-2 font-semibold">Frame</th>
                   <th className="px-3 py-2 font-semibold text-right">Price</th>
-                  <th className="px-3 py-2 font-semibold text-right">Cost</th>
+                  <th className="px-3 py-2 font-semibold text-right">Production</th>
+                  <th className="px-3 py-2 font-semibold text-right">Shipping</th>
                   <th className="px-3 py-2 font-semibold text-right">Processing fees</th>
                   <th className="px-3 py-2 font-semibold text-right">Gross profit</th>
                   <th className="px-3 py-2 font-semibold text-right">Margin</th>
@@ -241,10 +249,11 @@ export default function PricingCalculator() {
                       {r.frame === 'Framed' ? r.frameLabel : 'Unframed'}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{money(r.unitPrice)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-off-black/60">{money(r.productionCost)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">
-                      {money(r.unitCost)}
+                      {money(r.unitShipping + r.unitBranding)}
                       <span className="block text-[10px] text-off-black/35 leading-tight">
-                        {money(r.productionCost)} make · {money(r.unitShipping)} ship
+                        incl. {money(r.unitBranding)} branding
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">{money(r.unitFee)}</td>
