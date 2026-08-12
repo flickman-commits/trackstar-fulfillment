@@ -439,7 +439,7 @@ export default function Monopoly() {
           One section for the whole commercial picture: what exists, what is
           still open, and what it costs. Splitting these made a reader hold
           three separate tables in their head to answer one question. */}
-      <Section muted>
+      <Section>
         <SectionHeading>Pricing</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           Twenty-two race spaces, and nothing else for sale. Edition One carries no third-party
@@ -498,7 +498,7 @@ export default function Monopoly() {
       </Section>
 
       {/* ═══ RETURN ON INVESTMENT ═══ */}
-      <Section>
+      <Section muted>
         <SectionHeading>Return on investment</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           A board game is media. Price it like media.
@@ -538,7 +538,7 @@ export default function Monopoly() {
 
       {/* ═══ HOW YOU LOCK IN ═══ */}
       {COMMIT_STEPS.length > 0 && (
-        <Section muted>
+        <Section>
           <SectionHeading>How to commit</SectionHeading>
           <p className="mb-10 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
             $400 reserves your space, fully refundable. You commit real money only once the board is
@@ -919,6 +919,15 @@ function CommitmentDeadline({ remaining, total }: { remaining: number; total: nu
 // Dark and light sections alternate to give the page rhythm, per the brand's
 // landing-page rules.
 
+/**
+ * A full-bleed band. Three surfaces: paper, mint, and black.
+ *
+ * Adjacent sections must never share one. The surface change is the only thing
+ * telling a reader they have finished one idea and started another, and two
+ * mint bands in a row read as a single overlong section with a stray heading
+ * in the middle of it. Paper and mint alternate; black is the accent, used for
+ * the two sections that argue rather than inform.
+ */
 function Section({
   children,
   dark,
