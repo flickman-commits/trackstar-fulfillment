@@ -206,20 +206,20 @@ export const SALES_PLAN: SalesPlanItem[] = [
  * Real replies to the tease email, sent August 12 2026.
  *
  * The email asked four questions, one of which was what they would expect to
- * pay, so every quote here is paired with that person's own answer. These are
- * the four who answered the price question; two others wrote back without
- * naming a figure and are not shown, since a card with no price would read as
- * if the number had been withheld.
+ * pay, so every quote here is paired with that person's own answer. Only the
+ * three strongest are quoted; the rest of the price answers still appear in
+ * PriceExpectation.tsx, which plots every figure anybody named.
  *
  * Verbatim apart from trimming, and attributed by first name only because
  * these were private replies to a survey rather than reviews anybody submitted
  * for publication.
  *
- * Deliberately not curated into something rosier than it was. The $20 answer
- * stays. Eight people replied, one said outright they would not buy, and the
- * guesses ran $20 to $199 against a $45 direct price. Showing only the top of
- * that range is the kind of thing a race director checks and catches, and the
- * honest spread still lands above what we are charging.
+ * Which quotes get featured is an editorial call and three is fine. Which
+ * numbers feed the chart is not: eight people replied, one said outright they
+ * would not buy, and the guesses ran $20 to $199 against a $45 direct price.
+ * The chart keeps all four figures, because dropping the low one would move
+ * the median from $71 to $100 and that is choosing a number, not reporting
+ * one.
  */
 export const COMMUNITY_FEEDBACK = [
   {
@@ -239,12 +239,6 @@ export const COMMUNITY_FEEDBACK = [
       'I would be interested. I think chance entries to the World Majors would be a good idea.',
     name: 'A Trackstar customer',
     price: '$35 to $50',
-  },
-  {
-    quote:
-      'I would definitely be interested in buying one if it is not too expensive. I would love for there to be something with Strava on the board. Maybe "free parking" can be "free race entry."',
-    name: 'Zack',
-    price: '$20',
   },
 ]
 

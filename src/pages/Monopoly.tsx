@@ -19,6 +19,7 @@ import { PackageTiers } from '@/components/monopoly/PackageTiers'
 import { STATUS_COLORS, legendFor } from '@/components/monopoly/boardView'
 import { ExposureModel } from '@/components/monopoly/ExposureModel'
 import { BrandLockup } from '@/components/monopoly/BrandLockup'
+import PriceExpectation from '@/components/monopoly/PriceExpectation'
 import { MONOPOLY, UI_RADIUS, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import {
@@ -270,7 +271,7 @@ export default function Monopoly() {
           squares hold the exact slots the finished renders will fill. */}
       <Section muted>
         <Tag>The product</Tag>
-        <H2>What you're actually getting.</H2>
+        <H2>What's in the box.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           A full-size licensed Monopoly edition. Board, box, custom pieces, title deeds, money and
           cards, made to the same spec as any edition on a shelf.
@@ -330,7 +331,7 @@ export default function Monopoly() {
 
       {/* ═══ HOW IT GETS SOLD ═══ */}
       <Section>
-        <Tag>How we're going to sell it</Tag>
+        <Tag>Sales plan</Tag>
         <H2>We already know who buys this.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
           A partnership is only worth what the edition sells. Here's the plan behind the print run.
@@ -361,7 +362,7 @@ export default function Monopoly() {
             expect to pay for it. These came back within hours.
           </p>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
             {COMMUNITY_FEEDBACK.map((item) => (
               <figure
                 key={item.name + item.quote.slice(0, 24)}
@@ -384,6 +385,8 @@ export default function Monopoly() {
               </figure>
             ))}
           </div>
+
+          <PriceExpectation />
         </div>
       </Section>
 
@@ -391,7 +394,7 @@ export default function Monopoly() {
           The specific thing a race asked for: not "we will sell them" but which
           boxes, to whom, through what. */}
       <Section muted>
-        <Tag>Where the boxes go</Tag>
+        <Tag>Distribution</Tag>
         <H2>Every box in the first run, accounted for.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           A 2,004 box first run, which is the manufacturer's minimum. If pre-orders justify more, the
@@ -442,7 +445,7 @@ export default function Monopoly() {
           still open, and what it costs. Splitting these made a reader hold
           three separate tables in their head to answer one question. */}
       <Section muted>
-        <Tag>Ways to get on the board</Tag>
+        <Tag>Pricing</Tag>
         <H2>What's available, and what it costs.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           Twenty-two race spaces, and nothing else for sale. Edition One carries no third-party
@@ -512,8 +515,8 @@ export default function Monopoly() {
 
       {/* ═══ WHY TRACKSTAR ═══ */}
       <Section dark>
-        <Tag dark>Why Trackstar</Tag>
-        <H2 dark>We already do this. Just not in a box yet.</H2>
+        <Tag dark>Our expertise</Tag>
+        <H2 dark>We already do this for 20 races.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, maxWidth: '46rem' }}>
           This only works if whoever runs it can fill the board, produce it, and sell it.
         </p>
@@ -544,7 +547,7 @@ export default function Monopoly() {
       {/* ═══ HOW YOU LOCK IN ═══ */}
       {COMMIT_STEPS.length > 0 && (
         <Section muted>
-          <Tag>How you lock in</Tag>
+          <Tag>How to commit</Tag>
           <H2>A $400 deposit holds your space.</H2>
           <p className="mb-10 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
             $400 reserves your space, fully refundable. You commit real money only once the board is
@@ -602,8 +605,8 @@ export default function Monopoly() {
 
       {/* ═══ OBJECTIONS ═══ */}
       <Section>
-        <Tag>What you're probably thinking</Tag>
-        <H2>The short answers.</H2>
+        <Tag>Objections</Tag>
+        <H2>What races push back on.</H2>
         <div className="mt-8 grid gap-x-10 gap-y-8 md:grid-cols-2">
           <Beat
             title="You never touch product"
@@ -626,8 +629,8 @@ export default function Monopoly() {
 
       {/* ═══ FAQ ═══ */}
       <Section muted>
-        <Tag>FAQ</Tag>
-        <H2>Everything else.</H2>
+        <Tag>FAQs</Tag>
+        <H2>Common questions.</H2>
         <div className="mt-8 flex flex-col gap-px" style={{ backgroundColor: MONOPOLY.black }}>
           {FAQ.map((item) => (
             <details key={item.question} className="group px-5 py-4" style={{ backgroundColor: MONOPOLY.paper }}>
