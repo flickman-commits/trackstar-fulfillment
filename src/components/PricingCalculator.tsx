@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Loader2, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -145,8 +145,6 @@ export default function PricingCalculator() {
     return { revenue, profit, pct: revenue > 0 ? (profit / revenue) * 100 : 0 }
   }, [computed, data])
 
-  const outlierWarnings = (data?.rows || []).filter(r => (r.retailOutliers?.length || 0) > 0)
-
   return (
     <div>
       {/* Channel tabs */}
@@ -230,7 +228,7 @@ export default function PricingCalculator() {
                   <th className="px-3 py-2 font-semibold">Frame</th>
                   <th className="px-3 py-2 font-semibold text-right">Price</th>
                   <th className="px-3 py-2 font-semibold text-right">Cost</th>
-                  <th className="px-3 py-2 font-semibold text-right">Fees</th>
+                  <th className="px-3 py-2 font-semibold text-right">Processing fees</th>
                   <th className="px-3 py-2 font-semibold text-right">Gross profit</th>
                   <th className="px-3 py-2 font-semibold text-right">Margin</th>
                 </tr>
@@ -268,21 +266,6 @@ export default function PricingCalculator() {
               <Stat label={`Revenue · ${data.quantity} framed`} value={money(totals.revenue)} />
               <Stat label="Gross profit" value={money(totals.profit)} tone={totals.profit < 0 ? 'bad' : 'good'} />
               <Stat label="Margin" value={`${totals.pct.toFixed(0)}%`} tone={totals.profit < 0 ? 'bad' : undefined} />
-            </div>
-          )}
-
-          {outlierWarnings.length > 0 && (
-            <div className="mt-3 flex gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold">Retail prices are not uniform for every size.</p>
-                {outlierWarnings.map(r => (
-                  <p key={r.key}>
-                    {r.sizeLabel} {r.frame}: mostly {money(r.retailPrice ?? 0)}, but{' '}
-                    {r.retailOutliers.map(o => `${o.count} at ${money(o.price)}`).join(', ')}. The table uses the common price.
-                  </p>
-                ))}
-              </div>
             </div>
           )}
 

@@ -62,8 +62,10 @@ export async function fetchRetailPrices() {
   for (const [key, prices] of Object.entries(groups)) {
     // The catalog is meant to be uniform per size/frame. Where it is not, the
     // most common price is the real one and the outliers are stragglers from a
-    // half-finished repricing — surfaced rather than averaged away, because an
-    // average would quietly invent a price nobody actually charges.
+    // half-finished repricing. Deliberately the mode and NOT the mean: an
+    // average would invent a price nobody actually charges. Outliers are
+    // returned alongside so a caller can inspect them; the calculator itself
+    // just prices off the common value.
     const counts = {}
     for (const p of prices) counts[p] = (counts[p] || 0) + 1
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
