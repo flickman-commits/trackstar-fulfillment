@@ -617,7 +617,7 @@ export default function Monopoly() {
 
       {/* ═══ OBJECTIONS ═══ */}
       <Section>
-        <SectionHeading>What races tell us</SectionHeading>
+        <SectionHeading>Addressing your concerns</SectionHeading>
         {/* Their words, then ours. Naming the concern first is the whole point:
             a race director reading their own objection back knows it has been
             heard, which a reassurance phrased as a benefit never achieves. */}
@@ -627,7 +627,7 @@ export default function Monopoly() {
             body="You won't. Beyond the 5 comp copies that come with every space, no boxes are sent to you unless you choose a package that includes them."
           />
           <Beat
-            title="&ldquo;We can't be on a board with another shoe sponsor.&rdquo;"
+            title="&ldquo;We can't be on a board with a competing sponsor.&rdquo;"
             body="We have purposefully not taken on any sponsors in categories where races have partnerships. The only brand that can appear on your title deed is one you choose."
           />
           <Beat
