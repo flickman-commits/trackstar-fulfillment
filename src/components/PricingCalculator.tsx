@@ -91,10 +91,9 @@ function roundHalfUp(n: number) {
  * row means the same thing whichever channel you are looking at — a 45% line
  * should not read as healthy just because everything around it is worse.
  *
- * Thresholds are set where the decisions actually change: above 65% is the
- * DTC norm we design around, 50-65% is workable but worth a look before
- * discounting further, and under 50% is where a bulk quote stops being
- * obviously worth doing.
+ * Thresholds are set where the decisions actually change: 75%+ is the strong
+ * end of the range, 60-75% is workable but worth a look before discounting
+ * further, and under 60% is where a quote stops being obviously worth doing.
  */
 function marginTint(pct: number | null): { row: string; label: string; chip: string } {
   if (pct === null) return { row: '', label: 'text-off-black/40', chip: '' }
@@ -102,8 +101,8 @@ function marginTint(pct: number | null): { row: string; label: string; chip: str
   // and a row reading 65% while tinted as though it were below the threshold
   // just makes the reader distrust the color.
   const shown = Math.round(pct)
-  if (shown >= 65) return { row: 'bg-emerald-50', label: 'text-emerald-700', chip: 'bg-emerald-100 border-emerald-300' }
-  if (shown >= 50) return { row: 'bg-yellow-100/80', label: 'text-yellow-800', chip: 'bg-yellow-100 border-yellow-400' }
+  if (shown >= 75) return { row: 'bg-emerald-50', label: 'text-emerald-700', chip: 'bg-emerald-100 border-emerald-300' }
+  if (shown >= 60) return { row: 'bg-yellow-100/80', label: 'text-yellow-800', chip: 'bg-yellow-100 border-yellow-400' }
   return { row: 'bg-orange-200/70', label: 'text-orange-900', chip: 'bg-orange-200 border-orange-400' }
 }
 
@@ -431,9 +430,9 @@ export default function PricingCalculator() {
 
           <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-off-black/45">
             <span className="font-semibold uppercase tracking-wider text-off-black/35">Margin</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300" /> 65%+</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-400" /> 50-65%</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-orange-200 border border-orange-400" /> under 50%</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300" /> 75%+</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-400" /> 60-75%</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-orange-200 border border-orange-400" /> under 60%</span>
           </div>
 
           <div className="mt-3 space-y-1 text-[11px] text-off-black/40 leading-relaxed">
