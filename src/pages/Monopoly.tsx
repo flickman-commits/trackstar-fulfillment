@@ -225,8 +225,7 @@ export default function Monopoly() {
           Lead with editions people already know exist, then the gap. Naming
           the absence is a stronger opening than describing the product. */}
       <Section>
-        <Tag>What it is</Tag>
-        <H2>There is a Monopoly for almost everything.</H2>
+        <SectionHeading>What it is</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
           Over 300 officially licensed editions have been printed. Football clubs, cities, national
           parks, film franchises, theme parks, universities.
@@ -270,8 +269,7 @@ export default function Monopoly() {
           The first thing a race asked to see before committing. Placeholder
           squares hold the exact slots the finished renders will fill. */}
       <Section muted>
-        <Tag>The product</Tag>
-        <H2>What's in the box.</H2>
+        <SectionHeading>What's in the box</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           A full-size licensed Monopoly edition. Board, box, custom pieces, title deeds, money and
           cards, made to the same spec as any edition on a shelf.
@@ -303,8 +301,7 @@ export default function Monopoly() {
 
       {/* ═══ WHY YOU SHOULD CARE ═══ */}
       <Section dark>
-        <Tag dark>Why you should care</Tag>
-        <H2 dark>What a space does for your race.</H2>
+        <SectionHeading dark>Why you should care</SectionHeading>
         <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <Beat
             dark
@@ -331,8 +328,7 @@ export default function Monopoly() {
 
       {/* ═══ HOW IT GETS SOLD ═══ */}
       <Section>
-        <Tag>Sales plan</Tag>
-        <H2>We already know who buys this.</H2>
+        <SectionHeading>Sales plan</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
           A partnership is only worth what the edition sells. Here's the plan behind the print run.
         </p>
@@ -394,8 +390,7 @@ export default function Monopoly() {
           The specific thing a race asked for: not "we will sell them" but which
           boxes, to whom, through what. */}
       <Section muted>
-        <Tag>Distribution</Tag>
-        <H2>Every box in the first run, accounted for.</H2>
+        <SectionHeading>Distribution</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           A 2,004 box first run, which is the manufacturer's minimum. If pre-orders justify more, the
           run goes up and every number below goes up with it.
@@ -445,8 +440,7 @@ export default function Monopoly() {
           still open, and what it costs. Splitting these made a reader hold
           three separate tables in their head to answer one question. */}
       <Section muted>
-        <Tag>Pricing</Tag>
-        <H2>What's available, and what it costs.</H2>
+        <SectionHeading>Pricing</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           Twenty-two race spaces, and nothing else for sale. Edition One carries no third-party
           brands. It is presented by Trackstar, and the only names on the board are the races. The
@@ -505,8 +499,7 @@ export default function Monopoly() {
 
       {/* ═══ RETURN ON INVESTMENT ═══ */}
       <Section>
-        <Tag>Return on investment</Tag>
-        <H2>What that buys, in impressions.</H2>
+        <SectionHeading>Return on investment</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           A board game is media. Price it like media.
         </p>
@@ -515,8 +508,7 @@ export default function Monopoly() {
 
       {/* ═══ WHY TRACKSTAR ═══ */}
       <Section dark>
-        <Tag dark>Our expertise</Tag>
-        <H2 dark>We already do this for 20 races.</H2>
+        <SectionHeading dark>Our expertise</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, maxWidth: '46rem' }}>
           This only works if whoever runs it can fill the board, produce it, and sell it.
         </p>
@@ -547,8 +539,7 @@ export default function Monopoly() {
       {/* ═══ HOW YOU LOCK IN ═══ */}
       {COMMIT_STEPS.length > 0 && (
         <Section muted>
-          <Tag>How to commit</Tag>
-          <H2>A $400 deposit holds your space.</H2>
+          <SectionHeading>How to commit</SectionHeading>
           <p className="mb-10 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
             $400 reserves your space, fully refundable. You commit real money only once the board is
             full and you can see exactly who is on it.
@@ -584,8 +575,7 @@ export default function Monopoly() {
 
       {/* ═══ TIMELINE ═══ */}
       <Section muted>
-        <Tag>Timeline</Tag>
-        <H2>Board composition locks when design begins.</H2>
+        <SectionHeading>Timeline</SectionHeading>
         <div className="mt-8" style={{ borderTop: `2px solid ${MONOPOLY.black}` }}>
           {TIMELINE.map((phase) => (
             <div
@@ -605,8 +595,7 @@ export default function Monopoly() {
 
       {/* ═══ OBJECTIONS ═══ */}
       <Section>
-        <Tag>Objections</Tag>
-        <H2>What races push back on.</H2>
+        <SectionHeading>Objections</SectionHeading>
         <div className="mt-8 grid gap-x-10 gap-y-8 md:grid-cols-2">
           <Beat
             title="You never touch product"
@@ -629,8 +618,7 @@ export default function Monopoly() {
 
       {/* ═══ FAQ ═══ */}
       <Section muted>
-        <Tag>FAQs</Tag>
-        <H2>Common questions.</H2>
+        <SectionHeading>FAQs</SectionHeading>
         <div className="mt-8 flex flex-col gap-px" style={{ backgroundColor: MONOPOLY.black }}>
           {FAQ.map((item) => (
             <details key={item.question} className="group px-5 py-4" style={{ backgroundColor: MONOPOLY.paper }}>
@@ -960,17 +948,29 @@ function Section({
  * Section label as a tag rather than spaced-out uppercase text. Reads as a
  * chip you could click, which suits a page that is mostly interactive.
  */
-function Tag({ children, dark }: { children: React.ReactNode; dark?: boolean }) {
+/**
+ * The section heading, and the only one each section gets.
+ *
+ * This used to be a small red tag sitting above a large sentence, which meant
+ * every section announced itself twice: once as a label and once as a claim.
+ * The claims were doing less work than they looked like they were, since the
+ * paragraph underneath almost always made the same point better. So the label
+ * won, and it is the heading now.
+ *
+ * Still the red plate rather than plain type. On a page pretending to be a
+ * printed board game, the heading should look stamped on.
+ */
+function SectionHeading({ children, dark }: { children: React.ReactNode; dark?: boolean }) {
   return (
-    <div className="mb-4">
-      <span
+    <div className="mb-5">
+      <h2
         className="inline-block"
         style={{
-          fontSize: 11,
+          fontSize: 'clamp(16px, 1.7vw, 21px)',
           fontWeight: 700,
-          padding: '6px 13px',
-          lineHeight: 1.3,
-          letterSpacing: '0.06em',
+          padding: '9px 18px',
+          lineHeight: 1.25,
+          letterSpacing: '0.05em',
           textTransform: 'uppercase',
           color: '#FFFFFF',
           backgroundColor: MONOPOLY.red,
@@ -979,7 +979,7 @@ function Tag({ children, dark }: { children: React.ReactNode; dark?: boolean }) 
         }}
       >
         {children}
-      </span>
+      </h2>
     </div>
   )
 }
