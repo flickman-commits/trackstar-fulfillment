@@ -13,12 +13,19 @@
  * it by spaceKey. Duplicating the layout here in a second language would mean
  * two copies drifting apart the first time a space gets renamed.
  *
- * Three payloads come out, and the split between them is a security boundary,
- * not a convenience:
+ * What this module owns is narrow, and shrinking it was deliberate. The sheet
+ * used to carry tier fees and token prices too, which meant a repricing in the
+ * repo sat invisible behind a tab nobody had updated: the page read $10,000
+ * from src/lib/monopolyCopy.ts while this endpoint served $35,000 to anyone
+ * with devtools open, and the deal model quoted the same stale figure back at
+ * Matt. The ladder is a strategic decision that ships with a deploy, so it
+ * lives in code and this module no longer has an opinion about it.
  *
- *   public   — statuses, partner names, copy. No money.
- *   gated    — partnership fees and unit allocations. Released only after the
- *              visitor unlocks, or arrives on a personalised link.
+ * So the split is:
+ *
+ *   here     — the sales layer only: which spaces are sold, held or open, and
+ *              who holds them. The one thing that genuinely moves week to week.
+ *   code     — the offer itself. Tiers and tokens in src/lib/monopolyCopy.ts.
  *   internal — cost and margin. Served ONLY by the admin endpoint;
  *              getInternalEconomics() must never be reachable from api/public/.
  *
@@ -38,8 +45,6 @@ const SHEET_ID = process.env.MONOPOLY_SHEET_ID || '12EZc3RaxkY0Ye_nfeQzAya-5eCO7
 // cannot reasonably carry an em dash, so hyphens are what actually end up in the
 // spreadsheet. resolveTab() below accepts either style regardless.
 const TAB_BOARD = 'WEB - Board'
-const TAB_PACKAGES = 'WEB - Packages'
-const TAB_TOKENS = 'WEB - Tokens'
 
 const CACHE_TTL_MS = 5 * 60 * 1000
 
@@ -61,7 +66,7 @@ function resolveTab(wanted, actualTitles) {
   return actualTitles.find((t) => normaliseTitle(t) === target) || wanted
 }
 
-let cache = null // { at: number, value: { publicPayload, gatedPayload } }
+let cache = null // { at: number, value: { publicPayload } }
 
 // ── Cell parsing ────────────────────────────────────────────────────────────
 
@@ -202,57 +207,14 @@ function mapSpaceSales(rows) {
   return out
 }
 
-/**
- * Tier definitions. `slotsTotal` / `slotsRemaining` are deliberately NOT read
- * from the sheet — the client derives them from the merged board, so a tier
- * count can never disagree with the spaces it describes. Telling a race
- * director Boardwalk is open when it isn't is the worst error this page could
- * make, and derivation makes it impossible.
- */
-function mapTiers(rows) {
-  return toObjects(rows)
-    .filter((row) => str(row.tierkey))
-    .map((row) => ({
-      tierKey: str(row.tierkey),
-      label: str(row.label) || str(row.tierkey),
-      colorGroups: str(row.colorgroups)
-        .split(/[,;]/)
-        .map((g) => g.trim().toLowerCase())
-        .filter(Boolean),
-      features: lines(row.features),
-      sortOrder: int(row.sortorder) ?? 99,
-      isFounding: bool(row.isfounding),
-      // Gated — stripped before the public payload leaves the server.
-      fee: money(row.fee),
-      unitsIncluded: int(row.unitsincluded),
-      resaleValue: money(row.resalevalue),
-      netCost: money(row.netcost),
-    }))
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-}
-
-function mapTokens(rows) {
-  return toObjects(rows)
-    .filter((row) => str(row.name))
-    .map((row) => ({
-      name: str(row.name),
-      status: statusOf(row.status) ?? 'available',
-      imageUrl: safeImageUrl(row.imageurl),
-      description: str(row.description) || undefined,
-      sortOrder: int(row.sortorder) ?? 99,
-      price: money(row.price), // gated
-    }))
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-}
-
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Read the sales layer and build the public + gated payloads.
+ * Read the sales layer and build the public payload.
  *
  * @param {object} [opts]
  * @param {boolean} [opts.refresh] - bypass the 5-minute cache.
- * @returns {Promise<{ publicPayload: object, gatedPayload: object }>}
+ * @returns {Promise<{ publicPayload: object, staleReason?: object }>}
  */
 export async function getBoardData({ refresh = false } = {}) {
   if (!refresh && cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.value
@@ -260,50 +222,28 @@ export async function getBoardData({ refresh = false } = {}) {
   let built
   try {
     const titles = await listTabTitles(SHEET_ID)
-    const [boardRows, packageRows, tokenRows] = await readRanges(
-      [
-        `'${resolveTab(TAB_BOARD, titles)}'!A1:Z60`,
-        `'${resolveTab(TAB_PACKAGES, titles)}'!A1:Z40`,
-        `'${resolveTab(TAB_TOKENS, titles)}'!A1:Z40`,
-      ],
-      { spreadsheetId: SHEET_ID },
-    )
-
-    // Fill section by section, falling back to the snapshot wherever the sheet
-    // has nothing to say.
-    //
-    // A tab that exists but is empty reads as a *successful* API call returning
-    // zero rows, so without this an unfilled sheet would serve a hollow page —
-    // no tiers, no tokens, no timeline, no FAQ — and report itself as fresh.
-    // That is strictly worse than showing the snapshot, and it fails silently.
-    // Filling one tab at a time is also the natural way to populate the sheet,
-    // so partial data has to work rather than being all-or-nothing.
-    const sheetSpaceSales = mapSpaceSales(boardRows)
-    const sheetTiers = mapTiers(packageRows)
-    const sheetTokens = mapTokens(tokenRows)
-
-    const usedFallbackFor = []
-    const pick = (name, fromSheet, fromSnapshot) => {
-      const empty = !fromSheet || (Array.isArray(fromSheet) ? fromSheet.length === 0 : Object.keys(fromSheet).length === 0)
-      if (empty) usedFallbackFor.push(name)
-      return empty ? fromSnapshot : fromSheet
-    }
-
-    built = assemble({
-      spaceSales: pick('board', sheetSpaceSales, FALLBACK.spaceSales),
-      tiers: pick('packages', sheetTiers, FALLBACK.tiers),
-      tokens: pick('tokens', sheetTokens, FALLBACK.tokens),
-      // "Fresh" means at least one tab actually contributed something.
-      stale: usedFallbackFor.length === 3,
+    const [boardRows] = await readRanges([`'${resolveTab(TAB_BOARD, titles)}'!A1:Z60`], {
+      spreadsheetId: SHEET_ID,
     })
 
-    if (usedFallbackFor.length) {
+    // A tab that exists but is empty reads as a *successful* API call returning
+    // zero rows, so an unfilled sheet would otherwise serve an all-available
+    // board and report itself as fresh. Fall back to the snapshot and say so.
+    const sheetSpaceSales = mapSpaceSales(boardRows)
+    const isEmpty = Object.keys(sheetSpaceSales).length === 0
+
+    built = assemble({
+      spaceSales: isEmpty ? FALLBACK.spaceSales : sheetSpaceSales,
+      stale: isEmpty,
+    })
+
+    if (isEmpty) {
       built.staleReason = {
-        cause: usedFallbackFor.length === 3 ? 'empty_tabs' : 'partial_tabs',
-        fix: `The sheet is readable but these tabs are empty, so the snapshot is filling in: ${usedFallbackFor.join(', ')}.`,
-        detail: `Empty: ${usedFallbackFor.join(', ')}`,
+        cause: 'empty_tabs',
+        fix: `The sheet is readable but '${TAB_BOARD}' has no rows, so the snapshot is filling in.`,
+        detail: `Empty: ${TAB_BOARD}`,
       }
-      console.warn('[monopoly] empty sheet tabs, using snapshot for:', usedFallbackFor.join(', '))
+      console.warn('[monopoly] empty board tab, using snapshot')
     }
   } catch (err) {
     // Any Sheets problem — auth, sharing, a renamed tab — degrades to the
@@ -333,7 +273,7 @@ function classifySheetError(message) {
     return { cause: 'no_credentials', fix: 'GOOGLE_SERVICE_ACCOUNT_EMAIL / _KEY are not set in this environment.', detail: message }
   }
   if (m.includes('unable to parse range') || m.includes('not found')) {
-    return { cause: 'missing_tab', fix: `The sheet is readable but a tab is missing. Expected: '${TAB_BOARD}', '${TAB_PACKAGES}', '${TAB_TOKENS}'.`, detail: message }
+    return { cause: 'missing_tab', fix: `The sheet is readable but a tab is missing. Expected: '${TAB_BOARD}'.`, detail: message }
   }
   if (m.includes('permission') || m.includes('403') || m.includes('caller does not have')) {
     return { cause: 'not_shared', fix: 'Share the sheet with the service-account email as Viewer.', detail: message }
@@ -345,48 +285,19 @@ function classifySheetError(message) {
 }
 
 /**
- * Split the mapped data into the two payloads.
+ * Wrap the sales layer in the shape the endpoint returns.
  *
- * Gated fields are *omitted* from publicPayload, not blanked — the ungated
- * response carries no `fee` key at all, so there is nothing to un-hide in
- * devtools and nothing to leak through a serialisation mistake.
+ * There is no gated half any more. Fees are not read here, so there is no fee
+ * to strip and no way for one to leak — the strongest version of the boundary
+ * the two-payload split was trying to enforce.
  */
-function assemble({ spaceSales, tiers, tokens, stale }) {
-  const publicTiers = tiers.map(({ fee, unitsIncluded, resaleValue, netCost, ...rest }) => rest)
-  const publicTokens = tokens.map(({ price, ...rest }) => rest)
-
-  const publicPayload = {
-    spaceSales,
-    tiers: publicTiers,
-    tokens: publicTokens,
-    unlocked: false,
-    stale: Boolean(stale),
-  }
-
-  // Keyed so the endpoint can merge without re-deriving order or identity.
-  const gatedPayload = {
-    tiers: Object.fromEntries(
-      tiers.map((t) => [
-        t.tierKey,
-        { fee: t.fee, unitsIncluded: t.unitsIncluded, resaleValue: t.resaleValue, netCost: t.netCost },
-      ]),
-    ),
-    tokens: Object.fromEntries(tokens.map((t) => [t.name, { price: t.price }])),
-  }
-
-  return { publicPayload, gatedPayload }
-}
-
-/**
- * Merge the gated fields onto a public payload.
- * Called only after the request has proven it holds a valid unlock cookie.
- */
-export function mergeGated(publicPayload, gatedPayload) {
+function assemble({ spaceSales, stale }) {
   return {
-    ...publicPayload,
-    unlocked: true,
-    tiers: publicPayload.tiers.map((t) => ({ ...t, ...(gatedPayload.tiers[t.tierKey] || {}) })),
-    tokens: publicPayload.tokens.map((t) => ({ ...t, ...(gatedPayload.tokens[t.name] || {}) })),
+    publicPayload: {
+      spaceSales,
+      unlocked: true,
+      stale: Boolean(stale),
+    },
   }
 }
 

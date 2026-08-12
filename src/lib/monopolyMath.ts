@@ -17,6 +17,7 @@
  *     250 × 65 − 0 − (250 × 30) = +$8,750.
  */
 import type { MonopolyInternalPayload, PrintRunEconomics } from './monopolyTypes'
+import { TIERS } from './monopolyCopy'
 
 // ── Formatting ──────────────────────────────────────────────────────────────
 
@@ -301,7 +302,7 @@ export function calculateScenario(
   input: ScenarioInput,
   data: MonopolyInternalPayload,
 ): ScenarioResult {
-  const tierById = new Map(data.tiers.map((t) => [t.tierKey, t]))
+  const tierById = new Map(TIERS.map((t) => [t.tierKey, t]))
 
   let raceFees = 0
   let includedUnits = 0
@@ -343,7 +344,7 @@ export function calculateScenario(
 
   // How many mid-tier races it takes to cover the whole production, ignoring
   // every other revenue line. The honest version of "when does this work?".
-  const midTier = data.tiers.slice().sort((a, b) => a.fee - b.fee)[Math.floor(data.tiers.length / 2)]
+  const midTier = TIERS.slice().sort((a, b) => a.fee - b.fee)[Math.floor(TIERS.length / 2)]
   const breakEvenRacesAtMidTier = midTier && midTier.fee > 0 ? Math.ceil(cost.allIn / midTier.fee) : 0
 
   // Split the cost base the way the P&L reads it: goods against revenue,

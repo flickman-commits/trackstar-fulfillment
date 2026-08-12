@@ -31,6 +31,7 @@ import {
   DTC_BUFFER_UNITS,
   type ScenarioInput,
 } from '@/lib/monopolyMath'
+import { TIERS } from '@/lib/monopolyCopy'
 import type { MonopolyInternalPayload } from '@/lib/monopolyTypes'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 
@@ -107,7 +108,7 @@ export default function MonopolyModel() {
     const preset = PRESETS[key]
     setInput({
       ...input,
-      racesByTier: spreadRaces(preset.racesTotal, data),
+      racesByTier: spreadRaces(preset.racesTotal),
       // Snap to a real quoted run so the preset lights up a button rather than
       // silently falling through to nearest-match.
       printRunUnits:
@@ -173,7 +174,7 @@ export default function MonopolyModel() {
         <div className="flex min-w-0 flex-col gap-5">
           <Panel title="Races signed">
             <div className="flex flex-col gap-3">
-              {data.tiers.map((tier) => {
+              {TIERS.map((tier) => {
                 const actual = data.committed.find((c) => c.tierKey === tier.tierKey)?.count ?? 0
                 const value = input.racesByTier[tier.tierKey] ?? 0
                 return (
@@ -181,7 +182,7 @@ export default function MonopolyModel() {
                     <div className="min-w-0">
                       <div style={{ fontSize: 14, color: '#1A1A1A', fontWeight: 500 }}>{tier.label}</div>
                       <div style={{ fontSize: 12, color: '#8A857C' }}>
-                        {formatMoney(tier.fee)} · {tier.unitsIncluded} units
+                        {formatMoney(tier.fee)} · {tier.unitsIncluded} comp copies
                         {actual > 0 && ` · ${actual} committed`}
                       </div>
                     </div>
@@ -423,13 +424,13 @@ export default function MonopolyModel() {
                 <tr style={{ borderBottom: '1px solid #E0E0E0' }}>
                   <ThSm>Tier</ThSm>
                   <ThSm align="right">Fee</ThSm>
-                  <ThSm align="right">Units</ThSm>
+                  <ThSm align="right">Comps</ThSm>
                   <ThSm align="right">Unit cost</ThSm>
                   <ThSm align="right">Net to us</ThSm>
                 </tr>
               </thead>
               <tbody>
-                {data.tiers.map((tier) => {
+                {TIERS.map((tier) => {
                   const unitCost = tier.unitsIncluded * result.cost.trueCostPerUnit
                   return (
                     <tr key={tier.tierKey} style={{ borderBottom: '1px solid #EFEDE9' }}>
@@ -481,7 +482,7 @@ function restoreScenario(data: MonopolyInternalPayload): ScenarioInput {
 /** Start from what's actually on the board, not from zero. */
 function seedFromCommitted(data: MonopolyInternalPayload): ScenarioInput {
   const racesByTier: Record<string, number> = {}
-  for (const tier of data.tiers) racesByTier[tier.tierKey] = 0
+  for (const tier of TIERS) racesByTier[tier.tierKey] = 0
   for (const c of data.committed) racesByTier[c.tierKey] = c.count
 
   const dtcChannel = data.channels.find((c) => /dtc|direct/i.test(c.channel))
@@ -508,8 +509,8 @@ function seedFromCommitted(data: MonopolyInternalPayload): ScenarioInput {
  * tiers first — the sequencing rule is anchor deals before cheap ones, so a
  * preset that fills Brown first would model a scenario we've decided not to run.
  */
-function spreadRaces(total: number, data: MonopolyInternalPayload): Record<string, number> {
-  const byFee = [...data.tiers].sort((a, b) => b.fee - a.fee)
+function spreadRaces(total: number): Record<string, number> {
+  const byFee = [...TIERS].sort((a, b) => b.fee - a.fee)
   const out: Record<string, number> = {}
   let left = total
 

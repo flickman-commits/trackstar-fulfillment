@@ -20,7 +20,6 @@
 import { setCors } from '../_lib/auth.js'
 import {
   getBoardData,
-  mergeGated,
   resolvePersonalization,
 } from '../../server/services/monopolyBoard.js'
 import { checkRateLimit } from '../../server/lib/publicRateLimit.js'
@@ -64,19 +63,19 @@ export default async function handler(req, res) {
     )
     const refresh = hasAccessKey && req.query.refresh === '1'
 
-    const { publicPayload, gatedPayload } = await getBoardData({ refresh })
+    const { publicPayload } = await getBoardData({ refresh })
 
-    // Partnership pricing is shown to everyone. Matt sends this link directly to
+    // Partnership pricing is shown to everyone, and it ships with the client
+    // rather than riding on this response. Matt sends this link directly to
     // races he is already talking to, so an email wall only added friction in
     // front of people whose email he already had.
     //
-    // This is NOT the same boundary as cost and margin. Those live behind
+    // Cost and margin are a different boundary entirely. Those live behind
     // requireAdmin on /api/admin/monopoly-model and still never appear here.
     const slug = typeof req.query.p === 'string' ? req.query.p : ''
     const personalizedFor = resolvePersonalization(publicPayload, slug)
 
-    const body = mergeGated(publicPayload, gatedPayload)
-    return res.status(200).json({ ...body, personalizedFor: personalizedFor || undefined })
+    return res.status(200).json({ ...publicPayload, personalizedFor: personalizedFor || undefined })
   } catch (err) {
     console.error('[monopoly] request failed:', err)
     return res.status(500).json({ error: 'Unable to load board data' })

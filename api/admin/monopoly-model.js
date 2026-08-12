@@ -32,17 +32,11 @@ export default async function handler(req, res) {
       getBoardData({ refresh }),
       getInternalEconomics(),
     ])
-    const { publicPayload, gatedPayload } = board
+    const { publicPayload } = board
 
-    // Tier economics: label and slot count are public, fee and allocation come
-    // from the gated half. Joined here because the model needs both.
-    const tiers = publicPayload.tiers.map((tier) => ({
-      tierKey: tier.tierKey,
-      label: tier.label,
-      fee: gatedPayload.tiers[tier.tierKey]?.fee ?? 0,
-      unitsIncluded: gatedPayload.tiers[tier.tierKey]?.unitsIncluded ?? 0,
-    }))
-
+    // No tiers in this response. The ladder is code (src/lib/monopolyCopy.ts)
+    // and the model page imports it directly, so the fee Matt models against is
+    // by construction the fee a race director is being quoted.
     // What's actually spoken for right now, per tier — the model's starting
     // point. `hold` counts as committed here because Matt is modelling the
     // pipeline he's working, not only the ink that's dry.
@@ -55,7 +49,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ...economics,
-      tiers,
       committed: Object.entries(committedByTier).map(([tierKey, count]) => ({ tierKey, count })),
       stale: publicPayload.stale,
       // Admin-only, and deliberately not on publicPayload: the raw Sheets error

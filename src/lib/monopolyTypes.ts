@@ -165,19 +165,15 @@ export interface BrandPrice {
 /**
  * The wire format of GET /api/public/monopoly.
  *
- * Two things are deliberately absent. Board geometry, because the server knows
- * nothing about positions, colour groups or rent ladders — it sends the sales
- * layer keyed by spaceKey and the client merges it onto BOARD_LAYOUT. And all
- * page prose, which lives in monopolyCopy.ts: it only changes when the offer
- * changes, so routing it through a spreadsheet added a sync step and a way for
- * the page and the code to disagree.
+ * Only the sales layer travels. Board geometry stays in BOARD_LAYOUT, and the
+ * offer itself — prose, tiers, tokens — stays in monopolyCopy.ts, because each
+ * of those only changes when the offer changes, which is a deploy anyway.
+ * Routing them through a spreadsheet bought nothing and cost a way for the page
+ * and the payload to quote different prices, which is exactly what happened.
  */
 export interface MonopolySalesResponse {
   /** Per-space sales data, keyed by spaceKey ("GREEN 3", "STATION 2"). */
   spaceSales: Record<string, Partial<Pick<BoardSpace, 'displayName' | 'status' | 'tierKey' | 'partnerName' | 'logoUrl' | 'blurb' | 'raceSlug'>>>
-  /** Tiers without slot counts — the client derives those from the board. */
-  tiers: Omit<PackageTier, 'slotsTotal' | 'slotsRemaining'>[]
-  tokens: TokenSlot[]
   unlocked: boolean
   stale?: boolean
   /** Present when the request carried a recognised ?p= slug. */
@@ -220,7 +216,6 @@ export interface MonopolyInternalPayload {
     customPiecePerUnit: number
   }
   channels: { channel: string; price: number; shippingCost: number }[]
-  tiers: Required<Pick<PackageTier, 'tierKey' | 'label' | 'fee' | 'unitsIncluded'>>[]
   /** Spaces already sold, reserved or on hold — the model's starting point. */
   committed: {
     tierKey: string
