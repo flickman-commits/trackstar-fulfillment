@@ -309,6 +309,7 @@ export default function MonopolyModel() {
               <PnlRow label="Gross profit" value={result.grossProfit} subtotal />
 
               <PnlRow label="Legal" value={-result.cost.legal} />
+              <PnlRow label="Design" value={-result.cost.design} />
               <PnlRow label="Net profit" value={result.net} total />
             </div>
           </div>

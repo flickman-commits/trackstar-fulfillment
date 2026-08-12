@@ -38,6 +38,8 @@ export const PRINT_RUNS = [
 export const FIXED_COSTS = {
   /** Licensing and contract work. Flat, so it hurts most at the smallest run. */
   legal: 10000,
+  /** Board and packaging design. Flat, and paid whatever the run size. */
+  design: 3000,
   /** Only used for a run size with no quoted freight of its own. */
   freightPerThousand: 2000,
   /** Custom playing pieces, quoted per unit rather than as tooling. */

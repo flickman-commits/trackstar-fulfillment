@@ -214,6 +214,7 @@ export interface MonopolyInternalPayload {
   printRuns: PrintRunEconomics[]
   fixedCosts: {
     legal: number
+    design: number
     freightPerThousand: number
     /** Custom playing pieces, quoted per unit rather than as one-off tooling. */
     customPiecePerUnit: number

@@ -188,6 +188,9 @@ export interface AllInCost {
   customPieceCost: number
   manufacturing: number
   legal: number
+  design: number
+  /** Legal plus design: everything that does not move with the run size. */
+  fixedTotal: number
   freight: number
   allIn: number
   /**
@@ -220,7 +223,10 @@ export function calculateAllInCost(
   // Prefer the quoted freight for this run; the flat per-thousand rate is only
   // a stand-in for runs that haven't been quoted yet.
   const freight = run.freight ?? (run.units / 1000) * fixed.freightPerThousand
-  const allIn = manufacturing + fixed.legal + freight
+  // Legal and design are flat: paid once, whatever the run size. They sit below
+  // the gross line and are what make a small run expensive per unit.
+  const fixedTotal = fixed.legal + fixed.design
+  const allIn = manufacturing + freight + fixedTotal
 
   return {
     units: run.units,
@@ -229,6 +235,8 @@ export function calculateAllInCost(
     customPieceCost,
     manufacturing,
     legal: fixed.legal,
+    design: fixed.design,
+    fixedTotal,
     freight,
     allIn,
     variableCostPerUnit: run.units > 0 ? (manufacturing + freight) / run.units : 0,
@@ -351,9 +359,9 @@ export function calculateScenario(
     totalRevenue,
     cogs,
     grossProfit,
-    fixedCosts: cost.legal,
+    fixedCosts: cost.fixedTotal,
     cost,
-    net: grossProfit - cost.legal,
+    net: grossProfit - cost.fixedTotal,
     committedUnits,
     unitsRemaining: input.printRunUnits - committedUnits,
     recommendedPrintRun,
