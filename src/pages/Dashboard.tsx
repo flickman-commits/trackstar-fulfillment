@@ -3051,7 +3051,12 @@ Thank you!`
             className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
             onClick={(e) => { if (e.target === e.currentTarget) { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) } }}
           >
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md md:max-w-2xl max-h-[85vh] overflow-hidden">
+            {/* The pricing calculator carries eight numeric columns, so it gets a
+                wider shell than the rest of Settings rather than scrolling
+                sideways inside a 2xl box. */}
+            <div className={`bg-white rounded-xl shadow-2xl w-full max-h-[85vh] overflow-hidden ${
+              showArteloCosts ? 'max-w-md md:max-w-5xl' : 'max-w-md md:max-w-2xl'
+            }`}>
               {showArteloCosts ? (
                 /* Artelo cost matrix */
                 <div className="flex flex-col h-full max-h-[85vh]" style={{ animation: 'slideInRight 200ms ease-out' }}>

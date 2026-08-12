@@ -17,18 +17,20 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
  *                flat 30c processing fee are carried by that single unit.
  *                Quantity is fixed at 1 because a busy month is still one box
  *                per order.
- *   Wholesale  — charities and race partners alike: one consignment, so those
- *                same per-order costs divide across the run. This is where the
- *                margin comes from at volume, because Artelo gives no
- *                production discount at all — a bulk quote built on retail's
- *                per-unit shipping is simply wrong. The two used to be
- *                separate tabs and differed only by discount percentage, which
- *                is an input, not a channel.
+ *   Wholesale  — charities and race partners alike: one consignment, so the
+ *                per-order costs divide across the run, and package branding
+ *                is dropped entirely because bulk boxes go out plain.
  *
- * The Shipping column carries package branding as well as freight. Both are
- * billed per ORDER rather than per print, so they amortize together, and
- * folding them into one column keeps the row arithmetic honest: price minus
- * production minus shipping minus processing fees is exactly gross profit.
+ * Volume margin comes from that amortization, not from cheaper printing —
+ * Artelo gives no production discount at all, so a bulk quote built on
+ * retail's per-unit shipping is simply wrong. Charities and race partners
+ * were once separate tabs but differed only by discount percentage, which is
+ * an input, not a channel.
+ *
+ * The Shipping column carries package branding as well as freight on DTC,
+ * where both are billed per ORDER and amortize together. Bulk gets no branding
+ * at all. Either way the row reads as arithmetic: price minus production minus
+ * shipping minus processing fees is exactly gross profit.
  */
 
 type Channel = 'retail' | 'wholesale'
@@ -54,6 +56,8 @@ interface PricingData {
   assumptions: {
     shopifyFeePercent: number
     shopifyFeeFixed: number
+    stripeFeePercent?: number
+    stripeFeeFixed?: number
     photoAddOnPrice: number
     photoAddOnCost: number
   }
@@ -64,11 +68,32 @@ const CHANNELS: { id: Channel; label: string; blurb: string }[] = [
   {
     id: 'wholesale',
     label: 'Wholesale (Charities, Race Partners)',
-    blurb: 'One consignment — shipping, branding and the flat processing fee split across the run.',
+    blurb: 'One consignment — shipping and the flat processing fee split across the run. No package branding.',
   },
 ]
 
 const money = (n: number) => `$${n.toFixed(2)}`
+
+/**
+ * Row tint by margin. Absolute bands rather than "best in this table", so a
+ * row means the same thing whichever channel you are looking at — a 45% line
+ * should not read as healthy just because everything around it is worse.
+ *
+ * Thresholds are set where the decisions actually change: above 65% is the
+ * DTC norm we design around, 50-65% is workable but worth a look before
+ * discounting further, and under 50% is where a bulk quote stops being
+ * obviously worth doing.
+ */
+function marginTint(pct: number | null): { row: string; label: string } {
+  if (pct === null) return { row: '', label: 'text-off-black/40' }
+  // Band on the DISPLAYED figure, not the raw one. 64.6% renders as "65%",
+  // and a row reading 65% while tinted as though it were below the threshold
+  // just makes the reader distrust the color.
+  const shown = Math.round(pct)
+  if (shown >= 65) return { row: 'bg-green-50/70', label: 'text-green-800' }
+  if (shown >= 50) return { row: 'bg-amber-50/70', label: 'text-amber-800' }
+  return { row: 'bg-orange-100/60', label: 'text-orange-800' }
+}
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'bad' }) {
   return (
@@ -114,8 +139,19 @@ export default function PricingCalculator() {
 
   const computed = useMemo(() => {
     if (!data) return []
-    const { shopifyFeePercent, shopifyFeeFixed, photoAddOnPrice, photoAddOnCost } = data.assumptions
+    const a = data.assumptions
     const qty = data.quantity
+    const { photoAddOnPrice, photoAddOnCost } = a
+    // DTC collects through Shopify Payments; bulk is invoiced via Stripe. We
+    // absorb the fee on bulk rather than passing it on, so it is a real cost
+    // either way and stays in the margin math.
+    // Fall back to the Shopify rate if the API predates the Stripe fields.
+    // A stale or cached response must not be able to white-screen the
+    // dashboard, which is exactly what an undefined rate did here.
+    const stripePct = a.stripeFeePercent ?? a.shopifyFeePercent
+    const stripeFix = a.stripeFeeFixed ?? a.shopifyFeeFixed
+    const feePercent = channel === 'retail' ? a.shopifyFeePercent : stripePct
+    const feeFixed = channel === 'retail' ? a.shopifyFeeFixed : stripeFix
 
     return data.rows.filter(r => !r.error).map(r => {
       const base = r.retailPrice ?? 0
@@ -124,11 +160,14 @@ export default function PricingCalculator() {
         : Math.round(base * (1 - (Number.isFinite(discountPct) ? discountPct : 0) / 100) * 100) / 100
 
       const unitShipping = r.orderShipping / qty
-      const unitBranding = r.brandingCost / qty
+      // Package branding (insert + sticker) is a DTC touch. Bulk consignments
+      // to charities and race partners go out plain, so it is not a cost there
+      // at all — not merely amortized to something small.
+      const unitBranding = channel === 'retail' ? r.brandingCost / qty : 0
       const unitCost = r.productionCost + unitShipping + unitBranding + (includePhoto ? photoAddOnCost : 0)
       const unitPrice = price + (includePhoto ? photoAddOnPrice : 0)
       // Percentage applies per unit; the flat fee is per order, so it divides.
-      const unitFee = unitPrice * shopifyFeePercent + shopifyFeeFixed / qty
+      const unitFee = unitPrice * feePercent + feeFixed / qty
       const gp = unitPrice - unitCost - unitFee
 
       return {
@@ -242,8 +281,10 @@ export default function PricingCalculator() {
                 </tr>
               </thead>
               <tbody>
-                {computed.map(r => (
-                  <tr key={r.key} className="border-t border-border-gray/60">
+                {computed.map(r => {
+                  const tint = marginTint(r.gpPct)
+                  return (
+                  <tr key={r.key} className={`border-t border-border-gray/60 ${tint.row}`}>
                     <td className="px-3 py-2 font-medium text-off-black whitespace-nowrap">{r.sizeLabel}</td>
                     <td className="px-3 py-2 text-off-black/60 whitespace-nowrap">
                       {r.frame === 'Framed' ? r.frameLabel : 'Unframed'}
@@ -252,19 +293,22 @@ export default function PricingCalculator() {
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">{money(r.productionCost)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">
                       {money(r.unitShipping + r.unitBranding)}
-                      <span className="block text-[10px] text-off-black/35 leading-tight">
-                        incl. {money(r.unitBranding)} branding
-                      </span>
+                      {r.unitBranding > 0 && (
+                        <span className="block text-[10px] text-off-black/35 leading-tight">
+                          incl. {money(r.unitBranding)} branding
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">{money(r.unitFee)}</td>
                     <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.gp < 0 ? 'text-red-600' : 'text-green-700'}`}>
                       {money(r.gp)}
                     </td>
-                    <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.gp < 0 ? 'text-red-600' : 'text-off-black'}`}>
+                    <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.gp < 0 ? 'text-red-600' : tint.label}`}>
                       {r.gpPct === null ? '—' : `${r.gpPct.toFixed(0)}%`}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -278,6 +322,13 @@ export default function PricingCalculator() {
             </div>
           )}
 
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-off-black/45">
+            <span className="font-semibold uppercase tracking-wider text-off-black/35">Margin</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-50/70 border border-green-200" /> 65%+</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-50/70 border border-amber-200" /> 50-65%</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-orange-100/60 border border-orange-200" /> under 50%</span>
+          </div>
+
           <div className="mt-3 space-y-1 text-[11px] text-off-black/40 leading-relaxed">
             <p>
               Costs live from Artelo, retail prices live from Shopify. Every size ships as Premium Oak; frame color makes no difference to cost, so black and natural are the same price.
@@ -288,10 +339,13 @@ export default function PricingCalculator() {
             <p>
               {channel === 'retail'
                 ? 'Retail ships one print per order, so that unit carries the full shipping, the $0.80 package branding and the flat 30c of the payment fee.'
-                : `Bulk ships as one consignment of ${data.quantity}, so shipping, package branding and the flat 30c payment fee divide across the run. Production cost does not fall with volume — Artelo gives no quantity discount.`}
+                : `Bulk ships as one consignment of ${data.quantity}, so shipping and the flat 30c processing fee divide across the run, and package branding is not applied at all. Production cost does not fall with volume — Artelo gives no quantity discount.`}
             </p>
             <p>
-              Fees are Shopify Payments at {(data.assumptions.shopifyFeePercent * 100).toFixed(1)}% + {money(data.assumptions.shopifyFeeFixed)} per order. Gross profit excludes design time, returns and sales tax.
+              {channel === 'retail'
+                ? `Processing is Shopify Payments at ${(data.assumptions.shopifyFeePercent * 100).toFixed(1)}% + ${money(data.assumptions.shopifyFeeFixed)} per order.`
+                : `Processing is Stripe at ${(((data.assumptions.stripeFeePercent ?? data.assumptions.shopifyFeePercent)) * 100).toFixed(1)}% + ${money(data.assumptions.stripeFeeFixed ?? data.assumptions.shopifyFeeFixed)} per consignment — we absorb it rather than passing it to the partner, so it comes out of margin.`}
+              {' '}Gross profit excludes design time, returns and sales tax.
             </p>
             <p>Fetched {new Date(data.fetchedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
           </div>

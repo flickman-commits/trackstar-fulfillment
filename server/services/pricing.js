@@ -30,13 +30,23 @@ import { fetchVariantCatalog } from './shopifyProducts.js'
 export { SIZES, COLUMNS }
 
 /**
- * Shopify Payments US online rate: 2.9% + $0.30 per TRANSACTION. This is a
- * Shopify rate, nothing to do with who prints the poster — it applies to a
- * $100 order as $3.20 and a $250 order as $7.55. The fixed 30c is per order,
- * so like shipping it amortizes across a bulk order.
+ * Payment processing, by channel. Both are card rates and both are a cost WE
+ * absorb — on bulk we eat the fee rather than passing it to the partner, so it
+ * comes straight out of margin and belongs in this model.
+ *
+ *   Retail DTC  Shopify Payments, 2.9% + $0.30 — $3.20 on a $100 order.
+ *   Bulk        Stripe, same published card rate, one charge per consignment,
+ *               so the flat 30c amortizes across the run.
+ *
+ * The two rates being identical is a fact about card pricing today, not an
+ * assumption worth collapsing: they are separate constants so that a move to
+ * ACH or Stripe invoicing (materially cheaper on large amounts) is a one-line
+ * change here rather than an archaeology exercise.
  */
 export const SHOPIFY_FEE_PERCENT = 0.029
 export const SHOPIFY_FEE_FIXED = 0.30
+export const STRIPE_FEE_PERCENT = 0.029
+export const STRIPE_FEE_FIXED = 0.30
 
 /**
  * The photo add-on is sold as a separate $20 line item on DTC orders. It costs

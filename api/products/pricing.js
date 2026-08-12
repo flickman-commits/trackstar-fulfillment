@@ -30,6 +30,8 @@ import {
   COLUMNS,
   SHOPIFY_FEE_PERCENT,
   SHOPIFY_FEE_FIXED,
+  STRIPE_FEE_PERCENT,
+  STRIPE_FEE_FIXED,
   PHOTO_ADDON_PRICE,
   PHOTO_ADDON_COST,
 } from '../../server/services/pricing.js'
@@ -56,6 +58,8 @@ export default async function handler(req, res) {
       assumptions: {
         shopifyFeePercent: SHOPIFY_FEE_PERCENT,
         shopifyFeeFixed: SHOPIFY_FEE_FIXED,
+        stripeFeePercent: STRIPE_FEE_PERCENT,
+        stripeFeeFixed: STRIPE_FEE_FIXED,
         photoAddOnPrice: PHOTO_ADDON_PRICE,
         photoAddOnCost: PHOTO_ADDON_COST,
       },
