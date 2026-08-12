@@ -1,6 +1,6 @@
 /**
  * Baltimore Running Festival (Baltimore Marathon) — marathon + half, October.
- * SVE Timing platform (US Sports Timing), organiser Corrigan Sports.
+ * SVE Timing platform (US Sports Timing), organizer Corrigan Sports.
  * Results: https://results.svetiming.com/Corrigan-Sports-Enterprises/events/{year}/baltimore-running-festival/results
  *
  * Every year from 2021 to 2026 is live at that URL with no per-year id to look

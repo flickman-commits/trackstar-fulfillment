@@ -2,7 +2,7 @@
  * How the board reads availability.
  *
  * There is one board, not a set of views. A partner opening this wants two
- * things: to see the object, and to see whether their space is free. Colour
+ * things: to see the object, and to see whether their space is free. Color
  * decisions live here rather than inside BoardSpace so the legend, the board
  * and the inventory table stay in step by construction.
  */

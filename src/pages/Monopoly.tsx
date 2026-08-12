@@ -409,7 +409,7 @@ export default function Monopoly() {
             count={counts.raceSpacesRemaining}
             total={counts.raceSpacesTotal}
             label="Race spaces open"
-            note="The 22 coloured properties"
+            note="The 22 colored properties"
           />
           <InventoryStat count={5} total={5} label="Comp copies per race" note="Yours, whatever you pay" />
           <InventoryStat count={0} total={0} label="Brand sponsors" note="None, by design" />

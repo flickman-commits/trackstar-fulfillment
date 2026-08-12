@@ -25,7 +25,7 @@
  * `unitCost` is the base board only. Custom playing pieces add a further
  * $5.00/unit and are applied separately in calculateAllInCost, so the model can
  * show what that decision costs on its own — it is a per-unit charge, not
- * one-off tooling, so it scales with the run instead of amortising away and it
+ * one-off tooling, so it scales with the run instead of amortizing away and it
  * moves the wholesale break-even directly.
  */
 export const PRINT_RUNS = [

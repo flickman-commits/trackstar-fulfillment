@@ -34,6 +34,7 @@ const routes = [
   { method: 'post', path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
   { method: 'delete', path: '/api/orders/comments',          handler: '../api/orders/comments.js' },
   { method: 'get',  path: '/api/products/artelo-costs',    handler: '../api/products/artelo-costs.js' },
+  { method: 'get',  path: '/api/products/pricing',          handler: '../api/products/pricing.js' },
   { method: 'get',  path: '/api/products/bulk-edit',       handler: '../api/products/bulk-edit.js' },
   { method: 'post', path: '/api/products/bulk-edit',       handler: '../api/products/bulk-edit.js' },
   { method: 'get',  path: '/api/etsy/auth',                 handler: '../api/etsy/auth.js' },

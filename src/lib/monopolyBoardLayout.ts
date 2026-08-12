@@ -1,5 +1,5 @@
 /**
- * The immutable structure of a Monopoly board: 40 spaces, their kinds, colour
+ * The immutable structure of a Monopoly board: 40 spaces, their kinds, color
  * groups, classic prices and rent ladders.
  *
  * This is the game itself, not our data — it does not change when Matt sells a
@@ -15,7 +15,7 @@
 import type { BoardSpaceLayout, BoardEdge, ColorGroup } from './monopolyTypes'
 
 /**
- * Monopoly's mandated colour-group hexes. These are the game's, not Trackstar's
+ * Monopoly's mandated color-group hexes. These are the game's, not Trackstar's
  * — the brand palette governs the page around the board, not the board itself.
  */
 export const GROUP_COLORS: Record<ColorGroup, string> = {
@@ -29,7 +29,7 @@ export const GROUP_COLORS: Record<ColorGroup, string> = {
   darkblue: '#0072BB',
 }
 
-/** Human labels for the colour groups, used in tier copy and the inventory table. */
+/** Human labels for the color groups, used in tier copy and the inventory table. */
 export const GROUP_LABELS: Record<ColorGroup, string> = {
   brown: 'Brown',
   lightblue: 'Light Blue',
@@ -43,13 +43,13 @@ export const GROUP_LABELS: Record<ColorGroup, string> = {
 
 /**
  * Gameboard Mint, PMS 9525C, straight from the Monopoly brand spec. The board
- * surface is the single most recognisable colour in the system, so it is worth
+ * surface is the single most recognisable color in the system, so it is worth
  * being exact rather than close.
  */
 export const BOARD_FELT = '#CCE7D3'
 
 /**
- * Where a space sits on the perimeter. Drives colour-band edge and text
+ * Where a space sits on the perimeter. Drives color-band edge and text
  * rotation: a left-rail space reads bottom-to-top, a right-rail space
  * top-to-bottom, so the board is legible when you walk around it.
  */
@@ -174,7 +174,7 @@ export const BOARD_LAYOUT: BoardSpaceLayout[] = [
 export const RACE_SPACE_KEYS = BOARD_LAYOUT.filter((s) => s.type === 'property').map((s) => s.spaceKey)
 
 /**
- * Colour group → tier key. The Notion offer bands Boardwalk/Park Place highest
+ * Color group → tier key. The Notion offer bands Boardwalk/Park Place highest
  * and Brown/Light Blue lowest; this is the single mapping both the board's tier
  * view and the pricing table read from.
  */

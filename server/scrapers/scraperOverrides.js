@@ -10,7 +10,7 @@
  *   instance loads it once and reuses it across warm invocations.
  *
  *   The contract: call `await ensureOverridesLoaded()` before you build
- *   scrapers. Forget it and you get the file config, which is the old behaviour
+ *   scrapers. Forget it and you get the file config, which is the old behavior
  *   rather than a wrong one — a safe failure mode, deliberately.
  */
 const TTL_MS = 60 * 1000

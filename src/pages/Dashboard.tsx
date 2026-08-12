@@ -6,7 +6,7 @@ import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
-import ArteloCosts from '@/components/ArteloCosts'
+import PricingCalculator from '@/components/PricingCalculator'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
 
@@ -3063,12 +3063,12 @@ Thank you!`
                       >
                         <ChevronRight className="w-4 h-4 rotate-180" />
                       </button>
-                      <h2 className="text-base font-semibold text-off-black">Artelo Costs</h2>
+                      <h2 className="text-base font-semibold text-off-black">Pricing Calculator</h2>
                     </div>
                     <button onClick={() => { setShowSettings(false); setShowArteloCosts(false) }} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
                   </div>
                   <div className="p-6 flex-1 overflow-y-auto">
-                    <ArteloCosts />
+                    <PricingCalculator />
                   </div>
                 </div>
               ) : showReviewRequest ? (
@@ -3149,8 +3149,8 @@ Thank you!`
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Artelo Costs</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Production and shipping cost per size and frame</p>
+                          <p className="text-sm font-medium text-off-black">Pricing Calculator</p>
+                          <p className="text-xs mt-0.5 text-off-black/50">Costs, retail and margin across DTC, wholesale and charity</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <DollarSign className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />

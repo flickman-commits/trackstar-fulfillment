@@ -141,7 +141,7 @@ export default function ArteloCosts() {
 
           <div className="mt-3 space-y-1 text-[11px] text-off-black/40 leading-relaxed">
             <p>
-              Every size ships as Premium Oak. Colour makes no difference to cost, so black and natural are the same price.
+              Every size ships as Premium Oak. Color makes no difference to cost, so black and natural are the same price.
             </p>
             <p>
               Priced as we order: archival matte fine art paper, no mats, and framed items include framing service and hanging pins.

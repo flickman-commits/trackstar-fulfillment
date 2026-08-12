@@ -181,7 +181,7 @@ function createScraper(config, year) {
   // DB-backed event ids from the dashboard, layered last so a human fixing a
   // gap in the UI beats whatever the file happens to say. Reads a cache, so
   // callers must have awaited ensureOverridesLoaded(); when they have not,
-  // this is a no-op and the file config applies — old behaviour, not a wrong
+  // this is a no-op and the file config applies — old behavior, not a wrong
   // one.
   const effectiveConfig = applyOverride(fileConfig, year)
 

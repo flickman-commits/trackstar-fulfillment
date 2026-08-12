@@ -16,7 +16,7 @@
 
 // ── Board geometry ──────────────────────────────────────────────────────────
 
-/** The eight Monopoly property colour groups, plus the non-property kinds. */
+/** The eight Monopoly property color groups, plus the non-property kinds. */
 export type ColorGroup =
   | 'brown'
   | 'lightblue'
@@ -37,7 +37,7 @@ export type SpaceType =
   | 'corner'
 
 /**
- * Which edge of the board a space sits on. Drives the colour-band orientation
+ * Which edge of the board a space sits on. Drives the color-band orientation
  * and text rotation — a space on the left rail reads sideways, not upright.
  */
 export type BoardEdge = 'bottom' | 'left' | 'top' | 'right' | 'corner'
@@ -51,7 +51,7 @@ export type SpaceStatus =
   | 'not_for_sale' // corners, chance/chest, taxes
 
 /**
- * The immutable half of a board space: position, kind, colour group, and the
+ * The immutable half of a board space: position, kind, color group, and the
  * classic Monopoly rent values. This never changes — it is the structure of
  * the game itself — so it lives in code (monopolyBoardLayout.ts) rather than
  * in the sheet, and doubles as the render fallback when Sheets is unreachable.
@@ -91,7 +91,7 @@ export interface BoardSpace extends BoardSpaceLayout {
 /**
  * A partnership tier. `fee`, `unitsIncluded`, `resaleValue` and `netCost` are
  * GATED — they are stripped from the public payload until the visitor unlocks.
- * Everything else (label, which colour groups it covers, slots remaining) is
+ * Everything else (label, which color groups it covers, slots remaining) is
  * public, so an un-unlocked visitor can still see that Boardwalk is open.
  */
 export interface PackageTier {

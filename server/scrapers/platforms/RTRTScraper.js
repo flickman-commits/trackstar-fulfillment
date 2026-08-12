@@ -122,7 +122,7 @@ export class RTRTScraper extends BaseScraper {
    * Understands the vocabulary RTRT uses in both `course` values ("halfmarathon",
    * "5k", "1mile") and timing-point names ("HM", "MAR", "5K", "1M").
    *
-   * @returns {{label: string, miles: number}|null} null when unrecognised.
+   * @returns {{label: string, miles: number}|null} null when unrecognized.
    */
   _parseDistanceToken(token) {
     const t = String(token || '').trim().toLowerCase().replace(/[\s_-]/g, '')

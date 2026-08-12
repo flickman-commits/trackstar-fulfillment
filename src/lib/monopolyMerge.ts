@@ -2,7 +2,7 @@
  * Merges the server's sales layer onto the canonical board layout.
  *
  * The API sends only what changes — statuses, partner names, copy, keyed by
- * spaceKey. Everything structural (positions, colour groups, rent ladders)
+ * spaceKey. Everything structural (positions, color groups, rent ladders)
  * comes from BOARD_LAYOUT, so a bad sheet row can rename a space but can never
  * produce a board that isn't a Monopoly board.
  *

@@ -112,7 +112,7 @@ interface RepairResponse {
   proposals?: Array<{ year: number; eventId: number; usable: boolean; verified?: boolean }>
 }
 
-// Colour and copy per status.
+// Color and copy per status.
 //
 // Two things this encoding has to get right, both learned from looking at the
 // first render:

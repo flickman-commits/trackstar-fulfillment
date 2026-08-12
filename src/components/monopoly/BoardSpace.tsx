@@ -8,8 +8,8 @@
  *     renders correctly at 360px on a phone and 780px on a laptop. No breakpoints.
  *
  *  2. Each side is rotated inward (bottom 0°, left 90°, top 180°, right 270°),
- *     which is how a physical board is laid out: the colour band always faces
- *     the centre. The content is authored once as if it were a bottom-row space
+ *     which is how a physical board is laid out: the color band always faces
+ *     the center. The content is authored once as if it were a bottom-row space
  *     and the rotation does the rest.
  */
 import { memo } from 'react'
@@ -102,7 +102,7 @@ function BoardSpaceImpl({ space, isSelected, isHighlighted, isHovered, onSelect,
       }}
     >
       <div style={innerStyle} className="flex flex-col">
-        {/* Colour band — always faces the board centre once rotated. */}
+        {/* Color band — always faces the board center once rotated. */}
         {space.colorGroup && !isCorner && (
           <div
             style={{
@@ -157,7 +157,7 @@ function BoardSpaceImpl({ space, isSelected, isHighlighted, isHovered, onSelect,
         </div>
 
         {/* Availability pip. Open spaces read as a hollow ring, spoken-for ones
-            as a filled dot in their status colour. Always on: this is the one
+            as a filled dot in their status color. Always on: this is the one
             thing a partner is scanning the board for. */}
         {sellable && (
           <div

@@ -3,9 +3,9 @@ import type { ReactNode } from 'react'
 /**
  * One shared tag vocabulary for orders.
  *
- * Everything that used to be scattered across badges, coloured sub-text lines
+ * Everything that used to be scattered across badges, colored sub-text lines
  * and callout boxes is derived here so the dashboard table and the order detail
- * modal always say the same thing in the same colour.
+ * modal always say the same thing in the same color.
  *
  * Tone meanings (keep these consistent, they are the whole point):
  *   red    = blocking or urgent. Someone has to act.

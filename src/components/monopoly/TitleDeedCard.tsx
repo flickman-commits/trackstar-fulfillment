@@ -17,7 +17,7 @@ interface Props {
 
 /**
  * Labels for the house/hotel ladder. These read straight off `rent[1..5]`.
- * The colour-set row is not in that array — on a real title deed it is always
+ * The color-set row is not in that array — on a real title deed it is always
  * double the base rent, so it's derived rather than stored.
  */
 const HOUSE_ROWS = [
@@ -107,7 +107,7 @@ export function TitleDeedCard({ space, compact = false }: Props) {
       {isProperty ? (
         <div style={{ fontSize: px(11), color: '#1A1A1A' }}>
           <Row label="Rent" value={`$${space.rent![0]}`} bold px={px} />
-          <Row label="Rent with colour set" value={`$${space.rent![0] * 2}`} px={px} />
+          <Row label="Rent with color set" value={`$${space.rent![0] * 2}`} px={px} />
           {HOUSE_ROWS.map((label, i) => (
             <Row key={label} label={label} value={`$${space.rent![i + 1]}`} px={px} />
           ))}

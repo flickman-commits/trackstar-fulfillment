@@ -8,7 +8,7 @@
  * one "INTERNAL —" tab), which the licensor can ignore.
  *
  * This module deliberately knows nothing about board geometry. The 40-space
- * layout — positions, types, colour groups, rent ladders — lives once, in
+ * layout — positions, types, color groups, rent ladders — lives once, in
  * src/lib/monopolyBoardLayout.ts, and the client merges this sales layer onto
  * it by spaceKey. Duplicating the layout here in a second language would mean
  * two copies drifting apart the first time a space gets renamed.
@@ -115,7 +115,7 @@ function statusOf(cell) {
 }
 
 /**
- * Header row + data rows → objects keyed by normalised header, so re-ordering
+ * Header row + data rows → objects keyed by normalized header, so reordering
  * columns in the sheet doesn't silently shift every field by one.
  */
 function toObjects(rows) {
@@ -140,12 +140,12 @@ function lines(value) {
 // ── Mapping ─────────────────────────────────────────────────────────────────
 
 /**
- * Colour group → tier key. This is a pricing concern, not board geometry, so it
+ * Color group → tier key. This is a pricing concern, not board geometry, so it
  * legitimately lives on both sides: the client mirrors it for the tier view,
  * and the server needs it to attribute committed deals to a tier without
  * knowing anything about board positions.
  *
- * Derived from the spaceKey's colour prefix ("DARK BLUE 1" → darkblue), which
+ * Derived from the spaceKey's color prefix ("DARK BLUE 1" → darkblue), which
  * is the same label the licensor sheet uses for its rows.
  */
 const COLOR_PREFIX_TO_TIER = [

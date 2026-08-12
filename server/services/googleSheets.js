@@ -109,7 +109,7 @@ export async function readRanges(a1List, { spreadsheetId = FINANCIAL_TRACKER_SHE
     dateTimeRenderOption: 'FORMATTED_STRING',
   })
   // Sheets returns valueRanges in request order, but omits `values` entirely
-  // for an empty range — normalise so callers can index without guarding.
+  // for an empty range — normalize so callers can index without guarding.
   return a1List.map((_, i) => res.data.valueRanges?.[i]?.values || [])
 }
 

@@ -20,7 +20,7 @@ export const MONOPOLY = {
   black: '#231F20',
   /** PMS 9525C. The board itself. */
   mint: '#CCE7D3',
-  /** A lighter mint for large fills where the full board colour would shout. */
+  /** A lighter mint for large fills where the full board color would shout. */
   mintPale: '#E4F1E9',
   /** Aged paper, for title deed and card surfaces. */
   paper: '#FBF9F4',
