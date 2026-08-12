@@ -464,9 +464,10 @@ export default function Monopoly() {
           </h3>
           <ul className="flex flex-col gap-2" style={{ maxWidth: '40rem' }}>
             {[
+              'A guaranteed space on Edition One',
               'Creative approval on your marks',
               '5 complimentary units shipped to your office',
-              'First right of refusal on your space in future editions',
+              'First right of refusal on your space in any future edition',
               'The ability to reorder at the $35 wholesale price',
             ].map((item) => (
               <li key={item} className="flex gap-2.5" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>

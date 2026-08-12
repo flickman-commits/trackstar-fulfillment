@@ -52,10 +52,22 @@ export interface TierDef {
   isFounding: boolean
 }
 
+/**
+ * What every space carries, whatever the fee.
+ *
+ * The exclusivity line used to be "5-year category exclusivity in your market",
+ * which promised a clock rather than a thing. If no second edition is ever
+ * printed, five years of exclusivity is five years of nothing, and a race
+ * director who works that out mid-pitch has caught us selling air.
+ *
+ * Per edition is the honest unit. Your space on Edition One is guaranteed the
+ * moment you commit, and first refusal carries to whatever comes next, if
+ * anything does. It promises less and means more.
+ */
 const COMMON_FEATURES = [
   '5 comp copies for your team',
   'Your own title sponsor on your title deed card',
-  '5-year category exclusivity in your market',
+  'A guaranteed space on Edition One, and first refusal on the next',
 ]
 
 export const TIERS: TierDef[] = [
@@ -323,9 +335,9 @@ export const FAQ: FaqItem[] = [
       'No. You pay a fee. That is the whole commitment. We produce, warehouse, sell and ship every unit.',
   },
   {
-    question: 'What does a 5-year deal mean if the board is printed once?',
+    question: 'How long does this last?',
     answer:
-      'Your space is printed, so it is permanent. The 5-year term covers category exclusivity and first refusal on your space in any future edition.',
+      'It is per edition rather than per year. Committing guarantees your space on Edition One, which is printed once and then exists permanently. If there is ever a second edition you get first refusal on your space before it is offered to anybody else, and if there never is, you have still lost nothing to a clock running out.',
   },
   {
     question: 'Will this compromise our existing sponsors?',
