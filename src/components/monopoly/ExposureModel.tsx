@@ -85,9 +85,27 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
       {/* ── Headline numbers first, assumptions second ────────────────── */}
       {/* ── Reach, ungated ──────────────────────────────────────────────── */}
       <div className="grid gap-px sm:grid-cols-3" style={{ backgroundColor: MONOPOLY.black }}>
-        <BigStat value={fmt(result.playerSessions)} label="people at the table" sub="One person, one game" />
-        <BigStat value={fmt(Math.round(result.attentionHours))} label="hours of attention" sub="Seated, board in front of them" />
-        <BigStat value={fmt(result.impressions)} label="brand impressions" sub="Times an eye lands on your name" accent />
+        {/* The sub line is the arithmetic, not a slogan. "One person, one game"
+            did not tell anybody where 80K came from, and a number a race
+            director cannot rebuild is a number they discount. These recompute
+            from the inputs below, so changing an assumption changes the shown
+            working too. */}
+        <BigStat
+          value={fmt(result.playerSessions)}
+          label="people at the table"
+          sub={`${num(input.units)} boxes × ${input.gamesPerBox} games each × ${input.playersPerGame} players`}
+        />
+        <BigStat
+          value={fmt(Math.round(result.attentionHours))}
+          label="hours of attention"
+          sub={`${fmt(result.playerSessions)} people at the table × ${input.hoursPerGame} hours a game`}
+        />
+        <BigStat
+          value={fmt(result.impressions)}
+          label="brand impressions"
+          sub={`${fmt(Math.round(result.attentionHours))} hours × ${input.glancesPerPlayerHour} looks at the board an hour`}
+          accent
+        />
       </div>
 
       {/* ── The comparison ──────────────────────────────────────────────
@@ -146,11 +164,28 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
       )}
 
       {/* ── Everything a sceptic needs, folded away until they ask ─────── */}
-      <details className="mt-6">
+      <details className="group mt-6">
+        {/* Styled as a control rather than a line of bold text. It reads as the
+            most sceptical thing on the page and nobody was clicking it. */}
         <summary
-          className="cursor-pointer list-none"
-          style={{ fontSize: 14, fontWeight: 700, color: MONOPOLY.ink }}
+          className="inline-flex cursor-pointer list-none items-center gap-2"
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: MONOPOLY.ink,
+            padding: '10px 16px',
+            border: CARD_OUTLINE,
+            borderRadius: UI_RADIUS,
+            backgroundColor: MONOPOLY.paper,
+          }}
         >
+          <span
+            aria-hidden="true"
+            className="transition-transform group-open:rotate-45"
+            style={{ fontSize: 16, lineHeight: 1, color: MONOPOLY.red }}
+          >
+            +
+          </span>
           Show the assumptions and the full rate card
         </summary>
 
@@ -230,6 +265,11 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
       </details>
     </div>
   )
+}
+
+/** Plain thousands separator, for the working rather than the headline. */
+function num(n: number): string {
+  return n.toLocaleString('en-US')
 }
 
 function fmt(n: number): string {

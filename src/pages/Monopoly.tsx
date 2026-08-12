@@ -20,6 +20,7 @@ import { STATUS_COLORS, legendFor } from '@/components/monopoly/boardView'
 import { ExposureModel } from '@/components/monopoly/ExposureModel'
 import { BrandLockup } from '@/components/monopoly/BrandLockup'
 import PriceExpectation from '@/components/monopoly/PriceExpectation'
+import { UnitFlow } from '@/components/monopoly/UnitFlow'
 import { MONOPOLY, UI_RADIUS, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import {
@@ -325,24 +326,42 @@ export default function Monopoly() {
             title="Be part of history"
             body="There is only ever one first edition. This is it."
           />
-          <Beat
-            dark
-            title="It gives something back"
-            body="5% of all proceeds go to charity, chosen together with the partner races."
-          />
         </div>
       </Section>
 
       {/* ═══ HOW IT GETS SOLD ═══ */}
       <Section>
-        <SectionHeading>Sales plan</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-          A partnership is only worth what the edition sells. Here's the plan behind the print run.
+        <SectionHeading>How we sell it</SectionHeading>
+        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          A 2,004 box first run, which is the manufacturer's minimum. If pre-orders justify more,
+          the run goes up and every number below goes up with it.
         </p>
-        <div className="grid gap-8 md:grid-cols-2">
-          {SALES_PLAN.map((item) => (
-            <Beat key={item.title} title={item.title} body={item.body} />
-          ))}
+
+        <UnitFlow allocation={UNIT_ALLOCATION} />
+
+        {/* The allocation says which box goes where. These say how the people
+            who buy them find out, which is a different question and was
+            unreadable when both lived in one list. */}
+        <div className="mt-14">
+          <SubHeading>Sales channels</SubHeading>
+          <p className="mb-6 mt-2" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
+            These do not move units on their own. They move the people who decide whether units
+            move.
+          </p>
+          <div className="grid gap-8 md:grid-cols-3">
+            {SALES_PLAN.map((item) => (
+              <Beat key={item.title} title={item.title} body={item.body} />
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-14">
+          <SubHeading>How it launches</SubHeading>
+          <div className="mt-6 grid gap-8 md:grid-cols-3">
+            {LAUNCH_PLAN.map((item) => (
+              <Beat key={item.title} title={item.title} body={item.body} />
+            ))}
+          </div>
         </div>
 
         {/* Proof the audience is real, in their words rather than ours. Every
@@ -393,60 +412,11 @@ export default function Monopoly() {
         </div>
       </Section>
 
-      {/* ═══ WHERE THE BOXES GO ═══
-          The specific thing a race asked for: not "we will sell them" but which
-          boxes, to whom, through what. */}
-      <Section muted>
-        <SectionHeading>Distribution</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          A 2,004 box first run, which is the manufacturer's minimum. If pre-orders justify more, the
-          run goes up and every number below goes up with it.
-        </p>
-
-        <div style={{ border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS, overflow: 'hidden', backgroundColor: MONOPOLY.paper }}>
-          {UNIT_ALLOCATION.map((row, i) => (
-            <div
-              key={row.label}
-              className="flex items-baseline justify-between gap-4 px-5 py-4"
-              style={{ borderTop: i === 0 ? 'none' : `1px solid rgba(35,31,32,0.15)` }}
-            >
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: MONOPOLY.ink }}>{row.label}</div>
-                <div style={{ fontSize: 13, color: MONOPOLY.inkMuted, lineHeight: 1.5 }}>{row.note}</div>
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-                {row.units.toLocaleString()}
-              </div>
-            </div>
-          ))}
-          <div
-            className="flex items-baseline justify-between gap-4 px-5 py-4"
-            style={{ borderTop: `2px solid ${MONOPOLY.black}`, backgroundColor: MONOPOLY.mint }}
-          >
-            <div style={{ fontSize: 16, fontWeight: 700, color: MONOPOLY.ink }}>Total printed</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
-              {UNIT_ALLOCATION.reduce((sum, r) => sum + r.units, 0).toLocaleString()}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-14">
-          <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
-            How it launches
-          </h3>
-          <div className="mt-6 grid gap-8 md:grid-cols-2">
-            {LAUNCH_PLAN.map((item) => (
-              <Beat key={item.title} title={item.title} body={item.body} />
-            ))}
-          </div>
-        </div>
-      </Section>
-
       {/* ═══ WAYS TO GET ON THE BOARD ═══
           One section for the whole commercial picture: what exists, what is
           still open, and what it costs. Splitting these made a reader hold
           three separate tables in their head to answer one question. */}
-      <Section>
+      <Section muted>
         <SectionHeading>Investment</SectionHeading>
         <p className="mb-6 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           Quoted in cash, and every space includes 5 comp copies. If you would rather put some of it
@@ -478,6 +448,9 @@ export default function Monopoly() {
               </li>
             ))}
           </ul>
+          <div className="mt-8">
+            <CtaButton />
+          </div>
         </div>
 
         {SHOW_AVAILABILITY_TABLE && (
@@ -510,7 +483,7 @@ export default function Monopoly() {
       </Section>
 
       {/* ═══ RETURN ON INVESTMENT ═══ */}
-      <Section muted>
+      <Section>
         <SectionHeading>Return on investment</SectionHeading>
         <div className="mb-8 mt-3 flex flex-col gap-4" style={{ maxWidth: '46rem' }}>
           <p style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
@@ -533,28 +506,26 @@ export default function Monopoly() {
       <Section dark>
         <SectionHeading dark>Our expertise</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, maxWidth: '46rem' }}>
-          This only works if whoever runs it can fill the board, produce it, and sell it.
+          Here's why Trackstar is the right company to bring this product to life.
         </p>
-        <div className="grid gap-8 md:grid-cols-2">
+        {/* Three claims, each carrying its own number. The fourth used to be
+            customer service, which is table stakes rather than a reason, and
+            had nothing behind it to point at. */}
+        <div className="grid gap-8 md:grid-cols-3">
           <Beat
             dark
-            title="We are already inside the marathon world"
-            body="Twenty race partnerships are live today, among them the Marine Corps Marathon, California International and Eugene. Filling this board is not a cold start."
+            title="20 race partnerships"
+            body="Live today, among them the Marine Corps Marathon, California International and Eugene. Filling this board is not a cold start."
           />
           <Beat
             dark
-            title="Ecommerce and design are our operations"
-            body="Producing, warehousing, selling and shipping physical product is what the company already runs on."
+            title="Operational alignment"
+            body="Producing, warehousing, selling and shipping physical product is what the company already runs on. This is the same job we do every day."
           />
           <Beat
             dark
-            title="Marketing is what we are best at"
-            body="Paid social and partnership sales are the core of the business. We do not need to learn how to sell this."
-          />
-          <Beat
-            dark
-            title="Customer service that partners can point at"
-            body="The same support operation our race partners already trust with their own runners."
+            title="Marketing is our superpower"
+            body="We sold nearly 3,000 products in our first year, almost entirely through partnership and social media marketing."
           />
         </div>
       </Section>
@@ -593,6 +564,9 @@ export default function Monopoly() {
             ))}
           </ol>
 
+          <div className="mt-10">
+            <CtaButton />
+          </div>
         </Section>
       )}
 
@@ -613,6 +587,10 @@ export default function Monopoly() {
               {phase.note && <div style={{ fontSize: 14, color: '#666666' }}>{phase.note}</div>}
             </div>
           ))}
+        </div>
+
+        <div className="mt-10">
+          <CtaButton />
         </div>
       </Section>
 
@@ -667,7 +645,7 @@ export default function Monopoly() {
         <div className="mx-auto max-w-2xl text-center">
           <H2 dark>Marathon Monopoly is only going to get printed once. Are you in?</H2>
           <div className="mt-8">
-            <CtaButton large />
+            <CtaButton />
           </div>
         </div>
       </Section>
@@ -838,7 +816,14 @@ function PointerArrowMobile() {
  * "Reserve a space", not "this space" — on a page where no space is selected,
  * "this" points at nothing and the reader has to stop and work it out.
  */
-function CtaButton({ large }: { large?: boolean }) {
+/**
+ * The only call to action on the page, and deliberately one size.
+ *
+ * It appears five times: hero, Investment, How to commit, Timeline and the
+ * close. A bigger variant at the end made the last one look like a different,
+ * more final offer than the four above it, when it is the same $400 click.
+ */
+function CtaButton() {
   return (
     <a
       href={DEPOSIT_URL}
@@ -852,8 +837,8 @@ function CtaButton({ large }: { large?: boolean }) {
         fontWeight: 700,
         textTransform: 'uppercase',
         letterSpacing: '0.5px',
-        padding: large ? '14px 32px' : '12px 26px',
-        fontSize: large ? 15 : 14,
+        padding: '12px 26px',
+        fontSize: 14,
         textAlign: 'center',
       }}
     >
@@ -863,7 +848,7 @@ function CtaButton({ large }: { large?: boolean }) {
       <span
         className="block"
         style={{
-          fontSize: large ? 12 : 11,
+          fontSize: 11,
           fontWeight: 500,
           letterSpacing: '0.02em',
           textTransform: 'none',
@@ -1001,6 +986,15 @@ function H2({ children, dark }: { children: React.ReactNode; dark?: boolean }) {
     >
       {children}
     </h2>
+  )
+}
+
+/** A heading inside a section. One size, so the hierarchy stays two deep. */
+function SubHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+      {children}
+    </h3>
   )
 }
 

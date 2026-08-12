@@ -179,38 +179,25 @@ export const COMMIT_STEPS: CommitStep[] = [
   },
 ]
 
+/**
+ * Awareness channels, as distinct from the unit allocation above them.
+ *
+ * The allocation already answers "which box goes where". These three do not
+ * move units directly, they move the people who decide whether units move, so
+ * putting them in the same list as expo stock made both harder to read.
+ */
 export const SALES_PLAN: SalesPlanItem[] = [
   {
-    title: 'Trackstar already owns the buyer',
-    body: '10,000 people have already bought a running gift from us. Not a cold audience. Exactly the person who buys this.',
-  },
-  {
-    title: '22 race partners promoting at once',
-    body: 'Every race on the board has a reason to tell their runners. That is 22 lists on one product, in one gifting window.',
-  },
-  {
-    title: 'Direct to consumer',
-    body: 'Sold through Trackstar year round, with the marketing weight concentrated on the holiday window.',
+    title: 'Gifted to media',
+    body: 'Units to running and lifestyle outlets early enough to make their holiday coverage.',
   },
   {
     title: 'Seeded to running influencers',
     body: 'Units in the hands of the creators runners already follow, ahead of launch.',
   },
   {
-    title: 'Gifted to media',
-    body: 'Units to running and lifestyle outlets early enough to make their holiday coverage.',
-  },
-  {
     title: '2027 holiday gift guides',
     body: 'Placement is being pursued now. A licensed board game for a sport that has never had one is an easy story to place.',
-  },
-  {
-    title: 'Our own content',
-    body: 'A full photo shoot and original organic content, handed to every partner to use however they want.',
-  },
-  {
-    title: '5% of proceeds go to charity',
-    body: 'Chosen with the partner races and reported back. A game that gives something back is a far easier story to promote.',
   },
 ]
 
@@ -299,16 +286,12 @@ export const LAUNCH_PLAN = [
     body: 'Every race posts the same teaser on the same day. Twenty-two accounts, one moment, and the sense that something is happening rather than something is for sale.',
   },
   {
-    title: 'A launch film',
-    body: 'Produced by us, handed to every partner. Yours to run on your own channels with no production cost.',
+    title: 'A full photo shoot',
+    body: 'Product photography, social cutdowns and copy, delivered to every partner ahead of the drop. Yours to run on your own channels at no production cost.',
   },
   {
-    title: 'A party at Running USA',
-    body: 'Where the industry already is. The board on a table, the partner races in the room, press invited.',
-  },
-  {
-    title: 'Full photo and content kit',
-    body: 'Product photography, social cutdowns and copy, delivered to every partner ahead of the drop.',
+    title: 'Press',
+    body: 'Units in the hands of running and lifestyle press before launch, so the coverage lands in the same week the board goes on sale.',
   },
 ]
 
@@ -363,10 +346,5 @@ export const FAQ: FaqItem[] = [
     question: 'Can we put our own sponsor on the board?',
     answer:
       'Yes, on your own title deed card. It is the one place a brand can appear, and only attached to the race that already has the relationship, so it can never conflict with anybody else on the board.',
-  },
-  {
-    question: 'Where does the charity money go?',
-    answer:
-      '5% of all proceeds. The partner races help choose the cause, and the total raised is reported back to everyone on the board.',
   },
 ]
