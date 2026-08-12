@@ -26,6 +26,7 @@ import {
   LAUNCH_PLAN,
   PRODUCT_SHOTS,
   FAQ,
+  COMMUNITY_FEEDBACK,
   SALES_PLAN,
   TIMELINE,
   UNIT_ALLOCATION,
@@ -338,6 +339,49 @@ export default function Monopoly() {
           {SALES_PLAN.map((item) => (
             <Beat key={item.title} title={item.title} body={item.body} />
           ))}
+        </div>
+
+        {/* Proof the audience is real, in their words rather than ours. Every
+            claim above this is a plan; this is the only thing on the page that
+            already happened. */}
+        <div className="mt-14">
+          <h3
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: MONOPOLY.inkMuted,
+            }}
+          >
+            Feedback from our community
+          </h3>
+          <p className="mt-2" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
+            We teased the idea to our list before building anything. These came back within hours,
+            unprompted, about a product that does not exist yet.
+          </p>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {COMMUNITY_FEEDBACK.map((item) => (
+              <figure
+                key={item.name + item.quote.slice(0, 24)}
+                className="flex flex-col justify-between gap-4 px-5 py-5"
+                style={{
+                  border: `2px solid ${MONOPOLY.black}`,
+                  borderRadius: UI_RADIUS,
+                  backgroundColor: MONOPOLY.paper,
+                }}
+              >
+                <blockquote style={{ fontSize: 16, color: MONOPOLY.ink, lineHeight: 1.5 }}>
+                  “{item.quote}”
+                </blockquote>
+                <figcaption style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>
+                  <span style={{ fontWeight: 700, color: MONOPOLY.ink }}>{item.name}</span>
+                  {item.note && <span> · {item.note}</span>}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
       </Section>
 
