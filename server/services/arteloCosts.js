@@ -26,17 +26,24 @@ const PAPER_TYPE = 'ArchivalMatteFineArt'
 
 // Artelo prefixes sizes with "x". `label` is what the storefront calls them.
 /**
- * The framed style is per SIZE, not one style across the board.
+ * The framed style is per SIZE, because it has not always been the same
+ * across the range.
  *
- * 8x10 goes to Artelo as standard Oak; every larger size goes as PremiumOak.
- * The storefront calls both just "Black Oak" / "Natural Oak", so the
- * difference is invisible from Shopify but very visible on the invoice —
- * pricing 8x10 as PremiumOak overstates its cost by about $7.
+ * Every size now ships as PremiumOak. 8x10 used to go to Artelo as standard
+ * Oak, which is why this is a per-size field rather than one constant — the
+ * storefront calls both just "Black Oak" / "Natural Oak", so a change like
+ * that is invisible from Shopify and only shows up on the invoice.
  *
- * These values were read off real order items in arteloOrderData.
+ * Confirmed against Artelo's own pricing on 2026-08-12: 8x10 PremiumOak is
+ * $25.37 + $7.85 and 24x36 PremiumOak is $75.72 + $21.92, both matching the
+ * quotes Artelo returned for the upgraded variants. Pricing 8x10 as plain Oak
+ * now UNDERSTATES it by about $5.50 a unit.
+ *
+ * If a size is ever downgraded again, change it here and re-check against the
+ * API rather than assuming.
  */
 export const SIZES = [
-  { id: 'x8x10', label: '8x10', framedStyle: 'Oak', framedLabel: 'Oak' },
+  { id: 'x8x10', label: '8x10', framedStyle: 'PremiumOak', framedLabel: 'Premium Oak' },
   { id: 'x12x18', label: '12x18', framedStyle: 'PremiumOak', framedLabel: 'Premium Oak' },
   { id: 'x16x24', label: '16x24', framedStyle: 'PremiumOak', framedLabel: 'Premium Oak' },
   { id: 'x24x36', label: '24x36', framedStyle: 'PremiumOak', framedLabel: 'Premium Oak' },

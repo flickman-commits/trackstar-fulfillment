@@ -11,9 +11,11 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
  * archival matte fine art paper, and framed items with framing service and
  * hanging pins included.
  *
- * "Framed" resolves to a different Artelo frame style per size — 8x10 ships as
- * standard Oak, larger sizes as Premium Oak — which is invisible from Shopify
- * because the storefront labels both just "Black Oak" / "Natural Oak".
+ * "Framed" resolves per size to whichever Artelo frame style that size ships
+ * with, and each cell labels the style it used. Every size is Premium Oak as
+ * of Aug 2026; 8x10 was standard Oak before that. The storefront calls both
+ * just "Black Oak" / "Natural Oak", so a change like that is invisible from
+ * Shopify and only shows up in the landed cost.
  */
 
 interface Cell {
@@ -139,7 +141,7 @@ export default function ArteloCosts() {
 
           <div className="mt-3 space-y-1 text-[11px] text-off-black/40 leading-relaxed">
             <p>
-              8x10 ships as standard Oak; larger sizes ship as Premium Oak. Colour makes no difference to cost, so black and natural are the same price.
+              Every size ships as Premium Oak. Colour makes no difference to cost, so black and natural are the same price.
             </p>
             <p>
               Priced as we order: archival matte fine art paper, no mats, and framed items include framing service and hanging pins.
