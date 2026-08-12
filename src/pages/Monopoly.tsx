@@ -595,23 +595,26 @@ export default function Monopoly() {
 
       {/* ═══ OBJECTIONS ═══ */}
       <Section>
-        <SectionHeading>Objections</SectionHeading>
+        <SectionHeading>What races tell us</SectionHeading>
+        {/* Their words, then ours. Naming the concern first is the whole point:
+            a race director reading their own objection back knows it has been
+            heard, which a reassurance phrased as a benefit never achieves. */}
         <div className="mt-8 grid gap-x-10 gap-y-8 md:grid-cols-2">
           <Beat
-            title="You never touch product"
-            body="No inventory, no fulfilment, nothing to sell. We produce, store, ship and support every unit."
+            title="&ldquo;We don't want to hold any inventory.&rdquo;"
+            body="You won't. Beyond the 5 comp copies that come with every space, no boxes are sent to you unless you choose a package that includes them."
           />
           <Beat
-            title="It won't compromise your sponsors"
-            body="No footwear or apparel brand appears anywhere on the board or box. You approve every brand that does."
+            title="&ldquo;We can't be on a board with another shoe sponsor.&rdquo;"
+            body="We have purposefully not taken on any sponsors in categories where races have partnerships. The only brand that can appear on your title deed is one you choose."
           />
           <Beat
-            title="You control how you appear"
-            body="Full creative approval on your name and marks. Nothing prints that you haven't signed off."
+            title="&ldquo;We would need control over how our marks appear.&rdquo;"
+            body="You have full creative approval of how your name and marks appear on your assets."
           />
           <Beat
-            title="No risk if it doesn't fill"
-            body="Every deposit is refundable if we don't hit minimum commitments. Nothing prints until the board is full and funded."
+            title="&ldquo;What if you can't fill the board with enough races?&rdquo;"
+            body="All deposits are refundable. If we cannot fill the board, we refund your deposit."
           />
         </div>
       </Section>
@@ -639,11 +642,10 @@ export default function Monopoly() {
       {/* ═══ CTA ═══ */}
       <Section dark>
         <div className="mx-auto max-w-2xl text-center">
-          <H2 dark>Twenty-two spaces. Printed once.</H2>
-          <p className="mt-4" style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
-            Commitments close September 30. The board locks when design begins, and it prints once.
-          </p>
-          <CtaButton large />
+          <H2 dark>Marathon Monopoly is only going to get printed once. Are you in?</H2>
+          <div className="mt-8">
+            <CtaButton large />
+          </div>
         </div>
       </Section>
 
