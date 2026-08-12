@@ -205,37 +205,46 @@ export const SALES_PLAN: SalesPlanItem[] = [
 /**
  * Real replies to the tease email, sent August 12 2026.
  *
- * Verbatim apart from trimming and one typo fix, and attributed by first name
- * only because these were private replies to a survey, not reviews anybody
- * submitted for publication.
+ * The email asked four questions, one of which was what they would expect to
+ * pay, so every quote here is paired with that person's own answer. These are
+ * the four who answered the price question; two others wrote back without
+ * naming a figure and are not shown, since a card with no price would read as
+ * if the number had been withheld.
  *
- * Deliberately not cherry-picked into something rosier than it was. Of the
- * eight people who wrote back, one said outright they would not buy, and the
- * price guesses ran from $20 to $199. Quoting the enthusiasm and hiding the
- * spread would be the kind of thing a race director checks and catches, and
- * the honest version is strong enough: people replied at all, unprompted, to
- * a product that does not exist yet.
+ * Verbatim apart from trimming, and attributed by first name only because
+ * these were private replies to a survey rather than reviews anybody submitted
+ * for publication.
+ *
+ * Deliberately not curated into something rosier than it was. The $20 answer
+ * stays. Eight people replied, one said outright they would not buy, and the
+ * guesses ran $20 to $199 against a $45 direct price. Showing only the top of
+ * that range is the kind of thing a race director checks and catches, and the
+ * honest spread still lands above what we are charging.
  */
 export const COMMUNITY_FEEDBACK = [
   {
     quote:
-      'I will with 100000% confidence purchase it if you guys make it happen. It can actually even be a perfect gift for fellow runners. Price would not be an issue, we spend hundreds on race entry fees and gear so why not on a marathon board game.',
-    name: 'Rickzter',
+      'I will with 100000% confidence purchase it if you guys make it happen. It can actually even be a perfect gift for fellow runners. We spend hundreds on race entry fees and gear so why not on a marathon board game.',
+    name: 'Ricky',
+    price: 'Price would not be an issue',
   },
   {
     quote:
       'The ownership stickers must be sneakers or medals. I feel like jail has to be a porta potty.',
     name: 'Joshua',
-    note: 'Would buy. Expects to pay $100 to $199.',
+    price: '$100 to $199',
   },
   {
     quote:
-      'I would be interested. I would expect the game to cost $35 to $50. I think chance entries to the World Majors would be a good idea.',
+      'I would be interested. I think chance entries to the World Majors would be a good idea.',
     name: 'A Trackstar customer',
+    price: '$35 to $50',
   },
   {
-    quote: 'Instead of "Go to Jail," it could be "Injured, go to rehab."',
-    name: 'Ronald',
+    quote:
+      'I would definitely be interested in buying one if it is not too expensive. I would love for there to be something with Strava on the board. Maybe "free parking" can be "free race entry."',
+    name: 'Zack',
+    price: '$20',
   },
 ]
 

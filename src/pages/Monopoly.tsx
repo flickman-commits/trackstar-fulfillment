@@ -357,8 +357,8 @@ export default function Monopoly() {
             Feedback from our community
           </h3>
           <p className="mt-2" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-            We teased the idea to our list before building anything. These came back within hours,
-            unprompted, about a product that does not exist yet.
+            We teased the idea to our list before building anything, and asked what they would
+            expect to pay for it. These came back within hours.
           </p>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -375,9 +375,11 @@ export default function Monopoly() {
                 <blockquote style={{ fontSize: 16, color: MONOPOLY.ink, lineHeight: 1.5 }}>
                   “{item.quote}”
                 </blockquote>
-                <figcaption style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>
-                  <span style={{ fontWeight: 700, color: MONOPOLY.ink }}>{item.name}</span>
-                  {item.note && <span> · {item.note}</span>}
+                <figcaption>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: MONOPOLY.ink }}>{item.name}</div>
+                  <div className="mt-1" style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>
+                    Expects to pay: <span style={{ color: MONOPOLY.ink }}>{item.price}</span>
+                  </div>
                 </figcaption>
               </figure>
             ))}
