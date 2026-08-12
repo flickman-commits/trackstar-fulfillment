@@ -318,9 +318,29 @@ export const FAQ: FaqItem[] = [
       "Yes. We're working with the company that holds the sole rights from Hasbro to create official custom editions of MONOPOLY.",
   },
   {
-    question: 'Do we have to sell or store anything?',
+    question: 'What if we do not have the infrastructure to hold and sell inventory?',
     answer:
-      'No. You pay a fee. That is the whole commitment. We produce, warehouse, sell and ship every unit.',
+      'You do not need any. We produce, warehouse, sell and ship every unit. Beyond the 5 complimentary units that come with your space, no boxes are sent to you unless you choose to buy some.',
+  },
+  {
+    question: 'Will there be sponsors on the board competing with our own race sponsors?',
+    answer:
+      'No. Edition One carries no third-party brands at all. It is presented by Trackstar and the only names on the board are the races, so there is nothing on it that can conflict with a sponsor of yours.',
+  },
+  {
+    question: 'Can we put our own sponsor on the board?',
+    answer:
+      'Yes, on your own title deed card. It is the one place a brand can appear, and only attached to the race that already has the relationship, so it can never conflict with anybody else on the board.',
+  },
+  {
+    question: 'Will we have control of how our marks appear?',
+    answer:
+      'Yes. You have approval rights on your name, your marks and how your course is represented, and nothing prints until you have signed it off.',
+  },
+  {
+    question: 'What if you cannot fill the board?',
+    answer:
+      'Every deposit is refundable in full. Nothing prints until the board is committed and funded, so there is no version of this where you have paid for something that does not exist.',
   },
   {
     question: 'How long does this last?',
@@ -328,28 +348,8 @@ export const FAQ: FaqItem[] = [
       'It is per edition rather than per year. Committing guarantees your space on Edition One, which is printed once and then exists permanently. If there is ever a second edition you get first refusal on your space before it is offered to anybody else, and if there never is, you have still lost nothing to a clock running out.',
   },
   {
-    question: 'Will this compromise our existing sponsors?',
-    answer:
-      'No. Edition One carries no third-party brands at all. It is presented by Trackstar, and the only names on the board are the races. Nothing on it can conflict with a sponsor of yours.',
-  },
-  {
-    question: 'Who controls how our race appears?',
-    answer:
-      'You do. Approval rights on your name, marks and course representation before design locks.',
-  },
-  {
-    question: 'What if you do not fill the board?',
-    answer:
-      'Every deposit is refundable in full. Nothing prints until the board is committed and funded.',
-  },
-  {
     question: 'Can we offset the fee by buying boxes?',
     answer:
       'Yes. Fees are quoted in cash, and you can offset part of yours by committing to buy boxes at $35. Sell them at your expo for $55 and each one returns $20.',
-  },
-  {
-    question: 'Can we put our own sponsor on the board?',
-    answer:
-      'Yes, on your own title deed card. It is the one place a brand can appear, and only attached to the race that already has the relationship, so it can never conflict with anybody else on the board.',
   },
 ]

@@ -594,34 +594,8 @@ export default function Monopoly() {
         </div>
       </Section>
 
-      {/* ═══ OBJECTIONS ═══ */}
-      <Section>
-        <SectionHeading>Addressing your concerns</SectionHeading>
-        {/* Their words, then ours. Naming the concern first is the whole point:
-            a race director reading their own objection back knows it has been
-            heard, which a reassurance phrased as a benefit never achieves. */}
-        <div className="mt-8 grid gap-x-10 gap-y-8 md:grid-cols-2">
-          <Beat
-            title="&ldquo;We don't want to hold any inventory.&rdquo;"
-            body="You won't. Beyond the 5 comp copies that come with every space, no boxes are sent to you unless you choose a package that includes them."
-          />
-          <Beat
-            title="&ldquo;We can't be on a board with a competing sponsor.&rdquo;"
-            body="We have purposefully not taken on any sponsors in categories where races have partnerships. The only brand that can appear on your title deed is one you choose."
-          />
-          <Beat
-            title="&ldquo;We would need control over how our marks appear.&rdquo;"
-            body="You have full creative approval of how your name and marks appear on your assets."
-          />
-          <Beat
-            title="&ldquo;What if you can't fill the board with enough races?&rdquo;"
-            body="All deposits are refundable. If we cannot fill the board, we refund your deposit."
-          />
-        </div>
-      </Section>
-
       {/* ═══ FAQ ═══ */}
-      <Section muted>
+      <Section>
         <SectionHeading>FAQs</SectionHeading>
         <div className="mt-8 flex flex-col gap-px" style={{ backgroundColor: MONOPOLY.black }}>
           {FAQ.map((item) => (
@@ -829,34 +803,39 @@ function CtaButton() {
       href={DEPOSIT_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-block transition-opacity hover:opacity-90"
+      className="group inline-flex items-center gap-3 transition-all hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none"
       style={{
-        backgroundColor: MONOPOLY.red,
-        color: '#FFFFFF',
+        backgroundColor: MONOPOLY.paper,
+        color: MONOPOLY.ink,
+        border: `2px solid ${MONOPOLY.black}`,
         borderRadius: UI_RADIUS,
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-        padding: '12px 26px',
-        fontSize: 14,
-        textAlign: 'center',
+        padding: '13px 22px',
+        textAlign: 'left',
+        // A hard offset rather than a blur: the section headings are flat red
+        // plates, so the CTA needed to differ by more than wording. This one
+        // sits above the page and presses into it on hover, which no heading
+        // does. Paper rather than red for the same reason, and because the
+        // closing CTA sits on black where a red plate would just be a third
+        // red rectangle.
+        boxShadow: `4px 4px 0 ${MONOPOLY.red}`,
       }}
     >
-      Reserve your space
-      {/* The price and the refund promise ride on the button itself: it is the
-          objection a race has at the exact moment they are deciding to click. */}
+      <span>
+        <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: 14 }}>
+          Reserve your space
+        </span>
+        {/* The price and the refund promise ride on the button itself: it is the
+            objection a race has at the exact moment they are deciding to click. */}
+        <span className="block" style={{ fontSize: 11, fontWeight: 500, color: MONOPOLY.inkMuted, marginTop: 3 }}>
+          $400, fully refundable
+        </span>
+      </span>
       <span
-        className="block"
-        style={{
-          fontSize: 11,
-          fontWeight: 500,
-          letterSpacing: '0.02em',
-          textTransform: 'none',
-          opacity: 0.85,
-          marginTop: 3,
-        }}
+        aria-hidden="true"
+        className="transition-transform group-hover:translate-x-0.5"
+        style={{ color: MONOPOLY.red, fontSize: 18, fontWeight: 700, lineHeight: 1 }}
       >
-        $400, fully refundable
+        &rarr;
       </span>
     </a>
   )
