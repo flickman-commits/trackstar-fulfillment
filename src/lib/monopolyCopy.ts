@@ -162,20 +162,20 @@ export const TIMELINE: TimelinePhase[] = [
 
 export const COMMIT_STEPS: CommitStep[] = [
   {
-    title: '$400 reserves your space',
-    body: 'Fully refundable. Skin in the game, and the only money you put up until the board is real.',
+    title: 'Reserve your spot with a $400 deposit',
+    body: 'Fully refundable, and the only money you put up until the board is real.',
   },
   {
     title: 'We fill the board',
     body: 'All 22 race spaces. Nothing more is asked of you while that happens.',
   },
   {
-    title: '50% when the board is full',
+    title: 'You pay 50% when the board is full',
     body: 'You see the finished board first, then half is due, less the $400 you already paid.',
   },
   {
-    title: 'The rest when you have the product',
-    body: 'The final 50% is due once the boxes are made and in your hands. Not before.',
+    title: 'You pay the final 50% on delivery',
+    body: 'Due once the boxes are made and in your hands in 2027. Not before.',
   },
 ]
 
@@ -276,7 +276,7 @@ export const UNIT_ALLOCATION = [
   {
     label: 'Trackstar (DTC)',
     units: 1244,
-    note: 'Our email list of 10,000 people who have already bought a running gift, plus our organic and paid channels. Anything unallocated sells here.',
+    note: 'Our email list of 10,000 people who have already bought a running gift, plus our organic and paid channels.',
   },
 ]
 
@@ -305,10 +305,10 @@ export const LAUNCH_PLAN = [
  * placeholders holding the exact slots the finished imagery will fill.
  */
 export const PRODUCT_SHOTS = [
-  { label: 'The box', note: 'Front of pack' },
-  { label: 'The board', note: 'Full open board' },
-  { label: 'The pieces', note: 'Six custom tokens' },
-  { label: 'Title deeds', note: 'Race cards' },
+  { label: 'The Box' },
+  { label: 'The Board' },
+  { label: 'The Pieces' },
+  { label: 'Title Deeds' },
 ]
 
 export const FAQ: FaqItem[] = [
@@ -325,7 +325,7 @@ export const FAQ: FaqItem[] = [
   {
     question: 'Will there be sponsors on the board competing with our own race sponsors?',
     answer:
-      'No. Edition One carries no third-party brands at all. It is presented by Trackstar and the only names on the board are the races, so there is nothing on it that can conflict with a sponsor of yours.',
+      'The only other sponsors on the board will be title sponsors that individual races choose to put on their own title deed card. Other than that we are not taking on third-party sponsors anywhere on the board, so nothing appears beside your race that you did not agree to.',
   },
   {
     question: 'Can we put our own sponsor on the board?',

@@ -43,7 +43,7 @@ const PRINT_RUN = UNIT_ALLOCATION.reduce((sum, row) => sum + row.units, 0)
 
 const DEFAULTS: ExposureInput = {
   units: PRINT_RUN,
-  playersPerGame: 4,
+  playersPerGame: 3,
   gamesPerBox: 10,
   hoursPerGame: 2,
   glancesPerPlayerHour: 20,
@@ -103,7 +103,7 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
         <BigStat
           value={fmt(result.playerSessions)}
           label="people at the table"
-          sub={`${num(input.units)} boxes × ${input.gamesPerBox} games each × ${input.playersPerGame} players`}
+          sub={`${num(input.units)} boxes × ${input.gamesPerBox} games per box × ${input.playersPerGame} players per game`}
         />
         <BigStat
           value={fmt(Math.round(result.attentionHours))}
@@ -183,22 +183,24 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
       <details className="group mt-6">
         {/* Styled as a control rather than a line of bold text. It reads as the
             most sceptical thing on the page and nobody was clicking it. */}
+        {/* Underlined rather than boxed. It needs to read as clickable without
+            competing with the CTA, which is the only outlined control here. */}
         <summary
           className="inline-flex cursor-pointer list-none items-center gap-2"
           style={{
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: 700,
             color: MONOPOLY.ink,
-            padding: '10px 16px',
-            border: CARD_OUTLINE,
-            borderRadius: UI_RADIUS,
-            backgroundColor: MONOPOLY.paper,
+            textDecoration: 'underline',
+            textDecorationColor: MONOPOLY.red,
+            textUnderlineOffset: 5,
+            textDecorationThickness: 2,
           }}
         >
           <span
             aria-hidden="true"
             className="transition-transform group-open:rotate-45"
-            style={{ fontSize: 16, lineHeight: 1, color: MONOPOLY.red }}
+            style={{ fontSize: 16, lineHeight: 1, color: MONOPOLY.red, textDecoration: 'none' }}
           >
             +
           </span>

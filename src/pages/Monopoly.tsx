@@ -235,8 +235,8 @@ export default function Monopoly() {
       <Section>
         <SectionHeading>What it is</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-          Over 300 officially licensed editions have been printed. Football clubs, cities, national
-          parks, film franchises, theme parks, universities.
+          There have been over 300 custom editions made of Monopoly. Football clubs, cities,
+          national parks, film franchises, theme parks, universities.
         </p>
 
         <div className="mb-10 flex flex-wrap gap-2">
@@ -278,9 +278,10 @@ export default function Monopoly() {
           squares hold the exact slots the finished renders will fill. */}
       <Section muted>
         <SectionHeading>What's in the box</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          A full-size licensed Monopoly edition. Board, box, custom pieces, title deeds, money and
-          cards, made to the same spec as any edition on a shelf.
+        <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          Marathon Monopoly will be a full-size, licensed, limited edition Monopoly board game. It
+          will include the board, box, custom pieces, title deeds, money and cards, made to the same
+          spec as every other Monopoly board game, with official licensing provided by Hasbro.
         </p>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {PRODUCT_SHOTS.map((shot) => (
@@ -298,10 +299,9 @@ export default function Monopoly() {
                   Image coming
                 </span>
               </div>
-              <div className="mt-3" style={{ fontSize: 15, fontWeight: 700, color: MONOPOLY.ink }}>
+              <div className="mt-3" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
                 {shot.label}
               </div>
-              <div style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>{shot.note}</div>
             </div>
           ))}
         </div>
@@ -310,28 +310,28 @@ export default function Monopoly() {
       {/* ═══ WHY YOU SHOULD CARE ═══ */}
       <Section dark>
         <SectionHeading dark>Why you should care</SectionHeading>
-        <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid gap-8 md:grid-cols-3">
           <Beat
             dark
-            title="The company you keep"
+            title="Be Surrounded by Greatness"
             body="Twenty-two races define this edition, and they are the ones runners already care about. Being on the board is being named alongside them, in print, permanently."
           />
           <Beat
             dark
-            title="A marathon-obsessed audience"
-            body="3.2 million times your name is seen. And a runner who has done four of the twenty-two spends the whole game looking at the other eighteen."
+            title="Access to a Marathon-Obsessed Audience"
+            body="2.4 million times your name is seen. And a runner who has done four of the twenty-two spends the whole game looking at the other eighteen."
           />
           <Beat
             dark
-            title="Be part of history"
-            body="There is only ever one first edition. This is it."
+            title="Build a Legacy"
+            body="Be part of the first-ever edition of Marathon Monopoly and entrench your race in the lore of the marathon world."
           />
         </div>
       </Section>
 
       {/* ═══ HOW IT GETS SOLD ═══ */}
       <Section>
-        <SectionHeading>How we sell it</SectionHeading>
+        <SectionHeading>Sales and distribution plan</SectionHeading>
         <div className="mt-3">
           <UnitFlow allocation={UNIT_ALLOCATION} />
         </div>
@@ -341,7 +341,7 @@ export default function Monopoly() {
             unreadable when both lived in one list. */}
         <div className="mt-14">
           <SubHeading>Getting visibility on the product</SubHeading>
-          <p className="mb-6 mt-2" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
+          <p className="mb-6 mt-2" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
             These do not move units on their own. They move the people who decide whether units
             move.
           </p>
@@ -376,7 +376,7 @@ export default function Monopoly() {
           >
             Feedback from our community
           </h3>
-          <p className="mt-2" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
+          <p className="mt-2" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
             We teased the idea to our list before building anything, and asked what they would
             expect to pay for it. These came back within hours.
           </p>
@@ -415,7 +415,7 @@ export default function Monopoly() {
           three separate tables in their head to answer one question. */}
       <Section muted>
         <SectionHeading>Investment</SectionHeading>
-        <p className="mb-6 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+        <p className="mb-6 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           Quoted in cash, and every space includes 5 comp copies. If you would rather put some of it
           into product, you can offset part of the fee by committing to boxes at $35 and sell them
           at your expo for $55.
@@ -437,7 +437,7 @@ export default function Monopoly() {
               'First right of refusal on your space in any future edition',
               'The ability to reorder at the $35 wholesale price',
             ].map((item) => (
-              <li key={item} className="flex gap-2.5" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
+              <li key={item} className="flex gap-2.5" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
                 <span aria-hidden="true" style={{ color: MONOPOLY.red, fontWeight: 700 }}>
                   +
                 </span>
@@ -455,7 +455,7 @@ export default function Monopoly() {
           <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
             Which spaces are still open
           </h3>
-          <p className="mb-6" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6 }}>
+          <p className="mb-6" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6 }}>
             {takenCount > 0
               ? `${takenCount} of ${counts.raceSpacesTotal} spoken for. Position is assigned in the order it is committed.`
               : 'Every space is open. Position is assigned in the order it is committed.'}
@@ -469,7 +469,7 @@ export default function Monopoly() {
           <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
             The playing pieces
           </h3>
-          <p className="mb-6" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
+          <p className="mb-6" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
             Custom-molded tokens, open to gear, nutrition, timing and wearable brands. Renders are
             indicative. Final tooling is set during design.
           </p>
@@ -483,14 +483,14 @@ export default function Monopoly() {
       <Section>
         <SectionHeading>Return on investment</SectionHeading>
         <div className="mb-8 mt-3 flex flex-col gap-4" style={{ maxWidth: '46rem' }}>
-          <p style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
+          <p style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
             Marathon Monopoly will live in the households of thousands of runners and their
             families, who will sit staring at this board for three hours at a time, every time they
             play, for the next decade. Below is the exposure a space earns from marathon-obsessed
             people, estimated conservatively on purpose so our race partners can see what it is
             actually worth.
           </p>
-          <p style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
+          <p style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
             Attention on a board game is not attention on an Instagram ad. People sit with the game
             in front of them, rather than being bombarded by a hundred other things on a phone. We
             think these impressions are worth more than an Instagram impression.
@@ -502,7 +502,7 @@ export default function Monopoly() {
       {/* ═══ WHY TRACKSTAR ═══ */}
       <Section dark>
         <SectionHeading dark>Our expertise</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, maxWidth: '46rem' }}>
+        <p className="mb-8 mt-3" style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, maxWidth: '46rem' }}>
           Here's why Trackstar is the right company to bring this product to life.
         </p>
         {/* Three claims, each carrying its own number. The fourth used to be
@@ -511,20 +511,17 @@ export default function Monopoly() {
         <div className="grid gap-8 md:grid-cols-3">
           <Beat
             dark
-            title="20 race partnerships"
-            upper
+            title="20 Race Partnerships"
             body="Live today, among them the Marine Corps Marathon, California International and Eugene. Filling this board is not a cold start."
           />
           <Beat
             dark
-            title="Operational alignment"
-            upper
+            title="Operational Alignment"
             body="Producing, warehousing, selling and shipping physical product is what the company already runs on. This is the same job we do every day."
           />
           <Beat
             dark
-            title="Marketing is our superpower"
-            upper
+            title="Marketing Is Our Superpower"
             body="We sold nearly 3,000 products in our first year, almost entirely through partnership and social media marketing."
           />
         </div>
@@ -534,9 +531,8 @@ export default function Monopoly() {
       {COMMIT_STEPS.length > 0 && (
         <Section>
           <SectionHeading>How to commit</SectionHeading>
-          <p className="mb-10 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-            $400 reserves your space, fully refundable. You commit real money only once the board is
-            full and you can see exactly who is on it.
+          <p className="mb-10 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6 }}>
+            $400 reserves your space, fully refundable, and you commit real money only once the board is full.
           </p>
 
           <ol className="grid gap-px sm:grid-cols-2 lg:grid-cols-4" style={{ backgroundColor: MONOPOLY.black }}>
@@ -898,7 +894,7 @@ function Section({
 }) {
   return (
     <section
-      className="px-5 py-16 lg:px-8 lg:py-24"
+      className="py-16 lg:py-24"
       style={{
         backgroundColor: dark ? MONOPOLY.black : muted ? MONOPOLY.mint : MONOPOLY.paper,
         // The engraved banknote field runs under the mint panels, the way it
@@ -907,7 +903,10 @@ function Section({
         ...(dark ? guilloche('rgba(255,255,255,0.045)', 24) : {}),
       }}
     >
-      <div className="mx-auto max-w-6xl">{children}</div>
+      {/* Same container as the hero, down to the breakpoint padding. They used
+          to differ (1600/px-24 against 1152/px-8), so the content edge jumped
+          inward the moment you scrolled past the board. */}
+      <div className="mx-auto max-w-[1600px] px-5 lg:px-16 xl:px-24">{children}</div>
     </section>
   )
 }
