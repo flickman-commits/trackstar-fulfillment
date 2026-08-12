@@ -261,7 +261,7 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
                   fontSize: 14,
                 }}
               >
-                Reserve a space
+                Reserve this space, $400
               </button>
             )}
 

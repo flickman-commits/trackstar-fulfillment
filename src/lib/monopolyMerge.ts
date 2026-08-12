@@ -13,6 +13,7 @@
  * impossible.
  */
 import { BOARD_LAYOUT, GROUP_TO_TIER } from './monopolyBoardLayout'
+import { TIERS, TOKENS } from './monopolyCopy'
 import type {
   BoardSpace,
   MonopolyPublicPayload,
@@ -42,7 +43,9 @@ export function mergeSalesData(sales: MonopolySalesResponse): MonopolyPublicPayl
     }
   })
 
-  const tiers: PackageTier[] = (sales.tiers ?? []).map((tier) => {
+  // Definitions come from code; only the slot counts are live, derived from
+  // whichever spaces the sheet says are still open.
+  const tiers: PackageTier[] = TIERS.map((tier) => {
     const inTier = spaces.filter((s) => s.tierKey === tier.tierKey && s.type === 'property')
     return {
       ...tier,
@@ -56,12 +59,12 @@ export function mergeSalesData(sales: MonopolySalesResponse): MonopolyPublicPayl
   return {
     spaces,
     tiers,
-    tokens: sales.tokens ?? [],
+    tokens: TOKENS.map((t) => ({ ...t, status: 'available' as const })),
     counts: {
       raceSpacesTotal: raceSpaces.length,
       raceSpacesRemaining: raceSpaces.filter((s) => s.status === 'available').length,
       stationsRemaining: spaces.filter((s) => s.type === 'station' && s.status === 'available').length,
-      tokensRemaining: (sales.tokens ?? []).filter((t) => t.status === 'available').length,
+      tokensRemaining: TOKENS.length,
     },
     unlocked: Boolean(sales.unlocked),
     stale: sales.stale,

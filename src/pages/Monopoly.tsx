@@ -22,12 +22,13 @@ import { BrandLockup } from '@/components/monopoly/BrandLockup'
 import { MONOPOLY, UI_RADIUS, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import {
-  BRAND_PRICING,
-  BRAND_SLOTS,
   COMMIT_STEPS,
+  LAUNCH_PLAN,
+  PRODUCT_SHOTS,
   FAQ,
   SALES_PLAN,
   TIMELINE,
+  UNIT_ALLOCATION,
 } from '@/lib/monopolyCopy'
 import { mergeSalesData } from '@/lib/monopolyMerge'
 import type { BoardSpace, MonopolyPublicPayload, MonopolySalesResponse } from '@/lib/monopolyTypes'
@@ -51,7 +52,14 @@ const HEADER_HEIGHT_FALLBACK = 72
  * a flag rather than deleted because it earns its place once the board fills up.
  */
 const SHOW_AVAILABILITY_TABLE = false
-const CTA_EMAIL = 'matt@trackstar.art'
+/**
+ * Stripe payment link for the $400 reservation deposit.
+ *
+ * A hosted link rather than a Checkout integration: no keys in the app, no card
+ * data anywhere near our code, and Stripe collects race name and email on its
+ * own page. At this volume an integration would buy nothing.
+ */
+const DEPOSIT_URL = 'https://buy.stripe.com/3cI8wP6J17Xd3Vg3nl7kc06'
 
 export default function Monopoly() {
   const [params] = useSearchParams()
@@ -125,11 +133,11 @@ export default function Monopoly() {
 
   const handleSelect = useCallback((position: number) => setSelectedPosition(position), [])
 
-  const requestSpace = useCallback((space: BoardSpace) => {
-    const subject = encodeURIComponent(
-      `Marathon Monopoly: reserving a space (${space.displayName}, space ${space.position})`,
-    )
-    window.location.href = `mailto:${CTA_EMAIL}?subject=${subject}`
+  // Every path ends at the same $400 deposit. The modal knows which space they
+  // were looking at, but the hosted Stripe link cannot receive it, so which
+  // space it was gets confirmed by email after the deposit lands.
+  const requestSpace = useCallback(() => {
+    window.open(DEPOSIT_URL, '_blank', 'noopener,noreferrer')
   }, [])
 
   const { counts } = data
@@ -256,6 +264,41 @@ export default function Monopoly() {
         </div>
       </Section>
 
+      {/* ═══ THE PRODUCT ═══
+          The first thing a race asked to see before committing. Placeholder
+          squares hold the exact slots the finished renders will fill. */}
+      <Section muted>
+        <Tag>The product</Tag>
+        <H2>What you're actually getting.</H2>
+        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          A full-size licensed Monopoly edition. Board, box, custom pieces, title deeds, money and
+          cards, made to the same spec as any edition on a shelf.
+        </p>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {PRODUCT_SHOTS.map((shot) => (
+            <div key={shot.label}>
+              <div
+                className="flex aspect-square items-center justify-center"
+                style={{
+                  backgroundColor: MONOPOLY.paper,
+                  border: `2px solid ${MONOPOLY.black}`,
+                  borderRadius: UI_RADIUS,
+                  ...guilloche('rgba(35,31,32,0.07)', 20),
+                }}
+              >
+                <span style={{ fontSize: 12, color: '#8A857C', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Image coming
+                </span>
+              </div>
+              <div className="mt-3" style={{ fontSize: 15, fontWeight: 700, color: MONOPOLY.ink }}>
+                {shot.label}
+              </div>
+              <div style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>{shot.note}</div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
       {/* ═══ WHY YOU SHOULD CARE ═══ */}
       <Section dark>
         <Tag dark>Why you should care</Tag>
@@ -263,8 +306,8 @@ export default function Monopoly() {
         <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <Beat
             dark
-            title="It legitimises you"
-            body="Twenty-two races define this edition. Being one of them says where your race sits. Permanently."
+            title="The company you keep"
+            body="Twenty-two races define this edition, and they are the ones runners already care about. Being on the board is being named alongside them, in print, permanently."
           />
           <Beat
             dark
@@ -298,6 +341,56 @@ export default function Monopoly() {
         </div>
       </Section>
 
+      {/* ═══ WHERE THE BOXES GO ═══
+          The specific thing a race asked for: not "we will sell them" but which
+          boxes, to whom, through what. */}
+      <Section muted>
+        <Tag>Where the boxes go</Tag>
+        <H2>Every box in the first run, accounted for.</H2>
+        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          A 2,004 box first run, which is the manufacturer's minimum. If pre-orders justify more, the
+          run goes up and every number below goes up with it.
+        </p>
+
+        <div style={{ border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS, overflow: 'hidden', backgroundColor: MONOPOLY.paper }}>
+          {UNIT_ALLOCATION.map((row, i) => (
+            <div
+              key={row.label}
+              className="flex items-baseline justify-between gap-4 px-5 py-4"
+              style={{ borderTop: i === 0 ? 'none' : `1px solid rgba(35,31,32,0.15)` }}
+            >
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: MONOPOLY.ink }}>{row.label}</div>
+                <div style={{ fontSize: 13, color: MONOPOLY.inkMuted, lineHeight: 1.5 }}>{row.note}</div>
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                {row.units.toLocaleString()}
+              </div>
+            </div>
+          ))}
+          <div
+            className="flex items-baseline justify-between gap-4 px-5 py-4"
+            style={{ borderTop: `2px solid ${MONOPOLY.black}`, backgroundColor: MONOPOLY.mint }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: MONOPOLY.ink }}>Total printed</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+              {UNIT_ALLOCATION.reduce((sum, r) => sum + r.units, 0).toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-14">
+          <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+            How it launches
+          </h3>
+          <div className="mt-6 grid gap-8 md:grid-cols-2">
+            {LAUNCH_PLAN.map((item) => (
+              <Beat key={item.title} title={item.title} body={item.body} />
+            ))}
+          </div>
+        </div>
+      </Section>
+
       {/* ═══ WAYS TO GET ON THE BOARD ═══
           One section for the whole commercial picture: what exists, what is
           still open, and what it costs. Splitting these made a reader hold
@@ -306,35 +399,31 @@ export default function Monopoly() {
         <Tag>Ways to get on the board</Tag>
         <H2>What's available, and what it costs.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          Race spaces go to races. Railroads, utilities, tokens and the box lid go to brands. Buy
-          your own space, or fund one for a partner or charity. The four corners are fixed by the
-          licence.
+          Twenty-two race spaces, and nothing else for sale. Edition One carries no third-party
+          brands. It is presented by Trackstar, and the only names on the board are the races.
         </p>
 
-        <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-5" style={{ backgroundColor: MONOPOLY.black }}>
+        <div className="mb-12 grid gap-px sm:grid-cols-3" style={{ backgroundColor: MONOPOLY.black }}>
           <InventoryStat
             count={counts.raceSpacesRemaining}
             total={counts.raceSpacesTotal}
-            label="Race spaces"
+            label="Race spaces open"
             note="The 22 coloured properties"
           />
-          {BRAND_SLOTS.map((slot) => (
-            <InventoryStat key={slot.label} count={slot.available} total={slot.total} label={slot.label} />
-          ))}
+          <InventoryStat count={5} total={5} label="Comp copies per race" note="Yours, whatever you pay" />
+          <InventoryStat count={0} total={0} label="Brand sponsors" note="None, by design" />
         </div>
 
         <div className="mt-12">
           <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
-            Race space pricing
+            What a space costs
           </h3>
           <p className="mb-6" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-            One fee, paid in cash. Nothing to take, hold or sell.
+            Quoted in cash, and every space includes 5 comp copies. If you would rather put some of
+            it into product, you can offset part of the fee by committing to boxes at $35 and sell
+            them at your expo for $55.
           </p>
-          <PackageTiers
-            tiers={data.tiers}
-            brandPricing={BRAND_PRICING}
-            highlightTierKey={personalizedTierKey}
-          />
+          <PackageTiers tiers={data.tiers} highlightTierKey={personalizedTierKey} />
         </div>
 
         {SHOW_AVAILABILITY_TABLE && (
@@ -719,7 +808,9 @@ function PointerArrowMobile() {
 function CtaButton({ large }: { large?: boolean }) {
   return (
     <a
-      href={`mailto:${CTA_EMAIL}?subject=${encodeURIComponent('Marathon Monopoly: reserving a space')}`}
+      href={DEPOSIT_URL}
+      target="_blank"
+      rel="noopener noreferrer"
       className="inline-block transition-opacity hover:opacity-90"
       style={{
         backgroundColor: MONOPOLY.red,
@@ -732,7 +823,7 @@ function CtaButton({ large }: { large?: boolean }) {
         fontSize: large ? 15 : 14,
       }}
     >
-      Reserve a space
+      Reserve a space, $400
     </a>
   )
 }

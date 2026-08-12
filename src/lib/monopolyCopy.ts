@@ -19,29 +19,106 @@
  *            which is a code change anyway.
  */
 import type {
-  BrandPrice,
-  BrandSlot,
+  ColorGroup,
   CommitStep,
   FaqItem,
   SalesPlanItem,
   TimelinePhase,
 } from './monopolyTypes'
 
-/** Counts of everything on the board that can carry a name. */
-export const BRAND_SLOTS: BrandSlot[] = [
-  { label: 'Brand spaces (4 railroads, 2 utilities)', available: 6, total: 6 },
-  { label: 'Box lid, title partner', available: 1, total: 1 },
-  { label: 'Custom tokens', available: 6, total: 6 },
-  { label: 'Chance / Community Chest cards', available: 32, total: 32 },
+/**
+ * The pricing ladder, and the six playing pieces.
+ *
+ * These used to come from the sheet. They moved here for the same reason the
+ * copy did: a tier fee is a strategic decision that changes when the offer
+ * changes, not a weekly edit, and keeping it in the sheet meant a repricing in
+ * the repo could sit invisible behind a stale tab.
+ *
+ * What the sheet still owns is the only thing that genuinely moves week to
+ * week: which spaces are sold, held or open, and who holds them.
+ *
+ * Fees average $9,864 across 22 slots. The ladder exists so a major can buy a
+ * bigger space, which earlier partner feedback said matters.
+ */
+export interface TierDef {
+  tierKey: string
+  label: string
+  colorGroups: ColorGroup[]
+  fee: number
+  /** Comp copies included in every slot, whatever the tier. */
+  unitsIncluded: number
+  features: string[]
+  sortOrder: number
+  isFounding: boolean
+}
+
+const COMMON_FEATURES = ['5 comp copies for your team', '5-year category exclusivity in your market']
+
+export const TIERS: TierDef[] = [
+  {
+    tierKey: 'boardwalk',
+    label: 'Boardwalk / Park Place',
+    colorGroups: ['darkblue'],
+    fee: 16000,
+    unitsIncluded: 5,
+    features: [
+      'The two most recognised spaces on any Monopoly board',
+      'Largest name treatment on the board',
+      ...COMMON_FEATURES,
+    ],
+    sortOrder: 1,
+    isFounding: false,
+  },
+  {
+    tierKey: 'green',
+    label: 'Green',
+    colorGroups: ['green'],
+    fee: 12000,
+    unitsIncluded: 5,
+    features: ["Premium block on the board's final stretch", 'Full name treatment', ...COMMON_FEATURES],
+    sortOrder: 2,
+    isFounding: false,
+  },
+  {
+    tierKey: 'yellowred',
+    label: 'Yellow / Red',
+    colorGroups: ['yellow', 'red'],
+    fee: 10000,
+    unitsIncluded: 5,
+    features: ['High-traffic mid-board position', ...COMMON_FEATURES],
+    sortOrder: 3,
+    isFounding: false,
+  },
+  {
+    tierKey: 'orangepink',
+    label: 'Orange / Pink',
+    colorGroups: ['orange', 'pink'],
+    fee: 9000,
+    unitsIncluded: 5,
+    features: ['The most-landed-on block in the game', ...COMMON_FEATURES],
+    sortOrder: 4,
+    isFounding: false,
+  },
+  {
+    tierKey: 'bluebrown',
+    label: 'Light Blue / Brown',
+    colorGroups: ['lightblue', 'brown'],
+    fee: 7000,
+    unitsIncluded: 5,
+    features: ['Entry position on the board', ...COMMON_FEATURES],
+    sortOrder: 5,
+    isFounding: false,
+  },
 ]
 
-/** Indicative bands, not a rate card. Real numbers come out of a conversation. */
-export const BRAND_PRICING: BrandPrice[] = [
-  { label: 'Box lid / title partner', feeLow: 50000, feeHigh: 60000 },
-  { label: 'Railroad (4 available)', feeLow: 25000, feeHigh: 35000 },
-  { label: 'Utility (2 available)', feeLow: 20000, feeHigh: 25000 },
-  { label: 'Custom token (6 available)', feeLow: 15000, feeHigh: 20000 },
-  { label: 'Chance / Community Chest card', feeLow: 2500, feeHigh: 2500 },
+/** The six playing pieces. Part of the product now, not inventory to sell. */
+export const TOKENS = [
+  { name: 'The Running Shoe', description: 'The one every runner reaches for first.', sortOrder: 1 },
+  { name: 'The Finisher Medal', description: 'Ribbon and all.', sortOrder: 2 },
+  { name: 'The Gel Packet', description: 'The most divisive object in the sport.', sortOrder: 3 },
+  { name: 'The Water Cup', description: 'Pinched at the top, exactly the way you learn to.', sortOrder: 4 },
+  { name: 'The Foam Roller', description: 'Recovery, rendered in die-cast metal.', sortOrder: 5 },
+  { name: 'The Stopwatch', description: 'Every PR starts and ends here.', sortOrder: 6 },
 ]
 
 export const TIMELINE: TimelinePhase[] = [
@@ -69,20 +146,20 @@ export const TIMELINE: TimelinePhase[] = [
 
 export const COMMIT_STEPS: CommitStep[] = [
   {
-    title: '$500 reserves your space',
-    body: 'Fully refundable. It is the only money you put up until the board is real.',
+    title: '$400 reserves your space',
+    body: 'Fully refundable. Skin in the game, and the only money you put up until the board is real.',
   },
   {
     title: 'We fill the board',
-    body: '22 race spaces plus brand partners. Nothing more is asked of you while that happens.',
+    body: 'All 22 race spaces. Nothing more is asked of you while that happens.',
   },
   {
     title: '50% when the board is full',
-    body: 'You see the finished board first, then your 50% is due, less the $500 you already paid.',
+    body: 'You see the finished board first, then half is due, less the $400 you already paid.',
   },
   {
-    title: 'The balance on delivery',
-    body: 'The final 50% is due when the product ships.',
+    title: 'The rest when you have the product',
+    body: 'The final 50% is due once the boxes are made and in your hands. Not before.',
   },
 ]
 
@@ -121,6 +198,75 @@ export const SALES_PLAN: SalesPlanItem[] = [
   },
 ]
 
+/**
+ * Where every box goes, for a 2,004 print run.
+ *
+ * The single thing a race asked to see before putting money down: not "we will
+ * sell them", but which boxes, to whom, through what. Numbers are for the
+ * minimum run and scale up if pre-orders justify a bigger one.
+ */
+export const UNIT_ALLOCATION = [
+  {
+    label: 'To the 22 partner races',
+    units: 110,
+    note: '5 comp copies each, for staff, boards and giveaways',
+  },
+  {
+    label: 'Press and influencer seeding',
+    units: 50,
+    note: 'Running media and creators, in hand before launch',
+  },
+  {
+    label: 'Race expos and race stores',
+    units: 600,
+    note: 'Sold at $55 where there is no competing product on the shelf',
+  },
+  {
+    label: 'Trackstar direct to consumer',
+    units: 1000,
+    note: 'To a list of 10,000 people who have already bought a running gift',
+  },
+  {
+    label: 'Held back',
+    units: 244,
+    note: 'Replacements, late partner requests, second-wave press',
+  },
+]
+
+/**
+ * The launch itself. A coordinated drop is the difference between 22 races
+ * posting whenever they get round to it and the sport noticing on one day.
+ */
+export const LAUNCH_PLAN = [
+  {
+    title: 'One coordinated drop',
+    body: 'Every race posts the same teaser on the same day. Twenty-two accounts, one moment, and the sense that something is happening rather than something is for sale.',
+  },
+  {
+    title: 'A launch film',
+    body: 'Produced by us, handed to every partner. Yours to run on your own channels with no production cost.',
+  },
+  {
+    title: 'A party at Running USA',
+    body: 'Where the industry already is. The board on a table, the partner races in the room, press invited.',
+  },
+  {
+    title: 'Full photo and content kit',
+    body: 'Product photography, social cutdowns and copy, delivered to every partner ahead of the drop.',
+  },
+]
+
+/**
+ * Product shots. Real renders do not exist yet, so these are square
+ * placeholders holding the exact slots the finished imagery will fill.
+ */
+export const PRODUCT_SHOTS = [
+  { label: 'The box', note: 'Front of pack' },
+  { label: 'The board', note: 'Full open board' },
+  { label: 'The pieces', note: 'Six custom tokens' },
+  { label: 'Title deeds', note: 'Race cards' },
+]
+
 export const FAQ: FaqItem[] = [
   {
     question: 'Is this actually official?',
@@ -140,7 +286,7 @@ export const FAQ: FaqItem[] = [
   {
     question: 'Will this compromise our existing sponsors?',
     answer:
-      'No footwear or apparel brand appears anywhere on the board or box, and you approve every brand that does.',
+      'No. Edition One carries no third-party brands at all. It is presented by Trackstar, and the only names on the board are the races. Nothing on it can conflict with a sponsor of yours.',
   },
   {
     question: 'Who controls how our race appears?',
@@ -151,6 +297,11 @@ export const FAQ: FaqItem[] = [
     question: 'What if you do not fill the board?',
     answer:
       'Every deposit is refundable in full. Nothing prints until the board is committed and funded.',
+  },
+  {
+    question: 'Can we offset the fee by buying boxes?',
+    answer:
+      'Yes. Fees are quoted in cash, and you can offset part of yours by committing to buy boxes at $35. Sell them at your expo for $55 and each one returns $20.',
   },
   {
     question: 'Where does the charity money go?',

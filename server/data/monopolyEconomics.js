@@ -66,8 +66,14 @@ export const CHANNELS = [
 export const EXPO_PRICE = CHANNELS[0].price
 export const DTC_CHANNEL = CHANNELS[1]
 
-/** What a partner or retailer pays per unit at wholesale. */
-export const WHOLESALE_PRICE = 30
+/**
+ * What a race pays per unit when it buys boxes to offset part of its fee.
+ *
+ * At $30 this netted about a dollar a unit against fully loaded cost, which
+ * made unit sales pointless as a revenue line. At $35 a race still clears $20 a
+ * box selling at the $55 expo price, and we clear roughly $8 over make-and-ship.
+ */
+export const WHOLESALE_PRICE = 35
 
 export const ECONOMICS = {
   printRuns: PRINT_RUNS,
