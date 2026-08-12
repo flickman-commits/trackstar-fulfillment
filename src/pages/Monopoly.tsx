@@ -54,6 +54,13 @@ const HEADER_HEIGHT_FALLBACK = 72
  * a flag rather than deleted because it earns its place once the board fills up.
  */
 const SHOW_AVAILABILITY_TABLE = false
+
+/**
+ * The playing pieces are a real part of the product but not part of this ask,
+ * and the section read as a second thing being sold. Parked rather than
+ * deleted, since it goes back the moment tokens are on the table.
+ */
+const SHOW_TOKENS = false
 /**
  * Stripe payment link for the $400 reservation deposit.
  *
@@ -440,34 +447,36 @@ export default function Monopoly() {
           still open, and what it costs. Splitting these made a reader hold
           three separate tables in their head to answer one question. */}
       <Section>
-        <SectionHeading>Pricing</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          Twenty-two race spaces, and nothing else for sale. Edition One carries no third-party
-          brands. It is presented by Trackstar, and the only names on the board are the races. The
-          one exception is yours to give: your own title sponsor can appear on your title deed card.
+        <SectionHeading>Investment</SectionHeading>
+        <p className="mb-6 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          Quoted in cash, and every space includes 5 comp copies. If you would rather put some of it
+          into product, you can offset part of the fee by committing to boxes at $35 and sell them
+          at your expo for $55.
         </p>
+        <PackageTiers tiers={data.tiers} highlightTierKey={personalizedTierKey} />
 
-        <div className="mb-12 grid gap-px sm:grid-cols-3" style={{ backgroundColor: MONOPOLY.black }}>
-          <InventoryStat
-            count={counts.raceSpacesRemaining}
-            total={counts.raceSpacesTotal}
-            label="Race spaces open"
-            note="The 22 colored properties"
-          />
-          <InventoryStat count={5} total={5} label="Comp copies per race" note="Yours, whatever you pay" />
-          <InventoryStat count={0} total={0} label="Brand sponsors" note="None, by design" />
-        </div>
-
-        <div className="mt-12">
-          <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
-            What a space costs
+        {/* What the fee actually buys, listed once here rather than repeated
+            in every tier row. Nothing in it varies by tier, so a per-row copy
+            was five chances to disagree with itself. */}
+        <div className="mt-10">
+          <h3 className="mb-3" style={{ fontSize: 17, fontWeight: 700, color: MONOPOLY.ink }}>
+            Each race slot includes
           </h3>
-          <p className="mb-6" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-            Quoted in cash, and every space includes 5 comp copies. If you would rather put some of
-            it into product, you can offset part of the fee by committing to boxes at $35 and sell
-            them at your expo for $55.
-          </p>
-          <PackageTiers tiers={data.tiers} highlightTierKey={personalizedTierKey} />
+          <ul className="flex flex-col gap-2" style={{ maxWidth: '40rem' }}>
+            {[
+              'Creative approval on your marks',
+              '5 complimentary units shipped to your office',
+              'First right of refusal on your space in future editions',
+              'The ability to reorder at the $35 wholesale price',
+            ].map((item) => (
+              <li key={item} className="flex gap-2.5" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
+                <span aria-hidden="true" style={{ color: MONOPOLY.red, fontWeight: 700 }}>
+                  +
+                </span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         {SHOW_AVAILABILITY_TABLE && (
@@ -484,6 +493,7 @@ export default function Monopoly() {
         </div>
         )}
 
+        {SHOW_TOKENS && (
         <div className="mt-14">
           <h3 className="mb-2" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
             The playing pieces
@@ -494,15 +504,27 @@ export default function Monopoly() {
           </p>
           <TokenGallery tokens={data.tokens} />
         </div>
+        )}
 
       </Section>
 
       {/* ═══ RETURN ON INVESTMENT ═══ */}
       <Section muted>
         <SectionHeading>Return on investment</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          A board game is media. Price it like media.
-        </p>
+        <div className="mb-8 mt-3 flex flex-col gap-4" style={{ maxWidth: '46rem' }}>
+          <p style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
+            Marathon Monopoly will live in the households of thousands of runners and their
+            families, who will sit staring at this board for three hours at a time, every time they
+            play, for the next decade. Below is the exposure a space earns from marathon-obsessed
+            people, estimated conservatively on purpose so our race partners can see what it is
+            actually worth.
+          </p>
+          <p style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
+            Attention on a board game is not attention on an Instagram ad. People sit with the game
+            in front of them, rather than being bombarded by a hundred other things on a phone. We
+            think these impressions are worth more than an Instagram impression.
+          </p>
+        </div>
         <ExposureModel tiers={data.tiers} initialTierKey={personalizedTierKey} />
       </Section>
 
@@ -717,36 +739,6 @@ function ClickPrompt({ className }: { className?: string }) {
         see its title deed
       </span>
       <PointerArrow />
-    </div>
-  )
-}
-
-/** One inventory line: how many are left, out of how many exist. */
-function InventoryStat({
-  count,
-  total,
-  label,
-  note,
-}: {
-  count: number
-  total: number
-  label: string
-  note?: string
-}) {
-  return (
-    <div className="px-5 py-6" style={{ backgroundColor: MONOPOLY.paper }}>
-      <div style={{ fontSize: 34, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.03em', lineHeight: 1 }}>
-        {count}
-        <span style={{ fontSize: 17, color: MONOPOLY.inkMuted, fontWeight: 400 }}> of {total}</span>
-      </div>
-      <div className="mt-2" style={{ fontSize: 14, color: MONOPOLY.ink, fontWeight: 500 }}>
-        {label}
-      </div>
-      {note && (
-        <div className="mt-1" style={{ fontSize: 12, color: MONOPOLY.inkMuted, lineHeight: 1.4 }}>
-          {note}
-        </div>
-      )}
     </div>
   )
 }

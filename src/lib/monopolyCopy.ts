@@ -61,7 +61,7 @@ const COMMON_FEATURES = [
 export const TIERS: TierDef[] = [
   {
     tierKey: 'boardwalk',
-    label: 'Boardwalk / Park Place',
+    label: 'Dark Blue',
     colorGroups: ['darkblue'],
     fee: 16000,
     unitsIncluded: 5,

@@ -8,6 +8,7 @@
  */
 import type { BrandPrice, PackageTier } from '@/lib/monopolyTypes'
 import { formatMoney } from '@/lib/monopolyMath'
+import { GROUP_COLORS } from '@/lib/monopolyBoardLayout'
 
 interface Props {
   tiers: PackageTier[]
@@ -19,8 +20,11 @@ interface Props {
 export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
   return (
     <div className="flex flex-col gap-10">
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: 640 }}>
+      {/* No minimum width. The old 640px floor forced a horizontal scroll on
+          every phone, and this is three short columns that have no reason to
+          need one. */}
+      <div>
+        <table className="w-full border-collapse">
           <thead>
             <tr style={{ borderBottom: '2px solid #1A1A1A' }}>
               <Th>Tier</Th>
@@ -45,11 +49,30 @@ export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
                     opacity: soldOut ? 0.5 : 1,
                   }}
                 >
-                  <Td>
-                    <span style={{ fontWeight: 700, color: '#1A1A1A' }}>{tier.label}</span>
+                  <Td nowrap={false}>
+                    <span className="flex items-center gap-2.5">
+                      {/* The colour band off the title deed card. A tier IS its
+                          colour on the board, so showing it beats naming it. */}
+                      <span
+                        aria-hidden="true"
+                        className="shrink-0"
+                        style={{
+                          display: 'flex',
+                          width: 18,
+                          height: 26,
+                          border: '1.5px solid #1A1A1A',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {tier.colorGroups.map((g) => (
+                          <span key={g} style={{ flex: 1, backgroundColor: GROUP_COLORS[g] }} />
+                        ))}
+                      </span>
+                      <span style={{ fontWeight: 700, color: '#1A1A1A' }}>{tier.label}</span>
+                    </span>
                     {highlighted && (
                       <span
-                        className="ml-2 px-2 py-0.5"
+                        className="mt-1 inline-block px-2 py-0.5"
                         style={{ backgroundColor: '#ED1C24', color: '#FFFFFF', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}
                       >
                         Your tier
@@ -70,11 +93,6 @@ export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
           </tbody>
         </table>
       </div>
-
-      <p style={{ fontSize: 13, color: '#666666', lineHeight: 1.6 }}>
-        Every tier includes 5-year category exclusivity, creative approval on your marks, and right
-        of first refusal on your space in any future edition.
-      </p>
 
       {brandPricing && brandPricing.length > 0 && (
         <div>
@@ -110,7 +128,7 @@ function Th({ children, align = 'left' }: { children: React.ReactNode; align?: '
     <th
       style={{
         textAlign: align,
-        padding: '10px 12px',
+        padding: '10px 8px',
         fontSize: 11,
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
@@ -127,19 +145,21 @@ function Td({
   children,
   align = 'left',
   muted,
+  nowrap = true,
 }: {
   children: React.ReactNode
   align?: 'left' | 'right'
   muted?: boolean
+  nowrap?: boolean
 }) {
   return (
     <td
       style={{
         textAlign: align,
-        padding: '14px 12px',
+        padding: '12px 8px',
         fontSize: 14,
         color: muted ? '#666666' : '#1A1A1A',
-        whiteSpace: 'nowrap',
+        whiteSpace: nowrap ? 'nowrap' : 'normal',
       }}
     >
       {children}

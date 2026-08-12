@@ -90,11 +90,6 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
         <BigStat value={fmt(result.impressions)} label="brand impressions" sub="Times an eye lands on your name" accent />
       </div>
 
-      <p className="mt-5" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '48rem' }}>
-        Nobody scrolls past a board game. Every one of these is a person who sat down at a table
-        with your name in front of them.
-      </p>
-
       {/* ── The comparison ──────────────────────────────────────────────
           Led with the single number that matters. The full rate card is real
           and defensible, but a five-row table is something to study; the
