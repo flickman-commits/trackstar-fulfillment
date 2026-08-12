@@ -58,6 +58,8 @@ interface PricingData {
     shopifyFeeFixed: number
     stripeFeePercent?: number
     stripeFeeFixed?: number
+    wholesaleTiers?: { min: number; max: number | null; discount: number; label: string }[]
+    wholesaleExcludedSizes?: string[]
     photoAddOnPrice: number
     photoAddOnCost: number
   }
@@ -73,6 +75,20 @@ const CHANNELS: { id: Channel; label: string; blurb: string }[] = [
 ]
 
 const money = (n: number) => `$${n.toFixed(2)}`
+
+/**
+ * The published wholesale sheet rounds to whole dollars half-to-EVEN, not half
+ * up: 16x24 framed at 25% off is 142.5 and the sheet says $142, while at 15%
+ * off it is 161.5 and the sheet says $162. Matching this exactly is what makes
+ * a quote here the same number the customer already has in writing.
+ */
+function roundHalfToEven(n: number) {
+  const floor = Math.floor(n)
+  const frac = n - floor
+  if (frac > 0.5) return floor + 1
+  if (frac < 0.5) return floor
+  return floor % 2 === 0 ? floor : floor + 1
+}
 
 /**
  * Row tint by margin. Absolute bands rather than "best in this table", so a
@@ -112,8 +128,9 @@ export default function PricingCalculator() {
   const [channel, setChannel] = useState<Channel>('retail')
   const [quantity, setQuantity] = useState(25)
   const [includePhoto, setIncludePhoto] = useState(false)
-  // Channel pricing levers. Percentages are off retail.
-  const [wholesaleDiscount, setWholesaleDiscount] = useState('50')
+  // Discount comes from the published tier for this quantity. The override is
+  // for modelling a deal we have not published — empty means "use the tier".
+  const [discountOverride, setDiscountOverride] = useState('')
 
   // Retail always ships one at a time; bulk channels ship as one consignment.
   const effectiveQty = channel === 'retail' ? 1 : Math.max(1, Number(quantity) || 1)
@@ -135,7 +152,14 @@ export default function PricingCalculator() {
 
   useEffect(() => { load(effectiveQty) }, [load, effectiveQty])
 
-  const discountPct = channel === 'wholesale' ? Number(wholesaleDiscount) : 0
+  const tiers = data?.assumptions.wholesaleTiers ?? []
+  const activeTier = channel === 'wholesale'
+    ? tiers.find(t => effectiveQty >= t.min && (t.max === null || effectiveQty <= t.max)) ?? null
+    : null
+  const overrideNum = discountOverride.trim() === '' ? null : Number(discountOverride)
+  const discountPct = channel !== 'wholesale' ? 0
+    : (overrideNum !== null && Number.isFinite(overrideNum) ? overrideNum : (activeTier ? activeTier.discount * 100 : 0))
+  const excludedSizes = data?.assumptions.wholesaleExcludedSizes ?? []
 
   const computed = useMemo(() => {
     if (!data) return []
@@ -155,9 +179,10 @@ export default function PricingCalculator() {
 
     return data.rows.filter(r => !r.error).map(r => {
       const base = r.retailPrice ?? 0
+      const offSheet = channel === 'wholesale' && excludedSizes.includes(r.sizeLabel)
       const price = channel === 'retail'
         ? base
-        : Math.round(base * (1 - (Number.isFinite(discountPct) ? discountPct : 0) / 100) * 100) / 100
+        : roundHalfToEven(base * (1 - (Number.isFinite(discountPct) ? discountPct : 0) / 100))
 
       const unitShipping = r.orderShipping / qty
       // Package branding (insert + sticker) is a DTC touch. Bulk consignments
@@ -172,6 +197,7 @@ export default function PricingCalculator() {
 
       return {
         ...r,
+        offSheet,
         unitPrice,
         unitShipping,
         unitBranding,
@@ -188,7 +214,7 @@ export default function PricingCalculator() {
     const qty = data?.quantity ?? 1
     // A run of one size, not a blended basket — this is "if the whole order
     // were this line", which is how these quotes actually get negotiated.
-    const framed = computed.filter(r => r.frame === 'Framed')
+    const framed = computed.filter(r => r.frame === 'Framed' && !r.offSheet)
     const revenue = framed.reduce((s, r) => s + r.unitPrice, 0) * qty / (framed.length || 1)
     const profit = framed.reduce((s, r) => s + r.gp, 0) * qty / (framed.length || 1)
     return { revenue, profit, pct: revenue > 0 ? (profit / revenue) * 100 : 0 }
@@ -212,7 +238,14 @@ export default function PricingCalculator() {
           </button>
         ))}
       </div>
-      <p className="text-[11px] text-off-black/40 mb-3">{CHANNELS.find(c => c.id === channel)?.blurb}</p>
+      <p className="text-[11px] text-off-black/40 mb-3">
+        {CHANNELS.find(c => c.id === channel)?.blurb}
+        {channel === 'wholesale' && tiers.length > 0 && (
+          <span className="ml-1">
+            Published tiers: {tiers.map(t => `${t.label} ${(t.discount * 100).toFixed(0)}% off`).join(' · ')}.
+          </span>
+        )}
+      </p>
 
       {/* Controls */}
       <div className="bg-subtle-gray border border-border-gray rounded-lg p-3 mb-4 flex flex-wrap items-end gap-4">
@@ -229,13 +262,27 @@ export default function PricingCalculator() {
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">
-                Discount off retail
+                Tier discount
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="px-2.5 py-1.5 rounded-md bg-white border border-border-gray text-sm tabular-nums min-w-[4.5rem] text-center">
+                  {activeTier ? `${(activeTier.discount * 100).toFixed(0)}%` : '—'}
+                </div>
+                <span className="text-[11px] text-off-black/45">
+                  {activeTier ? activeTier.label : `under ${tiers[0]?.min ?? 10} units — retail`}
+                </span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">
+                Override
               </label>
               <div className="relative w-24">
                 <input
-                  value={wholesaleDiscount}
-                  onChange={e => setWholesaleDiscount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  value={discountOverride}
+                  onChange={e => setDiscountOverride(e.target.value.replace(/[^0-9.]/g, ''))}
                   inputMode="decimal"
+                  placeholder="tier"
                   className="w-full pl-2.5 pr-6 py-1.5 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
                 />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-off-black/40 text-xs">%</span>
@@ -282,14 +329,18 @@ export default function PricingCalculator() {
               </thead>
               <tbody>
                 {computed.map(r => {
-                  const tint = marginTint(r.gpPct)
+                  const tint = r.offSheet ? { row: '', label: '' } : marginTint(r.gpPct)
                   return (
                   <tr key={r.key} className={`border-t border-border-gray/60 ${tint.row}`}>
                     <td className="px-3 py-2 font-medium text-off-black whitespace-nowrap">{r.sizeLabel}</td>
                     <td className="px-3 py-2 text-off-black/60 whitespace-nowrap">
                       {r.frame === 'Framed' ? r.frameLabel : 'Unframed'}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums">{money(r.unitPrice)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {r.offSheet
+                        ? <span className="text-off-black/30" title="Not on the published wholesale sheet">not offered</span>
+                        : money(r.unitPrice)}
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">{money(r.productionCost)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">
                       {money(r.unitShipping + r.unitBranding)}
@@ -299,12 +350,14 @@ export default function PricingCalculator() {
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-off-black/60">{money(r.unitFee)}</td>
-                    <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.gp < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                      {money(r.gp)}
+                    <td className={`px-3 py-2 text-right tabular-nums ${r.offSheet ? 'text-off-black/25' : 'text-off-black/60'}`}>
+                      {r.offSheet ? '—' : money(r.unitFee)}
                     </td>
-                    <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.gp < 0 ? 'text-red-600' : tint.label}`}>
-                      {r.gpPct === null ? '—' : `${r.gpPct.toFixed(0)}%`}
+                    <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.offSheet ? 'text-off-black/25' : r.gp < 0 ? 'text-red-600' : 'text-green-700'}`}>
+                      {r.offSheet ? '—' : money(r.gp)}
+                    </td>
+                    <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.offSheet ? 'text-off-black/25' : r.gp < 0 ? 'text-red-600' : tint.label}`}>
+                      {r.offSheet || r.gpPct === null ? '—' : `${r.gpPct.toFixed(0)}%`}
                     </td>
                   </tr>
                   )

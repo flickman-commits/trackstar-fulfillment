@@ -34,6 +34,8 @@ import {
   STRIPE_FEE_FIXED,
   PHOTO_ADDON_PRICE,
   PHOTO_ADDON_COST,
+  WHOLESALE_TIERS,
+  WHOLESALE_EXCLUDED_SIZES,
 } from '../../server/services/pricing.js'
 
 export default async function handler(req, res) {
@@ -62,6 +64,8 @@ export default async function handler(req, res) {
         stripeFeeFixed: STRIPE_FEE_FIXED,
         photoAddOnPrice: PHOTO_ADDON_PRICE,
         photoAddOnCost: PHOTO_ADDON_COST,
+        wholesaleTiers: WHOLESALE_TIERS,
+        wholesaleExcludedSizes: WHOLESALE_EXCLUDED_SIZES,
       },
       rows,
     })

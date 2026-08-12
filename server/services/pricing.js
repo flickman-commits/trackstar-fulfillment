@@ -58,6 +58,47 @@ export const STRIPE_FEE_FIXED = 0.30
 export const PHOTO_ADDON_PRICE = 20
 export const PHOTO_ADDON_COST = 0
 
+/**
+ * Published wholesale tiers, by units in the shipment.
+ *
+ * Below 10 units there is no wholesale price — the sheet starts at 10, so a
+ * smaller order pays retail.
+ *
+ * The sheet does NOT list 24x36 at any tier. That is left as `null` price
+ * rather than silently extrapolated: whether the biggest size is offered
+ * wholesale at all is a commercial decision, not a rounding one.
+ */
+export const WHOLESALE_TIERS = [
+  { min: 10, max: 24, discount: 0.15, label: '10-24 units' },
+  { min: 25, max: 74, discount: 0.20, label: '25-74 units' },
+  { min: 75, max: null, discount: 0.25, label: '75+ units' },
+]
+
+/** Sizes absent from the published wholesale sheet. */
+export const WHOLESALE_EXCLUDED_SIZES = ['24x36']
+
+export function wholesaleTierFor(quantity) {
+  return WHOLESALE_TIERS.find(t => quantity >= t.min && (t.max === null || quantity <= t.max)) || null
+}
+
+/**
+ * Round to whole dollars the way the published wholesale sheet does: half to
+ * EVEN, not half up.
+ *
+ * This is not pedantry. 16x24 framed at 25% off is 142.5, and the sheet prints
+ * $142; at 15% off it is 161.5 and the sheet prints $162. Half-up gets the
+ * first one wrong. All eighteen cells of the sheet reproduce exactly under
+ * half-to-even, so that is the rule being used, and matching it means a quote
+ * from this tool is the same number the customer was already shown.
+ */
+export function roundHalfToEven(n) {
+  const floor = Math.floor(n)
+  const frac = n - floor
+  if (frac > 0.5) return floor + 1
+  if (frac < 0.5) return floor
+  return floor % 2 === 0 ? floor : floor + 1
+}
+
 /** Current retail price per size + frame, straight from Shopify. */
 export async function fetchRetailPrices() {
   const rows = await fetchVariantCatalog()
