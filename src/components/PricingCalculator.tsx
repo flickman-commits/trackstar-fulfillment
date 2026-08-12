@@ -96,15 +96,15 @@ function roundHalfUp(n: number) {
  * discounting further, and under 50% is where a bulk quote stops being
  * obviously worth doing.
  */
-function marginTint(pct: number | null): { row: string; label: string } {
-  if (pct === null) return { row: '', label: 'text-off-black/40' }
+function marginTint(pct: number | null): { row: string; label: string; chip: string } {
+  if (pct === null) return { row: '', label: 'text-off-black/40', chip: '' }
   // Band on the DISPLAYED figure, not the raw one. 64.6% renders as "65%",
   // and a row reading 65% while tinted as though it were below the threshold
   // just makes the reader distrust the color.
   const shown = Math.round(pct)
-  if (shown >= 65) return { row: 'bg-green-50/70', label: 'text-green-800' }
-  if (shown >= 50) return { row: 'bg-amber-50/70', label: 'text-amber-800' }
-  return { row: 'bg-orange-100/60', label: 'text-orange-800' }
+  if (shown >= 65) return { row: 'bg-emerald-50', label: 'text-emerald-700', chip: 'bg-emerald-100 border-emerald-300' }
+  if (shown >= 50) return { row: 'bg-yellow-100/80', label: 'text-yellow-800', chip: 'bg-yellow-100 border-yellow-400' }
+  return { row: 'bg-orange-200/70', label: 'text-orange-900', chip: 'bg-orange-200 border-orange-400' }
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'bad' }) {
@@ -127,6 +127,9 @@ export default function PricingCalculator() {
   // Discount comes from the published tier for this quantity. The override is
   // for modelling a deal we have not published — empty means "use the tier".
   const [discountOverride, setDiscountOverride] = useState('')
+  // Bulk orders are single-variant — we do not sell mixed consignments — so
+  // the roll-up is for one chosen row rather than a blended basket.
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
   // Retail always ships one at a time; bulk channels ship as one consignment.
   const effectiveQty = channel === 'retail' ? 1 : Math.max(1, Number(quantity) || 1)
@@ -194,6 +197,8 @@ export default function PricingCalculator() {
       return {
         ...r,
         offSheet,
+        // Undiscounted per-unit price, for showing the customer their saving.
+        listPrice: base + (includePhoto ? photoAddOnPrice : 0),
         unitPrice,
         unitShipping,
         unitBranding,
@@ -205,21 +210,49 @@ export default function PricingCalculator() {
     })
   }, [data, channel, discountPct, includePhoto])
 
+  const selectable = useMemo(
+    () => computed.filter(r => !r.offSheet),
+    [computed]
+  )
+
+  // Default the selection to the most representative line rather than nothing,
+  // and re-point it if the current pick stops being sellable in this channel.
+  useEffect(() => {
+    if (!selectable.length) return
+    if (selectedKey && selectable.some(r => r.key === selectedKey)) return
+    const preferred = selectable.find(r => r.frame === 'Framed') ?? selectable[0]
+    setSelectedKey(preferred.key)
+  }, [selectable, selectedKey])
+
+  const selected = selectable.find(r => r.key === selectedKey) ?? null
+
+  /**
+   * Order totals for the SELECTED variant only. Bulk consignments are
+   * single-variant — mixed orders are not something we sell — so a blended
+   * average across every size would describe an order nobody places.
+   */
   const totals = useMemo(() => {
-    if (!computed.length) return null
-    const qty = data?.quantity ?? 1
-    // A run of one size, not a blended basket — this is "if the whole order
-    // were this line", which is how these quotes actually get negotiated.
-    const framed = computed.filter(r => r.frame === 'Framed' && !r.offSheet)
-    const revenue = framed.reduce((s, r) => s + r.unitPrice, 0) * qty / (framed.length || 1)
-    const profit = framed.reduce((s, r) => s + r.gp, 0) * qty / (framed.length || 1)
-    return { revenue, profit, pct: revenue > 0 ? (profit / revenue) * 100 : 0 }
-  }, [computed, data])
+    if (!selected || !data) return null
+    const qty = data.quantity
+    const revenue = selected.unitPrice * qty
+    const profit = selected.gp * qty
+    const listRevenue = selected.listPrice * qty
+    const saving = listRevenue - revenue
+    return {
+      qty,
+      revenue,
+      profit,
+      pct: revenue > 0 ? (profit / revenue) * 100 : 0,
+      listRevenue,
+      saving,
+      savingPct: listRevenue > 0 ? (saving / listRevenue) * 100 : 0,
+    }
+  }, [selected, data])
 
   return (
     <div>
-      {/* Channel tabs */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
+      {/* Channel tabs + refresh */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3">
         {CHANNELS.map(c => (
           <button
             key={c.id}
@@ -233,6 +266,14 @@ export default function PricingCalculator() {
             {c.label}
           </button>
         ))}
+        <div className="flex-1" />
+        <button
+          onClick={() => load(effectiveQty)}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded-md transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </button>
       </div>
       <p className="text-[11px] text-off-black/40 mb-3">
         {CHANNELS.find(c => c.id === channel)?.blurb}
@@ -244,7 +285,9 @@ export default function PricingCalculator() {
       </p>
 
       {/* Controls */}
-      <div className="bg-subtle-gray border border-border-gray rounded-lg p-3 mb-4 flex flex-wrap items-end gap-4">
+      <div className={`mb-4 flex flex-wrap items-end gap-4 ${
+        channel === 'retail' ? '' : 'bg-subtle-gray border border-border-gray rounded-lg p-3'
+      }`}>
         {channel !== 'retail' && (
           <>
             <div>
@@ -286,18 +329,10 @@ export default function PricingCalculator() {
             </div>
           </>
         )}
-        <label className="inline-flex items-center gap-2 text-sm text-off-black/70 pb-1.5">
-          <input type="checkbox" checked={includePhoto} onChange={e => setIncludePhoto(e.target.checked)} className="w-4 h-4" />
-          Photo add-on {data ? `(+${money(data.assumptions.photoAddOnPrice)})` : ''}
+        <label className="inline-flex items-center gap-1.5 text-[11px] text-off-black/55 pb-2 cursor-pointer">
+          <input type="checkbox" checked={includePhoto} onChange={e => setIncludePhoto(e.target.checked)} className="w-3.5 h-3.5" />
+          Photo add-on {data ? `+${money(data.assumptions.photoAddOnPrice)}` : ''}
         </label>
-        <div className="flex-1" />
-        <button
-          onClick={() => load(effectiveQty)}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-off-black/70 bg-white border border-border-gray hover:bg-off-black/5 rounded-md transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </button>
       </div>
 
       {loading && !data && (
@@ -325,10 +360,25 @@ export default function PricingCalculator() {
               </thead>
               <tbody>
                 {computed.map(r => {
-                  const tint = r.offSheet ? { row: '', label: '' } : marginTint(r.gpPct)
+                  const tint = r.offSheet ? { row: '', label: '', chip: '' } : marginTint(r.gpPct)
+                  const isSelected = channel === 'wholesale' && r.key === selectedKey
+                  const clickable = channel === 'wholesale' && !r.offSheet
                   return (
-                  <tr key={r.key} className={`border-t border-border-gray/60 ${tint.row}`}>
-                    <td className="px-3 py-2 font-medium text-off-black whitespace-nowrap">{r.sizeLabel}</td>
+                  <tr
+                    key={r.key}
+                    onClick={clickable ? () => setSelectedKey(r.key) : undefined}
+                    className={`border-t border-border-gray/60 ${tint.row} ${
+                      clickable ? 'cursor-pointer hover:brightness-95' : ''
+                    } ${isSelected ? 'outline outline-2 -outline-offset-2 outline-off-black' : ''}`}
+                  >
+                    <td className="px-3 py-2 font-medium text-off-black whitespace-nowrap">
+                      {channel === 'wholesale' && !r.offSheet && (
+                        <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${
+                          isSelected ? 'bg-off-black' : 'bg-off-black/15'
+                        }`} />
+                      )}
+                      {r.sizeLabel}
+                    </td>
                     <td className="px-3 py-2 text-off-black/60 whitespace-nowrap">
                       {r.frame === 'Framed' ? r.frameLabel : 'Unframed'}
                     </td>
@@ -362,20 +412,35 @@ export default function PricingCalculator() {
             </table>
           </div>
 
-          {/* Order-level roll-up, bulk channels only */}
-          {channel !== 'retail' && totals && (
-            <div className="mt-3 grid grid-cols-3 gap-4 bg-subtle-gray border border-border-gray rounded-lg p-3">
-              <Stat label={`Revenue · ${data.quantity} framed`} value={money(totals.revenue)} />
-              <Stat label="Gross profit" value={money(totals.profit)} tone={totals.profit < 0 ? 'bad' : 'good'} />
-              <Stat label="Margin" value={`${totals.pct.toFixed(0)}%`} tone={totals.profit < 0 ? 'bad' : undefined} />
+          {/* Order roll-up for the SELECTED variant, bulk only */}
+          {channel === 'wholesale' && totals && selected && (
+            <div className="mt-3 border border-border-gray rounded-lg overflow-hidden">
+              <div className="px-3 py-2 bg-subtle-gray border-b border-border-gray flex items-baseline justify-between gap-2">
+                <p className="text-[11px] font-semibold text-off-black/60 uppercase tracking-wider">
+                  Order total · {totals.qty} × {selected.sizeLabel} {selected.frame === 'Framed' ? selected.frameLabel : 'Unframed'}
+                </p>
+                <p className="text-[11px] text-off-black/40">Click a row to change</p>
+              </div>
+              <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Stat label="Revenue" value={money(totals.revenue)} />
+                <Stat label="Gross profit" value={money(totals.profit)} tone={totals.profit < 0 ? 'bad' : 'good'} />
+                <Stat label="Margin" value={`${totals.pct.toFixed(0)}%`} tone={totals.profit < 0 ? 'bad' : undefined} />
+                <div>
+                  <p className="text-[11px] font-semibold text-off-black/40 uppercase tracking-wider">Customer saves</p>
+                  <p className="text-lg font-bold tabular-nums text-off-black">{money(totals.saving)}</p>
+                  <p className="text-[11px] text-off-black/45">
+                    {totals.savingPct.toFixed(0)}% off {money(totals.listRevenue)} retail
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-off-black/45">
             <span className="font-semibold uppercase tracking-wider text-off-black/35">Margin</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-50/70 border border-green-200" /> 65%+</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-50/70 border border-amber-200" /> 50-65%</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-orange-100/60 border border-orange-200" /> under 50%</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300" /> 65%+</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-400" /> 50-65%</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-orange-200 border border-orange-400" /> under 50%</span>
           </div>
 
           <div className="mt-3 space-y-1 text-[11px] text-off-black/40 leading-relaxed">
