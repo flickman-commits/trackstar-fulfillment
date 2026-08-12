@@ -77,17 +77,13 @@ const CHANNELS: { id: Channel; label: string; blurb: string }[] = [
 const money = (n: number) => `$${n.toFixed(2)}`
 
 /**
- * The published wholesale sheet rounds to whole dollars half-to-EVEN, not half
- * up: 16x24 framed at 25% off is 142.5 and the sheet says $142, while at 15%
- * off it is 161.5 and the sheet says $162. Matching this exactly is what makes
- * a quote here the same number the customer already has in writing.
+ * Wholesale prices round to whole dollars, halves UP. This differs from the
+ * printed sheet in one cell only — 16x24 framed at 25% off is 142.5, shown as
+ * $142 there and $143 here — which reads as a rounding artifact on the sheet
+ * rather than a deliberate price.
  */
-function roundHalfToEven(n: number) {
-  const floor = Math.floor(n)
-  const frac = n - floor
-  if (frac > 0.5) return floor + 1
-  if (frac < 0.5) return floor
-  return floor % 2 === 0 ? floor : floor + 1
+function roundHalfUp(n: number) {
+  return Math.round(n)
 }
 
 /**
@@ -182,7 +178,7 @@ export default function PricingCalculator() {
       const offSheet = channel === 'wholesale' && excludedSizes.includes(r.sizeLabel)
       const price = channel === 'retail'
         ? base
-        : roundHalfToEven(base * (1 - (Number.isFinite(discountPct) ? discountPct : 0) / 100))
+        : roundHalfUp(base * (1 - (Number.isFinite(discountPct) ? discountPct : 0) / 100))
 
       const unitShipping = r.orderShipping / qty
       // Package branding (insert + sticker) is a DTC touch. Bulk consignments
@@ -338,7 +334,7 @@ export default function PricingCalculator() {
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {r.offSheet
-                        ? <span className="text-off-black/30" title="Not on the published wholesale sheet">not offered</span>
+                        ? <span className="text-off-black/30" title="24x36 is not sold wholesale">not offered</span>
                         : money(r.unitPrice)}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">{money(r.productionCost)}</td>

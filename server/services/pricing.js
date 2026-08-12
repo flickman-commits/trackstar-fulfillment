@@ -64,9 +64,9 @@ export const PHOTO_ADDON_COST = 0
  * Below 10 units there is no wholesale price — the sheet starts at 10, so a
  * smaller order pays retail.
  *
- * The sheet does NOT list 24x36 at any tier. That is left as `null` price
- * rather than silently extrapolated: whether the biggest size is offered
- * wholesale at all is a commercial decision, not a rounding one.
+ * 24x36 is not sold wholesale at all — confirmed, not merely missing from the
+ * sheet. It renders as "not offered" and is excluded from the order roll-up
+ * rather than being extrapolated from its retail price.
  */
 export const WHOLESALE_TIERS = [
   { min: 10, max: 24, discount: 0.15, label: '10-24 units' },
@@ -82,21 +82,16 @@ export function wholesaleTierFor(quantity) {
 }
 
 /**
- * Round to whole dollars the way the published wholesale sheet does: half to
- * EVEN, not half up.
+ * Round wholesale prices to whole dollars, halves UP.
  *
- * This is not pedantry. 16x24 framed at 25% off is 142.5, and the sheet prints
- * $142; at 15% off it is 161.5 and the sheet prints $162. Half-up gets the
- * first one wrong. All eighteen cells of the sheet reproduce exactly under
- * half-to-even, so that is the rule being used, and matching it means a quote
- * from this tool is the same number the customer was already shown.
+ * Note this diverges from the printed sheet in exactly one cell: 16x24 framed
+ * at 25% off is 142.5, which the sheet shows as $142 and this shows as $143.
+ * Every other cell agrees. The sheet's $142 looks like a half-to-even artifact
+ * rather than an intended price, and rounding halves up is the rule we want
+ * going forward, so the tool rounds up and the sheet is the thing to reprint.
  */
-export function roundHalfToEven(n) {
-  const floor = Math.floor(n)
-  const frac = n - floor
-  if (frac > 0.5) return floor + 1
-  if (frac < 0.5) return floor
-  return floor % 2 === 0 ? floor : floor + 1
+export function roundHalfUp(n) {
+  return Math.round(n)
 }
 
 /** Current retail price per size + frame, straight from Shopify. */
