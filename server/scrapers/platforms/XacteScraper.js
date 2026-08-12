@@ -250,28 +250,44 @@ export class XacteScraper extends BaseScraper {
   }
 
   /**
-   * Get distance in miles from a result record
+   * Distance in miles for this result, or null if we cannot establish it.
+   *
+   * ONLY the curated config distances are trusted. Xacte's own split distance
+   * is reported in INCONSISTENT UNITS and cannot be used:
+   *
+   *   Army Ten-Miler  6554: 52800  -> feet   (10 mi)
+   *   Denver Colfax   6363: 42195  -> metres (marathon)
+   *   Denver Colfax   6362: 69218  -> feet   (half)
+   *   Surf City       6416:  5000  -> metres (5K)
+   *   Surf City       6417:  5280  -> feet   (1 mi)
+   *
+   * Two different units inside a single event, with no field saying which.
+   * Reading 52800 as metres is what put a 2:54/mi pace on a 1:35:02 ten-mile
+   * finish: 52800/1609.344 = 32.8 "miles". The number looked like metres, and
+   * the resulting pace looked like a number, so nothing complained.
+   *
+   * There is also deliberately no "assume marathon" fallback any more. That
+   * default silently paced a 10-mile race against 26.2 whenever a sub-event
+   * was missing from the config. Returning null yields no pace at all, which
+   * shows up as a gap for someone to fill rather than a plausible wrong value
+   * printed on a poster.
    */
   _getDistanceMiles(runner) {
-    // Try to get distance from splits data
-    const splits = runner.splits || {}
-    for (const split of Object.values(splits)) {
-      if (split.distance?.label === 'FINISH') {
-        const meters = split.distance.distance
-        if (meters) return meters / 1609.344
-      }
-    }
-
-    // Fallback: check config sub-events
     const subEvents = this.config.subEvents?.[this.year] || {}
-    for (const subEvent of Object.values(subEvents)) {
-      if (subEvent.id === runner.subeventId && subEvent.distance) {
-        return subEvent.distance / 1609.344
-      }
+    const entries = Object.values(subEvents).filter(s => s?.distance)
+
+    const matched = entries.find(s => s.id === runner.subeventId)
+    if (matched) return matched.distance / 1609.344
+
+    // Single-distance races (e.g. Army Ten-Miler) have exactly one sub-event,
+    // so an id mismatch is still unambiguous.
+    if (entries.length === 1) {
+      console.warn(`[${this.tag}] subeventId ${runner.subeventId} not in config; using the only configured distance`)
+      return entries[0].distance / 1609.344
     }
 
-    // Ultimate fallback: assume marathon
-    return 26.2
+    console.warn(`[${this.tag}] No configured distance for subeventId ${runner.subeventId} in ${this.year} — pace will be omitted. Add it to subEvents in the race config.`)
+    return null
   }
 }
 

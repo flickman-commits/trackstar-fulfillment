@@ -23,6 +23,7 @@ import { MTECResultsScraper } from './platforms/MTECResultsScraper.js'
 import { LaurelTimingScraper } from './platforms/LaurelTimingScraper.js'
 import { CompetitiveTimingScraper } from './platforms/CompetitiveTimingScraper.js'
 import { SVETimingScraper } from './platforms/SVETimingScraper.js'
+import { SportstatsScraper } from './platforms/SportstatsScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -65,6 +66,7 @@ import surfCityConfig from './configs/surfCity.js'
 import dallasConfig from './configs/dallas.js'
 import detroitConfig from './configs/detroit.js'
 import baltimoreConfig from './configs/baltimore.js'
+import memphisConfig from './configs/memphis.js'
 import grandmasConfig from './configs/grandmas.js'
 import columbusConfig from './configs/columbus.js'
 import stGeorgeConfig from './configs/stGeorge.js'
@@ -94,6 +96,7 @@ const PLATFORM_MAP = {
   laurel: LaurelTimingScraper,
   competitivetiming: CompetitiveTimingScraper,
   svetiming: SVETimingScraper,
+  sportstats: SportstatsScraper,
 }
 
 /**
@@ -140,6 +143,7 @@ const ALL_CONFIGS = [
   dallasConfig,
   detroitConfig,
   baltimoreConfig,
+  memphisConfig,
   grandmasConfig,
   columbusConfig,
   stGeorgeConfig,

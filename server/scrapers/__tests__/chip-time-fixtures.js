@@ -126,6 +126,51 @@ export const CHIP_TIME_FIXTURES = [
     notes: 'HALF distance (21098m = 13.11mi), gun 2:03:30 vs chip 1:55:39 (472s apart). Pacing this against 26.2 would give ~4:24/mi, so this fixture catches a wrong-distance regression.',
   },
 
+  // ── Sportstats (Memphis) ──────────────────────────────────────────────
+  // Two things need guarding here. The API returns BOTH times on every record
+  // (ot = chip, otg = gun), and it returns them in milliseconds that must be
+  // rounded UP to the next second — verified against six runners on the site's
+  // own leaderboard, where floor and round-to-nearest both render one second
+  // fast. Wave starts make the gun/chip gaps enormous, so a wrong column is
+  // obvious rather than subtle.
+  {
+    platform: 'sportstats',
+    race: 'Memphis Marathon',
+    year: 2025,
+    runner: 'Mary Miller',
+    expectedChipTime: '5:39:54',
+    expectedChipPace: '12:58',
+    expectedBib: '5044',
+    notes: 'St. Jude Memphis 2025 MARATHON (rid 145472). Chip 5:39:54 vs gun 6:19:26 — a 40-minute wave offset, so reading otg instead of ot fails loudly. 20394s ÷ 26.2 = 778.4 → 12:58.',
+  },
+  {
+    platform: 'sportstats',
+    race: 'Memphis Marathon',
+    year: 2025,
+    runner: 'Beth Smith',
+    expectedChipTime: '3:41:49',
+    expectedChipPace: '16:56',
+    expectedBib: '13931',
+    notes: 'St. Jude Memphis 2025 HALF (rid 145473) — verifies pace uses 13.1, not 26.2 (26.2 would give 8:28). Chip 3:41:49 vs gun 4:41:03, a 59-minute gap. "Beth" also exercises nickname matching against the surname query, since the API text search would not match "Beth" to an "Elizabeth" registration on its own.',
+  },
+
+  // ── Xacte (Army Ten-Miler) ────────────────────────────────────────────
+  // This platform had no fixture, which is how a 2:54/mi pace reached a
+  // customer's poster. Xacte's own split distance is in mixed units — 52800
+  // here is FEET (10 mi), while Denver's marathon reports 42195 METRES in the
+  // same field — so reading it as metres paced this 10-mile race against 32.8
+  // "miles". A non-marathon distance is the whole point of this fixture.
+  {
+    platform: 'xacte',
+    race: 'Army Ten-Miler',
+    year: 2025,
+    runner: 'Shane Goad',
+    expectedChipTime: '1:35:02',
+    expectedChipPace: '9:30',
+    expectedBib: '13204',
+    notes: 'Army Ten-Miler 2025 — a TEN MILE race. 5702s ÷ 10 = 570.2 → 9:30/mi. Pacing against 26.2 gives 3:37 and against the feed\'s 52800 "metres" gives 2:54, which is the bug this guards. Distance must come from the config subEvent (16093m), never from the split.',
+  },
+
   // ── SVE Timing (Baltimore) ────────────────────────────────────────────
   // This site puts "Gun Elapsed" and "Chip Elapsed" in adjacent columns, so
   // both fixtures are chosen for a wide gun/chip gap: an off-by-one column
