@@ -67,7 +67,7 @@ export interface TierDef {
 const COMMON_FEATURES = [
   '5 comp copies for your team',
   'Your own title sponsor on your title deed card',
-  'A guaranteed space on Edition One, and first refusal on the next',
+  'A race slot on Marathon Monopoly Edition One, and first refusal on the next',
 ]
 
 export const TIERS: TierDef[] = [
@@ -188,6 +188,10 @@ export const COMMIT_STEPS: CommitStep[] = [
  */
 export const SALES_PLAN: SalesPlanItem[] = [
   {
+    title: '22 race partners promoting at once',
+    body: 'Every race on the board has a reason to tell their runners. That is 22 lists behind one product, in one gifting window.',
+  },
+  {
     title: 'Gifted to media',
     body: 'Units to running and lifestyle outlets early enough to make their holiday coverage.',
   },
@@ -250,9 +254,9 @@ export const COMMUNITY_FEEDBACK = [
  */
 export const UNIT_ALLOCATION = [
   {
-    label: 'To the 22 partner races',
+    label: 'Complimentary copies for race partners',
     units: 110,
-    note: '5 comp copies each, for staff, boards and giveaways',
+    note: '5 complimentary units each, for staff, boards and giveaways',
   },
   {
     label: 'Press and influencer seeding',
@@ -260,21 +264,22 @@ export const UNIT_ALLOCATION = [
     note: 'Running media and creators, in hand before launch',
   },
   {
-    label: 'Race expos and race stores',
-    units: 600,
-    note: 'Sold at $55 where there is no competing product on the shelf',
+    label: 'Race partner distribution',
+    units: 400,
+    note: 'Races promoting through their own email list and social media, still purchased on the Trackstar site',
   },
   {
-    label: 'Trackstar direct to consumer',
-    units: 1000,
-    note: 'To a list of 10,000 people who have already bought a running gift',
+    label: 'Units races buy for their own stores',
+    units: 200,
+    note: 'Bought at $35 wholesale and sold at their expo or race store for $55',
   },
   {
-    label: 'Held back',
-    units: 244,
-    note: 'Replacements, late partner requests, second-wave press',
+    label: 'Trackstar (DTC)',
+    units: 1244,
+    note: 'Our email list of 10,000 people who have already bought a running gift, plus our organic and paid channels. Anything unallocated sells here.',
   },
 ]
+
 
 /**
  * The launch itself. A coordinated drop is the difference between 22 races

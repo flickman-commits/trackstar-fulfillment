@@ -332,18 +332,15 @@ export default function Monopoly() {
       {/* ═══ HOW IT GETS SOLD ═══ */}
       <Section>
         <SectionHeading>How we sell it</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          A 2,004 box first run, which is the manufacturer's minimum. If pre-orders justify more,
-          the run goes up and every number below goes up with it.
-        </p>
-
-        <UnitFlow allocation={UNIT_ALLOCATION} />
+        <div className="mt-3">
+          <UnitFlow allocation={UNIT_ALLOCATION} />
+        </div>
 
         {/* The allocation says which box goes where. These say how the people
             who buy them find out, which is a different question and was
             unreadable when both lived in one list. */}
         <div className="mt-14">
-          <SubHeading>Sales channels</SubHeading>
+          <SubHeading>Getting visibility on the product</SubHeading>
           <p className="mb-6 mt-2" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
             These do not move units on their own. They move the people who decide whether units
             move.
@@ -434,7 +431,7 @@ export default function Monopoly() {
           </h3>
           <ul className="flex flex-col gap-2" style={{ maxWidth: '40rem' }}>
             {[
-              'A guaranteed space on Edition One',
+              'A race slot on Marathon Monopoly Edition One',
               'Creative approval on your marks',
               '5 complimentary units shipped to your office',
               'First right of refusal on your space in any future edition',
@@ -515,16 +512,19 @@ export default function Monopoly() {
           <Beat
             dark
             title="20 race partnerships"
+            upper
             body="Live today, among them the Marine Corps Marathon, California International and Eugene. Filling this board is not a cold start."
           />
           <Beat
             dark
             title="Operational alignment"
+            upper
             body="Producing, warehousing, selling and shipping physical product is what the company already runs on. This is the same job we do every day."
           />
           <Beat
             dark
             title="Marketing is our superpower"
+            upper
             body="We sold nearly 3,000 products in our first year, almost entirely through partnership and social media marketing."
           />
         </div>
@@ -998,10 +998,29 @@ function SubHeading({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Beat({ title, body, dark }: { title: string; body: string; dark?: boolean }) {
+function Beat({
+  title,
+  body,
+  dark,
+  upper,
+}: {
+  title: string
+  body: string
+  dark?: boolean
+  /** Caps the heading. Used where the beat is a claim rather than a label. */
+  upper?: boolean
+}) {
   return (
     <div>
-      <h3 className="mb-2" style={{ fontSize: 17, fontWeight: 700, color: dark ? '#FFFFFF' : MONOPOLY.ink }}>
+      <h3
+        className="mb-2"
+        style={{
+          fontSize: 17,
+          fontWeight: 700,
+          color: dark ? '#FFFFFF' : MONOPOLY.ink,
+          ...(upper ? { textTransform: 'uppercase' as const, letterSpacing: '0.04em' } : {}),
+        }}
+      >
         {title}
       </h3>
       <p style={{ fontSize: 15, lineHeight: 1.65, color: dark ? 'rgba(255,255,255,0.7)' : MONOPOLY.inkMuted }}>{body}</p>

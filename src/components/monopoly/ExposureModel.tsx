@@ -23,6 +23,7 @@ import {
   type ExposureInput,
 } from '@/lib/monopolyMath'
 import type { PackageTier } from '@/lib/monopolyTypes'
+import { UNIT_ALLOCATION } from '@/lib/monopolyCopy'
 import { MONOPOLY, CARD_OUTLINE, UI_RADIUS, guilloche } from './monopolyTheme'
 
 interface Props {
@@ -31,8 +32,17 @@ interface Props {
   initialTierKey?: string
 }
 
+/**
+ * The print run, read off the allocation rather than typed here.
+ *
+ * These were 2,000 and 2,004 in two files, which meant the exposure maths
+ * quietly disagreed with the distribution chart directly above it. One source,
+ * so changing the run changes both.
+ */
+const PRINT_RUN = UNIT_ALLOCATION.reduce((sum, row) => sum + row.units, 0)
+
 const DEFAULTS: ExposureInput = {
-  units: 2000,
+  units: PRINT_RUN,
   playersPerGame: 4,
   gamesPerBox: 10,
   hoursPerGame: 2,
@@ -117,23 +127,29 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
           className="mt-10 px-6 py-7 sm:px-8"
           style={{ backgroundColor: MONOPOLY.red, borderRadius: UI_RADIUS, border: CARD_OUTLINE }}
         >
+          {/* CPM rather than cost per attention hour. The hour figure is the
+              more honest comparison, since it prices what an impression is
+              actually worth, but nobody buys media in hours and a number a
+              buyer cannot benchmark is a number they park. CPM is the unit they
+              already argue in, so the argument starts on their ground. The
+              seconds each impression buys is still in the rate card below. */}
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                One hour of a person's attention
+                Cost per 1,000 impressions
               </div>
               <div className="mt-2 flex items-baseline gap-4">
                 <span style={{ fontSize: 46, fontWeight: 700, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.03em' }}>
-                  ${perHour.toFixed(2)}
+                  ${cpm.toFixed(2)}
                 </span>
                 <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)' }}>
-                  vs <strong>${benchmarkCostPerHour(MEDIA_BENCHMARKS[0]).toFixed(2)}</strong> on Instagram
+                  CPM, vs <strong>${MEDIA_BENCHMARKS[0].cpm.toFixed(2)}</strong> on Instagram
                 </span>
               </div>
             </div>
 
             <div style={{ fontSize: 34, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.03em' }}>
-              {Math.round(benchmarkCostPerHour(MEDIA_BENCHMARKS[0]) / perHour)}x cheaper
+              {(MEDIA_BENCHMARKS[0].cpm / cpm).toFixed(1)}x cheaper
             </div>
           </div>
 
@@ -202,7 +218,7 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
             Change anything you disagree with
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <Stepper label="Boxes printed" value={input.units} step={500} min={2000} max={10000} onChange={set('units')} />
+            <Stepper label="Boxes printed" value={input.units} step={500} min={PRINT_RUN} max={10000} onChange={set('units')} />
             <Stepper label="Players per game" value={input.playersPerGame} step={1} min={2} max={8} onChange={set('playersPerGame')} />
             <Stepper label="Games per box" value={input.gamesPerBox} step={1} min={1} max={40} onChange={set('gamesPerBox')} suffix=" over 10 yrs" />
             <Stepper label="Hours per game" value={input.hoursPerGame} step={0.5} min={0.5} max={5} onChange={set('hoursPerGame')} suffix=" hrs" />

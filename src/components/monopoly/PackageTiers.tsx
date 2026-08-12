@@ -58,8 +58,8 @@ export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
                         className="shrink-0"
                         style={{
                           display: 'flex',
-                          width: 18,
-                          height: 26,
+                          width: 22,
+                          height: 22,
                           border: '1.5px solid #1A1A1A',
                           overflow: 'hidden',
                         }}
