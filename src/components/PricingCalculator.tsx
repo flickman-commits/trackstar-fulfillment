@@ -272,7 +272,7 @@ export default function PricingCalculator() {
           disabled={loading}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded-md transition-colors disabled:opacity-50"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh live Artelo/Shopify data
         </button>
       </div>
       <p className="text-[11px] text-off-black/40 mb-3">
@@ -369,16 +369,9 @@ export default function PricingCalculator() {
                     onClick={clickable ? () => setSelectedKey(r.key) : undefined}
                     className={`border-t border-border-gray/60 ${tint.row} ${
                       clickable ? 'cursor-pointer hover:brightness-95' : ''
-                    } ${isSelected ? 'outline outline-2 -outline-offset-2 outline-off-black' : ''}`}
+                    } ${isSelected ? 'outline outline-1 -outline-offset-1 outline-off-black/70' : ''}`}
                   >
-                    <td className="px-3 py-2 font-medium text-off-black whitespace-nowrap">
-                      {channel === 'wholesale' && !r.offSheet && (
-                        <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${
-                          isSelected ? 'bg-off-black' : 'bg-off-black/15'
-                        }`} />
-                      )}
-                      {r.sizeLabel}
-                    </td>
+                    <td className="px-3 py-2 font-medium text-off-black whitespace-nowrap">{r.sizeLabel}</td>
                     <td className="px-3 py-2 text-off-black/60 whitespace-nowrap">
                       {r.frame === 'Framed' ? r.frameLabel : 'Unframed'}
                     </td>
