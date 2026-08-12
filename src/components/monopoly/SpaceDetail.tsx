@@ -220,7 +220,7 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
                     </span>
                     {tier.unitsIncluded != null && (
                       <span style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>
-                        incl. {tier.unitsIncluded} units
+                        incl. {tier.unitsIncluded} comp copies
                       </span>
                     )}
                   </div>
@@ -261,7 +261,20 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
                   fontSize: 14,
                 }}
               >
-                Reserve this space, $400
+                Reserve your space
+                <span
+                  className="block"
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    letterSpacing: '0.02em',
+                    textTransform: 'none',
+                    opacity: 0.85,
+                    marginTop: 3,
+                  }}
+                >
+                  $400, fully refundable
+                </span>
               </button>
             )}
 

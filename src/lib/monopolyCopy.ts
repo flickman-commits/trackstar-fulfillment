@@ -52,7 +52,11 @@ export interface TierDef {
   isFounding: boolean
 }
 
-const COMMON_FEATURES = ['5 comp copies for your team', '5-year category exclusivity in your market']
+const COMMON_FEATURES = [
+  '5 comp copies for your team',
+  'Your own title sponsor on your title deed card',
+  '5-year category exclusivity in your market',
+]
 
 export const TIERS: TierDef[] = [
   {
@@ -302,6 +306,11 @@ export const FAQ: FaqItem[] = [
     question: 'Can we offset the fee by buying boxes?',
     answer:
       'Yes. Fees are quoted in cash, and you can offset part of yours by committing to buy boxes at $35. Sell them at your expo for $55 and each one returns $20.',
+  },
+  {
+    question: 'Can we put our own sponsor on the board?',
+    answer:
+      'Yes, on your own title deed card. It is the one place a brand can appear, and only attached to the race that already has the relationship, so it can never conflict with anybody else on the board.',
   },
   {
     question: 'Where does the charity money go?',

@@ -400,7 +400,8 @@ export default function Monopoly() {
         <H2>What's available, and what it costs.</H2>
         <p className="mb-8 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           Twenty-two race spaces, and nothing else for sale. Edition One carries no third-party
-          brands. It is presented by Trackstar, and the only names on the board are the races.
+          brands. It is presented by Trackstar, and the only names on the board are the races. The
+          one exception is yours to give: your own title sponsor can appear on your title deed card.
         </p>
 
         <div className="mb-12 grid gap-px sm:grid-cols-3" style={{ backgroundColor: MONOPOLY.black }}>
@@ -498,9 +499,9 @@ export default function Monopoly() {
       {COMMIT_STEPS.length > 0 && (
         <Section muted>
           <Tag>How you lock in</Tag>
-          <H2>A $500 deposit holds your space.</H2>
+          <H2>A $400 deposit holds your space.</H2>
           <p className="mb-10 mt-3" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-            $500 reserves your space, fully refundable. You commit real money only once the board is
+            $400 reserves your space, fully refundable. You commit real money only once the board is
             full and you can see exactly who is on it.
           </p>
 
@@ -819,11 +820,27 @@ function CtaButton({ large }: { large?: boolean }) {
         fontWeight: 700,
         textTransform: 'uppercase',
         letterSpacing: '0.5px',
-        padding: large ? '16px 32px' : '14px 26px',
+        padding: large ? '14px 32px' : '12px 26px',
         fontSize: large ? 15 : 14,
+        textAlign: 'center',
       }}
     >
-      Reserve a space, $400
+      Reserve your space
+      {/* The price and the refund promise ride on the button itself: it is the
+          objection a race has at the exact moment they are deciding to click. */}
+      <span
+        className="block"
+        style={{
+          fontSize: large ? 12 : 11,
+          fontWeight: 500,
+          letterSpacing: '0.02em',
+          textTransform: 'none',
+          opacity: 0.85,
+          marginTop: 3,
+        }}
+      >
+        $400, fully refundable
+      </span>
     </a>
   )
 }
