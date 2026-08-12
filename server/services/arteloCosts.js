@@ -53,7 +53,7 @@ export const SIZES = [
  * Two columns, because that is the choice a customer actually makes. Which
  * frame style "Framed" resolves to is a property of the size (see SIZES).
  *
- * Cost depends on frameStyle, not frameColor — get-costs takes no colour — so
+ * Cost depends on frameStyle, not frameColor — get-costs takes no color — so
  * black and natural are the same price. Metal exists in Artelo's catalog and
  * appears in older orders, but we no longer sell it, so it is not priced here.
  */
