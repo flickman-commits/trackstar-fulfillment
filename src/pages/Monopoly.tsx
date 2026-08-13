@@ -812,7 +812,7 @@ function CtaButton() {
       href={DEPOSIT_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="group inline-flex items-center gap-3 transition-opacity hover:opacity-90"
+      className="inline-block transition-opacity hover:opacity-90"
       style={{
         backgroundColor: MONOPOLY.red,
         color: '#FFFFFF',
@@ -822,22 +822,14 @@ function CtaButton() {
         textAlign: 'left',
       }}
     >
-      <span>
-        <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: 16 }}>
-          Reserve your space
-        </span>
-        {/* The price and the refund promise ride on the button itself: it is the
-            objection a race has at the exact moment they are deciding to click. */}
-        <span className="block" style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.85)', marginTop: 3 }}>
-          $400, fully refundable
-        </span>
+      <span style={{ display: 'block', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: 16, lineHeight: 1.15 }}>
+        Reserve your space
       </span>
-      <span
-        aria-hidden="true"
-        className="transition-transform group-hover:translate-x-0.5"
-        style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 700, lineHeight: 1 }}
-      >
-        &rarr;
+      {/* The price and the refund promise ride on the button itself: it is the
+          objection a race has at the exact moment they are deciding to click.
+          Set tight against the label so the two read as one control. */}
+      <span style={{ display: 'block', fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2, marginTop: 1 }}>
+        $400 (refundable)
       </span>
     </a>
   )

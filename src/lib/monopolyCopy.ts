@@ -339,7 +339,7 @@ export const LAUNCH_PLAN = [
     body: "To announce the launch of the product, we'll have 22 races post about it at the exact same time, driving intrigue and awareness.",
   },
   {
-    title: 'A full photo shoot',
+    title: 'Product photo shoot',
     body: 'Product photography, social cutdowns and copy, delivered to every partner ahead of the drop. Yours to run on your own channels at no production cost.',
   },
 ]
