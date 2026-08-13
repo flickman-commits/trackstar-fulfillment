@@ -185,26 +185,30 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
             most sceptical thing on the page and nobody was clicking it. */}
         {/* Underlined rather than boxed. It needs to read as clickable without
             competing with the CTA, which is the only outlined control here. */}
+        {/* The underline lives on the label, not the summary. text-decoration
+            propagates to children and a child cannot switch it off, so styling
+            the whole row underlined dragged the + along with it. */}
         <summary
           className="inline-flex cursor-pointer list-none items-center gap-2"
-          style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: MONOPOLY.ink,
-            textDecoration: 'underline',
-            textDecorationColor: MONOPOLY.red,
-            textUnderlineOffset: 5,
-            textDecorationThickness: 2,
-          }}
+          style={{ fontSize: 15, fontWeight: 700, color: MONOPOLY.ink }}
         >
           <span
             aria-hidden="true"
             className="transition-transform group-open:rotate-45"
-            style={{ fontSize: 16, lineHeight: 1, color: MONOPOLY.red, textDecoration: 'none' }}
+            style={{ fontSize: 16, lineHeight: 1, color: MONOPOLY.red }}
           >
             +
           </span>
-          Show the assumptions and the full rate card
+          <span
+            style={{
+              textDecoration: 'underline',
+              textDecorationColor: MONOPOLY.red,
+              textUnderlineOffset: 5,
+              textDecorationThickness: 2,
+            }}
+          >
+            Show the assumptions and the full rate card
+          </span>
         </summary>
 
         <div

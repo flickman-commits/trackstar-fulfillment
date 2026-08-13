@@ -359,24 +359,18 @@ export default function Monopoly() {
         {/* The allocation says which box goes where. These say how the people
             who buy them find out, which is a different question and was
             unreadable when both lived in one list. */}
+        {/* Visibility and launch were two grids of the same shape stacked on
+            each other, which read as one list interrupted by a heading. They
+            are the same argument: how anybody hears about it. */}
         <div className="mt-14">
           <SubHeading>Getting visibility on the product</SubHeading>
           <p className="mb-6 mt-2" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
             These do not move units on their own. They move the people who decide whether units
             move.
           </p>
-          <div className="grid gap-8 md:grid-cols-3">
-            {SALES_PLAN.map((item) => (
-              <Beat key={item.title} title={item.title} body={item.body} />
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-14">
-          <SubHeading>How it launches</SubHeading>
-          <div className="mt-6 grid gap-8 md:grid-cols-3">
-            {LAUNCH_PLAN.map((item) => (
-              <Beat key={item.title} title={item.title} body={item.body} />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[...SALES_PLAN, ...LAUNCH_PLAN].map((item) => (
+              <Beat key={item.title} card title={item.title} body={item.body} />
             ))}
           </div>
         </div>
@@ -1001,20 +995,36 @@ function Beat({
   body,
   dark,
   upper,
+  card,
 }: {
   title: string
   body: string
   dark?: boolean
   /** Caps the heading. Used where the beat is a claim rather than a label. */
   upper?: boolean
+  /** Red-outlined card. For grids where the beats are a set to scan. */
+  card?: boolean
 }) {
   return (
-    <div>
+    <div
+      style={
+        card
+          ? {
+              border: `2px solid ${MONOPOLY.red}`,
+              borderRadius: UI_RADIUS,
+              padding: '18px 20px',
+              backgroundColor: dark ? 'transparent' : MONOPOLY.paper,
+            }
+          : undefined
+      }
+    >
       <h3
         className="mb-2"
         style={{
-          fontSize: 17,
+          fontSize: 22,
           fontWeight: 700,
+          letterSpacing: '-0.02em',
+          lineHeight: 1.2,
           color: dark ? '#FFFFFF' : MONOPOLY.ink,
           ...(upper ? { textTransform: 'uppercase' as const, letterSpacing: '0.04em' } : {}),
         }}
