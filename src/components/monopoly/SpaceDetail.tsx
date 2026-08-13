@@ -253,27 +253,19 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
                 style={{
                   backgroundColor: MONOPOLY.red,
                   color: '#FFFFFF',
+                  border: `2px solid ${MONOPOLY.black}`,
                   borderRadius: UI_RADIUS,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  padding: '14px 24px',
-                  fontSize: 14,
+                  padding: '13px 22px',
                 }}
               >
-                Reserve your space
-                <span
-                  className="block"
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 500,
-                    letterSpacing: '0.02em',
-                    textTransform: 'none',
-                    opacity: 0.85,
-                    marginTop: 3,
-                  }}
-                >
-                  $400, fully refundable
+                {/* Matches CtaButton on the page exactly. The modal is where a
+                    race director actually decides, so it must not look like a
+                    different or lesser offer than the five buttons outside it. */}
+                <span style={{ display: 'block', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: 16, lineHeight: 1.15 }}>
+                  Reserve your space
+                </span>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2, marginTop: 1 }}>
+                  $400 (refundable)
                 </span>
               </button>
             )}
