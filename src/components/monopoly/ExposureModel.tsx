@@ -102,13 +102,13 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
             working too. */}
         <BigStat
           value={fmt(result.playerSessions)}
-          label="people at the table"
+          label="people will play this game"
           sub={`${num(input.units)} boxes × ${input.gamesPerBox} games per box × ${input.playersPerGame} players per game`}
         />
         <BigStat
           value={fmt(Math.round(result.attentionHours))}
           label="hours of attention"
-          sub={`${fmt(result.playerSessions)} people at the table × ${input.hoursPerGame} hours a game`}
+          sub={`${fmt(result.playerSessions)} players × ${input.hoursPerGame} hours a game`}
         />
         <BigStat
           value={fmt(result.impressions)}

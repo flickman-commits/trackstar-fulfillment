@@ -155,14 +155,6 @@ export const WHY_NOW = [
     title: 'Board games are having a moment',
     body: 'Tabletop has been one of the few physical categories growing while everything else moved to a screen, and the licensed editions people actually keep are the ones tied to something they love.',
   },
-  {
-    title: 'Runners want reasons to gather',
-    body: 'This is a sport built on showing up in person. The same instinct that fills a start corral is the one that puts four people around a table on a Sunday.',
-  },
-  {
-    title: 'A trophy you can actually play with',
-    body: 'A medal sits in a drawer. This is how a parent shows a kid what those early mornings were for, on the living room floor, on a board with their races printed on it.',
-  },
 ]
 
 export const TIMELINE: TimelinePhase[] = [
@@ -343,16 +335,12 @@ export const UNIT_ALLOCATION = [
  */
 export const LAUNCH_PLAN = [
   {
-    title: 'One coordinated drop',
-    body: 'Every race posts the same teaser on the same day. Twenty-two accounts, one moment, and the sense that something is happening rather than something is for sale.',
+    title: 'Simultaneous social media launch',
+    body: "To announce the launch of the product, we'll have 22 races post about it at the exact same time, driving intrigue and awareness.",
   },
   {
     title: 'A full photo shoot',
     body: 'Product photography, social cutdowns and copy, delivered to every partner ahead of the drop. Yours to run on your own channels at no production cost.',
-  },
-  {
-    title: 'Press',
-    body: 'Units in the hands of running and lifestyle press before launch, so the coverage lands in the same week the board goes on sale.',
   },
 ]
 

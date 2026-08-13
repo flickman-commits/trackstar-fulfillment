@@ -329,7 +329,7 @@ export default function Monopoly() {
 
       {/* ═══ WHY YOU SHOULD CARE ═══ */}
       <Section dark>
-        <SectionHeading dark>Why you should care</SectionHeading>
+        <SectionHeading>Why you should care</SectionHeading>
         <div className="mt-8 grid gap-8 md:grid-cols-3">
           <Beat
             dark
@@ -449,7 +449,6 @@ export default function Monopoly() {
               'Creative approval on your marks',
               '5 complimentary units shipped to your office',
               'First right of refusal on your space in any future edition',
-              'The ability to reorder at the $35 wholesale price',
             ].map((item) => (
               <li key={item} className="flex gap-2.5" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
                 <span aria-hidden="true" style={{ color: MONOPOLY.red, fontWeight: 700 }}>
@@ -515,7 +514,7 @@ export default function Monopoly() {
 
       {/* ═══ WHY TRACKSTAR ═══ */}
       <Section dark>
-        <SectionHeading dark>Our expertise</SectionHeading>
+        <SectionHeading>Our expertise</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, maxWidth: '46rem' }}>
           Here's why Trackstar is the right company to bring this product to life.
         </p>
@@ -813,37 +812,30 @@ function CtaButton() {
       href={DEPOSIT_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="group inline-flex items-center gap-3 transition-all hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none"
+      className="group inline-flex items-center gap-3 transition-opacity hover:opacity-90"
       style={{
-        backgroundColor: MONOPOLY.paper,
-        color: MONOPOLY.ink,
+        backgroundColor: MONOPOLY.red,
+        color: '#FFFFFF',
         border: `2px solid ${MONOPOLY.black}`,
         borderRadius: UI_RADIUS,
         padding: '13px 22px',
         textAlign: 'left',
-        // A hard offset rather than a blur: the section headings are flat red
-        // plates, so the CTA needed to differ by more than wording. This one
-        // sits above the page and presses into it on hover, which no heading
-        // does. Paper rather than red for the same reason, and because the
-        // closing CTA sits on black where a red plate would just be a third
-        // red rectangle.
-        boxShadow: `4px 4px 0 ${MONOPOLY.red}`,
       }}
     >
       <span>
-        <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: 14 }}>
+        <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: 16 }}>
           Reserve your space
         </span>
         {/* The price and the refund promise ride on the button itself: it is the
             objection a race has at the exact moment they are deciding to click. */}
-        <span className="block" style={{ fontSize: 11, fontWeight: 500, color: MONOPOLY.inkMuted, marginTop: 3 }}>
+        <span className="block" style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.85)', marginTop: 3 }}>
           $400, fully refundable
         </span>
       </span>
       <span
         aria-hidden="true"
         className="transition-transform group-hover:translate-x-0.5"
-        style={{ color: MONOPOLY.red, fontSize: 18, fontWeight: 700, lineHeight: 1 }}
+        style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 700, lineHeight: 1 }}
       >
         &rarr;
       </span>
@@ -938,10 +930,12 @@ function Section({
  * paragraph underneath almost always made the same point better. So the label
  * won, and it is the heading now.
  *
- * Still the red plate rather than plain type. On a page pretending to be a
- * printed board game, the heading should look stamped on.
+ * A raised paper plate rather than a flat red one. The CTA now owns red, which
+ * is the right way round: the thing you click should be the loudest object on
+ * the page, and previously the twelve headings were shouting over the five
+ * buttons in the same colour.
  */
-function SectionHeading({ children, dark }: { children: React.ReactNode; dark?: boolean }) {
+function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-5">
       <h2
@@ -953,10 +947,11 @@ function SectionHeading({ children, dark }: { children: React.ReactNode; dark?: 
           lineHeight: 1.25,
           letterSpacing: '0.05em',
           textTransform: 'uppercase',
-          color: '#FFFFFF',
-          backgroundColor: MONOPOLY.red,
-          border: `2px solid ${dark ? MONOPOLY.red : MONOPOLY.black}`,
+          color: MONOPOLY.ink,
+          backgroundColor: MONOPOLY.paper,
+          border: `2px solid ${MONOPOLY.black}`,
           borderRadius: UI_RADIUS,
+          boxShadow: `4px 4px 0 ${MONOPOLY.red}`,
         }}
       >
         {children}
