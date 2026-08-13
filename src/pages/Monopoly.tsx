@@ -21,6 +21,7 @@ import { ExposureModel } from '@/components/monopoly/ExposureModel'
 import { BrandLockup } from '@/components/monopoly/BrandLockup'
 import PriceExpectation from '@/components/monopoly/PriceExpectation'
 import { UnitFlow } from '@/components/monopoly/UnitFlow'
+import { PlaceholderImage } from '@/components/monopoly/PlaceholderImage'
 import { MONOPOLY, UI_RADIUS, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import {
@@ -30,6 +31,7 @@ import {
   FAQ,
   COMMUNITY_FEEDBACK,
   SALES_PLAN,
+  WHY_NOW,
   TIMELINE,
   UNIT_ALLOCATION,
 } from '@/lib/monopolyCopy'
@@ -276,7 +278,25 @@ export default function Monopoly() {
       {/* ═══ THE PRODUCT ═══
           The first thing a race asked to see before committing. Placeholder
           squares hold the exact slots the finished renders will fill. */}
+      {/* ═══ WHY NOW ═══
+          Every other section argues the product is good. This one argues the
+          moment is, which is the question a race director asks second. */}
       <Section muted>
+        <SectionHeading>Why now</SectionHeading>
+        <div className="mt-8 grid gap-8 md:grid-cols-2">
+          {WHY_NOW.map((item) => (
+            <Beat key={item.title} title={item.title} body={item.body} />
+          ))}
+        </div>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-3">
+          <PlaceholderImage label="Family around the board on the living room floor" />
+          <PlaceholderImage label="Parent and kid mid-game, medals on the wall behind" />
+          <PlaceholderImage label="Four friends at a kitchen table, phones face down" />
+        </div>
+      </Section>
+
+      <Section>
         <SectionHeading>What's in the box</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           Marathon Monopoly will be a full-size, licensed, limited edition Monopoly board game. It

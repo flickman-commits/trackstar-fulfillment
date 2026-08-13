@@ -3,16 +3,16 @@
  * charge for it.
  *
  * The shape is a kernel density estimate over the actual answers rather than a
- * drawn-in bell curve. With four responses the real distribution is lumpy and
- * slightly bimodal, and smoothing that into a tidy hill would be inventing a
- * result the survey did not produce. The caption says how many people answered
- * for the same reason: this is a signal worth showing, not a study, and a race
- * director who reads it as more than that because the chart looked
- * authoritative is a worse outcome than one who sees four dots.
+ * drawn-in bell curve. At this sample size the real distribution is lumpy, and
+ * smoothing it into a tidy hill would be inventing a result the survey did not
+ * produce. The caption says how many people answered for the same reason: this
+ * is a signal worth showing, not a study, and a race director who reads it as
+ * more than that because the chart looked authoritative is a worse outcome
+ * than one who counts the dots.
  *
- * Every numeric answer is plotted, including the $20 that is no longer quoted
- * above. Dropping the low one would lift the median from $71 to $100, which is
- * the difference between reporting a number and choosing one.
+ * Every numeric answer is plotted, including the ones not quoted above and the
+ * $20 at the bottom. Dropping the low end would lift the median, which is the
+ * difference between reporting a number and choosing one.
  *
  * Only the curve is SVG, stretched with preserveAspectRatio="none". Everything
  * carrying a number is HTML positioned by percentage, so the labels stay at
@@ -21,9 +21,10 @@
  * subtle.
  */
 import { MONOPOLY, UI_RADIUS } from './monopolyTheme'
+import { FEEDBACK_COUNTS, PRICE_ANSWERS } from '@/lib/monopolyCopy'
 
-/** Midpoints of what each person said, in dollars. Four of eight replies. */
-const RESPONSES = [20, 42.5, 100, 149.5]
+/** Midpoints of what each person said, sourced next to the quotes. */
+const RESPONSES = PRICE_ANSWERS
 
 /** What the edition is actually priced at: direct, then at a race expo. */
 const OUR_PRICE = { low: 45, high: 55 }
@@ -169,8 +170,8 @@ export default function PriceExpectation() {
       </div>
 
       <p className="mt-2" style={{ fontSize: 12, color: MONOPOLY.inkMuted, lineHeight: 1.5 }}>
-        Four of the eight replies named a figure. The mint band is what we plan to charge, $45 direct
-        and $55 at a race expo.
+        {FEEDBACK_COUNTS.namedAPrice} of the {FEEDBACK_COUNTS.replies} replies named a figure. The
+        mint band is what we plan to charge, $45 direct and $55 at a race expo.
       </p>
     </figure>
   )

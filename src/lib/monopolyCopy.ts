@@ -137,6 +137,34 @@ export const TOKENS = [
   { name: 'The Stopwatch', description: 'Every PR starts and ends here.', sortOrder: 6 },
 ]
 
+/**
+ * Why this lands in 2027 rather than being a nice idea at any time.
+ *
+ * Every other section argues the product is good. This one argues the moment
+ * is, which is the question a race director asks second and nobody had
+ * answered: board games are growing while screen time is the thing people say
+ * they want less of, and a physical object aimed at a sport with no board game
+ * of its own is sitting in the middle of that.
+ */
+export const WHY_NOW = [
+  {
+    title: 'People are tired of screens',
+    body: 'Digital fatigue is the defining consumer mood of the decade. The thing people say they want more of is time not spent looking at a phone, and a board on a table is the oldest answer to that there is.',
+  },
+  {
+    title: 'Board games are having a moment',
+    body: 'Tabletop has been one of the few physical categories growing while everything else moved to a screen, and the licensed editions people actually keep are the ones tied to something they love.',
+  },
+  {
+    title: 'Runners want reasons to gather',
+    body: 'This is a sport built on showing up in person. The same instinct that fills a start corral is the one that puts four people around a table on a Sunday.',
+  },
+  {
+    title: 'A trophy you can actually play with',
+    body: 'A medal sits in a drawer. This is how a parent shows a kid what those early mornings were for, on the living room floor, on a board with their races printed on it.',
+  },
+]
+
 export const TIMELINE: TimelinePhase[] = [
   {
     phase: 'Locking in races',
@@ -209,33 +237,43 @@ export const SALES_PLAN: SalesPlanItem[] = [
  * Real replies to the tease email, sent August 12 2026.
  *
  * The email asked four questions, one of which was what they would expect to
- * pay, so every quote here is paired with that person's own answer. Only the
- * three strongest are quoted; the rest of the price answers still appear in
- * PriceExpectation.tsx, which plots every figure anybody named.
+ * pay, so every quote here is paired with that person's own answer.
  *
  * Verbatim apart from trimming, and attributed by first name only because
  * these were private replies to a survey rather than reviews anybody submitted
- * for publication.
+ * for publication. Two people are called Ricky, hence the initials.
  *
- * Which quotes get featured is an editorial call and three is fine. Which
- * numbers feed the chart is not: eight people replied, one said outright they
- * would not buy, and the guesses ran $20 to $199 against a $45 direct price.
- * The chart keeps all four figures, because dropping the low one would move
- * the median from $71 to $100 and that is choosing a number, not reporting
- * one.
+ * Which quotes get featured is an editorial call. Which numbers feed the chart
+ * is not: 15 people wrote back, two said outright they would not buy, and the
+ * guesses ran $20 to $199 against a $45 direct price. PRICE_ANSWERS below is
+ * every figure anybody named, including the ones not quoted here, because
+ * dropping the low end would move the median and that is choosing a number
+ * rather than reporting one.
  */
 export const COMMUNITY_FEEDBACK = [
   {
     quote:
       'I will with 100000% confidence purchase it if you guys make it happen. It can actually even be a perfect gift for fellow runners. We spend hundreds on race entry fees and gear so why not on a marathon board game.',
-    name: 'Ricky',
+    name: 'Ricky F.',
     price: 'Price would not be an issue',
   },
   {
     quote:
-      'The ownership stickers must be sneakers or medals. I feel like jail has to be a porta potty.',
-    name: 'Joshua',
-    price: '$100 to $199',
+      'I actually have one of your Eugene Marathon prints already, so I am a fan of what you guys are doing and think this would be a really fun addition. I would love to see things that runners would immediately recognize: aid stations, porta-potties, the starting corral, gels, iconic medals, PRs, course hills, race-day weather.',
+    name: 'Ricky S.',
+    price: '$30 to $50',
+  },
+  {
+    quote:
+      'Great idea. I would order for sure. If it is personalized maybe a bit more. Jail should be DNF.',
+    name: 'Pat',
+    price: '$50 to $60',
+  },
+  {
+    quote:
+      'Yes, absolutely. So many ideas: new gel disagrees with you at mile 18, go back N spaces. You win a lottery entry into the London marathon, jump ahead N spaces. Favorite shoe company drops new carbon plate race shoes 6 weeks before your next race, pay $300.',
+    name: 'Dave',
+    price: 'Not exceeding $49',
   },
   {
     quote:
@@ -243,7 +281,25 @@ export const COMMUNITY_FEEDBACK = [
     name: 'A Trackstar customer',
     price: '$35 to $50',
   },
+  {
+    quote:
+      'The ownership stickers must be sneakers or medals. I feel like jail has to be a porta potty.',
+    name: 'Joshua',
+    price: '$100 to $199',
+  },
 ]
+
+/**
+ * Every price anybody named, in dollars, as the midpoint of their answer.
+ *
+ * Kept next to the quotes rather than inside the chart component so the two
+ * cannot drift, and so it is obvious that the chart holds more answers than
+ * the six cards do.
+ */
+export const PRICE_ANSWERS = [20, 40, 42.5, 49, 55, 100, 149.5]
+
+/** How many people replied at all, and how many of those named a figure. */
+export const FEEDBACK_COUNTS = { replies: 15, namedAPrice: PRICE_ANSWERS.length }
 
 /**
  * Where every box goes, for a 2,004 print run.
