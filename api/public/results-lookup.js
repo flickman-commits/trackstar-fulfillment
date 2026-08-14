@@ -122,7 +122,12 @@ export default async function handler(req, res) {
   // is now a thing we measure and show, not a thing we gate on.
   if (!isRacePublicSafe(resolvedRace)) {
     await observe({ outcome: 'off', status: 200, raceForLog: raceCanonical })
-    return res.status(200).json(fallback({ reason: 'no_instant_lookup' }))
+    // Send raceCanonical even though we found no scraper. It is derived from
+    // the title, not from a config, so it is the clean "Bayshore Marathon"
+    // rather than the listing title the widget sent us. Omitting it left the
+    // widget printing "Bayshore Marathon Personalized Race Print" on the review
+    // screen and writing it to the order's Race Name property.
+    return res.status(200).json(fallback({ reason: 'no_instant_lookup', raceCanonical }))
   }
 
   const cacheKey = buildCacheKey({ race: resolvedRace, year, name })
