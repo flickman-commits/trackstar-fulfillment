@@ -65,8 +65,13 @@ export const PHOTO_ADDON_COST = 0
  * smaller order pays retail.
  *
  * 24x36 is not sold wholesale at all — confirmed, not merely missing from the
- * sheet. It renders as "not offered" and is excluded from the order roll-up
- * rather than being extrapolated from its retail price.
+ * sheet. A size listed here renders as "not offered" and is excluded from the
+ * order roll-up rather than being extrapolated from its retail price.
+ *
+ * 24x36 was discontinued at retail on 2026-08-14, so it no longer reaches this
+ * rule: buildPricingGrid drops any size with no live Shopify price before the
+ * wholesale layer sees it. The entry stays because the statement is still true
+ * and would apply again the day the size comes back.
  */
 export const WHOLESALE_TIERS = [
   { min: 10, max: 24, discount: 0.15, label: '10-24 units' },
@@ -166,16 +171,35 @@ function round(n, dp = 2) {
 }
 
 /**
- * The full grid: every size x (unframed, framed), costed at `quantity` and
- * priced at retail. Channel pricing is applied by the caller on top of the
- * `retailPrice` returned here.
+ * The grid: every size x (unframed, framed) WE ACTUALLY SELL, costed at
+ * `quantity` and priced at retail. Channel pricing is applied by the caller on
+ * top of the `retailPrice` returned here.
+ *
+ * A size/frame with no live retail price is skipped rather than rendered.
+ * Discontinuing 24x36 took its variants out of Shopify but left it in SIZES,
+ * and the grid dutifully showed it at $0.00 with a $27 loss — a number that
+ * described nothing, because we no longer sell the thing. Skipping also saves
+ * an Artelo call per dead row.
+ *
+ * SIZES keeps the discontinued entry on purpose: it is the Artelo id and frame
+ * mapping, not a statement that we sell it. If 24x36 ever comes back in
+ * Shopify the row reappears here on its own, with no code change.
  */
 export async function buildPricingGrid({ quantity = 1, shippingDestination = 'US' } = {}) {
   const retail = await fetchRetailPrices()
+
+  // An empty catalog means the Shopify read failed or returned nothing, not
+  // that we sell nothing. Rendering an empty grid would look like a real
+  // answer, so say what happened instead.
+  if (!Object.keys(retail).length) {
+    throw new Error('No retail prices came back from Shopify, so the grid would be empty. Check the catalog read.')
+  }
+
   const rows = []
 
   for (const size of SIZES) {
     for (const column of COLUMNS) {
+      if (!retail[`${size.label}|${column.id}`]) continue
       const frameStyle = column.id === 'Framed' ? size.framedStyle : 'Unframed'
       const key = `${size.id}|${column.id}`
       try {
