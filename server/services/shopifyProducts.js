@@ -166,6 +166,285 @@ export async function applyVariantPrices(updates) {
 }
 
 // ---------------------------------------------------------------------------
+// Variant removal, and putting it back
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything needed to recreate a variant byte-for-byte later.
+ *
+ * The image is captured as a URL, not an id. Deleting a variant leaves the
+ * product's media alone, so at restore time we re-find the same file among the
+ * product's media and re-attach it (see mediaIdsByFile). Storing the id instead
+ * would be no more stable and would rot silently if media were re-uploaded.
+ */
+const VARIANT_SNAPSHOT_QUERY = `
+  query VariantSnapshot($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on ProductVariant {
+        id
+        title
+        price
+        compareAtPrice
+        barcode
+        taxable
+        position
+        selectedOptions { name value }
+        image { url }
+        inventoryPolicy
+        inventoryItem {
+          sku
+          tracked
+          requiresShipping
+          measurement { weight { value unit } }
+        }
+        product { id title handle }
+      }
+    }
+  }
+`
+
+const PRODUCT_VARIANT_COUNT_QUERY = `
+  query VariantCounts($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on Product {
+        id
+        title
+        variantsCount { count }
+      }
+    }
+  }
+`
+
+const PRODUCT_MEDIA_QUERY = `
+  query ProductMedia($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on Product {
+        id
+        media(first: 250) {
+          nodes { id ... on MediaImage { image { url } } }
+        }
+      }
+    }
+  }
+`
+
+const BULK_DELETE = `
+  mutation BulkDelete($productId: ID!, $variantsIds: [ID!]!) {
+    productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
+      product { id }
+      userErrors { field message }
+    }
+  }
+`
+
+const BULK_CREATE = `
+  mutation BulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+    productVariantsBulkCreate(productId: $productId, variants: $variants) {
+      productVariants { id title }
+      userErrors { field message }
+    }
+  }
+`
+
+/** Shopify caps a nodes() lookup, and we routinely ask about ~200 variants. */
+function chunk(arr, size) {
+  const out = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
+
+/**
+ * The CDN path of a Shopify file URL, minus the ?v= cache buster.
+ * Two URLs for the same uploaded file agree on this and on nothing else, which
+ * is what lets a restored variant find its original image again.
+ */
+function fileKey(url) {
+  const m = /\/files\/([^?]+)/.exec(url || '')
+  return m ? m[1] : null
+}
+
+/** Full snapshots for the given variant ids, in no particular order. */
+export async function fetchVariantSnapshots(variantIds) {
+  const out = []
+  for (const ids of chunk(variantIds, 100)) {
+    const data = await shopifyGraphql(VARIANT_SNAPSHOT_QUERY, { ids })
+    for (const n of data.nodes) {
+      if (!n) continue
+      out.push({
+        variantId: n.id,
+        productId: n.product.id,
+        productTitle: n.product.title,
+        productHandle: n.product.handle,
+        title: n.title,
+        price: n.price,
+        compareAtPrice: n.compareAtPrice,
+        barcode: n.barcode,
+        taxable: n.taxable,
+        position: n.position,
+        optionValues: n.selectedOptions.map(o => ({ optionName: o.name, name: o.value })),
+        imageUrl: n.image?.url || null,
+        inventoryPolicy: n.inventoryPolicy,
+        sku: n.inventoryItem?.sku || null,
+        tracked: n.inventoryItem?.tracked ?? null,
+        requiresShipping: n.inventoryItem?.requiresShipping ?? null,
+        weight: n.inventoryItem?.measurement?.weight?.value ?? null,
+        weightUnit: n.inventoryItem?.measurement?.weight?.unit ?? null,
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * Which of these products would be left with no variants at all?
+ *
+ * Shopify refuses to delete a product's last variant, and rightly so. Rather
+ * than let the mutation fail halfway through a batch we check first and hand
+ * the caller a list to exclude, so a 200-variant sweep does not stop dead on
+ * the one product that only sells one size.
+ */
+export async function findProductsLosingEveryVariant(deletions) {
+  const wanted = new Map()
+  for (const d of deletions) {
+    wanted.set(d.productId, (wanted.get(d.productId) || 0) + 1)
+  }
+
+  const blocked = []
+  for (const ids of chunk([...wanted.keys()], 100)) {
+    const data = await shopifyGraphql(PRODUCT_VARIANT_COUNT_QUERY, { ids })
+    for (const n of data.nodes) {
+      if (!n) continue
+      const total = n.variantsCount?.count ?? 0
+      if (wanted.get(n.id) >= total) {
+        blocked.push({ productId: n.id, productTitle: n.title, total, selected: wanted.get(n.id) })
+      }
+    }
+  }
+  return blocked
+}
+
+/**
+ * Delete variants, grouped by product.
+ *
+ * Mirrors applyVariantPrices: one call per product, sequential, and a partial
+ * failure is reported rather than thrown so the caller can still record what
+ * did go. A batch that half-applied still needs its half to be restorable.
+ */
+export async function deleteVariants(deletions) {
+  const byProduct = new Map()
+  for (const d of deletions) {
+    if (!byProduct.has(d.productId)) byProduct.set(d.productId, [])
+    byProduct.get(d.productId).push(d)
+  }
+
+  const deleted = []
+  const failures = []
+
+  for (const [productId, group] of byProduct) {
+    try {
+      const data = await shopifyGraphql(BULK_DELETE, {
+        productId,
+        variantsIds: group.map(d => d.variantId),
+      })
+      const result = data.productVariantsBulkDelete
+      if (result.userErrors?.length) {
+        failures.push({ productId, message: result.userErrors.map(e => e.message).join('; ') })
+        continue
+      }
+      deleted.push(...group)
+    } catch (error) {
+      failures.push({ productId, message: error.message })
+    }
+  }
+
+  return { deleted, failures }
+}
+
+/** file key -> media id, for each of the given products. */
+async function mediaIdsByFile(productIds) {
+  const map = new Map()
+  for (const ids of chunk(productIds, 50)) {
+    const data = await shopifyGraphql(PRODUCT_MEDIA_QUERY, { ids })
+    for (const n of data.nodes) {
+      if (!n) continue
+      const inner = new Map()
+      for (const m of n.media.nodes) {
+        const key = fileKey(m.image?.url)
+        if (key) inner.set(key, m.id)
+      }
+      map.set(n.id, inner)
+    }
+  }
+  return map
+}
+
+/**
+ * Recreate variants from snapshots taken before they were deleted.
+ *
+ * Option values that no longer exist on the product (deleting every 24x36
+ * variant takes "24x36" off the Size option with it) are re-added by Shopify
+ * as a side effect of creating a variant that uses them, so the option comes
+ * back on its own.
+ *
+ * The one thing this cannot restore is identity: recreated variants get new
+ * ids. Anything holding an old variant id — a saved cart, a draft order, a
+ * hardcoded id in the theme — will not resolve to the restored variant.
+ */
+export async function recreateVariants(snapshots) {
+  const byProduct = new Map()
+  for (const s of snapshots) {
+    if (!byProduct.has(s.productId)) byProduct.set(s.productId, [])
+    byProduct.get(s.productId).push(s)
+  }
+
+  const media = await mediaIdsByFile([...byProduct.keys()])
+  const created = []
+  const failures = []
+
+  for (const [productId, group] of byProduct) {
+    const forProduct = media.get(productId) || new Map()
+    try {
+      const data = await shopifyGraphql(BULK_CREATE, {
+        productId,
+        variants: group.map(s => {
+          const input = {
+            optionValues: s.optionValues,
+            price: String(s.price),
+            taxable: s.taxable ?? true,
+            inventoryPolicy: s.inventoryPolicy || 'CONTINUE',
+            inventoryItem: {
+              sku: s.sku || null,
+              tracked: s.tracked ?? false,
+              requiresShipping: s.requiresShipping ?? true,
+            },
+          }
+          if (s.compareAtPrice) input.compareAtPrice = String(s.compareAtPrice)
+          if (s.barcode) input.barcode = s.barcode
+          if (s.weight != null && s.weightUnit) {
+            input.inventoryItem.measurement = {
+              weight: { value: s.weight, unit: s.weightUnit },
+            }
+          }
+          const mediaId = forProduct.get(fileKey(s.imageUrl))
+          if (mediaId) input.mediaId = mediaId
+          return input
+        }),
+      })
+      const result = data.productVariantsBulkCreate
+      if (result.userErrors?.length) {
+        failures.push({ productId, message: result.userErrors.map(e => e.message).join('; ') })
+        continue
+      }
+      created.push(...result.productVariants.map(v => ({ productId, variantId: v.id, title: v.title })))
+    } catch (error) {
+      failures.push({ productId, message: error.message })
+    }
+  }
+
+  return { created, failures }
+}
+
+// ---------------------------------------------------------------------------
 // Product-level catalog sync
 // ---------------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, ArrowLeft, RotateCcw, AlertTriangle, Check } from 'lucide-react'
+import { Loader2, ArrowLeft, RotateCcw, AlertTriangle, Check, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 
@@ -39,6 +39,15 @@ interface Batch {
 }
 
 type PriceMode = 'set' | 'percent' | 'amount'
+
+/** What the server says a removal would do, before it does any of it. */
+interface RemovePreview {
+  wouldDelete: number
+  products: number
+  missing: string[]
+  blocked: { productId: string; productTitle: string; total: number; selected: number }[]
+  sample: { productTitle: string; title: string; sku: string | null; price: string }[]
+}
 
 function money(n: number) {
   return `$${n.toFixed(2)}`
@@ -101,6 +110,13 @@ export default function ProductsBulkEdit() {
 
   const [applying, setApplying] = useState(false)
   const [confirming, setConfirming] = useState(false)
+
+  // Removal is a separate, heavier flow: a dry run first, then a typed
+  // confirmation. Deleting a variant is not a price you can nudge back — the
+  // undo rebuilds it from a snapshot, and rebuilt variants get new IDs.
+  const [removing, setRemoving] = useState(false)
+  const [removePreview, setRemovePreview] = useState<RemovePreview | null>(null)
+  const [removeTyped, setRemoveTyped] = useState('')
 
   const loadCatalog = useCallback(async () => {
     setLoading(true)
@@ -216,8 +232,70 @@ export default function ProductsBulkEdit() {
     }
   }
 
+  /** Ask what would happen. Nothing is deleted by this. */
+  const previewRemove = async () => {
+    setRemoving(true)
+    try {
+      const res = await apiFetch(`${API_BASE}/api/products/bulk-edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          dryRun: true,
+          variantIds: matched.map(v => v.variantId),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Preview failed')
+      setRemovePreview(data)
+      setRemoveTyped('')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Preview failed')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  const confirmRemove = async () => {
+    setRemoving(true)
+    try {
+      const res = await apiFetch(`${API_BASE}/api/products/bulk-edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          variantIds: matched.map(v => v.variantId),
+          filters: { sizes, frames, titleQuery, excludeCustom, activeOnly },
+          description:
+            `Removed ${sizes.length ? sizes.join(', ') : 'variants'}`
+            + (frames.length ? ` / ${frames.join(', ')}` : ''),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Remove failed')
+      if (data.failures?.length) {
+        toast.error(`${data.deleted} removed, ${data.failures.length} product(s) failed`)
+        console.error('Bulk remove failures:', data.failures)
+      } else {
+        toast.success(`Removed ${data.deleted} variant${data.deleted === 1 ? '' : 's'}`)
+      }
+      setRemovePreview(null)
+      await Promise.all([loadCatalog(), loadBatches()])
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Remove failed')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   const undo = async (batch: Batch) => {
-    if (!window.confirm(`Undo "${batch.description}"? This restores ${batch.count} variant price${batch.count === 1 ? '' : 's'}.`)) return
+    // A removal batch is rebuilt, not repriced, and the wording has to say so:
+    // "restore 192 variant prices" would be a lie about what is coming back.
+    const isRemoval = /^Removed /.test(batch.description)
+    const prompt = isRemoval
+      ? `Undo "${batch.description}"? This recreates ${batch.count} variant${batch.count === 1 ? '' : 's'} with their original options, price, SKU, weight and image. They will get NEW Shopify variant IDs.`
+      : `Undo "${batch.description}"? This restores ${batch.count} variant price${batch.count === 1 ? '' : 's'}.`
+    if (!window.confirm(prompt)) return
     try {
       const res = await apiFetch(`${API_BASE}/api/products/bulk-edit`, {
         method: 'POST',
@@ -226,8 +304,11 @@ export default function ProductsBulkEdit() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Undo failed')
-      if (data.fullyUndone) toast.success(`Reverted ${data.reverted} variants`)
-      else toast.error(`Reverted ${data.reverted} of ${data.total}; some failed`)
+      // A price undo reports `reverted`, a removal undo reports `restored`.
+      const n = data.restored ?? data.reverted
+      const verb = isRemoval ? 'Restored' : 'Reverted'
+      if (data.fullyUndone) toast.success(`${verb} ${n} variants`)
+      else toast.error(`${verb} ${n} of ${data.total}; some failed`)
       await Promise.all([loadCatalog(), loadBatches()])
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Undo failed')
@@ -344,6 +425,30 @@ export default function ProductsBulkEdit() {
                   className="px-4 py-2.5 text-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-30"
                 >
                   Review and apply
+                </button>
+              </div>
+
+              {/*
+                Removal acts on everything the filters matched, not on the price
+                preview — a variant you are deleting has no "new price", so
+                `changing` would be empty and the button dead.
+              */}
+              <div className="mt-4 pt-4 border-t border-border-gray flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-off-black">Discontinue a size or frame</p>
+                  <p className="text-xs text-off-black/50 mt-0.5">
+                    Deletes all {matched.length} matched variant{matched.length === 1 ? '' : 's'} from Shopify.
+                    Undoable from the batch list, though restored variants get new IDs.
+                  </p>
+                </div>
+                <button
+                  onClick={previewRemove}
+                  disabled={!matched.length || removing}
+                  className="px-4 py-2.5 text-sm font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md transition-colors disabled:opacity-30 inline-flex items-center gap-2"
+                >
+                  {removing && !removePreview
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking…</>
+                    : <><Trash2 className="w-4 h-4" /> Remove {matched.length} variant{matched.length === 1 ? '' : 's'}</>}
                 </button>
               </div>
             </div>
@@ -472,6 +577,79 @@ export default function ProductsBulkEdit() {
               <button
                 onClick={() => setConfirming(false)}
                 disabled={applying}
+                className="px-4 py-2.5 text-sm font-medium text-off-black/70 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm removal. Deliberately heavier than the price confirm: this one
+          shows the server's own dry run and will not arm until REMOVE is typed. */}
+      {removePreview && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => !removing && setRemovePreview(null)}>
+          <div className="bg-white rounded-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-4">
+              <Trash2 className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div>
+                <h2 className="text-lg font-semibold text-off-black">
+                  Remove {removePreview.wouldDelete} variant{removePreview.wouldDelete === 1 ? '' : 's'}?
+                </h2>
+                <p className="text-sm text-off-black/60 mt-1">
+                  Across {removePreview.products} product{removePreview.products === 1 ? '' : 's'}. They disappear from
+                  the storefront immediately. Existing orders keep their line items.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-off-white rounded-lg p-3 mb-4 max-h-40 overflow-y-auto">
+              {removePreview.sample.map((s, i) => (
+                <p key={i} className="text-xs text-off-black/70 truncate">
+                  {s.productTitle} <span className="text-off-black/40">·</span> {s.title}
+                  {s.sku && <span className="text-off-black/40"> · {s.sku}</span>}
+                </p>
+              ))}
+              {removePreview.wouldDelete > removePreview.sample.length && (
+                <p className="text-xs text-off-black/40 mt-1">
+                  …and {removePreview.wouldDelete - removePreview.sample.length} more
+                </p>
+              )}
+            </div>
+
+            {removePreview.blocked.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                <p className="text-xs font-medium text-amber-900">
+                  {removePreview.blocked.length} product{removePreview.blocked.length === 1 ? '' : 's'} skipped
+                </p>
+                <p className="text-xs text-amber-800/80 mt-0.5">
+                  A product cannot lose every variant it has, so these are left alone.
+                </p>
+              </div>
+            )}
+
+            <label className="block text-xs text-off-black/60 mb-1.5">
+              Type <span className="font-mono font-semibold text-off-black">REMOVE</span> to confirm
+            </label>
+            <input
+              value={removeTyped}
+              onChange={e => setRemoveTyped(e.target.value)}
+              placeholder="REMOVE"
+              className="w-full px-3 py-2 mb-5 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30"
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={confirmRemove}
+                disabled={removing || removeTyped !== 'REMOVE' || !removePreview.wouldDelete}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors disabled:opacity-40 inline-flex items-center justify-center gap-2"
+              >
+                {removing ? <><Loader2 className="w-4 h-4 animate-spin" /> Removing…</> : 'Remove variants'}
+              </button>
+              <button
+                onClick={() => setRemovePreview(null)}
+                disabled={removing}
                 className="px-4 py-2.5 text-sm font-medium text-off-black/70 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
               >
                 Cancel
