@@ -263,12 +263,6 @@ export const COMMUNITY_FEEDBACK = [
   },
   {
     quote:
-      'I actually have one of your Eugene Marathon prints already, so I am a fan of what you guys are doing and think this would be a really fun addition. I would love to see things that runners would immediately recognize: aid stations, porta-potties, the starting corral, gels, iconic medals, PRs, course hills, race-day weather.',
-    name: 'Ricky S.',
-    price: '$30 to $50',
-  },
-  {
-    quote:
       'Great idea. I would order for sure. If it is personalized maybe a bit more. Jail should be DNF.',
     name: 'Pat',
     price: '$50 to $60',
@@ -278,18 +272,6 @@ export const COMMUNITY_FEEDBACK = [
       'Yes, absolutely. So many ideas: new gel disagrees with you at mile 18, go back N spaces. You win a lottery entry into the London marathon, jump ahead N spaces. Favorite shoe company drops new carbon plate race shoes 6 weeks before your next race, pay $300.',
     name: 'Dave',
     price: 'Not exceeding $49',
-  },
-  {
-    quote:
-      'I would be interested. I think chance entries to the World Majors would be a good idea.',
-    name: 'A Trackstar customer',
-    price: '$35 to $50',
-  },
-  {
-    quote:
-      'The ownership stickers must be sneakers or medals. I feel like jail has to be a porta potty.',
-    name: 'Joshua',
-    price: '$100 to $199',
   },
 ]
 
@@ -384,11 +366,6 @@ export const FAQ: FaqItem[] = [
       'The only other sponsors on the board will be title sponsors that individual races choose to put on their own title deed card. Other than that we are not taking on third-party sponsors anywhere on the board, so nothing appears beside your race that you did not agree to.',
   },
   {
-    question: 'Can we put our own sponsor on the board?',
-    answer:
-      'Yes, on your own title deed card. It is the one place a brand can appear, and only attached to the race that already has the relationship, so it can never conflict with anybody else on the board.',
-  },
-  {
     question: 'Will we have control of how our marks appear?',
     answer:
       'Yes. You have approval rights on your name, your marks and how your course is represented, and nothing prints until you have signed it off.',
@@ -404,8 +381,8 @@ export const FAQ: FaqItem[] = [
       'It is per edition rather than per year. Committing guarantees your space on Edition One, which is printed once and then exists permanently. If there is ever a second edition you get first refusal on your space before it is offered to anybody else, and if there never is, you have still lost nothing to a clock running out.',
   },
   {
-    question: 'Can we offset the fee by buying boxes?',
+    question: 'Can we offset the fee by buying units of Marathon Monopoly?',
     answer:
-      'Yes. Fees are quoted in cash, and you can offset part of yours by committing to buy boxes at $35. Sell them at your expo for $55 and each one returns $20.',
+      'Yes. All the fees above are quoted in cash, but you are allowed to offset that number by buying up to 100 units at $35 per unit. Sell them at your expo for $55 and each one returns $20.',
   },
 ]

@@ -21,7 +21,7 @@
  * subtle.
  */
 import { MONOPOLY, UI_RADIUS } from './monopolyTheme'
-import { FEEDBACK_COUNTS, PRICE_ANSWERS } from '@/lib/monopolyCopy'
+import { PRICE_ANSWERS } from '@/lib/monopolyCopy'
 
 /** Midpoints of what each person said, sourced next to the quotes. */
 const RESPONSES = PRICE_ANSWERS
@@ -170,8 +170,7 @@ export default function PriceExpectation() {
       </div>
 
       <p className="mt-2" style={{ fontSize: 12, color: MONOPOLY.inkMuted, lineHeight: 1.5 }}>
-        {FEEDBACK_COUNTS.namedAPrice} of the {FEEDBACK_COUNTS.replies} replies named a figure. The
-        mint band is what we plan to charge, $45 direct and $55 at a race expo.
+        The median. We plan to charge right around there.
       </p>
     </figure>
   )

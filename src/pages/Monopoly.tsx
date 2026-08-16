@@ -233,18 +233,56 @@ export default function Monopoly() {
       </section>
 
       {/* ═══ WHAT IT IS ═══
-          Lead with editions people already know exist, then the gap. Naming
-          the absence is a stronger opening than describing the product. */}
+          The product itself, first. A race director asked what they are being
+          put on before they asked why it should exist, and the old order had
+          them reading about Dollywood for a screen before seeing the box. */}
       <Section>
         <SectionHeading>What it is</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
+        <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          Marathon Monopoly will be a full-size, licensed, limited edition Monopoly board game. It
+          will include the board, box, custom pieces, title deeds, money and cards, made to the same
+          spec as every other Monopoly board game, with official licensing provided by Hasbro.
+        </p>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {PRODUCT_SHOTS.map((shot) => (
+            <div key={shot.label}>
+              <PlaceholderImage label="Image coming" />
+              <div className="mt-3" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+                {shot.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {/* ═══ WHY NOW ═══
+          Every other section argues the product is good. This one argues the
+          moment is, which is the question a race director asks second. The
+          300-editions proof lives here now: it is evidence that the category
+          works, which is a why-now argument rather than a what-is-it one. */}
+      <Section muted>
+        <SectionHeading>Why now</SectionHeading>
+        <div className="mt-8 grid gap-8 md:grid-cols-2">
+          {WHY_NOW.map((item) => (
+            <Beat key={item.title} title={item.title} body={item.body} />
+          ))}
+        </div>
+
+        {/* Two, matching the two beats above them. */}
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+          <PlaceholderImage label="Family around the board on the living room floor" aspect="aspect-[4/3]" />
+          <PlaceholderImage label="Parent and kid mid-game, medals on the wall behind" aspect="aspect-[4/3]" />
+        </div>
+
+        <p className="mb-6 mt-14" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
           There have been over 300 custom editions made of Monopoly. Football clubs, cities,
           national parks, film franchises, theme parks, universities.
         </p>
 
+        {/* Five, not nine. The point is that the category is crowded, and nine
+            logos made the reader audit the list instead of taking the point. */}
         <div className="mb-10 flex flex-wrap gap-2">
-          {['Star Wars', 'Premier League clubs', 'National Parks', 'Game of Thrones', 'Dollywood',
-            'NFL teams', 'Cities and regions', 'Universities', 'The Beatles'].map((label) => (
+          {['Star Wars', 'Premier League clubs', 'National Parks', 'Game of Thrones', 'NFL teams'].map((label) => (
             <span
               key={label}
               style={{
@@ -276,71 +314,19 @@ export default function Monopoly() {
         </div>
       </Section>
 
-      {/* ═══ THE PRODUCT ═══
-          The first thing a race asked to see before committing. Placeholder
-          squares hold the exact slots the finished renders will fill. */}
-      {/* ═══ WHY NOW ═══
-          Every other section argues the product is good. This one argues the
-          moment is, which is the question a race director asks second. */}
-      <Section muted>
-        <SectionHeading>Why now</SectionHeading>
-        <div className="mt-8 grid gap-8 md:grid-cols-2">
-          {WHY_NOW.map((item) => (
-            <Beat key={item.title} title={item.title} body={item.body} />
-          ))}
-        </div>
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          <PlaceholderImage label="Family around the board on the living room floor" />
-          <PlaceholderImage label="Parent and kid mid-game, medals on the wall behind" />
-          <PlaceholderImage label="Four friends at a kitchen table, phones face down" />
-        </div>
-      </Section>
-
-      <Section>
-        <SectionHeading>What's in the box</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          Marathon Monopoly will be a full-size, licensed, limited edition Monopoly board game. It
-          will include the board, box, custom pieces, title deeds, money and cards, made to the same
-          spec as every other Monopoly board game, with official licensing provided by Hasbro.
-        </p>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {PRODUCT_SHOTS.map((shot) => (
-            <div key={shot.label}>
-              <div
-                className="flex aspect-square items-center justify-center"
-                style={{
-                  backgroundColor: MONOPOLY.paper,
-                  border: `2px solid ${MONOPOLY.black}`,
-                  borderRadius: UI_RADIUS,
-                  ...guilloche('rgba(35,31,32,0.07)', 20),
-                }}
-              >
-                <span style={{ fontSize: 12, color: '#8A857C', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  Image coming
-                </span>
-              </div>
-              <div className="mt-3" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
-                {shot.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
       {/* ═══ WHY YOU SHOULD CARE ═══ */}
       <Section dark>
         <SectionHeading>Why you should care</SectionHeading>
         <div className="mt-8 grid gap-8 md:grid-cols-3">
           <Beat
             dark
-            title="Be Surrounded by Greatness"
-            body="Twenty-two races define this edition, and they are the ones runners already care about. Being on the board is being named alongside them, in print, permanently."
+            title="Be Associated With the World's Best Marathons"
+            body="There are only 22 spots for races on this Monopoly board, and we are choosing the ones that runners already care about. Being on this board is a sign that you are among the best, in print, permanently."
           />
           <Beat
             dark
             title="Access to a Marathon-Obsessed Audience"
-            body="2.4 million times your name is seen. And a runner who has done four of the twenty-two spends the whole game looking at the other eighteen."
+            body="We will be selling this through all of our race partners and through our own audience of running enthusiasts. This goes to a very targeted and enthusiastic group: people who love discovering new races and talking about races."
           />
           <Beat
             dark
@@ -431,11 +417,28 @@ export default function Monopoly() {
       <Section muted>
         <SectionHeading>Investment</SectionHeading>
         <p className="mb-6 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          Quoted in cash, and every space includes 5 comp copies. If you would rather put some of it
-          into product, you can offset part of the fee by committing to boxes at $35 and sell them
-          at your expo for $55.
+          The investment needed for each space is listed below. The price increases as you go around
+          the board, to respect the prestige of that part of it.
         </p>
         <PackageTiers tiers={data.tiers} highlightTierKey={personalizedTierKey} />
+
+        {/* The offset was the last line of a paragraph nobody read to the end
+            of. It is the one thing here that lowers the number, so it gets to
+            be an object rather than a clause. */}
+        <div
+          className="mt-8 px-6 py-6 sm:px-8"
+          style={{ backgroundColor: '#1F6B47', border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
+        >
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)' }}>
+            Prefer to put some of it into product?
+          </p>
+          <p className="mt-2" style={{ fontSize: 20, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.35, maxWidth: '46rem' }}>
+            You can buy up to 100 units at $35 each to offset the price of your space.
+          </p>
+          <p className="mt-2" style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, maxWidth: '46rem' }}>
+            Sell them at your expo for $55 and each one returns $20.
+          </p>
+        </div>
 
         {/* What the fee actually buys, listed once here rather than repeated
             in every tier row. Nothing in it varies by tier, so a per-row copy
@@ -503,11 +506,6 @@ export default function Monopoly() {
             play, for the next decade. Below is the exposure a space earns from marathon-obsessed
             people, estimated conservatively on purpose so our race partners can see what it is
             actually worth.
-          </p>
-          <p style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
-            Attention on a board game is not attention on an Instagram ad. People sit with the game
-            in front of them, rather than being bombarded by a hundred other things on a phone. We
-            think these impressions are worth more than an Instagram impression.
           </p>
         </div>
         <ExposureModel tiers={data.tiers} initialTierKey={personalizedTierKey} />
@@ -672,6 +670,14 @@ function HeroActions() {
 
       <div className="order-2 mt-6">
         <CtaButton />
+      </div>
+
+      {/* The object itself, next to the layout. The board beside this shows the
+          edition; this shows the thing that turns up in a box. Capped narrow
+          because the hero is pinned to one viewport on desktop and this is the
+          element with room to push it over. */}
+      <div className="order-4 mt-7 max-w-[13rem]">
+        <PlaceholderImage label="Product photo, box front" aspect="aspect-[4/3]" />
       </div>
     </div>
   )
