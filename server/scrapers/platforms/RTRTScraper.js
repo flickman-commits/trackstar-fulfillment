@@ -58,7 +58,7 @@ function assertNoRtrtError(data, tag, what) {
   // Credential problems are the ones worth naming outright: they are silent,
   // permanent until someone re-pulls a token, and not self-healing.
   const hint = type === 'not_authorized'
-    ? ' (appId/appToken pair is invalid or expired for this event — re-pull them from the tracker)'
+    ? ' (appId/appToken pair is invalid or expired for this event - re-pull them from the tracker)'
     : ''
   throw new Error(`RTRT ${what} failed for ${tag}: ${type} - ${msg}${hint}`)
 }
@@ -333,7 +333,7 @@ export class RTRTScraper extends BaseScraper {
       // the registration-derived guess above, which is wrong for anyone signed
       // up for more than one event that weekend.
       if (label && label !== resolvedEventType) {
-        console.log(`[${this.tag}] Finish split says ${label}, not ${resolvedEventType} — trusting the split`)
+        console.log(`[${this.tag}] Finish split says ${label}, not ${resolvedEventType} - trusting the split`)
         resolvedEventType = label
       }
 

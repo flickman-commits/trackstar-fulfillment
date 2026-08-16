@@ -236,13 +236,13 @@ function wrapWithFallback(primary, fallback, tag) {
     try {
       result = await originalSearch(runnerName)
     } catch (err) {
-      console.log(`[${tag}] Primary scraper threw (${err.message}) — trying fallback`)
+      console.log(`[${tag}] Primary scraper threw (${err.message}) - trying fallback`)
       return fallback.searchRunner(runnerName)
     }
 
     if (result?.found || result?.ambiguous) return result
 
-    console.log(`[${tag}] Primary returned "${result?.researchStatus || 'nothing'}" — trying fallback`)
+    console.log(`[${tag}] Primary returned "${result?.researchStatus || 'nothing'}" - trying fallback`)
     try {
       const fbResult = await fallback.searchRunner(runnerName)
       if (fbResult?.found || fbResult?.ambiguous) return fbResult
@@ -256,7 +256,7 @@ function wrapWithFallback(primary, fallback, tag) {
       if (result?.researchStatus === 'year_not_configured' && fbResult) return fbResult
       return result || fbResult
     } catch (err) {
-      console.log(`[${tag}] Fallback scraper threw (${err.message}) — keeping primary result`)
+      console.log(`[${tag}] Fallback scraper threw (${err.message}) - keeping primary result`)
       return result
     }
   }

@@ -286,7 +286,7 @@ export class XacteScraper extends BaseScraper {
       return entries[0].distance / 1609.344
     }
 
-    console.warn(`[${this.tag}] No configured distance for subeventId ${runner.subeventId} in ${this.year} — pace will be omitted. Add it to subEvents in the race config.`)
+    console.warn(`[${this.tag}] No configured distance for subeventId ${runner.subeventId} in ${this.year} - pace will be omitted. Add it to subEvents in the race config.`)
     return null
   }
 }

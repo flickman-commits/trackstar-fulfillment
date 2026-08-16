@@ -71,7 +71,7 @@ const CHANNELS: { id: Channel; label: string; blurb: string }[] = [
   {
     id: 'wholesale',
     label: 'Wholesale (Charities, Race Partners)',
-    blurb: 'One consignment — shipping and the flat processing fee split across the run. No package branding.',
+    blurb: 'One consignment - shipping and the flat processing fee split across the run. No package branding.',
   },
 ]
 
@@ -299,10 +299,10 @@ export default function PricingCalculator() {
               </label>
               <div className="flex items-center gap-2">
                 <div className="px-2.5 py-1.5 rounded-md bg-white border border-border-gray text-sm tabular-nums min-w-[4.5rem] text-center">
-                  {activeTier ? `${(activeTier.discount * 100).toFixed(0)}%` : '—'}
+                  {activeTier ? `${(activeTier.discount * 100).toFixed(0)}%` : '-'}
                 </div>
                 <span className="text-[11px] text-off-black/45">
-                  {activeTier ? activeTier.label : `under ${tiers[0]?.min ?? 10} units — retail`}
+                  {activeTier ? activeTier.label : `under ${tiers[0]?.min ?? 10} units - retail`}
                 </span>
               </div>
             </div>
@@ -384,13 +384,13 @@ export default function PricingCalculator() {
                       )}
                     </td>
                     <td className={`px-3 py-2 text-right tabular-nums ${r.offSheet ? 'text-off-black/25' : 'text-off-black/60'}`}>
-                      {r.offSheet ? '—' : money(r.unitFee)}
+                      {r.offSheet ? '-' : money(r.unitFee)}
                     </td>
                     <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.offSheet ? 'text-off-black/25' : r.gp < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                      {r.offSheet ? '—' : money(r.gp)}
+                      {r.offSheet ? '-' : money(r.gp)}
                     </td>
                     <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.offSheet ? 'text-off-black/25' : r.gp < 0 ? 'text-red-600' : tint.label}`}>
-                      {r.offSheet || r.gpPct === null ? '—' : `${r.gpPct.toFixed(0)}%`}
+                      {r.offSheet || r.gpPct === null ? '-' : `${r.gpPct.toFixed(0)}%`}
                     </td>
                   </tr>
                   )
@@ -440,12 +440,12 @@ export default function PricingCalculator() {
             <p>
               {channel === 'retail'
                 ? 'Retail ships one print per order, so that unit carries the full shipping, the $0.80 package branding and the flat 30c of the payment fee.'
-                : `Bulk ships as one consignment of ${data.quantity}, so shipping and the flat 30c processing fee divide across the run, and package branding is not applied at all. Production cost does not fall with volume — Artelo gives no quantity discount.`}
+                : `Bulk ships as one consignment of ${data.quantity}, so shipping and the flat 30c processing fee divide across the run, and package branding is not applied at all. Production cost does not fall with volume - Artelo gives no quantity discount.`}
             </p>
             <p>
               {channel === 'retail'
                 ? `Processing is Shopify Payments at ${(data.assumptions.shopifyFeePercent * 100).toFixed(1)}% + ${money(data.assumptions.shopifyFeeFixed)} per order.`
-                : `Processing is Stripe at ${(((data.assumptions.stripeFeePercent ?? data.assumptions.shopifyFeePercent)) * 100).toFixed(1)}% + ${money(data.assumptions.stripeFeeFixed ?? data.assumptions.shopifyFeeFixed)} per consignment — we absorb it rather than passing it to the partner, so it comes out of margin.`}
+                : `Processing is Stripe at ${(((data.assumptions.stripeFeePercent ?? data.assumptions.shopifyFeePercent)) * 100).toFixed(1)}% + ${money(data.assumptions.stripeFeeFixed ?? data.assumptions.shopifyFeeFixed)} per consignment - we absorb it rather than passing it to the partner, so it comes out of margin.`}
               {' '}Gross profit excludes design time, returns and sales tax.
             </p>
             <p>Fetched {new Date(data.fetchedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>

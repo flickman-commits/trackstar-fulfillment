@@ -101,7 +101,7 @@ async function main() {
         designStatus: 'awaiting_review',
         customerEmail: CUSTOMER_EMAIL,
         customerName: CUSTOMER_NAME,
-        creativeDirection: 'This is a test order — practice the approval / revision flow here.',
+        creativeDirection: 'This is a test order - practice the approval / revision flow here.',
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       },
       include: { proofs: true, approvalToken: true },

@@ -152,7 +152,7 @@ function Tile({
       {placeholder && (
         <span
           className="absolute top-2 right-2 px-1.5 py-0.5 bg-off-black/5 text-off-black/40 text-[9px] font-medium rounded uppercase tracking-wider hidden md:inline"
-          title="Placeholder value — real metric lands in a later phase"
+          title="Placeholder value - real metric lands in a later phase"
         >
           Placeholder
         </span>
@@ -213,7 +213,7 @@ export default function CreatorsHome() {
   const deniedCreators = creators.filter(c => c.status === 'denied')
 
   const handleDeclineSample = async (creator: Creator) => {
-    if (!confirm(`Decline sample request from ${creator.name || 'this creator'}? They'll be marked denied and hidden from the list — no fulfillment order will be created. You can un-deny them later from "Show denied".`)) return
+    if (!confirm(`Decline sample request from ${creator.name || 'this creator'}? They'll be marked denied and hidden from the list - no fulfillment order will be created. You can un-deny them later from "Show denied".`)) return
     setDecliningId(creator.id)
     try {
       const res = await apiFetch('/api/orders/actions', {
@@ -650,7 +650,7 @@ function InviteModal({ briefs, onClose, onCreated }: {
           {createdLink ? (
             <div>
               <p className="text-sm text-off-black/70 mb-3">
-                Send this link to the creator — it takes them to the onboarding wizard.
+                Send this link to the creator - it takes them to the onboarding wizard.
                 {linkCopied && ' Already copied to your clipboard.'}
               </p>
               <div className="flex items-center gap-2 mb-5">
@@ -717,7 +717,7 @@ function InviteModal({ briefs, onClose, onCreated }: {
                   </div>
                   {briefs.length === 0 ? (
                     <div className="text-xs text-off-black/40 italic bg-subtle-gray border border-dashed border-border-gray rounded p-3">
-                      No active briefs yet — you can <Link to="/briefs" className="underline">create one</Link> first, or skip and assign later.
+                      No active briefs yet - you can <Link to="/briefs" className="underline">create one</Link> first, or skip and assign later.
                     </div>
                   ) : (
                     <div className="space-y-1 max-h-44 overflow-y-auto border border-border-gray rounded p-2">
@@ -810,7 +810,7 @@ function CreatorDrawer({
     const shippedOrCompleted = !!(creator.sampleOrder?.shippedAt || creator.sampleOrder?.status === 'completed')
     const orderNote = creator.sampleOrder
       ? shippedOrCompleted
-        ? `\n\nThe linked sample order ${creator.sampleOrder.orderNumber} has already shipped/completed — it will stay in the fulfillment queue.`
+        ? `\n\nThe linked sample order ${creator.sampleOrder.orderNumber} has already shipped/completed - it will stay in the fulfillment queue.`
         : `\n\nThe linked sample order ${creator.sampleOrder.orderNumber} (not yet shipped) will also be deleted.`
       : ''
     if (!confirm(`Delete creator "${creator.name || 'unnamed'}"? This can't be undone.${orderNote}`)) return
@@ -1042,7 +1042,7 @@ function CreatorDrawer({
               <div className="mt-3 pt-3 border-t border-border-gray space-y-2">
                 <ProfileRow
                   label="Cost (COGS)"
-                  value={creator.sampleCostUsd ? formatUsd(creator.sampleCostUsd) : '—'}
+                  value={creator.sampleCostUsd ? formatUsd(creator.sampleCostUsd) : '-'}
                 />
                 <ProfileRow
                   label="Order"
@@ -1296,7 +1296,7 @@ function ProfileRow({
           <span className="text-off-black/80 break-all">{text}</span>
         )
       ) : (
-        <span className="text-off-black/30 italic">—</span>
+        <span className="text-off-black/30 italic">-</span>
       )}
     </div>
   )

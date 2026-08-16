@@ -158,7 +158,7 @@ const OUTCOME_COLOR: Record<string, string> = {
 }
 
 function fmtMs(ms: number | null) {
-  if (ms == null) return '—'
+  if (ms == null) return '-'
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms} ms`
 }
 
@@ -277,7 +277,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
     repair(`discover:${race}`, race, { action: 'discover-ids', race, apply: true }, d => {
       if (!d?.discoverable) return { ok: false, text: d?.reason || 'Not discoverable' }
       const applied = (d.proposals || []).filter(p => p.usable)
-      if (!applied.length) return { ok: false, text: 'Nothing to apply — no published results for the missing years' }
+      if (!applied.length) return { ok: false, text: 'Nothing to apply - no published results for the missing years' }
       const verified = applied.filter(p => p.verified).length
       return {
         ok: true,
@@ -288,7 +288,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
   const capture = (race: string, year: number) =>
     repair(`capture:${race}:${year}`, race, { action: 'capture-fixture', race, year }, d =>
       d?.ok
-        ? { ok: true, text: `Captured ${d.runnerName}${d.bib ? ` #${d.bib}` : ''}${d.officialTime ? ` (${d.officialTime})` : ''} for ${year} — probes can now assert against it` }
+        ? { ok: true, text: `Captured ${d.runnerName}${d.bib ? ` #${d.bib}` : ''}${d.officialTime ? ` (${d.officialTime})` : ''} for ${year} - probes can now assert against it` }
         : { ok: false, text: d?.error || 'Could not capture a finisher' }
     )
 
@@ -433,7 +433,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                 </p>
               </button>
 
-              <div className="rounded-lg border border-border-gray p-3" title={`p95 ${fmtMs(s.p95Ms)} — the tail the 10s cap has to absorb`}>
+              <div className="rounded-lg border border-border-gray p-3" title={`p95 ${fmtMs(s.p95Ms)} - the tail the 10s cap has to absorb`}>
                 <p className="text-xs text-off-black/50">Median lookup</p>
                 <p className="text-2xl font-semibold text-off-black">{fmtMs(s.medianMs)}</p>
                 <p className="text-[11px] text-off-black/40 mt-0.5">p95 {fmtMs(s.p95Ms)}</p>
@@ -449,7 +449,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                 <div key={cause}>
                   <p className={`text-xs font-semibold ${STATUS_META[cause].text}`}>
                     {STATUS_META[cause].label} · {data.needsHelpByCause[cause].length}
-                    <span className="font-normal text-off-black/50"> — {STATUS_META[cause].blurb}</span>
+                    <span className="font-normal text-off-black/50"> - {STATUS_META[cause].blurb}</span>
                   </p>
                   <ul className="mt-1 space-y-0.5">
                     {data.needsHelpByCause[cause].map((n, i) => (
@@ -468,13 +468,13 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
           )}
 
           {/* Races we SELL with no scraper at all. These can never appear in
-              the table below, because that table is built from configs — which
+              the table below, because that table is built from configs - which
               is exactly why they went unnoticed. */}
           {showNeedsScraper && data && (
             <div className="rounded-lg border border-orange-200 bg-orange-50/40 p-3 space-y-2 max-h-64 overflow-y-auto">
               <p className="text-xs font-semibold text-orange-700">
                 Selling with no scraper · {data.needsScraper.length}
-                <span className="font-normal text-off-black/50"> — shoppers on these pages only get manual entry</span>
+                <span className="font-normal text-off-black/50"> - shoppers on these pages only get manual entry</span>
               </p>
               <ul className="space-y-0.5">
                 {data.needsScraper.map(p => (
@@ -544,7 +544,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                     <td className="px-3 py-2 text-off-black/80">
                       {e.race || <span className="text-off-black/30 italic">unresolved</span>}
                     </td>
-                    <td className="px-3 py-2 text-off-black/60">{e.year ?? '—'}</td>
+                    <td className="px-3 py-2 text-off-black/60">{e.year ?? '-'}</td>
                     <td className="px-3 py-2 font-mono text-xs text-off-black/80">{e.name}</td>
                     <td className={`px-3 py-2 ${OUTCOME_COLOR[e.outcome] || 'text-off-black/60'}`}>
                       {e.outcome}{e.cached ? ' (cache)' : ''}
@@ -604,7 +604,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                       </td>
                       <td className="px-3 py-2.5">
                         {r.years.map(y => (
-                          <span key={y.year} className="inline-block w-11 text-center" title={`${y.year}: ${STATUS_META[y.status].label} — ${y.detail || STATUS_META[y.status].blurb}`}>
+                          <span key={y.year} className="inline-block w-11 text-center" title={`${y.year}: ${STATUS_META[y.status].label} - ${y.detail || STATUS_META[y.status].blurb}`}>
                             <span className={`inline-block w-2.5 h-2.5 rounded-full ${STATUS_META[y.status].dot}`} />
                           </span>
                         ))}
@@ -699,7 +699,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                                           <td className="py-1 text-off-black/50 whitespace-nowrap pr-2">
                                             {new Date(e.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                           </td>
-                                          <td className="py-1 pr-2 text-off-black/70">{e.year ?? '—'}</td>
+                                          <td className="py-1 pr-2 text-off-black/70">{e.year ?? '-'}</td>
                                           <td className="py-1 pr-2 font-mono text-off-black/80 truncate max-w-[130px]">{e.name}</td>
                                           <td className={`py-1 pr-2 ${OUTCOME_COLOR[e.outcome] || 'text-off-black/60'}`}>{e.outcome}</td>
                                           <td className="py-1 text-right text-off-black/50">{fmtMs(e.ms)}</td>

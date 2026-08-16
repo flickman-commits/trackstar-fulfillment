@@ -32,7 +32,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:38:10',
     expectedChipPace: '6:02',
     expectedBib: '387',
-    notes: 'Boston 2024 — chip time, NOT gun time (which is 2:38:18 → pace 6:03)',
+    notes: 'Boston 2024 - chip time, NOT gun time (which is 2:38:18 → pace 6:03)',
   },
   {
     platform: 'mika',
@@ -42,7 +42,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:00:35',
     expectedChipPace: '4:36',
     expectedBib: '2',
-    notes: 'World record holder — chip time at Chicago 2023',
+    notes: 'World record holder - chip time at Chicago 2023',
   },
   {
     platform: 'mika',
@@ -52,7 +52,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:03:17',
     expectedChipPace: '4:42',
     expectedBib: null,
-    notes: 'Berlin 2024 men\'s winner — verifies Mika auto-discovery of dynamic event code',
+    notes: 'Berlin 2024 men\'s winner - verifies Mika auto-discovery of dynamic event code',
   },
 
   // ── RTRT (Marine Corps Historic Half) ─────────────────────────────────
@@ -64,7 +64,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:13:56',
     expectedChipPace: '10:14',
     expectedBib: '2263',
-    notes: 'MCHH 2025 — verifies RTRT netTime (chip), NOT waveTime (gun-equivalent ~2:15:30). Also verifies courseMap filters to halfmarathon course (5K is a separate course at the same RTRT event).',
+    notes: 'MCHH 2025 - verifies RTRT netTime (chip), NOT waveTime (gun-equivalent ~2:15:30). Also verifies courseMap filters to halfmarathon course (5K is a separate course at the same RTRT event).',
   },
 
   // ── Tokyo Marathon (custom platform) ──────────────────────────────────
@@ -76,7 +76,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:03:22',
     expectedChipPace: '4:43',
     expectedBib: '5',
-    notes: 'Tokyo 2025 men\'s winner — verifies net (chip) time, NOT gross (gun)',
+    notes: 'Tokyo 2025 men\'s winner - verifies net (chip) time, NOT gross (gun)',
   },
 
   // ── Athlinks (Orange County) ──────────────────────────────────────────
@@ -88,7 +88,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:23:41',
     expectedChipPace: '5:29',
     expectedBib: '3',
-    notes: 'OC 2025 men\'s winner — verifies Athlinks Search API + course filter (marathon vs half)',
+    notes: 'OC 2025 men\'s winner - verifies Athlinks Search API + course filter (marathon vs half)',
   },
 
   // ── ChronoTrack Live ──────────────────────────────────────────────────
@@ -141,7 +141,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '5:39:54',
     expectedChipPace: '12:58',
     expectedBib: '5044',
-    notes: 'St. Jude Memphis 2025 MARATHON (rid 145472). Chip 5:39:54 vs gun 6:19:26 — a 40-minute wave offset, so reading otg instead of ot fails loudly. 20394s ÷ 26.2 = 778.4 → 12:58.',
+    notes: 'St. Jude Memphis 2025 MARATHON (rid 145472). Chip 5:39:54 vs gun 6:19:26 - a 40-minute wave offset, so reading otg instead of ot fails loudly. 20394s ÷ 26.2 = 778.4 → 12:58.',
   },
   {
     platform: 'sportstats',
@@ -151,7 +151,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '3:41:49',
     expectedChipPace: '16:56',
     expectedBib: '13931',
-    notes: 'St. Jude Memphis 2025 HALF (rid 145473) — verifies pace uses 13.1, not 26.2 (26.2 would give 8:28). Chip 3:41:49 vs gun 4:41:03, a 59-minute gap. "Beth" also exercises nickname matching against the surname query, since the API text search would not match "Beth" to an "Elizabeth" registration on its own.',
+    notes: 'St. Jude Memphis 2025 HALF (rid 145473) - verifies pace uses 13.1, not 26.2 (26.2 would give 8:28). Chip 3:41:49 vs gun 4:41:03, a 59-minute gap. "Beth" also exercises nickname matching against the surname query, since the API text search would not match "Beth" to an "Elizabeth" registration on its own.',
   },
 
   // ── Xacte (Army Ten-Miler) ────────────────────────────────────────────
@@ -168,7 +168,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '1:35:02',
     expectedChipPace: '9:30',
     expectedBib: '13204',
-    notes: 'Army Ten-Miler 2025 — a TEN MILE race. 5702s ÷ 10 = 570.2 → 9:30/mi. Pacing against 26.2 gives 3:37 and against the feed\'s 52800 "metres" gives 2:54, which is the bug this guards. Distance must come from the config subEvent (16093m), never from the split.',
+    notes: 'Army Ten-Miler 2025 - a TEN MILE race. 5702s ÷ 10 = 570.2 → 9:30/mi. Pacing against 26.2 gives 3:37 and against the feed\'s 52800 "metres" gives 2:54, which is the bug this guards. Distance must come from the config subEvent (16093m), never from the split.',
   },
 
   // ── SVE Timing (Baltimore) ────────────────────────────────────────────
@@ -183,7 +183,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '04:49:20',
     expectedChipPace: '11:03',
     expectedBib: '1770',
-    notes: 'Baltimore 2025 MARATHON. Gun 04:51:59 vs chip 04:49:20 (159s apart) — reading the gun column fails. 17360s ÷ 26.2 = 662.6 → 11:03. Division must match /^MARATHON$/ and not MARATHON RIM or MARATHON HANDCYCLE. https://results.svetiming.com/Corrigan-Sports-Enterprises/events/2025/baltimore-running-festival/results',
+    notes: 'Baltimore 2025 MARATHON. Gun 04:51:59 vs chip 04:49:20 (159s apart) - reading the gun column fails. 17360s ÷ 26.2 = 662.6 → 11:03. Division must match /^MARATHON$/ and not MARATHON RIM or MARATHON HANDCYCLE. https://results.svetiming.com/Corrigan-Sports-Enterprises/events/2025/baltimore-running-festival/results',
   },
   {
     platform: 'svetiming',
@@ -193,7 +193,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '02:46:49',
     expectedChipPace: '12:44',
     expectedBib: '40257',
-    notes: 'Baltimore 2025 HALF MARATHON — verifies pace uses 13.1, not 26.2 (26.2 would give ~6:22). Gun 03:04:58 vs chip 02:46:49 is an 18-minute gap, the widest we have, so a gun-time regression is unmissable. 10009s ÷ 13.1 = 764.0 → 12:44.',
+    notes: 'Baltimore 2025 HALF MARATHON - verifies pace uses 13.1, not 26.2 (26.2 would give ~6:22). Gun 03:04:58 vs chip 02:46:49 is an 18-minute gap, the widest we have, so a gun-time regression is unmissable. 10009s ÷ 13.1 = 764.0 → 12:44.',
   },
 
   // ── Athlinks (Detroit) ────────────────────────────────────────────────
@@ -210,7 +210,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '3:08:30',
     expectedChipPace: '7:12',
     expectedBib: '1895',
-    notes: 'Detroit 2024 Marathon (event 1093379). 11310s ÷ 26.2 = 7:11.7 → 7:12. Athlinks prints 07:11 because it paces against the exact 42195m (26.2188mi); ours is correct for the 26.2 in the config, so do NOT "fix" this to 7:11. Same runner also has an International Half entry (2:36:47, bib 12158) — this fixture confirms eventSearchOrder picks the marathon.',
+    notes: 'Detroit 2024 Marathon (event 1093379). 11310s ÷ 26.2 = 7:11.7 → 7:12. Athlinks prints 07:11 because it paces against the exact 42195m (26.2188mi); ours is correct for the 26.2 in the config, so do NOT "fix" this to 7:11. Same runner also has an International Half entry (2:36:47, bib 12158) - this fixture confirms eventSearchOrder picks the marathon.',
   },
   {
     platform: 'athlinks',
@@ -236,7 +236,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '3:23:06',
     expectedChipPace: '7:45',
     expectedBib: '477',
-    notes: 'Dallas 2025 Marathon (eID 16993). Gun 3:25:02 vs chip 3:23:06, so a gun-time regression fails here. POSITIVE SPLIT: held 7:38/mi through the 2:51:56 mark then faded, so the final-segment pace is well off the overall 7:45/mi — a split-interval pace regression also fails. Page prints 7:45/M as the overall pace.',
+    notes: 'Dallas 2025 Marathon (eID 16993). Gun 3:25:02 vs chip 3:23:06, so a gun-time regression fails here. POSITIVE SPLIT: held 7:38/mi through the 2:51:56 mark then faded, so the final-segment pace is well off the overall 7:45/mi - a split-interval pace regression also fails. Page prints 7:45/M as the overall pace.',
   },
   {
     platform: 'mychiptime',
@@ -246,7 +246,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:12:20',
     expectedChipPace: '10:06',
     expectedBib: '16943',
-    notes: 'Dallas 2025 HALF (eID 16991) — verifies pace is computed against 13.1, not 26.2 (26.2 would give ~5:03/mi). Gun 2:47:21 vs chip 2:12:20, a 35-minute gap, so this is the strongest gun-time catch we have. NEGATIVE SPLIT: 11:17 → 10:50 → 10:28 → 10:26 per-segment against a 10:06/M overall. Page prints 10:06/M.',
+    notes: 'Dallas 2025 HALF (eID 16991) - verifies pace is computed against 13.1, not 26.2 (26.2 would give ~5:03/mi). Gun 2:47:21 vs chip 2:12:20, a 35-minute gap, so this is the strongest gun-time catch we have. NEGATIVE SPLIT: 11:17 → 10:50 → 10:28 → 10:26 per-segment against a 10:06/M overall. Page prints 10:06/M.',
   },
 
   // ── MultiSport Australia (Sydney) ─────────────────────────────────────
@@ -258,7 +258,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:08:31',
     expectedChipPace: '4:54',
     expectedBib: null,
-    notes: 'Sydney 2025 — verifies net_time extraction + Cloudflare bypass',
+    notes: 'Sydney 2025 - verifies net_time extraction + Cloudflare bypass',
   },
 
   // ── RaceRoster ────────────────────────────────────────────────────────
@@ -270,7 +270,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '4:34:33',
     expectedChipPace: '10:29',
     expectedBib: '3931',
-    notes: 'Pittsburgh 2025 marathon — verifies sub-event filtering + chip time',
+    notes: 'Pittsburgh 2025 marathon - verifies sub-event filtering + chip time',
   },
   {
     platform: 'raceroster',
@@ -280,7 +280,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:57:39',
     expectedChipPace: '6:46',
     expectedBib: '1362',
-    notes: 'Oakland 2024 women\'s winner — verifies historic year support',
+    notes: 'Oakland 2024 women\'s winner - verifies historic year support',
   },
 
   // ── Brooksee ──────────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:45:56',
     expectedChipPace: '6:20',
     expectedBib: '178',
-    notes: 'Missoula 2025 Marathon (RunSignUp/Competitive Timing). Positive split — 1st half 5:55/mi, 2nd half 6:45/mi — so the OVERALL pace (6:20) ≠ final-segment pace. Chip 2:45:55.71 rounds to 2:45:56. https://runsignup.com/Race/Results/8029/562587',
+    notes: 'Missoula 2025 Marathon (RunSignUp/Competitive Timing). Positive split - 1st half 5:55/mi, 2nd half 6:45/mi - so the OVERALL pace (6:20) ≠ final-segment pace. Chip 2:45:55.71 rounds to 2:45:56. https://runsignup.com/Race/Results/8029/562587',
   },
   {
     platform: 'runsignup',
@@ -316,7 +316,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '1:10:52',
     expectedChipPace: '5:25',
     expectedBib: '55',
-    notes: 'Missoula 2025 Half Marathon — verifies half pace is computed against 13.1, not 26.2. Chip 1:10:52.48 → 1:10:52. https://runsignup.com/Race/Results/8029/562511',
+    notes: 'Missoula 2025 Half Marathon - verifies half pace is computed against 13.1, not 26.2. Chip 1:10:52.48 → 1:10:52. https://runsignup.com/Race/Results/8029/562511',
   },
 
   // ── Competitive Timing (LivePlanIt) — Missoula 2026 (not yet on RunSignUp) ──
@@ -328,7 +328,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '4:26:50',
     expectedChipPace: '10:11',
     expectedBib: '2346',
-    notes: 'Missoula 2026 Marathon (Competitive Timing API). Big positive split (slowed ~71 min in the 2nd half) so OVERALL pace (10:11) ≠ final-segment pace — confirms we compute from chip ÷ 26.2. finish_time_seconds 16010.28 → 4:26:50. https://competitivetiming.com/events/missoula-marathon/2026/marathon/results',
+    notes: 'Missoula 2026 Marathon (Competitive Timing API). Big positive split (slowed ~71 min in the 2nd half) so OVERALL pace (10:11) ≠ final-segment pace - confirms we compute from chip ÷ 26.2. finish_time_seconds 16010.28 → 4:26:50. https://competitivetiming.com/events/missoula-marathon/2026/marathon/results',
   },
   {
     platform: 'competitivetiming',
@@ -338,7 +338,7 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '1:06:21',
     expectedChipPace: '5:04',
     expectedBib: '53',
-    notes: 'Missoula 2026 Half Marathon (Competitive Timing) — verifies half pace computes against 13.1. finish_time_seconds 3981.26 → 1:06:21. https://competitivetiming.com/events/missoula-marathon/2026/half-marathon/results',
+    notes: 'Missoula 2026 Half Marathon (Competitive Timing) - verifies half pace computes against 13.1. finish_time_seconds 3981.26 → 1:06:21. https://competitivetiming.com/events/missoula-marathon/2026/half-marathon/results',
   },
 
   // ── NYRR ──────────────────────────────────────────────────────────────

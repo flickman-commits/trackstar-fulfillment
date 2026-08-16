@@ -105,15 +105,15 @@ function buildUserMessage({ playbook, scoreboard, levers, shopifySales, metaAcco
 
   sections.push(`# Window\n\nDate range (rolling 7 days, ending Thursday):\n  Since: ${window.since}\n  Until: ${window.until}`)
 
-  sections.push(`# Ad Ops Playbook (from Notion)\n\n${playbook || '[playbook unavailable — fall back to defaults]'}`)
+  sections.push(`# Ad Ops Playbook (from Notion)\n\n${playbook || '[playbook unavailable - fall back to defaults]'}`)
 
-  sections.push(`# Financial Tracker — Daily Scoreboard (last 7 days)\n\n${formatRowsForPrompt(scoreboard)}`)
-  sections.push(`# Financial Tracker — The Levers (last 7 days)\n\n${formatRowsForPrompt(levers)}`)
+  sections.push(`# Financial Tracker - Daily Scoreboard (last 7 days)\n\n${formatRowsForPrompt(scoreboard)}`)
+  sections.push(`# Financial Tracker - The Levers (last 7 days)\n\n${formatRowsForPrompt(levers)}`)
 
-  sections.push(`# Shopify — Sales by Product (last 7 days)\n\n${formatShopify(shopifySales)}`)
+  sections.push(`# Shopify - Sales by Product (last 7 days)\n\n${formatShopify(shopifySales)}`)
 
-  sections.push(`# Meta Ads — Account Totals (last 7 days)\n\n${formatMetaAccount(metaAccount)}`)
-  sections.push(`# Meta Ads — Ad-level Breakdown (last 7 days)\n\n${formatMetaAds(metaAds)}`)
+  sections.push(`# Meta Ads - Account Totals (last 7 days)\n\n${formatMetaAccount(metaAccount)}`)
+  sections.push(`# Meta Ads - Ad-level Breakdown (last 7 days)\n\n${formatMetaAds(metaAds)}`)
 
   return sections.join('\n\n---\n\n')
 }
@@ -182,14 +182,14 @@ function formatMetaAds(ads) {
 async function postToSlack(report, summary) {
   const webhook = process.env.SLACK_ADS_DEBRIEF_WEBHOOK_URL
   if (!webhook) {
-    console.warn('[weeklyAdsDebrief] SLACK_ADS_DEBRIEF_WEBHOOK_URL not set — skipping Slack post')
+    console.warn('[weeklyAdsDebrief] SLACK_ADS_DEBRIEF_WEBHOOK_URL not set - skipping Slack post')
     return { posted: false, reason: 'no webhook' }
   }
 
   // Slack accepts plain text payloads with mrkdwn enabled by default.
   // Split into chunks if too long.
   const chunks = chunkForSlack(report, SLACK_TEXT_LIMIT)
-  const header = `📊 *Weekly Ads Debrief* — ${summary.window.since} → ${summary.window.until}\n_Meta spend: $${summary.totalSpend.toFixed(2)} · Purchases: ${summary.purchases} · Avg CPA: $${summary.avgCpa.toFixed(2)} · Cost to run this debrief: $${summary.costUsd.toFixed(3)}_`
+  const header = `📊 *Weekly Ads Debrief* - ${summary.window.since} → ${summary.window.until}\n_Meta spend: $${summary.totalSpend.toFixed(2)} · Purchases: ${summary.purchases} · Avg CPA: $${summary.avgCpa.toFixed(2)} · Cost to run this debrief: $${summary.costUsd.toFixed(3)}_`
 
   // First post: header + first chunk
   const first = await fetch(webhook, {

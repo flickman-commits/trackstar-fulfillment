@@ -90,7 +90,7 @@ export default function PostApprovalChecklist({
       })
       // Update design status
       onDesignStatusChange('sent_to_production')
-      toast.success('Eli has been notified — sent to production!')
+      toast.success('Eli has been notified - sent to production!')
     } catch {
       toast.error('Failed to notify Eli')
     } finally {
@@ -194,7 +194,7 @@ export default function PostApprovalChecklist({
         {isSending ? (
           <><Loader2 className="w-4 h-4 animate-spin" /> Notifying Eli...</>
         ) : (
-          <><Send className="w-4 h-4" /> Files Uploaded — Notify Eli</>
+          <><Send className="w-4 h-4" /> Files Uploaded - Notify Eli</>
         )}
       </button>
     </div>

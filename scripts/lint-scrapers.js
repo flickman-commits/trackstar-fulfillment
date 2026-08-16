@@ -71,9 +71,9 @@ for (const platformFile of platformFiles) {
     const msg =
       `Platform "${platformFile}Scraper.js" has no chip-time fixture. ` +
       `Add one to server/scrapers/__tests__/chip-time-fixtures.js with platform: "${expectedKey}" ` +
-      `(include an uneven-splits runner — see the add-race-scraper skill).`
+      `(include an uneven-splits runner - see the add-race-scraper skill).`
     if (FIXTURE_GRANDFATHERED.has(platformFile) || FIXTURE_GRANDFATHERED.has(expectedKey)) {
-      warnings.push(msg + ' [grandfathered — backfill when possible]')
+      warnings.push(msg + ' [grandfathered - backfill when possible]')
     } else {
       errors.push(msg)
     }
@@ -116,7 +116,7 @@ for (const file of configFiles) {
     }
     console.log(`  ✓ ${file.padEnd(25)} (${cfg.platform})`)
   } catch (e) {
-    errors.push(`${file}: failed to import — ${e.message}`)
+    errors.push(`${file}: failed to import - ${e.message}`)
   }
 }
 

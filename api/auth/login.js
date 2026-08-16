@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
   const expected = process.env.ADMIN_PASSWORD
   if (!expected) {
-    console.error('[auth/login] ADMIN_PASSWORD not configured — blocking login')
+    console.error('[auth/login] ADMIN_PASSWORD not configured - blocking login')
     return res.status(500).json({ error: 'Server misconfigured' })
   }
 

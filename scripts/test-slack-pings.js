@@ -84,7 +84,7 @@ async function postDesignStandup() {
   dueThisWeek.sort((a, b) => a.due - b.due)
 
   const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
-  const orderLine = (o) => `• #${displayNum(o)} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
+  const orderLine = (o) => `• #${displayNum(o)} - ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) - due ${fmt(o.due)}`
 
   const appUrl = process.env.APP_BASE_URL || ''
   const dashboardFooter = appUrl

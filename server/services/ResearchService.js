@@ -348,10 +348,10 @@ export class ResearchService {
     // namesMatch), surface them as 'ambiguous' so the dashboard shows the
     // possible-match picker instead of just "Runner not found".
     if (!results.found && !results.ambiguous && results.possibleMatches?.length > 0) {
-      console.log(`[ResearchService] Initial search returned ${results.possibleMatches.length} candidates — marking ambiguous`)
+      console.log(`[ResearchService] Initial search returned ${results.possibleMatches.length} candidates - marking ambiguous`)
       results.ambiguous = true
       results.researchStatus = 'ambiguous'
-      results.researchNotes = `No exact match for "${runnerName}". ${results.possibleMatches.length} possible match${results.possibleMatches.length > 1 ? 'es' : ''} found — please verify.`
+      results.researchNotes = `No exact match for "${runnerName}". ${results.possibleMatches.length} possible match${results.possibleMatches.length > 1 ? 'es' : ''} found - please verify.`
     }
 
     // Last-name fallback: if full name not found AND no candidates surfaced yet,
@@ -380,7 +380,7 @@ export class ResearchService {
           results = fallbackResults
           results.ambiguous = true
           results.researchStatus = 'ambiguous'
-          results.researchNotes = `No exact match for "${runnerName}". Found ${fallbackResults.possibleMatches?.length || 'multiple'} runner(s) with last name "${lastName}" — please verify.`
+          results.researchNotes = `No exact match for "${runnerName}". Found ${fallbackResults.possibleMatches?.length || 'multiple'} runner(s) with last name "${lastName}" - please verify.`
         } else {
           console.log(`[ResearchService] Last name fallback also returned no results`)
         }
@@ -591,7 +591,7 @@ export class ResearchService {
     const text = [
       heading,
       detail,
-      `Order: \`${orderNumber}\` — runner: *${runner}*`,
+      `Order: \`${orderNumber}\` - runner: *${runner}*`,
     ].join('\n')
 
     try {

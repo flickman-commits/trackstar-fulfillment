@@ -47,6 +47,6 @@ export default async function handler(req, res) {
     windowDays: sinceMs ? days : null,
     capped: entries.length >= limit,
     entries,
-    note: 'From the LookupLog table — visible across every serverless instance. For stdout records, grep [LOOKUP] in Vercel logs.',
+    note: 'From the LookupLog table - visible across every serverless instance. For stdout records, grep [LOOKUP] in Vercel logs.',
   })
 }

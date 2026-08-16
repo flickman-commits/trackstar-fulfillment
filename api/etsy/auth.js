@@ -71,7 +71,7 @@ export default async function handler(req, res) {
       // Validate the OAuth state parameter to prevent CSRF attacks
       if (!savedState || !state || savedState !== state) {
         return res.status(403).json({
-          error: 'OAuth state mismatch — possible CSRF attack. Please restart the OAuth flow.'
+          error: 'OAuth state mismatch - possible CSRF attack. Please restart the OAuth flow.'
         })
       }
 

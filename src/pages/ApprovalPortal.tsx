@@ -315,7 +315,7 @@ export default function ApprovalPortal() {
             <p style={{ color: '#666666', fontSize: '14px', lineHeight: 1.6, marginBottom: '4px' }}>
               We'll send your design to production right away.
               <br />
-              It will arrive in 7 business days — stoked for you to get it!
+              It will arrive in 7 business days - stoked for you to get it!
             </p>
             <p style={{ color: '#999999', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</p>
           </div>
@@ -363,7 +363,7 @@ export default function ApprovalPortal() {
                     return (
                       <div key={batchNum}>
                         <p className="text-xs font-medium mb-2" style={{ color: '#999999', letterSpacing: '0.03em' }}>
-                          Batch {batchNum} — {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
+                          Batch {batchNum} - {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {batchProofs.map(proof => {
@@ -476,7 +476,7 @@ export default function ApprovalPortal() {
                 Approve {proofBeingConfirmedOptionNum && proofs.filter(p => p.status === 'pending').length > 1 ? `Option ${proofBeingConfirmedOptionNum}` : 'this design'}?
               </h3>
               <p style={{ color: '#666666', fontSize: '14px', margin: '0 0 20px', lineHeight: 1.55 }}>
-                We'll send this design straight to production. No more changes after this — last chance to request revisions if you spot anything.
+                We'll send this design straight to production. No more changes after this - last chance to request revisions if you spot anything.
               </p>
               <div className="flex gap-2">
                 <button
@@ -564,7 +564,7 @@ export default function ApprovalPortal() {
           {hasPendingProofs && (
             <div style={{ marginTop: '14px', padding: '10px 14px', backgroundColor: 'rgba(70, 0, 214, 0.06)', border: '1px solid rgba(70, 0, 214, 0.18)', borderRadius: '6px' }}>
               <p style={{ color: '#1A1A1A', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
-                <strong style={{ color: '#4600D6' }}>Please don't email us with revisions</strong> — tap <strong>Request Revision to this Design</strong> on the design you want changed.
+                <strong style={{ color: '#4600D6' }}>Please don't email us with revisions</strong> - tap <strong>Request Revision to this Design</strong> on the design you want changed.
               </p>
             </div>
           )}
@@ -879,7 +879,7 @@ export default function ApprovalPortal() {
                         return (
                           <div key={batchNum}>
                             <p className="text-xs font-medium mb-2" style={{ color: '#999999', letterSpacing: '0.03em' }}>
-                              Batch {batchNum} — {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
+                              Batch {batchNum} - {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {batchProofs.map(proof => {

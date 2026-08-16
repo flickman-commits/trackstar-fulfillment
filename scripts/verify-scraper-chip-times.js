@@ -48,7 +48,7 @@ async function main() {
         console.log(`❌ TIME_MISMATCH (got ${got}, expected ${want})`)
         results.push({ ...fx, pass: false, reason: `Time mismatch: got ${got}, expected ${want}` })
       } else if (fx.expectedChipPace && gotPace !== wantPace) {
-        console.log(`❌ PACE_MISMATCH (got ${gotPace || '<empty>'}, expected ${wantPace}) — likely gun-pace regression`)
+        console.log(`❌ PACE_MISMATCH (got ${gotPace || '<empty>'}, expected ${wantPace}) - likely gun-pace regression`)
         results.push({ ...fx, pass: false, reason: `Pace mismatch: got ${gotPace}, expected ${wantPace}` })
       } else if (fx.expectedBib && result.bibNumber !== fx.expectedBib) {
         console.log(`❌ BIB_MISMATCH (got ${result.bibNumber}, expected ${fx.expectedBib})`)

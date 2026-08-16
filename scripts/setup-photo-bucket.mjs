@@ -32,7 +32,7 @@ if (listErr) {
 }
 
 if (existing.some(b => b.name === BUCKET)) {
-  console.log(`✓ Bucket "${BUCKET}" already exists — nothing to do.`)
+  console.log(`✓ Bucket "${BUCKET}" already exists - nothing to do.`)
   process.exit(0)
 }
 

@@ -300,7 +300,7 @@ export default async function handler(req, res) {
           const action_text = approval === 'approve'
             ? `approved Option ${proof.version}`
             : `requested revisions on Option ${proof.version}`
-          const suffix = approval === 'approve' ? ' — the file is ready to upload to orders.' : ''
+          const suffix = approval === 'approve' ? ' - the file is ready to upload to orders.' : ''
           const slackMsg = {
             text: `${emoji} <@U04KBDJH5C3> *${customerName}* ${action_text} for order *${displayNum}*${suffix}${feedback ? `\n> _"${feedback}"_` : ''}`
           }
@@ -471,11 +471,11 @@ export default async function handler(req, res) {
           <p style="margin:0 0 ${note ? '16px' : '24px'};font-size:15px;color:#666666;line-height:1.6;">${bodyText}</p>${note ? `
           <p style="margin:0 0 24px;font-size:14px;color:#1A1A1A;line-height:1.6;padding:12px 16px;background-color:#F7F5F0;border-left:3px solid #4600D6;font-style:italic;">${note.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>` : ''}
 
-          <!-- How this works — head off the "I'll just reply to this email" instinct -->
+          <!-- How this works - head off the "I'll just reply to this email" instinct -->
           <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr><td style="background-color:#F7F5F0;padding:16px 20px;border-left:3px solid #4600D6;">
             <p style="margin:0 0 12px;font-size:11px;font-weight:700;color:#4600D6;letter-spacing:0.1em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">HOW THIS WORKS</p>
             <p style="margin:0 0 6px;font-size:14px;color:#1A1A1A;line-height:1.5;"><strong style="color:#4600D6;">1.</strong> &nbsp;Click below to see your design${proofCount > 1 ? ' options' : ''}.</p>
-            <p style="margin:0 0 6px;font-size:14px;color:#1A1A1A;line-height:1.5;"><strong style="color:#4600D6;">2.</strong> &nbsp;Either approve your favorite, or request changes — <strong>both happen right in the portal</strong>.</p>
+            <p style="margin:0 0 6px;font-size:14px;color:#1A1A1A;line-height:1.5;"><strong style="color:#4600D6;">2.</strong> &nbsp;Either approve your favorite, or request changes - <strong>both happen right in the portal</strong>.</p>
             <p style="margin:0;font-size:14px;color:#1A1A1A;line-height:1.5;"><strong style="color:#4600D6;">3.</strong> &nbsp;We'll work on your revisions and send you updated mockups.</p>
           </td></tr></table>
 
@@ -487,13 +487,13 @@ export default async function handler(req, res) {
 
           <!-- Anti-reply line. Customers were emailing edits back instead of using the portal. -->
           <p style="margin:24px 0 0;font-size:13px;color:#666666;text-align:center;line-height:1.55;padding:0 12px;">
-            ✋ &nbsp;Please don't reply to this email with edits — we can only process changes through the <strong style="color:#1A1A1A;">Request Changes</strong> button on the portal.
+            ✋ &nbsp;Please don't reply to this email with edits - we can only process changes through the <strong style="color:#1A1A1A;">Request Changes</strong> button on the portal.
           </p>
           <p style="margin:16px 0 0;font-size:11px;color:#999999;text-align:center;">This link expires in 30 days.</p>
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:24px 0 0;text-align:center;">
-          <p style="margin:0;font-size:11px;color:#999999;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">Trackstar — Celebrating athletic achievement.</p>
+          <p style="margin:0;font-size:11px;color:#999999;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">Trackstar - Celebrating athletic achievement.</p>
         </td></tr>
       </table>
     </td></tr>
@@ -563,7 +563,7 @@ export default async function handler(req, res) {
       // Send Slack notification to Eli
       if (process.env.SLACK_PROOF_WEBHOOK_URL) {
         const slackMsg = {
-          text: `📋 <@U09UVEP1N3Y> Final PDF uploaded for order *${displayNum}* — ready for production.`
+          text: `📋 <@U09UVEP1N3Y> Final PDF uploaded for order *${displayNum}* - ready for production.`
         }
         fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
           method: 'POST',

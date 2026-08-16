@@ -116,7 +116,7 @@ function canonicalize(name) {
 // Main
 // -----------------------------------------------------------------------------
 async function main() {
-  console.log(APPLY ? '🔥 APPLY mode — will write to DB' : '🧪 DRY RUN — preview only (pass --apply to write)')
+  console.log(APPLY ? '🔥 APPLY mode - will write to DB' : '🧪 DRY RUN - preview only (pass --apply to write)')
   console.log()
 
   // 1. Read + parse CSV

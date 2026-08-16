@@ -216,7 +216,7 @@ export class ChronoTrackScraper extends BaseScraper {
       // Genuinely ambiguous: same name, multiple finishes. Let a human pick.
       const distinctNames = new Set(finished.map(f => f.name.toLowerCase()))
       if (distinctNames.size > 1 || finished.length > 1) {
-        console.log(`[${this.tag}] ${finished.length} finishes matched — ambiguous`)
+        console.log(`[${this.tag}] ${finished.length} finishes matched - ambiguous`)
         return this.ambiguousResult(finished.map(f => ({
           name: f.name,
           bib: f.bib,

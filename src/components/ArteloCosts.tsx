@@ -115,7 +115,7 @@ export default function ArteloCosts() {
                     {data.columns.map(col => {
                       const cell = data.cells[`${size.id}|${col.id}`]
                       if (!cell || cell.error) {
-                        return <td key={col.id} className="px-3 py-2 text-right text-off-black/25">—</td>
+                        return <td key={col.id} className="px-3 py-2 text-right text-off-black/25">-</td>
                       }
                       return (
                         <td key={col.id} className="px-3 py-2 text-right tabular-nums whitespace-nowrap">

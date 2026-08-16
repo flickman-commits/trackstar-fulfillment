@@ -148,7 +148,7 @@ export class BaseScraper {
 
     if (typeof this.config?.calculateDate === 'function') {
       const guessed = this.config.calculateDate(this.year)
-      console.warn(`[${this.tag || this.raceName} ${this.year}] No verified date — falling back to a computed one (${guessed?.toDateString?.()}). Add a raceDates entry.`)
+      console.warn(`[${this.tag || this.raceName} ${this.year}] No verified date - falling back to a computed one (${guessed?.toDateString?.()}). Add a raceDates entry.`)
       return guessed
     }
 
@@ -334,7 +334,7 @@ export class BaseScraper {
    * dashboard as a config-needed alert, not a missing-runner.
    */
   yearNotConfiguredResult(extraNote) {
-    const note = `${this.raceName} ${this.year} not configured yet — ` +
+    const note = `${this.raceName} ${this.year} not configured yet - ` +
       `event/result IDs need to be added to the scraper config.` +
       (extraNote ? ` (${extraNote})` : '')
     return {
@@ -390,8 +390,8 @@ export class BaseScraper {
       yearFound: this.year,
       researchStatus: 'ambiguous',
       researchNotes: list.length > 0
-        ? `Multiple matches found: ${list.map(m => m.name).filter(Boolean).join(', ')} — please pick the right runner`
-        : 'Multiple matches found — please pick the right runner'
+        ? `Multiple matches found: ${list.map(m => m.name).filter(Boolean).join(', ')} - please pick the right runner`
+        : 'Multiple matches found - please pick the right runner'
     }
   }
 }

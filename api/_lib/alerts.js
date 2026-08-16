@@ -21,7 +21,7 @@ export async function alertError(context, error, meta = {}) {
     ? '\n' + Object.entries(meta).map(([k, v]) => `• ${k}: ${v}`).join('\n')
     : ''
 
-  const text = `🚨 *System Alert — ${context}*\n\`${errorMsg}\`${metaStr}`
+  const text = `🚨 *System Alert - ${context}*\n\`${errorMsg}\`${metaStr}`
 
   try {
     await fetch(webhookUrl, {

@@ -48,7 +48,7 @@ async function main() {
     const research = order.runnerResearch[0]
     if (!research) { console.log(`  ${r.orderNumber}: NO RESEARCH RECORD`); continue }
 
-    console.log(`  ${r.orderNumber}: ${r.runnerName} — updating ${r.storedTime} → ${r.currentChipTime}`)
+    console.log(`  ${r.orderNumber}: ${r.runnerName} - updating ${r.storedTime} → ${r.currentChipTime}`)
 
     if (APPLY) {
       await prisma.runnerResearch.update({

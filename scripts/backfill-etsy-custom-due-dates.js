@@ -84,7 +84,7 @@ async function main() {
   if (samples.length > 0) {
     console.log(`\n[Backfill] Sample changes (first ${samples.length}):`)
     for (const s of samples) {
-      console.log(`  #${s.orderNumber}  ${s.race} — ${s.runner}`)
+      console.log(`  #${s.orderNumber}  ${s.race} - ${s.runner}`)
       console.log(`     created ${s.createdAt}  →  due ${s.dueDate}`)
     }
   }

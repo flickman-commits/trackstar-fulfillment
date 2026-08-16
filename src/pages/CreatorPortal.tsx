@@ -343,7 +343,7 @@ function StepWelcome(_: { briefs: PortalBrief[] }) {
       />
 
       <p className="text-sm text-off-black/80 leading-relaxed">
-        ^^ This could be you. Apply below and we'll review your application — if it's a fit we'll ship you a personalized Trackstar print in exchange for some short-form content.
+        ^^ This could be you. Apply below and we'll review your application - if it's a fit we'll ship you a personalized Trackstar print in exchange for some short-form content.
       </p>
     </div>
   )
@@ -836,17 +836,17 @@ function BriefCard({ brief, hideTitle = false }: { brief: PortalBrief; hideTitle
         <div className="mt-2 space-y-2">
           <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">Framework (guardrails, not a script)</div>
           {brief.hooks && (
-            <Box label="Hook — opening line options">
+            <Box label="Hook - opening line options">
               <pre className="whitespace-pre-wrap text-sm text-off-black/80 font-sans leading-relaxed">{brief.hooks}</pre>
             </Box>
           )}
           {brief.emotion && (
-            <Box label="Emotion — the feeling to land">
+            <Box label="Emotion - the feeling to land">
               <pre className="whitespace-pre-wrap text-sm text-off-black/80 font-sans leading-relaxed">{brief.emotion}</pre>
             </Box>
           )}
           {brief.fomo && (
-            <Box label="FOMO — why act now">
+            <Box label="FOMO - why act now">
               <pre className="whitespace-pre-wrap text-sm text-off-black/80 font-sans leading-relaxed">{brief.fomo}</pre>
             </Box>
           )}
@@ -890,7 +890,7 @@ function ReferenceList({ raw }: { raw: string }) {
       const urlMatch = line.match(/https?:\/\/\S+/)
       if (urlMatch) {
         const url = urlMatch[0]
-        const note = line.replace(url, '').replace(/^[\s—–-]+/, '').trim()
+        const note = line.replace(url, '').replace(/^[\s-–-]+/, '').trim()
         return { url, note }
       }
       return { url: '', note: line }
@@ -910,7 +910,7 @@ function ReferenceList({ raw }: { raw: string }) {
               {r.url}
             </a>
           ) : null}
-          {r.url && r.note ? <span className="text-off-black/40"> — </span> : null}
+          {r.url && r.note ? <span className="text-off-black/40"> - </span> : null}
           {r.note ? <span>{r.note}</span> : null}
         </li>
       ))}

@@ -135,7 +135,7 @@ export function setCors(req, res, { methods = 'GET, POST, OPTIONS', allowPublic 
 export function requireAdmin(req, res) {
   const secret = process.env.ADMIN_SECRET
   if (!secret) {
-    console.error('[auth] ADMIN_SECRET not configured — blocking request')
+    console.error('[auth] ADMIN_SECRET not configured - blocking request')
     res.status(500).json({ error: 'Server misconfigured' })
     return false
   }

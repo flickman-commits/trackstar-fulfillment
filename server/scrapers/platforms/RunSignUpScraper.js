@@ -127,7 +127,7 @@ export class RunSignUpScraper extends BaseScraper {
       const results = rawResults.map(r => {
         const chip = (r.chip_time && String(r.chip_time).trim()) || null
         if (!chip && r.clock_time) {
-          console.warn(`[${this.tag} ${this.year}] Runner ${r.first_name} ${r.last_name} has clock_time but no chip_time — refusing to use gun time`)
+          console.warn(`[${this.tag} ${this.year}] Runner ${r.first_name} ${r.last_name} has clock_time but no chip_time - refusing to use gun time`)
         }
         return {
           name: `${r.first_name || ''} ${r.last_name || ''}`.trim(),

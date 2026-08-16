@@ -94,7 +94,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Trackstar Instant Lookup — Preview</title>
+<title>Trackstar Instant Lookup - Preview</title>
 <style>
   body { margin: 0; background: #F7F5F0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.04em; color: #1A1A1A; }
   .pv-bar { position: sticky; top: 0; z-index: 10; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: .75rem 1rem; background: #1A1A1A; color: #fff; font-size: .85rem; }

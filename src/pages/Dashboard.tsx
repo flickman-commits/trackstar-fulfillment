@@ -198,7 +198,7 @@ function OrderSourceMark({ source, size = 'md' }: { source: Order['source']; siz
     return (
       <span
         className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-semibold whitespace-nowrap"
-        title="Creator-program sample — free fulfillment"
+        title="Creator-program sample - free fulfillment"
       >
         🎁 Creator
       </span>
@@ -598,7 +598,7 @@ const SETTINGS_NAV: {
     group: 'System',
     items: [
       { id: 'diagnostics', label: 'Diagnostics', blurb: 'Test connections and run a full health check', icon: FlaskConical },
-      { id: 'maintenance', label: 'Maintenance', blurb: 'Cache and research resets — destructive', icon: Settings },
+      { id: 'maintenance', label: 'Maintenance', blurb: 'Cache and research resets - destructive', icon: Settings },
     ],
   },
 ]
@@ -917,7 +917,7 @@ export default function Dashboard() {
       const data = await response.json()
       const messages: Record<string, string> = {
         'refresh-weather': `Weather refreshed for ${data.refreshed ?? 0} race(s)`,
-        'clear-research': `Cleared ${data.deleted ?? 0} research records — re-research to repopulate`,
+        'clear-research': `Cleared ${data.deleted ?? 0} research records - re-research to repopulate`,
         'clear-race-cache': `Race info cache cleared for ${data.cleared ?? 0} race(s)`,
       }
       setToast({ message: messages[action], type: 'success' })
@@ -1140,7 +1140,7 @@ export default function Dashboard() {
         if (data.possibleMatches?.length > 0) {
           setPossibleMatchesMap(prev => ({ ...prev, [orderNumber]: data.possibleMatches }))
           setToast({
-            message: `Found ${data.possibleMatches.length} possible match${data.possibleMatches.length > 1 ? 'es' : ''} — please verify`,
+            message: `Found ${data.possibleMatches.length} possible match${data.possibleMatches.length > 1 ? 'es' : ''} - please verify`,
             type: 'info'
           })
         } else {
@@ -1200,7 +1200,7 @@ export default function Dashboard() {
       }
 
       setToast({
-        message: `Match accepted: ${match.name} — Bib: ${match.bib}, Time: ${match.time}`,
+        message: `Match accepted: ${match.name} - Bib: ${match.bib}, Time: ${match.time}`,
         type: 'success'
       })
 
@@ -1285,7 +1285,7 @@ export default function Dashboard() {
         throw new Error(data.error || 'Failed to re-open order')
       }
 
-      setToast({ message: 'Order re-opened — back in the queue', type: 'success' })
+      setToast({ message: 'Order re-opened - back in the queue', type: 'success' })
       setSelectedOrder(null)
       await fetchOrders()
     } catch (error) {
@@ -1325,7 +1325,7 @@ export default function Dashboard() {
         const data = await response.json().catch(() => ({}))
         throw new Error(data.error || 'Failed to send delay notice')
       }
-      setToast({ message: `Delay notice sent — promised ${days} day${days === 1 ? '' : 's'} late`, type: 'success' })
+      setToast({ message: `Delay notice sent - promised ${days} day${days === 1 ? '' : 's'} late`, type: 'success' })
       setDelayDialogOpen(false)
       // Update local state immediately so the badge shows up without a refetch
       const sentAt = new Date().toISOString()
@@ -1993,7 +1993,7 @@ export default function Dashboard() {
 
     // Confirm so a misplaced click on a huge queue doesn't surprise.
     const scopeLabel = raceFilter || (searchQuery ? `search: ${searchQuery}` : 'all queues')
-    if (!confirm(`Research ${queue.length} order${queue.length === 1 ? '' : 's'} in ${scopeLabel}? This may take a couple minutes — you can keep working in the background.`)) return
+    if (!confirm(`Research ${queue.length} order${queue.length === 1 ? '' : 's'} in ${scopeLabel}? This may take a couple minutes - you can keep working in the background.`)) return
 
     bulkStopRef.current = false
     setBulkRunning(true)
@@ -2561,7 +2561,7 @@ Thank you!`
                                   {order.raceYear ? `Year: ${order.raceYear}` : ''}
                                 </span>
                                 <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
-                                  {order.partnerContactName || order.customerEmail || '—'}
+                                  {order.partnerContactName || order.customerEmail || '-'}
                                 </span>
                               </>
                             ) : (
@@ -2570,7 +2570,7 @@ Thank you!`
                                   Due: {formatDueDate(order.dueDate)}
                                 </span>
                                 <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
-                                  {order.effectiveRaceName || order.raceName || '—'}
+                                  {order.effectiveRaceName || order.raceName || '-'}
                                 </span>
                               </>
                             )}
@@ -2613,7 +2613,7 @@ Thank you!`
                               <div className="mt-0.5 flex items-center justify-between gap-2">
                                 <span className="text-xs text-off-black/40">Completed</span>
                                 <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
-                                  {order.effectiveRaceName || order.raceName || '—'}
+                                  {order.effectiveRaceName || order.raceName || '-'}
                                 </span>
                               </div>
                             </div>
@@ -2626,7 +2626,7 @@ Thank you!`
 
                 {filteredOrders.length === 0 && !searchQuery && (
                   <div className="text-center py-12 text-off-black/40 text-sm">
-                    {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet — click "New Race Partner" to add one'}
+                    {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet - click "New Race Partner" to add one'}
                   </div>
                 )}
                 {searchQuery && filteredOrders.length === 0 && filteredCompletedOrders.length === 0 && (
@@ -2786,10 +2786,10 @@ Thank you!`
                               </div>
                             </td>
                             <td className="px-3 py-4">
-                              <span className="text-sm text-off-black/70">{order.raceYear || '—'}</span>
+                              <span className="text-sm text-off-black/70">{order.raceYear || '-'}</span>
                             </td>
                             <td className="px-3 py-4 hidden md:table-cell">
-                              <span className="text-sm text-off-black/70">{order.partnerContactName || order.customerEmail || '—'}</span>
+                              <span className="text-sm text-off-black/70">{order.partnerContactName || order.customerEmail || '-'}</span>
                             </td>
                             <td className="px-3 pr-6 py-4 text-sm text-off-black/60 hidden lg:table-cell">
                               {(order.proofCount ?? 0) > 0 ? (
@@ -2865,7 +2865,7 @@ Thank you!`
                               <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
                             </td>
                             <td className="px-3 pr-6 py-4 text-sm text-off-black/60 hidden lg:table-cell">
-                              <span className="line-clamp-1">{order.effectiveRaceName || order.raceName || '—'}</span>
+                              <span className="line-clamp-1">{order.effectiveRaceName || order.raceName || '-'}</span>
                             </td>
                           </tr>
                         )
@@ -2912,13 +2912,13 @@ Thank you!`
                                   </div>
                                 </td>
                                 <td className="px-3 py-4">
-                                  <span className="text-sm text-off-black/40">—</span>
+                                  <span className="text-sm text-off-black/40">-</span>
                                 </td>
                                 <td className="px-3 py-4 hidden md:table-cell">
                                   <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
                                 </td>
                                 <td className="px-3 pr-6 py-4 text-sm text-off-black/60 hidden lg:table-cell">
-                                  <span className="line-clamp-1">{order.effectiveRaceName || order.raceName || '—'}</span>
+                                  <span className="line-clamp-1">{order.effectiveRaceName || order.raceName || '-'}</span>
                                 </td>
                               </tr>
                             )
@@ -2932,7 +2932,7 @@ Thank you!`
 
               {filteredOrders.length === 0 && !searchQuery && (
                 <div className="hidden md:block text-center py-16 text-off-black/40 text-sm">
-                  {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet — click "New Race Partner" to add one'}
+                  {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet - click "New Race Partner" to add one'}
                 </div>
               )}
 
@@ -3082,7 +3082,7 @@ Thank you!`
             onClick={(e) => { if (e.target === e.currentTarget) setShowSettings(false) }}
           >
             {/* Sidebar shell. Settings used to be one scrolling column of cards,
-                which stopped working once panels grew their own controls — the
+                which stopped working once panels grew their own controls - the
                 pricing calculator alone is a full workspace. A fixed nav on the
                 left and one panel on the right means a panel can be as complex
                 as it needs to be without burying everything below it. */}
@@ -3408,7 +3408,7 @@ Thank you!`
                                         }`}
                                         title={isOverridden ? 'User-set override (click to edit)' : 'Default from scraper config (click to override)'}
                                       >
-                                        {currentShorthand || '—'}
+                                        {currentShorthand || '-'}
                                         <Pencil className="w-2.5 h-2.5 opacity-50" />
                                       </button>
                                     )}
@@ -3600,7 +3600,7 @@ Thank you!`
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-off-black">Test Connections</p>
-                        <p className="text-xs mt-0.5 text-off-black/50">Step-by-step diagnostics for Artelo, Shopify, and Etsy — tells you exactly which credential or API call is failing.</p>
+                        <p className="text-xs mt-0.5 text-off-black/50">Step-by-step diagnostics for Artelo, Shopify, and Etsy - tells you exactly which credential or API call is failing.</p>
                       </div>
                       <button
                         onClick={async () => {
@@ -3835,19 +3835,19 @@ Thank you!`
               )}
               {bulkSummary.notFound > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-warning-amber">⚠ Not found — needs manual lookup</span>
+                  <span className="text-warning-amber">⚠ Not found - needs manual lookup</span>
                   <span className="font-medium text-off-black tabular-nums">{bulkSummary.notFound}</span>
                 </div>
               )}
               {bulkSummary.ambiguous > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-warning-amber">? Ambiguous — multiple matches</span>
+                  <span className="text-warning-amber">? Ambiguous - multiple matches</span>
                   <span className="font-medium text-off-black tabular-nums">{bulkSummary.ambiguous}</span>
                 </div>
               )}
               {bulkSummary.error > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-red-600">🚧 Error — scraper or upstream issue</span>
+                  <span className="text-red-600">🚧 Error - scraper or upstream issue</span>
                   <span className="font-medium text-off-black tabular-nums">{bulkSummary.error}</span>
                 </div>
               )}
@@ -4073,7 +4073,7 @@ Thank you!`
                             <span className="text-base leading-none">⏰</span>
                             <div className="flex-1 text-xs">
                               <p className="font-medium text-amber-900">
-                                Pushed due date {selectedOrder.delayNoticeDaysLate ?? '?'} day{selectedOrder.delayNoticeDaysLate === 1 ? '' : 's'} — email sent
+                                Pushed due date {selectedOrder.delayNoticeDaysLate ?? '?'} day{selectedOrder.delayNoticeDaysLate === 1 ? '' : 's'} - email sent
                               </p>
                               <p className="text-amber-700/80 mt-0.5">
                                 Customer notified {new Date(selectedOrder.delayNoticeSentAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}
@@ -4328,13 +4328,13 @@ Thank you!`
 
                       {/* Delay-notice banner — shown when Dan has emailed the customer
                           warning them about a delay. The due date itself isn't changed
-                          (we keep it as the original promise) — this is purely a flag. */}
+                          (we keep it as the original promise) - this is purely a flag. */}
                       {selectedOrder.delayNoticeSentAt && (
                         <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
                           <span className="text-base leading-none">⏰</span>
                           <div className="flex-1 text-xs">
                             <p className="font-medium text-amber-900">
-                              Pushed due date {selectedOrder.delayNoticeDaysLate ?? '?'} day{selectedOrder.delayNoticeDaysLate === 1 ? '' : 's'} — email sent
+                              Pushed due date {selectedOrder.delayNoticeDaysLate ?? '?'} day{selectedOrder.delayNoticeDaysLate === 1 ? '' : 's'} - email sent
                             </p>
                             <p className="text-amber-700/80 mt-0.5">
                               Customer notified {new Date(selectedOrder.delayNoticeSentAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}
@@ -4730,7 +4730,7 @@ Thank you!`
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-semibold">
                           🎁 Creator
                         </span>
-                        <span className="text-xs text-emerald-800 font-medium">Free sample for the Creator Program — do not charge.</span>
+                        <span className="text-xs text-emerald-800 font-medium">Free sample for the Creator Program - do not charge.</span>
                       </div>
                       {/* Print — surface frame type alongside size since creator
                           samples are manual orders. For regular orders Artelo
@@ -4739,8 +4739,8 @@ Thank you!`
                       <div className="mb-3">
                         <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider mb-1.5">Print</div>
                         <div className="bg-white border border-emerald-200 rounded p-2.5 text-sm text-off-black/80 flex flex-wrap gap-x-4 gap-y-1">
-                          <span><span className="text-off-black/50">Size:</span> <span className="font-medium">{selectedOrder.productSize || '—'}</span></span>
-                          <span><span className="text-off-black/50">Frame:</span> <span className="font-medium">{selectedOrder.frameType || '—'}</span></span>
+                          <span><span className="text-off-black/50">Size:</span> <span className="font-medium">{selectedOrder.productSize || '-'}</span></span>
+                          <span><span className="text-off-black/50">Frame:</span> <span className="font-medium">{selectedOrder.frameType || '-'}</span></span>
                         </div>
                       </div>
                       {selectedOrder.creatorShipping && (
@@ -4996,7 +4996,7 @@ Thank you!`
                               <span
                                 className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold"
                                 style={{ background: 'rgba(70,0,214,0.10)', color: '#4600D6', border: '1px solid rgba(70,0,214,0.25)' }}
-                                title="The customer confirmed an official-results match in the Instant Lookup widget before checkout — no scrape needed."
+                                title="The customer confirmed an official-results match in the Instant Lookup widget before checkout - no scrape needed."
                               >
                                 🟣 Confirmed by customer
                               </span>
@@ -5382,7 +5382,7 @@ Thank you!`
                                     {!isMarathon && (
                                       <span
                                         className="inline-flex items-center px-1.5 py-0.5 bg-warning-amber/15 text-warning-amber border border-warning-amber/30 text-[10px] font-bold rounded leading-none"
-                                        title="Not the full marathon — double-check the template"
+                                        title="Not the full marathon - double-check the template"
                                       >
                                         !!
                                       </span>
@@ -5847,7 +5847,7 @@ Thank you!`
                     Emergency use only
                   </p>
                   <p className="text-xs text-amber-800/90 leading-relaxed">
-                    This emails the customer that their order will be late. We do <strong>not</strong> want to make a habit of this — only use it when a delay is unavoidable. The due date will stay the same; a flag will appear on this order showing it was sent.
+                    This emails the customer that their order will be late. We do <strong>not</strong> want to make a habit of this - only use it when a delay is unavoidable. The due date will stay the same; a flag will appear on this order showing it was sent.
                   </p>
                 </div>
 

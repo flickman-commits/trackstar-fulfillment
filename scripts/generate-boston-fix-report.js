@@ -89,11 +89,11 @@ async function main() {
 
   // Markdown
   const md = []
-  md.push('# Boston Marathon 2026 — Time/Pace Correction Report')
+  md.push('# Boston Marathon 2026 - Time/Pace Correction Report')
   md.push('')
-  md.push('Hey Eli — heads up: a scraper bug was pulling gun time/pace instead of chip time/pace for Boston Marathon orders. The fix is live and the database has been corrected for all 11 affected orders below.')
+  md.push('Hey Eli - heads up: a scraper bug was pulling gun time/pace instead of chip time/pace for Boston Marathon orders. The fix is live and the database has been corrected for all 11 affected orders below.')
   md.push('')
-  md.push('**All 11 orders are still in `not_started` design status — none have been printed.** They\'ll print with the correct chip-time values now. No reprint needed.')
+  md.push('**All 11 orders are still in `not_started` design status - none have been printed.** They\'ll print with the correct chip-time values now. No reprint needed.')
   md.push('')
   md.push('Just want to make sure you have a record of the change in case anything looks off.')
   md.push('')

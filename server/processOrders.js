@@ -574,7 +574,7 @@ export async function processOrders(options = {}) {
       })
       for (const dbOrder of pendingDbOrders) {
         if (!allArteloOrderIds.has(dbOrder.parentOrderNumber)) {
-          log(`[processOrders] Order ${dbOrder.orderNumber} not in Artelo and >3 days old — marking completed`)
+          log(`[processOrders] Order ${dbOrder.orderNumber} not in Artelo and >3 days old - marking completed`)
           await prisma.order.update({
             where: { id: dbOrder.id },
             data: { status: 'completed', researchedAt: new Date() }
@@ -1005,7 +1005,7 @@ export async function processOrders(options = {}) {
                   const fallbackUrl = process.env.SLACK_PROOF_WEBHOOK_URL
                   const slackUrl = eliDmUrl || fallbackUrl
                   if (slackUrl) {
-                    const text = `🚀 <@U09UVEP1N3Y> *EXPEDITED ORDER* — *${displayNum}* (${raceName}, ${runnerName})\n` +
+                    const text = `🚀 <@U09UVEP1N3Y> *EXPEDITED ORDER* - *${displayNum}* (${raceName}, ${runnerName})\n` +
                       `Customer paid for *${shippingMethod || 'expedited'}* shipping. Please prioritize this order:\n` +
                       `• Verify all personalization is complete\n` +
                       `• You can send this one to production yourself (no need to wait for Matt)\n` +
@@ -1015,7 +1015,7 @@ export async function processOrders(options = {}) {
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ text })
                     }).catch(e => log(`[processOrders] Expedited Slack notification failed: ${e.message}`))
-                    log(`[processOrders] 🚀 Expedited shipping detected on ${order.orderId}-${lineItemIndex} — Slack sent`)
+                    log(`[processOrders] 🚀 Expedited shipping detected on ${order.orderId}-${lineItemIndex} - Slack sent`)
                   }
                 }
               } catch (e) {
@@ -1048,7 +1048,7 @@ export async function processOrders(options = {}) {
                 // resulting RunnerResearch row simply has null time/pace, and
                 // the order's hadNoTime flag drives the "No Time" badge.
                 if (dbOrder.lookupVerified === true) {
-                  log(`[processOrders] ✅ Customer-verified result for ${dbOrder.orderNumber} — skipping runner scrape`)
+                  log(`[processOrders] ✅ Customer-verified result for ${dbOrder.orderNumber} - skipping runner scrape`)
                   try {
                     await researchService.applyVerifiedResult(dbOrder.orderNumber)
                     results.researched++

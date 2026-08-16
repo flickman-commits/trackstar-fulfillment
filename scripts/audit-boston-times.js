@@ -105,7 +105,7 @@ async function main() {
       const newBib = result.bibNumber
       const differ = normalizeTime(newTime) !== normalizeTime(storedTime)
 
-      console.log(differ ? `🚨 DIFFERS — was ${storedTime}, should be ${newTime}` : `OK (${storedTime})`)
+      console.log(differ ? `🚨 DIFFERS - was ${storedTime}, should be ${newTime}` : `OK (${storedTime})`)
 
       report.push({
         orderNumber: order.orderNumber,

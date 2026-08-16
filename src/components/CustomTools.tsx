@@ -127,7 +127,7 @@ function PaceConverter() {
       <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-2.5 text-center">
         <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Pace per mile</p>
         <span className="relative inline-block">
-          <span className="text-2xl font-bold text-off-black tabular-nums">{pacePerMile ?? '—'}</span>
+          <span className="text-2xl font-bold text-off-black tabular-nums">{pacePerMile ?? '-'}</span>
           {pacePerMile && (
             <button
               onClick={copyPace}

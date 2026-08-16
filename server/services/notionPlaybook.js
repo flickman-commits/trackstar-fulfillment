@@ -148,7 +148,7 @@ export async function fetchPlaybookMarkdown({ forceFresh = false } = {}) {
 
   // Cache miss / forced refresh — hit Notion
   try {
-    console.log('[notionPlaybook] Cache miss — fetching from Notion...')
+    console.log('[notionPlaybook] Cache miss - fetching from Notion...')
     const client = getClient()
     const text = await fetchBlocksRecursive(client, PLAYBOOK_PAGE_ID)
 

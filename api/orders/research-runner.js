@@ -77,7 +77,7 @@ export default async function handler(req, res) {
       return res.status(400).json({
         error: error.message,
         errorType: 'no_scraper',
-        actionRequired: `Add a scraper config for "${error.message.replace(/^.*race:\s*/, '')}" — or add an alias to an existing one if this race should map to a config we already have.`,
+        actionRequired: `Add a scraper config for "${error.message.replace(/^.*race:\s*/, '')}" - or add an alias to an existing one if this race should map to a config we already have.`,
         supportedRaces: getSupportedRaces()
       })
     }

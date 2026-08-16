@@ -85,19 +85,19 @@ test(
 
 // Pattern 3: No prefix — "{Race} Poster | ..."
 test(
-  'No prefix — Grandma\'s (with HTML entity)',
+  'No prefix - Grandma\'s (with HTML entity)',
   parseEtsyRaceName("Grandma&#39;s Marathon Poster | Personalized Race Map, Runner Gift"),
   "Grandma's Marathon"
 )
 
 test(
-  'No prefix — CIM',
+  'No prefix - CIM',
   parseEtsyRaceName('CIM Marathon Poster | Personalized Race Map, Runner Gift'),
   'CIM Marathon'
 )
 
 test(
-  'No prefix — Army Ten Miler',
+  'No prefix - Army Ten Miler',
   parseEtsyRaceName('Army Ten Miler Poster | Personalized Marathon Race Map | Custom Army Ten Miler Course Map | Army Ten Miler Runner Gift'),
   'Army Ten Miler'
 )
@@ -177,19 +177,19 @@ test(
 )
 
 test(
-  'Name only — needs attention',
+  'Name only - needs attention',
   parseEtsyPersonalization('Alice Johnson'),
   { runnerName: 'Alice Johnson', raceYear: null, rawText: 'Alice Johnson', needsAttention: true }
 )
 
 test(
-  'Empty string — needs attention',
+  'Empty string - needs attention',
   parseEtsyPersonalization(''),
   { runnerName: null, raceYear: null, rawText: '', needsAttention: true }
 )
 
 test(
-  'Year only — needs attention',
+  'Year only - needs attention',
   parseEtsyPersonalization('2025'),
   { runnerName: null, raceYear: 2025, rawText: '2025', needsAttention: true }
 )

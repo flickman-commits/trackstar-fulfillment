@@ -170,7 +170,7 @@ async function backfill() {
 
       if (isCustom) {
         const displayRace = updateData.raceName || order.raceName
-        console.log(`  🎨 Custom: ${order.orderNumber} — ${displayRace}`)
+        console.log(`  🎨 Custom: ${order.orderNumber} - ${displayRace}`)
         if (updateData.bibNumberCustomer) console.log(`     Bib: ${updateData.bibNumberCustomer}`)
         if (updateData.timeCustomer) console.log(`     Time: ${updateData.timeCustomer}`)
         if (updateData.creativeDirection) console.log(`     Creative Direction: ${updateData.creativeDirection}`)

@@ -180,7 +180,7 @@ function extractEtsyPersonalization(transaction) {
 // Main
 // -----------------------------------------------------------------------------
 async function main() {
-  console.log(APPLY ? '🔥 APPLY mode — will write changes' : '🧪 DRY RUN — no DB writes (pass --apply to commit)')
+  console.log(APPLY ? '🔥 APPLY mode - will write changes' : '🧪 DRY RUN - no DB writes (pass --apply to commit)')
   console.log()
 
   // Pull all rows, grouped by parent order
@@ -237,7 +237,7 @@ async function main() {
     mismatched++
 
     const orderName = first.shopifyOrderData?.name || first.etsyOrderData?.receipt_id || parent
-    console.log(`\n=== ${orderName} (parent ${parent}) — Artelo↔upstream mismatch detected ===`)
+    console.log(`\n=== ${orderName} (parent ${parent}) - Artelo↔upstream mismatch detected ===`)
     console.log(`    matchMap: ${JSON.stringify(matchMap)}`)
 
     for (const row of rows) {
@@ -248,7 +248,7 @@ async function main() {
 
       // Skip rows with any user override
       if (row.runnerNameOverride || row.raceNameOverride || row.yearOverride) {
-        console.log(`  idx ${i}: SKIP — has user override (runner=${row.runnerNameOverride}, race=${row.raceNameOverride}, year=${row.yearOverride})`)
+        console.log(`  idx ${i}: SKIP - has user override (runner=${row.runnerNameOverride}, race=${row.raceNameOverride}, year=${row.yearOverride})`)
         skipped++
         continue
       }

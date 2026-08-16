@@ -283,7 +283,7 @@ async function handleAcceptMatch({ orderNumber, match }, res) {
         enrichedResultsUrl = enriched.resultsUrl || enrichedResultsUrl
         console.log(`[actions/accept-match] Enriched: time=${enrichedTime} pace=${enrichedPace}`)
       } else {
-        console.log(`[actions/accept-match] Re-search did not return a unique match — saving with available data`)
+        console.log(`[actions/accept-match] Re-search did not return a unique match - saving with available data`)
       }
     } catch (err) {
       // Don't fail the accept — just save with what we have
@@ -498,7 +498,7 @@ async function handleDesignStatus({ orderNumber, designStatus }, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: `🖨️ <@U09UVEP1N3Y> Final PDF ready for order *${displayNum}* — ready for production!`
+        text: `🖨️ <@U09UVEP1N3Y> Final PDF ready for order *${displayNum}* - ready for production!`
       })
     }).catch(e => console.warn('[actions] Slack failed:', e.message))
   }
@@ -525,7 +525,7 @@ async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
     return res.status(400).json({ error: 'Delay notice is only for custom orders' })
   }
   if (!existing.customerEmail) {
-    return res.status(400).json({ error: 'No customer email on file for this order — cannot send delay notice' })
+    return res.status(400).json({ error: 'No customer email on file for this order - cannot send delay notice' })
   }
 
   if (!process.env.RESEND_API_KEY) {
@@ -566,7 +566,7 @@ async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
           <h1 style="margin:0 0 20px;font-size:22px;color:#1A1A1A;font-weight:700;letter-spacing:0.02em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">A quick heads-up on your order</h1>
           <p style="margin:0 0 14px;font-size:15px;color:#555555;line-height:1.6;">Hey ${firstName},</p>
           <p style="margin:0 0 14px;font-size:15px;color:#555555;line-height:1.6;">
-            Quick update — we've been swamped with custom orders the past couple of weeks, and things are running slightly behind where we'd hoped.
+            Quick update - we've been swamped with custom orders the past couple of weeks, and things are running slightly behind where we'd hoped.
           </p>
           <p style="margin:0 0 14px;font-size:15px;color:#555555;line-height:1.6;">
             We haven't forgotten you. We refuse to put out a design we're not proud of, so ${dueDateLine}
@@ -581,7 +581,7 @@ async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:24px 0 0;text-align:center;">
-          <p style="margin:0;font-size:11px;color:#999999;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">Trackstar — Celebrating athletic achievement.</p>
+          <p style="margin:0;font-size:11px;color:#999999;letter-spacing:0.05em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">Trackstar - Celebrating athletic achievement.</p>
         </td></tr>
       </table>
     </td></tr>
@@ -619,7 +619,7 @@ async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
   const slackUrl = process.env.SLACK_DM_WEBHOOK_URL || process.env.SLACK_PROOF_WEBHOOK_URL
   if (slackUrl) {
     const dueDateText = originalDueDate ? ` (was due ${originalDueDate})` : ''
-    const text = `⏰ *Custom-order delay notice sent* — order *${displayNum}* for ${existing.customerName || 'customer'} (${existing.raceName || 'custom design'}). Promised *${days} day${days === 1 ? '' : 's'}* late${dueDateText}. Email went to ${existing.customerEmail}.`
+    const text = `⏰ *Custom-order delay notice sent* - order *${displayNum}* for ${existing.customerName || 'customer'} (${existing.raceName || 'custom design'}). Promised *${days} day${days === 1 ? '' : 's'}* late${dueDateText}. Email went to ${existing.customerEmail}.`
     fetch(slackUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -685,7 +685,7 @@ async function handleMessageCustomer({ orderId, body }, res) {
           <h1 style="margin:0 0 16px;font-size:22px;color:#1A1A1A;font-weight:700;letter-spacing:0.02em;">Your designer has a question</h1>
           <p style="margin:0 0 14px;font-size:15px;color:#555555;line-height:1.6;">Hey ${firstName},</p>
           <p style="margin:0 0 24px;font-size:15px;color:#555555;line-height:1.6;">
-            We're working on your custom design for order ${displayNum} and our designer has a quick question for you. Tap below to read it and reply — it only takes a moment, and it helps us get your design just right.
+            We're working on your custom design for order ${displayNum} and our designer has a quick question for you. Tap below to read it and reply - it only takes a moment, and it helps us get your design just right.
           </p>
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 8px;">
             <a href="${portalUrl}" style="display:inline-block;background-color:#4600D6;color:#FFFFFF;font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;letter-spacing:0.03em;">VIEW &amp; REPLY</a>
@@ -695,7 +695,7 @@ async function handleMessageCustomer({ orderId, body }, res) {
           </p>
         </td></tr>
         <tr><td style="padding:24px 0 0;text-align:center;">
-          <p style="margin:0;font-size:11px;color:#999999;letter-spacing:0.05em;">Trackstar — Celebrating athletic achievement.</p>
+          <p style="margin:0;font-size:11px;color:#999999;letter-spacing:0.05em;">Trackstar - Celebrating athletic achievement.</p>
         </td></tr>
       </table>
     </td></tr>
@@ -730,7 +730,7 @@ async function handleMessageCustomer({ orderId, body }, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: `💬 Question sent to *${existing.customerName || 'customer'}* for order *${displayNum}* — emailed ${existing.customerEmail}. I'll ping you here when they reply.`,
+        text: `💬 Question sent to *${existing.customerName || 'customer'}* for order *${displayNum}* - emailed ${existing.customerEmail}. I'll ping you here when they reply.`,
       }),
     }).catch(e => console.warn('[actions/message-customer] Slack notify failed:', e.message))
   }
@@ -988,7 +988,7 @@ async function handleMondayPipeline(res) {
     }
 
     const urgentSection = urgentCount > 0
-      ? `\n\n:rotating_light: *Urgent (due within 3 days):*\n${urgentOrders.map(o => `• #${o.parentOrderNumber || o.orderNumber || '?'} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${formatDate(o.dueDate)}`).join('\n')}`
+      ? `\n\n:rotating_light: *Urgent (due within 3 days):*\n${urgentOrders.map(o => `• #${o.parentOrderNumber || o.orderNumber || '?'} - ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) - due ${formatDate(o.dueDate)}`).join('\n')}`
       : ''
 
     const message = {
@@ -1080,7 +1080,7 @@ async function handleDailyDesignUpdate(res) {
     dueNext7Days.sort((a, b) => a.due - b.due)
 
     const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
-    const orderLine = (o) => `• #${displayNum(o)} — ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) — due ${fmt(o.due)}`
+    const orderLine = (o) => `• #${displayNum(o)} - ${o.runnerName || 'Unknown'} (${o.raceName || 'Custom'}) - due ${fmt(o.due)}`
 
     const appUrl = process.env.APP_BASE_URL || ''
     const dashboardFooter = appUrl
@@ -1124,7 +1124,7 @@ async function handleDailyDesignUpdate(res) {
 
     const webhookUrl = process.env.SLACK_DESIGN_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
     if (!webhookUrl) {
-      console.warn('[actions/daily-design-update] No webhook URL configured — skipping post')
+      console.warn('[actions/daily-design-update] No webhook URL configured - skipping post')
       return res.status(200).json({ success: false, error: 'no webhook configured' })
     }
 
@@ -1214,12 +1214,12 @@ async function handleTestConnections(res) {
     }
     const data = await resp.json()
     arteloOrdersCount = Array.isArray(data) ? data.length : (data.orders?.length || 0)
-    return { status: 'ok', message: `HTTP 200 — ${arteloOrdersCount} order(s) in sample` }
+    return { status: 'ok', message: `HTTP 200 - ${arteloOrdersCount} order(s) in sample` }
   })
 
   await runStep('artelo', 'Response shape valid', async () => {
     if (arteloOrdersCount === 0) {
-      return { status: 'warn', message: 'API returned 0 orders — could be empty store, but worth verifying' }
+      return { status: 'warn', message: 'API returned 0 orders - could be empty store, but worth verifying' }
     }
     return { status: 'ok', message: `Got ${arteloOrdersCount} order(s) with the expected JSON shape` }
   })
@@ -1303,7 +1303,7 @@ async function handleTestConnections(res) {
   await runStep('etsy', 'Refresh token in database', async () => {
     etsyRefreshTokenRow = await prisma.systemConfig.findUnique({ where: { key: 'etsy_refresh_token' } })
     if (!etsyRefreshTokenRow?.value) {
-      return { status: 'error', message: 'No refresh token in DB — visit /api/etsy/auth to re-authenticate' }
+      return { status: 'error', message: 'No refresh token in DB - visit /api/etsy/auth to re-authenticate' }
     }
     return { status: 'ok', message: `Token stored (${etsyRefreshTokenRow.value.length} chars)` }
   })
@@ -1324,7 +1324,7 @@ async function handleTestConnections(res) {
     })
     if (!resp.ok) {
       const body = await resp.text()
-      return { status: 'error', message: `Refresh failed (HTTP ${resp.status}) — visit /api/etsy/auth to re-authenticate`, detail: body.slice(0, 300) }
+      return { status: 'error', message: `Refresh failed (HTTP ${resp.status}) - visit /api/etsy/auth to re-authenticate`, detail: body.slice(0, 300) }
     }
     const data = await resp.json()
     etsyAccessToken = data.access_token
@@ -1366,7 +1366,7 @@ async function handleTestConnections(res) {
     })
     if (!resp.ok) {
       const body = await resp.text()
-      return { status: 'error', message: `HTTP ${resp.status} (likely scope issue — need transactions_r)`, detail: body.slice(0, 300) }
+      return { status: 'error', message: `HTTP ${resp.status} (likely scope issue - need transactions_r)`, detail: body.slice(0, 300) }
     }
     const data = await resp.json()
     const sample = data.results?.[0]
@@ -1635,9 +1635,9 @@ async function handleCreateRacePartner({ partnerName, raceYear, contactName, con
       arteloOrderData: {},
       raceName: String(partnerName).trim(),
       raceYear: year,
-      runnerName: '—',
-      productSize: '—',
-      frameType: '—',
+      runnerName: '-',
+      productSize: '-',
+      frameType: '-',
       trackstarOrderType: 'race_partner',
       designStatus: 'not_started',
       status: 'pending',
@@ -2148,7 +2148,7 @@ async function pingSampleRequested(creator) {
     `${mention}🎬 *New Creator Sample Request*`,
     `Creator: *${creator.name || '(unnamed)'}*${creator.instagramHandle ? ` · ${creator.instagramHandle}` : ''}`,
     `Race: ${creator.raceName || 'Unknown'}${creator.raceYear ? ` ${creator.raceYear}` : ''}`,
-    `Print: ${creator.productSize || '—'} · ${creator.frameType || '—'}`,
+    `Print: ${creator.productSize || '-'} · ${creator.frameType || '-'}`,
     `Ships to: ${[creator.shippingCity, creator.shippingState].filter(Boolean).join(', ') || 'address on file'}`,
     reviewLink,
   ].filter(Boolean)
@@ -2177,7 +2177,7 @@ async function pingSampleApprovedToEli(creator, order) {
   ].filter(Boolean).join(' · ')
 
   const lines = [
-    `🎁 *New Creator Sample to Build* — ${order.orderNumber}`,
+    `🎁 *New Creator Sample to Build* - ${order.orderNumber}`,
     `Please create this order manually in Artelo.`,
     ``,
     `*Creator:* ${creator.name || '(unnamed)'}${creator.instagramHandle ? ` · ${creator.instagramHandle}` : ''}`,
@@ -2185,7 +2185,7 @@ async function pingSampleApprovedToEli(creator, order) {
     ``,
     `*Race:* ${creator.raceName || 'Unknown'}${creator.raceYear ? ` ${creator.raceYear}` : ''}`,
     runnerDetails ? `*Runner:* ${runnerDetails}` : null,
-    `*Print:* ${creator.productSize || '—'} · ${creator.frameType || '—'}`,
+    `*Print:* ${creator.productSize || '-'} · ${creator.frameType || '-'}`,
     ``,
     `*Ship to:*`,
     '```',
@@ -2215,8 +2215,8 @@ async function createCreatorSampleOrder(creator) {
       raceName: creator.raceName || 'Unknown Race',
       raceYear: creator.raceYear || new Date().getFullYear(),
       runnerName: creator.name || 'Creator',
-      productSize: creator.productSize || '—',
-      frameType: creator.frameType || '—',
+      productSize: creator.productSize || '-',
+      frameType: creator.frameType || '-',
 
       // Everything Elí needs to actually produce + ship this lives here.
       // She'll manually mirror this into Artelo. Keeping it in a single
@@ -2290,7 +2290,7 @@ async function handleDeclineCreatorSample({ creatorId }, res) {
 
   const creator = await prisma.creator.findUnique({ where: { id: creatorId } })
   if (!creator) return res.status(404).json({ error: 'Creator not found' })
-  if (creator.sampleOrderId) return res.status(400).json({ error: 'Sample already approved — cannot decline' })
+  if (creator.sampleOrderId) return res.status(400).json({ error: 'Sample already approved - cannot decline' })
 
   await prisma.creator.update({
     where: { id: creatorId },
@@ -2312,7 +2312,7 @@ async function handleSetCreatorSampleTracking({ creatorId, trackingNumber, track
     select: { sampleOrderId: true }
   })
   if (!creator) return res.status(404).json({ error: 'Creator not found' })
-  if (!creator.sampleOrderId) return res.status(400).json({ error: 'No sample order yet — approve first' })
+  if (!creator.sampleOrderId) return res.status(400).json({ error: 'No sample order yet - approve first' })
 
   const trimmed = (trackingNumber || '').trim()
   const carrier = (trackingCarrier || '').trim()
@@ -2581,7 +2581,7 @@ async function handleWeeklyAdsDebrief(res, { isCron, dryRun }) {
     // run when it's actually 4pm in New York. Manual triggers (isCron=false)
     // bypass this guard so Matt can test any time.
     if (isCron && !isFridayFourPmEastern()) {
-      console.log('[actions/weekly-ads-debrief] Skipping — not 4pm ET right now')
+      console.log('[actions/weekly-ads-debrief] Skipping - not 4pm ET right now')
       return res.status(200).json({ skipped: true, reason: 'not_4pm_eastern' })
     }
 

@@ -430,7 +430,7 @@ export default function ProductsBulkEdit() {
 
               {/*
                 Removal acts on everything the filters matched, not on the price
-                preview — a variant you are deleting has no "new price", so
+                preview - a variant you are deleting has no "new price", so
                 `changing` would be empty and the button dead.
               */}
               <div className="mt-4 pt-4 border-t border-border-gray flex items-center gap-3">
@@ -486,12 +486,12 @@ export default function ProductsBulkEdit() {
                                 </span>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-off-black/60">{v.size || '—'}</td>
-                            <td className="px-3 py-2 text-off-black/60">{v.frame || '—'}</td>
+                            <td className="px-3 py-2 text-off-black/60">{v.size || '-'}</td>
+                            <td className="px-3 py-2 text-off-black/60">{v.frame || '-'}</td>
                             <td className="px-3 py-2 text-right text-off-black/60 tabular-nums">{money(Number(v.price))}</td>
                             <td className="px-4 py-2 text-right tabular-nums">
                               {next === null ? (
-                                <span className="text-off-black/30">—</span>
+                                <span className="text-off-black/30">-</span>
                               ) : willChange ? (
                                 <span className="font-semibold text-green-700">{money(next)}</span>
                               ) : (

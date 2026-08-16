@@ -69,7 +69,7 @@ export function parseEtsyRaceName(listingTitle) {
     if (name.toLowerCase().endsWith(suffix.toLowerCase())) {
       name = name.slice(0, -suffix.length).trim()
       // Remove trailing comma or dash
-      name = name.replace(/[,\-–—]\s*$/, '').trim()
+      name = name.replace(/[,\-–-]\s*$/, '').trim()
       break
     }
   }
@@ -148,7 +148,7 @@ export function parseEtsyPersonalization(rawText) {
 
   // 5. Clean up separators
   text = text
-    .replace(/[,/|–—]+/g, ' ')  // Replace separators with spaces
+    .replace(/[,/|–-]+/g, ' ')  // Replace separators with spaces
     .replace(/\s+/g, ' ')        // Collapse multiple spaces
     .trim()
 

@@ -40,7 +40,7 @@ async function main() {
   })
 
   console.log(`\nFound ${affected.length} Etsy orders missing etsyOrderData`)
-  console.log(APPLY ? '🟢 APPLY mode — will write changes' : '🔵 DRY-RUN — nothing will be written. Pass --apply to commit.')
+  console.log(APPLY ? '🟢 APPLY mode - will write changes' : '🔵 DRY-RUN - nothing will be written. Pass --apply to commit.')
   console.log()
 
   // Group by parent receipt — one fetch per receipt covers all its line items

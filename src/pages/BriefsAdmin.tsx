@@ -267,7 +267,7 @@ function BriefEditor({ brief, onClose, onSaved }: {
           <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-5">
             <p className="text-xs text-off-black/70 leading-relaxed">
               <span className="font-semibold text-off-black">Guardrails, not scripts.</span>{' '}
-              Show what's worked, explain the framework (hook → emotion → FOMO), then let creators find their own voice. Paste your top-performing reference videos below so they have examples to study — don't hand them a line-by-line script.
+              Show what's worked, explain the framework (hook → emotion → FOMO), then let creators find their own voice. Paste your top-performing reference videos below so they have examples to study - don't hand them a line-by-line script.
             </p>
           </div>
 
@@ -279,9 +279,9 @@ function BriefEditor({ brief, onClose, onSaved }: {
             <div className="pt-2">
               <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-2">Information Framework</div>
               <div className="space-y-3">
-                <FieldText label="Hook — opening line options" value={draft.hooks} onChange={(v) => setDraft({ ...draft, hooks: v })} multiline placeholder={`I trained 6 months for this moment…\nThe one thing no runner talks about…`} />
-                <FieldText label="Emotion — what feeling should the video land?" value={draft.emotion} onChange={(v) => setDraft({ ...draft, emotion: v })} multiline placeholder="e.g. pride, nostalgia, validation — the lever that makes the viewer lean in" />
-                <FieldText label="FOMO — why should they act now?" value={draft.fomo} onChange={(v) => setDraft({ ...draft, fomo: v })} multiline placeholder="e.g. only marathon finishers get this, limited edition, race is over soon" />
+                <FieldText label="Hook - opening line options" value={draft.hooks} onChange={(v) => setDraft({ ...draft, hooks: v })} multiline placeholder={`I trained 6 months for this moment…\nThe one thing no runner talks about…`} />
+                <FieldText label="Emotion - what feeling should the video land?" value={draft.emotion} onChange={(v) => setDraft({ ...draft, emotion: v })} multiline placeholder="e.g. pride, nostalgia, validation - the lever that makes the viewer lean in" />
+                <FieldText label="FOMO - why should they act now?" value={draft.fomo} onChange={(v) => setDraft({ ...draft, fomo: v })} multiline placeholder="e.g. only marathon finishers get this, limited edition, race is over soon" />
               </div>
             </div>
 
@@ -384,7 +384,7 @@ function parseReferences(raw: string | null): Reference[] {
       const urlMatch = line.match(/https?:\/\/\S+/)
       if (urlMatch) {
         const url = urlMatch[0]
-        const rest = line.replace(url, '').replace(/^[\s—–-]+/, '').trim()
+        const rest = line.replace(url, '').replace(/^[\s-–-]+/, '').trim()
         return { url, note: rest }
       }
       return { url: '', note: line }
@@ -396,7 +396,7 @@ function serializeReferences(refs: Reference[]): string {
     .map(r => {
       const url = r.url.trim()
       const note = r.note.trim()
-      if (url && note) return `${url} — ${note}`
+      if (url && note) return `${url} - ${note}`
       return url || note
     })
     .filter(Boolean)

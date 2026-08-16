@@ -96,7 +96,7 @@ async function main() {
   }
 
   if (!APPLY) {
-    console.log('\nDry run — no changes written. Re-run with --apply to update.')
+    console.log('\nDry run - no changes written. Re-run with --apply to update.')
     return
   }
 
