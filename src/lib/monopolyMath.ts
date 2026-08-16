@@ -306,7 +306,7 @@ export interface ScenarioResult {
   cost: AllInCost
   net: number
   /**
-   * Boxes handed to partners as their included comp copies.
+   * Boxes handed to partners as their included complimentary units.
    *
    * Their cost already sits inside manufacturing, since they are part of the
    * same run. Surfaced separately so the P&L can show what giving them away is
@@ -416,4 +416,132 @@ export function calculateScenario(
     breakEvenRacesAtMidTier,
     racesSigned,
   }
+}
+
+// ── Internal: cash flow ─────────────────────────────────────────────────────
+
+/**
+ * When money actually moves, as opposed to whether the deal works.
+ *
+ * The P&L says the edition is profitable. It does not say whether we can pay
+ * the manufacturer in January 2027, which is a different question with a
+ * different answer: race fees arrive in two lumps around the board filling and
+ * the product landing, while the factory wants half its money at the purchase
+ * order and the rest before it ships. The gap between those is the number that
+ * decides whether this needs financing.
+ *
+ * Assumptions are stated rather than buried, because every one of them is a
+ * negotiating position rather than a fact:
+ *
+ *   - Manufacturer takes 50% at PO and 50% before shipping. Standard, and the
+ *     single biggest driver of the low point.
+ *   - Legal is paid when the licence is signed, design during design.
+ *   - Race fees: deposits on reservation, 50% when the board fills, the balance
+ *     on delivery.
+ *   - Wholesale units are invoiced when they ship to the race, at delivery.
+ *   - DTC revenue lands across the holiday window, not on day one.
+ */
+export interface CashFlowPeriod {
+  label: string
+  /** What happens, in the order it hits the account. */
+  lines: { label: string; amount: number }[]
+  inflow: number
+  outflow: number
+  net: number
+  /** Running balance after this period. */
+  cumulative: number
+}
+
+export interface CashFlowResult {
+  periods: CashFlowPeriod[]
+  /** Lowest the balance ever gets. The amount that has to be funded. */
+  trough: number
+  troughLabel: string
+  /** Balance at the end, which should reconcile to net profit. */
+  ending: number
+}
+
+const MANUFACTURER_DEPOSIT_SHARE = 0.5
+
+export function calculateCashFlow(
+  input: ScenarioInput,
+  result: ScenarioResult,
+  depositPerRace: number,
+): CashFlowResult {
+  const manufacturing = result.cost.manufacturing
+  const atPo = manufacturing * MANUFACTURER_DEPOSIT_SHARE
+  const preShip = manufacturing - atPo
+
+  const deposits = result.racesSigned * depositPerRace
+  // The 50% instalment is net of deposits already banked, matching what the
+  // commit steps promise a race director.
+  const halfFees = result.raceFees * 0.5 - deposits
+  const finalFees = result.raceFees * 0.5
+
+  const wholesale = result.offsetRevenue
+  const dtcNet = result.dtcRevenue
+  const pickPack = input.dtcUnits * input.dtcPickPackCost
+
+  const raw: { label: string; lines: { label: string; amount: number }[] }[] = [
+    {
+      label: 'Now to Sep 2026',
+      lines: [
+        { label: `Reservation deposits (${result.racesSigned} races)`, amount: deposits },
+        { label: 'Legal and licensing', amount: -result.cost.legal },
+      ],
+    },
+    {
+      label: 'Oct to Dec 2026',
+      lines: [
+        { label: '50% of race fees, less deposits', amount: halfFees },
+        { label: 'Design', amount: -result.cost.design },
+        { label: 'Brand partnerships', amount: result.brandRevenue },
+      ],
+    },
+    {
+      label: 'Jan 2027 (purchase order)',
+      lines: [{ label: 'Manufacturer deposit, 50%', amount: -atPo }],
+    },
+    {
+      label: 'Sep 2027 (before shipping)',
+      lines: [
+        { label: 'Manufacturer balance, 50%', amount: -preShip },
+        { label: 'Freight', amount: -result.cost.freight },
+      ],
+    },
+    {
+      label: 'Oct 2027 (product lands)',
+      lines: [
+        { label: 'Final 50% of race fees', amount: finalFees },
+        { label: `Wholesale units (${input.offsetUnitsSold.toLocaleString()})`, amount: wholesale },
+        { label: '3PL receiving, storage and fees', amount: -result.cost.fulfillment },
+      ],
+    },
+    {
+      label: 'Oct 2027 to Jan 2028',
+      lines: [
+        { label: `DTC sales (${input.dtcUnits.toLocaleString()} units, net of shipping)`, amount: dtcNet + pickPack },
+        { label: 'Pick and pack', amount: -pickPack },
+      ],
+    },
+  ]
+
+  let cumulative = 0
+  let trough = 0
+  let troughLabel = ''
+
+  const periods = raw.map((p) => {
+    const lines = p.lines.filter((l) => l.amount !== 0)
+    const inflow = lines.filter((l) => l.amount > 0).reduce((sum, l) => sum + l.amount, 0)
+    const outflow = lines.filter((l) => l.amount < 0).reduce((sum, l) => sum + l.amount, 0)
+    const net = inflow + outflow
+    cumulative += net
+    if (cumulative < trough) {
+      trough = cumulative
+      troughLabel = p.label
+    }
+    return { label: p.label, lines, inflow, outflow, net, cumulative }
+  })
+
+  return { periods, trough, troughLabel, ending: cumulative }
 }

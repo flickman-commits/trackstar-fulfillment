@@ -221,7 +221,7 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
                     </span>
                     {tier.unitsIncluded != null && (
                       <span style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>
-                        incl. {tier.unitsIncluded} comp copies
+                        incl. {tier.unitsIncluded} complimentary units
                       </span>
                     )}
                   </div>

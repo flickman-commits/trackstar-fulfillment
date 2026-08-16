@@ -239,9 +239,9 @@ export default function Monopoly() {
       <Section>
         <SectionHeading>What it is</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          Marathon Monopoly will be a full-size, licensed, limited edition Monopoly board game. It
-          will include the board, box, custom pieces, title deeds, money and cards, made to the same
-          spec as every other Monopoly board game, with official licensing provided by Hasbro.
+          Marathon Monopoly is a licensed, limited-edition Monopoly board game created to celebrate
+          the best marathons in the country. It has everything a normal Monopoly game has, but
+          reimagined for marathons.
         </p>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {PRODUCT_SHOTS.map((shot) => (
@@ -262,26 +262,12 @@ export default function Monopoly() {
           works, which is a why-now argument rather than a what-is-it one. */}
       <Section muted>
         <SectionHeading>Why now</SectionHeading>
-        <div className="mt-8 grid gap-8 md:grid-cols-2">
-          {WHY_NOW.map((item) => (
-            <Beat key={item.title} title={item.title} body={item.body} />
-          ))}
-        </div>
 
-        {/* Two, matching the two beats above them. */}
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          <PlaceholderImage label="Family around the board on the living room floor" aspect="aspect-[4/3]" />
-          <PlaceholderImage label="Parent and kid mid-game, medals on the wall behind" aspect="aspect-[4/3]" />
-        </div>
-
-        <p className="mb-6 mt-14" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-          There have been over 300 custom editions made of Monopoly. Football clubs, cities,
-          national parks, film franchises, theme parks, universities.
-        </p>
+        <SubHeading>There have been over 300 custom editions made of Monopoly</SubHeading>
 
         {/* Five, not nine. The point is that the category is crowded, and nine
-            logos made the reader audit the list instead of taking the point. */}
-        <div className="mb-10 flex flex-wrap gap-2">
+            made the reader audit the list instead of taking the point. */}
+        <div className="mb-10 mt-5 flex flex-wrap gap-2">
           {['Star Wars', 'Premier League clubs', 'National Parks', 'Game of Thrones', 'NFL teams'].map((label) => (
             <span
               key={label}
@@ -308,9 +294,21 @@ export default function Monopoly() {
             So why isn't there a Marathon Monopoly?
           </p>
           <p className="mt-4" style={{ fontSize: 16, color: 'rgba(255,255,255,0.9)', lineHeight: 1.6, maxWidth: '44rem' }}>
-            Running has the audience, the obsession, and the gift problem every December. It has
-            never had the board. That changes now.
+            We've got the audience, the obsession, and the need for novel gifts every December. All
+            we're missing is the board. That changes now.
           </p>
+        </div>
+
+        <div className="mt-14 grid gap-8 md:grid-cols-2">
+          {WHY_NOW.map((item) => (
+            <Beat key={item.title} title={item.title} body={item.body} />
+          ))}
+        </div>
+
+        {/* Two, matching the two beats above them. */}
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+          <PlaceholderImage label="Family around the board on the living room floor" aspect="aspect-[4/3]" />
+          <PlaceholderImage label="Parent and kid mid-game, medals on the wall behind" aspect="aspect-[4/3]" />
         </div>
       </Section>
 
@@ -430,13 +428,15 @@ export default function Monopoly() {
           style={{ backgroundColor: '#1F6B47', border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
         >
           <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)' }}>
-            Prefer to put some of it into product?
+            Offset cost by buying units
           </p>
           <p className="mt-2" style={{ fontSize: 20, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.35, maxWidth: '46rem' }}>
-            You can buy up to 100 units at $35 each to offset the price of your space.
+            You can buy up to 100 units at $35/unit to offset the investment in your space on the
+            board.
           </p>
           <p className="mt-2" style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, maxWidth: '46rem' }}>
-            Sell them at your expo for $55 and each one returns $20.
+            You can sell these at your expo, feature them in your online store, or give them away to
+            people in your community.
           </p>
         </div>
 
@@ -672,13 +672,6 @@ function HeroActions() {
         <CtaButton />
       </div>
 
-      {/* The object itself, next to the layout. The board beside this shows the
-          edition; this shows the thing that turns up in a box. Capped narrow
-          because the hero is pinned to one viewport on desktop and this is the
-          element with room to push it over. */}
-      <div className="order-4 mt-7 max-w-[13rem]">
-        <PlaceholderImage label="Product photo, box front" aspect="aspect-[4/3]" />
-      </div>
     </div>
   )
 }

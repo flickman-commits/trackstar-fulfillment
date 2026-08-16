@@ -22,6 +22,7 @@ import { ArrowLeft, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import {
   calculateScenario,
+  calculateCashFlow,
   COMPED_SLOT_COUNT,
   calculateAllInCost,
   wholesaleMargin,
@@ -32,7 +33,7 @@ import {
   DTC_BUFFER_UNITS,
   type ScenarioInput,
 } from '@/lib/monopolyMath'
-import { TIERS } from '@/lib/monopolyCopy'
+import { DEPOSIT_AMOUNT, TIERS } from '@/lib/monopolyCopy'
 import type { MonopolyInternalPayload } from '@/lib/monopolyTypes'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 
@@ -135,6 +136,8 @@ export default function MonopolyModel() {
       dtcUnits: preset.dtc,
     })
   }
+
+  const cash = calculateCashFlow(input, result, DEPOSIT_AMOUNT)
 
   const committedTotal = data.committed.reduce((sum, c) => sum + c.count, 0)
   // Wholesale decisions are made against variable cost. Legal is a fixed cost of
@@ -344,7 +347,7 @@ export default function MonopolyModel() {
               {result.compCopyUnits > 0 && (
                 <PnlRow
                   memo
-                  label={`of which comp copies to partners, ${result.compCopyUnits.toLocaleString()} units`}
+                  label={`of which complimentary units to partners, ${result.compCopyUnits.toLocaleString()} units`}
                   value={-result.compCopyUnits * result.cost.unitCost}
                 />
               )}
@@ -493,6 +496,54 @@ export default function MonopolyModel() {
             <p className="mt-3" style={{ fontSize: 12, color: '#8A857C', lineHeight: 1.5 }}>
               Included units costed at the true per-unit rate for the selected print run, so this
               moves as the run changes.
+            </p>
+          </Panel>
+
+          {/* The P&L says whether the deal works. This says whether we can pay
+              the factory in January 2027, which is a different question: fees
+              arrive in two lumps and the manufacturer wants half at the PO. */}
+          <Panel title="Cash flow">
+            <div
+              className="mb-4 px-4 py-3"
+              style={{ backgroundColor: cash.trough < 0 ? '#FDF0EE' : '#F0F7F2', border: '1px solid #E0E0E0' }}
+            >
+              <div style={{ fontSize: 12, color: '#666666' }}>
+                {cash.trough < 0 ? 'Cash needed at the low point' : 'Never goes negative'}
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: cash.trough < 0 ? '#B3261E' : '#1F6B47' }}>
+                {cash.trough < 0 ? formatMoney(Math.abs(cash.trough)) : formatMoney(0)}
+              </div>
+              {cash.trough < 0 && (
+                <div style={{ fontSize: 12, color: '#8A857C' }}>Low point: {cash.troughLabel}</div>
+              )}
+            </div>
+
+            <div className="flex flex-col">
+              {cash.periods.map((period) => (
+                <div key={period.label} className="py-3" style={{ borderTop: '1px solid #EFEDE9' }}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>{period.label}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: period.cumulative < 0 ? '#B3261E' : '#1A1A1A', whiteSpace: 'nowrap' }}>
+                      {formatSigned(period.cumulative)}
+                    </span>
+                  </div>
+                  {period.lines.map((line) => (
+                    <div key={line.label} className="mt-1 flex items-baseline justify-between gap-3">
+                      <span style={{ fontSize: 12, color: '#8A857C' }}>{line.label}</span>
+                      <span style={{ fontSize: 12, color: line.amount < 0 ? '#B3261E' : '#1F6B47', whiteSpace: 'nowrap' }}>
+                        {formatSigned(line.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-3" style={{ fontSize: 12, color: '#8A857C', lineHeight: 1.5 }}>
+              Assumes the manufacturer takes 50% at the purchase order and 50% before shipping,
+              which is the biggest driver of the low point and the first thing worth negotiating.
+              Race fees land as deposits, then 50% when the board fills, then the balance on
+              delivery. Bold figures are the running balance, not the period.
             </p>
           </Panel>
         </div>

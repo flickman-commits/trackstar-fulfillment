@@ -65,7 +65,7 @@ export interface TierDef {
  * anything does. It promises less and means more.
  */
 const COMMON_FEATURES = [
-  '5 comp copies for your team',
+  '5 complimentary units for your team',
   'Your own title sponsor on your title deed card',
   'A race slot on Marathon Monopoly Edition One, and first refusal on the next',
 ]
@@ -195,19 +195,19 @@ export const TIMELINE: TimelinePhase[] = [
 export const COMMIT_STEPS: CommitStep[] = [
   {
     title: `Reserve your spot with a $${DEPOSIT_AMOUNT} deposit`,
-    body: 'Fully refundable, and the only money you put up until the board is real.',
+    body: `Once you confirm which space you want with Matt, you put down a $${DEPOSIT_AMOUNT} deposit to reserve it. Fully refundable if we do not end up filling the entire board.`,
   },
   {
-    title: 'We fill the board',
-    body: 'All 22 race spaces. Nothing more is asked of you while that happens.',
+    title: 'We fill up the remaining race slots',
+    body: 'We keep filling slots until all 22 are full with world-class marathons.',
   },
   {
-    title: 'You pay 50% when the board is full',
-    body: `You see the finished board first, then half is due, less the $${DEPOSIT_AMOUNT} you already paid.`,
+    title: 'You pay 50% of your investment',
+    body: `You see the complete list of races first, then pay the 50%, less the $${DEPOSIT_AMOUNT} you already put down.`,
   },
   {
-    title: 'You pay the final 50% on delivery',
-    body: 'Due once the boxes are made and in your hands in 2027. Not before.',
+    title: 'Final 50% when the product is in hand',
+    body: 'Due on receipt of your complimentary units, and any additional units you ordered. Roughly October 2027.',
   },
 ]
 
