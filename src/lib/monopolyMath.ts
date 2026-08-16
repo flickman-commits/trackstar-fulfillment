@@ -269,6 +269,8 @@ export interface ScenarioInput {
   dtcShippingCost: number
   /** 3PL pick and pack per DTC unit. Charged per order, so DTC only. */
   dtcPickPackCost: number
+  /** Paid acquisition per DTC unit. Zero for anything the list sells. */
+  dtcAcquisitionCost: number
   wholesalePrice: number
   customPieces: boolean
   /**
@@ -362,7 +364,9 @@ export function calculateScenario(
   // Pick and pack rides with shipping: both are only incurred when a box goes
   // to one person. Expo and wholesale units leave by the pallet and never touch
   // either, which is why neither belongs in the fixed base.
-  const dtcRevenue = input.dtcUnits * (input.dtcPrice - input.dtcShippingCost - input.dtcPickPackCost)
+  const dtcRevenue =
+    input.dtcUnits *
+    (input.dtcPrice - input.dtcShippingCost - input.dtcPickPackCost - input.dtcAcquisitionCost)
   const totalRevenue = raceFees + offsetRevenue + input.brandRevenue + dtcRevenue
 
   // Fall back to the nearest defined run so a hand-typed print run still costs
@@ -481,6 +485,7 @@ export function calculateCashFlow(
   const wholesale = result.offsetRevenue
   const dtcNet = result.dtcRevenue
   const pickPack = input.dtcUnits * input.dtcPickPackCost
+  const adSpend = input.dtcUnits * input.dtcAcquisitionCost
 
   const raw: { label: string; lines: { label: string; amount: number }[] }[] = [
     {
@@ -520,8 +525,9 @@ export function calculateCashFlow(
     {
       label: 'Oct 2027 to Jan 2028',
       lines: [
-        { label: `DTC sales (${input.dtcUnits.toLocaleString()} units, net of shipping)`, amount: dtcNet + pickPack },
+        { label: `DTC sales (${input.dtcUnits.toLocaleString()} units, net of shipping)`, amount: dtcNet + pickPack + adSpend },
         { label: 'Pick and pack', amount: -pickPack },
+        { label: 'Paid acquisition', amount: -adSpend },
       ],
     },
   ]

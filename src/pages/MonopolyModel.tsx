@@ -295,6 +295,13 @@ export default function MonopolyModel() {
               onChange={(v) => set('dtcPrice', v)}
             />
             <NumberField
+              label="DTC acquisition cost (CPA)"
+              value={input.dtcAcquisitionCost}
+              step={5}
+              prefix="$"
+              onChange={(v) => set('dtcAcquisitionCost', v)}
+            />
+            <NumberField
               label="Brand partnership revenue"
               value={input.brandRevenue}
               step={5000}
@@ -335,7 +342,7 @@ export default function MonopolyModel() {
               />
               <PnlRow label="Brand partnerships" value={result.brandRevenue} />
               <PnlRow
-                label={`DTC (${input.dtcUnits.toLocaleString()} units, net of shipping and pick/pack)`}
+                label={`DTC (${input.dtcUnits.toLocaleString()} units, net of shipping, pick/pack and ads)`}
                 value={result.dtcRevenue}
               />
               <PnlRow label="Total revenue" value={result.totalRevenue} subtotal />
@@ -467,90 +474,90 @@ export default function MonopolyModel() {
           </Panel>
 
           {/* Per-tier margin */}
-          <Panel title="Margin per tier">
-            <div className="-mx-1 overflow-x-auto px-1">
-            <table className="w-full border-collapse" style={{ minWidth: 420 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #E0E0E0' }}>
-                  <ThSm>Tier</ThSm>
-                  <ThSm align="right">Fee</ThSm>
-                  <ThSm align="right">Comps</ThSm>
-                  <ThSm align="right">Unit cost</ThSm>
-                  <ThSm align="right">Net to us</ThSm>
-                </tr>
-              </thead>
-              <tbody>
-                {TIERS.map((tier) => {
-                  const unitCost = tier.unitsIncluded * result.cost.trueCostPerUnit
-                  return (
-                    <tr key={tier.tierKey} style={{ borderBottom: '1px solid #EFEDE9' }}>
-                      <TdSm>{tier.label}</TdSm>
-                      <TdSm align="right">{formatMoney(tier.fee)}</TdSm>
-                      <TdSm align="right">{tier.unitsIncluded}</TdSm>
-                      <TdSm align="right">{formatMoney(unitCost)}</TdSm>
-                      <TdSm align="right" bold>
-                        {formatMoney(tier.fee - unitCost)}
-                      </TdSm>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            </div>
-            <p className="mt-3" style={{ fontSize: 12, color: '#8A857C', lineHeight: 1.5 }}>
-              Included units costed at the true per-unit rate for the selected print run, so this
-              moves as the run changes.
-            </p>
-          </Panel>
-
-          {/* The P&L says whether the deal works. This says whether we can pay
-              the factory in January 2027, which is a different question: fees
-              arrive in two lumps and the manufacturer wants half at the PO. */}
-          <Panel title="Cash flow">
-            <div
-              className="mb-4 px-4 py-3"
-              style={{ backgroundColor: cash.trough < 0 ? '#FDF0EE' : '#F0F7F2', border: '1px solid #E0E0E0' }}
-            >
-              <div style={{ fontSize: 12, color: '#666666' }}>
-                {cash.trough < 0 ? 'Cash needed at the low point' : 'Never goes negative'}
-              </div>
-              <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: cash.trough < 0 ? '#B3261E' : '#1F6B47' }}>
-                {cash.trough < 0 ? formatMoney(Math.abs(cash.trough)) : formatMoney(0)}
-              </div>
-              {cash.trough < 0 && (
-                <div style={{ fontSize: 12, color: '#8A857C' }}>Low point: {cash.troughLabel}</div>
-              )}
-            </div>
-
-            <div className="flex flex-col">
-              {cash.periods.map((period) => (
-                <div key={period.label} className="py-3" style={{ borderTop: '1px solid #EFEDE9' }}>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>{period.label}</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: period.cumulative < 0 ? '#B3261E' : '#1A1A1A', whiteSpace: 'nowrap' }}>
-                      {formatSigned(period.cumulative)}
-                    </span>
-                  </div>
-                  {period.lines.map((line) => (
-                    <div key={line.label} className="mt-1 flex items-baseline justify-between gap-3">
-                      <span style={{ fontSize: 12, color: '#8A857C' }}>{line.label}</span>
-                      <span style={{ fontSize: 12, color: line.amount < 0 ? '#B3261E' : '#1F6B47', whiteSpace: 'nowrap' }}>
-                        {formatSigned(line.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-
-            <p className="mt-3" style={{ fontSize: 12, color: '#8A857C', lineHeight: 1.5 }}>
-              Assumes the manufacturer takes 50% at the purchase order and 50% before shipping,
-              which is the biggest driver of the low point and the first thing worth negotiating.
-              Race fees land as deposits, then 50% when the board fills, then the balance on
-              delivery. Bold figures are the running balance, not the period.
-            </p>
-          </Panel>
         </div>
+      </div>
+
+      {/* Cash flow gets the full width and runs left to right, because the
+          question it answers is "when", and a column of stacked periods makes
+          the reader rebuild the sequence in their head. */}
+      <div className="mt-6">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1A1A1A', letterSpacing: '-0.02em' }}>
+            Cash flow
+          </h2>
+          <div style={{ fontSize: 13, color: cash.trough < 0 ? '#B3261E' : '#1F6B47', fontWeight: 700 }}>
+            {cash.trough < 0
+              ? `${formatMoney(Math.abs(cash.trough))} needed at the low point · ${cash.troughLabel}`
+              : 'Never goes negative'}
+          </div>
+        </div>
+
+        <div className="-mx-1 overflow-x-auto px-1 pb-2">
+          <div className="flex items-stretch gap-0" style={{ minWidth: 980 }}>
+            {cash.periods.map((period, i) => (
+              <div key={period.label} className="flex flex-1 items-stretch" style={{ minWidth: 0 }}>
+                <div
+                  className="flex min-w-0 flex-1 flex-col px-4 py-4"
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #E0E0E0',
+                    borderLeftWidth: i === 0 ? 1 : 0,
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#8A857C' }}>
+                    {period.label}
+                  </div>
+
+                  <div className="mt-3 flex flex-1 flex-col gap-1.5">
+                    {period.lines.map((line) => (
+                      <div key={line.label} className="flex items-baseline justify-between gap-2">
+                        <span style={{ fontSize: 11, color: '#8A857C', lineHeight: 1.35 }}>{line.label}</span>
+                        <span style={{ fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', color: line.amount < 0 ? '#B3261E' : '#1F6B47' }}>
+                          {formatSigned(line.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* The running balance, which is the number the row exists
+                      to show. Period net is available by subtraction. */}
+                  <div className="mt-4 pt-2" style={{ borderTop: '1px solid #EFEDE9' }}>
+                    <div style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#8A857C' }}>
+                      Balance
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 19,
+                        fontWeight: 700,
+                        letterSpacing: '-0.02em',
+                        color: period.cumulative < 0 ? '#B3261E' : '#1A1A1A',
+                      }}
+                    >
+                      {formatSigned(period.cumulative)}
+                    </div>
+                  </div>
+                </div>
+
+                {i < cash.periods.length - 1 && (
+                  <div
+                    aria-hidden="true"
+                    className="flex shrink-0 items-center justify-center"
+                    style={{ width: 22, color: '#C9C4BC', fontSize: 15 }}
+                  >
+                    &rarr;
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-3" style={{ fontSize: 12, color: '#8A857C', lineHeight: 1.5, maxWidth: '52rem' }}>
+          Assumes the manufacturer takes 50% at the purchase order and 50% before shipping, which is
+          the biggest driver of the low point and the first thing worth negotiating. Race fees land
+          as deposits, then 50% when the board fills, then the balance on delivery. The large figure
+          in each column is the running balance, not that period on its own.
+        </p>
       </div>
     </Shell>
   )
@@ -600,6 +607,7 @@ function seedFromCommitted(data: MonopolyInternalPayload): ScenarioInput {
     dtcPrice: dtcChannel?.price ?? 45,
     dtcShippingCost: dtcChannel?.shippingCost ?? 10,
     dtcPickPackCost: data.pickPackPerUnit,
+    dtcAcquisitionCost: data.dtcCpa,
     wholesalePrice: data.wholesalePrice,
     customPieces: true,
     compTopTierSlots: false,

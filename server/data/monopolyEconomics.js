@@ -119,6 +119,22 @@ export const DTC_CHANNEL = CHANNELS[1]
  */
 export const PICK_PACK_PER_UNIT = 3.5
 
+/**
+ * Blended cost to acquire one DTC customer, in dollars.
+ *
+ * Per unit rather than a flat line in FIXED_COSTS, because a cost-per-
+ * acquisition is by definition per acquisition: doubling DTC volume doubles
+ * the spend. Parked in FIXED_COSTS it would have stayed at one number while
+ * the model moved DTC from 900 to 3,000 units, which is the one thing the
+ * model exists to test.
+ *
+ * $30 assumes paid social carries the whole channel through the Christmas
+ * window, when auction prices are at their annual peak. Anything sold to the
+ * existing list costs nothing to acquire, so the true blended figure falls as
+ * the list does more of the work. It is an input on the model for that reason.
+ */
+export const DTC_CPA = 30
+
 export const WHOLESALE_PRICE = 35
 
 export const ECONOMICS = {
@@ -126,5 +142,6 @@ export const ECONOMICS = {
   fixedCosts: FIXED_COSTS,
   channels: CHANNELS,
   pickPackPerUnit: PICK_PACK_PER_UNIT,
+  dtcCpa: DTC_CPA,
   wholesalePrice: WHOLESALE_PRICE,
 }

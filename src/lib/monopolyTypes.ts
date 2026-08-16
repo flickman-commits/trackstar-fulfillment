@@ -220,6 +220,8 @@ export interface MonopolyInternalPayload {
   channels: { channel: string; price: number; shippingCost: number }[]
   /** 3PL pick and pack per unit shipped to a consumer. Variable, not fixed. */
   pickPackPerUnit: number
+  /** Blended paid-acquisition cost per DTC unit sold. */
+  dtcCpa: number
   /** Spaces already sold, reserved or on hold — the model's starting point. */
   committed: {
     tierKey: string
