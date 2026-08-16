@@ -14,6 +14,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ChevronRight, AlertTriangle, RefreshCw } from 'lucide-react'
 import { apiFetch } from '../lib/api'
+import { btnPrimary, btnSecondary, segment, segmentGroup, inputBase } from '@/lib/ui'
 
 type Status = 'live' | 'drifted' | 'broken' | 'no_year' | 'no_probe' | 'ineligible' | 'not_run_yet'
 
@@ -357,7 +358,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
               <button
                 onClick={syncCatalog}
                 disabled={syncing}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border-gray text-off-black/70 hover:bg-subtle-gray transition-colors disabled:opacity-50"
+                className={btnSecondary}
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing ? 'Syncing…' : 'Sync catalog'}
@@ -365,14 +366,14 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
               <button
                 onClick={runProbe}
                 disabled={probing}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border-gray text-off-black/70 hover:bg-subtle-gray transition-colors disabled:opacity-50"
+                className={btnSecondary}
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${probing ? 'animate-spin' : ''}`} />
                 {probing ? 'Probing…' : 'Run probe'}
               </button>
               <button
                 onClick={load}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors"
+                className={btnPrimary}
               >
                 {loading ? 'Loading…' : 'Refresh'}
               </button>
@@ -493,14 +494,12 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
             {/* Two views of the same data. Grouping answers "which race do I
                 fix"; the raw log answers "what just happened", which grouping
                 genuinely hides. Neither replaces the other. */}
-            <div className="inline-flex rounded-lg border border-border-gray overflow-hidden flex-shrink-0">
+            <div className={`${segmentGroup} flex-shrink-0`}>
               {([['races', 'By race'], ['log', 'Log']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setView(key)}
-                  className={`px-3 py-2 text-xs font-medium transition-colors ${
-                    view === key ? 'bg-off-black text-white' : 'text-off-black/60 hover:bg-subtle-gray'
-                  }`}
+                  className={segment(view === key)}
                 >
                   {label}
                   {key === 'log' && data ? ` (${data.entries.length})` : ''}
@@ -511,7 +510,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
               value={filter}
               onChange={e => setFilter(e.target.value)}
               placeholder={view === 'races' ? 'Filter races…' : 'Filter by race, name, year or outcome…'}
-              className="flex-1 px-3 py-2 rounded-lg border border-border-gray text-sm placeholder:text-off-black/30 focus:outline-none focus:ring-1 focus:ring-off-black/20"
+              className={`${inputBase} flex-1`}
             />
           </div>
           {error && <p className="text-xs text-red-700">{error}</p>}

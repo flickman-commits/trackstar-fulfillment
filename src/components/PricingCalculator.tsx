@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+import { btnGhost, segment, segmentGroup, inputBase, fieldLabel } from '@/lib/ui'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -251,25 +252,19 @@ export default function PricingCalculator() {
   return (
     <div>
       {/* Channel tabs + refresh */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-3">
-        {CHANNELS.map(c => (
-          <button
-            key={c.id}
-            onClick={() => setChannel(c.id)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-              channel === c.id
-                ? 'bg-off-black text-white border-off-black'
-                : 'bg-white text-off-black/60 border-border-gray hover:bg-off-black/5'
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className={segmentGroup}>
+          {CHANNELS.map(c => (
+            <button key={c.id} onClick={() => setChannel(c.id)} className={segment(channel === c.id)}>
+              {c.label}
+            </button>
+          ))}
+        </div>
         <div className="flex-1" />
         <button
           onClick={() => load(effectiveQty)}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded-md transition-colors disabled:opacity-50"
+          className={btnGhost}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh live Artelo/Shopify data
         </button>
@@ -290,16 +285,16 @@ export default function PricingCalculator() {
         {channel !== 'retail' && (
           <>
             <div>
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Units in shipment</label>
+              <label className={fieldLabel}>Units in shipment</label>
               <input
                 value={quantity}
                 onChange={e => setQuantity(Number(e.target.value.replace(/[^0-9]/g, '')) || 1)}
                 inputMode="numeric"
-                className="w-24 px-2.5 py-1.5 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                className={`${inputBase} w-24`}
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">
+              <label className={fieldLabel}>
                 Tier discount
               </label>
               <div className="flex items-center gap-2">
@@ -312,7 +307,7 @@ export default function PricingCalculator() {
               </div>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">
+              <label className={fieldLabel}>
                 Override
               </label>
               <div className="relative w-24">
@@ -321,7 +316,7 @@ export default function PricingCalculator() {
                   onChange={e => setDiscountOverride(e.target.value.replace(/[^0-9.]/g, ''))}
                   inputMode="decimal"
                   placeholder="tier"
-                  className="w-full pl-2.5 pr-6 py-1.5 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                  className={`${inputBase} w-full pr-6`}
                 />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-off-black/40 text-xs">%</span>
               </div>

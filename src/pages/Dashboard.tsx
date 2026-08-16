@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'rea
 import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
+import { btnPrimary, btnDanger, inputBase } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
@@ -3101,9 +3102,9 @@ Thank you!`
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md md:max-w-5xl h-[85vh] overflow-hidden flex">
 
               {/* Nav */}
-              <aside className="hidden md:flex w-60 flex-shrink-0 flex-col border-r border-border-gray bg-subtle-gray">
-                <div className="p-3 border-b border-border-gray">
-                  <div className="relative">
+              <aside className="hidden md:flex w-48 flex-shrink-0 flex-col border-r border-border-gray bg-subtle-gray">
+                <div className="h-[68px] flex items-center px-3 border-b border-border-gray">
+                  <div className="relative w-full">
                     <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/30" />
                     <input
                       value={settingsQuery}
@@ -3145,7 +3146,7 @@ Thank you!`
 
               {/* Panel */}
               <div className="flex-1 min-w-0 flex flex-col">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-border-gray flex-shrink-0">
+                <div className="h-[68px] flex items-center justify-between px-5 border-b border-border-gray flex-shrink-0">
                   <div className="min-w-0">
                     <h2 className="text-base font-semibold text-off-black truncate">
                       {SETTINGS_NAV.flatMap((g) => g.items).find((i) => i.id === settingsPanel)?.label ?? 'Settings'}
@@ -3215,7 +3216,7 @@ Thank you!`
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => setShowAddRace(!showAddRace)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors"
+                          className={btnPrimary}
                         >
                           {showAddRace ? 'Cancel' : '+ Add Race'}
                         </button>
@@ -3228,7 +3229,7 @@ Thank you!`
                         placeholder="Search races by name, year, or location…"
                         value={raceDbSearch}
                         onChange={(e) => setRaceDbSearch(e.target.value)}
-                        className="w-full pl-8 pr-8 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                        className={`${inputBase} w-full pl-8 pr-8`}
                       />
                       <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/40" />
                       {raceDbSearch && (
@@ -3268,7 +3269,7 @@ Thank you!`
                             placeholder="Race Name"
                             value={newRaceValues.raceName}
                             onChange={(e) => setNewRaceValues(prev => ({ ...prev, raceName: e.target.value }))}
-                            className="flex-1 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                            className={`${inputBase} flex-1`}
                           />
                           <input
                             type="number"
@@ -3283,20 +3284,20 @@ Thank you!`
                             type="date"
                             value={newRaceValues.raceDate}
                             onChange={(e) => setNewRaceValues(prev => ({ ...prev, raceDate: e.target.value }))}
-                            className="flex-1 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                            className={`${inputBase} flex-1`}
                           />
                           <input
                             type="text"
                             placeholder="Location (e.g. Boston, MA)"
                             value={newRaceValues.location}
                             onChange={(e) => setNewRaceValues(prev => ({ ...prev, location: e.target.value }))}
-                            className="flex-1 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                            className={`${inputBase} flex-1`}
                           />
                         </div>
                         <button
                           onClick={createRace}
                           disabled={isSavingRace}
-                          className="w-full px-3 py-2 rounded-md text-sm font-medium bg-off-black text-white hover:opacity-80 transition-colors disabled:opacity-50"
+                          className={`${btnPrimary} w-full py-2`}
                         >
                           {isSavingRace ? 'Creating...' : 'Create Race'}
                         </button>
@@ -3587,12 +3588,12 @@ Thank you!`
                         value={customersServedInput}
                         onChange={(e) => setCustomersServedInput(e.target.value)}
                         placeholder={customersServedCount !== null ? String(customersServedCount) : 'Loading...'}
-                        className="flex-1 min-w-0 rounded-md border border-border-gray px-3 py-1.5 text-sm text-off-black bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                        className={`${inputBase} flex-1 min-w-0`}
                       />
                       <button
                         onClick={saveCustomersServedCount}
                         disabled={isLoadingCounter || customersServedInput === String(customersServedCount)}
-                        className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                        className={`${btnPrimary} flex-shrink-0`}
                       >
                         {isLoadingCounter && <Loader2 className="w-3 h-3 animate-spin" />}
                         {isLoadingCounter ? 'Saving…' : 'Update & Sync'}
@@ -3634,7 +3635,7 @@ Thank you!`
                           }
                         }}
                         disabled={isRunningConnTest}
-                        className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                        className={`${btnPrimary} flex-shrink-0`}
                       >
                         {isRunningConnTest && <Loader2 className="w-3 h-3 animate-spin" />}
                         {isRunningConnTest ? 'Testing…' : 'Test Connections'}
@@ -3712,7 +3713,7 @@ Thank you!`
                           }
                         }}
                         disabled={isRunningHealth}
-                        className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                        className={`${btnPrimary} flex-shrink-0`}
                       >
                         {isRunningHealth && <Loader2 className="w-3 h-3 animate-spin" />}
                         {isRunningHealth ? 'Checking…' : 'Run Health Check'}
@@ -3758,7 +3759,7 @@ Thank you!`
                       <button
                         onClick={() => runSettingsAction('clear-research')}
                         disabled={settingsAction !== null}
-                        className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700"
+                        className={`${btnDanger} flex-shrink-0`}
                       >
                         {settingsAction === 'clear-research' && <Loader2 className="w-3 h-3 animate-spin" />}
                         {settingsAction === 'clear-research' ? 'Running…' : 'Run'}
