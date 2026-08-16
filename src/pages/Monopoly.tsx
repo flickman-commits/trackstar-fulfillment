@@ -72,7 +72,7 @@ const SHOW_TOKENS = false
  * data anywhere near our code, and Stripe collects race name and email on its
  * own page. At this volume an integration would buy nothing.
  */
-const DEPOSIT_URL = 'https://buy.stripe.com/3cI8wP6J17Xd3Vg3nl7kc06'
+const DEPOSIT_URL = 'https://buy.stripe.com/14A00jc3la5ldvQ5vt7kc07'
 
 export default function Monopoly() {
   const [params] = useSearchParams()
