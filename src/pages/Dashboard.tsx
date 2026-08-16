@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'rea
 import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
-import { btnPrimary, btnDanger, inputBase } from '@/lib/ui'
+import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
@@ -2339,38 +2339,25 @@ Thank you!`
                 <ChevronDownIcon className="w-3.5 h-3.5 text-off-black/40" />
               </div>
             </div>
-            {/* View Switcher - Desktop */}
-            <div className="hidden md:flex gap-2">
-              <button
-                onClick={() => { setActiveView('standard'); setSearchQuery('') }}
-                className={`px-5 py-2 text-sm font-medium rounded-full transition-colors border ${
-                  activeView === 'standard'
-                    ? 'bg-off-black text-white border-off-black'
-                    : 'bg-white text-off-black border-border-gray hover:bg-subtle-gray'
-                }`}
-              >
-                Standard
-              </button>
-              <button
-                onClick={() => { setActiveView('custom'); setSearchQuery('') }}
-                className={`px-5 py-2 text-sm font-medium rounded-full transition-colors border ${
-                  activeView === 'custom'
-                    ? 'bg-off-black text-white border-off-black'
-                    : 'bg-white text-off-black border-border-gray hover:bg-subtle-gray'
-                }`}
-              >
-                Custom
-              </button>
-              <button
-                onClick={() => { setActiveView('race_partner'); setSearchQuery('') }}
-                className={`px-5 py-2 text-sm font-medium rounded-full transition-colors border ${
-                  activeView === 'race_partner'
-                    ? 'bg-off-black text-white border-off-black'
-                    : 'bg-white text-off-black border-border-gray hover:bg-subtle-gray'
-                }`}
-              >
-                Race Partners
-              </button>
+            {/* View Switcher - Desktop. A segmented control rather than three
+                free-standing pills: these are three views of one list, not three
+                separate actions, and grouping them says so. Matches the channel
+                switcher in the pricing panel. Mobile keeps its dropdown, which
+                is the right control when the options do not fit side by side. */}
+            <div className={`hidden md:inline-flex ${segmentGroup}`}>
+              {([
+                ['standard', 'Standard'],
+                ['custom', 'Custom'],
+                ['race_partner', 'Race Partners'],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => { setActiveView(key); setSearchQuery('') }}
+                  className={segment(activeView === key, 'md')}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 

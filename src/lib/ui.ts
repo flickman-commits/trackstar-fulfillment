@@ -40,8 +40,9 @@ export const btnGhost = `${base} text-off-black/55 hover:text-off-black hover:bg
  * purpose: choosing what you are looking at is not the same gesture as doing
  * something to it.
  */
-export const segment = (active: boolean) =>
-  `px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+export const segment = (active: boolean, size: 'sm' | 'md' = 'sm') =>
+  `${size === 'md' ? 'px-4 py-1.5 text-sm' : 'px-3 py-1.5 text-xs'} ` +
+  `rounded-md font-medium transition-colors ${
     active
       ? 'bg-off-black text-white'
       : 'text-off-black/60 hover:text-off-black hover:bg-off-black/5'
