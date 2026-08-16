@@ -305,6 +305,14 @@ export interface ScenarioResult {
   fixedCosts: number
   cost: AllInCost
   net: number
+  /**
+   * Boxes handed to partners as their included comp copies.
+   *
+   * Their cost already sits inside manufacturing, since they are part of the
+   * same run. Surfaced separately so the P&L can show what giving them away is
+   * worth without charging it twice.
+   */
+  compCopyUnits: number
   /** Units promised to partners plus DTC — versus what's being printed. */
   committedUnits: number
   unitsRemaining: number
@@ -401,6 +409,7 @@ export function calculateScenario(
     fixedCosts: cost.fixedTotal,
     cost,
     net: grossProfit - cost.fixedTotal,
+    compCopyUnits: includedUnits,
     committedUnits,
     unitsRemaining: input.printRunUnits - committedUnits,
     recommendedPrintRun,

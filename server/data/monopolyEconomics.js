@@ -37,7 +37,7 @@ export const PRINT_RUNS = [
 
 export const FIXED_COSTS = {
   /** Licensing and contract work. Flat, so it hurts most at the smallest run. */
-  legal: 10000,
+  legal: 5000,
   /** Board and packaging design. Flat, and paid whatever the run size. */
   design: 3000,
   /**

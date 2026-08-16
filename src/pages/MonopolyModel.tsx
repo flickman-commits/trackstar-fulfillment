@@ -46,11 +46,17 @@ const STORAGE_KEY = 'monopoly-model-scenario'
  * and none are being sold, so a preset that opened with $140,000 of it made
  * every scenario look funded by revenue that does not exist. The input stays,
  * so the case can still be modelled the moment there is one to model.
+ *
+ * Unit counts track the published allocation rather than round numbers. Base
+ * is the 2,004 run as actually planned: 90 comps, 200 bought by races for
+ * their own stores, 1,200 direct. An earlier draft had Base selling 1,000
+ * wholesale out of a 2,004 run, which is four times the allocation and would
+ * have left 14 spare boxes.
  */
 const PRESETS: Record<string, { label: string; racesTotal: number; printRun: number; offset: number; brand: number; dtc: number }> = {
-  conservative: { label: 'Conservative', racesTotal: 12, printRun: 3000, offset: 500, brand: 0, dtc: 800 },
-  base: { label: 'Base', racesTotal: 18, printRun: 5004, offset: 1500, brand: 0, dtc: 1200 },
-  aggressive: { label: 'Aggressive', racesTotal: 22, printRun: 5004, offset: 3000, brand: 0, dtc: 1500 },
+  conservative: { label: 'Conservative', racesTotal: 12, printRun: 2004, offset: 100, brand: 0, dtc: 900 },
+  base: { label: 'Base', racesTotal: 18, printRun: 2004, offset: 200, brand: 0, dtc: 1200 },
+  aggressive: { label: 'Aggressive', racesTotal: 22, printRun: 5004, offset: 1000, brand: 0, dtc: 3000 },
 }
 
 export default function MonopolyModel() {
@@ -167,6 +173,16 @@ export default function MonopolyModel() {
               {preset.label}
             </Chip>
           ))}
+          {/* Sits with the presets because it is a scenario, not a production
+              setting. Toggles rather than applies, so it composes with whichever
+              preset is loaded instead of replacing it. */}
+          <Chip
+            active={input.compTopTierSlots}
+            onClick={() => set('compTopTierSlots', !input.compTopTierSlots)}
+          >
+            Majors not paying
+            {input.compTopTierSlots && ` · ${formatMoney(result.compedFees)} waived`}
+          </Chip>
           <Chip onClick={() => setInput(seedFromCommitted(data))}>
             <RotateCcw className="mr-1 inline h-3 w-3" />
             Reset to actual
@@ -190,7 +206,7 @@ export default function MonopolyModel() {
                     <div className="min-w-0">
                       <div style={{ fontSize: 14, color: '#1A1A1A', fontWeight: 500 }}>{tier.label}</div>
                       <div style={{ fontSize: 12, color: '#8A857C' }}>
-                        {formatMoney(tier.fee)} · {tier.unitsIncluded} comp copies
+                        {formatMoney(tier.fee)}
                         {actual > 0 && ` · ${actual} committed`}
                       </div>
                     </div>
@@ -233,74 +249,54 @@ export default function MonopolyModel() {
               </div>
             </Field>
 
-            {/* The anchor-deal scenario, as a switch rather than something to
-                work out by hand. Comped races keep their space and their units;
-                only the fee goes. */}
-            <Field label={`Comp the top ${COMPED_SLOT_COUNT} slots to land the majors`}>
-              <button
-                type="button"
-                onClick={() => set('compTopTierSlots', !input.compTopTierSlots)}
-                style={{
-                  padding: '8px 14px',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  border: `1px solid ${input.compTopTierSlots ? '#231F20' : '#E0E0E0'}`,
-                  backgroundColor: input.compTopTierSlots ? '#231F20' : '#FFFFFF',
-                  color: input.compTopTierSlots ? '#FFFFFF' : '#666666',
-                }}
-              >
-                {input.compTopTierSlots
-                  ? `Dark Blue x${COMPED_SLOT_COUNT} free, ${formatMoney(result.compedFees)} waived`
-                  : 'Everyone pays'}
-              </button>
-            </Field>
-
-            <Field label="Include custom token tooling">
-              <button
-                type="button"
-                onClick={() => set('customPieces', !input.customPieces)}
-                style={{
-                  padding: '8px 14px',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  border: `1px solid ${input.customPieces ? '#231F20' : '#E0E0E0'}`,
-                  backgroundColor: input.customPieces ? '#231F20' : '#FFFFFF',
-                  color: input.customPieces ? '#FFFFFF' : '#666666',
-                }}
-              >
-                {input.customPieces
-                  ? `Custom pieces, +${formatUnitCost(data.fixedCosts.customPiecePerUnit)}/unit`
-                  : 'Classic pieces, no uplift'}
-              </button>
-            </Field>
+            <label className="flex cursor-pointer items-center gap-2.5 pt-1">
+              <input
+                type="checkbox"
+                checked={input.customPieces}
+                onChange={(e) => set('customPieces', e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#1A1A1A' }}
+              />
+              <span style={{ fontSize: 14, color: '#1A1A1A' }}>
+                Custom pieces {formatUnitCost(data.fixedCosts.customPiecePerUnit)} per unit
+              </span>
+            </label>
           </Panel>
 
           <Panel title="Other revenue">
             <NumberField
-              label={`Offset units sold at ${formatMoney(data.wholesalePrice)} wholesale`}
+              label="Wholesale units sold"
               value={input.offsetUnitsSold}
               step={100}
               onChange={(v) => set('offsetUnitsSold', v)}
             />
+            {/* Wired to the same input the arithmetic uses, so testing a
+                different wholesale price actually reprices the line above. */}
             <NumberField
-              label="Brand revenue (none planned for Edition One)"
-              value={input.brandRevenue}
-              step={5000}
+              label="Wholesale price"
+              value={input.wholesalePrice}
+              step={1}
               prefix="$"
-              onChange={(v) => set('brandRevenue', v)}
+              onChange={(v) => set('wholesalePrice', v)}
             />
             <NumberField
-              label="Direct-to-consumer units"
+              label="Trackstar DTC units sold"
               value={input.dtcUnits}
               step={100}
               onChange={(v) => set('dtcUnits', v)}
             />
             <NumberField
-              label="DTC price per unit"
+              label="DTC price"
               value={input.dtcPrice}
               step={1}
               prefix="$"
               onChange={(v) => set('dtcPrice', v)}
+            />
+            <NumberField
+              label="Brand partnership revenue"
+              value={input.brandRevenue}
+              step={5000}
+              prefix="$"
+              onChange={(v) => set('brandRevenue', v)}
             />
           </Panel>
         </div>
@@ -330,7 +326,10 @@ export default function MonopolyModel() {
               {result.compedFees > 0 && (
                 <PnlRow label={`Comped to majors (${COMPED_SLOT_COUNT} slots)`} value={0} />
               )}
-              <PnlRow label="Offset unit sales" value={result.offsetRevenue} />
+              <PnlRow
+                label={`Wholesale (${input.offsetUnitsSold.toLocaleString()} units at ${formatMoney(input.wholesalePrice)})`}
+                value={result.offsetRevenue}
+              />
               <PnlRow label="Brand partnerships" value={result.brandRevenue} />
               <PnlRow
                 label={`DTC (${input.dtcUnits.toLocaleString()} units, net of shipping and pick/pack)`}
@@ -342,6 +341,13 @@ export default function MonopolyModel() {
                 label={`Manufacturing (${result.cost.units.toLocaleString()} × ${formatUnitCost(result.cost.unitCost)})`}
                 value={-result.cost.manufacturing}
               />
+              {result.compCopyUnits > 0 && (
+                <PnlRow
+                  memo
+                  label={`of which comp copies to partners, ${result.compCopyUnits.toLocaleString()} units`}
+                  value={-result.compCopyUnits * result.cost.unitCost}
+                />
+              )}
               <PnlRow label="Freight" value={-result.cost.freight} />
               <PnlRow label="Gross profit" value={result.grossProfit} subtotal />
 
@@ -528,7 +534,9 @@ function seedFromCommitted(data: MonopolyInternalPayload): ScenarioInput {
     racesByTier,
     // Snap to a real quoted run rather than a round number, so the print-run
     // buttons highlight instead of silently falling through to nearest-match.
-    printRunUnits: data.printRuns.find((r) => r.units === 5004)?.units ?? data.printRuns[0].units,
+    // 2,004 is the manufacturer's minimum and the intended first bet: a lot is
+    // unknown here and sitting on unsold thousands is the expensive mistake.
+    printRunUnits: data.printRuns.find((r) => r.units === 2004)?.units ?? data.printRuns[0].units,
     offsetUnitsSold: 0,
     brandRevenue: 0,
     dtcUnits: 0,
@@ -678,7 +686,19 @@ function Stepper({
   )
 }
 
-function Chip({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+/**
+ * A scenario button. `active` is for the ones that latch rather than apply,
+ * so a toggled scenario is visible without reading the P&L to infer it.
+ */
+function Chip({
+  onClick,
+  children,
+  active,
+}: {
+  onClick: () => void
+  children: React.ReactNode
+  active?: boolean
+}) {
   return (
     <button
       type="button"
@@ -688,9 +708,9 @@ function Chip({ onClick, children }: { onClick: () => void; children: React.Reac
         padding: '7px 13px',
         fontSize: 13,
         fontWeight: 500,
-        border: '1px solid #E0E0E0',
-        backgroundColor: '#FFFFFF',
-        color: '#666666',
+        border: `1px solid ${active ? '#1A1A1A' : '#E0E0E0'}`,
+        backgroundColor: active ? '#1A1A1A' : '#FFFFFF',
+        color: active ? '#FFFFFF' : '#666666',
       }}
     >
       {children}
@@ -716,27 +736,44 @@ function PnlRow({
   value,
   subtotal,
   total,
+  memo,
 }: {
   label: string
   value: number
   subtotal?: boolean
   total?: boolean
+  /**
+   * Shown for information and NOT part of any sum above or below it. Used for
+   * costs already counted elsewhere, where the reader still wants the figure.
+   */
+  memo?: boolean
 }) {
   const emphasised = subtotal || total
   return (
     <div
-      className="flex items-baseline justify-between gap-4 py-2.5"
+      className="flex items-baseline justify-between gap-4"
       style={{
         borderTop: emphasised ? '1px solid rgba(255,255,255,0.2)' : undefined,
         marginTop: emphasised ? 4 : 0,
+        paddingTop: memo ? 0 : 10,
+        paddingBottom: memo ? 10 : 10,
       }}
     >
-      <span style={{ fontSize: 14, color: emphasised ? '#FFFFFF' : 'rgba(255,255,255,0.6)', fontWeight: emphasised ? 700 : 400 }}>
+      <span
+        style={{
+          fontSize: memo ? 12 : 14,
+          fontStyle: memo ? 'italic' : undefined,
+          paddingLeft: memo ? 12 : 0,
+          color: memo ? 'rgba(255,255,255,0.38)' : emphasised ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+          fontWeight: emphasised ? 700 : 400,
+        }}
+      >
         {label}
       </span>
       <span
         style={{
-          fontSize: total ? 18 : 14,
+          fontSize: total ? 18 : memo ? 12 : 14,
+          fontStyle: memo ? 'italic' : undefined,
           fontWeight: emphasised ? 700 : 500,
           color: total ? (value >= 0 ? '#7CE0A0' : '#FF8B7A') : 'rgba(255,255,255,0.9)',
           whiteSpace: 'nowrap',
