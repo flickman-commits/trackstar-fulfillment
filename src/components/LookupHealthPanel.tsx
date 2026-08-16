@@ -195,7 +195,9 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
   // Race grouping is the default because the usual question is "which race do
   // I fix". The raw log is the second view for when the question is instead
   // "what just happened", which grouping genuinely obscures.
-  const [view, setView] = useState<'races' | 'log'>('races')
+  // Log leads: the first question on opening this is almost always "what just
+  // happened", and grouping by race is the follow-up once something looks off.
+  const [view, setView] = useState<'races' | 'log'>('log')
   const [error, setError] = useState<string | null>(null)
 
   const load = async () => {
@@ -495,7 +497,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                 fix"; the raw log answers "what just happened", which grouping
                 genuinely hides. Neither replaces the other. */}
             <div className={`${segmentGroup} flex-shrink-0`}>
-              {([['races', 'By race'], ['log', 'Log']] as const).map(([key, label]) => (
+              {([['log', 'Log'], ['races', 'By race']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setView(key)}
