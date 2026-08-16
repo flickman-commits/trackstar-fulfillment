@@ -267,6 +267,8 @@ export interface ScenarioInput {
   dtcUnits: number
   dtcPrice: number
   dtcShippingCost: number
+  /** 3PL pick and pack per DTC unit. Charged per order, so DTC only. */
+  dtcPickPackCost: number
   wholesalePrice: number
   customPieces: boolean
 }
@@ -323,7 +325,10 @@ export function calculateScenario(
   }
 
   const offsetRevenue = input.offsetUnitsSold * input.wholesalePrice
-  const dtcRevenue = input.dtcUnits * (input.dtcPrice - input.dtcShippingCost)
+  // Pick and pack rides with shipping: both are only incurred when a box goes
+  // to one person. Expo and wholesale units leave by the pallet and never touch
+  // either, which is why neither belongs in the fixed base.
+  const dtcRevenue = input.dtcUnits * (input.dtcPrice - input.dtcShippingCost - input.dtcPickPackCost)
   const totalRevenue = raceFees + offsetRevenue + input.brandRevenue + dtcRevenue
 
   // Fall back to the nearest defined run so a hand-typed print run still costs

@@ -43,25 +43,31 @@ export const FIXED_COSTS = {
   /**
    * 3PL receiving, storage and account fees for the first run.
    *
-   * Deliberately conservative and derived rather than guessed. A Monopoly box
-   * is roughly 40x27x5cm, so a 48x40 pallet stacked to 60in holds around 150 of
-   * them once packing loss is allowed for. 2,004 units is therefore about 14
-   * pallets inbound.
+   * Benchmarked against published 2026 rate-card surveys rather than guessed.
+   * The first version of this line used $45/pallet receiving and $40/pallet
+   * storage, which is 4x and 2x the market average respectively, and produced a
+   * $6,000 figure that was wrong in the expensive direction.
    *
-   *   Receiving      14 pallets x $45          ~$630
-   *   Storage        avg 9 pallets x $40 x 12  ~$4,320
-   *   Setup, account, minimums                 ~$500
+   *   Market (2026 surveys)   Receiving $5-15/pallet, avg $10.52
+   *                           Storage   $15-40/pallet/mo, avg ~$20
+   *                           Setup     $250-1,000 one-off, avg ~$425
+   *                           Minimums  $0-750/mo, avg ~$517
    *
-   * That is ~$5,450, rounded up to $6,000 because the storage line assumes the
-   * inventory depletes over twelve months and a slower sell-through costs more,
-   * which is the direction we would rather be wrong in.
+   * A Monopoly box is about 40x27x5cm, so a 48x40 pallet holds roughly 165 of
+   * them once master cartons and dunnage are allowed for. 2,004 units is about
+   * 12 pallets.
    *
-   * NOT included: per-order pick and pack, which is $3 to $4 an order plus
-   * materials. That is a variable cost of a DTC sale, not a cost of holding the
-   * run, so it does not belong in a fixed total that gets amortised across
-   * every unit including the ones shipped by the pallet.
+   *   Receiving    12 pallets x $15 (top of range)      $180
+   *   Storage      avg 7.2 pallets x $25/mo x 12      $2,160
+   *   Setup                                             $425
+   *   Monthly minimum shortfall, ~6 quiet months      $1,500
+   *
+   * ~$4,265, rounded to $4,500. At survey averages rather than the top of each
+   * range this lands nearer $2,300, so the number carries roughly 2x headroom.
+   * The swing factor is the monthly minimum, not the storage: if the 3PL bills
+   * a $500 floor in months where we ship almost nothing, that dominates.
    */
-  fulfillment: 6000,
+  fulfillment: 4500,
   /** Only used for a run size with no quoted freight of its own. */
   freightPerThousand: 2000,
   /** Custom playing pieces, quoted per unit rather than as tooling. */
@@ -95,11 +101,29 @@ export const DTC_CHANNEL = CHANNELS[1]
  * made unit sales pointless as a revenue line. At $35 a race still clears $20 a
  * box selling at the $55 expo price, and we clear roughly $8 over make-and-ship.
  */
+/**
+ * 3PL pick and pack, per unit shipped to a consumer.
+ *
+ * Variable, not fixed: it is charged per order, so it applies to DTC and
+ * Amazon and never to the boxes that leave by the pallet for a race expo.
+ * Folding it into the fixed total would have charged it against units that are
+ * never picked.
+ *
+ * 2026 surveys put B2C pick and pack at an average of $3.20 to $3.25 an order
+ * with $0.30 to $0.75 per additional item. A board game is one item in one box,
+ * so the first-item rate is the whole cost. Rounded up to $3.50.
+ *
+ * This sits alongside the channel's shippingCost rather than inside it, so
+ * "shipping" keeps meaning postage and each can be requoted on its own.
+ */
+export const PICK_PACK_PER_UNIT = 3.5
+
 export const WHOLESALE_PRICE = 35
 
 export const ECONOMICS = {
   printRuns: PRINT_RUNS,
   fixedCosts: FIXED_COSTS,
   channels: CHANNELS,
+  pickPackPerUnit: PICK_PACK_PER_UNIT,
   wholesalePrice: WHOLESALE_PRICE,
 }

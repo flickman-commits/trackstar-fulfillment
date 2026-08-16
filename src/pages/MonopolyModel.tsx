@@ -299,7 +299,10 @@ export default function MonopolyModel() {
               <PnlRow label="Race fees" value={result.raceFees} />
               <PnlRow label="Offset unit sales" value={result.offsetRevenue} />
               <PnlRow label="Brand partnerships" value={result.brandRevenue} />
-              <PnlRow label={`DTC (${input.dtcUnits.toLocaleString()} units, net of shipping)`} value={result.dtcRevenue} />
+              <PnlRow
+                label={`DTC (${input.dtcUnits.toLocaleString()} units, net of shipping and pick/pack)`}
+                value={result.dtcRevenue}
+              />
               <PnlRow label="Total revenue" value={result.totalRevenue} subtotal />
 
               <PnlRow
@@ -311,7 +314,7 @@ export default function MonopolyModel() {
 
               <PnlRow label="Legal" value={-result.cost.legal} />
               <PnlRow label="Design" value={-result.cost.design} />
-              <PnlRow label="3PL storage and handling" value={-result.cost.fulfillment} />
+              <PnlRow label="3PL receiving, storage and account fees" value={-result.cost.fulfillment} />
               <PnlRow label="Net profit" value={result.net} total />
             </div>
           </div>
@@ -500,6 +503,7 @@ function seedFromCommitted(data: MonopolyInternalPayload): ScenarioInput {
     // too instead of leaving the model quoting a number nobody sells at.
     dtcPrice: dtcChannel?.price ?? 45,
     dtcShippingCost: dtcChannel?.shippingCost ?? 10,
+    dtcPickPackCost: data.pickPackPerUnit,
     wholesalePrice: data.wholesalePrice,
     customPieces: true,
   }

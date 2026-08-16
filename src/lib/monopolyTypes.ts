@@ -218,6 +218,8 @@ export interface MonopolyInternalPayload {
     customPiecePerUnit: number
   }
   channels: { channel: string; price: number; shippingCost: number }[]
+  /** 3PL pick and pack per unit shipped to a consumer. Variable, not fixed. */
+  pickPackPerUnit: number
   /** Spaces already sold, reserved or on hold — the model's starting point. */
   committed: {
     tierKey: string
