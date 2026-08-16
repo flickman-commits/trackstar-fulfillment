@@ -40,6 +40,28 @@ export const FIXED_COSTS = {
   legal: 10000,
   /** Board and packaging design. Flat, and paid whatever the run size. */
   design: 3000,
+  /**
+   * 3PL receiving, storage and account fees for the first run.
+   *
+   * Deliberately conservative and derived rather than guessed. A Monopoly box
+   * is roughly 40x27x5cm, so a 48x40 pallet stacked to 60in holds around 150 of
+   * them once packing loss is allowed for. 2,004 units is therefore about 14
+   * pallets inbound.
+   *
+   *   Receiving      14 pallets x $45          ~$630
+   *   Storage        avg 9 pallets x $40 x 12  ~$4,320
+   *   Setup, account, minimums                 ~$500
+   *
+   * That is ~$5,450, rounded up to $6,000 because the storage line assumes the
+   * inventory depletes over twelve months and a slower sell-through costs more,
+   * which is the direction we would rather be wrong in.
+   *
+   * NOT included: per-order pick and pack, which is $3 to $4 an order plus
+   * materials. That is a variable cost of a DTC sale, not a cost of holding the
+   * run, so it does not belong in a fixed total that gets amortised across
+   * every unit including the ones shipped by the pallet.
+   */
+  fulfillment: 6000,
   /** Only used for a run size with no quoted freight of its own. */
   freightPerThousand: 2000,
   /** Custom playing pieces, quoted per unit rather than as tooling. */

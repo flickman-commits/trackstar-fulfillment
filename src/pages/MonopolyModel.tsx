@@ -311,6 +311,7 @@ export default function MonopolyModel() {
 
               <PnlRow label="Legal" value={-result.cost.legal} />
               <PnlRow label="Design" value={-result.cost.design} />
+              <PnlRow label="3PL storage and handling" value={-result.cost.fulfillment} />
               <PnlRow label="Net profit" value={result.net} total />
             </div>
           </div>

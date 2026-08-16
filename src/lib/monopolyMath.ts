@@ -190,7 +190,9 @@ export interface AllInCost {
   manufacturing: number
   legal: number
   design: number
-  /** Legal plus design: everything that does not move with the run size. */
+  /** 3PL receiving, storage and account fees for the run. */
+  fulfillment: number
+  /** Legal, design and fulfilment: everything that does not move with the run. */
   fixedTotal: number
   freight: number
   allIn: number
@@ -224,9 +226,12 @@ export function calculateAllInCost(
   // Prefer the quoted freight for this run; the flat per-thousand rate is only
   // a stand-in for runs that haven't been quoted yet.
   const freight = run.freight ?? (run.units / 1000) * fixed.freightPerThousand
-  // Legal and design are flat: paid once, whatever the run size. They sit below
-  // the gross line and are what make a small run expensive per unit.
-  const fixedTotal = fixed.legal + fixed.design
+  // Legal, design and the 3PL are flat: paid whatever the run size. They sit
+  // below the gross line and are what make a small run expensive per unit.
+  // Fulfilment is only near-flat, since a bigger run needs more pallet months,
+  // but it is quoted for this run and treating it as fixed understates a large
+  // run rather than overstating a small one, which is the safe direction.
+  const fixedTotal = fixed.legal + fixed.design + fixed.fulfillment
   const allIn = manufacturing + freight + fixedTotal
 
   return {
@@ -237,6 +242,7 @@ export function calculateAllInCost(
     manufacturing,
     legal: fixed.legal,
     design: fixed.design,
+    fulfillment: fixed.fulfillment,
     fixedTotal,
     freight,
     allIn,
