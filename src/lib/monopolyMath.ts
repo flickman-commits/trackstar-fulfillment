@@ -271,10 +271,23 @@ export interface ScenarioInput {
   dtcPickPackCost: number
   wholesalePrice: number
   customPieces: boolean
+  /**
+   * Give the two dearest slots away to land the majors.
+   *
+   * The board is worth more with Boston and New York on it than the $32,000
+   * those two spaces would raise, because every other race is buying proximity
+   * to them. This models that trade rather than arguing it.
+   */
+  compTopTierSlots: boolean
 }
+
+/** How many of the dearest slots get comped when compTopTierSlots is on. */
+export const COMPED_SLOT_COUNT = 2
 
 export interface ScenarioResult {
   raceFees: number
+  /** Fees waived on the comped majors. Zero unless compTopTierSlots is on. */
+  compedFees: number
   offsetRevenue: number
   brandRevenue: number
   dtcRevenue: number
@@ -313,13 +326,26 @@ export function calculateScenario(
   const tierById = new Map(TIERS.map((t) => [t.tierKey, t]))
 
   let raceFees = 0
+  let compedFees = 0
   let includedUnits = 0
   let racesSigned = 0
+
+  // The dearest tier is the one the majors would take, so that is what gets
+  // comped. Read off the ladder rather than hardcoded, so a repricing that
+  // reorders the tiers cannot leave this pointing at the wrong one.
+  const topTierKey = [...TIERS].sort((a, b) => b.fee - a.fee)[0]?.tierKey
 
   for (const [tierKey, count] of Object.entries(input.racesByTier)) {
     const tier = tierById.get(tierKey)
     if (!tier || count <= 0) continue
-    raceFees += tier.fee * count
+
+    // A comped race still takes its space and still gets its included units.
+    // Only the fee goes away, which is the whole point of the scenario.
+    const comped =
+      input.compTopTierSlots && tierKey === topTierKey ? Math.min(COMPED_SLOT_COUNT, count) : 0
+
+    raceFees += tier.fee * (count - comped)
+    compedFees += tier.fee * comped
     includedUnits += tier.unitsIncluded * count
     racesSigned += count
   }
@@ -365,6 +391,7 @@ export function calculateScenario(
 
   return {
     raceFees,
+    compedFees,
     offsetRevenue,
     brandRevenue: input.brandRevenue,
     dtcRevenue,

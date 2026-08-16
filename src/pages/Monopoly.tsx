@@ -30,6 +30,7 @@ import {
   PRODUCT_SHOTS,
   FAQ,
   COMMUNITY_FEEDBACK,
+  DEPOSIT_AMOUNT,
   SALES_PLAN,
   WHY_NOW,
   TIMELINE,
@@ -65,7 +66,7 @@ const SHOW_AVAILABILITY_TABLE = false
  */
 const SHOW_TOKENS = false
 /**
- * Stripe payment link for the $400 reservation deposit.
+ * Stripe payment link for the reservation deposit.
  *
  * A hosted link rather than a Checkout integration: no keys in the app, no card
  * data anywhere near our code, and Stripe collects race name and email on its
@@ -145,7 +146,7 @@ export default function Monopoly() {
 
   const handleSelect = useCallback((position: number) => setSelectedPosition(position), [])
 
-  // Every path ends at the same $400 deposit. The modal knows which space they
+  // Every path ends at the same deposit. The modal knows which space they
   // were looking at, but the hosted Stripe link cannot receive it, so which
   // space it was gets confirmed by email after the deposit lands.
   const requestSpace = useCallback(() => {
@@ -545,7 +546,7 @@ export default function Monopoly() {
         <Section>
           <SectionHeading>How to commit</SectionHeading>
           <p className="mb-10 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6 }}>
-            $400 reserves your space, fully refundable, and you commit real money only once the board is full.
+            ${DEPOSIT_AMOUNT} reserves your space, fully refundable, and you commit real money only once the board is full.
           </p>
 
           <ol className="grid gap-px sm:grid-cols-2 lg:grid-cols-4" style={{ backgroundColor: MONOPOLY.black }}>
@@ -804,7 +805,7 @@ function PointerArrowMobile() {
  *
  * It appears five times: hero, Investment, How to commit, Timeline and the
  * close. A bigger variant at the end made the last one look like a different,
- * more final offer than the four above it, when it is the same $400 click.
+ * more final offer than the four above it, when it is the same click.
  */
 function CtaButton() {
   return (
@@ -829,7 +830,7 @@ function CtaButton() {
           objection a race has at the exact moment they are deciding to click.
           Set tight against the label so the two read as one control. */}
       <span style={{ display: 'block', fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2, marginTop: 1 }}>
-        $400 (refundable)
+        ${DEPOSIT_AMOUNT} (refundable)
       </span>
     </a>
   )

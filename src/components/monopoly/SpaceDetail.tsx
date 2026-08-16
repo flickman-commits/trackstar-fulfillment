@@ -12,6 +12,7 @@ import type { BoardSpace, PackageTier } from '@/lib/monopolyTypes'
 import { TitleDeedCard } from './TitleDeedCard'
 import { STATUS_COLORS } from './boardView'
 import { MONOPOLY, UI_RADIUS } from './monopolyTheme'
+import { DEPOSIT_AMOUNT } from '@/lib/monopolyCopy'
 import { formatMoney } from '@/lib/monopolyMath'
 
 interface Props {
@@ -265,7 +266,7 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
                   Reserve your space
                 </span>
                 <span style={{ display: 'block', fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2, marginTop: 1 }}>
-                  $400 (refundable)
+                  ${DEPOSIT_AMOUNT} (refundable)
                 </span>
               </button>
             )}

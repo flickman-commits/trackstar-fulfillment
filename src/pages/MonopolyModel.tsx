@@ -22,6 +22,7 @@ import { ArrowLeft, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import {
   calculateScenario,
+  COMPED_SLOT_COUNT,
   calculateAllInCost,
   wholesaleMargin,
   formatMoney,
@@ -225,6 +226,28 @@ export default function MonopolyModel() {
               </div>
             </Field>
 
+            {/* The anchor-deal scenario, as a switch rather than something to
+                work out by hand. Comped races keep their space and their units;
+                only the fee goes. */}
+            <Field label={`Comp the top ${COMPED_SLOT_COUNT} slots to land the majors`}>
+              <button
+                type="button"
+                onClick={() => set('compTopTierSlots', !input.compTopTierSlots)}
+                style={{
+                  padding: '8px 14px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  border: `1px solid ${input.compTopTierSlots ? '#231F20' : '#E0E0E0'}`,
+                  backgroundColor: input.compTopTierSlots ? '#231F20' : '#FFFFFF',
+                  color: input.compTopTierSlots ? '#FFFFFF' : '#666666',
+                }}
+              >
+                {input.compTopTierSlots
+                  ? `Dark Blue x${COMPED_SLOT_COUNT} free, ${formatMoney(result.compedFees)} waived`
+                  : 'Everyone pays'}
+              </button>
+            </Field>
+
             <Field label="Include custom token tooling">
               <button
                 type="button"
@@ -297,6 +320,9 @@ export default function MonopolyModel() {
 
             <div className="mt-6 flex flex-col">
               <PnlRow label="Race fees" value={result.raceFees} />
+              {result.compedFees > 0 && (
+                <PnlRow label={`Comped to majors (${COMPED_SLOT_COUNT} slots)`} value={0} />
+              )}
               <PnlRow label="Offset unit sales" value={result.offsetRevenue} />
               <PnlRow label="Brand partnerships" value={result.brandRevenue} />
               <PnlRow
@@ -506,6 +532,7 @@ function seedFromCommitted(data: MonopolyInternalPayload): ScenarioInput {
     dtcPickPackCost: data.pickPackPerUnit,
     wholesalePrice: data.wholesalePrice,
     customPieces: true,
+    compTopTierSlots: false,
   }
 }
 

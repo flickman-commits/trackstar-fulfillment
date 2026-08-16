@@ -157,6 +157,18 @@ export const WHY_NOW = [
   },
 ]
 
+/**
+ * The reservation deposit, in dollars.
+ *
+ * One constant because it appears in the commit steps, the page prose, the
+ * page CTA and the board-space modal, and those had already drifted once.
+ *
+ * ⚠️ This is display only. The amount actually charged is fixed inside the
+ * Stripe payment link at DEPOSIT_URL, so changing this number does NOT change
+ * what a race director pays. Both have to move together.
+ */
+export const DEPOSIT_AMOUNT = 250
+
 export const TIMELINE: TimelinePhase[] = [
   {
     phase: 'Locking in races',
@@ -182,7 +194,7 @@ export const TIMELINE: TimelinePhase[] = [
 
 export const COMMIT_STEPS: CommitStep[] = [
   {
-    title: 'Reserve your spot with a $400 deposit',
+    title: `Reserve your spot with a $${DEPOSIT_AMOUNT} deposit`,
     body: 'Fully refundable, and the only money you put up until the board is real.',
   },
   {
@@ -191,7 +203,7 @@ export const COMMIT_STEPS: CommitStep[] = [
   },
   {
     title: 'You pay 50% when the board is full',
-    body: 'You see the finished board first, then half is due, less the $400 you already paid.',
+    body: `You see the finished board first, then half is due, less the $${DEPOSIT_AMOUNT} you already paid.`,
   },
   {
     title: 'You pay the final 50% on delivery',
