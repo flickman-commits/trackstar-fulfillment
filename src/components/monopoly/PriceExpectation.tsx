@@ -169,9 +169,6 @@ export default function PriceExpectation() {
         ))}
       </div>
 
-      <p className="mt-2" style={{ fontSize: 12, color: MONOPOLY.inkMuted, lineHeight: 1.5 }}>
-        The median. We plan to charge right around there.
-      </p>
     </figure>
   )
 }

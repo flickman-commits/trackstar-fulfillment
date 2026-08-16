@@ -65,6 +65,9 @@ const SHOW_AVAILABILITY_TABLE = false
  * deleted, since it goes back the moment tokens are on the table.
  */
 const SHOW_TOKENS = false
+
+/** Races that must be signed before the page starts counting spaces down. */
+const SPACES_LEFT_THRESHOLD = 4
 /**
  * Stripe payment link for the reservation deposit.
  *
@@ -263,7 +266,7 @@ export default function Monopoly() {
       <Section muted>
         <SectionHeading>Why now</SectionHeading>
 
-        <SubHeading>There have been over 300 custom editions made of Monopoly</SubHeading>
+        <SubHeading>There have been over 300 custom editions made of Monopoly...</SubHeading>
 
         {/* Five, not nine. The point is that the category is crowded, and nine
             made the reader audit the list instead of taking the point. */}
@@ -415,8 +418,8 @@ export default function Monopoly() {
       <Section muted>
         <SectionHeading>Investment</SectionHeading>
         <p className="mb-6 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          The investment needed for each space is listed below. The price increases as you go around
-          the board, to respect the prestige of that part of it.
+          The investment needed for each space is listed below. The prices increase as you get to
+          more valuable parts of the Monopoly board.
         </p>
         <PackageTiers tiers={data.tiers} highlightTierKey={personalizedTierKey} />
 
@@ -425,10 +428,10 @@ export default function Monopoly() {
             be an object rather than a clause. */}
         <div
           className="mt-8 px-6 py-6 sm:px-8"
-          style={{ backgroundColor: '#1F6B47', border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
+          style={{ backgroundColor: '#367F5C', border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
         >
           <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)' }}>
-            Offset cost by buying units
+            Offset the slot fee...
           </p>
           <p className="mt-2" style={{ fontSize: 20, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.35, maxWidth: '46rem' }}>
             You can buy up to 100 units at $35/unit to offset the investment in your space on the
@@ -449,7 +452,7 @@ export default function Monopoly() {
           </h3>
           <ul className="flex flex-col gap-2" style={{ maxWidth: '40rem' }}>
             {[
-              'A race slot on Marathon Monopoly Edition One',
+              'A race slot on Marathon Monopoly: Edition 1 (name and marks on board slot, title deed and rule book)',
               'Creative approval on your marks',
               '5 complimentary units shipped to your office',
               'First right of refusal on your space in any future edition',
@@ -865,9 +868,14 @@ function CommitmentDeadline({ remaining, total }: { remaining: number; total: nu
       >
         Commitments close September 30
       </span>
-      <span style={{ fontSize: 14, color: MONOPOLY.inkMuted }}>
-        {remaining} of {total} race spaces left
-      </span>
+      {/* Held back until four races are in. "22 of 22 left" is arithmetically
+          true and reads as nobody has signed, which is the opposite of what a
+          scarcity line is for. Once it is counting down it starts working. */}
+      {total - remaining >= SPACES_LEFT_THRESHOLD && (
+        <span style={{ fontSize: 14, color: MONOPOLY.inkMuted }}>
+          Only {remaining} (of {total}) race spaces left
+        </span>
+      )}
     </div>
   )
 }
