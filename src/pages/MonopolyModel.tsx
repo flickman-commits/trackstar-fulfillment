@@ -39,11 +39,18 @@ import { useDocumentHead } from '@/lib/useDocumentHead'
 const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 const STORAGE_KEY = 'monopoly-model-scenario'
 
-/** Named starting points, straight from the partnership model's scenarios. */
+/**
+ * Named starting points, straight from the partnership model's scenarios.
+ *
+ * Brand revenue is 0 in all three. Edition One carries no third-party brands
+ * and none are being sold, so a preset that opened with $140,000 of it made
+ * every scenario look funded by revenue that does not exist. The input stays,
+ * so the case can still be modelled the moment there is one to model.
+ */
 const PRESETS: Record<string, { label: string; racesTotal: number; printRun: number; offset: number; brand: number; dtc: number }> = {
-  conservative: { label: 'Conservative', racesTotal: 12, printRun: 3000, offset: 500, brand: 45000, dtc: 800 },
-  base: { label: 'Base', racesTotal: 18, printRun: 5004, offset: 1500, brand: 140000, dtc: 1200 },
-  aggressive: { label: 'Aggressive', racesTotal: 22, printRun: 5004, offset: 3000, brand: 280000, dtc: 1500 },
+  conservative: { label: 'Conservative', racesTotal: 12, printRun: 3000, offset: 500, brand: 0, dtc: 800 },
+  base: { label: 'Base', racesTotal: 18, printRun: 5004, offset: 1500, brand: 0, dtc: 1200 },
+  aggressive: { label: 'Aggressive', racesTotal: 22, printRun: 5004, offset: 3000, brand: 0, dtc: 1500 },
 }
 
 export default function MonopolyModel() {
@@ -276,7 +283,7 @@ export default function MonopolyModel() {
               onChange={(v) => set('offsetUnitsSold', v)}
             />
             <NumberField
-              label="Brand revenue (box lid, railroads, tokens, cards)"
+              label="Brand revenue (none planned for Edition One)"
               value={input.brandRevenue}
               step={5000}
               prefix="$"
