@@ -170,7 +170,12 @@ function fmtAgo(iso: string | null) {
   return hrs < 24 ? `${hrs}h ago` : `${Math.round(hrs / 24)}d ago`
 }
 
-export default function LookupHealthPanel({ onClose }: { onClose: () => void }) {
+/**
+ * `embedded` renders the panel body alone, for hosting inside the Settings
+ * shell, which already supplies the overlay, the card and the close button.
+ * Standalone keeps its own chrome so nothing else that opens it has to change.
+ */
+export default function LookupHealthPanel({ onClose, embedded = false }: { onClose?: () => void; embedded?: boolean }) {
   const [data, setData] = useState<HealthPayload | null>(null)
   const [loading, setLoading] = useState(false)
   const [probing, setProbing] = useState(false)
@@ -336,17 +341,14 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
 
   const s = data?.stats
 
-  return (
-    <div
-      className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-border-gray flex-shrink-0 space-y-4">
+  const body = (
+    <>
+        {/* Header. Embedded, the Settings shell already shows the title, so
+            only the controls and the freshness line carry over. */}
+        <div className={`flex-shrink-0 space-y-4 ${embedded ? 'pb-4' : 'px-6 py-4 border-b border-border-gray'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h2 className="text-base font-semibold text-off-black">Instant Lookup Dashboard</h2>
+              {!embedded && <h2 className="text-base font-semibold text-off-black">Instant Lookup Dashboard</h2>}
               <span className="text-xs text-off-black/50">
                 Traffic: last 7 days · Probe: {fmtAgo(s?.lastProbeAt ?? null)}
               </span>
@@ -374,7 +376,9 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
               >
                 {loading ? 'Loading…' : 'Refresh'}
               </button>
-              <button onClick={onClose} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none ml-1">×</button>
+              {!embedded && (
+                <button onClick={onClose} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none ml-1">×</button>
+              )}
             </div>
           </div>
 
@@ -769,6 +773,18 @@ export default function LookupHealthPanel({ onClose }: { onClose: () => void }) 
             the <em>wrong</em> runner and not just one that is down. Median excludes cache hits.
           </p>
         </div>
+    </>
+  )
+
+  if (embedded) return <div className="relative flex flex-col min-h-0">{body}</div>
+
+  return (
+    <div
+      className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
+    >
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col">
+        {body}
       </div>
     </div>
   )

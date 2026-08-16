@@ -640,7 +640,6 @@ export default function Dashboard() {
   // One flag for the consolidated Instant Lookup Dashboard. All
   // of its data fetching lives inside the component now, rather than being
   // threaded through this already-oversized page.
-  const [showLookupHealth, setShowLookupHealth] = useState(false)
 
   // Personalization photo: opened on demand, never held as a durable link.
   const [photoError, setPhotoError] = useState<string | null>(null)
@@ -750,7 +749,6 @@ export default function Dashboard() {
   const [isSavingRace, setIsSavingRace] = useState(false)
   const [showAddRace, setShowAddRace] = useState(false)
   const [newRaceValues, setNewRaceValues] = useState({ raceName: '', year: new Date().getFullYear().toString(), raceDate: '', location: '' })
-  const [showRaceDatabase, setShowRaceDatabase] = useState(false)
   // Tab switcher: standard vs custom order view
   const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner'>('standard')
   // "New Race Partner" modal state
@@ -3131,11 +3129,7 @@ Thank you!`
                           return (
                             <button
                               key={item.id}
-                              onClick={() => {
-                                if (item.id === 'races') { setShowRaceDatabase(true); return }
-                                if (item.id === 'lookup') { setShowLookupHealth(true); return }
-                                setSettingsPanel(item.id)
-                              }}
+                              onClick={() => setSettingsPanel(item.id)}
                               className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-sm transition-colors ${active ? 'bg-white text-off-black shadow-sm font-medium' : 'text-off-black/65 hover:bg-white/70'}`}
                             >
                               <Icon className="w-4 h-4 flex-shrink-0 text-off-black/45" />
@@ -3169,11 +3163,7 @@ Thank you!`
                     {SETTINGS_NAV.flatMap((g) => g.items).map((item) => (
                       <button
                         key={item.id}
-                        onClick={() => {
-                          if (item.id === 'races') { setShowRaceDatabase(true); return }
-                          if (item.id === 'lookup') { setShowLookupHealth(true); return }
-                          setSettingsPanel(item.id)
-                        }}
+                        onClick={() => setSettingsPanel(item.id)}
                         className={`px-2.5 py-1 text-xs rounded-md border ${settingsPanel === item.id ? 'bg-off-black text-white border-off-black' : 'bg-white text-off-black/60 border-border-gray'}`}
                       >
                         {item.label}
@@ -3216,10 +3206,377 @@ Thank you!`
                     </div>
                   )}
 
+                  {settingsPanel === 'lookup' && <LookupHealthPanel embedded />}
+
+                  {settingsPanel === 'races' && (
+                    <div className="flex flex-col min-h-0">
+                  <div className="flex-shrink-0 space-y-3 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setShowAddRace(!showAddRace)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors"
+                        >
+                          {showAddRace ? 'Cancel' : '+ Add Race'}
+                        </button>
+                      </div>
+                    </div>
+                    {/* Search bar — filters race groups by name (and location/year) */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search races by name, year, or location…"
+                        value={raceDbSearch}
+                        onChange={(e) => setRaceDbSearch(e.target.value)}
+                        className="w-full pl-8 pr-8 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                      />
+                      <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/40" />
+                      {raceDbSearch && (
+                        <button
+                          onClick={() => setRaceDbSearch('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-off-black/40 hover:text-off-black/70"
+                          title="Clear search"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                      {raceDbSearch && (
+                        <div className="absolute right-9 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              // Expand all matching groups when searching
+                              const matches = Array.from(new Set(races.map(r => r.raceName)))
+                                .filter(name => name.toLowerCase().includes(raceDbSearch.toLowerCase()))
+                              setExpandedRaceGroups(new Set(matches))
+                            }}
+                            className="text-[10px] text-off-black/50 hover:text-off-black underline"
+                          >
+                            Expand all
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-6">
+                    {/* Add Race Form */}
+                    {showAddRace && (
+                      <div className="mb-4 p-4 bg-subtle-gray border border-border-gray rounded-lg space-y-3">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Race Name"
+                            value={newRaceValues.raceName}
+                            onChange={(e) => setNewRaceValues(prev => ({ ...prev, raceName: e.target.value }))}
+                            className="flex-1 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Year"
+                            value={newRaceValues.year}
+                            onChange={(e) => setNewRaceValues(prev => ({ ...prev, year: e.target.value }))}
+                            className="w-24 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="date"
+                            value={newRaceValues.raceDate}
+                            onChange={(e) => setNewRaceValues(prev => ({ ...prev, raceDate: e.target.value }))}
+                            className="flex-1 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Location (e.g. Boston, MA)"
+                            value={newRaceValues.location}
+                            onChange={(e) => setNewRaceValues(prev => ({ ...prev, location: e.target.value }))}
+                            className="flex-1 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                          />
+                        </div>
+                        <button
+                          onClick={createRace}
+                          disabled={isSavingRace}
+                          className="w-full px-3 py-2 rounded-md text-sm font-medium bg-off-black text-white hover:opacity-80 transition-colors disabled:opacity-50"
+                        >
+                          {isSavingRace ? 'Creating...' : 'Create Race'}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Race List — grouped by raceName, with year entries nested.
+                        Each group exposes the filename shorthand for editing. */}
+                    {isLoadingRaces ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="w-5 h-5 animate-spin text-off-black/40" />
+                      </div>
+                    ) : races.length === 0 ? (
+                      <p className="text-sm text-off-black/40 text-center py-8">No races in database</p>
+                    ) : (() => {
+                      // Group all races by raceName
+                      const grouped = races.reduce<Record<string, typeof races>>((acc, r) => {
+                        (acc[r.raceName] ||= []).push(r)
+                        return acc
+                      }, {})
+
+                      // Apply search filter — matches against race name, year, or location
+                      const q = raceDbSearch.trim().toLowerCase()
+                      const filteredEntries = Object.entries(grouped)
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .filter(([raceName, group]) => {
+                          if (!q) return true
+                          if (raceName.toLowerCase().includes(q)) return true
+                          return group.some(r =>
+                            String(r.year).includes(q) ||
+                            (r.location || '').toLowerCase().includes(q)
+                          )
+                        })
+
+                      if (filteredEntries.length === 0) {
+                        return <p className="text-sm text-off-black/40 text-center py-8">No races match "{raceDbSearch}"</p>
+                      }
+
+                      return (
+                      <div className="space-y-3">
+                        {filteredEntries
+                          .map(([raceName, group]) => {
+                            const sortedYears = [...group].sort((a, b) => b.year - a.year)
+                            const currentShorthand = raceShorthands[raceName] || ''
+                            const isOverridden = !!raceShorthandOverrides[raceName]
+                            const isEditingThis = editingShorthandFor === raceName
+                            const isExpanded = expandedRaceGroups.has(raceName)
+                            const toggleExpanded = () => {
+                              setExpandedRaceGroups(prev => {
+                                const next = new Set(prev)
+                                if (next.has(raceName)) next.delete(raceName)
+                                else next.add(raceName)
+                                return next
+                              })
+                            }
+                            // Show year range in collapsed header for quick scanning
+                            const yearRange = sortedYears.length === 1
+                              ? String(sortedYears[0].year)
+                              : `${sortedYears[sortedYears.length - 1].year}–${sortedYears[0].year}`
+                            return (
+                              <div key={raceName} className="rounded-lg border border-border-gray overflow-hidden">
+                                {/* Group header — clicking the left side toggles expand;
+                                    inner buttons (filename edit) stop propagation. */}
+                                <div className="bg-off-black/[0.03] flex items-center gap-3 border-b border-border-gray">
+                                  <button
+                                    type="button"
+                                    onClick={toggleExpanded}
+                                    className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3 hover:bg-off-black/[0.04] transition-colors text-left"
+                                    aria-expanded={isExpanded}
+                                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${raceName}`}
+                                  >
+                                    {isExpanded
+                                      ? <ChevronDownIcon className="w-4 h-4 text-off-black/50 shrink-0" />
+                                      : <ChevronRight className="w-4 h-4 text-off-black/50 shrink-0" />
+                                    }
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-semibold text-off-black truncate">{raceName}</div>
+                                      <div className="text-[11px] text-off-black/40 mt-0.5">
+                                        {sortedYears.length} {sortedYears.length === 1 ? 'year' : 'years'} · {yearRange}
+                                      </div>
+                                    </div>
+                                  </button>
+                                  <div className="flex items-center gap-2 px-4">
+                                    <span className="text-[10px] text-off-black/40 uppercase tracking-wider">Filename</span>
+                                    {isEditingThis ? (
+                                      <>
+                                        <input
+                                          type="text"
+                                          value={editingShorthandValue}
+                                          onChange={(e) => setEditingShorthandValue(e.target.value)}
+                                          placeholder="e.g. Boston"
+                                          autoFocus
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="w-28 px-2 py-1 text-xs border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') saveRaceShorthand(raceName, editingShorthandValue)
+                                            if (e.key === 'Escape') setEditingShorthandFor(null)
+                                          }}
+                                        />
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); saveRaceShorthand(raceName, editingShorthandValue) }}
+                                          disabled={savingShorthand}
+                                          className="text-xs text-green-600 hover:text-green-700 disabled:opacity-50"
+                                        >
+                                          {savingShorthand ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                        </button>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); setEditingShorthandFor(null) }}
+                                          className="text-xs text-off-black/50 hover:text-off-black/70"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setEditingShorthandFor(raceName); setEditingShorthandValue(currentShorthand) }}
+                                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-mono rounded border ${
+                                          isOverridden
+                                            ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                            : 'bg-white border-border-gray text-off-black/70 hover:bg-off-black/5'
+                                        }`}
+                                        title={isOverridden ? 'User-set override (click to edit)' : 'Default from scraper config (click to override)'}
+                                      >
+                                        {currentShorthand || '—'}
+                                        <Pencil className="w-2.5 h-2.5 opacity-50" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                {/* Body — merge controls + year entries. Only rendered when expanded. */}
+                                {isExpanded && (<>
+                                {/* Merge controls — inline picker when this group is the active merge source */}
+                                {mergingRace === raceName ? (
+                                  <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+                                    <span className="text-[11px] text-amber-900 shrink-0">Merge <strong>{raceName}</strong> into:</span>
+                                    <select
+                                      value={mergeTarget}
+                                      onChange={(e) => setMergeTarget(e.target.value)}
+                                      className="flex-1 min-w-0 px-2 py-1 text-xs border border-amber-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-amber-300"
+                                      autoFocus
+                                    >
+                                      <option value="">Choose canonical race…</option>
+                                      {Array.from(new Set(races.map(r => r.raceName)))
+                                        .filter(n => n !== raceName)
+                                        .sort()
+                                        .map(n => <option key={n} value={n}>{n}</option>)}
+                                    </select>
+                                    <button
+                                      onClick={() => mergeRace(raceName, mergeTarget)}
+                                      disabled={!mergeTarget || isMergingRace}
+                                      className="px-2.5 py-1 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                                    >
+                                      {isMergingRace ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                      Merge
+                                    </button>
+                                    <button
+                                      onClick={() => { setMergingRace(null); setMergeTarget('') }}
+                                      className="text-xs text-off-black/50 hover:text-off-black/70 p-1"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="px-4 py-1.5 bg-off-black/[0.01] border-b border-border-gray flex justify-end">
+                                    <button
+                                      onClick={() => { setMergingRace(raceName); setMergeTarget('') }}
+                                      className="text-[11px] text-off-black/50 hover:text-off-black transition-colors inline-flex items-center gap-1"
+                                      title="Consolidate this race into another (renames orders + race entries)"
+                                    >
+                                      Merge into…
+                                    </button>
+                                  </div>
+                                )}
+                                {/* Year entries */}
+                                <div className="divide-y divide-border-gray">
+                                  {sortedYears.map((race) => (
+                                    <div key={race.id} className="py-2.5 px-4 bg-white">
+                                      {editingRaceId === race.id ? (
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-off-black">{race.raceName} {race.year}</span>
+                                  <div className="flex items-center gap-3">
+                                    <button
+                                      onClick={() => saveRaceEdit(race.id)}
+                                      disabled={isSavingRace}
+                                      className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                                    >
+                                      {isSavingRace ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingRaceId(null)}
+                                      className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
+                                    >
+                                      <X className="w-3 h-3" />
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="text-[11px] text-off-black/50 block mb-1">Date</label>
+                                    <input
+                                      type="date"
+                                      value={raceEditValues.raceDate}
+                                      onChange={(e) => setRaceEditValues(prev => ({ ...prev, raceDate: e.target.value }))}
+                                      className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] text-off-black/50 block mb-1">Location</label>
+                                    <input
+                                      type="text"
+                                      value={raceEditValues.location}
+                                      onChange={(e) => setRaceEditValues(prev => ({ ...prev, location: e.target.value }))}
+                                      placeholder="e.g. Austin, TX"
+                                      className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] text-off-black/50 block mb-1">Weather</label>
+                                    <select
+                                      value={raceEditValues.weatherCondition}
+                                      onChange={(e) => setRaceEditValues(prev => ({ ...prev, weatherCondition: e.target.value }))}
+                                      className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                                    >
+                                      <option value="">--</option>
+                                      <option value="Sunny">Sunny</option>
+                                      <option value="Cloudy">Cloudy</option>
+                                      <option value="Rainy">Rainy</option>
+                                      <option value="Snowy">Snowy</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] text-off-black/50 block mb-1">Temp</label>
+                                    <input
+                                      type="text"
+                                      value={raceEditValues.weatherTemp}
+                                      onChange={(e) => setRaceEditValues(prev => ({ ...prev, weatherTemp: e.target.value }))}
+                                      placeholder="e.g. 65°F"
+                                      className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-sm font-semibold text-off-black w-12 shrink-0 tabular-nums">{race.year}</span>
+                                <div className="flex-1 flex items-center gap-4 text-xs text-off-black/50 min-w-0">
+                                  {race.raceDate && <span>{new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })}</span>}
+                                  {race.location && <span className="truncate">{race.location}</span>}
+                                  {race.weatherCondition && <span>{race.weatherCondition.charAt(0).toUpperCase() + race.weatherCondition.slice(1)}</span>}
+                                  {race.weatherTemp && <span>{race.weatherTemp}</span>}
+                                </div>
+                                <button
+                                  onClick={() => startEditingRace(race)}
+                                  className="text-blue-600 hover:text-blue-700 transition-colors shrink-0"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                                    </div>
+                                  ))}
+                                </div>
+                                </>)}{/* /isExpanded body */}
+                              </div>
+                            )
+                          })}
+                      </div>
+                      )
+                    })()}
+                  </div>
+                    </div>
+                  )}
+
                   {settingsPanel === 'storefront' && (
-                    <div className="-m-5">
+                    <div className="space-y-4">
                 {/* Customers Served Counter */}
-                <div className="border-t border-border-gray p-6">
+                <div>
                   <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
                     <p className="text-sm font-medium text-off-black">Customers Served Counter</p>
                     <p className="text-xs mt-0.5 text-off-black/50 mb-3">Adjust the counter displayed on the Shopify storefront. Saves to DB and syncs to Shopify.</p>
@@ -3248,9 +3605,9 @@ Thank you!`
                   )}
 
                   {settingsPanel === 'diagnostics' && (
-                    <div className="-m-5">
+                    <div className="space-y-4 divide-y divide-border-gray [&>div+div]:pt-4">
                 {/* Test Connections — granular Artelo / Shopify / Etsy diagnostics */}
-                <div className="border-t border-border-gray p-6">
+                <div>
                   <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -3329,7 +3686,7 @@ Thank you!`
                 </div>
 
                 {/* System Health Check */}
-                <div className="border-t border-border-gray p-6">
+                <div>
                   <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -3389,9 +3746,9 @@ Thank you!`
                   )}
 
                   {settingsPanel === 'maintenance' && (
-                    <div className="-m-5">
+                    <div className="space-y-4">
                 {/* Danger zone */}
-                <div className="border-t border-border-gray p-6">
+                <div>
                   <div className="rounded-lg border border-red-200 bg-red-50 p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -3418,381 +3775,7 @@ Thank you!`
         )}
 
 
-        {/* Instant Lookup Dashboard — the consolidated panel. */}
-        {showLookupHealth && <LookupHealthPanel onClose={() => setShowLookupHealth(false)} />}
-
         {/* Race Database Full-Screen Overlay */}
-        {showRaceDatabase && (
-          <div
-            className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowRaceDatabase(false) }}
-          >
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-              <div className="px-6 py-4 border-b border-border-gray flex-shrink-0 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-off-black">Race Database</h2>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setShowAddRace(!showAddRace)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-off-black text-white hover:opacity-80 transition-colors"
-                    >
-                      {showAddRace ? 'Cancel' : '+ Add Race'}
-                    </button>
-                    <button onClick={() => setShowRaceDatabase(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
-                  </div>
-                </div>
-                {/* Search bar — filters race groups by name (and location/year) */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search races by name, year, or location…"
-                    value={raceDbSearch}
-                    onChange={(e) => setRaceDbSearch(e.target.value)}
-                    className="w-full pl-8 pr-8 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                  />
-                  <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/40" />
-                  {raceDbSearch && (
-                    <button
-                      onClick={() => setRaceDbSearch('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-off-black/40 hover:text-off-black/70"
-                      title="Clear search"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                  {raceDbSearch && (
-                    <div className="absolute right-9 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          // Expand all matching groups when searching
-                          const matches = Array.from(new Set(races.map(r => r.raceName)))
-                            .filter(name => name.toLowerCase().includes(raceDbSearch.toLowerCase()))
-                          setExpandedRaceGroups(new Set(matches))
-                        }}
-                        className="text-[10px] text-off-black/50 hover:text-off-black underline"
-                      >
-                        Expand all
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6">
-                {/* Add Race Form */}
-                {showAddRace && (
-                  <div className="mb-4 p-4 bg-subtle-gray border border-border-gray rounded-lg space-y-3">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Race Name"
-                        value={newRaceValues.raceName}
-                        onChange={(e) => setNewRaceValues(prev => ({ ...prev, raceName: e.target.value }))}
-                        className="flex-1 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Year"
-                        value={newRaceValues.year}
-                        onChange={(e) => setNewRaceValues(prev => ({ ...prev, year: e.target.value }))}
-                        className="w-24 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="date"
-                        value={newRaceValues.raceDate}
-                        onChange={(e) => setNewRaceValues(prev => ({ ...prev, raceDate: e.target.value }))}
-                        className="flex-1 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Location (e.g. Boston, MA)"
-                        value={newRaceValues.location}
-                        onChange={(e) => setNewRaceValues(prev => ({ ...prev, location: e.target.value }))}
-                        className="flex-1 px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                      />
-                    </div>
-                    <button
-                      onClick={createRace}
-                      disabled={isSavingRace}
-                      className="w-full px-3 py-2 rounded-md text-sm font-medium bg-off-black text-white hover:opacity-80 transition-colors disabled:opacity-50"
-                    >
-                      {isSavingRace ? 'Creating...' : 'Create Race'}
-                    </button>
-                  </div>
-                )}
-
-                {/* Race List — grouped by raceName, with year entries nested.
-                    Each group exposes the filename shorthand for editing. */}
-                {isLoadingRaces ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="w-5 h-5 animate-spin text-off-black/40" />
-                  </div>
-                ) : races.length === 0 ? (
-                  <p className="text-sm text-off-black/40 text-center py-8">No races in database</p>
-                ) : (() => {
-                  // Group all races by raceName
-                  const grouped = races.reduce<Record<string, typeof races>>((acc, r) => {
-                    (acc[r.raceName] ||= []).push(r)
-                    return acc
-                  }, {})
-
-                  // Apply search filter — matches against race name, year, or location
-                  const q = raceDbSearch.trim().toLowerCase()
-                  const filteredEntries = Object.entries(grouped)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .filter(([raceName, group]) => {
-                      if (!q) return true
-                      if (raceName.toLowerCase().includes(q)) return true
-                      return group.some(r =>
-                        String(r.year).includes(q) ||
-                        (r.location || '').toLowerCase().includes(q)
-                      )
-                    })
-
-                  if (filteredEntries.length === 0) {
-                    return <p className="text-sm text-off-black/40 text-center py-8">No races match "{raceDbSearch}"</p>
-                  }
-
-                  return (
-                  <div className="space-y-3">
-                    {filteredEntries
-                      .map(([raceName, group]) => {
-                        const sortedYears = [...group].sort((a, b) => b.year - a.year)
-                        const currentShorthand = raceShorthands[raceName] || ''
-                        const isOverridden = !!raceShorthandOverrides[raceName]
-                        const isEditingThis = editingShorthandFor === raceName
-                        const isExpanded = expandedRaceGroups.has(raceName)
-                        const toggleExpanded = () => {
-                          setExpandedRaceGroups(prev => {
-                            const next = new Set(prev)
-                            if (next.has(raceName)) next.delete(raceName)
-                            else next.add(raceName)
-                            return next
-                          })
-                        }
-                        // Show year range in collapsed header for quick scanning
-                        const yearRange = sortedYears.length === 1
-                          ? String(sortedYears[0].year)
-                          : `${sortedYears[sortedYears.length - 1].year}–${sortedYears[0].year}`
-                        return (
-                          <div key={raceName} className="rounded-lg border border-border-gray overflow-hidden">
-                            {/* Group header — clicking the left side toggles expand;
-                                inner buttons (filename edit) stop propagation. */}
-                            <div className="bg-off-black/[0.03] flex items-center gap-3 border-b border-border-gray">
-                              <button
-                                type="button"
-                                onClick={toggleExpanded}
-                                className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3 hover:bg-off-black/[0.04] transition-colors text-left"
-                                aria-expanded={isExpanded}
-                                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${raceName}`}
-                              >
-                                {isExpanded
-                                  ? <ChevronDownIcon className="w-4 h-4 text-off-black/50 shrink-0" />
-                                  : <ChevronRight className="w-4 h-4 text-off-black/50 shrink-0" />
-                                }
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-semibold text-off-black truncate">{raceName}</div>
-                                  <div className="text-[11px] text-off-black/40 mt-0.5">
-                                    {sortedYears.length} {sortedYears.length === 1 ? 'year' : 'years'} · {yearRange}
-                                  </div>
-                                </div>
-                              </button>
-                              <div className="flex items-center gap-2 px-4">
-                                <span className="text-[10px] text-off-black/40 uppercase tracking-wider">Filename</span>
-                                {isEditingThis ? (
-                                  <>
-                                    <input
-                                      type="text"
-                                      value={editingShorthandValue}
-                                      onChange={(e) => setEditingShorthandValue(e.target.value)}
-                                      placeholder="e.g. Boston"
-                                      autoFocus
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-28 px-2 py-1 text-xs border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') saveRaceShorthand(raceName, editingShorthandValue)
-                                        if (e.key === 'Escape') setEditingShorthandFor(null)
-                                      }}
-                                    />
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); saveRaceShorthand(raceName, editingShorthandValue) }}
-                                      disabled={savingShorthand}
-                                      className="text-xs text-green-600 hover:text-green-700 disabled:opacity-50"
-                                    >
-                                      {savingShorthand ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); setEditingShorthandFor(null) }}
-                                      className="text-xs text-off-black/50 hover:text-off-black/70"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setEditingShorthandFor(raceName); setEditingShorthandValue(currentShorthand) }}
-                                    className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-mono rounded border ${
-                                      isOverridden
-                                        ? 'bg-blue-50 border-blue-200 text-blue-700'
-                                        : 'bg-white border-border-gray text-off-black/70 hover:bg-off-black/5'
-                                    }`}
-                                    title={isOverridden ? 'User-set override (click to edit)' : 'Default from scraper config (click to override)'}
-                                  >
-                                    {currentShorthand || '—'}
-                                    <Pencil className="w-2.5 h-2.5 opacity-50" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            {/* Body — merge controls + year entries. Only rendered when expanded. */}
-                            {isExpanded && (<>
-                            {/* Merge controls — inline picker when this group is the active merge source */}
-                            {mergingRace === raceName ? (
-                              <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
-                                <span className="text-[11px] text-amber-900 shrink-0">Merge <strong>{raceName}</strong> into:</span>
-                                <select
-                                  value={mergeTarget}
-                                  onChange={(e) => setMergeTarget(e.target.value)}
-                                  className="flex-1 min-w-0 px-2 py-1 text-xs border border-amber-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-amber-300"
-                                  autoFocus
-                                >
-                                  <option value="">Choose canonical race…</option>
-                                  {Array.from(new Set(races.map(r => r.raceName)))
-                                    .filter(n => n !== raceName)
-                                    .sort()
-                                    .map(n => <option key={n} value={n}>{n}</option>)}
-                                </select>
-                                <button
-                                  onClick={() => mergeRace(raceName, mergeTarget)}
-                                  disabled={!mergeTarget || isMergingRace}
-                                  className="px-2.5 py-1 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
-                                >
-                                  {isMergingRace ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                                  Merge
-                                </button>
-                                <button
-                                  onClick={() => { setMergingRace(null); setMergeTarget('') }}
-                                  className="text-xs text-off-black/50 hover:text-off-black/70 p-1"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="px-4 py-1.5 bg-off-black/[0.01] border-b border-border-gray flex justify-end">
-                                <button
-                                  onClick={() => { setMergingRace(raceName); setMergeTarget('') }}
-                                  className="text-[11px] text-off-black/50 hover:text-off-black transition-colors inline-flex items-center gap-1"
-                                  title="Consolidate this race into another (renames orders + race entries)"
-                                >
-                                  Merge into…
-                                </button>
-                              </div>
-                            )}
-                            {/* Year entries */}
-                            <div className="divide-y divide-border-gray">
-                              {sortedYears.map((race) => (
-                                <div key={race.id} className="py-2.5 px-4 bg-white">
-                                  {editingRaceId === race.id ? (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-off-black">{race.raceName} {race.year}</span>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  onClick={() => saveRaceEdit(race.id)}
-                                  disabled={isSavingRace}
-                                  className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
-                                >
-                                  {isSavingRace ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                                  Save
-                                </button>
-                                <button
-                                  onClick={() => setEditingRaceId(null)}
-                                  className="flex items-center gap-1 text-xs text-off-black/50 hover:text-off-black/70 transition-colors"
-                                >
-                                  <X className="w-3 h-3" />
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-[11px] text-off-black/50 block mb-1">Date</label>
-                                <input
-                                  type="date"
-                                  value={raceEditValues.raceDate}
-                                  onChange={(e) => setRaceEditValues(prev => ({ ...prev, raceDate: e.target.value }))}
-                                  className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[11px] text-off-black/50 block mb-1">Location</label>
-                                <input
-                                  type="text"
-                                  value={raceEditValues.location}
-                                  onChange={(e) => setRaceEditValues(prev => ({ ...prev, location: e.target.value }))}
-                                  placeholder="e.g. Austin, TX"
-                                  className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[11px] text-off-black/50 block mb-1">Weather</label>
-                                <select
-                                  value={raceEditValues.weatherCondition}
-                                  onChange={(e) => setRaceEditValues(prev => ({ ...prev, weatherCondition: e.target.value }))}
-                                  className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                                >
-                                  <option value="">--</option>
-                                  <option value="Sunny">Sunny</option>
-                                  <option value="Cloudy">Cloudy</option>
-                                  <option value="Rainy">Rainy</option>
-                                  <option value="Snowy">Snowy</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="text-[11px] text-off-black/50 block mb-1">Temp</label>
-                                <input
-                                  type="text"
-                                  value={raceEditValues.weatherTemp}
-                                  onChange={(e) => setRaceEditValues(prev => ({ ...prev, weatherTemp: e.target.value }))}
-                                  placeholder="e.g. 65°F"
-                                  className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-sm font-semibold text-off-black w-12 shrink-0 tabular-nums">{race.year}</span>
-                            <div className="flex-1 flex items-center gap-4 text-xs text-off-black/50 min-w-0">
-                              {race.raceDate && <span>{new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })}</span>}
-                              {race.location && <span className="truncate">{race.location}</span>}
-                              {race.weatherCondition && <span>{race.weatherCondition.charAt(0).toUpperCase() + race.weatherCondition.slice(1)}</span>}
-                              {race.weatherTemp && <span>{race.weatherTemp}</span>}
-                            </div>
-                            <button
-                              onClick={() => startEditingRace(race)}
-                              className="text-blue-600 hover:text-blue-700 transition-colors shrink-0"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                                </div>
-                              ))}
-                            </div>
-                            </>)}{/* /isExpanded body */}
-                          </div>
-                        )
-                      })}
-                  </div>
-                  )
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
 
 
         {/* Loading State */}
