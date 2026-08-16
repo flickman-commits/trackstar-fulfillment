@@ -344,12 +344,16 @@ export default function MonopolyModel() {
                 label={`Manufacturing (${result.cost.units.toLocaleString()} × ${formatUnitCost(result.cost.unitCost)})`}
                 value={-result.cost.manufacturing}
               />
+              {/* Not a charge. These boxes are part of the run, so their cost
+                  is already inside the manufacturing line above. Rendered as
+                  plain text rather than a signed figure because a -$1,650 in a
+                  column of deductions reads as a deduction however it is
+                  labelled, and this one is not. */}
               {result.compCopyUnits > 0 && (
-                <PnlRow
-                  memo
-                  label={`of which complimentary units to partners, ${result.compCopyUnits.toLocaleString()} units`}
-                  value={-result.compCopyUnits * result.cost.unitCost}
-                />
+                <MemoLine>
+                  Includes {result.compCopyUnits.toLocaleString()} complimentary units for partners,{' '}
+                  {formatMoney(result.compCopyUnits * result.cost.unitCost)} of the figure above
+                </MemoLine>
               )}
               <PnlRow label="Freight" value={-result.cost.freight} />
               <PnlRow label="Gross profit" value={result.grossProfit} subtotal />
@@ -782,40 +786,54 @@ function Metric({ label, value, warn }: { label: string; value: string; warn?: b
   )
 }
 
+/**
+ * A note under a P&L line, carrying no figure in the money column.
+ *
+ * Anything with a signed number on the right reads as part of the arithmetic,
+ * so a breakdown of a line above has to look different in kind rather than
+ * just smaller.
+ */
+function MemoLine({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: 12,
+        lineHeight: 1.5,
+        color: 'rgba(255,255,255,0.4)',
+        paddingLeft: 12,
+        paddingBottom: 10,
+        marginTop: -4,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 function PnlRow({
   label,
   value,
   subtotal,
   total,
-  memo,
 }: {
   label: string
   value: number
   subtotal?: boolean
   total?: boolean
-  /**
-   * Shown for information and NOT part of any sum above or below it. Used for
-   * costs already counted elsewhere, where the reader still wants the figure.
-   */
-  memo?: boolean
 }) {
   const emphasised = subtotal || total
   return (
     <div
-      className="flex items-baseline justify-between gap-4"
+      className="flex items-baseline justify-between gap-4 py-2.5"
       style={{
         borderTop: emphasised ? '1px solid rgba(255,255,255,0.2)' : undefined,
         marginTop: emphasised ? 4 : 0,
-        paddingTop: memo ? 0 : 10,
-        paddingBottom: memo ? 10 : 10,
       }}
     >
       <span
         style={{
-          fontSize: memo ? 12 : 14,
-          fontStyle: memo ? 'italic' : undefined,
-          paddingLeft: memo ? 12 : 0,
-          color: memo ? 'rgba(255,255,255,0.38)' : emphasised ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+          fontSize: 14,
+          color: emphasised ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
           fontWeight: emphasised ? 700 : 400,
         }}
       >
@@ -823,8 +841,7 @@ function PnlRow({
       </span>
       <span
         style={{
-          fontSize: total ? 18 : memo ? 12 : 14,
-          fontStyle: memo ? 'italic' : undefined,
+          fontSize: total ? 18 : 14,
           fontWeight: emphasised ? 700 : 500,
           color: total ? (value >= 0 ? '#7CE0A0' : '#FF8B7A') : 'rgba(255,255,255,0.9)',
           whiteSpace: 'nowrap',
