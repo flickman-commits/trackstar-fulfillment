@@ -847,16 +847,20 @@ function CtaButton() {
 function CommitmentDeadline({ remaining, total }: { remaining: number; total: number }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      {/* The section-heading plate, not the CTA plate. This is a fact about the
+          offer sitting directly above the one button in the hero, and in red it
+          read as a second thing to click. */}
       <span
         style={{
           fontSize: 13,
           fontWeight: 700,
           textTransform: 'uppercase',
           letterSpacing: '0.06em',
-          color: '#FFFFFF',
-          backgroundColor: MONOPOLY.red,
+          color: MONOPOLY.ink,
+          backgroundColor: MONOPOLY.paper,
           border: `2px solid ${MONOPOLY.black}`,
           borderRadius: UI_RADIUS,
+          boxShadow: `4px 4px 0 ${MONOPOLY.red}`,
           padding: '6px 12px',
         }}
       >
