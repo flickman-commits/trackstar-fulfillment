@@ -43,31 +43,32 @@ export const FIXED_COSTS = {
   /**
    * 3PL receiving, storage and account fees for the first run.
    *
-   * Benchmarked against published 2026 rate-card surveys rather than guessed.
-   * The first version of this line used $45/pallet receiving and $40/pallet
-   * storage, which is 4x and 2x the market average respectively, and produced a
-   * $6,000 figure that was wrong in the expensive direction.
-   *
-   *   Market (2026 surveys)   Receiving $5-15/pallet, avg $10.52
-   *                           Storage   $15-40/pallet/mo, avg ~$20
-   *                           Setup     $250-1,000 one-off, avg ~$425
-   *                           Minimums  $0-750/mo, avg ~$517
+   * Benchmarked against published 2026 rate-card surveys rather than guessed:
+   * receiving $5-15 a pallet (avg $10.52), storage $15-40 a pallet month (avg
+   * ~$20), setup $250-1,000 (avg ~$425), monthly minimums $0-750 (avg ~$517).
    *
    * A Monopoly box is about 40x27x5cm, so a 48x40 pallet holds roughly 165 of
    * them once master cartons and dunnage are allowed for. 2,004 units is about
    * 12 pallets.
    *
-   *   Receiving    12 pallets x $15 (top of range)      $180
-   *   Storage      avg 7.2 pallets x $25/mo x 12      $2,160
-   *   Setup                                             $425
-   *   Monthly minimum shortfall, ~6 quiet months      $1,500
+   * Stock lands in October 2027 and is expected to clear by January, so this is
+   * a four month holding period over one gifting season, not a year.
    *
-   * ~$4,265, rounded to $4,500. At survey averages rather than the top of each
-   * range this lands nearer $2,300, so the number carries roughly 2x headroom.
-   * The swing factor is the monthly minimum, not the storage: if the 3PL bills
-   * a $500 floor in months where we ship almost nothing, that dominates.
+   *   Receiving    12 pallets x $15 (top of range)      $180
+   *   Storage      avg 8 pallets x $25/mo x 4 months    $800
+   *   Setup                                             $425
+   *   Monthly minimum, Oct and Jan shortfall            $620
+   *
+   * ~$2,025, rounded to $2,500. Priced at the top of every published range, so
+   * the survey-average case is nearer $1,200.
+   *
+   * The number that actually moves this is not storage, it is the assumption
+   * that the run clears in four months. Minimums average $517 whether or not
+   * anything ships, so every extra month of unsold stock costs roughly $700 in
+   * minimum plus storage. A run that sits until the following holiday roughly
+   * quadruples this line.
    */
-  fulfillment: 4500,
+  fulfillment: 2500,
   /** Only used for a run size with no quoted freight of its own. */
   freightPerThousand: 2000,
   /** Custom playing pieces, quoted per unit rather than as tooling. */
