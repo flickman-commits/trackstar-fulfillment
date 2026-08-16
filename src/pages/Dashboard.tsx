@@ -558,6 +558,50 @@ const REVIEW_PRODUCTS: { name: string; link: string }[] = [
   { name: 'Twin Cities Marathon', link: 'https://yotpo.com/go/A3v2ZhPB' },
 ]
 
+type SettingsPanel = 'pricing' | 'reviews' | 'races' | 'lookup' | 'storefront' | 'diagnostics' | 'maintenance'
+
+/**
+ * Settings navigation. Grouped rather than a flat list because the panels do
+ * genuinely different jobs — a pricing workspace and a destructive cache wipe
+ * should not sit next to each other looking identical.
+ *
+ * `races` and `lookup` open their own full-screen overlays rather than
+ * rendering inline; they are listed here so the nav is the single place you go
+ * looking, not because they share the panel area.
+ */
+const SETTINGS_NAV: {
+  group: string
+  items: { id: SettingsPanel; label: string; blurb: string; icon: typeof Settings }[]
+}[] = [
+  {
+    group: 'Tools',
+    items: [
+      { id: 'pricing', label: 'Pricing Calculator', blurb: 'Costs, retail and margin across DTC and wholesale', icon: DollarSign },
+      { id: 'reviews', label: 'Request Reviews', blurb: 'Copy a review request message for any product', icon: Star },
+    ],
+  },
+  {
+    group: 'Data',
+    items: [
+      { id: 'races', label: 'Race Database', blurb: 'Race dates, locations and weather', icon: CloudSun },
+      { id: 'lookup', label: 'Instant Lookup', blurb: 'Which races work, which need help', icon: Search },
+    ],
+  },
+  {
+    group: 'Storefront',
+    items: [
+      { id: 'storefront', label: 'Customers Served', blurb: 'The counter shown on the Shopify storefront', icon: Users },
+    ],
+  },
+  {
+    group: 'System',
+    items: [
+      { id: 'diagnostics', label: 'Diagnostics', blurb: 'Test connections and run a full health check', icon: FlaskConical },
+      { id: 'maintenance', label: 'Maintenance', blurb: 'Cache and research resets — destructive', icon: Settings },
+    ],
+  },
+]
+
 export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -580,7 +624,8 @@ export default function Dashboard() {
   const bulkStopRef = useRef(false)
   const [bulkSummary, setBulkSummary] = useState<BulkSummary | null>(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [showArteloCosts, setShowArteloCosts] = useState(false)
+  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>('pricing')
+  const [settingsQuery, setSettingsQuery] = useState('')
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
   type HealthCheck = { status: 'ok' | 'warn' | 'error'; detail?: string | null; latency?: string }
   type HealthResults = { overall: string; checks: Record<string, HealthCheck>; error?: string }
@@ -591,7 +636,6 @@ export default function Dashboard() {
   type ConnTestResult = { timestamp: string; providers: { artelo: ConnTestProvider; shopify: ConnTestProvider; etsy: ConnTestProvider }; error?: string }
   const [connTestResults, setConnTestResults] = useState<ConnTestResult | null>(null)
   const [isRunningConnTest, setIsRunningConnTest] = useState(false)
-  const [showReviewRequest, setShowReviewRequest] = useState(false)
 
   // One flag for the consolidated Instant Lookup Dashboard. All
   // of its data fetching lives inside the component now, rather than being
@@ -3049,341 +3093,326 @@ Thank you!`
         {showSettings && (
           <div
             className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
-            onClick={(e) => { if (e.target === e.currentTarget) { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) } }}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowSettings(false) }}
           >
-            {/* The pricing calculator carries eight numeric columns, so it gets a
-                wider shell than the rest of Settings rather than scrolling
-                sideways inside a 2xl box. */}
-            <div className={`bg-white rounded-xl shadow-2xl w-full max-h-[85vh] overflow-hidden ${
-              showArteloCosts ? 'max-w-md md:max-w-5xl' : 'max-w-md md:max-w-2xl'
-            }`}>
-              {showArteloCosts ? (
-                /* Artelo cost matrix */
-                <div className="flex flex-col h-full max-h-[85vh]" style={{ animation: 'slideInRight 200ms ease-out' }}>
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray flex-shrink-0">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setShowArteloCosts(false)}
-                        className="text-off-black/40 hover:text-off-black/70 transition-colors"
-                      >
-                        <ChevronRight className="w-4 h-4 rotate-180" />
-                      </button>
-                      <h2 className="text-base font-semibold text-off-black">Pricing Calculator</h2>
-                    </div>
-                    <button onClick={() => { setShowSettings(false); setShowArteloCosts(false) }} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
-                  </div>
-                  <div className="p-6 flex-1 overflow-y-auto">
-                    <PricingCalculator />
+            {/* Sidebar shell. Settings used to be one scrolling column of cards,
+                which stopped working once panels grew their own controls — the
+                pricing calculator alone is a full workspace. A fixed nav on the
+                left and one panel on the right means a panel can be as complex
+                as it needs to be without burying everything below it. */}
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md md:max-w-5xl h-[85vh] overflow-hidden flex">
+
+              {/* Nav */}
+              <aside className="hidden md:flex w-60 flex-shrink-0 flex-col border-r border-border-gray bg-subtle-gray">
+                <div className="p-3 border-b border-border-gray">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/30" />
+                    <input
+                      value={settingsQuery}
+                      onChange={(e) => setSettingsQuery(e.target.value)}
+                      placeholder="Search settings"
+                      className="w-full pl-8 pr-2.5 py-1.5 text-sm bg-white border border-border-gray rounded-md focus:outline-none focus:ring-2 focus:ring-off-black/15"
+                    />
                   </div>
                 </div>
-              ) : showReviewRequest ? (
-                /* Review Request panel */
-                <div className="flex flex-col h-full max-h-[85vh]" style={{ animation: 'slideInRight 200ms ease-out' }}>
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray flex-shrink-0">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => { setShowReviewRequest(false); setReviewCopied(null) }}
-                        className="text-off-black/40 hover:text-off-black/70 transition-colors"
-                      >
-                        <ChevronRight className="w-4 h-4 rotate-180" />
-                      </button>
-                      <h2 className="text-base font-semibold text-off-black">Which product?</h2>
-                    </div>
-                    <button onClick={() => { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) }} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
+                <nav className="flex-1 overflow-y-auto p-2">
+                  {SETTINGS_NAV.map((group) => {
+                    const items = group.items.filter((i) =>
+                      !settingsQuery.trim() ||
+                      (i.label + ' ' + i.blurb).toLowerCase().includes(settingsQuery.trim().toLowerCase())
+                    )
+                    if (!items.length) return null
+                    return (
+                      <div key={group.group} className="mb-3">
+                        <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/35">{group.group}</p>
+                        {items.map((item) => {
+                          const Icon = item.icon
+                          const active = settingsPanel === item.id
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                if (item.id === 'races') { setShowRaceDatabase(true); return }
+                                if (item.id === 'lookup') { setShowLookupHealth(true); return }
+                                setSettingsPanel(item.id)
+                              }}
+                              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-sm transition-colors ${active ? 'bg-white text-off-black shadow-sm font-medium' : 'text-off-black/65 hover:bg-white/70'}`}
+                            >
+                              <Icon className="w-4 h-4 flex-shrink-0 text-off-black/45" />
+                              <span className="truncate">{item.label}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </nav>
+              </aside>
+
+              {/* Panel */}
+              <div className="flex-1 min-w-0 flex flex-col">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border-gray flex-shrink-0">
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold text-off-black truncate">
+                      {SETTINGS_NAV.flatMap((g) => g.items).find((i) => i.id === settingsPanel)?.label ?? 'Settings'}
+                    </h2>
+                    <p className="text-xs text-off-black/45 truncate">
+                      {SETTINGS_NAV.flatMap((g) => g.items).find((i) => i.id === settingsPanel)?.blurb ?? ''}
+                    </p>
                   </div>
-                  <div className="p-3 flex-1 overflow-y-auto">
-                    {REVIEW_PRODUCTS.map((product) => (
+                  <button onClick={() => setShowSettings(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none flex-shrink-0 ml-4">×</button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5">
+                  {/* Mobile nav — the sidebar is hidden under md. */}
+                  <div className="md:hidden mb-4 flex flex-wrap gap-1.5">
+                    {SETTINGS_NAV.flatMap((g) => g.items).map((item) => (
                       <button
-                        key={product.name}
+                        key={item.id}
                         onClick={() => {
-                          const msg = `If you have 2-seconds would you mind leaving us a review? It really helps us as a young brand. Link here: ${product.link}`
-                          const ta = document.createElement('textarea')
-                          ta.value = msg
-                          ta.style.position = 'fixed'
-                          ta.style.opacity = '0'
-                          document.body.appendChild(ta)
-                          ta.select()
-                          document.execCommand('copy')
-                          document.body.removeChild(ta)
-                          setReviewCopied(product.name)
-                          setTimeout(() => setReviewCopied(null), 2000)
+                          if (item.id === 'races') { setShowRaceDatabase(true); return }
+                          if (item.id === 'lookup') { setShowLookupHealth(true); return }
+                          setSettingsPanel(item.id)
                         }}
-                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-subtle-gray transition-colors flex items-center justify-between group"
+                        className={`px-2.5 py-1 text-xs rounded-md border ${settingsPanel === item.id ? 'bg-off-black text-white border-off-black' : 'bg-white text-off-black/60 border-border-gray'}`}
                       >
-                        <span className="text-sm text-off-black">{product.name}</span>
-                        <span className="text-xs text-off-black/30 group-hover:text-off-black/50 flex items-center gap-1">
-                          {reviewCopied === product.name ? (
-                            <><Check className="w-3.5 h-3.5 text-green-600" /><span className="text-green-600">Copied!</span></>
-                          ) : (
-                            <><Copy className="w-3.5 h-3.5" /> Copy</>
-                          )}
-                        </span>
+                        {item.label}
                       </button>
                     ))}
                   </div>
+
+                  {settingsPanel === 'pricing' && <PricingCalculator />}
+
+                  {settingsPanel === 'reviews' && (
+                    <div>
+                      {REVIEW_PRODUCTS.map((product) => (
+                        <button
+                          key={product.name}
+                          onClick={() => {
+                            const msg = `If you have 2-seconds would you mind leaving us a review? It really helps us as a young brand. Link here: ${product.link}`
+                            const ta = document.createElement('textarea')
+                            ta.value = msg
+                            ta.style.position = 'fixed'
+                            ta.style.opacity = '0'
+                            document.body.appendChild(ta)
+                            ta.select()
+                            document.execCommand('copy')
+                            document.body.removeChild(ta)
+                            setReviewCopied(product.name)
+                            setTimeout(() => setReviewCopied(null), 2000)
+                          }}
+                          className="w-full text-left px-4 py-3 rounded-lg hover:bg-subtle-gray transition-colors flex items-center justify-between group"
+                        >
+                          <span className="text-sm text-off-black">{product.name}</span>
+                          <span className="text-xs text-off-black/30 group-hover:text-off-black/50 flex items-center gap-1">
+                            {reviewCopied === product.name ? (
+                              <><Check className="w-3.5 h-3.5 text-green-600" /><span className="text-green-600">Copied!</span></>
+                            ) : (
+                              <><Copy className="w-3.5 h-3.5" /> Copy</>
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {settingsPanel === 'storefront' && (
+                    <div className="-m-5">
+                {/* Customers Served Counter */}
+                <div className="border-t border-border-gray p-6">
+                  <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
+                    <p className="text-sm font-medium text-off-black">Customers Served Counter</p>
+                    <p className="text-xs mt-0.5 text-off-black/50 mb-3">Adjust the counter displayed on the Shopify storefront. Saves to DB and syncs to Shopify.</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={customersServedInput}
+                        onChange={(e) => setCustomersServedInput(e.target.value)}
+                        placeholder={customersServedCount !== null ? String(customersServedCount) : 'Loading...'}
+                        className="flex-1 min-w-0 rounded-md border border-border-gray px-3 py-1.5 text-sm text-off-black bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                      />
+                      <button
+                        onClick={saveCustomersServedCount}
+                        disabled={isLoadingCounter || customersServedInput === String(customersServedCount)}
+                        className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                      >
+                        {isLoadingCounter && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {isLoadingCounter ? 'Saving…' : 'Update & Sync'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                /* Settings main content */
-                <div className="overflow-y-auto max-h-[85vh]">
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray">
-                    <h2 className="text-base font-semibold text-off-black">Settings</h2>
-                    <button onClick={() => { setShowSettings(false); setShowReviewRequest(false); setReviewCopied(null) }} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none">×</button>
-                  </div>
 
-                  {/* Navigation cards */}
-                  <div className="p-6 space-y-3">
-                    <button
-                      onClick={() => setShowRaceDatabase(true)}
-                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Race Database</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Manage race dates, locations, and weather</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs text-off-black/30">{races.length} {races.length === 1 ? 'race' : 'races'}</span>
-                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
-                        </div>
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={() => setShowArteloCosts(true)}
-                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Pricing Calculator</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Costs, retail and margin across DTC, wholesale and charity</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <DollarSign className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
-                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
-                        </div>
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={() => setShowReviewRequest(true)}
-                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Request Reviews</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Copy a review request message for any product</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Star className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
-                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Instant Lookup Dashboard — one card. These were two
-                        (Scraper Status, Instant Lookup), each blind exactly where
-                        the other could see: traffic data says nothing about a race
-                        nobody visited, and the scraper test said nothing about real
-                        outcomes and only ever checked the current year. */}
-                    <button
-                      onClick={() => setShowLookupHealth(true)}
-                      className="w-full rounded-lg border border-border-gray bg-subtle-gray p-4 hover:bg-off-black/[0.06] transition-colors text-left group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Instant Lookup Dashboard</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Which races work, which need help, and every lookup behind it</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <ChevronRight className="w-4 h-4 text-off-black/30 group-hover:text-off-black/50 transition-colors" />
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-
-                  {/* Customers Served Counter */}
-                  <div className="border-t border-border-gray p-6">
-                    <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
-                      <p className="text-sm font-medium text-off-black">Customers Served Counter</p>
-                      <p className="text-xs mt-0.5 text-off-black/50 mb-3">Adjust the counter displayed on the Shopify storefront. Saves to DB and syncs to Shopify.</p>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="0"
-                          value={customersServedInput}
-                          onChange={(e) => setCustomersServedInput(e.target.value)}
-                          placeholder={customersServedCount !== null ? String(customersServedCount) : 'Loading...'}
-                          className="flex-1 min-w-0 rounded-md border border-border-gray px-3 py-1.5 text-sm text-off-black bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                        />
-                        <button
-                          onClick={saveCustomersServedCount}
-                          disabled={isLoadingCounter || customersServedInput === String(customersServedCount)}
-                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
-                        >
-                          {isLoadingCounter && <Loader2 className="w-3 h-3 animate-spin" />}
-                          {isLoadingCounter ? 'Saving…' : 'Update & Sync'}
-                        </button>
-                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Test Connections — granular Artelo / Shopify / Etsy diagnostics */}
-                  <div className="border-t border-border-gray p-6">
-                    <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">Test Connections</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Step-by-step diagnostics for Artelo, Shopify, and Etsy — tells you exactly which credential or API call is failing.</p>
-                        </div>
-                        <button
-                          onClick={async () => {
-                            setIsRunningConnTest(true)
-                            setConnTestResults(null)
-                            try {
-                              const response = await apiFetch('/api/orders/actions?action=test-connections')
-                              const data = await response.json()
-                              if (!response.ok && !data.providers) {
-                                setConnTestResults({ timestamp: new Date().toISOString(), providers: { artelo: { status: 'error', steps: [] }, shopify: { status: 'error', steps: [] }, etsy: { status: 'error', steps: [] } }, error: data.error || `HTTP ${response.status}` })
-                              } else {
-                                setConnTestResults(data)
-                              }
-                            } catch (err: unknown) {
-                              const msg = err instanceof Error ? err.message : 'Failed to test connections'
-                              setConnTestResults({ timestamp: new Date().toISOString(), providers: { artelo: { status: 'error', steps: [] }, shopify: { status: 'error', steps: [] }, etsy: { status: 'error', steps: [] } }, error: msg })
-                            } finally {
-                              setIsRunningConnTest(false)
-                            }
-                          }}
-                          disabled={isRunningConnTest}
-                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
-                        >
-                          {isRunningConnTest && <Loader2 className="w-3 h-3 animate-spin" />}
-                          {isRunningConnTest ? 'Testing…' : 'Test Connections'}
-                        </button>
+                  {settingsPanel === 'diagnostics' && (
+                    <div className="-m-5">
+                {/* Test Connections — granular Artelo / Shopify / Etsy diagnostics */}
+                <div className="border-t border-border-gray p-6">
+                  <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-off-black">Test Connections</p>
+                        <p className="text-xs mt-0.5 text-off-black/50">Step-by-step diagnostics for Artelo, Shopify, and Etsy — tells you exactly which credential or API call is failing.</p>
                       </div>
+                      <button
+                        onClick={async () => {
+                          setIsRunningConnTest(true)
+                          setConnTestResults(null)
+                          try {
+                            const response = await apiFetch('/api/orders/actions?action=test-connections')
+                            const data = await response.json()
+                            if (!response.ok && !data.providers) {
+                              setConnTestResults({ timestamp: new Date().toISOString(), providers: { artelo: { status: 'error', steps: [] }, shopify: { status: 'error', steps: [] }, etsy: { status: 'error', steps: [] } }, error: data.error || `HTTP ${response.status}` })
+                            } else {
+                              setConnTestResults(data)
+                            }
+                          } catch (err: unknown) {
+                            const msg = err instanceof Error ? err.message : 'Failed to test connections'
+                            setConnTestResults({ timestamp: new Date().toISOString(), providers: { artelo: { status: 'error', steps: [] }, shopify: { status: 'error', steps: [] }, etsy: { status: 'error', steps: [] } }, error: msg })
+                          } finally {
+                            setIsRunningConnTest(false)
+                          }
+                        }}
+                        disabled={isRunningConnTest}
+                        className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                      >
+                        {isRunningConnTest && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {isRunningConnTest ? 'Testing…' : 'Test Connections'}
+                      </button>
+                    </div>
 
-                      {connTestResults && (
-                        <div className="mt-4 space-y-3">
-                          {connTestResults.error && (
-                            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{connTestResults.error}</div>
-                          )}
-                          {(['artelo', 'shopify', 'etsy'] as const).map(provider => {
-                            const p = connTestResults.providers[provider]
-                            if (!p) return null
-                            const providerLabel = { artelo: 'Artelo', shopify: 'Shopify', etsy: 'Etsy' }[provider]
-                            const headerIcon = p.status === 'ok' ? '✅' : p.status === 'warn' ? '⚠️' : '❌'
-                            const headerColor = p.status === 'ok' ? 'text-green-700' : p.status === 'warn' ? 'text-amber-700' : 'text-red-700'
-                            const bgColor = p.status === 'ok' ? 'bg-green-50 border-green-200' : p.status === 'warn' ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'
-                            return (
-                              <div key={provider} className={`rounded border ${bgColor} p-3`}>
-                                <div className={`text-xs font-bold ${headerColor} uppercase tracking-wide mb-2`}>
-                                  {headerIcon} {providerLabel}
-                                </div>
-                                <div className="space-y-1.5">
-                                  {p.steps.map((step, idx) => (
-                                    <div key={idx} className="flex items-start gap-2 text-xs">
-                                      <span className="flex-shrink-0 mt-0.5">{step.status === 'ok' ? '✅' : step.status === 'warn' ? '⚠️' : '❌'}</span>
-                                      <div className="min-w-0 flex-1">
-                                        <span className="font-medium text-off-black">{step.name}</span>
-                                        {step.latency && <span className="text-off-black/30 ml-1.5">({step.latency})</span>}
-                                        <div className={`mt-0.5 ${step.status === 'ok' ? 'text-off-black/60' : step.status === 'warn' ? 'text-amber-700' : 'text-red-700'}`}>
-                                          {step.message}
-                                        </div>
-                                        {step.detail && (
-                                          <div className="mt-1 px-2 py-1 bg-white/60 border border-black/5 rounded font-mono text-[10px] text-off-black/60 break-all whitespace-pre-wrap">
-                                            {step.detail}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
+                    {connTestResults && (
+                      <div className="mt-4 space-y-3">
+                        {connTestResults.error && (
+                          <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{connTestResults.error}</div>
+                        )}
+                        {(['artelo', 'shopify', 'etsy'] as const).map(provider => {
+                          const p = connTestResults.providers[provider]
+                          if (!p) return null
+                          const providerLabel = { artelo: 'Artelo', shopify: 'Shopify', etsy: 'Etsy' }[provider]
+                          const headerIcon = p.status === 'ok' ? '✅' : p.status === 'warn' ? '⚠️' : '❌'
+                          const headerColor = p.status === 'ok' ? 'text-green-700' : p.status === 'warn' ? 'text-amber-700' : 'text-red-700'
+                          const bgColor = p.status === 'ok' ? 'bg-green-50 border-green-200' : p.status === 'warn' ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'
+                          return (
+                            <div key={provider} className={`rounded border ${bgColor} p-3`}>
+                              <div className={`text-xs font-bold ${headerColor} uppercase tracking-wide mb-2`}>
+                                {headerIcon} {providerLabel}
                               </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* System Health Check */}
-                  <div className="border-t border-border-gray p-6">
-                    <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-off-black">System Health Check</p>
-                          <p className="text-xs mt-0.5 text-off-black/50">Tests database, Etsy, Shopify, Resend, and Slack connections. Runs automatically every Monday at 12pm.</p>
-                        </div>
-                        <button
-                          onClick={async () => {
-                            setIsRunningHealth(true)
-                            setHealthResults(null)
-                            try {
-                              const response = await apiFetch('/api/orders/actions?action=health-check')
-                              const data = await response.json()
-                              if (!response.ok && !data.checks) {
-                                setHealthResults({ overall: 'error', checks: {}, error: data.error || `HTTP ${response.status}` })
-                              } else {
-                                setHealthResults(data)
-                              }
-                            } catch (err) {
-                              setHealthResults({ overall: 'error', checks: {}, error: err instanceof Error ? err.message : 'Failed to run health check' })
-                            } finally {
-                              setIsRunningHealth(false)
-                            }
-                          }}
-                          disabled={isRunningHealth}
-                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
-                        >
-                          {isRunningHealth && <Loader2 className="w-3 h-3 animate-spin" />}
-                          {isRunningHealth ? 'Checking…' : 'Run Health Check'}
-                        </button>
-                      </div>
-
-                      {healthResults && (
-                        <div className="mt-3 space-y-1.5">
-                          <div className={`text-xs font-medium ${healthResults.overall === 'healthy' ? 'text-green-600' : healthResults.overall === 'degraded' ? 'text-amber-600' : 'text-red-600'}`}>
-                            {healthResults.overall === 'healthy' ? '✅ All systems healthy' : healthResults.overall === 'degraded' ? '⚠️ Some systems degraded' : '🚨 Critical issues detected'}
-                          </div>
-                          {healthResults.error && (
-                            <div className="text-xs text-red-500 mt-1">{healthResults.error}</div>
-                          )}
-                          {healthResults.checks && Object.entries(healthResults.checks).map(([name, check]) => (
-                            <div key={name} className="flex items-start gap-2 text-xs">
-                              <span className="flex-shrink-0 mt-0.5">{check.status === 'ok' ? '✅' : check.status === 'warn' ? '⚠️' : '❌'}</span>
-                              <div className="min-w-0">
-                                <span className="font-medium text-off-black capitalize">{name}</span>
-                                <span className="text-off-black/50 ml-1.5">{check.detail}</span>
-                                {check.latency && <span className="text-off-black/30 ml-1">({check.latency})</span>}
+                              <div className="space-y-1.5">
+                                {p.steps.map((step, idx) => (
+                                  <div key={idx} className="flex items-start gap-2 text-xs">
+                                    <span className="flex-shrink-0 mt-0.5">{step.status === 'ok' ? '✅' : step.status === 'warn' ? '⚠️' : '❌'}</span>
+                                    <div className="min-w-0 flex-1">
+                                      <span className="font-medium text-off-black">{step.name}</span>
+                                      {step.latency && <span className="text-off-black/30 ml-1.5">({step.latency})</span>}
+                                      <div className={`mt-0.5 ${step.status === 'ok' ? 'text-off-black/60' : step.status === 'warn' ? 'text-amber-700' : 'text-red-700'}`}>
+                                        {step.message}
+                                      </div>
+                                      {step.detail && (
+                                        <div className="mt-1 px-2 py-1 bg-white/60 border border-black/5 rounded font-mono text-[10px] text-off-black/60 break-all whitespace-pre-wrap">
+                                          {step.detail}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Danger zone */}
-                  <div className="border-t border-border-gray p-6">
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-red-700">Clear Runner Research</p>
-                          <p className="text-xs mt-0.5 text-red-500">Deletes cached bib, time, and pace data for orders that haven&apos;t been marked complete, sending them back to &quot;Ready to research&quot;. Completed orders keep their data. Use after fixing a scraper bug.</p>
-                        </div>
-                        <button
-                          onClick={() => runSettingsAction('clear-research')}
-                          disabled={settingsAction !== null}
-                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700"
-                        >
-                          {settingsAction === 'clear-research' && <Loader2 className="w-3 h-3 animate-spin" />}
-                          {settingsAction === 'clear-research' ? 'Running…' : 'Run'}
-                        </button>
+                          )
+                        })}
                       </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* System Health Check */}
+                <div className="border-t border-border-gray p-6">
+                  <div className="rounded-lg border border-border-gray bg-subtle-gray p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-off-black">System Health Check</p>
+                        <p className="text-xs mt-0.5 text-off-black/50">Tests database, Etsy, Shopify, Resend, and Slack connections. Runs automatically every Monday at 12pm.</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setIsRunningHealth(true)
+                          setHealthResults(null)
+                          try {
+                            const response = await apiFetch('/api/orders/actions?action=health-check')
+                            const data = await response.json()
+                            if (!response.ok && !data.checks) {
+                              setHealthResults({ overall: 'error', checks: {}, error: data.error || `HTTP ${response.status}` })
+                            } else {
+                              setHealthResults(data)
+                            }
+                          } catch (err) {
+                            setHealthResults({ overall: 'error', checks: {}, error: err instanceof Error ? err.message : 'Failed to run health check' })
+                          } finally {
+                            setIsRunningHealth(false)
+                          }
+                        }}
+                        disabled={isRunningHealth}
+                        className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-off-black text-white hover:bg-off-black/80"
+                      >
+                        {isRunningHealth && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {isRunningHealth ? 'Checking…' : 'Run Health Check'}
+                      </button>
+                    </div>
+
+                    {healthResults && (
+                      <div className="mt-3 space-y-1.5">
+                        <div className={`text-xs font-medium ${healthResults.overall === 'healthy' ? 'text-green-600' : healthResults.overall === 'degraded' ? 'text-amber-600' : 'text-red-600'}`}>
+                          {healthResults.overall === 'healthy' ? '✅ All systems healthy' : healthResults.overall === 'degraded' ? '⚠️ Some systems degraded' : '🚨 Critical issues detected'}
+                        </div>
+                        {healthResults.error && (
+                          <div className="text-xs text-red-500 mt-1">{healthResults.error}</div>
+                        )}
+                        {healthResults.checks && Object.entries(healthResults.checks).map(([name, check]) => (
+                          <div key={name} className="flex items-start gap-2 text-xs">
+                            <span className="flex-shrink-0 mt-0.5">{check.status === 'ok' ? '✅' : check.status === 'warn' ? '⚠️' : '❌'}</span>
+                            <div className="min-w-0">
+                              <span className="font-medium text-off-black capitalize">{name}</span>
+                              <span className="text-off-black/50 ml-1.5">{check.detail}</span>
+                              {check.latency && <span className="text-off-black/30 ml-1">({check.latency})</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                    </div>
+                  )}
+
+                  {settingsPanel === 'maintenance' && (
+                    <div className="-m-5">
+                {/* Danger zone */}
+                <div className="border-t border-border-gray p-6">
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-red-700">Clear Runner Research</p>
+                        <p className="text-xs mt-0.5 text-red-500">Deletes cached bib, time, and pace data for orders that haven&apos;t been marked complete, sending them back to &quot;Ready to research&quot;. Completed orders keep their data. Use after fixing a scraper bug.</p>
+                      </div>
+                      <button
+                        onClick={() => runSettingsAction('clear-research')}
+                        disabled={settingsAction !== null}
+                        className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700"
+                      >
+                        {settingsAction === 'clear-research' && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {settingsAction === 'clear-research' ? 'Running…' : 'Run'}
+                      </button>
                     </div>
                   </div>
                 </div>
-              )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
