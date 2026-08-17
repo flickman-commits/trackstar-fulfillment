@@ -105,10 +105,11 @@ export default function Monopoly() {
   }, [])
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null)
 
+  // This is what a race director sees in a text message preview, so it reads
+  // as the product rather than as a document about the product.
   useDocumentHead({
-    title: 'Marathon Monopoly, Partnership Offer',
-    description:
-      'A limited-edition Monopoly board game for the sport of running. 22 race spaces, printed once, permanent.',
+    title: 'Marathon Monopoly',
+    description: "The world's greatest marathons, on the most famous board game ever made.",
     noindex: true,
   })
 

@@ -161,6 +161,39 @@ function isMonopolyHost(): boolean {
   return window.location.hostname.split('.')[0] === 'monopoly'
 }
 
+/** The one canonical address for the partnership page. */
+const MONOPOLY_ORIGIN = 'https://monopoly.trackstar.art'
+
+/**
+ * Sends an old /monopoly link to the subdomain that now owns the page.
+ *
+ * A hard redirect rather than a removed route, because links to
+ * fast.trackstar.art/monopoly are already in race directors' inboxes and a 404
+ * is a worse answer than a redirect. The query string survives so a
+ * personalised ?p= link still greets the right race.
+ *
+ * Only fires on the real domain. On localhost the page keeps rendering in
+ * place, otherwise every local run of /monopoly would bounce to production.
+ */
+function RedirectToMonopolyHost({ path = '/' }: { path?: string }) {
+  const onProduction = window.location.hostname.endsWith('trackstar.art')
+
+  useEffect(() => {
+    if (onProduction) {
+      window.location.replace(`${MONOPOLY_ORIGIN}${path}${window.location.search}`)
+    }
+  }, [onProduction, path])
+
+  if (onProduction) return null
+  return path === '/model' ? (
+    <PasswordGate>
+      <MonopolyModel />
+    </PasswordGate>
+  ) : (
+    <Monopoly />
+  )
+}
+
 export default function App() {
   if (isMonopolyHost()) {
     return (
@@ -207,7 +240,8 @@ export default function App() {
           <Route path="/approve/:token" element={<ApprovalPortal />} />
           <Route path="/creator/:token" element={<CreatorPortal />} />
           <Route path="/apply" element={<CreatorApply />} />
-          <Route path="/monopoly" element={<Monopoly />} />
+          {/* The page lives on monopoly.trackstar.art now. */}
+          <Route path="/monopoly" element={<RedirectToMonopolyHost />} />
 
           {/* Protected routes */}
           <Route path="/*" element={
@@ -218,7 +252,7 @@ export default function App() {
                 <Route path="/creators" element={<CreatorsHome />} />
                 <Route path="/products" element={<ProductsBulkEdit />} />
                 <Route path="/briefs" element={<BriefsAdmin />} />
-                <Route path="/monopoly/model" element={<MonopolyModel />} />
+                <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>
             </PasswordGate>
           } />
