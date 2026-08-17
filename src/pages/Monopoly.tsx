@@ -257,29 +257,6 @@ export default function Monopoly() {
           ))}
         </div>
 
-        {/* The license is not signed. Saying so here, unprompted and above the
-            fold of the objections, is worth more than the claim it replaces: a
-            race director who finds it out on their own stops believing the rest
-            of the page, and the honest version is the better argument anyway,
-            because their commitment is what secures it. */}
-        <div
-          className="mt-10 px-6 py-6 sm:px-8"
-          style={{ backgroundColor: MONOPOLY.paper, border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
-        >
-          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: MONOPOLY.inkMuted }}>
-            Where the license stands
-          </p>
-          <p className="mt-2" style={{ fontSize: 17, color: MONOPOLY.ink, lineHeight: 1.6, maxWidth: '46rem' }}>
-            We have a verbal commitment from the company that holds the sole rights to create custom
-            Monopoly editions. They have told us that once all 22 races are signed up, they can get
-            this edition approved.
-          </p>
-          <p className="mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-            That is why the board is being filled first. If it does not work out for any reason, you
-            get all of your money back.
-          </p>
-        </div>
-
         {/* Said once, near the images, rather than left for a race director to
             work out from the misspelt words inside them. */}
         <p className="mt-6" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
