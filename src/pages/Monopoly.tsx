@@ -21,7 +21,7 @@ import { ExposureModel } from '@/components/monopoly/ExposureModel'
 import { BrandLockup } from '@/components/monopoly/BrandLockup'
 import PriceExpectation from '@/components/monopoly/PriceExpectation'
 import { UnitFlow } from '@/components/monopoly/UnitFlow'
-import { PlaceholderImage } from '@/components/monopoly/PlaceholderImage'
+import { ProductImage } from '@/components/monopoly/ProductImage'
 import { MONOPOLY, UI_RADIUS, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import {
@@ -249,13 +249,21 @@ export default function Monopoly() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {PRODUCT_SHOTS.map((shot) => (
             <div key={shot.label}>
-              <PlaceholderImage label="Image coming" />
+              <ProductImage src={shot.src} label={shot.label} />
               <div className="mt-3" style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
                 {shot.label}
               </div>
             </div>
           ))}
         </div>
+
+        {/* Said once, near the images, rather than left for a race director to
+            work out from the misspelt words inside them. */}
+        <p className="mt-6" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
+          Concept renders. The races shown are illustrative rather than confirmed. Board design,
+          artwork and game rules are all subject to change during the 12-week design and development
+          period, which begins once every space is committed.
+        </p>
       </Section>
 
       {/* ═══ WHY NOW ═══
@@ -310,8 +318,8 @@ export default function Monopoly() {
 
         {/* Two, matching the two beats above them. */}
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          <PlaceholderImage label="Family around the board on the living room floor" aspect="aspect-[4/3]" />
-          <PlaceholderImage label="Parent and kid mid-game, medals on the wall behind" aspect="aspect-[4/3]" />
+          <ProductImage label="Family around the board on the living room floor" aspect="aspect-[4/3]" />
+          <ProductImage label="Parent and kid mid-game, medals on the wall behind" aspect="aspect-[4/3]" />
         </div>
       </Section>
 
@@ -640,8 +648,9 @@ export default function Monopoly() {
         style={{ borderTop: `2px solid ${MONOPOLY.black}`, backgroundColor: MONOPOLY.paper }}
       >
         <p style={{ fontSize: 13, color: MONOPOLY.inkMuted, lineHeight: 1.6 }}>
-          Marathon Monopoly is an officially licensed edition. Board renderings are indicative and
-          subject to design approval.
+          Marathon Monopoly is an officially licensed edition. All imagery is a concept render.
+          Board design, artwork and game rules are subject to change during the 12-week design and
+          development period.
         </p>
       </footer>
 

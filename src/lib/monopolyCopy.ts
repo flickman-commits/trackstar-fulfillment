@@ -339,14 +339,18 @@ export const LAUNCH_PLAN = [
 ]
 
 /**
- * Product shots. Real renders do not exist yet, so these are square
- * placeholders holding the exact slots the finished imagery will fill.
+ * Product shots.
+ *
+ * Concept renders, not photographs: the board has not been designed yet, so
+ * anything legible inside them is illustrative. The set follows what we
+ * actually have imagery of rather than an idealised list, which is why there
+ * is no box shot here. An entry with no `src` renders as a reserved slot.
  */
-export const PRODUCT_SHOTS = [
-  { label: 'The Box' },
-  { label: 'The Board' },
-  { label: 'The Pieces' },
-  { label: 'Title Deeds' },
+export const PRODUCT_SHOTS: { label: string; src?: string }[] = [
+  { label: 'The Board', src: '/monopoly/board.jpg' },
+  { label: 'The Pieces', src: '/monopoly/pieces.jpg' },
+  { label: 'Title Deeds', src: '/monopoly/title-deed.jpg' },
+  { label: 'The Cards', src: '/monopoly/community-chest.jpg' },
 ]
 
 export const FAQ: FaqItem[] = [
@@ -364,6 +368,11 @@ export const FAQ: FaqItem[] = [
     question: 'Will there be sponsors on the board competing with our own race sponsors?',
     answer:
       'The only other sponsors on the board will be title sponsors that individual races choose to put on their own title deed card. Other than that we are not taking on third-party sponsors anywhere on the board, so nothing appears beside your race that you did not agree to.',
+  },
+  {
+    question: 'Is the board design final?',
+    answer:
+      'No. Everything you have seen is a concept render. The board layout, artwork, tokens and game rules are all worked out during the 12-week design and development period, which starts once all 22 spaces are committed, and you approve how your own race appears before anything prints.',
   },
   {
     question: 'Will we have control of how our marks appear?',

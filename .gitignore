@@ -35,3 +35,8 @@ dist-ssr
 .env*.local
 .env.vercel-check
 products_export.csv
+
+# Full-resolution Monopoly concept renders. Web-optimised copies live in
+# public/monopoly/ and are what the page serves; the multi-megabyte originals
+# stay out of the repo.
+public/Marathon Monopoly Image*.jpeg
