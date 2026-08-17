@@ -36,7 +36,8 @@ dist-ssr
 .env.vercel-check
 products_export.csv
 
-# Full-resolution Monopoly concept renders. Web-optimised copies live in
+# Full-resolution Monopoly concept renders. Web-optimized copies live in
 # public/monopoly/ and are what the page serves; the multi-megabyte originals
-# stay out of the repo.
-public/Marathon Monopoly Image*.jpeg
+# stay out of the repo and out of any directory Vite serves.
+.image-source/
+public/Marathon Monopoly*.jpeg
