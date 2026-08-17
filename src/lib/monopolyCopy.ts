@@ -233,7 +233,7 @@ export const SALES_PLAN: SalesPlanItem[] = [
   },
   {
     title: '2027 holiday gift guides',
-    body: 'Placement is being pursued now. A licensed board game for a sport that has never had one is an easy story to place.',
+    body: 'Placement is being pursued now. An official Monopoly edition for a sport that has never had one is an easy story to place.',
   },
 ]
 
@@ -355,9 +355,9 @@ export const PRODUCT_SHOTS: { label: string; src?: string }[] = [
 
 export const FAQ: FaqItem[] = [
   {
-    question: 'Is this actually official?',
+    question: 'Is this officially licensed yet?',
     answer:
-      "Yes. We're working with the company that holds the sole rights from Hasbro to create official custom editions of MONOPOLY.",
+      "Not yet, and we would rather tell you that than have you find it out later. We are in active conversations with the company that holds the sole rights from Hasbro to create official custom editions of MONOPOLY, and they have given us a verbal commitment. The licence is granted on the strength of the edition we bring them, so filling this board is what secures it. Nothing prints, and nothing beyond your refundable deposit is due, until it is signed.",
   },
   {
     question: 'What if we do not have the infrastructure to hold and sell inventory?',
@@ -380,9 +380,9 @@ export const FAQ: FaqItem[] = [
       'Yes. You have approval rights on your name, your marks and how your course is represented, and nothing prints until you have signed it off.',
   },
   {
-    question: 'What if you cannot fill the board?',
+    question: 'What if you cannot fill the board, or the licence does not come through?',
     answer:
-      'Every deposit is refundable in full. Nothing prints until the board is committed and funded, so there is no version of this where you have paid for something that does not exist.',
+      'Every deposit is refundable in full, for either reason. Nothing prints until the board is committed, the licence is executed and the run is funded, so there is no version of this where you have paid for something that does not exist.',
   },
   {
     question: 'How long does this last?',

@@ -108,7 +108,7 @@ export default function Monopoly() {
   useDocumentHead({
     title: 'Marathon Monopoly, Partnership Offer',
     description:
-      'An officially licensed Monopoly edition for the sport of running. 22 race spaces, printed once, permanent.',
+      'A limited-edition Monopoly board game for the sport of running. 22 race spaces, printed once, permanent.',
     noindex: true,
   })
 
@@ -242,9 +242,9 @@ export default function Monopoly() {
       <Section>
         <SectionHeading>What it is</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          Marathon Monopoly is a licensed, limited-edition Monopoly board game created to celebrate
-          the best marathons in the country. It has everything a normal Monopoly game has, but
-          reimagined for marathons.
+          Marathon Monopoly is a limited-edition Monopoly board game created to celebrate the best
+          marathons in the country. It has everything a normal Monopoly game has, but reimagined for
+          marathons.
         </p>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {PRODUCT_SHOTS.map((shot) => (
@@ -255,6 +255,29 @@ export default function Monopoly() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* The licence is not signed. Saying so here, unprompted and above the
+            fold of the objections, is worth more than the claim it replaces: a
+            race director who finds it out on their own stops believing the rest
+            of the page, and the honest version is the better argument anyway,
+            because their commitment is what secures it. */}
+        <div
+          className="mt-10 px-6 py-6 sm:px-8"
+          style={{ backgroundColor: MONOPOLY.paper, border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
+        >
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: MONOPOLY.inkMuted }}>
+            Where the licence stands
+          </p>
+          <p className="mt-2" style={{ fontSize: 17, color: MONOPOLY.ink, lineHeight: 1.6, maxWidth: '46rem' }}>
+            We are in active conversations with the company that holds the sole rights from Hasbro to
+            create official custom Monopoly editions, and we have a verbal commitment from them.
+          </p>
+          <p className="mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
+            The licence is granted on the strength of the edition we bring them. A full board of 22
+            world-class marathons is that case, which is why these spaces are being filled first.
+            Nothing prints, and nothing beyond your refundable deposit is due, until it is signed.
+          </p>
         </div>
 
         {/* Said once, near the images, rather than left for a race director to
@@ -653,9 +676,9 @@ export default function Monopoly() {
         style={{ borderTop: `2px solid ${MONOPOLY.black}`, backgroundColor: MONOPOLY.paper }}
       >
         <p style={{ fontSize: 13, color: MONOPOLY.inkMuted, lineHeight: 1.6 }}>
-          Marathon Monopoly is an officially licensed edition. All imagery is a concept render.
-          Board design, artwork and game rules are subject to change during the 12-week design and
-          development period.
+          Marathon Monopoly is a proposed official Monopoly edition. The licence is in negotiation
+          and not yet executed. All imagery is a concept render, and board design, artwork and game
+          rules are subject to change during the 12-week design and development period.
         </p>
       </footer>
 
