@@ -241,10 +241,14 @@ export default function Monopoly() {
           them reading about Dollywood for a screen before seeing the box. */}
       <Section>
         <SectionHeading>What it is</SectionHeading>
-        <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+        <p className="mb-4 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
           Marathon Monopoly is a limited-edition Monopoly board game created to celebrate the best
-          marathons in the country. It has everything a normal Monopoly game has, but reimagined for
-          marathons.
+          marathons in the country.
+        </p>
+        <p className="mb-8" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          Every space is a world-class marathon. Land on one and you pay the registration fee. Travel
+          the board, buy up marathons, add aid stations, and start charging fees of your own. It is a
+          way for runners to connect over the sport they love and discover new races.
         </p>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {PRODUCT_SHOTS.map((shot) => (
