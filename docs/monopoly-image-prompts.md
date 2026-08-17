@@ -14,7 +14,7 @@ Three things went wrong, and all three are fixable in the prompt:
    The fix is a **text whitelist**: name the few strings allowed to be legible
    and explicitly require everything else to be too small or too soft to read.
 2. **A manufacturer logo.** Every render invented a mangled Hasbro mark. We do
-   not have the licence yet, so it should not appear at all, garbled or not.
+   not have the license yet, so it should not appear at all, garbled or not.
 3. **Real race names.** New York City Marathon, Marine Corps and California
    International all appeared. None have committed. Use the colour-tier
    placeholder names the real board component already uses.
@@ -37,6 +37,7 @@ CONSISTENT ACROSS THE WHOLE SET:
 - Playing pieces are matte pewter / antiqued silver die-cast metal.
 - Overall feel: a premium modern board-game press kit. Crisp, clean, uncluttered.
 - Shot on a 50mm lens, natural colour, no heavy vignette, no HDR look.
+- SQUARE 1:1 aspect ratio. Every image in this set is square.
 
 HARD RULES:
 - NO manufacturer branding anywhere in frame. No Hasbro, no Parker Brothers,
@@ -198,8 +199,8 @@ Monopoly board from the reference image, with cards fanned at the edges,
 metal pieces on the spaces, and a couple of finisher medals resting nearby.
 
 Late-afternoon window light from the left, warm and soft. Shot at f/2.8 so the
-people and the board are sharp and the room falls away gently. Horizontal 16:9
-composition with headroom above the faces and the full board visible.
+people and the board are sharp and the room falls away gently. SQUARE 1:1
+composition, with headroom above the faces and the full board visible.
 
 LEGIBLE TEXT ALLOWED: "MARATHON MONOPOLY" on the board centre only. Every
 other word on the board and cards must be too small or too soft to read.

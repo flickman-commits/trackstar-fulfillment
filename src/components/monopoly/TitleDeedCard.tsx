@@ -31,17 +31,17 @@ const HOUSE_ROWS = [
 /**
  * What a non-property square says on its card.
  *
- * The four corners matter most here: they are fixed by the Monopoly licence and
+ * The four corners matter most here: they are fixed by the Monopoly license and
  * appear unchanged on every edition ever printed, so anyone clicking one needs
  * to understand it is not inventory rather than assume it is simply unsold.
  */
 function copyForType(type: BoardSpace['type']): string {
   switch (type) {
     case 'corner':
-      return 'Fixed by the Monopoly licence. The four corners keep their original names and artwork on every edition ever printed, so this square cannot be renamed, sponsored or sold.'
+      return 'Fixed by the Monopoly license. The four corners keep their original names and artwork on every edition ever printed, so this square cannot be renamed, sponsored or sold.'
     case 'chance':
     case 'chest':
-      return 'The deck keeps its original name under the licence. What changes is the cards inside it, which are written for this edition.'
+      return 'The deck keeps its original name under the license. What changes is the cards inside it, which are written for this edition.'
     case 'tax':
       return 'Renamed for this edition to suit the sport. Not a partner space.'
     default:

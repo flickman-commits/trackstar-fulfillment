@@ -176,7 +176,7 @@ export interface MonopolySalesResponse {
   spaceSales: Record<string, Partial<Pick<BoardSpace, 'displayName' | 'status' | 'tierKey' | 'partnerName' | 'logoUrl' | 'blurb' | 'raceSlug'>>>
   unlocked: boolean
   stale?: boolean
-  /** Present when the request carried a recognised ?p= slug. */
+  /** Present when the request carried a recognized ?p= slug. */
   personalizedFor?: { raceSlug: string; displayName: string; spaceKey: string }
 }
 
@@ -194,7 +194,7 @@ export interface MonopolyPublicPayload {
   }
   /** True when this response already includes the gated fields. */
   unlocked: boolean
-  /** Set when the page was opened with a recognised ?p= slug. */
+  /** Set when the page was opened with a recognized ?p= slug. */
   personalizedFor?: {
     raceSlug: string
     displayName: string

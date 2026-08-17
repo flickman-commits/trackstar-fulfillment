@@ -257,7 +257,7 @@ export default function Monopoly() {
           ))}
         </div>
 
-        {/* The licence is not signed. Saying so here, unprompted and above the
+        {/* The license is not signed. Saying so here, unprompted and above the
             fold of the objections, is worth more than the claim it replaces: a
             race director who finds it out on their own stops believing the rest
             of the page, and the honest version is the better argument anyway,
@@ -267,7 +267,7 @@ export default function Monopoly() {
           style={{ backgroundColor: MONOPOLY.paper, border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
         >
           <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: MONOPOLY.inkMuted }}>
-            Where the licence stands
+            Where the license stands
           </p>
           <p className="mt-2" style={{ fontSize: 17, color: MONOPOLY.ink, lineHeight: 1.6, maxWidth: '46rem' }}>
             We have a verbal commitment from the company that holds the sole rights to create custom
@@ -342,11 +342,13 @@ export default function Monopoly() {
         {/* One image, wide. Two side by side were competing for the same job,
             and this is the whole argument in a single frame: the board on a
             table with a family around it. */}
-        <div className="mt-10">
+        {/* Square, matching the source, so nothing is cropped away. Capped in
+            width because a full-bleed square would be taller than the viewport
+            on a laptop and push the rest of the section off the screen. */}
+        <div className="mt-10 max-w-2xl">
           <ProductImage
             src="/monopoly/family.jpg"
             label="A family playing Marathon Monopoly around a kitchen table"
-            aspect="aspect-[16/9]"
           />
         </div>
       </Section>
@@ -676,7 +678,7 @@ export default function Monopoly() {
         style={{ borderTop: `2px solid ${MONOPOLY.black}`, backgroundColor: MONOPOLY.paper }}
       >
         <p style={{ fontSize: 13, color: MONOPOLY.inkMuted, lineHeight: 1.6 }}>
-          Marathon Monopoly is a proposed official Monopoly edition. The licence is in negotiation
+          Marathon Monopoly is a proposed official Monopoly edition. The license is in negotiation
           and not yet executed. All imagery is a concept render, and board design, artwork and game
           rules are subject to change during the 12-week design and development period.
         </p>

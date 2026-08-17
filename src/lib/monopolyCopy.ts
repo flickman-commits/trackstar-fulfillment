@@ -78,7 +78,7 @@ export const TIERS: TierDef[] = [
     fee: 16000,
     unitsIncluded: 5,
     features: [
-      'The two most recognised spaces on any Monopoly board',
+      'The two most recognized spaces on any Monopoly board',
       'Largest name treatment on the board',
       ...COMMON_FEATURES,
     ],
@@ -380,9 +380,9 @@ export const FAQ: FaqItem[] = [
       'Yes. You have approval rights on your name, your marks and how your course is represented, and nothing prints until you have signed it off.',
   },
   {
-    question: 'What if you cannot fill the board, or the licence does not come through?',
+    question: 'What if you cannot fill the board, or the license does not come through?',
     answer:
-      'Every deposit is refundable in full, for either reason. Nothing prints until the board is committed, the licence is executed and the run is funded, so there is no version of this where you have paid for something that does not exist.',
+      'Every deposit is refundable in full, for either reason. Nothing prints until the board is committed, the license is executed and the run is funded, so there is no version of this where you have paid for something that does not exist.',
   },
   {
     question: 'How long does this last?',

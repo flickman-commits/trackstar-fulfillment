@@ -454,7 +454,7 @@ export function calculateScenario(
  *
  *   - Manufacturer takes 50% at PO and 50% before shipping. Standard, and the
  *     single biggest driver of the low point.
- *   - Legal is paid when the licence is signed, design during design.
+ *   - Legal is paid when the license is signed, design during design.
  *   - Race fees: deposits on reservation, 50% when the board fills, the balance
  *     on delivery.
  *   - Wholesale units are invoiced when they ship to the race, at delivery.

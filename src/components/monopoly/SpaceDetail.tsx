@@ -273,7 +273,7 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
 
             {!sellable && (
               <p style={{ fontSize: 13, color: MONOPOLY.inkMuted, lineHeight: 1.6 }}>
-                Not for sale. The four corners are fixed by the Monopoly licence and cannot be
+                Not for sale. The four corners are fixed by the Monopoly license and cannot be
                 renamed, and the Chance and Community Chest decks are written as part of the
                 edition itself.
               </p>

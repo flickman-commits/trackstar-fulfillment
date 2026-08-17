@@ -76,7 +76,7 @@ export function Board({
           className="relative flex items-center justify-center overflow-hidden"
         >
           {/* Chance and Community Chest, angled into opposite quadrants the way
-              they sit on the original. The deck names are fixed by the licence;
+              they sit on the original. The deck names are fixed by the license;
               the card contents are where the running edition lives. */}
           <CardDeck label="Chance" color="#F7941D" corner="topRight" />
           <CardDeck label="Community Chest" color="#5BA4D9" corner="bottomLeft" />
