@@ -249,7 +249,7 @@ export const SALES_PLAN: SalesPlanItem[] = [
  *
  * Which quotes get featured is an editorial call. Which numbers feed the chart
  * is not: 15 people wrote back, two said outright they would not buy, and the
- * guesses ran $20 to $199 against a $45 direct price. PRICE_ANSWERS below is
+ * guesses ran $20 to $199 against a $55 direct price. PRICE_ANSWERS below is
  * every figure anybody named, including the ones not quoted here, because
  * dropping the low end would move the median and that is choosing a number
  * rather than reporting one.

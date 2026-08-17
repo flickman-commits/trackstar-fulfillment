@@ -23,6 +23,7 @@ import { apiFetch } from '@/lib/api'
 import {
   calculateScenario,
   calculateCashFlow,
+  TARGET_NET,
   COMPED_SLOT_COUNT,
   calculateAllInCost,
   wholesaleMargin,
@@ -34,8 +35,12 @@ import {
   type ScenarioInput,
 } from '@/lib/monopolyMath'
 import { DEPOSIT_AMOUNT, TIERS } from '@/lib/monopolyCopy'
+import { TIER_SLOT_COUNTS } from '@/lib/monopolyBoardLayout'
 import type { MonopolyInternalPayload } from '@/lib/monopolyTypes'
 import { useDocumentHead } from '@/lib/useDocumentHead'
+
+/** The dearest tier, read off the ladder so a repricing cannot strand it. */
+const TOP_TIER_KEY = [...TIERS].sort((a, b) => b.fee - a.fee)[0]?.tierKey
 
 const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 const STORAGE_KEY = 'monopoly-model-scenario'
@@ -181,7 +186,15 @@ export default function MonopolyModel() {
               preset is loaded instead of replacing it. */}
           <Chip
             active={input.compTopTierSlots}
-            onClick={() => set('compTopTierSlots', !input.compTopTierSlots)}
+            onClick={() =>
+              setInput({
+                ...input,
+                compTopTierSlots: !input.compTopTierSlots,
+                // Comping the majors only means anything on a full board, so
+                // the scenario fills it rather than leaving the reader to.
+                ...(input.compTopTierSlots ? {} : { racesByTier: spreadRaces(22) }),
+              })
+            }
           >
             Majors not paying
             {input.compTopTierSlots && ` · ${formatMoney(result.compedFees)} waived`}
@@ -204,19 +217,34 @@ export default function MonopolyModel() {
               {TIERS.map((tier) => {
                 const actual = data.committed.find((c) => c.tierKey === tier.tierKey)?.count ?? 0
                 const value = input.racesByTier[tier.tierKey] ?? 0
+                // Mirrors calculateScenario: the dearest tier, up to two.
+                const comped =
+                  input.compTopTierSlots && tier.tierKey === TOP_TIER_KEY
+                    ? Math.min(COMPED_SLOT_COUNT, value)
+                    : 0
                 return (
                   <div key={tier.tierKey} className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div style={{ fontSize: 14, color: '#1A1A1A', fontWeight: 500 }}>{tier.label}</div>
                       <div style={{ fontSize: 12, color: '#8A857C' }}>
-                        {formatMoney(tier.fee)}
+                        {comped > 0 ? (
+                          <>
+                            <span style={{ textDecoration: 'line-through' }}>{formatMoney(tier.fee)}</span>{' '}
+                            <span style={{ color: '#B3261E', fontWeight: 700 }}>$0 &times; {comped} comped</span>
+                          </>
+                        ) : (
+                          formatMoney(tier.fee)
+                        )}
+                        {` · ${TIER_SLOT_COUNTS[tier.tierKey] ?? 0} slots`}
                         {actual > 0 && ` · ${actual} committed`}
                       </div>
                     </div>
+                    {/* Capped at what the board actually has. Dark Blue is two
+                        spaces; no scenario can sign three of them. */}
                     <Stepper
                       value={value}
                       min={0}
-                      max={12}
+                      max={TIER_SLOT_COUNTS[tier.tierKey] ?? 0}
                       onChange={(v) => set('racesByTier', { ...input.racesByTier, [tier.tierKey]: v })}
                     />
                   </div>
@@ -333,9 +361,6 @@ export default function MonopolyModel() {
 
             <div className="mt-6 flex flex-col">
               <PnlRow label="Race fees" value={result.raceFees} />
-              {result.compedFees > 0 && (
-                <PnlRow label={`Comped to majors (${COMPED_SLOT_COUNT} slots)`} value={0} />
-              )}
               <PnlRow
                 label={`Wholesale (${input.offsetUnitsSold.toLocaleString()} units at ${formatMoney(input.wholesalePrice)})`}
                 value={result.offsetRevenue}
@@ -383,6 +408,19 @@ export default function MonopolyModel() {
                 <strong style={{ color: '#1A1A1A' }}>{result.racesSigned}</strong> in this scenario,{' '}
                 <strong style={{ color: '#1A1A1A' }}>{committedTotal}</strong> actually committed.
               </p>
+
+              {/* Break-even is the floor. This is the number worth aiming at,
+                  and it counts the rest of the scenario's revenue rather than
+                  asking races to carry everything alone. */}
+              <div className="mt-4 pt-4" style={{ borderTop: '1px solid #EFEDE9' }}>
+                <div style={{ fontSize: 34, fontWeight: 700, color: '#1A1A1A', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                  {result.racesForTargetNet}
+                </div>
+                <p className="mt-2" style={{ fontSize: 13, color: '#666666', lineHeight: 1.5 }}>
+                  mid-tier races for <strong style={{ color: '#1A1A1A' }}>{formatMoney(TARGET_NET)}</strong> net,
+                  counting the wholesale, DTC and brand revenue already in this scenario.
+                </p>
+              </div>
             </Panel>
 
             <Panel title="Recommended print run">

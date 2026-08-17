@@ -321,8 +321,13 @@ export interface ScenarioResult {
   /** Committed + media hold + DTC buffer, per the sizing rule. */
   recommendedPrintRun: number
   breakEvenRacesAtMidTier: number
+  /** Mid-tier races needed to clear TARGET_NET, holding other revenue fixed. */
+  racesForTargetNet: number
   racesSigned: number
 }
+
+/** The net profit worth aiming at, as opposed to merely not losing money. */
+export const TARGET_NET = 50000
 
 /** Reserved for press, media seeding and samples before anything is sold. */
 export const MEDIA_HOLD_UNITS = 300
@@ -396,6 +401,15 @@ export function calculateScenario(
   const midTier = TIERS.slice().sort((a, b) => a.fee - b.fee)[Math.floor(TIERS.length / 2)]
   const breakEvenRacesAtMidTier = midTier && midTier.fee > 0 ? Math.ceil(cost.allIn / midTier.fee) : 0
 
+  // Same question as break-even, asked at a number worth doing rather than at
+  // zero. Other revenue is held at whatever the scenario says, so this answers
+  // "how many more races" in the world the rest of the inputs describe.
+  const otherRevenue = offsetRevenue + input.brandRevenue + dtcRevenue
+  const racesForTargetNet =
+    midTier && midTier.fee > 0
+      ? Math.max(0, Math.ceil((cost.allIn + TARGET_NET - otherRevenue) / midTier.fee))
+      : 0
+
   // Split the cost base the way the P&L reads it: goods against revenue,
   // fixed costs below the gross line.
   const cogs = cost.manufacturing + cost.freight
@@ -418,6 +432,7 @@ export function calculateScenario(
     unitsRemaining: input.printRunUnits - committedUnits,
     recommendedPrintRun,
     breakEvenRacesAtMidTier,
+    racesForTargetNet,
     racesSigned,
   }
 }

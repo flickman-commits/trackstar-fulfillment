@@ -78,16 +78,16 @@ export const FIXED_COSTS = {
 /**
  * Where units get sold, and what each channel nets after shipping.
  *
- * Expo is the highest price and carries no shipping: there is no competing
- * product on the shelf and the buyer is already in the moment. DTC is lower and
- * absorbs fulfilment, so it nets the least of the three per unit.
+ * Expo and DTC now both price at $55; expo carries no shipping, so it nets
+ * more per unit despite the same sticker. DTC absorbs fulfilment and paid
+ * acquisition, which is what makes it the thinnest channel of the three.
  *
  * The first entry is the reference retail price, and the DTC entry seeds the
  * model's default scenario.
  */
 export const CHANNELS = [
   { channel: 'Race expo / race store', price: 55, shippingCost: 0 },
-  { channel: 'Trackstar DTC', price: 45, shippingCost: 10 },
+  { channel: 'Trackstar DTC', price: 55, shippingCost: 10 },
   { channel: 'Amazon', price: 54.99, shippingCost: 10 },
 ]
 

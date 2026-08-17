@@ -188,3 +188,20 @@ export const GROUP_TO_TIER: Record<ColorGroup, string> = {
   lightblue: 'bluebrown',
   brown: 'bluebrown',
 }
+
+/**
+ * How many sellable race spaces each tier actually has on the board.
+ *
+ * Derived from the layout rather than written down, because the two would
+ * eventually disagree and the board is the thing that is actually true. Dark Blue has
+ * two spaces; no scenario can sign three of them.
+ */
+export const TIER_SLOT_COUNTS: Record<string, number> = BOARD_LAYOUT.reduce(
+  (counts, space) => {
+    if (space.type !== 'property' || !space.colorGroup) return counts
+    const tier = GROUP_TO_TIER[space.colorGroup]
+    counts[tier] = (counts[tier] ?? 0) + 1
+    return counts
+  },
+  {} as Record<string, number>,
+)
