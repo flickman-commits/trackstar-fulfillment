@@ -316,10 +316,15 @@ export default function Monopoly() {
           ))}
         </div>
 
-        {/* Two, matching the two beats above them. */}
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          <ProductImage label="Family around the board on the living room floor" aspect="aspect-[4/3]" />
-          <ProductImage label="Parent and kid mid-game, medals on the wall behind" aspect="aspect-[4/3]" />
+        {/* One image, wide. Two side by side were competing for the same job,
+            and this is the whole argument in a single frame: the board on a
+            table with a family around it. */}
+        <div className="mt-10">
+          <ProductImage
+            src="/monopoly/family.jpg"
+            label="A family playing Marathon Monopoly around a kitchen table"
+            aspect="aspect-[16/9]"
+          />
         </div>
       </Section>
 
