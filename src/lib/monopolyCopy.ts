@@ -357,7 +357,7 @@ export const FAQ: FaqItem[] = [
   {
     question: 'Is this officially licensed yet?',
     answer:
-      "Not yet, and we would rather tell you that than have you find it out later. We have a verbal commitment from the company that holds the sole rights to create custom Monopoly editions, and they have told us that once all 22 races are signed up, they can get this edition approved. If it does not work out for any reason, you get all of your money back.",
+      "We have a verbal commitment from the company that holds the sole rights to create custom Monopoly editions, and they have told us that once all 22 races are signed up, they can get this edition approved. If it does not work out for any reason, you get all of your money back.",
   },
   {
     question: 'What if we do not have the infrastructure to hold and sell inventory?',

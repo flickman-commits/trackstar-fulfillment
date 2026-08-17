@@ -315,19 +315,15 @@ export default function Monopoly() {
           </p>
         </div>
 
-        <div className="mt-14 grid gap-8 md:grid-cols-2">
-          {WHY_NOW.map((item) => (
-            <Beat key={item.title} title={item.title} body={item.body} />
-          ))}
-        </div>
-
-        {/* One image, wide. Two side by side were competing for the same job,
-            and this is the whole argument in a single frame: the board on a
-            table with a family around it. */}
-        {/* Square, matching the source, so nothing is cropped away. Capped in
-            width because a full-bleed square would be taller than the viewport
-            on a laptop and push the rest of the section off the screen. */}
-        <div className="mt-10 max-w-2xl">
+        {/* Beats left, picture right on a laptop; stacked on a phone. The image
+            sat below them at half width before, which left a column of empty
+            mint beside it and pushed the section over a screen tall. */}
+        <div className="mt-14 grid items-center gap-10 lg:grid-cols-2">
+          <div className="flex flex-col gap-8">
+            {WHY_NOW.map((item) => (
+              <Beat key={item.title} title={item.title} body={item.body} />
+            ))}
+          </div>
           <ProductImage
             src="/monopoly/family.jpg"
             label="A family playing Marathon Monopoly around a kitchen table"
@@ -468,14 +464,14 @@ export default function Monopoly() {
             was five chances to disagree with itself. */}
         <div className="mt-10">
           <h3 className="mb-3" style={{ fontSize: 17, fontWeight: 700, color: MONOPOLY.ink }}>
-            Each race slot includes
+            Purchasing a race slot includes
           </h3>
           <ul className="flex flex-col gap-2" style={{ maxWidth: '40rem' }}>
             {[
-              'A race slot on Marathon Monopoly: Edition 1 (name and marks on board slot, title deed and rule book)',
-              'Creative approval on your marks',
+              "Your race's name on Marathon Monopoly: Edition One",
+              'Creative approval of your marks',
               '5 complimentary units shipped to your office',
-              'First right of refusal on your space in any future edition',
+              'First right of refusal on your space in any future edition*',
             ].map((item) => (
               <li key={item} className="flex gap-2.5" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
                 <span aria-hidden="true" style={{ color: MONOPOLY.red, fontWeight: 700 }}>
@@ -485,6 +481,11 @@ export default function Monopoly() {
               </li>
             ))}
           </ul>
+          {/* Small, and said once. It is a scope note, not a sales point. */}
+          <p className="mt-4" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '40rem' }}>
+            *Your investment covers Edition One. If we ever print another, that edition is its own
+            agreement, and you get first look at your space before anyone else.
+          </p>
           <div className="mt-8">
             <CtaButton />
           </div>
