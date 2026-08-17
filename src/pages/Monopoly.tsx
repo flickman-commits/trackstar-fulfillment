@@ -270,13 +270,13 @@ export default function Monopoly() {
             Where the licence stands
           </p>
           <p className="mt-2" style={{ fontSize: 17, color: MONOPOLY.ink, lineHeight: 1.6, maxWidth: '46rem' }}>
-            We are in active conversations with the company that holds the sole rights from Hasbro to
-            create official custom Monopoly editions, and we have a verbal commitment from them.
+            We have a verbal commitment from the company that holds the sole rights to create custom
+            Monopoly editions. They have told us that once all 22 races are signed up, they can get
+            this edition approved.
           </p>
           <p className="mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-            The licence is granted on the strength of the edition we bring them. A full board of 22
-            world-class marathons is that case, which is why these spaces are being filled first.
-            Nothing prints, and nothing beyond your refundable deposit is due, until it is signed.
+            That is why the board is being filled first. If it does not work out for any reason, you
+            get all of your money back.
           </p>
         </div>
 
