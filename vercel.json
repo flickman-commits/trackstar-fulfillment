@@ -34,11 +34,6 @@
     },
     {
       "source": "/((?!api/).*)",
-      "has": [{ "type": "host", "value": "monopoly.trackstar.art" }],
-      "destination": "/monopoly.html"
-    },
-    {
-      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]

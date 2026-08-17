@@ -26,16 +26,6 @@ import { PRICE_ANSWERS } from '@/lib/monopolyCopy'
 /** Midpoints of what each person said, sourced next to the quotes. */
 const RESPONSES = PRICE_ANSWERS
 
-/**
- * What the edition is priced at to a consumer, direct and at a race expo.
- *
- * This used to be a $45-$55 band. Both channels now sit at $55, so a band
- * would be zero width; it renders as a marker with a fixed pixel width so the
- * price stays visible against the curve.
- */
-const OUR_PRICE = 55
-const PRICE_MARKER_W = 8
-
 const MAX = 200
 const PLOT_H = 76
 /** Wide enough that four points read as one field rather than four spikes. */
@@ -95,17 +85,6 @@ export default function PriceExpectation() {
       </figcaption>
 
       <div className="relative" style={{ height: PLOT_H, marginTop: 14 }}>
-        {/* What we charge, behind everything else. */}
-        <div
-          className="absolute inset-y-0"
-          style={{
-            left: `${pct(OUR_PRICE)}%`,
-            width: PRICE_MARKER_W,
-            marginLeft: -PRICE_MARKER_W / 2,
-            backgroundColor: MONOPOLY.mint,
-          }}
-        />
-
         <svg
           viewBox="0 0 100 100"
           preserveAspectRatio="none"

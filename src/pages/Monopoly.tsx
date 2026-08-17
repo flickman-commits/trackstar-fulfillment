@@ -369,8 +369,8 @@ export default function Monopoly() {
         <div className="mt-14">
           <SubHeading>Getting visibility on the product</SubHeading>
           <p className="mb-6 mt-2" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-            These do not move units on their own. They move the people who decide whether units
-            move.
+            Here are a few of the strategies, amongst others, that we will use to get eyeballs on
+            this product.
           </p>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[...SALES_PLAN, ...LAUNCH_PLAN].map((item) => (
@@ -395,8 +395,8 @@ export default function Monopoly() {
             Feedback from our community
           </h3>
           <p className="mt-2" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '44rem' }}>
-            We teased the idea to our list before building anything, and asked what they would
-            expect to pay for it. These came back within hours.
+            We teased the idea for Marathon Monopoly to our email list, and here were some of their
+            responses.
           </p>
 
           <div className="mt-6 grid gap-4 md:grid-cols-3">
