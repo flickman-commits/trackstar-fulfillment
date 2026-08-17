@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useState, useEffect, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
@@ -144,7 +144,61 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
   )
 }
 
+/**
+ * True when the app is being served from the Marathon Monopoly subdomain.
+ *
+ * On that host the partnership page is the whole site: it answers at "/" so a
+ * race director gets monopoly.trackstar.art rather than a path hanging off the
+ * fulfilment tool. The dashboard and the rest of the admin surface are not
+ * routed there at all, which also means the subdomain cannot be used to reach
+ * them even with the password.
+ *
+ * Matched on the leading label rather than the full string so preview
+ * deployments and any future monopoly.* host behave the same way.
+ */
+function isMonopolyHost(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.location.hostname.split('.')[0] === 'monopoly'
+}
+
 export default function App() {
+  if (isMonopolyHost()) {
+    return (
+      <ErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Monopoly />} />
+            {/* Same page, so an existing /monopoly link pasted at this host
+                still lands somewhere sensible instead of 404ing. */}
+            <Route path="/monopoly" element={<Monopoly />} />
+            <Route
+              path="/model"
+              element={
+                <PasswordGate>
+                  <MonopolyModel />
+                </PasswordGate>
+              }
+            />
+            <Route
+              path="/monopoly/model"
+              element={
+                <PasswordGate>
+                  <MonopolyModel />
+                </PasswordGate>
+              }
+            />
+            {/* Anything else on this host is not a page we publish here. */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          <Toaster
+            position="bottom-center"
+            toastOptions={{ className: '!bg-off-black !text-white !rounded-md' }}
+          />
+        </BrowserRouter>
+      </ErrorBoundary>
+    )
+  }
+
   return (
     <ErrorBoundary>
       <BrowserRouter>
