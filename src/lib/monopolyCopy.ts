@@ -37,8 +37,19 @@ import type {
  * What the sheet still owns is the only thing that genuinely moves week to
  * week: which spaces are sold, held or open, and who holds them.
  *
- * Fees average $9,864 across 22 slots. The ladder exists so a major can buy a
- * bigger space, which earlier partner feedback said matters.
+ * Repriced from call data rather than from a spreadsheet. Races were on the
+ * fence at $20,000 and refused anything above it, so the ladder is built so the
+ * median slot lands at $15,500 and the whole board averages $15,636 across 22
+ * slots. Listing above what we expect to take leaves room to negotiate down, or
+ * to let a race buy units and bring its own number down.
+ *
+ * Dark Blue is capped at $24,000 for a reason that is arithmetic, not taste. On
+ * a 2,004 box run the edition delivers 2.4 million impressions, so a slot above
+ * $24,048 costs a race more per thousand impressions than an Instagram ad, and
+ * the media argument inverts. Every tier here stays under that line.
+ *
+ * The ladder exists so a major can buy a bigger space, which earlier partner
+ * feedback said matters.
  */
 export interface TierDef {
   tierKey: string
@@ -75,7 +86,7 @@ export const TIERS: TierDef[] = [
     tierKey: 'boardwalk',
     label: 'Dark Blue',
     colorGroups: ['darkblue'],
-    fee: 16000,
+    fee: 24000,
     unitsIncluded: 5,
     features: [
       'The two most recognized spaces on any Monopoly board',
@@ -89,7 +100,7 @@ export const TIERS: TierDef[] = [
     tierKey: 'green',
     label: 'Green',
     colorGroups: ['green'],
-    fee: 12000,
+    fee: 20000,
     unitsIncluded: 5,
     features: ["Premium block on the board's final stretch", 'Full name treatment', ...COMMON_FEATURES],
     sortOrder: 2,
@@ -99,7 +110,7 @@ export const TIERS: TierDef[] = [
     tierKey: 'yellowred',
     label: 'Yellow / Red',
     colorGroups: ['yellow', 'red'],
-    fee: 10000,
+    fee: 17000,
     unitsIncluded: 5,
     features: ['High-traffic mid-board position', ...COMMON_FEATURES],
     sortOrder: 3,
@@ -109,7 +120,7 @@ export const TIERS: TierDef[] = [
     tierKey: 'orangepink',
     label: 'Orange / Pink',
     colorGroups: ['orange', 'pink'],
-    fee: 9000,
+    fee: 14000,
     unitsIncluded: 5,
     features: ['The most-landed-on block in the game', ...COMMON_FEATURES],
     sortOrder: 4,
@@ -119,7 +130,7 @@ export const TIERS: TierDef[] = [
     tierKey: 'bluebrown',
     label: 'Light Blue / Brown',
     colorGroups: ['lightblue', 'brown'],
-    fee: 7000,
+    fee: 10000,
     unitsIncluded: 5,
     features: ['Entry position on the board', ...COMMON_FEATURES],
     sortOrder: 5,
