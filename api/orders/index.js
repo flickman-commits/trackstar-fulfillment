@@ -33,6 +33,19 @@ function formatTemp(temp) {
 /**
  * Format time - removes leading zero from hours (04:14:45 -> 4:14:45)
  */
+/**
+ * Customer-entered time and pace are free text on custom orders, so only pass
+ * through values that actually look like a duration ("3:48:29", "8:43").
+ * Anything else is a note to a human, not a number for a poster.
+ */
+function looksLikeTime(v) {
+  return typeof v === 'string' && /^\s*\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*$/.test(v)
+}
+
+function pickCustomerValue(v) {
+  return looksLikeTime(v) ? v.trim() : null
+}
+
 function formatTime(time) {
   if (!time) return null
   // Round up milliseconds to nearest second (4:37:44.935 -> 4:37:45)
@@ -174,8 +187,20 @@ export default async function handler(req, res) {
         // customer-confirmed bib from the Instant Lookup widget. Protects
         // against verified orders where Phase 1 never ran (e.g. older code path).
         bibNumber: research?.bibNumber || order.customerBib || null,
-        officialTime: formatTime(research?.officialTime),
-        officialPace: formatPace(research?.officialPace),
+        // Same defense-in-depth as the bib above. The Instant Lookup widget
+        // already captured a time and pace the shopper confirmed, so showing
+        // "Pending research" for those while displaying their bib was telling
+        // Eli we had nothing when we had the numbers all along. That gap is
+        // permanent for a race with no scraper, where research will never fill
+        // it in.
+        //
+        // Guarded by looksLikeTime because customerFinishTime is free text on
+        // custom orders and really does arrive as things like
+        // "N/A - Review Design Info", which must not be rendered as a finish
+        // time. Provenance is not lost: the order's tags already say whether
+        // this was a verified auto match or something the customer typed.
+        officialTime: formatTime(research?.officialTime || pickCustomerValue(order.customerFinishTime)),
+        officialPace: formatPace(research?.officialPace || pickCustomerValue(order.customerPace)),
         eventType: research?.eventType || null,
         researchStatus: research?.researchStatus || null,
         // How the result was obtained: "scraper" | "customer_verified". Drives
