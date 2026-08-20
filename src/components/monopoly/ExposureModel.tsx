@@ -62,6 +62,8 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
   const fee = tier?.fee ?? 0
 
   const cpm = effectiveCpm(fee, result.impressions)
+  // How much less a thousand impressions costs here than on Instagram.
+  const savingsPct = Math.round(((MEDIA_BENCHMARKS[0].cpm - cpm) / MEDIA_BENCHMARKS[0].cpm) * 100)
   const perHour = costPerAttentionHour(fee, result.attentionHours)
   // The fixture that renders on first paint carries no fees, so the cost columns
   // wait for real data rather than flashing a placeholder.
@@ -148,8 +150,16 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
               </div>
             </div>
 
+            {/* A percentage rather than a multiple. "29% cheaper" lands harder
+                than "1.4x cheaper" for the same fact, and it is the unit a
+                media buyer already reasons in.
+
+                Below one percent it says so instead of rounding to "0%
+                cheaper", which reads as a broken number rather than as the
+                honest answer. That happens at the top of the ladder, where a
+                slot is priced level with Instagram by design. */}
             <div style={{ fontSize: 34, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.03em' }}>
-              {(MEDIA_BENCHMARKS[0].cpm / cpm).toFixed(1)}x cheaper
+              {savingsPct >= 1 ? `${savingsPct}% cheaper` : 'the same as Instagram'}
             </div>
           </div>
 
