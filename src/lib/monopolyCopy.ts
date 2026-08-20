@@ -403,6 +403,6 @@ export const FAQ: FaqItem[] = [
   {
     question: 'Can we offset the fee by buying units of Marathon Monopoly?',
     answer:
-      'Yes. All the fees above are quoted in cash, but you are allowed to offset that number by buying up to 200 units at $35 per unit. Sell them at your expo for $55 and each one returns $20.',
+      'Yes. All the fees above are quoted in cash, but you are allowed to offset that number by buying up to 150 units at $35 per unit. Sell them at your expo for $55 and each one returns $20.',
   },
 ]
