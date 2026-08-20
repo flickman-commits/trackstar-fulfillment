@@ -450,7 +450,7 @@ export default function Monopoly() {
             Offset the slot fee...
           </p>
           <p className="mt-2" style={{ fontSize: 20, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.35, maxWidth: '46rem' }}>
-            You can buy up to 100 units at $35/unit to offset the investment in your space on the
+            You can buy up to 200 units at $35/unit to offset the investment in your space on the
             board.
           </p>
           <p className="mt-2" style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, maxWidth: '46rem' }}>
