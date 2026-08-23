@@ -305,6 +305,76 @@ export const FEEDBACK_COUNTS = { replies: 15, namedAPrice: PRICE_ANSWERS.length 
  * sell them", but which boxes, to whom, through what. Numbers are for the
  * minimum run and scale up if pre-orders justify a bigger one.
  */
+/**
+ * The two ways a race can turn its slot fee back into money.
+ *
+ * One place for these because four files were about to quote them: the offset
+ * FAQ, the distribution allocation, the EarnItBack calculator and the deck.
+ * The wholesale margin is derived rather than stated, so a change to retail or
+ * wholesale cannot leave a stale "$20 a box" behind it.
+ *
+ * `commission` is set level with the wholesale margin on purpose. A race earns
+ * the same either way, so the choice between them is about whether they want to
+ * hold stock, never about which one pays better.
+ *
+ * `referralPool` is the "Race partner distribution" line in UNIT_ALLOCATION.
+ * That row already assumed races would drive sales to our site; this pays them
+ * for it. Keep the two in step.
+ */
+/**
+ * The Board Guide: a second surface, reached by QR code from the box.
+ *
+ * A space on the board carries a race's name and its colours, and that is all
+ * the board can carry. Twenty-two names on a game board is recognition, not
+ * information, and a race director who wants to convert that recognition into
+ * entries has nowhere to send anybody.
+ *
+ * The guide is that somewhere. Every box carries a code, every code lands on
+ * one page, and every race on the board gets a panel on it: what the course is
+ * like, what the finish feels like, when entries open. The board earns the
+ * attention and the guide is where the attention can act.
+ *
+ * The promo code is the part that makes it measurable. A race issues its own
+ * code, only the guide carries it, and every redemption is a runner who found
+ * that race through this box. That turns a media buy a race director has to
+ * take on faith into a channel with a number at the end of it, which is the
+ * single thing the exposure model cannot give them.
+ *
+ * Deliberately not promised as a permanent URL with permanent hosting. It ships
+ * with Edition One and lives as long as the edition does, same as the space.
+ */
+export const BOARD_GUIDE = {
+  /** Where the code on the box lands. */
+  url: 'trackstar.art/pages/board-guide',
+  beats: [
+    {
+      title: 'A page of your own',
+      body: 'Photos, your course, your story, and the one thing that makes your race worth flying for. As much room as you want, rather than the two words that fit on a game board.',
+    },
+    {
+      title: 'A code only found here',
+      body: 'Offer a discount on entry, a free upgrade, or anything else you choose. It appears nowhere but this guide, so every redemption is a runner the board sent you.',
+    },
+    {
+      title: 'Twenty-two races, one audience',
+      body: 'Somebody who bought this box already loves marathons. They are reading about your race next to the other 21, at the exact moment they are thinking about which one to run.',
+    },
+  ],
+}
+
+export const UNIT_PROGRAM = {
+  /** What a box sells for, at an expo or on our site. */
+  retailPrice: 55,
+  /** What a race pays for boxes it intends to resell itself. */
+  wholesalePrice: 35,
+  /** Most boxes a race may buy at wholesale against one space. */
+  wholesaleCap: 150,
+  /** Paid per box sold through a race's own link or code. */
+  commission: 20,
+  /** Boxes of the first run set aside for race-driven sales. */
+  referralPool: 400,
+}
+
 export const UNIT_ALLOCATION = [
   {
     label: 'Complimentary copies for race partners',
@@ -401,8 +471,13 @@ export const FAQ: FaqItem[] = [
       'It is per edition rather than per year. Committing guarantees your space on Edition One, which is printed once and then exists permanently. If there is ever a second edition you get first refusal on your space before it is offered to anybody else, and if there never is, you have still lost nothing to a clock running out.',
   },
   {
+    question: 'What is the Board Guide?',
+    answer:
+      'Every box carries a QR code that opens a digital guide, and every race on the board has its own panel on it. You get photos, a description of your course, and a promotional code that exists nowhere else, so anybody who redeems it came to you from the board. The space puts your name in front of people; the guide is where they can act on it. You write your own panel and we build it.',
+  },
+  {
     question: 'Can we offset the fee by buying units of Marathon Monopoly?',
     answer:
-      'Yes. All the fees above are quoted in cash, but you are allowed to offset that number by buying up to 150 units at $35 per unit. Sell them at your expo for $55 and each one returns $20.',
+      'Yes, and there are two ways to do it. You can buy up to 150 units at $35 and resell them at your expo for $55, which returns $20 a box. Or you can skip the inventory entirely: we give you a link and a code that are yours, you send people to it, and we pay you $20 for every box sold through it. We take the order, pack it and ship it. Both pay the same, and you can use both.',
   },
 ]

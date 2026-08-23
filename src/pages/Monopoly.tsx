@@ -18,13 +18,16 @@ import { TokenGallery } from '@/components/monopoly/TokenGallery'
 import { PackageTiers } from '@/components/monopoly/PackageTiers'
 import { STATUS_COLORS, legendFor } from '@/components/monopoly/boardView'
 import { ExposureModel } from '@/components/monopoly/ExposureModel'
+import { EarnItBack } from '@/components/monopoly/EarnItBack'
+import { QrGlyph } from '@/components/monopoly/QrGlyph'
 import { BrandLockup } from '@/components/monopoly/BrandLockup'
 import PriceExpectation from '@/components/monopoly/PriceExpectation'
 import { UnitFlow } from '@/components/monopoly/UnitFlow'
 import { ProductImage } from '@/components/monopoly/ProductImage'
-import { MONOPOLY, UI_RADIUS, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
+import { MONOPOLY, UI_RADIUS, CARD_OUTLINE, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import {
+  BOARD_GUIDE,
   COMMIT_STEPS,
   LAUNCH_PLAN,
   PRODUCT_SHOTS,
@@ -441,23 +444,12 @@ export default function Monopoly() {
 
         {/* The offset was the last line of a paragraph nobody read to the end
             of. It is the one thing here that lowers the number, so it gets to
-            be an object rather than a clause. */}
-        <div
-          className="mt-8 px-6 py-6 sm:px-8"
-          style={{ backgroundColor: '#367F5C', border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
-        >
-          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)' }}>
-            Offset the slot fee...
-          </p>
-          <p className="mt-2" style={{ fontSize: 20, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.35, maxWidth: '46rem' }}>
-            You can buy up to 150 units at $35/unit to offset the investment in your space on the
-            board.
-          </p>
-          <p className="mt-2" style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, maxWidth: '46rem' }}>
-            You can sell these at your expo, feature them in your online store, or give them away to
-            people in your community.
-          </p>
-        </div>
+            be an object rather than a clause.
+
+            It now carries both routes. Wholesale alone asked a race to hold
+            stock, which is the one thing organisers said they will not do, so
+            the offer only ever worked for races that already run a store. */}
+        <EarnItBack tiers={data.tiers} initialTierKey={personalizedTierKey} />
 
         {/* What the fee actually buys, listed once here rather than repeated
             in every tier row. Nothing in it varies by tier, so a per-row copy
@@ -471,6 +463,7 @@ export default function Monopoly() {
               "Your race's name on Marathon Monopoly: Edition One",
               'Creative approval of your marks',
               '5 complimentary units shipped to your office',
+              'Your own page on the Board Guide, with a promo code only found there',
               'First right of refusal on your space in any future edition*',
             ].map((item) => (
               <li key={item} className="flex gap-2.5" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
@@ -533,6 +526,58 @@ export default function Monopoly() {
           </p>
         </div>
         <ExposureModel tiers={data.tiers} initialTierKey={personalizedTierKey} />
+      </Section>
+
+      {/* ═══ THE SECOND SURFACE ═══
+          Sits directly after the exposure model on purpose. That section ends
+          on a CPM, which is a number a race director still has to take on
+          faith. This one is where the same attention becomes a click and then a
+          redemption, so the argument finishes on something countable rather
+          than on an impression estimate. */}
+      <Section muted>
+        <SectionHeading>The Board Guide</SectionHeading>
+        <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          A game board has room for your name and your colours, and nothing else. So every box also
+          carries a QR code, and it opens a guide where each of the 22 races gets a page to say what
+          makes it worth running.
+        </p>
+
+        <div className="grid gap-4 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:items-start">
+          {/* The physical half of the idea. A code on a box is the whole
+              mechanism, so it gets drawn rather than described. */}
+          <div
+            className="flex flex-col items-center justify-center px-6 py-8"
+            style={{ border: CARD_OUTLINE, borderRadius: UI_RADIUS, backgroundColor: MONOPOLY.paper }}
+          >
+            <QrGlyph />
+            <div
+              className="mt-4 text-center"
+              style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: MONOPOLY.inkMuted }}
+            >
+              Printed on every box
+            </div>
+            <div className="mt-2 text-center" style={{ fontSize: 15, color: MONOPOLY.ink, fontWeight: 700 }}>
+              {BOARD_GUIDE.url}
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
+            {BOARD_GUIDE.beats.map((beat) => (
+              <div
+                key={beat.title}
+                className="px-5 py-5"
+                style={{ border: CARD_OUTLINE, borderRadius: UI_RADIUS, backgroundColor: MONOPOLY.paper }}
+              >
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+                  {beat.title}
+                </h3>
+                <p className="mt-2" style={{ fontSize: 16, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
+                  {beat.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       </Section>
 
       {/* ═══ WHY TRACKSTAR ═══ */}
