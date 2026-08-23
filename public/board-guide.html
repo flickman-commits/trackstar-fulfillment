@@ -8,8 +8,9 @@
     ~/Software/trackstar-art/templates/page.board-guide.json
   Regenerate with: node _preview/build-mm-preview.mjs  (in that repo)
 
-  Race names here are invented. Nothing on the board is committed, and a page
-  a race director can reach must not imply otherwise.
+  Race names are invented and the city art is illustration, not photography.
+  Nothing on the board is committed, and a page a race director can reach must
+  not imply otherwise.
 -->
 
 <html lang="en"><head>
@@ -205,24 +206,45 @@
 
 .mm-race__img { border: var(--mm-outline); border-radius: 4px; overflow: hidden; }
 .mm-race__img img,
-.mm-race__img svg { display: block; width: 100%; height: 170px; object-fit: cover; }
+.mm-race__img svg { display: block; width: 100%; height: 190px; object-fit: cover; }
 
-/* The offer. Dashed rather than solid so it reads as a coupon torn from
-   something, which is what it is. */
+/* The offer, folded away.
+
+   This was a dashed coupon box at full volume on every card, which made a guide
+   to 22 races read as a sheet of promo codes. Closed by default and styled as a
+   quiet disclosure: the code is a reason to come back to a race, not the reason
+   the race is on the board. */
 .mm-race__offer {
-  margin-top: auto; padding: 14px 16px;
-  border: 2px dashed var(--mm-ink); border-radius: 6px; background: var(--mm-mint-pale);
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgba(35, 31, 32, 0.15);
 }
-.mm-race__offer-label {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--mm-muted);
+
+.mm-race__offer-summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mm-muted);
 }
-.mm-race__code {
-  display: flex; align-items: center; gap: 10px; margin-top: 6px;
+.mm-race__offer-summary::-webkit-details-marker { display: none; }
+.mm-race__offer-summary::before {
+  content: '+';
+  color: var(--mm-red);
+  font-weight: 700;
+  transition: transform 0.15s ease;
 }
+.mm-race__offer[open] .mm-race__offer-summary::before { transform: rotate(45deg); }
+
+.mm-race__offer-body { margin-top: 12px; }
+
+.mm-race__code { display: flex; align-items: center; gap: 10px; }
 .mm-race__code strong {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 19px; letter-spacing: 0.06em;
+  font-size: 17px; letter-spacing: 0.06em;
 }
 .mm-race__copy {
   margin-left: auto; padding: 6px 12px; cursor: pointer;
@@ -230,7 +252,7 @@
   font-size: 13px; font-weight: 700;
 }
 .mm-race__copy.is-copied { background: var(--mm-ink); color: #fff; }
-.mm-race__offer p { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--mm-muted); }
+.mm-race__offer-body p { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--mm-muted); }
 
 .mm-race__link {
   display: inline-block; margin-top: 12px; font-size: 15px; font-weight: 700;
@@ -248,66 +270,84 @@
 </style>
 </head><body>
 <div class="mm mm-guide">
-<div style="max-width:1200px;margin:0 auto;padding:18px 20px 0;"><p style="margin:0;padding:12px 16px;border:2px solid #231F20;border-radius:6px;background:#FEF200;font-size:14px;line-height:1.5;font-weight:700;">Preview. The races below are placeholders, shown to demonstrate the format. The real guide is built once the board is full.</p></div><div class="mm__container">
+<div style="max-width:1200px;margin:0 auto;padding:18px 20px 0;"><p style="margin:0;padding:12px 16px;border:2px solid #231F20;border-radius:6px;background:#FEF200;font-size:14px;line-height:1.5;font-weight:700;">Preview. The races and artwork below are placeholders, shown to demonstrate the format. The real guide is built once the board is full.</p></div><div class="mm__container">
   <div class="mm-guide__head">
     <span class="mm__plate">Marathon Monopoly</span>
     <h1 class="mm__h2" style="margin-top:20px;">The Board Guide</h1>
-    <p class="mm__lede">Every race on the board, in the words of the people who put it on. Each one has a code you will not find anywhere else.</p>
+    <p class="mm__lede">Learn what makes each of the races on Marathon Monopoly special.</p>
   </div>
   
   <div class="mm-guide__filters" data-mm-filters>
     <button type="button" class="mm-guide__filter" data-mm-filter="all" aria-pressed="true">All 8</button>
-    <button type="button" class="mm-guide__filter" data-mm-filter="darkblue" aria-pressed="false">Dark blue</button><button type="button" class="mm-guide__filter" data-mm-filter="green" aria-pressed="false">Green</button><button type="button" class="mm-guide__filter" data-mm-filter="yellow" aria-pressed="false">Yellow</button><button type="button" class="mm-guide__filter" data-mm-filter="orange" aria-pressed="false">Orange</button><button type="button" class="mm-guide__filter" data-mm-filter="lightblue" aria-pressed="false">Light blue</button><button type="button" class="mm-guide__filter" data-mm-filter="brown" aria-pressed="false">Brown</button>
+    <button type="button" class="mm-guide__filter" data-mm-filter="darkblue" aria-pressed="false">Dark Blue</button><button type="button" class="mm-guide__filter" data-mm-filter="green" aria-pressed="false">Green</button><button type="button" class="mm-guide__filter" data-mm-filter="yellow" aria-pressed="false">Yellow</button><button type="button" class="mm-guide__filter" data-mm-filter="orange" aria-pressed="false">Orange</button><button type="button" class="mm-guide__filter" data-mm-filter="lightblue" aria-pressed="false">Light Blue</button><button type="button" class="mm-guide__filter" data-mm-filter="brown" aria-pressed="false">Brown</button>
   </div>
   <div class="mm-guide__grid" data-mm-grid>
     
       <article class="mm__card mm-race" data-mm-group="darkblue">
         <div class="mm-race__band" style="background:#0072BB;"></div>
         <div class="mm-race__body">
-          <div class="mm-race__space">Dark blue race space</div>
+          <div class="mm-race__space">Dark Blue race space</div>
           <h2 class="mm-race__name">Harbor City Marathon</h2>
           <p class="mm-race__meta">Harbor City  |  April</p>
           <div class="mm-race__img">
-  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
-    <rect width="800" height="800" fill="#CCE7D3"/>
-    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
-      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
-      letter-spacing="2">RACE PHOTO</text>
+  <svg viewBox="0 0 800 380" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Illustrated aerial view of a city">
+    <defs>
+      <linearGradient id="sky0" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#F6C89A"/><stop offset="100%" stop-color="#E8896B"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="380" fill="url(#sky0)"/>
+    <circle cx="425" cy="81" r="26" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="-20" y="142" width="45" height="68" fill="#8E5A6A"/><rect x="34" y="142" width="39" height="68" fill="#8E5A6A"/><rect x="82" y="181" width="39" height="29" fill="#8E5A6A"/><rect x="125" y="195" width="32" height="15" fill="#8E5A6A"/><rect x="164" y="178" width="46" height="32" fill="#8E5A6A"/><rect x="182" y="142" width="4" height="26" fill="#8E5A6A"/><rect x="216" y="140" width="25" height="70" fill="#8E5A6A"/><rect x="226" y="111" width="4" height="26" fill="#8E5A6A"/><rect x="247" y="166" width="30" height="44" fill="#8E5A6A"/><rect x="286" y="174" width="30" height="36" fill="#8E5A6A"/><rect x="298" y="141" width="4" height="26" fill="#8E5A6A"/><rect x="322" y="135" width="24" height="75" fill="#8E5A6A"/><rect x="354" y="139" width="29" height="71" fill="#8E5A6A"/><rect x="389" y="135" width="23" height="75" fill="#8E5A6A"/><rect x="420" y="181" width="29" height="29" fill="#8E5A6A"/><rect x="457" y="150" width="41" height="60" fill="#8E5A6A"/><rect x="506" y="136" width="36" height="74" fill="#8E5A6A"/><rect x="551" y="183" width="27" height="27" fill="#8E5A6A"/><rect x="583" y="171" width="36" height="39" fill="#8E5A6A"/><rect x="629" y="156" width="38" height="54" fill="#8E5A6A"/><rect x="676" y="164" width="35" height="46" fill="#8E5A6A"/><rect x="720" y="156" width="30" height="54" fill="#8E5A6A"/><rect x="760" y="146" width="44" height="64" fill="#8E5A6A"/><rect x="813" y="148" width="44" height="62" fill="#8E5A6A"/>
+    <rect x="-20" y="136" width="47" height="116" fill="#3B2B45"/><rect x="31" y="143" width="27" height="109" fill="#3B2B45"/><rect x="63" y="181" width="28" height="71" fill="#3B2B45"/><rect x="94" y="213" width="38" height="39" fill="#3B2B45"/><rect x="137" y="148" width="45" height="104" fill="#3B2B45"/><rect x="186" y="164" width="43" height="88" fill="#3B2B45"/><rect x="238" y="236" width="28" height="16" fill="#3B2B45"/><rect x="249" y="216" width="4" height="26" fill="#3B2B45"/><rect x="273" y="215" width="32" height="37" fill="#3B2B45"/><rect x="310" y="179" width="49" height="73" fill="#3B2B45"/><rect x="364" y="233" width="53" height="19" fill="#3B2B45"/><rect x="422" y="154" width="44" height="98" fill="#3B2B45"/><rect x="473" y="168" width="42" height="84" fill="#3B2B45"/><rect x="525" y="209" width="48" height="43" fill="#3B2B45"/><rect x="579" y="235" width="49" height="17" fill="#3B2B45"/><rect x="633" y="173" width="43" height="79" fill="#3B2B45"/><rect x="683" y="211" width="29" height="41" fill="#3B2B45"/><rect x="695" y="177" width="4" height="26" fill="#3B2B45"/><rect x="718" y="141" width="41" height="111" fill="#3B2B45"/><rect x="767" y="220" width="29" height="32" fill="#3B2B45"/><rect x="803" y="138" width="44" height="114" fill="#3B2B45"/><rect x="820" y="119" width="4" height="26" fill="#3B2B45"/>
+    <rect x="0" y="252" width="800" height="128" fill="#5C4A63"/>
+    <rect x="498" y="270" width="191" height="3" fill="#FFFFFF" opacity="0.160"/><rect x="503" y="286" width="126" height="3" fill="#FFFFFF" opacity="0.146"/><rect x="62" y="302" width="146" height="3" fill="#FFFFFF" opacity="0.132"/><rect x="71" y="318" width="60" height="3" fill="#FFFFFF" opacity="0.118"/><rect x="378" y="334" width="279" height="3" fill="#FFFFFF" opacity="0.104"/><rect x="92" y="350" width="166" height="3" fill="#FFFFFF" opacity="0.090"/><rect x="534" y="366" width="141" height="3" fill="#FFFFFF" opacity="0.076"/><rect x="174" y="382" width="110" height="3" fill="#FFFFFF" opacity="0.062"/><rect x="307" y="398" width="209" height="3" fill="#FFFFFF" opacity="0.048"/>
   </svg></div>
           <p class="mm-race__blurb">The oldest race on the board, and the only one here you have to qualify for. The hill is at mile 20, exactly where you do not want it.</p>
-          <div class="mm-race__offer">
-            <div class="mm-race__offer-label">Use this code when you enter</div>
-            <div class="mm-race__code">
-              <strong data-mm-code>MONOPOLY-HARBOR</strong>
-              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+          <details class="mm-race__offer">
+            <summary class="mm-race__offer-summary">Runner offer</summary>
+            <div class="mm-race__offer-body">
+              <div class="mm-race__code">
+                <strong data-mm-code>MONOPOLY-HARBOR</strong>
+                <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+              </div>
+              <p>$15 off entry. Valid until registration closes.</p>
             </div>
-            <p>$15 off entry. Valid until registration closes.</p>
-          </div>
+          </details>
           <a class="mm-race__link" href="#">Race website</a>
         </div>
       </article>
       <article class="mm__card mm-race" data-mm-group="darkblue">
         <div class="mm-race__band" style="background:#0072BB;"></div>
         <div class="mm-race__body">
-          <div class="mm-race__space">Dark blue race space</div>
+          <div class="mm-race__space">Dark Blue race space</div>
           <h2 class="mm-race__name">Metro Marathon</h2>
           <p class="mm-race__meta">Metro  |  November</p>
           <div class="mm-race__img">
-  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
-    <rect width="800" height="800" fill="#CCE7D3"/>
-    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
-      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
-      letter-spacing="2">RACE PHOTO</text>
+  <svg viewBox="0 0 800 380" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Illustrated aerial view of a city">
+    <defs>
+      <linearGradient id="sky1" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#BFE3F2"/><stop offset="100%" stop-color="#7FB2D6"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="380" fill="url(#sky1)"/>
+    <circle cx="333" cy="68" r="26" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="-20" y="146" width="26" height="64" fill="#5C7FA6"/><rect x="12" y="156" width="36" height="54" fill="#5C7FA6"/><rect x="53" y="141" width="39" height="69" fill="#5C7FA6"/><rect x="102" y="164" width="39" height="46" fill="#5C7FA6"/><rect x="118" y="131" width="4" height="26" fill="#5C7FA6"/><rect x="148" y="186" width="40" height="24" fill="#5C7FA6"/><rect x="192" y="191" width="33" height="19" fill="#5C7FA6"/><rect x="229" y="159" width="29" height="51" fill="#5C7FA6"/><rect x="263" y="129" width="35" height="81" fill="#5C7FA6"/><rect x="306" y="147" width="22" height="63" fill="#5C7FA6"/><rect x="331" y="140" width="42" height="70" fill="#5C7FA6"/><rect x="379" y="152" width="38" height="58" fill="#5C7FA6"/><rect x="422" y="192" width="23" height="18" fill="#5C7FA6"/><rect x="449" y="170" width="41" height="40" fill="#5C7FA6"/><rect x="498" y="138" width="39" height="72" fill="#5C7FA6"/><rect x="544" y="138" width="29" height="72" fill="#5C7FA6"/><rect x="577" y="132" width="42" height="78" fill="#5C7FA6"/><rect x="627" y="182" width="32" height="28" fill="#5C7FA6"/><rect x="662" y="148" width="31" height="62" fill="#5C7FA6"/><rect x="700" y="190" width="37" height="20" fill="#5C7FA6"/><rect x="741" y="166" width="32" height="44" fill="#5C7FA6"/><rect x="779" y="177" width="46" height="33" fill="#5C7FA6"/>
+    <rect x="-20" y="181" width="49" height="71" fill="#2F4460"/><rect x="36" y="220" width="36" height="32" fill="#2F4460"/><rect x="50" y="189" width="4" height="26" fill="#2F4460"/><rect x="80" y="169" width="33" height="83" fill="#2F4460"/><rect x="117" y="203" width="53" height="49" fill="#2F4460"/><rect x="180" y="166" width="29" height="86" fill="#2F4460"/><rect x="215" y="180" width="35" height="72" fill="#2F4460"/><rect x="254" y="195" width="27" height="57" fill="#2F4460"/><rect x="289" y="179" width="51" height="73" fill="#2F4460"/><rect x="347" y="229" width="30" height="23" fill="#2F4460"/><rect x="359" y="200" width="4" height="26" fill="#2F4460"/><rect x="383" y="235" width="35" height="17" fill="#2F4460"/><rect x="422" y="199" width="31" height="53" fill="#2F4460"/><rect x="435" y="173" width="4" height="26" fill="#2F4460"/><rect x="463" y="137" width="54" height="115" fill="#2F4460"/><rect x="525" y="223" width="39" height="29" fill="#2F4460"/><rect x="568" y="223" width="45" height="29" fill="#2F4460"/><rect x="621" y="217" width="42" height="35" fill="#2F4460"/><rect x="669" y="143" width="34" height="109" fill="#2F4460"/><rect x="708" y="148" width="52" height="104" fill="#2F4460"/><rect x="764" y="152" width="36" height="100" fill="#2F4460"/><rect x="778" y="114" width="4" height="26" fill="#2F4460"/><rect x="804" y="146" width="44" height="106" fill="#2F4460"/>
+    <rect x="0" y="252" width="800" height="128" fill="#4A7194"/>
+    <rect x="64" y="270" width="245" height="3" fill="#FFFFFF" opacity="0.160"/><rect x="522" y="286" width="259" height="3" fill="#FFFFFF" opacity="0.146"/><rect x="51" y="302" width="189" height="3" fill="#FFFFFF" opacity="0.132"/><rect x="434" y="318" width="270" height="3" fill="#FFFFFF" opacity="0.118"/><rect x="684" y="334" width="61" height="3" fill="#FFFFFF" opacity="0.104"/><rect x="4" y="350" width="151" height="3" fill="#FFFFFF" opacity="0.090"/><rect x="385" y="366" width="187" height="3" fill="#FFFFFF" opacity="0.076"/><rect x="62" y="382" width="181" height="3" fill="#FFFFFF" opacity="0.062"/><rect x="462" y="398" width="297" height="3" fill="#FFFFFF" opacity="0.048"/>
   </svg></div>
           <p class="mm-race__blurb">Five boroughs, two million people on the street, and a park finish people plan a decade around.</p>
-          <div class="mm-race__offer">
-            <div class="mm-race__offer-label">Use this code when you enter</div>
-            <div class="mm-race__code">
-              <strong data-mm-code>MONOPOLY-METRO</strong>
-              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+          <details class="mm-race__offer">
+            <summary class="mm-race__offer-summary">Runner offer</summary>
+            <div class="mm-race__offer-body">
+              <div class="mm-race__code">
+                <strong data-mm-code>MONOPOLY-METRO</strong>
+                <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+              </div>
+              <p>Guaranteed-entry application fee waived.</p>
             </div>
-            <p>Guaranteed-entry application fee waived.</p>
-          </div>
+          </details>
           <a class="mm-race__link" href="#">Race website</a>
         </div>
       </article>
@@ -318,21 +358,30 @@
           <h2 class="mm-race__name">Lakeside Marathon</h2>
           <p class="mm-race__meta">Lakeside  |  October</p>
           <div class="mm-race__img">
-  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
-    <rect width="800" height="800" fill="#CCE7D3"/>
-    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
-      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
-      letter-spacing="2">RACE PHOTO</text>
+  <svg viewBox="0 0 800 380" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Illustrated aerial view of a city">
+    <defs>
+      <linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#F3D9A4"/><stop offset="100%" stop-color="#D98E5A"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="380" fill="url(#sky2)"/>
+    <circle cx="242" cy="116" r="26" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="-20" y="150" width="31" height="60" fill="#9C6A55"/><rect x="21" y="170" width="32" height="40" fill="#9C6A55"/><rect x="63" y="171" width="39" height="39" fill="#9C6A55"/><rect x="110" y="133" width="22" height="77" fill="#9C6A55"/><rect x="142" y="180" width="26" height="30" fill="#9C6A55"/><rect x="176" y="140" width="37" height="70" fill="#9C6A55"/><rect x="219" y="189" width="39" height="21" fill="#9C6A55"/><rect x="264" y="177" width="35" height="33" fill="#9C6A55"/><rect x="302" y="174" width="31" height="36" fill="#9C6A55"/><rect x="339" y="130" width="26" height="80" fill="#9C6A55"/><rect x="350" y="100" width="4" height="26" fill="#9C6A55"/><rect x="370" y="134" width="26" height="76" fill="#9C6A55"/><rect x="404" y="173" width="36" height="37" fill="#9C6A55"/><rect x="442" y="130" width="24" height="80" fill="#9C6A55"/><rect x="475" y="130" width="36" height="80" fill="#9C6A55"/><rect x="489" y="110" width="4" height="26" fill="#9C6A55"/><rect x="515" y="130" width="44" height="80" fill="#9C6A55"/><rect x="533" y="108" width="4" height="26" fill="#9C6A55"/><rect x="566" y="192" width="35" height="18" fill="#9C6A55"/><rect x="607" y="166" width="23" height="44" fill="#9C6A55"/><rect x="616" y="137" width="4" height="26" fill="#9C6A55"/><rect x="637" y="134" width="37" height="76" fill="#9C6A55"/><rect x="683" y="151" width="36" height="59" fill="#9C6A55"/><rect x="698" y="132" width="4" height="26" fill="#9C6A55"/><rect x="724" y="148" width="33" height="62" fill="#9C6A55"/><rect x="765" y="138" width="44" height="72" fill="#9C6A55"/><rect x="812" y="180" width="37" height="30" fill="#9C6A55"/>
+    <rect x="-20" y="219" width="35" height="33" fill="#3A2A33"/><rect x="24" y="141" width="51" height="111" fill="#3A2A33"/><rect x="79" y="143" width="47" height="109" fill="#3A2A33"/><rect x="131" y="172" width="34" height="80" fill="#3A2A33"/><rect x="173" y="214" width="40" height="38" fill="#3A2A33"/><rect x="220" y="167" width="48" height="85" fill="#3A2A33"/><rect x="275" y="163" width="53" height="89" fill="#3A2A33"/><rect x="296" y="144" width="4" height="26" fill="#3A2A33"/><rect x="334" y="206" width="36" height="46" fill="#3A2A33"/><rect x="375" y="220" width="31" height="32" fill="#3A2A33"/><rect x="410" y="216" width="29" height="36" fill="#3A2A33"/><rect x="444" y="173" width="27" height="79" fill="#3A2A33"/><rect x="474" y="235" width="29" height="17" fill="#3A2A33"/><rect x="507" y="237" width="38" height="15" fill="#3A2A33"/><rect x="554" y="203" width="51" height="49" fill="#3A2A33"/><rect x="612" y="150" width="28" height="102" fill="#3A2A33"/><rect x="645" y="134" width="38" height="118" fill="#3A2A33"/><rect x="689" y="225" width="42" height="27" fill="#3A2A33"/><rect x="739" y="208" width="49" height="44" fill="#3A2A33"/><rect x="794" y="151" width="45" height="101" fill="#3A2A33"/>
+    <rect x="0" y="252" width="800" height="128" fill="#6B4B4E"/>
+    <rect x="360" y="270" width="254" height="3" fill="#FFFFFF" opacity="0.160"/><rect x="535" y="286" width="213" height="3" fill="#FFFFFF" opacity="0.146"/><rect x="15" y="302" width="285" height="3" fill="#FFFFFF" opacity="0.132"/><rect x="549" y="318" width="197" height="3" fill="#FFFFFF" opacity="0.118"/><rect x="103" y="334" width="280" height="3" fill="#FFFFFF" opacity="0.104"/><rect x="361" y="350" width="298" height="3" fill="#FFFFFF" opacity="0.090"/><rect x="412" y="366" width="111" height="3" fill="#FFFFFF" opacity="0.076"/><rect x="16" y="382" width="265" height="3" fill="#FFFFFF" opacity="0.062"/><rect x="517" y="398" width="95" height="3" fill="#FFFFFF" opacity="0.048"/>
   </svg></div>
           <p class="mm-race__blurb">Flat, fast and built for a personal best. More records have fallen here than anywhere else on the board.</p>
-          <div class="mm-race__offer">
-            <div class="mm-race__offer-label">Use this code when you enter</div>
-            <div class="mm-race__code">
-              <strong data-mm-code>MONOPOLY-LAKE</strong>
-              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+          <details class="mm-race__offer">
+            <summary class="mm-race__offer-summary">Runner offer</summary>
+            <div class="mm-race__offer-body">
+              <div class="mm-race__code">
+                <strong data-mm-code>MONOPOLY-LAKE</strong>
+                <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+              </div>
+              <p>10% off entry, plus a free race photo package.</p>
             </div>
-            <p>10% off entry, plus a free race photo package.</p>
-          </div>
+          </details>
           <a class="mm-race__link" href="#">Race website</a>
         </div>
       </article>
@@ -343,21 +392,30 @@
           <h2 class="mm-race__name">Pacific Marathon</h2>
           <p class="mm-race__meta">Pacific  |  March</p>
           <div class="mm-race__img">
-  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
-    <rect width="800" height="800" fill="#CCE7D3"/>
-    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
-      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
-      letter-spacing="2">RACE PHOTO</text>
+  <svg viewBox="0 0 800 380" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Illustrated aerial view of a city">
+    <defs>
+      <linearGradient id="sky3" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#C9D9E8"/><stop offset="100%" stop-color="#8E9FB8"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="380" fill="url(#sky3)"/>
+    <circle cx="150" cy="104" r="26" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="-20" y="154" width="36" height="56" fill="#66748C"/><rect x="23" y="183" width="29" height="27" fill="#66748C"/><rect x="59" y="130" width="40" height="80" fill="#66748C"/><rect x="104" y="172" width="30" height="38" fill="#66748C"/><rect x="137" y="146" width="40" height="64" fill="#66748C"/><rect x="182" y="187" width="27" height="23" fill="#66748C"/><rect x="216" y="131" width="30" height="79" fill="#66748C"/><rect x="228" y="101" width="4" height="26" fill="#66748C"/><rect x="254" y="184" width="22" height="26" fill="#66748C"/><rect x="280" y="171" width="37" height="39" fill="#66748C"/><rect x="322" y="195" width="23" height="15" fill="#66748C"/><rect x="354" y="187" width="39" height="23" fill="#66748C"/><rect x="396" y="154" width="24" height="56" fill="#66748C"/><rect x="429" y="160" width="30" height="50" fill="#66748C"/><rect x="468" y="192" width="33" height="18" fill="#66748C"/><rect x="509" y="194" width="26" height="16" fill="#66748C"/><rect x="544" y="190" width="34" height="20" fill="#66748C"/><rect x="583" y="153" width="45" height="57" fill="#66748C"/><rect x="637" y="174" width="35" height="36" fill="#66748C"/><rect x="680" y="169" width="25" height="41" fill="#66748C"/><rect x="709" y="163" width="43" height="47" fill="#66748C"/><rect x="756" y="188" width="43" height="22" fill="#66748C"/><rect x="803" y="188" width="46" height="22" fill="#66748C"/><rect x="822" y="156" width="4" height="26" fill="#66748C"/>
+    <rect x="-20" y="179" width="34" height="73" fill="#333D52"/><rect x="-6" y="142" width="4" height="26" fill="#333D52"/><rect x="18" y="237" width="49" height="15" fill="#333D52"/><rect x="76" y="160" width="31" height="92" fill="#333D52"/><rect x="115" y="209" width="46" height="43" fill="#333D52"/><rect x="170" y="158" width="38" height="94" fill="#333D52"/><rect x="185" y="131" width="4" height="26" fill="#333D52"/><rect x="211" y="164" width="27" height="88" fill="#333D52"/><rect x="246" y="201" width="45" height="51" fill="#333D52"/><rect x="299" y="205" width="30" height="47" fill="#333D52"/><rect x="335" y="143" width="30" height="109" fill="#333D52"/><rect x="369" y="215" width="49" height="37" fill="#333D52"/><rect x="424" y="178" width="50" height="74" fill="#333D52"/><rect x="480" y="148" width="48" height="104" fill="#333D52"/><rect x="537" y="199" width="36" height="53" fill="#333D52"/><rect x="578" y="202" width="40" height="50" fill="#333D52"/><rect x="623" y="215" width="43" height="37" fill="#333D52"/><rect x="672" y="186" width="54" height="66" fill="#333D52"/><rect x="735" y="206" width="48" height="46" fill="#333D52"/><rect x="788" y="170" width="33" height="82" fill="#333D52"/>
+    <rect x="0" y="252" width="800" height="128" fill="#55637C"/>
+    <rect x="161" y="270" width="147" height="3" fill="#FFFFFF" opacity="0.160"/><rect x="578" y="286" width="121" height="3" fill="#FFFFFF" opacity="0.146"/><rect x="80" y="302" width="143" height="3" fill="#FFFFFF" opacity="0.132"/><rect x="270" y="318" width="188" height="3" fill="#FFFFFF" opacity="0.118"/><rect x="517" y="334" width="170" height="3" fill="#FFFFFF" opacity="0.104"/><rect x="348" y="350" width="288" height="3" fill="#FFFFFF" opacity="0.090"/><rect x="207" y="366" width="92" height="3" fill="#FFFFFF" opacity="0.076"/><rect x="616" y="382" width="110" height="3" fill="#FFFFFF" opacity="0.062"/><rect x="239" y="398" width="272" height="3" fill="#FFFFFF" opacity="0.048"/>
   </svg></div>
           <p class="mm-race__blurb">Stadium to the sea. You start under the lights and finish within sight of the water.</p>
-          <div class="mm-race__offer">
-            <div class="mm-race__offer-label">Use this code when you enter</div>
-            <div class="mm-race__code">
-              <strong data-mm-code>MONOPOLY-PACIFIC</strong>
-              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+          <details class="mm-race__offer">
+            <summary class="mm-race__offer-summary">Runner offer</summary>
+            <div class="mm-race__offer-body">
+              <div class="mm-race__code">
+                <strong data-mm-code>MONOPOLY-PACIFIC</strong>
+                <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+              </div>
+              <p>$20 off entry through December.</p>
             </div>
-            <p>$20 off entry through December.</p>
-          </div>
+          </details>
           <a class="mm-race__link" href="#">Race website</a>
         </div>
       </article>
@@ -368,21 +426,30 @@
           <h2 class="mm-race__name">Gulf Coast Marathon</h2>
           <p class="mm-race__meta">Gulf Coast  |  January</p>
           <div class="mm-race__img">
-  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
-    <rect width="800" height="800" fill="#CCE7D3"/>
-    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
-      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
-      letter-spacing="2">RACE PHOTO</text>
+  <svg viewBox="0 0 800 380" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Illustrated aerial view of a city">
+    <defs>
+      <linearGradient id="sky4" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#FBE3B8"/><stop offset="100%" stop-color="#F2A15C"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="380" fill="url(#sky4)"/>
+    <circle cx="618" cy="91" r="26" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="-20" y="157" width="42" height="53" fill="#A9705E"/><rect x="25" y="127" width="26" height="83" fill="#A9705E"/><rect x="54" y="160" width="40" height="50" fill="#A9705E"/><rect x="98" y="141" width="37" height="69" fill="#A9705E"/><rect x="139" y="182" width="30" height="28" fill="#A9705E"/><rect x="178" y="164" width="41" height="46" fill="#A9705E"/><rect x="195" y="132" width="4" height="26" fill="#A9705E"/><rect x="229" y="186" width="40" height="24" fill="#A9705E"/><rect x="279" y="142" width="39" height="68" fill="#A9705E"/><rect x="327" y="149" width="44" height="61" fill="#A9705E"/><rect x="378" y="187" width="25" height="23" fill="#A9705E"/><rect x="410" y="169" width="27" height="41" fill="#A9705E"/><rect x="443" y="135" width="36" height="75" fill="#A9705E"/><rect x="488" y="190" width="36" height="20" fill="#A9705E"/><rect x="534" y="184" width="30" height="26" fill="#A9705E"/><rect x="569" y="187" width="24" height="23" fill="#A9705E"/><rect x="601" y="149" width="41" height="61" fill="#A9705E"/><rect x="651" y="138" width="39" height="72" fill="#A9705E"/><rect x="695" y="187" width="25" height="23" fill="#A9705E"/><rect x="729" y="158" width="32" height="52" fill="#A9705E"/><rect x="768" y="127" width="24" height="83" fill="#A9705E"/><rect x="801" y="158" width="30" height="52" fill="#A9705E"/>
+    <rect x="-20" y="197" width="28" height="55" fill="#40303A"/><rect x="13" y="203" width="29" height="49" fill="#40303A"/><rect x="49" y="235" width="37" height="17" fill="#40303A"/><rect x="90" y="148" width="40" height="104" fill="#40303A"/><rect x="135" y="182" width="37" height="70" fill="#40303A"/><rect x="178" y="212" width="53" height="40" fill="#40303A"/><rect x="240" y="172" width="35" height="80" fill="#40303A"/><rect x="280" y="211" width="44" height="41" fill="#40303A"/><rect x="334" y="146" width="47" height="106" fill="#40303A"/><rect x="385" y="200" width="33" height="52" fill="#40303A"/><rect x="422" y="221" width="41" height="31" fill="#40303A"/><rect x="470" y="176" width="36" height="76" fill="#40303A"/><rect x="511" y="162" width="51" height="90" fill="#40303A"/><rect x="567" y="143" width="46" height="109" fill="#40303A"/><rect x="618" y="234" width="40" height="18" fill="#40303A"/><rect x="664" y="198" width="52" height="54" fill="#40303A"/><rect x="724" y="218" width="51" height="34" fill="#40303A"/><rect x="744" y="188" width="4" height="26" fill="#40303A"/><rect x="783" y="158" width="51" height="94" fill="#40303A"/>
+    <rect x="0" y="252" width="800" height="128" fill="#7A5551"/>
+    <rect x="461" y="270" width="61" height="3" fill="#FFFFFF" opacity="0.160"/><rect x="357" y="286" width="255" height="3" fill="#FFFFFF" opacity="0.146"/><rect x="348" y="302" width="217" height="3" fill="#FFFFFF" opacity="0.132"/><rect x="696" y="318" width="92" height="3" fill="#FFFFFF" opacity="0.118"/><rect x="467" y="334" width="258" height="3" fill="#FFFFFF" opacity="0.104"/><rect x="669" y="350" width="68" height="3" fill="#FFFFFF" opacity="0.090"/><rect x="151" y="366" width="121" height="3" fill="#FFFFFF" opacity="0.076"/><rect x="491" y="382" width="126" height="3" fill="#FFFFFF" opacity="0.062"/><rect x="169" y="398" width="291" height="3" fill="#FFFFFF" opacity="0.048"/>
   </svg></div>
           <p class="mm-race__blurb">The fastest January race in the country, and the friendliest expo you will go to.</p>
-          <div class="mm-race__offer">
-            <div class="mm-race__offer-label">Use this code when you enter</div>
-            <div class="mm-race__code">
-              <strong data-mm-code>MONOPOLY-GULF</strong>
-              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+          <details class="mm-race__offer">
+            <summary class="mm-race__offer-summary">Runner offer</summary>
+            <div class="mm-race__offer-body">
+              <div class="mm-race__code">
+                <strong data-mm-code>MONOPOLY-GULF</strong>
+                <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+              </div>
+              <p>Free upgrade to the reserved corral.</p>
             </div>
-            <p>Free upgrade to the reserved corral.</p>
-          </div>
+          </details>
           <a class="mm-race__link" href="#">Race website</a>
         </div>
       </article>
@@ -393,46 +460,64 @@
           <h2 class="mm-race__name">Island Marathon</h2>
           <p class="mm-race__meta">Island  |  December</p>
           <div class="mm-race__img">
-  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
-    <rect width="800" height="800" fill="#CCE7D3"/>
-    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
-      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
-      letter-spacing="2">RACE PHOTO</text>
+  <svg viewBox="0 0 800 380" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Illustrated aerial view of a city">
+    <defs>
+      <linearGradient id="sky5" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#B7DCCB"/><stop offset="100%" stop-color="#6FA894"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="380" fill="url(#sky5)"/>
+    <circle cx="526" cy="79" r="26" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="-20" y="161" width="23" height="49" fill="#4E7C70"/><rect x="10" y="141" width="22" height="69" fill="#4E7C70"/><rect x="40" y="190" width="40" height="20" fill="#4E7C70"/><rect x="56" y="155" width="4" height="26" fill="#4E7C70"/><rect x="90" y="175" width="27" height="35" fill="#4E7C70"/><rect x="127" y="135" width="39" height="75" fill="#4E7C70"/><rect x="171" y="184" width="41" height="26" fill="#4E7C70"/><rect x="219" y="172" width="36" height="38" fill="#4E7C70"/><rect x="259" y="169" width="33" height="41" fill="#4E7C70"/><rect x="298" y="196" width="28" height="14" fill="#4E7C70"/><rect x="309" y="164" width="4" height="26" fill="#4E7C70"/><rect x="330" y="130" width="28" height="80" fill="#4E7C70"/><rect x="366" y="168" width="37" height="42" fill="#4E7C70"/><rect x="407" y="195" width="25" height="15" fill="#4E7C70"/><rect x="441" y="195" width="38" height="15" fill="#4E7C70"/><rect x="483" y="126" width="29" height="84" fill="#4E7C70"/><rect x="516" y="156" width="27" height="54" fill="#4E7C70"/><rect x="547" y="163" width="28" height="47" fill="#4E7C70"/><rect x="581" y="157" width="23" height="53" fill="#4E7C70"/><rect x="612" y="175" width="45" height="35" fill="#4E7C70"/><rect x="630" y="142" width="4" height="26" fill="#4E7C70"/><rect x="665" y="187" width="22" height="23" fill="#4E7C70"/><rect x="694" y="155" width="40" height="55" fill="#4E7C70"/><rect x="744" y="180" width="43" height="30" fill="#4E7C70"/><rect x="795" y="140" width="29" height="70" fill="#4E7C70"/>
+    <rect x="-20" y="206" width="33" height="46" fill="#28403C"/><rect x="-7" y="167" width="4" height="26" fill="#28403C"/><rect x="16" y="205" width="35" height="47" fill="#28403C"/><rect x="61" y="216" width="47" height="36" fill="#28403C"/><rect x="116" y="153" width="42" height="99" fill="#28403C"/><rect x="163" y="160" width="49" height="92" fill="#28403C"/><rect x="220" y="176" width="45" height="76" fill="#28403C"/><rect x="273" y="226" width="54" height="26" fill="#28403C"/><rect x="333" y="223" width="37" height="29" fill="#28403C"/><rect x="375" y="221" width="33" height="31" fill="#28403C"/><rect x="411" y="187" width="34" height="65" fill="#28403C"/><rect x="449" y="220" width="45" height="32" fill="#28403C"/><rect x="498" y="177" width="29" height="75" fill="#28403C"/><rect x="534" y="175" width="28" height="77" fill="#28403C"/><rect x="571" y="186" width="37" height="66" fill="#28403C"/><rect x="613" y="183" width="51" height="69" fill="#28403C"/><rect x="671" y="225" width="28" height="27" fill="#28403C"/><rect x="706" y="156" width="31" height="96" fill="#28403C"/><rect x="747" y="170" width="36" height="82" fill="#28403C"/><rect x="791" y="163" width="51" height="89" fill="#28403C"/>
+    <rect x="0" y="252" width="800" height="128" fill="#427065"/>
+    <rect x="399" y="270" width="234" height="3" fill="#FFFFFF" opacity="0.160"/><rect x="3" y="286" width="295" height="3" fill="#FFFFFF" opacity="0.146"/><rect x="457" y="302" width="83" height="3" fill="#FFFFFF" opacity="0.132"/><rect x="497" y="318" width="294" height="3" fill="#FFFFFF" opacity="0.118"/><rect x="39" y="334" width="124" height="3" fill="#FFFFFF" opacity="0.104"/><rect x="154" y="350" width="249" height="3" fill="#FFFFFF" opacity="0.090"/><rect x="534" y="366" width="219" height="3" fill="#FFFFFF" opacity="0.076"/><rect x="152" y="382" width="83" height="3" fill="#FFFFFF" opacity="0.062"/><rect x="74" y="398" width="252" height="3" fill="#FFFFFF" opacity="0.048"/>
   </svg></div>
           <p class="mm-race__blurb">A flat, shaded loop through a barrier island. Small field, big personal bests.</p>
-          <div class="mm-race__offer">
-            <div class="mm-race__offer-label">Use this code when you enter</div>
-            <div class="mm-race__code">
-              <strong data-mm-code>MONOPOLY-ISLAND</strong>
-              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+          <details class="mm-race__offer">
+            <summary class="mm-race__offer-summary">Runner offer</summary>
+            <div class="mm-race__offer-body">
+              <div class="mm-race__code">
+                <strong data-mm-code>MONOPOLY-ISLAND</strong>
+                <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+              </div>
+              <p>15% off the marathon or the half.</p>
             </div>
-            <p>15% off the marathon or the half.</p>
-          </div>
+          </details>
           <a class="mm-race__link" href="#">Race website</a>
         </div>
       </article>
       <article class="mm__card mm-race" data-mm-group="lightblue">
         <div class="mm-race__band" style="background:#AAE0FA;"></div>
         <div class="mm-race__body">
-          <div class="mm-race__space">Light blue race space</div>
+          <div class="mm-race__space">Light Blue race space</div>
           <h2 class="mm-race__name">Riverside Marathon</h2>
           <p class="mm-race__meta">Riverside  |  April</p>
           <div class="mm-race__img">
-  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
-    <rect width="800" height="800" fill="#CCE7D3"/>
-    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
-      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
-      letter-spacing="2">RACE PHOTO</text>
+  <svg viewBox="0 0 800 380" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Illustrated aerial view of a city">
+    <defs>
+      <linearGradient id="sky6" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#F6C89A"/><stop offset="100%" stop-color="#E8896B"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="380" fill="url(#sky6)"/>
+    <circle cx="434" cy="67" r="26" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="-20" y="165" width="28" height="45" fill="#8E5A6A"/><rect x="11" y="155" width="43" height="55" fill="#8E5A6A"/><rect x="59" y="150" width="41" height="60" fill="#8E5A6A"/><rect x="107" y="149" width="28" height="61" fill="#8E5A6A"/><rect x="141" y="184" width="34" height="26" fill="#8E5A6A"/><rect x="185" y="188" width="45" height="22" fill="#8E5A6A"/><rect x="240" y="167" width="27" height="43" fill="#8E5A6A"/><rect x="274" y="184" width="29" height="26" fill="#8E5A6A"/><rect x="285" y="156" width="4" height="26" fill="#8E5A6A"/><rect x="307" y="173" width="35" height="37" fill="#8E5A6A"/><rect x="351" y="171" width="30" height="39" fill="#8E5A6A"/><rect x="391" y="134" width="28" height="76" fill="#8E5A6A"/><rect x="423" y="168" width="36" height="42" fill="#8E5A6A"/><rect x="467" y="180" width="25" height="30" fill="#8E5A6A"/><rect x="496" y="167" width="23" height="43" fill="#8E5A6A"/><rect x="527" y="173" width="45" height="37" fill="#8E5A6A"/><rect x="578" y="137" width="33" height="73" fill="#8E5A6A"/><rect x="617" y="179" width="28" height="31" fill="#8E5A6A"/><rect x="649" y="142" width="28" height="68" fill="#8E5A6A"/><rect x="687" y="136" width="44" height="74" fill="#8E5A6A"/><rect x="739" y="194" width="35" height="16" fill="#8E5A6A"/><rect x="780" y="168" width="27" height="42" fill="#8E5A6A"/><rect x="815" y="129" width="28" height="81" fill="#8E5A6A"/>
+    <rect x="-20" y="192" width="42" height="60" fill="#3B2B45"/><rect x="32" y="147" width="39" height="105" fill="#3B2B45"/><rect x="77" y="156" width="30" height="96" fill="#3B2B45"/><rect x="89" y="132" width="4" height="26" fill="#3B2B45"/><rect x="110" y="164" width="30" height="88" fill="#3B2B45"/><rect x="148" y="214" width="50" height="38" fill="#3B2B45"/><rect x="203" y="229" width="27" height="23" fill="#3B2B45"/><rect x="236" y="150" width="49" height="102" fill="#3B2B45"/><rect x="292" y="209" width="27" height="43" fill="#3B2B45"/><rect x="323" y="214" width="36" height="38" fill="#3B2B45"/><rect x="367" y="221" width="30" height="31" fill="#3B2B45"/><rect x="405" y="196" width="28" height="56" fill="#3B2B45"/><rect x="439" y="237" width="38" height="15" fill="#3B2B45"/><rect x="483" y="203" width="47" height="49" fill="#3B2B45"/><rect x="502" y="169" width="4" height="26" fill="#3B2B45"/><rect x="537" y="201" width="34" height="51" fill="#3B2B45"/><rect x="580" y="231" width="28" height="21" fill="#3B2B45"/><rect x="613" y="176" width="27" height="76" fill="#3B2B45"/><rect x="646" y="144" width="41" height="108" fill="#3B2B45"/><rect x="693" y="145" width="29" height="107" fill="#3B2B45"/><rect x="729" y="167" width="51" height="85" fill="#3B2B45"/><rect x="790" y="195" width="51" height="57" fill="#3B2B45"/>
+    <rect x="0" y="252" width="800" height="128" fill="#5C4A63"/>
+    <rect x="504" y="270" width="249" height="3" fill="#FFFFFF" opacity="0.160"/><rect x="603" y="286" width="191" height="3" fill="#FFFFFF" opacity="0.146"/><rect x="487" y="302" width="212" height="3" fill="#FFFFFF" opacity="0.132"/><rect x="48" y="318" width="166" height="3" fill="#FFFFFF" opacity="0.118"/><rect x="281" y="334" width="293" height="3" fill="#FFFFFF" opacity="0.104"/><rect x="228" y="350" width="217" height="3" fill="#FFFFFF" opacity="0.090"/><rect x="438" y="366" width="240" height="3" fill="#FFFFFF" opacity="0.076"/><rect x="275" y="382" width="181" height="3" fill="#FFFFFF" opacity="0.062"/><rect x="381" y="398" width="272" height="3" fill="#FFFFFF" opacity="0.048"/>
   </svg></div>
           <p class="mm-race__blurb">A skyline course across the water, with the best spectator turnout per mile anywhere.</p>
-          <div class="mm-race__offer">
-            <div class="mm-race__offer-label">Use this code when you enter</div>
-            <div class="mm-race__code">
-              <strong data-mm-code>MONOPOLY-RIVER</strong>
-              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+          <details class="mm-race__offer">
+            <summary class="mm-race__offer-summary">Runner offer</summary>
+            <div class="mm-race__offer-body">
+              <div class="mm-race__code">
+                <strong data-mm-code>MONOPOLY-RIVER</strong>
+                <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+              </div>
+              <p>$10 off any distance.</p>
             </div>
-            <p>$10 off any distance.</p>
-          </div>
+          </details>
           <a class="mm-race__link" href="#">Race website</a>
         </div>
       </article>
@@ -443,26 +528,35 @@
           <h2 class="mm-race__name">Bayshore Marathon</h2>
           <p class="mm-race__meta">Bayshore  |  December</p>
           <div class="mm-race__img">
-  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
-    <rect width="800" height="800" fill="#CCE7D3"/>
-    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
-      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
-      letter-spacing="2">RACE PHOTO</text>
+  <svg viewBox="0 0 800 380" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Illustrated aerial view of a city">
+    <defs>
+      <linearGradient id="sky7" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#BFE3F2"/><stop offset="100%" stop-color="#7FB2D6"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="380" fill="url(#sky7)"/>
+    <circle cx="342" cy="115" r="26" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="-20" y="169" width="33" height="41" fill="#5C7FA6"/><rect x="20" y="169" width="40" height="41" fill="#5C7FA6"/><rect x="69" y="180" width="41" height="30" fill="#5C7FA6"/><rect x="115" y="188" width="35" height="22" fill="#5C7FA6"/><rect x="158" y="150" width="24" height="60" fill="#5C7FA6"/><rect x="188" y="164" width="35" height="46" fill="#5C7FA6"/><rect x="227" y="179" width="41" height="31" fill="#5C7FA6"/><rect x="276" y="133" width="33" height="77" fill="#5C7FA6"/><rect x="318" y="136" width="45" height="74" fill="#5C7FA6"/><rect x="368" y="164" width="44" height="46" fill="#5C7FA6"/><rect x="417" y="143" width="37" height="67" fill="#5C7FA6"/><rect x="460" y="188" width="37" height="22" fill="#5C7FA6"/><rect x="504" y="168" width="35" height="42" fill="#5C7FA6"/><rect x="548" y="132" width="26" height="78" fill="#5C7FA6"/><rect x="580" y="134" width="29" height="76" fill="#5C7FA6"/><rect x="614" y="143" width="31" height="67" fill="#5C7FA6"/><rect x="651" y="194" width="41" height="16" fill="#5C7FA6"/><rect x="701" y="137" width="35" height="73" fill="#5C7FA6"/><rect x="743" y="183" width="23" height="27" fill="#5C7FA6"/><rect x="772" y="141" width="26" height="69" fill="#5C7FA6"/><rect x="807" y="150" width="25" height="60" fill="#5C7FA6"/>
+    <rect x="-20" y="201" width="33" height="51" fill="#2F4460"/><rect x="21" y="152" width="52" height="100" fill="#2F4460"/><rect x="82" y="135" width="45" height="117" fill="#2F4460"/><rect x="131" y="141" width="43" height="111" fill="#2F4460"/><rect x="183" y="151" width="48" height="101" fill="#2F4460"/><rect x="202" y="117" width="4" height="26" fill="#2F4460"/><rect x="240" y="220" width="40" height="32" fill="#2F4460"/><rect x="289" y="213" width="42" height="39" fill="#2F4460"/><rect x="337" y="174" width="39" height="78" fill="#2F4460"/><rect x="352" y="149" width="4" height="26" fill="#2F4460"/><rect x="385" y="226" width="44" height="26" fill="#2F4460"/><rect x="439" y="216" width="36" height="36" fill="#2F4460"/><rect x="481" y="221" width="29" height="31" fill="#2F4460"/><rect x="518" y="165" width="49" height="87" fill="#2F4460"/><rect x="576" y="149" width="47" height="103" fill="#2F4460"/><rect x="629" y="221" width="30" height="31" fill="#2F4460"/><rect x="668" y="177" width="38" height="75" fill="#2F4460"/><rect x="713" y="236" width="30" height="16" fill="#2F4460"/><rect x="752" y="178" width="36" height="74" fill="#2F4460"/><rect x="796" y="194" width="29" height="58" fill="#2F4460"/>
+    <rect x="0" y="252" width="800" height="128" fill="#4A7194"/>
+    <rect x="261" y="270" width="91" height="3" fill="#FFFFFF" opacity="0.160"/><rect x="422" y="286" width="166" height="3" fill="#FFFFFF" opacity="0.146"/><rect x="39" y="302" width="161" height="3" fill="#FFFFFF" opacity="0.132"/><rect x="124" y="318" width="168" height="3" fill="#FFFFFF" opacity="0.118"/><rect x="548" y="334" width="189" height="3" fill="#FFFFFF" opacity="0.104"/><rect x="207" y="350" width="85" height="3" fill="#FFFFFF" opacity="0.090"/><rect x="363" y="366" width="162" height="3" fill="#FFFFFF" opacity="0.076"/><rect x="256" y="382" width="236" height="3" fill="#FFFFFF" opacity="0.062"/><rect x="212" y="398" width="61" height="3" fill="#FFFFFF" opacity="0.048"/>
   </svg></div>
           <p class="mm-race__blurb">Waterfront, warm, and the last chance at a qualifier before the year closes.</p>
-          <div class="mm-race__offer">
-            <div class="mm-race__offer-label">Use this code when you enter</div>
-            <div class="mm-race__code">
-              <strong data-mm-code>MONOPOLY-BAY</strong>
-              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+          <details class="mm-race__offer">
+            <summary class="mm-race__offer-summary">Runner offer</summary>
+            <div class="mm-race__offer-body">
+              <div class="mm-race__code">
+                <strong data-mm-code>MONOPOLY-BAY</strong>
+                <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+              </div>
+              <p>Free 5K entry when you register for the marathon.</p>
             </div>
-            <p>Free 5K entry when you register for the marathon.</p>
-          </div>
+          </details>
           <a class="mm-race__link" href="#">Race website</a>
         </div>
       </article>
   </div>
-  <div class="mm-guide__foot"><p>Placeholder races shown while the board is being filled. Codes are set by each race and can change; if one has expired, the race website will have their current offer.</p></div>
+  <div class="mm-guide__foot"><p>Placeholder races shown while the board is being filled. Offers are set by each race and can change; the race website will always have their current entry details.</p></div>
 </div></div>
 
 <script>
