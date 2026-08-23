@@ -157,14 +157,34 @@ export const TOKENS = [
  * they want less of, and a physical object aimed at a sport with no board game
  * of its own is sitting in the middle of that.
  */
+export const WHY_NOW_INTRO =
+  'There are over 300 custom editions of Monopoly (Star Wars, National Parks, NFL teams) but why not Marathon Monopoly? We have got the audience, the obsession and the need for novel gifts. That changes now.'
+
+/**
+ * Three beats, left of the photograph.
+ *
+ * The first one used to be a subheading, a row of five example chips and a
+ * large red panel asking the question, all above these two. That was three
+ * pieces of furniture to make one point, and the point is now in the intro
+ * above. Folded down to a beat so the section reads as one list rather than a
+ * build-up followed by an unrelated pair.
+ *
+ * The licensed-editions clause came out of "Board games are having a moment"
+ * when the precedent beat took its place at the top, because the two were
+ * making the same argument a paragraph apart.
+ */
 export const WHY_NOW = [
+  {
+    title: 'Monopoly does this constantly',
+    body: 'Star Wars, National Parks, NFL teams, Premier League clubs. Over 300 licensed editions have been made, the ones people keep are tied to something they already love, and not one of them has been for running.',
+  },
   {
     title: 'People are tired of screens',
     body: 'Digital fatigue is the defining consumer mood of the decade. The thing people say they want more of is time not spent looking at a phone, and a board on a table is the oldest answer to that there is.',
   },
   {
     title: 'Board games are having a moment',
-    body: 'Tabletop has been one of the few physical categories growing while everything else moved to a screen, and the licensed editions people actually keep are the ones tied to something they love.',
+    body: 'Tabletop has been one of the few physical categories growing while everything else moved to a screen, and a marathon is exactly the kind of thing people build a shelf around.',
   },
 ]
 

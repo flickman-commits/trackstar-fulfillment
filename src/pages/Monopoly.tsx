@@ -28,6 +28,7 @@ import { MONOPOLY, UI_RADIUS, CARD_OUTLINE, HAND_FONT, guilloche } from '@/compo
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import {
   BOARD_GUIDE,
+  WHY_NOW_INTRO,
   COMMIT_STEPS,
   LAUNCH_PLAN,
   PRODUCT_SHOTS,
@@ -280,48 +281,19 @@ export default function Monopoly() {
           300-editions proof lives here now: it is evidence that the category
           works, which is a why-now argument rather than a what-is-it one. */}
       <Section muted>
-        <SectionHeading>Why now</SectionHeading>
-
-        <SubHeading>There have been over 300 custom editions made of Monopoly...</SubHeading>
-
-        {/* Five, not nine. The point is that the category is crowded, and nine
-            made the reader audit the list instead of taking the point. */}
-        <div className="mb-10 mt-5 flex flex-wrap gap-2">
-          {['Star Wars', 'Premier League clubs', 'National Parks', 'Game of Thrones', 'NFL teams'].map((label) => (
-            <span
-              key={label}
-              style={{
-                fontSize: 14,
-                padding: '8px 14px',
-                backgroundColor: MONOPOLY.paper,
-                border: `1.5px solid ${MONOPOLY.black}`,
-                borderRadius: UI_RADIUS,
-                color: MONOPOLY.ink,
-                fontWeight: 500,
-              }}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
-
-        <div
-          className="px-6 py-7 sm:px-9 sm:py-9"
-          style={{ backgroundColor: MONOPOLY.red, border: `2px solid ${MONOPOLY.black}`, borderRadius: UI_RADIUS }}
-        >
-          <p style={{ fontSize: 'clamp(22px, 3vw, 34px)', fontWeight: 700, color: '#FFFFFF', lineHeight: 1.15, letterSpacing: '-0.02em' }}>
-            So why isn't there a Marathon Monopoly?
-          </p>
-          <p className="mt-4" style={{ fontSize: 16, color: 'rgba(255,255,255,0.9)', lineHeight: 1.6, maxWidth: '44rem' }}>
-            We've got the audience, the obsession, and the need for novel gifts every December. All
-            we're missing is the board. That changes now.
-          </p>
-        </div>
+        {/* This was a subheading, a row of five example chips and a big red
+            panel asking the question, all stacked above two beats and a photo.
+            Three pieces of furniture to make one point, and the point is the
+            heading. It is now the heading, one paragraph, and three beats. */}
+        <SectionHeading>Why isn't there Marathon Monopoly?</SectionHeading>
+        <p className="mb-10 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
+          {WHY_NOW_INTRO}
+        </p>
 
         {/* Beats left, picture right on a laptop; stacked on a phone. The image
             sat below them at half width before, which left a column of empty
             mint beside it and pushed the section over a screen tall. */}
-        <div className="mt-14 grid items-center gap-10 lg:grid-cols-2">
+        <div className="grid items-center gap-10 lg:grid-cols-2">
           <div className="flex flex-col gap-8">
             {WHY_NOW.map((item) => (
               <Beat key={item.title} title={item.title} body={item.body} />
