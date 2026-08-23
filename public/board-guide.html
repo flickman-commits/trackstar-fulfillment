@@ -1,0 +1,486 @@
+<!doctype html>
+<!--
+  Snapshot of the Board Guide, hosted so the QR code on the partner proposal
+  resolves to something real instead of a 404 in front of a race director.
+
+  Source of truth is the Shopify theme:
+    ~/Software/trackstar-art/sections/mm-board-guide.liquid
+    ~/Software/trackstar-art/templates/page.board-guide.json
+  Regenerate with: node _preview/build-mm-preview.mjs  (in that repo)
+
+  Race names here are invented. Nothing on the board is committed, and a page
+  a race director can reach must not imply otherwise.
+-->
+
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Board Guide | Marathon Monopoly</title>
+<meta name="robots" content="noindex, nofollow">
+<style>*{box-sizing:border-box}body{margin:0;background:#FBF9F4}/*
+ * Marathon Monopoly: PDP and Board Guide.
+ *
+ * One stylesheet for both surfaces because they are one product. A buyer
+ * scans the code on the box and lands on the guide, and the guide has to feel
+ * like the thing in their hands or the code reads as a redirect to somewhere
+ * else.
+ *
+ * The palette is the published Monopoly brand spec, not Trackstar's. Trackstar
+ * purple is deliberately absent here: on this product the Monopoly system owns
+ * every surface, so the page reads as one object rather than two brands
+ * negotiating. Same decision as the partner proposal at monopoly.trackstar.art.
+ */
+
+.mm {
+  --mm-red: #ED1C24;      /* PMS 485C */
+  --mm-ink: #231F20;      /* PMS Black 6C, warmer than pure black */
+  --mm-mint: #CCE7D3;     /* PMS 9525C, the board itself */
+  --mm-mint-pale: #E4F1E9;
+  --mm-paper: #FBF9F4;
+  --mm-muted: #5F5A57;
+  --mm-outline: 2px solid var(--mm-ink);
+
+  background: var(--mm-paper);
+  color: var(--mm-ink);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.mm__container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+@media (min-width: 990px) {
+  .mm__container { padding: 0 40px; }
+}
+
+/* The section label as a bordered plate with a hard red offset shadow. It is
+   the one repeated motif that ties every Monopoly surface together. */
+.mm__plate {
+  display: inline-block;
+  padding: 9px 18px;
+  border: var(--mm-outline);
+  background: var(--mm-paper);
+  box-shadow: 4px 4px 0 var(--mm-red);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.25;
+}
+
+.mm__h2 {
+  font-size: clamp(26px, 3.6vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.mm__lede {
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--mm-muted);
+  max-width: 46rem;
+  margin: 12px 0 0;
+}
+
+.mm__card {
+  border: var(--mm-outline);
+  border-radius: 6px;
+  background: var(--mm-paper);
+  overflow: hidden;
+}
+
+/* ── PDP ─────────────────────────────────────────────────────────────── */
+
+.mm-pdp { padding: 32px 0 64px; }
+
+.mm-pdp__grid { display: grid; gap: 28px; }
+
+@media (min-width: 990px) {
+  .mm-pdp__grid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 48px;
+    align-items: start;
+  }
+}
+
+.mm-pdp__stage { border: var(--mm-outline); border-radius: 6px; background: var(--mm-mint); overflow: hidden; }
+.mm-pdp__stage img,
+.mm-pdp__stage svg { display: block; width: 100%; height: auto; }
+
+.mm-pdp__thumbs { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.mm-pdp__thumb {
+  width: 72px; height: 72px; padding: 0; cursor: pointer;
+  border: var(--mm-outline); border-radius: 4px; background: var(--mm-paper); overflow: hidden;
+}
+.mm-pdp__thumb.is-active { box-shadow: 3px 3px 0 var(--mm-red); }
+.mm-pdp__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.mm-pdp__eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--mm-red);
+}
+
+.mm-pdp__title {
+  font-size: clamp(30px, 4.4vw, 46px);
+  font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; margin: 10px 0 0;
+}
+
+.mm-pdp__price { display: flex; align-items: baseline; gap: 10px; margin-top: 18px; }
+.mm-pdp__price-now { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+.mm-pdp__price-note { font-size: 14px; color: var(--mm-muted); }
+
+.mm-pdp__blurb { font-size: 17px; line-height: 1.6; color: var(--mm-muted); margin: 16px 0 0; }
+
+.mm-pdp__points { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 10px; }
+.mm-pdp__points li { display: flex; gap: 10px; font-size: 16px; line-height: 1.55; color: var(--mm-muted); }
+.mm-pdp__points li::before { content: '+'; color: var(--mm-red); font-weight: 700; }
+
+.mm-pdp__atc {
+  display: block; width: 100%; margin-top: 26px; padding: 17px 22px;
+  border: var(--mm-outline); border-radius: 6px; background: var(--mm-red); color: #fff;
+  font-size: 17px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  cursor: pointer; text-align: center;
+}
+.mm-pdp__atc[disabled] { background: var(--mm-muted); cursor: not-allowed; }
+
+/* The scarcity line. Real number or nothing: a fake counter on a product that
+   has not shipped is the fastest way to lose a collector. */
+.mm-pdp__stock {
+  margin-top: 12px; font-size: 14px; text-align: center; color: var(--mm-muted);
+}
+
+/* Board Guide teaser on the PDP. The code on the box is a feature of the
+   product, so it is sold here, not just printed on the packaging. */
+.mm-pdp__guide {
+  margin-top: 28px; padding: 20px 22px;
+  border: var(--mm-outline); border-radius: 6px; background: var(--mm-mint-pale);
+  display: flex; gap: 18px; align-items: center;
+}
+.mm-pdp__guide-qr { flex: 0 0 auto; }
+.mm-pdp__guide h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.mm-pdp__guide p { margin: 6px 0 0; font-size: 15px; line-height: 1.55; color: var(--mm-muted); }
+.mm-pdp__guide a { color: var(--mm-ink); font-weight: 700; }
+
+/* ── Board Guide ─────────────────────────────────────────────────────── */
+
+.mm-guide { padding: 40px 0 72px; }
+
+.mm-guide__head { text-align: center; max-width: 44rem; margin: 0 auto 32px; }
+.mm-guide__head .mm__lede { margin-left: auto; margin-right: auto; }
+
+.mm-guide__filters {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 0 0 28px;
+}
+.mm-guide__filter {
+  padding: 8px 14px; border: var(--mm-outline); border-radius: 999px;
+  background: var(--mm-paper); font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.mm-guide__filter[aria-pressed='true'] { background: var(--mm-ink); color: #fff; }
+
+.mm-guide__grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+
+@media (min-width: 700px)  { .mm-guide__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1050px) { .mm-guide__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.mm-race { display: flex; flex-direction: column; }
+.mm-race[hidden] { display: none; }
+
+/* The colour band is the whole point of the card: it is the group the race
+   occupies on the board, so a reader can match card to space without a legend. */
+.mm-race__band { height: 34px; border-bottom: var(--mm-outline); }
+
+.mm-race__body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+
+.mm-race__space {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--mm-muted);
+}
+.mm-race__name { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.mm-race__meta { font-size: 14px; color: var(--mm-muted); margin: 0; }
+.mm-race__blurb { font-size: 15px; line-height: 1.6; color: var(--mm-muted); margin: 0; }
+
+.mm-race__img { border: var(--mm-outline); border-radius: 4px; overflow: hidden; }
+.mm-race__img img,
+.mm-race__img svg { display: block; width: 100%; height: 170px; object-fit: cover; }
+
+/* The offer. Dashed rather than solid so it reads as a coupon torn from
+   something, which is what it is. */
+.mm-race__offer {
+  margin-top: auto; padding: 14px 16px;
+  border: 2px dashed var(--mm-ink); border-radius: 6px; background: var(--mm-mint-pale);
+}
+.mm-race__offer-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--mm-muted);
+}
+.mm-race__code {
+  display: flex; align-items: center; gap: 10px; margin-top: 6px;
+}
+.mm-race__code strong {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 19px; letter-spacing: 0.06em;
+}
+.mm-race__copy {
+  margin-left: auto; padding: 6px 12px; cursor: pointer;
+  border: var(--mm-outline); border-radius: 4px; background: var(--mm-paper);
+  font-size: 13px; font-weight: 700;
+}
+.mm-race__copy.is-copied { background: var(--mm-ink); color: #fff; }
+.mm-race__offer p { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--mm-muted); }
+
+.mm-race__link {
+  display: inline-block; margin-top: 12px; font-size: 15px; font-weight: 700;
+  color: var(--mm-ink); text-decoration: underline;
+  text-decoration-color: var(--mm-red); text-decoration-thickness: 2px; text-underline-offset: 4px;
+}
+
+.mm-guide__empty { text-align: center; padding: 40px 0; color: var(--mm-muted); font-size: 16px; }
+
+.mm-guide__foot {
+  margin-top: 40px; padding: 24px; text-align: center;
+  border: var(--mm-outline); border-radius: 6px; background: var(--mm-mint);
+}
+.mm-guide__foot p { margin: 0 auto; max-width: 40rem; font-size: 16px; line-height: 1.6; }
+</style>
+</head><body>
+<div class="mm mm-guide">
+<div style="max-width:1200px;margin:0 auto;padding:18px 20px 0;"><p style="margin:0;padding:12px 16px;border:2px solid #231F20;border-radius:6px;background:#FEF200;font-size:14px;line-height:1.5;font-weight:700;">Preview. The races below are placeholders, shown to demonstrate the format. The real guide is built once the board is full.</p></div><div class="mm__container">
+  <div class="mm-guide__head">
+    <span class="mm__plate">Marathon Monopoly</span>
+    <h1 class="mm__h2" style="margin-top:20px;">The Board Guide</h1>
+    <p class="mm__lede">Every race on the board, in the words of the people who put it on. Each one has a code you will not find anywhere else.</p>
+  </div>
+  
+  <div class="mm-guide__filters" data-mm-filters>
+    <button type="button" class="mm-guide__filter" data-mm-filter="all" aria-pressed="true">All 8</button>
+    <button type="button" class="mm-guide__filter" data-mm-filter="darkblue" aria-pressed="false">Dark blue</button><button type="button" class="mm-guide__filter" data-mm-filter="green" aria-pressed="false">Green</button><button type="button" class="mm-guide__filter" data-mm-filter="yellow" aria-pressed="false">Yellow</button><button type="button" class="mm-guide__filter" data-mm-filter="orange" aria-pressed="false">Orange</button><button type="button" class="mm-guide__filter" data-mm-filter="lightblue" aria-pressed="false">Light blue</button><button type="button" class="mm-guide__filter" data-mm-filter="brown" aria-pressed="false">Brown</button>
+  </div>
+  <div class="mm-guide__grid" data-mm-grid>
+    
+      <article class="mm__card mm-race" data-mm-group="darkblue">
+        <div class="mm-race__band" style="background:#0072BB;"></div>
+        <div class="mm-race__body">
+          <div class="mm-race__space">Dark blue race space</div>
+          <h2 class="mm-race__name">Harbor City Marathon</h2>
+          <p class="mm-race__meta">Harbor City  |  April</p>
+          <div class="mm-race__img">
+  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
+    <rect width="800" height="800" fill="#CCE7D3"/>
+    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
+      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
+      letter-spacing="2">RACE PHOTO</text>
+  </svg></div>
+          <p class="mm-race__blurb">The oldest race on the board, and the only one here you have to qualify for. The hill is at mile 20, exactly where you do not want it.</p>
+          <div class="mm-race__offer">
+            <div class="mm-race__offer-label">Use this code when you enter</div>
+            <div class="mm-race__code">
+              <strong data-mm-code>MONOPOLY-HARBOR</strong>
+              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+            </div>
+            <p>$15 off entry. Valid until registration closes.</p>
+          </div>
+          <a class="mm-race__link" href="#">Race website</a>
+        </div>
+      </article>
+      <article class="mm__card mm-race" data-mm-group="darkblue">
+        <div class="mm-race__band" style="background:#0072BB;"></div>
+        <div class="mm-race__body">
+          <div class="mm-race__space">Dark blue race space</div>
+          <h2 class="mm-race__name">Metro Marathon</h2>
+          <p class="mm-race__meta">Metro  |  November</p>
+          <div class="mm-race__img">
+  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
+    <rect width="800" height="800" fill="#CCE7D3"/>
+    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
+      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
+      letter-spacing="2">RACE PHOTO</text>
+  </svg></div>
+          <p class="mm-race__blurb">Five boroughs, two million people on the street, and a park finish people plan a decade around.</p>
+          <div class="mm-race__offer">
+            <div class="mm-race__offer-label">Use this code when you enter</div>
+            <div class="mm-race__code">
+              <strong data-mm-code>MONOPOLY-METRO</strong>
+              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+            </div>
+            <p>Guaranteed-entry application fee waived.</p>
+          </div>
+          <a class="mm-race__link" href="#">Race website</a>
+        </div>
+      </article>
+      <article class="mm__card mm-race" data-mm-group="green">
+        <div class="mm-race__band" style="background:#1FB25A;"></div>
+        <div class="mm-race__body">
+          <div class="mm-race__space">Green race space</div>
+          <h2 class="mm-race__name">Lakeside Marathon</h2>
+          <p class="mm-race__meta">Lakeside  |  October</p>
+          <div class="mm-race__img">
+  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
+    <rect width="800" height="800" fill="#CCE7D3"/>
+    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
+      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
+      letter-spacing="2">RACE PHOTO</text>
+  </svg></div>
+          <p class="mm-race__blurb">Flat, fast and built for a personal best. More records have fallen here than anywhere else on the board.</p>
+          <div class="mm-race__offer">
+            <div class="mm-race__offer-label">Use this code when you enter</div>
+            <div class="mm-race__code">
+              <strong data-mm-code>MONOPOLY-LAKE</strong>
+              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+            </div>
+            <p>10% off entry, plus a free race photo package.</p>
+          </div>
+          <a class="mm-race__link" href="#">Race website</a>
+        </div>
+      </article>
+      <article class="mm__card mm-race" data-mm-group="green">
+        <div class="mm-race__band" style="background:#1FB25A;"></div>
+        <div class="mm-race__body">
+          <div class="mm-race__space">Green race space</div>
+          <h2 class="mm-race__name">Pacific Marathon</h2>
+          <p class="mm-race__meta">Pacific  |  March</p>
+          <div class="mm-race__img">
+  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
+    <rect width="800" height="800" fill="#CCE7D3"/>
+    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
+      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
+      letter-spacing="2">RACE PHOTO</text>
+  </svg></div>
+          <p class="mm-race__blurb">Stadium to the sea. You start under the lights and finish within sight of the water.</p>
+          <div class="mm-race__offer">
+            <div class="mm-race__offer-label">Use this code when you enter</div>
+            <div class="mm-race__code">
+              <strong data-mm-code>MONOPOLY-PACIFIC</strong>
+              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+            </div>
+            <p>$20 off entry through December.</p>
+          </div>
+          <a class="mm-race__link" href="#">Race website</a>
+        </div>
+      </article>
+      <article class="mm__card mm-race" data-mm-group="yellow">
+        <div class="mm-race__band" style="background:#FEF200;"></div>
+        <div class="mm-race__body">
+          <div class="mm-race__space">Yellow race space</div>
+          <h2 class="mm-race__name">Gulf Coast Marathon</h2>
+          <p class="mm-race__meta">Gulf Coast  |  January</p>
+          <div class="mm-race__img">
+  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
+    <rect width="800" height="800" fill="#CCE7D3"/>
+    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
+      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
+      letter-spacing="2">RACE PHOTO</text>
+  </svg></div>
+          <p class="mm-race__blurb">The fastest January race in the country, and the friendliest expo you will go to.</p>
+          <div class="mm-race__offer">
+            <div class="mm-race__offer-label">Use this code when you enter</div>
+            <div class="mm-race__code">
+              <strong data-mm-code>MONOPOLY-GULF</strong>
+              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+            </div>
+            <p>Free upgrade to the reserved corral.</p>
+          </div>
+          <a class="mm-race__link" href="#">Race website</a>
+        </div>
+      </article>
+      <article class="mm__card mm-race" data-mm-group="orange">
+        <div class="mm-race__band" style="background:#F7941D;"></div>
+        <div class="mm-race__body">
+          <div class="mm-race__space">Orange race space</div>
+          <h2 class="mm-race__name">Island Marathon</h2>
+          <p class="mm-race__meta">Island  |  December</p>
+          <div class="mm-race__img">
+  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
+    <rect width="800" height="800" fill="#CCE7D3"/>
+    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
+      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
+      letter-spacing="2">RACE PHOTO</text>
+  </svg></div>
+          <p class="mm-race__blurb">A flat, shaded loop through a barrier island. Small field, big personal bests.</p>
+          <div class="mm-race__offer">
+            <div class="mm-race__offer-label">Use this code when you enter</div>
+            <div class="mm-race__code">
+              <strong data-mm-code>MONOPOLY-ISLAND</strong>
+              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+            </div>
+            <p>15% off the marathon or the half.</p>
+          </div>
+          <a class="mm-race__link" href="#">Race website</a>
+        </div>
+      </article>
+      <article class="mm__card mm-race" data-mm-group="lightblue">
+        <div class="mm-race__band" style="background:#AAE0FA;"></div>
+        <div class="mm-race__body">
+          <div class="mm-race__space">Light blue race space</div>
+          <h2 class="mm-race__name">Riverside Marathon</h2>
+          <p class="mm-race__meta">Riverside  |  April</p>
+          <div class="mm-race__img">
+  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
+    <rect width="800" height="800" fill="#CCE7D3"/>
+    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
+      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
+      letter-spacing="2">RACE PHOTO</text>
+  </svg></div>
+          <p class="mm-race__blurb">A skyline course across the water, with the best spectator turnout per mile anywhere.</p>
+          <div class="mm-race__offer">
+            <div class="mm-race__offer-label">Use this code when you enter</div>
+            <div class="mm-race__code">
+              <strong data-mm-code>MONOPOLY-RIVER</strong>
+              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+            </div>
+            <p>$10 off any distance.</p>
+          </div>
+          <a class="mm-race__link" href="#">Race website</a>
+        </div>
+      </article>
+      <article class="mm__card mm-race" data-mm-group="brown">
+        <div class="mm-race__band" style="background:#955436;"></div>
+        <div class="mm-race__body">
+          <div class="mm-race__space">Brown race space</div>
+          <h2 class="mm-race__name">Bayshore Marathon</h2>
+          <p class="mm-race__meta">Bayshore  |  December</p>
+          <div class="mm-race__img">
+  <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Race photo">
+    <rect width="800" height="800" fill="#CCE7D3"/>
+    <text x="400" y="400" text-anchor="middle" dominant-baseline="middle"
+      font-family="ui-monospace, monospace" font-size="22" fill="#5F5A57"
+      letter-spacing="2">RACE PHOTO</text>
+  </svg></div>
+          <p class="mm-race__blurb">Waterfront, warm, and the last chance at a qualifier before the year closes.</p>
+          <div class="mm-race__offer">
+            <div class="mm-race__offer-label">Use this code when you enter</div>
+            <div class="mm-race__code">
+              <strong data-mm-code>MONOPOLY-BAY</strong>
+              <button type="button" class="mm-race__copy" data-mm-copy>Copy</button>
+            </div>
+            <p>Free 5K entry when you register for the marathon.</p>
+          </div>
+          <a class="mm-race__link" href="#">Race website</a>
+        </div>
+      </article>
+  </div>
+  <div class="mm-guide__foot"><p>Placeholder races shown while the board is being filled. Codes are set by each race and can change; if one has expired, the race website will have their current offer.</p></div>
+</div></div>
+
+<script>
+(function () {
+  var root = document.querySelector('.mm-guide');
+  var filters = root.querySelector('[data-mm-filters]');
+  if (filters) filters.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-mm-filter]'); if (!btn) return;
+    var want = btn.getAttribute('data-mm-filter');
+    filters.querySelectorAll('[data-mm-filter]').forEach(function (b) { b.setAttribute('aria-pressed', String(b === btn)); });
+    root.querySelectorAll('[data-mm-group]').forEach(function (c) {
+      c.hidden = want !== 'all' && c.getAttribute('data-mm-group') !== want;
+    });
+  });
+  root.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-mm-copy]'); if (!btn) return;
+    btn.textContent = 'Copied'; btn.classList.add('is-copied');
+    setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('is-copied'); }, 1600);
+  });
+})();
+</script></body></html>

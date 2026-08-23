@@ -19,7 +19,7 @@ import { PackageTiers } from '@/components/monopoly/PackageTiers'
 import { STATUS_COLORS, legendFor } from '@/components/monopoly/boardView'
 import { ExposureModel } from '@/components/monopoly/ExposureModel'
 import { EarnItBack } from '@/components/monopoly/EarnItBack'
-import { QrGlyph } from '@/components/monopoly/QrGlyph'
+import { QrGlyph, BOARD_GUIDE_QR_TARGET } from '@/components/monopoly/QrGlyph'
 import { BrandLockup } from '@/components/monopoly/BrandLockup'
 import PriceExpectation from '@/components/monopoly/PriceExpectation'
 import { UnitFlow } from '@/components/monopoly/UnitFlow'
@@ -458,19 +458,55 @@ export default function Monopoly() {
           <h3 className="mb-3" style={{ fontSize: 17, fontWeight: 700, color: MONOPOLY.ink }}>
             Purchasing a race slot includes
           </h3>
+          {/* The Board Guide line is emphasised rather than sitting flush with
+              the rest. It is the only item here that is new to a reader who has
+              seen a sponsorship deck before, and the section immediately below
+              is the guide itself, so this is what carries them into it. */}
           <ul className="flex flex-col gap-2" style={{ maxWidth: '40rem' }}>
             {[
-              "Your race's name on Marathon Monopoly: Edition One",
-              'Creative approval of your marks',
-              '5 complimentary units shipped to your office',
-              'Your own page on the Board Guide, with a promo code only found there',
-              'First right of refusal on your space in any future edition*',
+              { text: "Your race's name on Marathon Monopoly: Edition One" },
+              { text: 'Creative approval of your marks' },
+              { text: '5 complimentary units shipped to your office' },
+              {
+                text: 'Your own page on the Board Guide, with a discount code for your race that is only found there',
+                feature: true,
+              },
+              { text: 'First right of refusal on your space in any future edition*' },
             ].map((item) => (
-              <li key={item} className="flex gap-2.5" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
+              <li
+                key={item.text}
+                className="flex gap-2.5"
+                style={{
+                  fontSize: 17,
+                  color: item.feature ? MONOPOLY.ink : MONOPOLY.inkMuted,
+                  fontWeight: item.feature ? 700 : 400,
+                  lineHeight: 1.55,
+                }}
+              >
                 <span aria-hidden="true" style={{ color: MONOPOLY.red, fontWeight: 700 }}>
                   +
                 </span>
-                <span>{item}</span>
+                <span>
+                  {item.text}
+                  {item.feature && (
+                    <span
+                      className="ml-2 inline-block align-middle"
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        color: '#FFFFFF',
+                        backgroundColor: MONOPOLY.red,
+                        border: `1.5px solid ${MONOPOLY.black}`,
+                        borderRadius: 3,
+                        padding: '2px 7px',
+                      }}
+                    >
+                      New
+                    </span>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
@@ -513,33 +549,14 @@ export default function Monopoly() {
 
       </Section>
 
-      {/* ═══ RETURN ON INVESTMENT ═══ */}
-      <Section>
-        <SectionHeading>Return on investment</SectionHeading>
-        <div className="mb-8 mt-3 flex flex-col gap-4" style={{ maxWidth: '46rem' }}>
-          <p style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
-            Marathon Monopoly will live in the households of thousands of runners and their
-            families, who will sit staring at this board for three hours at a time, every time they
-            play, for the next decade. Below is the exposure a space earns from marathon-obsessed
-            people, estimated conservatively on purpose so our race partners can see what it is
-            actually worth.
-          </p>
-        </div>
-        <ExposureModel tiers={data.tiers} initialTierKey={personalizedTierKey} />
-      </Section>
-
       {/* ═══ THE SECOND SURFACE ═══
-          Sits directly after the exposure model on purpose. That section ends
-          on a CPM, which is a number a race director still has to take on
-          faith. This one is where the same attention becomes a click and then a
-          redemption, so the argument finishes on something countable rather
-          than on an impression estimate. */}
-      <Section muted>
+          Directly after Investment, because the slot list ends by promising a
+          page on the guide and this is that promise shown. Paper, so it does
+          not run into the mint of the section above it. */}
+      <Section>
         <SectionHeading>The Board Guide</SectionHeading>
         <p className="mb-8 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          A game board has room for your name and your colours, and nothing else. So every box also
-          carries a QR code, and it opens a guide where each of the 22 races gets a page to say what
-          makes it worth running.
+          {BOARD_GUIDE.intro}
         </p>
 
         <div className="grid gap-4 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:items-start">
@@ -556,9 +573,22 @@ export default function Monopoly() {
             >
               Printed on every box
             </div>
-            <div className="mt-2 text-center" style={{ fontSize: 15, color: MONOPOLY.ink, fontWeight: 700 }}>
-              {BOARD_GUIDE.url}
-            </div>
+            {/* Live, so it can be scanned off a laptop mid-pitch. */}
+            <a
+              href={BOARD_GUIDE_QR_TARGET}
+              className="mt-2 text-center"
+              style={{
+                fontSize: 15,
+                color: MONOPOLY.ink,
+                fontWeight: 700,
+                textDecoration: 'underline',
+                textDecorationColor: MONOPOLY.red,
+                textDecorationThickness: 2,
+                textUnderlineOffset: 4,
+              }}
+            >
+              Scan it, or tap here
+            </a>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
@@ -578,6 +608,21 @@ export default function Monopoly() {
             ))}
           </div>
         </div>
+      </Section>
+
+      {/* ═══ RETURN ON INVESTMENT ═══ */}
+      <Section muted>
+        <SectionHeading>Return on investment</SectionHeading>
+        <div className="mb-8 mt-3 flex flex-col gap-4" style={{ maxWidth: '46rem' }}>
+          <p style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65 }}>
+            Marathon Monopoly will live in the households of thousands of runners and their
+            families, who will sit staring at this board for three hours at a time, every time they
+            play, for the next decade. Below is the exposure a space earns from marathon-obsessed
+            people, estimated conservatively on purpose so our race partners can see what it is
+            actually worth.
+          </p>
+        </div>
+        <ExposureModel tiers={data.tiers} initialTierKey={personalizedTierKey} />
       </Section>
 
       {/* ═══ WHY TRACKSTAR ═══ */}

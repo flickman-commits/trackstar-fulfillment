@@ -346,18 +346,20 @@ export const FEEDBACK_COUNTS = { replies: 15, namedAPrice: PRICE_ANSWERS.length 
 export const BOARD_GUIDE = {
   /** Where the code on the box lands. */
   url: 'trackstar.art/pages/board-guide',
+  intro:
+    'Every board comes with a QR code that takes the people playing the game to an interactive website showing off all the races on the board.',
   beats: [
     {
-      title: 'A page of your own',
-      body: 'Photos, your course, your story, and the one thing that makes your race worth flying for. As much room as you want, rather than the two words that fit on a game board.',
+      title: 'Another touchpoint',
+      body: 'The board puts your name in front of them. The guide is where they can read about your race, see it, and decide they want to run it.',
     },
     {
-      title: 'A code only found here',
-      body: 'Offer a discount on entry, a free upgrade, or anything else you choose. It appears nowhere but this guide, so every redemption is a runner the board sent you.',
+      title: 'Discount codes for your race',
+      body: 'Offer a discount on entry, a free upgrade, or anything else you choose. The code appears nowhere but here, so every redemption is a runner the board sent you.',
     },
     {
-      title: 'Twenty-two races, one audience',
-      body: 'Somebody who bought this box already loves marathons. They are reading about your race next to the other 21, at the exact moment they are thinking about which one to run.',
+      title: 'Interactive',
+      body: 'Photos, your course, your story, and a link straight to registration. As much room as you want, rather than the two words that fit on a game board.',
     },
   ],
 }
@@ -476,8 +478,13 @@ export const FAQ: FaqItem[] = [
       'Every box carries a QR code that opens a digital guide, and every race on the board has its own panel on it. You get photos, a description of your course, and a promotional code that exists nowhere else, so anybody who redeems it came to you from the board. The space puts your name in front of people; the guide is where they can act on it. You write your own panel and we build it.',
   },
   {
-    question: 'Can we offset the fee by buying units of Marathon Monopoly?',
+    question: 'Can we earn any of the fee back by selling units?',
     answer:
-      'Yes, and there are two ways to do it. You can buy up to 150 units at $35 and resell them at your expo for $55, which returns $20 a box. Or you can skip the inventory entirely: we give you a link and a code that are yours, you send people to it, and we pay you $20 for every box sold through it. We take the order, pack it and ship it. Both pay the same, and you can use both.',
+      'You do not have to. Every race gets its own link, and we pay you $20 for every box sold through it while we handle the order, the packing and the shipping. Nothing to buy up front and nothing to store.',
+  },
+  {
+    question: 'Can we buy units wholesale?',
+    answer:
+      'Yes. Boxes are $35 each if you would rather hold stock and sell it yourself at your expo or in your race store, where they sell for $55. Most races take the link instead, because it pays the same $20 a box without the cash up front or the boxes in the office.',
   },
 ]

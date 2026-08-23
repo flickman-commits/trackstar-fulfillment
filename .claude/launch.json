@@ -4,14 +4,35 @@
     {
       "name": "dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "widget-preview",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8773", "--directory", "shopify/_preview"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8773",
+        "--directory",
+        "shopify/_preview"
+      ],
       "port": 8773
+    },
+    {
+      "name": "monopoly-theme-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8776",
+        "--directory",
+        "/Users/flickman/Software/trackstar-art/_preview"
+      ],
+      "port": 8776
     }
   ]
 }
