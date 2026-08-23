@@ -28,7 +28,6 @@ import { MONOPOLY, UI_RADIUS, CARD_OUTLINE, HAND_FONT, guilloche } from '@/compo
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import {
   BOARD_GUIDE,
-  WHY_NOW_INTRO,
   COMMIT_STEPS,
   LAUNCH_PLAN,
   PRODUCT_SHOTS,
@@ -285,15 +284,12 @@ export default function Monopoly() {
             panel asking the question, all stacked above two beats and a photo.
             Three pieces of furniture to make one point, and the point is the
             heading. It is now the heading, one paragraph, and three beats. */}
-        <SectionHeading>Why isn't there Marathon Monopoly?</SectionHeading>
-        <p className="mb-10 mt-3" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.65, maxWidth: '46rem' }}>
-          {WHY_NOW_INTRO}
-        </p>
+        <SectionHeading>Why now?</SectionHeading>
 
         {/* Beats left, picture right on a laptop; stacked on a phone. The image
             sat below them at half width before, which left a column of empty
             mint beside it and pushed the section over a screen tall. */}
-        <div className="grid items-center gap-10 lg:grid-cols-2">
+        <div className="mt-8 grid items-center gap-10 lg:grid-cols-2">
           <div className="flex flex-col gap-8">
             {WHY_NOW.map((item) => (
               <Beat key={item.title} title={item.title} body={item.body} />

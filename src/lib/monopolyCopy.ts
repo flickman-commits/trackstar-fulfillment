@@ -157,26 +157,27 @@ export const TOKENS = [
  * they want less of, and a physical object aimed at a sport with no board game
  * of its own is sitting in the middle of that.
  */
-export const WHY_NOW_INTRO =
-  'There are over 300 custom editions of Monopoly (Star Wars, National Parks, NFL teams) but why not Marathon Monopoly? We have got the audience, the obsession and the need for novel gifts. That changes now.'
-
 /**
  * Three beats, left of the photograph.
  *
  * The first one used to be a subheading, a row of five example chips and a
- * large red panel asking the question, all above these two. That was three
- * pieces of furniture to make one point, and the point is now in the intro
- * above. Folded down to a beat so the section reads as one list rather than a
- * build-up followed by an unrelated pair.
+ * large red panel asking the question, all stacked above the other two. That
+ * was three pieces of furniture to make one point, so it is now a beat and the
+ * section reads as one list.
+ *
+ * It carries the question rather than the section heading because the heading
+ * is the label on a plate, and a plate reading "Why isn't there Marathon
+ * Monopoly?" is a sentence pretending to be a tab. The heading says where you
+ * are, the beat asks the question, and the answer is the two beats under it.
  *
  * The licensed-editions clause came out of "Board games are having a moment"
- * when the precedent beat took its place at the top, because the two were
- * making the same argument a paragraph apart.
+ * when this beat took its place at the top, because the two were making the
+ * same argument a paragraph apart.
  */
 export const WHY_NOW = [
   {
-    title: 'Monopoly does this constantly',
-    body: 'Star Wars, National Parks, NFL teams, Premier League clubs. Over 300 licensed editions have been made, the ones people keep are tied to something they already love, and not one of them has been for running.',
+    title: "Why isn't there Marathon Monopoly?",
+    body: 'There are over 300 custom editions of Monopoly (Star Wars, National Parks, NFL teams) but why not Marathon Monopoly? We have got the audience, the obsession and the need for novel gifts. That changes now.',
   },
   {
     title: 'People are tired of screens',
