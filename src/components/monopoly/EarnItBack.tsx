@@ -22,45 +22,30 @@
  * this as partial recovery invites the reader to work out that full recovery is
  * out of reach, which turns a straightforwardly good offer into a shortfall.
  */
-import { useMemo, useState } from 'react'
-import type { PackageTier } from '@/lib/monopolyTypes'
+import { useState } from 'react'
 import { UNIT_PROGRAM } from '@/lib/monopolyCopy'
 import { MONOPOLY, CARD_OUTLINE, UI_RADIUS } from './monopolyTheme'
 
-interface Props {
-  tiers: PackageTier[]
-  /** Preselected when the visitor arrived on a personalized link. */
-  initialTierKey?: string
-}
 
 const { commission, sliderMax } = UNIT_PROGRAM
 
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`
 
-export function EarnItBack({ tiers, initialTierKey }: Props) {
-  const pricedTiers = useMemo(() => tiers.filter((t) => t.fee != null), [tiers])
-  const [tierKey, setTierKey] = useState<string | undefined>(
-    () =>
-      initialTierKey ??
-      pricedTiers.find((t) => t.tierKey === 'orangepink')?.tierKey ??
-      pricedTiers[0]?.tierKey,
-  )
+export function EarnItBack() {
   const [units, setUnits] = useState(150)
 
-  const tier = pricedTiers.find((t) => t.tierKey === tierKey) ?? pricedTiers[0]
-  const fee = tier?.fee ?? 0
   const earned = units * commission
 
   return (
     <div className="mt-8">
       <h3 style={{ fontSize: 22, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
-        Earn some of it back
+        Earn Commission Selling the Game
       </h3>
       <p className="mt-2" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-        Every race gets its own link. Send your people to it and we pay you{' '}
-        <strong style={{ color: MONOPOLY.ink }}>{money(commission)} for every box</strong> sold
-        through it. We take the order, pack it and ship it, so there is no stock to buy and nothing
-        to hold.
+        Each race will get a unique link to sell Marathon Monopoly through. Orders attributed to you
+        will earn you a <strong style={{ color: MONOPOLY.ink }}>{money(commission)} commission</strong>{' '}
+        per game sold. Trackstar will hold all the inventory and do all the fulfillment, so you do
+        not have to worry about anything on that end.
       </p>
 
       <div
@@ -91,67 +76,31 @@ export function EarnItBack({ tiers, initialTierKey }: Props) {
           style={{ accentColor: '#FFFFFF' }}
         />
 
-        <div className="mt-6 flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
-          {/* Units lead, money answers. */}
-          <div>
-            <div className="flex items-baseline gap-3">
-              <span style={{ fontSize: 62, fontWeight: 700, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.04em' }}>
-                {units}
-              </span>
-              <span style={{ fontSize: 20, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
-                units sold
-              </span>
-            </div>
-            <div
-              className="mt-3"
-              style={{ fontSize: 26, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.02em' }}
-            >
-              {money(earned)} back to your race
-            </div>
+        {/* Two sentences rather than a stat block with labels. The number that
+            moves is set large inside the sentence it belongs to, so what the
+            slider does is legible without anything explaining which figure is
+            which. The tier selector went with it: nothing here varies by tier,
+            so it was a control that changed a number nobody was reading. */}
+        <div className="mt-7 flex flex-col gap-5">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span style={{ fontSize: 20, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
+              If you sell
+            </span>
+            <span style={{ fontSize: 62, fontWeight: 700, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.04em' }}>
+              {units}
+            </span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
+              units
+            </span>
           </div>
-
-          {pricedTiers.length > 0 && (
-            <div>
-              <label
-                htmlFor="earn-tier"
-                className="block"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  color: 'rgba(255,255,255,0.75)',
-                }}
-              >
-                Choose your space
-              </label>
-              <select
-                id="earn-tier"
-                value={tierKey}
-                onChange={(e) => setTierKey(e.target.value)}
-                className="mt-2"
-                style={{
-                  border: `1px solid ${MONOPOLY.black}`,
-                  borderRadius: UI_RADIUS,
-                  padding: '8px 12px',
-                  fontSize: 14,
-                  backgroundColor: '#FFFFFF',
-                  color: MONOPOLY.ink,
-                }}
-              >
-                {pricedTiers.map((t) => (
-                  <option key={t.tierKey} value={t.tierKey}>
-                    {t.label} space
-                  </option>
-                ))}
-              </select>
-              {fee > 0 && (
-                <div className="mt-2" style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>
-                  {money(fee)} in cash
-                </div>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span style={{ fontSize: 20, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
+              You make
+            </span>
+            <span style={{ fontSize: 62, fontWeight: 700, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.04em' }}>
+              {money(earned)}
+            </span>
+          </div>
         </div>
       </div>
 

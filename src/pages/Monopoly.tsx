@@ -21,7 +21,6 @@ import { ExposureModel } from '@/components/monopoly/ExposureModel'
 import { EarnItBack } from '@/components/monopoly/EarnItBack'
 import { QrGlyph, BOARD_GUIDE_QR_TARGET } from '@/components/monopoly/QrGlyph'
 import { BrandLockup } from '@/components/monopoly/BrandLockup'
-import PriceExpectation from '@/components/monopoly/PriceExpectation'
 import { UnitFlow } from '@/components/monopoly/UnitFlow'
 import { ProductImage } from '@/components/monopoly/ProductImage'
 import { MONOPOLY, UI_RADIUS, CARD_OUTLINE, HAND_FONT, guilloche } from '@/components/monopoly/monopolyTheme'
@@ -379,17 +378,13 @@ export default function Monopoly() {
                 <blockquote style={{ fontSize: 16, color: MONOPOLY.ink, lineHeight: 1.5 }}>
                   “{item.quote}”
                 </blockquote>
-                <figcaption>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: MONOPOLY.ink }}>{item.name}</div>
-                  <div className="mt-1" style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>
-                    Expects to pay: <span style={{ color: MONOPOLY.ink }}>{item.price}</span>
-                  </div>
+                <figcaption style={{ fontSize: 26, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+                  {item.name}
                 </figcaption>
               </figure>
             ))}
           </div>
 
-          <PriceExpectation />
         </div>
       </Section>
 
@@ -412,7 +407,7 @@ export default function Monopoly() {
             It now carries both routes. Wholesale alone asked a race to hold
             stock, which is the one thing organizers said they will not do, so
             the offer only ever worked for races that already run a store. */}
-        <EarnItBack tiers={data.tiers} initialTierKey={personalizedTierKey} />
+        <EarnItBack />
 
         {/* What the fee actually buys, listed once here rather than repeated
             in every tier row. Nothing in it varies by tier, so a per-row copy

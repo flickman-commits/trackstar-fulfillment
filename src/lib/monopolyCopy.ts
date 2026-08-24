@@ -353,19 +353,14 @@ export const SALES_PLAN: SalesPlanItem[] = [
 /**
  * Real replies to the tease email, sent August 12 2026.
  *
- * The email asked four questions, one of which was what they would expect to
- * pay, so every quote here is paired with that person's own answer.
- *
  * Verbatim apart from trimming, and attributed by first name only because
  * these were private replies to a survey rather than reviews anybody submitted
  * for publication. Two people are called Ricky, hence the initials.
  *
- * Which quotes get featured is an editorial call. Which numbers feed the chart
- * is not: 15 people wrote back, two said outright they would not buy, and the
- * guesses ran $20 to $199 against a $65 direct price. PRICE_ANSWERS below is
- * every figure anybody named, including the ones not quoted here, because
- * dropping the low end would move the median and that is choosing a number
- * rather than reporting one.
+ * `price` is what each person said they would expect to pay. It is no longer
+ * shown: the distribution chart and the per-quote price line went together,
+ * because a survey of 15 people answering a hypothetical was being read as a
+ * price test. The figures stay on the record here.
  */
 export const COMMUNITY_FEEDBACK = [
   {
@@ -388,17 +383,6 @@ export const COMMUNITY_FEEDBACK = [
   },
 ]
 
-/**
- * Every price anybody named, in dollars, as the midpoint of their answer.
- *
- * Kept next to the quotes rather than inside the chart component so the two
- * cannot drift, and so it is obvious that the chart holds more answers than
- * the six cards do.
- */
-export const PRICE_ANSWERS = [20, 40, 42.5, 49, 55, 100, 149.5]
-
-/** How many people replied at all, and how many of those named a figure. */
-export const FEEDBACK_COUNTS = { replies: 15, namedAPrice: PRICE_ANSWERS.length }
 
 /**
  * Where every box goes, for a 2,004 print run.
@@ -452,11 +436,11 @@ export const BOARD_GUIDE = {
     'Every board comes with a QR code that takes the people playing the game to an interactive website showing off all the races on the board.',
   beats: [
     {
-      title: 'Another touchpoint',
+      title: 'Another Touchpoint',
       body: 'The board puts your name in front of them. The guide is where they can read about your race, see it, and decide they want to run it.',
     },
     {
-      title: 'Discount codes for your race',
+      title: 'Offer Discount Codes',
       body: 'Offer a discount on entry, a free upgrade, or anything else you choose. The code appears nowhere but here, so every redemption is a runner the board sent you.',
     },
     {
