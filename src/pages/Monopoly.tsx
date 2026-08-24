@@ -38,6 +38,7 @@ import {
   WHY_NOW,
   TIMELINE,
   UNIT_ALLOCATION,
+  WHATS_IN_IT,
 } from '@/lib/monopolyCopy'
 import { mergeSalesData } from '@/lib/monopolyMerge'
 import type { BoardSpace, MonopolyPublicPayload, MonopolySalesResponse } from '@/lib/monopolyTypes'
@@ -302,25 +303,17 @@ export default function Monopoly() {
         </div>
       </Section>
 
-      {/* ═══ WHY YOU SHOULD CARE ═══ */}
+      {/* ═══ WHAT'S IN IT FOR YOU ═══
+          Six deliverables, replacing three beats that were all sentiment and
+          nothing you could hand over. Most of these already existed further
+          down the page but nowhere together, so the reader who wanted to know
+          what the fee buys had to assemble it from four sections. */}
       <Section dark>
-        <SectionHeading>Why you should care</SectionHeading>
-        <div className="mt-8 grid gap-8 md:grid-cols-3">
-          <Beat
-            dark
-            title="Be Associated With the World's Best Marathons"
-            body="There are only 22 spots for races on this Monopoly board, and we are choosing the ones that runners already care about. Being on this board is a sign that you are among the best, in print, permanently."
-          />
-          <Beat
-            dark
-            title="Access to a Marathon-Obsessed Audience"
-            body="We will be selling this through all of our race partners and through our own audience of running enthusiasts. This goes to a very targeted and enthusiastic group: people who love discovering new races and talking about races."
-          />
-          <Beat
-            dark
-            title="Build a Legacy"
-            body="Be part of the first-ever edition of Marathon Monopoly and entrench your race in the lore of the marathon world."
-          />
+        <SectionHeading>What's in it for you</SectionHeading>
+        <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          {WHATS_IN_IT.map((item) => (
+            <Beat key={item.title} dark title={item.title} body={item.body} />
+          ))}
         </div>
       </Section>
 

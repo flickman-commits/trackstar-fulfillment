@@ -158,6 +158,67 @@ export const TOKENS = [
  * of its own is sitting in the middle of that.
  */
 /**
+ * What a race actually gets for the fee, as six deliverables.
+ *
+ * This replaced three soft beats titled "Be Associated With the World's Best
+ * Marathons", "Access to a Marathon-Obsessed Audience" and "Build a Legacy".
+ * Not one of them was a thing anybody hands over, and they sat in the most
+ * valuable position on the page, third, right where a reader asks what they get
+ * for the money.
+ *
+ * Most of these already existed, scattered across five sections: the referral
+ * commission was only in the Investment calculator, first refusal only in the
+ * slot list and a FAQ, the guide only in its own section further down. A race
+ * director reading top to bottom could not answer "what do I get for $17,000"
+ * without scrolling back through four places. Stating them once as a set turns
+ * the later sections into proof rather than repetition.
+ */
+
+/**
+ * Whether a race may resell its square to its own title sponsor.
+ *
+ * Off, and the copy kept rather than deleted, because the offer is not settled.
+ * If one race sells its square to a shoe brand and another sells to a competing
+ * one, that is a sponsor conflict printed onto a physical product that cannot
+ * be patched afterwards, and Winning Moves will want approval over any brand
+ * appearing on the board regardless. Turn this on once approval rights are
+ * written into the agreement.
+ */
+const SHOW_RESALE = false
+
+const RESALE_LINE =
+  ' And if you would rather your title sponsor carried the cost, you can resell your square to them outright.'
+
+export const WHATS_IN_IT = [
+  {
+    title: 'Access to the distribution network',
+    body: 'All 22 races are promoting a product with your race on it. Their runners meet your race, and yours meet theirs. Nothing in running has ever put 22 race audiences behind one object.',
+  },
+  {
+    title: 'The square is yours',
+    body:
+      'Your race, your colour group, and your own title deed card. Your title sponsor can sit on that card with you if you want them there.' +
+      (SHOW_RESALE ? RESALE_LINE : ''),
+  },
+  {
+    title: 'Exclusive sales rights',
+    body: 'Only the 22 races on the board can earn commission on the game. Anybody can send people our way, but a square is what makes it pay: $20 a box, on every order attributed to you.',
+  },
+  {
+    title: 'Right of first refusal',
+    body: 'Twenty-two squares exist and that number never moves. Hold one and you get the first offer on it, before your space is shown to anybody else.',
+  },
+  {
+    title: 'Your own page on the Board Guide',
+    body: 'A QR code on every box opens a guide to the board, and your race has a page on it: your course, your story, and a discount code that exists nowhere else.',
+  },
+  {
+    title: 'Your title deed, framed',
+    body: 'A 16 by 24 inch Trackstar print of your title deed card, framed and sent to your office. The same thing we make for your finishers, made for you.',
+  },
+]
+
+/**
  * Three beats, left of the photograph.
  *
  * The first one used to be a subheading, a row of five example chips and a
