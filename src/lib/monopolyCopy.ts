@@ -460,10 +460,31 @@ export const UNIT_PROGRAM = {
    * Keep this in step with the Shopify product, which already lists at $65.
    */
   retailPrice: 65,
-  /** What a race pays for boxes it intends to resell itself. */
-  wholesalePrice: 35,
-  /** Most boxes a race may buy at wholesale against one space. */
-  wholesaleCap: 150,
+  /**
+   * What a race pays for boxes it intends to resell itself.
+   *
+   * $40, up from $35. Two things moved underneath that number. Retail went to
+   * $65, which quietly raised a reseller's margin from $20 to $30 and made
+   * wholesale pay a race half again what the referral does. And the channel was
+   * never carrying its outbound freight: the model books expo shipping at zero,
+   * but somebody puts those boxes on a truck. That runs about $1.70 a unit on a
+   * pallet and $4.40 on a small parcel order, so true break-even is $31 to $34
+   * against a $29.50 landed cost, not $29.50.
+   *
+   * At $40 a race still clears $25 reselling at $65, ahead of the $20 referral,
+   * and we make roughly $6 to $9 depending on order size.
+   */
+  wholesalePrice: 40,
+
+  /**
+   * Smallest wholesale order, in units.
+   *
+   * Small orders are where the margin goes: 25 units ships at $4.40 a unit
+   * against $1.73 on a pallet. A floor also separates races that mean to sell
+   * from races wanting a few for the office, which the 5 complimentary units
+   * already cover.
+   */
+  wholesaleMin: 25,
   /** Paid per box sold through a race's own link or code. */
   commission: 20,
   /**
@@ -496,7 +517,7 @@ export const UNIT_ALLOCATION = [
   {
     label: 'Up for grabs',
     units: 1844,
-    note: 'Split between races selling through their own links, wholesale orders, and Trackstar\u2019s own audience. First come, first served. Wholesale units are available on request at $35 per unit.',
+    note: 'Split between races selling through their own links, wholesale orders, and Trackstar\u2019s own audience. First come, first served. Wholesale units are available on request at $40 per unit, 25 unit minimum.',
   },
 ]
 
@@ -575,6 +596,6 @@ export const FAQ: FaqItem[] = [
   {
     question: 'Can we buy units wholesale?',
     answer:
-      'Yes. Boxes are $35 each if you would rather hold stock and sell it yourself at your expo or in your race store, where they sell for $65. Most races take the link instead, because there is no cash up front and no boxes to store, but the wholesale option is there whenever you want it.',
+      'Yes. Boxes are $40 each with a 25 unit minimum, if you would rather hold stock and sell it yourself at your expo or in your race store. At the $65 suggested retail that is $25 a box to you. Most races take the link instead, because there is no cash up front and no boxes to store, but the wholesale option is there whenever you want it.',
   },
 ]

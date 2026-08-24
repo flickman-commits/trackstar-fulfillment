@@ -101,11 +101,19 @@ export const EXPO_PRICE = CHANNELS[0].price
 export const DTC_CHANNEL = CHANNELS[1]
 
 /**
- * What a race pays per unit when it buys boxes to offset part of its fee.
+ * What a race pays per unit when it buys boxes to resell itself.
  *
- * At $30 this netted about a dollar a unit against fully loaded cost, which
- * made unit sales pointless as a revenue line. At $35 a race still clears $20 a
- * box selling at the $55 expo price, and we clear roughly $8 over make-and-ship.
+ * $40, with a 25 unit minimum.
+ *
+ * $35 was fully loaded break-even almost exactly ($29.50 landed plus $5.24 of
+ * fixed costs a unit), so the channel was built to contribute nothing. It was
+ * also ignoring its own outbound freight, which this file books at zero for the
+ * expo channel: roughly $1.70 a unit by pallet, $4.40 by parcel on a small
+ * order. Add that and $35 was breaking even at best.
+ *
+ * Retail moving to $65 raised a reseller's margin from $20 to $30 without
+ * anybody deciding to. $40 puts it at $25, still ahead of the $20 referral,
+ * and leaves us $6 to $9 a unit.
  */
 /**
  * 3PL pick and pack, per unit shipped to a consumer.
@@ -140,7 +148,10 @@ export const PICK_PACK_PER_UNIT = 3.5
  */
 export const DTC_CPA = 30
 
-export const WHOLESALE_PRICE = 35
+export const WHOLESALE_PRICE = 40
+
+/** Smallest wholesale order. Small orders carry more than twice the freight. */
+export const WHOLESALE_MIN_UNITS = 25
 
 export const ECONOMICS = {
   printRuns: PRINT_RUNS,
@@ -149,4 +160,5 @@ export const ECONOMICS = {
   pickPackPerUnit: PICK_PACK_PER_UNIT,
   dtcCpa: DTC_CPA,
   wholesalePrice: WHOLESALE_PRICE,
+  wholesaleMinUnits: WHOLESALE_MIN_UNITS,
 }
