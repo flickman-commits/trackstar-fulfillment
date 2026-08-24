@@ -158,7 +158,7 @@ export const TOKENS = [
  * of its own is sitting in the middle of that.
  */
 /**
- * What a race actually gets for the fee, as five deliverables.
+ * What a race actually gets for the fee, as six deliverables.
  *
  * This replaced three soft beats titled "Be Associated With the World's Best
  * Marathons", "Access to a Marathon-Obsessed Audience" and "Build a Legacy".
@@ -173,12 +173,20 @@ export const TOKENS = [
  * without scrolling back through four places. Stating them once as a set turns
  * the later sections into proof rather than repetition.
  *
- * There were six. "The square is yours" is gone, and with it the option for a
- * race to put its own title sponsor on the board or resell its square. Two
- * races bringing competing sponsors is a conflict printed onto a physical
- * object that cannot be patched after the run, so the offer is not worth the
- * risk. Removed rather than hidden, because a switched-off feature still reads
- * as one somebody might switch on.
+ * "The square is yours" was removed along with the option for a race to put its
+ * own title sponsor on the board or resell its square. Two races bringing
+ * competing sponsors is a conflict printed onto a physical object that cannot
+ * be patched after the run. Removed rather than hidden, because a switched-off
+ * feature still reads as one somebody might switch on.
+ *
+ * The commission card used to lead on exclusivity, that only the 22 races could
+ * earn on the game. True, and worth nothing: no running club or influencer was
+ * queuing up for the right, so the card was guarding a door nobody was trying
+ * to open while burying the part that matters, which is the $20.
+ *
+ * Ordered so the grid reads in two rows of three: the commercial case first
+ * (audience, commission, merchandise), then what a race owns (their space,
+ * their page, the print on the wall).
  */
 
 export const WHATS_IN_IT = [
@@ -187,8 +195,12 @@ export const WHATS_IN_IT = [
     body: 'Each race is incentivized to promote this product. As their runners buy it, they discover your race.',
   },
   {
-    title: 'Exclusive Sales Rights',
-    body: "Only the 22 races on the board will be able to earn a commission from selling this game. You'll be able to earn $20 a box on all orders attributed to you, without having to hold product or do fulfillment.",
+    title: 'Earn a Commission Selling the Product',
+    body: "You'll earn $20 a box on every order attributed to you, without having to hold product or do fulfillment. We take the order, pack it and ship it.",
+  },
+  {
+    title: 'Expand Your Merch Offering',
+    body: "Add a unique product that's highly giftable to your merchandising lineup.",
   },
   {
     title: 'Right of First Refusal',
