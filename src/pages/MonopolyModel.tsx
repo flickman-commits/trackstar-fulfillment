@@ -330,6 +330,13 @@ export default function MonopolyModel() {
               onChange={(v) => set('dtcAcquisitionCost', v)}
             />
             <NumberField
+              label="Running USA share of collected fees"
+              suffix="%"
+              value={Math.round((input.runningUsaRate ?? 0) * 1000) / 10}
+              step={0.5}
+              onChange={(v) => set('runningUsaRate', v / 100)}
+            />
+            <NumberField
               label="Brand partnership revenue"
               value={input.brandRevenue}
               step={5000}
@@ -393,6 +400,14 @@ export default function MonopolyModel() {
               <PnlRow label="Legal" value={-result.cost.legal} />
               <PnlRow label="Design" value={-result.cost.design} />
               <PnlRow label="3PL receiving, storage and account fees" value={-result.cost.fulfillment} />
+              {/* Sits with the fixed costs because that is where it lands in the
+                  P&L, but it is not one: it is a share of fee revenue, so it
+                  rises with every race signed and stays at zero on a comped
+                  major. */}
+              <PnlRow
+                label={`Running USA (${((input.runningUsaRate ?? 0) * 100).toFixed(1)}% of ${formatMoney(result.raceFees)} collected fees)`}
+                value={-result.runningUsaShare}
+              />
               <PnlRow label="Net profit" value={result.net} total />
             </div>
           </div>
@@ -639,6 +654,9 @@ function seedFromCommitted(data: MonopolyInternalPayload): ScenarioInput {
     printRunUnits: data.printRuns.find((r) => r.units === 2004)?.units ?? data.printRuns[0].units,
     offsetUnitsSold: 0,
     brandRevenue: 0,
+    // From the payload rather than hardcoded, so the working number moves in
+    // one place when the Running USA deal actually settles.
+    runningUsaRate: data.runningUsaRate ?? 0,
     dtcUnits: 0,
     // From the channel table rather than hardcoded, so a repricing lands here
     // too instead of leaving the model quoting a number nobody sells at.
@@ -718,12 +736,15 @@ function NumberField({
   value,
   step,
   prefix,
+  suffix,
   onChange,
 }: {
   label: string
   value: number
   step: number
   prefix?: string
+  /** Unit shown after the input. Percentages read wrong without one. */
+  suffix?: string
   onChange: (v: number) => void
 }) {
   return (
@@ -746,6 +767,7 @@ function NumberField({
             color: '#1A1A1A',
           }}
         />
+        {suffix && <span style={{ fontSize: 14, color: '#8A857C' }}>{suffix}</span>}
       </div>
     </Field>
   )

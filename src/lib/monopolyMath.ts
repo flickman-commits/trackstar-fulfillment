@@ -272,6 +272,18 @@ export interface ScenarioInput {
   /** Paid acquisition per DTC unit. Zero for anything the list sells. */
   dtcAcquisitionCost: number
   wholesalePrice: number
+  /**
+   * Share of COLLECTED listing fees committed to Running USA, as a fraction.
+   *
+   * Collected, not the gross ladder: a comped major raises nothing, and paying
+   * a percentage of a fee we chose not to charge would be real money against
+   * revenue that never existed.
+   *
+   * It behaves like a fixed cost in the P&L, sitting below the gross line with
+   * legal and design, but it is not one: it moves with fee revenue, so signing
+   * one more race raises it and comping one does not.
+   */
+  runningUsaRate: number
   customPieces: boolean
   /**
    * Give the two dearest slots away to land the majors.
@@ -305,6 +317,8 @@ export interface ScenarioResult {
   grossProfit: number
   /** Costs that do not move with the run size. Legal, today. */
   fixedCosts: number
+  /** Cash owed to Running USA: collected fees times the agreed share. */
+  runningUsaShare: number
   cost: AllInCost
   net: number
   /**
@@ -398,17 +412,24 @@ export function calculateScenario(
 
   // How many mid-tier races it takes to cover the whole production, ignoring
   // every other revenue line. The honest version of "when does this work?".
+  // Every mid-tier race added brings in its fee less whatever share of it goes
+  // to Running USA, so the effective fee is what pays for production.
+  const rate = input.runningUsaRate ?? 0
   const midTier = TIERS.slice().sort((a, b) => a.fee - b.fee)[Math.floor(TIERS.length / 2)]
-  const breakEvenRacesAtMidTier = midTier && midTier.fee > 0 ? Math.ceil(cost.allIn / midTier.fee) : 0
+  const midTierNetFee = midTier ? midTier.fee * (1 - rate) : 0
+  const breakEvenRacesAtMidTier = midTierNetFee > 0 ? Math.ceil(cost.allIn / midTierNetFee) : 0
 
   // Same question as break-even, asked at a number worth doing rather than at
   // zero. Other revenue is held at whatever the scenario says, so this answers
   // "how many more races" in the world the rest of the inputs describe.
   const otherRevenue = offsetRevenue + input.brandRevenue + dtcRevenue
   const racesForTargetNet =
-    midTier && midTier.fee > 0
-      ? Math.max(0, Math.ceil((cost.allIn + TARGET_NET - otherRevenue) / midTier.fee))
+    midTierNetFee > 0
+      ? Math.max(0, Math.ceil((cost.allIn + TARGET_NET - otherRevenue) / midTierNetFee))
       : 0
+
+  // Paid on what the board actually raises, so comped majors cost nothing here.
+  const runningUsaShare = raceFees * (input.runningUsaRate ?? 0)
 
   // Split the cost base the way the P&L reads it: goods against revenue,
   // fixed costs below the gross line.
@@ -425,8 +446,9 @@ export function calculateScenario(
     cogs,
     grossProfit,
     fixedCosts: cost.fixedTotal,
+    runningUsaShare,
     cost,
-    net: grossProfit - cost.fixedTotal,
+    net: grossProfit - cost.fixedTotal - runningUsaShare,
     compCopyUnits: includedUnits,
     committedUnits,
     unitsRemaining: input.printRunUnits - committedUnits,
@@ -497,6 +519,10 @@ export function calculateCashFlow(
   const halfFees = result.raceFees * 0.5 - deposits
   const finalFees = result.raceFees * 0.5
 
+  // Paid as the fees land rather than in a lump, since it is a share of them.
+  const runningUsaFirst = result.runningUsaShare * 0.5
+  const runningUsaSecond = result.runningUsaShare - runningUsaFirst
+
   const wholesale = result.offsetRevenue
   const dtcNet = result.dtcRevenue
   const pickPack = input.dtcUnits * input.dtcPickPackCost
@@ -516,6 +542,7 @@ export function calculateCashFlow(
         { label: '50% of race fees, less deposits', amount: halfFees },
         { label: 'Design', amount: -result.cost.design },
         { label: 'Brand partnerships', amount: result.brandRevenue },
+        { label: 'Running USA share, on fees banked so far', amount: -runningUsaFirst },
       ],
     },
     {
@@ -533,6 +560,7 @@ export function calculateCashFlow(
       label: 'Oct 2027 (product lands)',
       lines: [
         { label: 'Final 50% of race fees', amount: finalFees },
+        { label: 'Running USA share, balance', amount: -runningUsaSecond },
         { label: `Wholesale units (${input.offsetUnitsSold.toLocaleString()})`, amount: wholesale },
         { label: '3PL receiving, storage and fees', amount: -result.cost.fulfillment },
       ],

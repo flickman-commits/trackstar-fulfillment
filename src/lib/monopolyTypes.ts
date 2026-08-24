@@ -230,6 +230,8 @@ export interface MonopolyInternalPayload {
   wholesalePrice: number
   /** True when the sheet was unreachable and this came from the snapshot. */
   stale?: boolean
+  /** Share of collected listing fees committed to Running USA. */
+  runningUsaRate: number
 }
 
 export interface PrintRunEconomics {

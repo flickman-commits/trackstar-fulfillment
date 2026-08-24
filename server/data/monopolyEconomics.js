@@ -148,6 +148,25 @@ export const PICK_PACK_PER_UNIT = 3.5
  */
 export const DTC_CPA = 30
 
+/**
+ * Share of collected listing fees committed to Running USA.
+ *
+ * Of COLLECTED fees, not the gross ladder: a comped major raises nothing, so
+ * paying a percentage of a fee we chose not to charge would cost real money
+ * against revenue that never existed. It also keeps the incentive honest, since
+ * Running USA is helping fill the board and is paid on what the board actually
+ * raises.
+ *
+ * Fees rather than total revenue, because unit sales barely clear their own
+ * cost at this run size and a percentage of them would come straight out of
+ * production. Fees rather than net profit, because net is arguable and an
+ * outside party should never be given a reason to audit our cost base.
+ *
+ * 5% is the working number and nothing is signed. It is an input on the model
+ * for that reason.
+ */
+export const RUNNING_USA_RATE = 0.05
+
 export const WHOLESALE_PRICE = 40
 
 /** Smallest wholesale order. Small orders carry more than twice the freight. */
@@ -160,5 +179,6 @@ export const ECONOMICS = {
   pickPackPerUnit: PICK_PACK_PER_UNIT,
   dtcCpa: DTC_CPA,
   wholesalePrice: WHOLESALE_PRICE,
+  runningUsaRate: RUNNING_USA_RATE,
   wholesaleMinUnits: WHOLESALE_MIN_UNITS,
 }
