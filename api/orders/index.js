@@ -46,6 +46,31 @@ function pickCustomerValue(v) {
   return looksLikeTime(v) ? v.trim() : null
 }
 
+/**
+ * Discount codes applied to the Shopify order.
+ *
+ * Surfaced so a code can act as a fulfillment instruction, not just a price
+ * change: a charity or race partner gets their own code, and its presence is
+ * what tells Eli to print the co-branded version of that design. Nothing acts
+ * on it yet, this only makes it visible.
+ *
+ * Shape from Shopify is [{ code, type, amount }] where type is percentage,
+ * fixed_amount or shipping. All types are passed through rather than filtering
+ * to line-item discounts, because a partner code could be set up any way and
+ * silently hiding one would be worse than showing an uninteresting one.
+ */
+function extractDiscountCodes(order) {
+  const codes = order?.shopifyOrderData?.discount_codes
+  if (!Array.isArray(codes)) return []
+  return codes
+    .filter(c => c && typeof c.code === 'string' && c.code.trim())
+    .map(c => ({
+      code: c.code.trim(),
+      type: c.type || null,
+      amount: c.amount || null,
+    }))
+}
+
 function formatTime(time) {
   if (!time) return null
   // Round up milliseconds to nearest second (4:37:44.935 -> 4:37:45)
@@ -186,6 +211,8 @@ export default async function handler(req, res) {
         // Defense-in-depth: when no research bib exists, fall back to the
         // customer-confirmed bib from the Instant Lookup widget. Protects
         // against verified orders where Phase 1 never ran (e.g. older code path).
+        // Discount codes used at checkout. See extractDiscountCodes.
+        discountCodes: extractDiscountCodes(order),
         bibNumber: research?.bibNumber || order.customerBib || null,
         // Same defense-in-depth as the bib above. The Instant Lookup widget
         // already captured a time and pace the shopper confirmed, so showing

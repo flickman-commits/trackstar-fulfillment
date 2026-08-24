@@ -148,6 +148,8 @@ interface Order {
   delayNoticeDaysLate?: number | null
   shopifyCreatedAt?: string | null
   orderPlacedAt?: string | null
+  /** Discount codes used at checkout. Intended to drive co-branded designs. */
+  discountCodes?: { code: string; type: string | null; amount: string | null }[]
   // Shipping
   shippingMethod?: string | null
   isExpedited?: boolean
@@ -305,6 +307,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     // Marketplace order date for sorting
     shopifyCreatedAt: order.shopifyCreatedAt as string | null | undefined,
     orderPlacedAt: order.orderPlacedAt as string | null | undefined,
+    discountCodes: order.discountCodes as Order['discountCodes'],
     // Shipping (for expedited badge / callout)
     shippingMethod: order.shippingMethod as string | null | undefined,
     isExpedited: order.isExpedited as boolean | undefined,
@@ -4685,6 +4688,24 @@ Thank you!`
                               <span>Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}</span>
                             </span>
                           )}
+                          {/* Discount codes sit with the product facts because
+                              that is what they will become: a partner code is
+                              the instruction to print the co-branded design.
+                              One chip per code, since an order can carry a
+                              product discount and a shipping one at once. */}
+                          {(selectedOrder.discountCodes || []).map((d) => (
+                            <span
+                              key={d.code}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-semibold bg-amber-100 text-amber-800 border-amber-300"
+                              title={
+                                d.amount
+                                  ? `${d.code} - ${d.type === 'percentage' ? 'percentage' : d.type === 'shipping' ? 'shipping' : 'fixed amount'} discount, $${d.amount} off`
+                                  : d.code
+                              }
+                            >
+                              Discount: {d.code}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     </div>
