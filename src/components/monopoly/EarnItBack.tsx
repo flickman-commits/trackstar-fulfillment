@@ -33,7 +33,7 @@ interface Props {
   initialTierKey?: string
 }
 
-const { retailPrice, commission, referralPool } = UNIT_PROGRAM
+const { commission, sliderMax } = UNIT_PROGRAM
 
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`
 
@@ -83,7 +83,7 @@ export function EarnItBack({ tiers, initialTierKey }: Props) {
           id="earn-units"
           type="range"
           min={25}
-          max={referralPool}
+          max={sliderMax}
           step={25}
           value={units}
           onChange={(e) => setUnits(Number(e.target.value))}
@@ -155,10 +155,6 @@ export function EarnItBack({ tiers, initialTierKey }: Props) {
         </div>
       </div>
 
-      <p className="mt-4" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '46rem' }}>
-        {referralPool} boxes of the first run are set aside for races selling to their own people,
-        and they are first come. Boxes sell for {money(retailPrice)}.
-      </p>
     </div>
   )
 }

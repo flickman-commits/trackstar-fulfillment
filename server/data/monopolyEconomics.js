@@ -78,17 +78,22 @@ export const FIXED_COSTS = {
 /**
  * Where units get sold, and what each channel nets after shipping.
  *
- * Expo and DTC now both price at $55; expo carries no shipping, so it nets
- * more per unit despite the same sticker. DTC absorbs fulfilment and paid
- * acquisition, which is what makes it the thinnest channel of the three.
+ * Expo and DTC both price at $65; expo carries no shipping, so it nets more
+ * per unit despite the same sticker.
+ *
+ * $65 rather than $55 because the referral programme pays a race $20 a box and
+ * that has to come from somewhere. Landed cost is $29.50, shipping $10, pick
+ * and pack $3.50, commission $20, so break-even on a referred unit is $63. At
+ * $55 every referred box lost $8. The $55 figure was the race's resale margin
+ * on a $35 wholesale box, not our break-even.
  *
  * The first entry is the reference retail price, and the DTC entry seeds the
  * model's default scenario.
  */
 export const CHANNELS = [
-  { channel: 'Race expo / race store', price: 55, shippingCost: 0 },
-  { channel: 'Trackstar DTC', price: 55, shippingCost: 10 },
-  { channel: 'Amazon', price: 54.99, shippingCost: 10 },
+  { channel: 'Race expo / race store', price: 65, shippingCost: 0 },
+  { channel: 'Trackstar DTC', price: 65, shippingCost: 10 },
+  { channel: 'Amazon', price: 64.99, shippingCost: 10 },
 ]
 
 /** Convenience accessors so callers don't index the array by position. */

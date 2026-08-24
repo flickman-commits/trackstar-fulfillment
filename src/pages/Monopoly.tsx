@@ -419,55 +419,19 @@ export default function Monopoly() {
           <h3 className="mb-3" style={{ fontSize: 17, fontWeight: 700, color: MONOPOLY.ink }}>
             Purchasing a race slot includes
           </h3>
-          {/* The Board Guide line is emphasised rather than sitting flush with
-              the rest. It is the only item here that is new to a reader who has
-              seen a sponsorship deck before, and the section immediately below
-              is the guide itself, so this is what carries them into it. */}
           <ul className="flex flex-col gap-2" style={{ maxWidth: '40rem' }}>
             {[
-              { text: "Your race's name on Marathon Monopoly: Edition One" },
-              { text: 'Creative approval of your marks' },
-              { text: '5 complimentary units shipped to your office' },
-              {
-                text: 'Your own page on the Board Guide, with a discount code for your race that is only found there',
-                feature: true,
-              },
-              { text: 'First right of refusal on your space in any future edition*' },
+              "Your race's name on Marathon Monopoly: Edition One",
+              'Creative approval of your marks',
+              '5 complimentary units shipped to your office',
+              'Featured in the Board Guide - a digital landing page where you can explain more about your race',
+              'First right of refusal on your space in any future edition*',
             ].map((item) => (
-              <li
-                key={item.text}
-                className="flex gap-2.5"
-                style={{
-                  fontSize: 17,
-                  color: item.feature ? MONOPOLY.ink : MONOPOLY.inkMuted,
-                  fontWeight: item.feature ? 700 : 400,
-                  lineHeight: 1.55,
-                }}
-              >
+              <li key={item} className="flex gap-2.5" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
                 <span aria-hidden="true" style={{ color: MONOPOLY.red, fontWeight: 700 }}>
                   +
                 </span>
-                <span>
-                  {item.text}
-                  {item.feature && (
-                    <span
-                      className="ml-2 inline-block align-middle"
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        color: '#FFFFFF',
-                        backgroundColor: MONOPOLY.red,
-                        border: `1.5px solid ${MONOPOLY.black}`,
-                        borderRadius: 3,
-                        padding: '2px 7px',
-                      }}
-                    >
-                      New
-                    </span>
-                  )}
-                </span>
+                <span>{item}</span>
               </li>
             ))}
           </ul>

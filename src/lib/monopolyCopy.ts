@@ -328,7 +328,7 @@ export const SALES_PLAN: SalesPlanItem[] = [
  *
  * Which quotes get featured is an editorial call. Which numbers feed the chart
  * is not: 15 people wrote back, two said outright they would not buy, and the
- * guesses ran $20 to $199 against a $55 direct price. PRICE_ANSWERS below is
+ * guesses ran $20 to $199 against a $65 direct price. PRICE_ANSWERS below is
  * every figure anybody named, including the ones not quoted here, because
  * dropping the low end would move the median and that is choosing a number
  * rather than reporting one.
@@ -385,9 +385,9 @@ export const FEEDBACK_COUNTS = { replies: 15, namedAPrice: PRICE_ANSWERS.length 
  * the same either way, so the choice between them is about whether they want to
  * hold stock, never about which one pays better.
  *
- * `referralPool` is the "Race partner distribution" line in UNIT_ALLOCATION.
- * That row already assumed races would drive sales to our site; this pays them
- * for it. Keep the two in step.
+ * There is no reserved referral pool. Complimentary copies and press seeding
+ * come off the top of the run and everything after that is first come, however
+ * it sells.
  */
 /**
  * The Board Guide: a second surface, reached by QR code from the box.
@@ -426,23 +426,48 @@ export const BOARD_GUIDE = {
       body: 'Offer a discount on entry, a free upgrade, or anything else you choose. The code appears nowhere but here, so every redemption is a runner the board sent you.',
     },
     {
-      title: 'Interactive',
-      body: 'Photos, your course, your story, and a link straight to registration. As much room as you want, rather than the two words that fit on a game board.',
+      title: 'Rich Content',
+      body: 'Photos, your course, your story, and a link straight to registration. As much room as you want to tell your story the way you want.',
     },
   ],
 }
 
 export const UNIT_PROGRAM = {
-  /** What a box sells for, at an expo or on our site. */
-  retailPrice: 55,
+  /**
+   * What a box sells for, on our site or at an expo.
+   *
+   * $65, not $55. With a $20 referral commission the true break-even is $63:
+   * $29.50 landed, $10 shipping, $3.50 pick and pack, $20 to the race. At $55
+   * every referred box loses $8, which is roughly $14,700 across the run and an
+   * $18,440 swing against $65.
+   *
+   * The $55 figure came from the wholesale case, where a race buys at $35 and
+   * clears $20 reselling. That is the race's margin, not our break-even, and
+   * the two were being read as the same number.
+   *
+   * Keep this in step with the Shopify product, which already lists at $65.
+   */
+  retailPrice: 65,
   /** What a race pays for boxes it intends to resell itself. */
   wholesalePrice: 35,
   /** Most boxes a race may buy at wholesale against one space. */
   wholesaleCap: 150,
   /** Paid per box sold through a race's own link or code. */
   commission: 20,
-  /** Boxes of the first run set aside for race-driven sales. */
-  referralPool: 400,
+  /**
+   * Ceiling on the earnings slider, in units.
+   *
+   * Not a reserved allocation. Nothing in the run is set aside for race-driven
+   * sales any more: complimentary copies and press seeding come off the top and
+   * everything else is first come, whether it sells through a race link, a
+   * wholesale order or our own audience.
+   *
+   * 300 rather than 400 because 22 races selling 84 boxes each is already the
+   * entire sellable run. A slider that reaches 400 quietly implies a fifth of
+   * the print is available to any one race, which is only true for the first
+   * few who ask.
+   */
+  sliderMax: 300,
 }
 
 export const UNIT_ALLOCATION = [
@@ -457,19 +482,9 @@ export const UNIT_ALLOCATION = [
     note: 'Running media and creators, in hand before launch',
   },
   {
-    label: 'Race partner distribution',
-    units: 400,
-    note: 'Races promoting through their own email list and social media, still purchased on the Trackstar site',
-  },
-  {
-    label: 'Units races buy for their own stores',
-    units: 200,
-    note: 'Bought at $35 wholesale and sold at their expo or race store for $55',
-  },
-  {
-    label: 'Trackstar (DTC)',
-    units: 1244,
-    note: 'Our email list of 10,000 people who have already bought a running gift, plus our organic and paid channels.',
+    label: 'Up for grabs',
+    units: 1844,
+    note: 'Split between races selling through their own links, wholesale orders, and Trackstar\u2019s own audience. First come, first served. Wholesale units are available on request at $35 per unit.',
   },
 ]
 
@@ -516,11 +531,6 @@ export const FAQ: FaqItem[] = [
       'You do not need any. We produce, warehouse, sell and ship every unit. Beyond the 5 complimentary units that come with your space, no boxes are sent to you unless you choose to buy some.',
   },
   {
-    question: 'Will there be sponsors on the board competing with our own race sponsors?',
-    answer:
-      'No. We are not selling sponsor placements anywhere on this board, to anybody. The only names on it are the 22 races. Nothing appears beside your race that you did not agree to.',
-  },
-  {
     question: 'Is the board design final?',
     answer:
       'No. Everything you have seen is a concept render. The board layout, artwork, tokens and game rules are all worked out during the 12-week design and development period, which starts once all 22 spaces are committed, and you approve how your own race appears before anything prints.',
@@ -553,6 +563,6 @@ export const FAQ: FaqItem[] = [
   {
     question: 'Can we buy units wholesale?',
     answer:
-      'Yes. Boxes are $35 each if you would rather hold stock and sell it yourself at your expo or in your race store, where they sell for $55. Most races take the link instead, because it pays the same $20 a box without the cash up front or the boxes in the office.',
+      'Yes. Boxes are $35 each if you would rather hold stock and sell it yourself at your expo or in your race store, where they sell for $65. Most races take the link instead, because there is no cash up front and no boxes to store, but the wholesale option is there whenever you want it.',
   },
 ]
