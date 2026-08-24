@@ -3,7 +3,7 @@
  *
  * A real, scannable code rather than a drawn stand-in. It resolves to a hosted
  * preview of the guide, so a race director who scans it during a pitch lands on
- * the actual format instead of a 404. That page is labelled a preview and its
+ * the actual format instead of a 404. That page is labeled a preview and its
  * races are invented, because nothing on the board is committed yet.
  *
  * Generated with `npx qrcode -t svg -e M`. The path data is committed rather

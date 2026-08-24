@@ -77,7 +77,7 @@ export interface TierDef {
  */
 const COMMON_FEATURES = [
   '5 complimentary units for your team',
-  'Your own title sponsor on your title deed card',
+  'Your own page on the Board Guide',
   'A race slot on Marathon Monopoly Edition One, and first refusal on the next',
 ]
 
@@ -158,7 +158,7 @@ export const TOKENS = [
  * of its own is sitting in the middle of that.
  */
 /**
- * What a race actually gets for the fee, as six deliverables.
+ * What a race actually gets for the fee, as five deliverables.
  *
  * This replaced three soft beats titled "Be Associated With the World's Best
  * Marathons", "Access to a Marathon-Obsessed Audience" and "Build a Legacy".
@@ -172,49 +172,35 @@ export const TOKENS = [
  * director reading top to bottom could not answer "what do I get for $17,000"
  * without scrolling back through four places. Stating them once as a set turns
  * the later sections into proof rather than repetition.
- */
-
-/**
- * Whether a race may resell its square to its own title sponsor.
  *
- * Off, and the copy kept rather than deleted, because the offer is not settled.
- * If one race sells its square to a shoe brand and another sells to a competing
- * one, that is a sponsor conflict printed onto a physical product that cannot
- * be patched afterwards, and Winning Moves will want approval over any brand
- * appearing on the board regardless. Turn this on once approval rights are
- * written into the agreement.
+ * There were six. "The square is yours" is gone, and with it the option for a
+ * race to put its own title sponsor on the board or resell its square. Two
+ * races bringing competing sponsors is a conflict printed onto a physical
+ * object that cannot be patched after the run, so the offer is not worth the
+ * risk. Removed rather than hidden, because a switched-off feature still reads
+ * as one somebody might switch on.
  */
-const SHOW_RESALE = false
-
-const RESALE_LINE =
-  ' And if you would rather your title sponsor carried the cost, you can resell your square to them outright.'
 
 export const WHATS_IN_IT = [
   {
-    title: 'Access to the distribution network',
-    body: 'All 22 races are promoting a product with your race on it. Their runners meet your race, and yours meet theirs. Nothing in running has ever put 22 race audiences behind one object.',
+    title: '22 Races Promoting a Product With Your Race On It',
+    body: 'Each race is incentivized to promote this product. As their runners buy it, they discover your race.',
   },
   {
-    title: 'The square is yours',
-    body:
-      'Your race, your colour group, and your own title deed card. Your title sponsor can sit on that card with you if you want them there.' +
-      (SHOW_RESALE ? RESALE_LINE : ''),
+    title: 'Exclusive Sales Rights',
+    body: "Only the 22 races on the board will be able to earn a commission from selling this game. You'll be able to earn $20 a box on all orders attributed to you, without having to hold product or do fulfillment.",
   },
   {
-    title: 'Exclusive sales rights',
-    body: 'Only the 22 races on the board can earn commission on the game. Anybody can send people our way, but a square is what makes it pay: $20 a box, on every order attributed to you.',
+    title: 'Right of First Refusal',
+    body: 'If we create more editions of Marathon Monopoly, you will have the first shot to renew your space before we offer it to anyone else.',
   },
   {
-    title: 'Right of first refusal',
-    body: 'Twenty-two squares exist and that number never moves. Hold one and you get the first offer on it, before your space is shown to anybody else.',
+    title: 'A Place to Tell Your Story',
+    body: 'There will be a QR code in every box that opens up the Board Guide. Your race has a page on it. You can tell your story, explain your course, and even include a discount code if you want.',
   },
   {
-    title: 'Your own page on the Board Guide',
-    body: 'A QR code on every box opens a guide to the board, and your race has a page on it: your course, your story, and a discount code that exists nowhere else.',
-  },
-  {
-    title: 'Your title deed, framed',
-    body: 'A 16 by 24 inch Trackstar print of your title deed card, framed and sent to your office. The same thing we make for your finishers, made for you.',
+    title: 'A Framed Title Deed',
+    body: "We'll send all the races on our board a framed piece of wall art that shows your Marathon Monopoly Title Deed.",
   },
 ]
 
@@ -406,7 +392,7 @@ export const FEEDBACK_COUNTS = { replies: 15, namedAPrice: PRICE_ANSWERS.length 
 /**
  * The Board Guide: a second surface, reached by QR code from the box.
  *
- * A space on the board carries a race's name and its colours, and that is all
+ * A space on the board carries a race's name and its colors, and that is all
  * the board can carry. Twenty-two names on a game board is recognition, not
  * information, and a race director who wants to convert that recognition into
  * entries has nowhere to send anybody.
@@ -532,7 +518,7 @@ export const FAQ: FaqItem[] = [
   {
     question: 'Will there be sponsors on the board competing with our own race sponsors?',
     answer:
-      'The only other sponsors on the board will be title sponsors that individual races choose to put on their own title deed card. Other than that we are not taking on third-party sponsors anywhere on the board, so nothing appears beside your race that you did not agree to.',
+      'No. We are not selling sponsor placements anywhere on this board, to anybody. The only names on it are the 22 races. Nothing appears beside your race that you did not agree to.',
   },
   {
     question: 'Is the board design final?',

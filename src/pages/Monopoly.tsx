@@ -6,7 +6,7 @@
  * be clicking their own space before they've read a sentence.
  *
  * Pricing and terms are gated behind an email capture, except when Matt sends a
- * personalised link (?p=boston), which arrives already unlocked. The gate is
+ * personalized link (?p=boston), which arrives already unlocked. The gate is
  * enforced server-side: the ungated API response simply does not contain fees.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -148,7 +148,7 @@ export default function Monopoly() {
   const selectedSpace = selectedPosition != null ? (spaceByPosition.get(selectedPosition) ?? null) : null
   const highlightPosition = data.personalizedFor?.suggestedPosition ?? null
   // Drives the "your tier" badge in the pricing table and preselects the
-  // calculator, so a personalised visitor lands on their own numbers.
+  // calculator, so a personalized visitor lands on their own numbers.
   const personalizedTierKey =
     highlightPosition != null ? spaceByPosition.get(highlightPosition)?.tierKey : undefined
 
@@ -408,7 +408,7 @@ export default function Monopoly() {
             be an object rather than a clause.
 
             It now carries both routes. Wholesale alone asked a race to hold
-            stock, which is the one thing organisers said they will not do, so
+            stock, which is the one thing organizers said they will not do, so
             the offer only ever worked for races that already run a store. */}
         <EarnItBack tiers={data.tiers} initialTierKey={personalizedTierKey} />
 
@@ -1010,7 +1010,7 @@ function Section({
  * A raised paper plate rather than a flat red one. The CTA now owns red, which
  * is the right way round: the thing you click should be the loudest object on
  * the page, and previously the twelve headings were shouting over the five
- * buttons in the same colour.
+ * buttons in the same color.
  */
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (

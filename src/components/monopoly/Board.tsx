@@ -21,7 +21,7 @@ const LOGO_SRC = '/Marathon Monopoly Logo.png'
 interface Props {
   spaces: BoardSpaceData[]
   selectedPosition: number | null
-  /** Set by ?p= personalisation — pulses the visitor's own space. */
+  /** Set by ?p= personalization — pulses the visitor's own space. */
   highlightPosition?: number | null
   onSelectSpace: (position: number) => void
 }
@@ -68,7 +68,7 @@ export function Board({
             cut off and printed sideways. */}
         {hoveredSpace && <SpaceTooltip space={hoveredSpace} />}
 
-        {/* Centre medallion: the wordmark plus the two card decks. This is the
+        {/* Center medallion: the wordmark plus the two card decks. This is the
             single cue that makes the whole thing read as Monopoly before anyone
             reads a word on it. */}
         <div
@@ -113,7 +113,7 @@ function SpaceTooltip({ space }: { space: BoardSpaceData }) {
   const { row, col } = gridPosition(space.position)
   const edge = edgeFor(space.position)
 
-  // Track offsets: corners are wider, so a cell's centre is not a simple
+  // Track offsets: corners are wider, so a cell's center is not a simple
   // fraction of eleven.
   const axis = (i: number) => {
     if (i === 1) return CORNER_CQW / 2
@@ -193,7 +193,7 @@ function SpaceTooltip({ space }: { space: BoardSpaceData }) {
 }
 
 /**
- * A card deck resting on the board's centre. Rotated the same 45° as the
+ * A card deck resting on the board's center. Rotated the same 45° as the
  * wordmark so the three elements read as one composition rather than three
  * things that happen to be in the middle.
  */

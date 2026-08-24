@@ -51,7 +51,7 @@ const STORAGE_KEY = 'monopoly-model-scenario'
  * Brand revenue is 0 in all three. Edition One carries no third-party brands
  * and none are being sold, so a preset that opened with $140,000 of it made
  * every scenario look funded by revenue that does not exist. The input stays,
- * so the case can still be modelled the moment there is one to model.
+ * so the case can still be modeled the moment there is one to model.
  *
  * Unit counts track the published allocation rather than round numbers. Base
  * is the 2,004 run as actually planned: 90 comps, 200 bought by races for
@@ -380,7 +380,7 @@ export default function MonopolyModel() {
                   is already inside the manufacturing line above. Rendered as
                   plain text rather than a signed figure because a -$1,650 in a
                   column of deductions reads as a deduction however it is
-                  labelled, and this one is not. */}
+                  labeled, and this one is not. */}
               {result.compCopyUnits > 0 && (
                 <MemoLine>
                   Includes {result.compCopyUnits.toLocaleString()} complimentary units for partners,{' '}

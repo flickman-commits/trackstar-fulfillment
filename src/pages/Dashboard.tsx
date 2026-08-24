@@ -442,7 +442,7 @@ function LookupLegend() {
       {open && (
         <>
           <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setOpen(false)} />
-          {/* Centred and FIXED, not anchored to the button. The order modal is
+          {/* Centerd and FIXED, not anchored to the button. The order modal is
               max-h-[90vh] overflow-y-auto, so an absolutely positioned panel
               gets clipped the moment it opens below the fold on a long order. */}
           <div
@@ -1119,7 +1119,7 @@ export default function Dashboard() {
       const data = await response.json()
 
       if (data.found) {
-        // Optimistically update the selected order so the modal shows results immediately
+        // Optimiztically update the selected order so the modal shows results immediately
         setSelectedOrder(prev => prev ? {
           ...prev,
           bibNumber: data.results.bibNumber,
@@ -1235,7 +1235,7 @@ export default function Dashboard() {
   // Mark order as completed.
   // Keep the modal open after the action — Eli often wants to take another
   // look at the same order right after marking it (re-check filename, etc.),
-  // and the optimistic status flip swaps the button to "Re-Open Order" so
+  // and the optimiztic status flip swaps the button to "Re-Open Order" so
   // he can immediately un-do if he hit it by mistake.
   const markAsCompleted = async (orderNumber: string) => {
     try {
@@ -1254,7 +1254,7 @@ export default function Dashboard() {
       }
 
       setToast({ message: 'Order marked as completed!', type: 'success' })
-      // Optimistically reflect the new status without closing the modal
+      // Optimiztically reflect the new status without closing the modal
       setSelectedOrder(prev => prev && prev.orderNumber === orderNumber ? { ...prev, status: 'completed' } : prev)
       setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, status: 'completed' } : o))
       await fetchOrders()
@@ -1638,7 +1638,7 @@ export default function Dashboard() {
 
   // Update design status for custom orders
   const updateDesignStatus = async (orderNumber: string, designStatus: DesignStatus) => {
-    // Optimistically update UI immediately before the API call
+    // Optimiztically update UI immediately before the API call
     const previousStatus = selectedOrder?.designStatus
     if (selectedOrder?.orderNumber === orderNumber) {
       setSelectedOrder(prev => prev ? { ...prev, designStatus } : null)
@@ -1661,7 +1661,7 @@ export default function Dashboard() {
       fetchOrders() // Refresh in background
     } catch (error) {
       if (import.meta.env.DEV) console.error('Error updating design status:', error)
-      // Roll back optimistic update on failure
+      // Roll back optimiztic update on failure
       if (selectedOrder?.orderNumber === orderNumber && previousStatus) {
         setSelectedOrder(prev => prev ? { ...prev, designStatus: previousStatus } : null)
       }

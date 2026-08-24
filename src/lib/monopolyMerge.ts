@@ -23,7 +23,7 @@ import type {
   SpaceType,
 } from './monopolyTypes'
 
-/** Corners, cards and taxes carry the edition's flavour — they're never sold. */
+/** Corners, cards and taxes carry the edition's flavor — they're never sold. */
 function defaultStatus(type: SpaceType): SpaceStatus {
   return type === 'property' || type === 'station' || type === 'utility' ? 'available' : 'not_for_sale'
 }

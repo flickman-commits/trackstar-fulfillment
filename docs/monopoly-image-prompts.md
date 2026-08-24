@@ -16,7 +16,7 @@ Three things went wrong, and all three are fixable in the prompt:
 2. **A manufacturer logo.** Every render invented a mangled Hasbro mark. We do
    not have the license yet, so it should not appear at all, garbled or not.
 3. **Real race names.** New York City Marathon, Marine Corps and California
-   International all appeared. None have committed. Use the colour-tier
+   International all appeared. None have committed. Use the color-tier
    placeholder names the real board component already uses.
 
 ---
@@ -31,12 +31,12 @@ CONSISTENT ACROSS THE WHOLE SET:
 - Soft, diffused daylight from the upper left. Gentle natural shadows. No
   harsh specular highlights.
 - Board playing surface is pale mint green (hex #CCE7D3). Accents are bright
-  red (#ED1C24) and warm near-black ink (#231F20). Property colour bands are
+  red (#ED1C24) and warm near-black ink (#231F20). Property color bands are
   brown #955436, light blue #AAE0FA, pink #D93A96, orange #F7941D, red #ED1B24,
   yellow #FEF200, green #1FB25A, dark blue #0072BB.
 - Playing pieces are matte pewter / antiqued silver die-cast metal.
 - Overall feel: a premium modern board-game press kit. Crisp, clean, uncluttered.
-- Shot on a 50mm lens, natural colour, no heavy vignette, no HDR look.
+- Shot on a 50mm lens, natural color, no heavy vignette, no HDR look.
 - SQUARE 1:1 aspect ratio. Every image in this set is square.
 
 HARD RULES:
@@ -74,7 +74,7 @@ neutral surface, board filling the frame, edges parallel to the frame edges
 BOARD STRUCTURE — standard Monopoly geometry, 40 spaces around a square:
 - Four corner squares: bottom-right "GO" with a large red arrow, bottom-left
   "IN JAIL / JUST VISITING", top-left "FREE PARKING", top-right "GO TO JAIL".
-- 22 property spaces in eight colour groups, each with a coloured band along
+- 22 property spaces in eight color groups, each with a colored band along
   its inner edge. Clockwise from GO: 2 brown, 3 light blue, 3 pink, 3 orange,
   3 red, 3 yellow, 3 green, 2 dark blue.
 - 4 "station" spaces evenly spaced, one per side, each showing a small flat
@@ -91,7 +91,7 @@ BOARD STRUCTURE — standard Monopoly geometry, 40 spaces around a square:
 CENTRE OF THE BOARD:
 A bold red and black "MARATHON MONOPOLY" wordmark on a white plate, angled
 diagonally, with a simple flat illustration of a road-race field of diverse
-runners beneath it. Keep the centre illustration simple and graphic, not busy.
+runners beneath it. Keep the center illustration simple and graphic, not busy.
 
 LEGIBLE TEXT ALLOWED (exactly these, nothing else):
 "MARATHON MONOPOLY", "GO", "FREE PARKING", "IN JAIL", "JUST VISITING",
@@ -166,12 +166,12 @@ below and behind it.
 
 THE HELD CARD, landscape orientation, white with a thin black keyline:
 - The word "CHANCE" in the top left, in a classic script, black.
-- Centred beneath it, in bold black capitals, three short lines:
+- Centerd beneath it, in bold black capitals, three short lines:
   "NEW GEL DISAGREES WITH YOU"
   "AT MILE 18"
   "GO BACK 3 SPACES"
 - To the right, a simple black line-drawing of a runner in a vest and shorts,
-  doubled over holding their stomach. Line art only, no colour, no top hat, no
+  doubled over holding their stomach. Line art only, no color, no top hat, no
   moustache, no resemblance to any existing mascot character.
 
 The face-down stack shows a plain red card back with a small white question
@@ -202,7 +202,7 @@ Late-afternoon window light from the left, warm and soft. Shot at f/2.8 so the
 people and the board are sharp and the room falls away gently. SQUARE 1:1
 composition, with headroom above the faces and the full board visible.
 
-LEGIBLE TEXT ALLOWED: "MARATHON MONOPOLY" on the board centre only. Every
+LEGIBLE TEXT ALLOWED: "MARATHON MONOPOLY" on the board center only. Every
 other word on the board and cards must be too small or too soft to read.
 
 [BLOCK B]

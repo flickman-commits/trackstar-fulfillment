@@ -28,7 +28,7 @@ import { MONOPOLY, CARD_OUTLINE, UI_RADIUS, guilloche } from './monopolyTheme'
 
 interface Props {
   tiers: PackageTier[]
-  /** Preselected when the visitor arrived on a personalised link. */
+  /** Preselected when the visitor arrived on a personalized link. */
   initialTierKey?: string
 }
 

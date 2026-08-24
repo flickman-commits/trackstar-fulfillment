@@ -1,7 +1,7 @@
 /**
  * The tier table and brand slot pricing.
  *
- * Leads with net cost rather than fee. The race organiser's own framing was
+ * Leads with net cost rather than fee. The race organizer's own framing was
  * that they'd "back into it to see if it makes sense" — so the number that
  * decides the deal is what it costs after the included allocation is resold,
  * not the sticker price. Both are shown; the one that closes is emphasised.
@@ -13,7 +13,7 @@ import { GROUP_COLORS } from '@/lib/monopolyBoardLayout'
 interface Props {
   tiers: PackageTier[]
   brandPricing?: BrandPrice[]
-  /** Highlighted when the visitor arrived on a personalised link. */
+  /** Highlighted when the visitor arrived on a personalized link. */
   highlightTierKey?: string
 }
 
@@ -35,7 +35,7 @@ export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
           <tbody>
             {tiers.map((tier) => {
               const highlighted = tier.tierKey === highlightTierKey
-              // A personalised visitor's own tier is never dimmed, even when it
+              // A personalized visitor's own tier is never dimmed, even when it
               // shows 0 open — the reason it's full is usually that they're the
               // one holding the space, and greying out their own row reads as
               // "you can't have this".
@@ -51,8 +51,8 @@ export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
                 >
                   <Td nowrap={false}>
                     <span className="flex items-center gap-2.5">
-                      {/* The colour band off the title deed card. A tier IS its
-                          colour on the board, so showing it beats naming it. */}
+                      {/* The color band off the title deed card. A tier IS its
+                          color on the board, so showing it beats naming it. */}
                       <span
                         aria-hidden="true"
                         className="shrink-0"

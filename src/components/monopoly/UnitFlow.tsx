@@ -20,7 +20,7 @@ interface Allocation {
 }
 
 /**
- * Board colours rather than a generated ramp, so the chart belongs to the same
+ * Board colors rather than a generated ramp, so the chart belongs to the same
  * object as everything above it. Ordered to keep adjacent segments distinct.
  */
 const COLORS = ['#0072BB', '#1FB25A', '#F7941D', '#ED1C24', '#955436']

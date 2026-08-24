@@ -82,7 +82,7 @@ export interface BoardSpace extends BoardSpaceLayout {
   partnerName?: string
   logoUrl?: string
   blurb?: string
-  /** Slug for ?p= personalisation, e.g. "boston". */
+  /** Slug for ?p= personalization, e.g. "boston". */
   raceSlug?: string
 }
 

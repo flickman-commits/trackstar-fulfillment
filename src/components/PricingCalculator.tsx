@@ -125,7 +125,7 @@ export default function PricingCalculator() {
   const [quantity, setQuantity] = useState(25)
   const [includePhoto, setIncludePhoto] = useState(false)
   // Discount comes from the published tier for this quantity. The override is
-  // for modelling a deal we have not published — empty means "use the tier".
+  // for modeling a deal we have not published — empty means "use the tier".
   const [discountOverride, setDiscountOverride] = useState('')
   // Bulk orders are single-variant — we do not sell mixed consignments — so
   // the roll-up is for one chosen row rather than a blended basket.

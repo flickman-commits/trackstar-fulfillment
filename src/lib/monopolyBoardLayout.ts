@@ -6,7 +6,7 @@
  * space, so it lives in code rather than in the sheet. The sheet supplies only
  * the sales layer (custom name, status, tier, partner) which gets merged on top
  * in monopolyBoard.js. That split is why the page still renders a correct,
- * recognisable board when Google Sheets is unreachable.
+ * recognizable board when Google Sheets is unreachable.
  *
  * Space keys match the row labels in the Winning Moves master content sheet's
  * "Game board" tab (BROWN 1, STATION 2, GREEN 3…) so the two can be joined
@@ -43,7 +43,7 @@ export const GROUP_LABELS: Record<ColorGroup, string> = {
 
 /**
  * Gameboard Mint, PMS 9525C, straight from the Monopoly brand spec. The board
- * surface is the single most recognisable color in the system, so it is worth
+ * surface is the single most recognizable color in the system, so it is worth
  * being exact rather than close.
  */
 export const BOARD_FELT = '#CCE7D3'

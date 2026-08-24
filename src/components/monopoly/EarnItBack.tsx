@@ -7,7 +7,7 @@
  *
  * This section used to offer two options side by side, wholesale and referral,
  * held at the same $20 so the choice was purely about effort. That was honest
- * but it was also a fork in the middle of a pitch, and the organiser who
+ * but it was also a fork in the middle of a pitch, and the organizer who
  * prompted this whole idea had already said plainly that races will not hold
  * inventory. Presenting a route nobody takes as an equal option just asked
  * every reader to rule it out themselves. Wholesale is still available and now
@@ -29,7 +29,7 @@ import { MONOPOLY, CARD_OUTLINE, UI_RADIUS } from './monopolyTheme'
 
 interface Props {
   tiers: PackageTier[]
-  /** Preselected when the visitor arrived on a personalised link. */
+  /** Preselected when the visitor arrived on a personalized link. */
   initialTierKey?: string
 }
 

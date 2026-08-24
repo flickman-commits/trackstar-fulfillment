@@ -20,7 +20,7 @@ interface Props {
   tiers: PackageTier[]
   wholesalePrice: number
   retailPrice: number
-  /** Preselected when the visitor arrived on a personalised link. */
+  /** Preselected when the visitor arrived on a personalized link. */
   initialTierKey?: string
 }
 
@@ -142,7 +142,7 @@ export function OffsetCalculator({ tiers, wholesalePrice, retailPrice, initialTi
         </div>
         <div className="mt-2" style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
           {ahead
-            ? 'in your favour, before any value assigned to being on the board'
+            ? 'in your favor, before any value assigned to being on the board'
             : 'net cost, after reselling every unit you hold'}
         </div>
 

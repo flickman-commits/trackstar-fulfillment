@@ -1,5 +1,5 @@
 /**
- * Centred modal for a clicked board space.
+ * Centerd modal for a clicked board space.
  *
  * The important part is the name field. A tier table tells a race director what
  * a space costs; typing their own name and watching it appear on the title deed

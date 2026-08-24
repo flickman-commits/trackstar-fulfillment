@@ -11,7 +11,7 @@
  *
  *   Yellow tier — fee $16,000, 150 units included, buy 400 more at $30,
  *   resell everything at $65:
- *     (150 + 400) × 65 − 16,000 − (400 × 30) = +$7,750 in the partner's favour.
+ *     (150 + 400) × 65 − 16,000 − (400 × 30) = +$7,750 in the partner's favor.
  *
  *   Founding Partner — no fee, 250 units bought at $30, resold at $65:
  *     250 × 65 − 0 − (250 × 30) = +$8,750.

@@ -170,7 +170,7 @@ const MONOPOLY_ORIGIN = 'https://monopoly.trackstar.art'
  * A hard redirect rather than a removed route, because links to
  * fast.trackstar.art/monopoly are already in race directors' inboxes and a 404
  * is a worse answer than a redirect. The query string survives so a
- * personalised ?p= link still greets the right race.
+ * personalized ?p= link still greets the right race.
  *
  * Only fires on the real domain. On localhost the page keeps rendering in
  * place, otherwise every local run of /monopoly would bounce to production.

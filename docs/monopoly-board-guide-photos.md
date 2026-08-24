@@ -25,14 +25,14 @@ tilted slightly down, wide establishing view.
 CONSISTENT ACROSS THE SET:
 - Golden hour, sun low and behind the camera, long soft shadows.
 - Clear air, gentle atmospheric haze toward the horizon.
-- Natural colour. No HDR, no heavy grading, no teal-and-orange look.
+- Natural color. No HDR, no heavy grading, no teal-and-orange look.
 - Shot on a 24mm equivalent lens, level horizon, no fisheye distortion.
 - 2:1 landscape crop, composed so the skyline sits in the lower two thirds.
 
 HARD RULES:
 - NO runners, NO race courses, NO finish lines, NO start corrals, NO crowds,
   NO banners, NO branded signage of any kind.
-- NO recognisable corporate logos on buildings.
+- NO recognizable corporate logos on buildings.
 - NO text, watermarks, timestamps or UI overlays.
 - NO people identifiable at any distance.
 ```
@@ -53,7 +53,7 @@ Block B.
 ```
 [BLOCK A]
 
-The city is [CITY]. Include its most recognisable natural feature: [RIVER,
+The city is [CITY]. Include its most recognizable natural feature: [RIVER,
 HARBOUR, LAKE, MOUNTAINS OR COASTLINE]. The skyline should be identifiable to
 somebody who has been there, without relying on any single landmark filling
 the frame.
@@ -68,7 +68,7 @@ month the race takes place, not high summer by default.
 
 - Check at 100% for invented signage and garbled text on buildings before use.
 - Crop to 2:1. The card renders at 190px tall and crops to fill, so anything
-  important must sit near the centre.
+  important must sit near the center.
 - Resize and convert:
   `sips -Z 1600 -s format jpeg -s formatOptions 72 <src> --out <city>.jpg`
 - Upload through the theme editor on the race's block in the Board Guide
