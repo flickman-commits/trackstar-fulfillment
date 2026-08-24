@@ -12,7 +12,7 @@ import type { BoardSpace, PackageTier } from '@/lib/monopolyTypes'
 import { TitleDeedCard } from './TitleDeedCard'
 import { STATUS_COLORS } from './boardView'
 import { MONOPOLY, UI_RADIUS } from './monopolyTheme'
-import { DEPOSIT_AMOUNT } from '@/lib/monopolyCopy'
+import { DEPOSIT_AMOUNT, SLOT_INCLUDES } from '@/lib/monopolyCopy'
 import { formatMoney } from '@/lib/monopolyMath'
 
 interface Props {
@@ -92,15 +92,39 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
           >
             Space {space.position} · {space.spaceKey}
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="p-1 transition-opacity hover:opacity-60"
-            style={{ color: MONOPOLY.ink }}
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {/* Status sits in the header rather than in a labelled row of its own
+              further down. That row spent a third of its width on the word
+              "Status" to describe a chip that already reads as one, and it put
+              the single most useful fact about a space below the fold on a
+              phone. */}
+          <div className="flex items-center gap-3">
+            {sellable && (
+              <span
+                className="px-3 py-1"
+                style={{
+                  backgroundColor: status.fill,
+                  color: status.text,
+                  border: available ? `1px solid ${MONOPOLY.black}` : 'none',
+                  borderRadius: UI_RADIUS,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                {status.label}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="p-1 transition-opacity hover:opacity-60"
+              style={{ color: MONOPOLY.ink }}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-6 overflow-y-auto p-6 sm:grid-cols-[minmax(0,250px)_1fr] sm:gap-8">
@@ -142,33 +166,6 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
               </div>
             )}
 
-            {sellable && (
-              <div
-                className="flex items-center justify-between px-4 py-3"
-                style={{
-                  backgroundColor: MONOPOLY.paper,
-                  border: `1px solid ${MONOPOLY.black}`,
-                  borderRadius: UI_RADIUS,
-                }}
-              >
-                <span style={{ fontSize: 13, color: MONOPOLY.inkMuted }}>Status</span>
-                <span
-                  className="px-3 py-1"
-                  style={{
-                    backgroundColor: status.fill,
-                    color: status.text,
-                    border: available ? `1px solid ${MONOPOLY.black}` : 'none',
-                    borderRadius: UI_RADIUS,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                  }}
-                >
-                  {status.label}
-                </span>
-              </div>
-            )}
 
             {space.partnerName && (
               <div
@@ -228,7 +225,7 @@ export function SpaceDetail({ space, tier, onClose, onRequestSpace }: Props) {
                 )}
 
                 <ul className="flex flex-col gap-2">
-                  {tier.features.map((f) => (
+                  {SLOT_INCLUDES.map((f) => (
                     <li
                       key={f}
                       className="flex gap-2"

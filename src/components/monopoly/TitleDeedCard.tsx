@@ -16,16 +16,21 @@ interface Props {
 }
 
 /**
- * Labels for the house/hotel ladder. These read straight off `rent[1..5]`.
- * The color-set row is not in that array — on a real title deed it is always
+ * Labels for the aid station ladder. These read straight off `rent[1..5]`.
+ * The color-set row is not in that array: on a real title deed it is always
  * double the base rent, so it's derived rather than stored.
+ *
+ * Houses become aid stations and rent becomes race fees, which is the one
+ * place the running theme can touch the game's own vocabulary without
+ * changing how anything is played. The hotel row is the tell: four aid
+ * stations upgrade to full support, not to a building.
  */
-const HOUSE_ROWS = [
-  'Rent with 1 House',
-  'Rent with 2 Houses',
-  'Rent with 3 Houses',
-  'Rent with 4 Houses',
-  'Rent with HOTEL',
+const AID_STATION_ROWS = [
+  'Race Fees with 1 Aid Station',
+  'Race Fees with 2 Aid Stations',
+  'Race Fees with 3 Aid Stations',
+  'Race Fees with 4 Aid Stations',
+  'Race Fees with Full Support',
 ]
 
 /**
@@ -106,14 +111,14 @@ export function TitleDeedCard({ space, compact = false }: Props) {
 
       {isProperty ? (
         <div style={{ fontSize: px(11), color: '#1A1A1A' }}>
-          <Row label="Rent" value={`$${space.rent![0]}`} bold px={px} />
-          <Row label="Rent with color set" value={`$${space.rent![0] * 2}`} px={px} />
-          {HOUSE_ROWS.map((label, i) => (
+          <Row label="Race Fees" value={`$${space.rent![0]}`} bold px={px} />
+          <Row label="Race Fees with color set" value={`$${space.rent![0] * 2}`} px={px} />
+          {AID_STATION_ROWS.map((label, i) => (
             <Row key={label} label={label} value={`$${space.rent![i + 1]}`} px={px} />
           ))}
           <div style={{ borderTop: '1px solid #1A1A1A', margin: `${px(8)} 0` }} />
-          <Row label="Houses cost" value={`$${space.houseCost}  each`} px={px} />
-          <Row label="Hotels cost" value={`$${space.houseCost}  (plus 4 houses)`} px={px} />
+          <Row label="Aid Stations cost" value={`$${space.houseCost}  each`} px={px} />
+          <Row label="Full Support cost" value={`$${space.houseCost}  (plus 4 aid stations)`} px={px} />
         </div>
       ) : (
         <div style={{ fontSize: px(11), color: '#4A4A4A', lineHeight: 1.5, padding: `${px(4)} ${px(2)}` }}>

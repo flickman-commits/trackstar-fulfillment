@@ -37,6 +37,8 @@ import {
   SALES_PLAN,
   WHY_NOW,
   TIMELINE,
+  SLOT_INCLUDES,
+  SLOT_INCLUDES_NOTE,
   UNIT_ALLOCATION,
   WHATS_IN_IT,
 } from '@/lib/monopolyCopy'
@@ -290,7 +292,7 @@ export default function Monopoly() {
         {/* Beats left, picture right on a laptop; stacked on a phone. The image
             sat below them at half width before, which left a column of empty
             mint beside it and pushed the section over a screen tall. */}
-        <div className="mt-8 grid items-center gap-10 lg:grid-cols-2">
+        <div className="mt-8 grid items-start gap-10 lg:grid-cols-2">
           <div className="flex flex-col gap-8">
             {WHY_NOW.map((item) => (
               <Beat key={item.title} title={item.title} body={item.body} />
@@ -420,25 +422,21 @@ export default function Monopoly() {
             Purchasing a race slot includes
           </h3>
           <ul className="flex flex-col gap-2" style={{ maxWidth: '40rem' }}>
-            {[
-              "Your race's name on Marathon Monopoly: Edition One",
-              'Creative approval of your marks',
-              '5 complimentary units shipped to your office',
-              'Featured in the Board Guide - a digital landing page where you can explain more about your race',
-              'First right of refusal on your space in any future edition*',
-            ].map((item) => (
+            {SLOT_INCLUDES.map((item, i) => (
               <li key={item} className="flex gap-2.5" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
                 <span aria-hidden="true" style={{ color: MONOPOLY.red, fontWeight: 700 }}>
                   +
                 </span>
-                <span>{item}</span>
+                <span>
+                  {item}
+                  {i === SLOT_INCLUDES.length - 1 && '*'}
+                </span>
               </li>
             ))}
           </ul>
           {/* Small, and said once. It is a scope note, not a sales point. */}
           <p className="mt-4" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '40rem' }}>
-            *Your investment covers Edition One. If we ever print another, that edition is its own
-            agreement, and you get first look at your space before anyone else.
+            *{SLOT_INCLUDES_NOTE}
           </p>
           <div className="mt-8">
             <CtaButton />

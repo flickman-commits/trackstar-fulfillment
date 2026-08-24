@@ -64,6 +64,28 @@ export interface TierDef {
 }
 
 /**
+ * What buying a slot includes.
+ *
+ * One list, rendered in two places: the Investment section and the title deed
+ * modal on every board space. They used to be separate arrays saying different
+ * things, so a race director who clicked their own square saw a shorter,
+ * staler version of the offer than the one further down the page.
+ *
+ * The asterisk on the last line belongs to the page, which prints the footnote
+ * under it. The modal has no room for a footnote, so it appends nothing.
+ */
+export const SLOT_INCLUDES = [
+  "Your race's name on Marathon Monopoly: Edition One",
+  'Creative approval of your marks',
+  '5 complimentary units shipped to your office',
+  'Featured in the Board Guide - a digital landing page where you can explain more about your race',
+  'First right of refusal on your space in any future edition',
+]
+
+export const SLOT_INCLUDES_NOTE =
+  'Your investment covers Edition One. If we ever print another, that edition is its own agreement, and you get first look at your space before anyone else.'
+
+/**
  * What every space carries, whatever the fee.
  *
  * The exclusivity line used to be "5-year category exclusivity in your market",
