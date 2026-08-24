@@ -33,7 +33,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { setCors } from '../_lib/auth.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
-import { MIN_BYTES } from '../../server/lib/imageValidation.js'
 
 const BUCKET = 'personalization-photos'
 
@@ -104,7 +103,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'rate_limited', retryAfterMs: limit.retryAfterMs })
   }
 
-  const { contentType, size, width, height, filename, sourceBytes } = req.body || {}
+  const { contentType, size, width, height, filename } = req.body || {}
 
   const ext = ALLOWED_TYPES[String(contentType || '').toLowerCase()]
   if (!ext) {
@@ -118,27 +117,11 @@ export default async function handler(req, res) {
   if (!Number.isFinite(bytes) || bytes <= 0) {
     return res.status(400).json({ error: 'bad_request', message: 'Missing file size.' })
   }
-  // Applied to the PRE-CROP original where we have it, not to `size`. A
-  // cropping client uploads a square re-encode, so `size` is a product of our
-  // own JPEG quality setting and says nothing about whether the customer
-  // picked a screenshot: a 4MB original zoomed into a tight crop lands well
-  // under 1MB and is not remotely "compressed".
-  //
-  // Falls back to `size` when sourceBytes is absent, which is a storefront
-  // that does not crop. Without the fallback the gate would silently vanish
-  // for those clients for as long as the two deploys are out of step.
-  //
-  // Client-supplied either way, so this is a hint. Resolution is the check
-  // that actually holds, and it runs on real pixels in photo-verify.
-  const reported = Number(sourceBytes)
-  const srcBytes = Number.isFinite(reported) && reported > 0 ? reported : bytes
-  if (srcBytes < MIN_BYTES) {
-    return res.status(400).json({
-      error: 'too_compressed',
-      minBytes: MIN_BYTES,
-      message: 'That file looks compressed (under 1MB), which prints soft. Please upload the original photo from your phone or camera.',
-    })
-  }
+  // No file-size FLOOR. Byte count is a poor proxy for print quality: a sharp,
+  // high-resolution phone photo (including iOS's HEIC->JPEG transcode) often
+  // lands under 1MB and was being wrongly rejected. Print sharpness is gated by
+  // resolution against real pixels in photo-verify; only the max stays here to
+  // reject video-sized mistakes.
   if (bytes > MAX_BYTES) {
     return res.status(413).json({
       error: 'too_large',

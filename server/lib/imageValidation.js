@@ -31,21 +31,13 @@ export const MAX_PIXELS = 100_000_000
  */
 export const MIN_SHORT_EDGE = 1200
 
-/**
- * 1MB floor, as a proxy for "this file has not been through compression".
- *
- * Blunt on purpose: file size does not track resolution once JPEG quality
- * varies, so a well-compressed but genuinely sharp photo can fall under this
- * and be refused. Accepted to catch the far more common case, a screenshot or
- * a social media re-download, which is what actually prints soft. Resolution
- * itself is still checked separately against MIN_SHORT_EDGE.
- *
- * Applies ONLY to the file the customer picked, never to what gets uploaded.
- * The storefront crops to a square and re-encodes first, so the uploaded bytes
- * are our own JPEG and their size carries no signal about the original. The
- * single consumer is photo-upload-url, reading `sourceBytes`.
+/*
+ * There is deliberately NO file-size floor. Byte count is a poor proxy for
+ * print quality: a sharp, high-resolution phone photo re-encodes to JPEG well
+ * under 1MB (and iOS's HEIC->JPEG transcode routinely does), so a floor wrongly
+ * refuses good photos. Print sharpness is gated by MIN_SHORT_EDGE against real
+ * pixels in photo-verify; a corrupt/undecodable file is caught there too.
  */
-export const MIN_BYTES = 1024 * 1024
 
 const startsWith = (buf, bytes, offset = 0) =>
   bytes.every((b, i) => buf[offset + i] === b)
