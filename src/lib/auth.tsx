@@ -18,8 +18,14 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 export interface CurrentUser {
   id: string
   email: string
-  name: string
+  firstName: string
+  lastName: string
   role: 'admin' | 'staff'
+}
+
+/** "Matt Hickman", or just "Matt" when no last name is set. */
+export function fullName(user: { firstName?: string; lastName?: string } | null): string {
+  return [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim()
 }
 
 interface AuthValue {
@@ -92,7 +98,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
         <div className={card}>
           <p className="text-body-sm font-medium text-off-black">This page is admin only</p>
           <p className="text-xs text-off-black/50 mt-2">
-            You are signed in as {user?.name || 'staff'}. Ask an admin if you need access.
+            You are signed in as {fullName(user) || 'staff'}. Ask an admin if you need access.
           </p>
           <a
             href="/"
@@ -239,7 +245,7 @@ function SignInForm({ onDone }: { onDone: (u: CurrentUser) => void }) {
 }
 
 function AcceptInvite({ token, onDone }: { token: string; onDone: (u: CurrentUser) => void }) {
-  const [invitee, setInvitee] = useState<{ email: string; name: string } | null>(null)
+  const [invitee, setInvitee] = useState<{ email: string; firstName: string } | null>(null)
   const [loadError, setLoadError] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -305,7 +311,7 @@ function AcceptInvite({ token, onDone }: { token: string; onDone: (u: CurrentUse
         </div>
         <form onSubmit={handleSubmit} className={card}>
           <h1 className="text-body font-semibold text-off-black">
-            {invitee ? `Welcome, ${invitee.name}` : 'Set your password'}
+            {invitee ? `Welcome, ${invitee.firstName}` : 'Set your password'}
           </h1>
           <p className="text-xs text-off-black/50 mt-1 mb-4">
             {invitee?.email ? `Choose a password for ${invitee.email}.` : 'Loading...'}

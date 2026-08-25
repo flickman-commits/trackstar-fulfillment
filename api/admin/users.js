@@ -2,7 +2,7 @@
  * /api/admin/users - manage who can sign in.
  *
  *   GET                                   list everyone (admin only)
- *   POST   { action:'invite', email, name, role }   create an account + invite link
+ *   POST   { action:'invite', email, firstName, lastName, role }  account + invite link
  *   POST   { action:'role', id, role }              promote / demote
  *   POST   { action:'active', id, isActive }        deactivate / reactivate
  *   POST   { action:'reset', id }                   issue a fresh invite link
@@ -13,9 +13,7 @@
  * Everything except set-password and set-name is admin-only: the roster is part of the
  * admin view, so a staff session cannot reach it by typing the URL either.
  * set-password and set-name are the exceptions: hiding the admin view must not
- * take away someone's ability to manage their own account. Names are stored in
- * one column and split on whitespace for display, so "first" and "last" are a
- * presentation of one value rather than two fields to keep in step.
+ * take away someone's ability to manage their own account.
  *
  * Accounts are created without a password and with a single-use invite token.
  * Nobody types a colleague's password for them, and no password travels over
@@ -26,7 +24,7 @@ import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import {
-  ROLES, hashPassword, normalizeEmail, isValidEmail,
+  ROLES, hashPassword, normalizeEmail, isValidEmail, fullName,
   loadActiveUser, requireAdminRole, recordAudit,
 } from '../_lib/users.js'
 
@@ -34,14 +32,14 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const MIN_PASSWORD = 10
 
 const PUBLIC_FIELDS = {
-  id: true, email: true, name: true, role: true, isActive: true,
+  id: true, email: true, firstName: true, lastName: true, role: true, isActive: true,
   lastLoginAt: true, createdAt: true, inviteExpiresAt: true, passwordHash: true,
 }
 
 /** Never let a password hash out of the API, even to an admin. */
 function shape(u) {
   const { passwordHash, ...rest } = u
-  return { ...rest, hasPassword: Boolean(passwordHash) }
+  return { ...rest, name: fullName(u), hasPassword: Boolean(passwordHash) }
 }
 
 function newInvite() {
@@ -67,7 +65,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       if (!await requireAdminRole(req, res, actor)) return
       const users = await prisma.user.findMany({
-        orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
+        orderBy: [{ isActive: 'desc' }, { firstName: 'asc' }, { lastName: 'asc' }],
         select: PUBLIC_FIELDS,
       })
       return res.status(200).json({ users: users.map(shape) })
@@ -84,11 +82,12 @@ export default async function handler(req, res) {
         const first = String(body.firstName || '').trim()
         const last = String(body.lastName || '').trim()
         if (!first) return res.status(400).json({ error: 'First name is required' })
-        const name = [first, last].filter(Boolean).join(' ')
-        if (name.length > 80) return res.status(400).json({ error: 'That name is too long' })
+        if (first.length > 60 || last.length > 60) {
+          return res.status(400).json({ error: 'That name is too long' })
+        }
         const user = await prisma.user.update({
           where: { id: me.id },
-          data: { name },
+          data: { firstName: first, lastName: last },
           select: PUBLIC_FIELDS,
         })
         // Not audited. Someone correcting the spelling of their own name is
@@ -118,7 +117,10 @@ export default async function handler(req, res) {
 
       if (action === 'invite') {
         const email = normalizeEmail(body.email)
-        const name = String(body.name || '').trim() || email.split('@')[0]
+        // The email prefix is a placeholder, not a guess at their name. They
+        // can correct it from My Account once they accept the invite.
+        const firstName = String(body.firstName || '').trim() || email.split('@')[0]
+        const lastName = String(body.lastName || '').trim()
         const role = ROLES.includes(body.role) ? body.role : 'staff'
         if (!isValidEmail(email)) return res.status(400).json({ error: 'Enter a valid email address' })
 
@@ -127,7 +129,7 @@ export default async function handler(req, res) {
 
         const invite = newInvite()
         const user = await prisma.user.create({
-          data: { email, name, role, ...invite },
+          data: { email, firstName, lastName, role, ...invite },
           select: PUBLIC_FIELDS,
         })
         await recordAudit({

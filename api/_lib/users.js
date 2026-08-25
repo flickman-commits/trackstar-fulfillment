@@ -15,6 +15,11 @@ import crypto from 'crypto'
 import prisma from './prisma.js'
 
 export const ROLES = ['admin', 'staff']
+
+/** "Matt Hickman", or just "Matt" when no last name is set. */
+export function fullName(user) {
+  return [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim()
+}
 const SCRYPT_KEYLEN = 64
 
 /** "scrypt:<saltHex>:<hashHex>" */
@@ -63,7 +68,7 @@ export async function loadActiveUser(actor) {
   if (!actor.id) return null
   const user = await prisma.user.findUnique({
     where: { id: actor.id },
-    select: { id: true, email: true, name: true, role: true, isActive: true },
+    select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true },
   })
   if (!user || !user.isActive) return null
   return user

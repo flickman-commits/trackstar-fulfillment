@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const user = await findByToken(req.query?.token)
       if (!user) return res.status(404).json({ error: 'That invite link is invalid or has expired.' })
-      return res.status(200).json({ email: user.email, name: user.name })
+      return res.status(200).json({ email: user.email, firstName: user.firstName, lastName: user.lastName })
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -53,7 +53,10 @@ export default async function handler(req, res) {
       },
     })
 
-    const actor = { id: user.id, email: user.email, name: user.name, role: user.role }
+    const actor = {
+      id: user.id, email: user.email, role: user.role,
+      firstName: user.firstName, lastName: user.lastName,
+    }
     res.setHeader('Set-Cookie', buildSessionCookie(req, { token: createSessionToken(actor) }))
     return res.status(200).json({ ok: true, user: actor })
   } catch (error) {

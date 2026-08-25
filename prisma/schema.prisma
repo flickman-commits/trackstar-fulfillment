@@ -609,7 +609,11 @@ model ProductEditBatch {
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
-  name         String
+  // Stored separately rather than as one "name" string. A single column forces
+  // every reader to guess where the split is, and that guess is wrong for
+  // anyone whose first or last name is more than one word.
+  firstName    String
+  lastName     String    @default("")
   // scrypt, stored as "scrypt:<saltHex>:<hashHex>". Null while an invite is
   // outstanding, which is also what blocks sign-in until they set one.
   passwordHash String?

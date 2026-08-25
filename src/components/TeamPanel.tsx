@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Loader2, RefreshCw, UserPlus, Copy, Check, LogOut } from 'lucide-react'
-import { useAuth } from '@/lib/auth'
+import { useAuth, fullName } from '@/lib/auth'
 import { btnPrimary, btnSecondary, btnDanger, btnGhost, inputBase, fieldLabel } from '@/lib/ui'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -24,6 +24,9 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 interface TeamMember {
   id: string
   email: string
+  firstName: string
+  lastName: string
+  /** Composed server-side so the table and the toasts agree on one spelling. */
   name: string
   role: 'admin' | 'staff'
   isActive: boolean
@@ -87,7 +90,7 @@ export function PeoplePanel() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [inviteUrl, setInviteUrl] = useState('')
   const [showInvite, setShowInvite] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', role: 'staff' as 'admin' | 'staff' })
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', role: 'staff' as 'admin' | 'staff' })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -128,7 +131,7 @@ export function PeoplePanel() {
     if (data?.inviteUrl) {
       setInviteUrl(data.inviteUrl)
       setShowInvite(false)
-      setForm({ name: '', email: '', role: 'staff' })
+      setForm({ firstName: '', lastName: '', email: '', role: 'staff' })
     }
   }
 
@@ -169,14 +172,23 @@ export function PeoplePanel() {
 
       {showInvite && (
         <form onSubmit={invite} className="rounded-lg border border-border-gray bg-subtle-gray/40 p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
-              <label className={fieldLabel}>Name</label>
+              <label className={fieldLabel}>First name</label>
               <input
                 className={inputBase}
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                placeholder="Name"
+                value={form.firstName}
+                onChange={e => setForm({ ...form, firstName: e.target.value })}
+                placeholder="First"
+              />
+            </div>
+            <div>
+              <label className={fieldLabel}>Last name</label>
+              <input
+                className={inputBase}
+                value={form.lastName}
+                onChange={e => setForm({ ...form, lastName: e.target.value })}
+                placeholder="Last"
               />
             </div>
             <div>
@@ -209,7 +221,8 @@ export function PeoplePanel() {
             <button type="button" onClick={() => setShowInvite(false)} className={btnSecondary}>Cancel</button>
           </div>
           <p className="text-[11px] text-off-black/45">
-            They choose their own password from the link. You never type it for them.
+            They choose their own password from the link, and can correct their
+            name from My Account. You never type a password for them.
           </p>
         </form>
       )}
@@ -309,18 +322,16 @@ export function PeoplePanel() {
 export function AccountPanel() {
   const { user, signOut, refresh } = useAuth()
 
-  // The stored name is one string. It is split for editing because "first and
-  // last name" is how people think about their own name, and rejoined on save
-  // so there is still only one value to keep correct.
   const [first, setFirst] = useState('')
   const [last, setLast] = useState('')
   const [savingName, setSavingName] = useState(false)
 
+  // Seed the inputs from the session, and re-seed when it refreshes after a
+  // save so the fields reflect what was actually stored.
   useEffect(() => {
-    const parts = (user?.name || '').trim().split(/\s+/).filter(Boolean)
-    setFirst(parts[0] || '')
-    setLast(parts.slice(1).join(' '))
-  }, [user?.name])
+    setFirst(user?.firstName || '')
+    setLast(user?.lastName || '')
+  }, [user?.firstName, user?.lastName])
 
   const [changingPassword, setChangingPassword] = useState(false)
   const [password, setPassword] = useState('')
@@ -328,7 +339,7 @@ export function AccountPanel() {
   const [savingPassword, setSavingPassword] = useState(false)
 
   const nameChanged =
-    [first.trim(), last.trim()].filter(Boolean).join(' ') !== (user?.name || '').trim()
+    first.trim() !== (user?.firstName || '') || last.trim() !== (user?.lastName || '')
 
   const saveName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -378,7 +389,7 @@ export function AccountPanel() {
     <div className="space-y-6 max-w-md">
       <div>
         <p className="text-sm font-medium text-off-black">
-          {user?.name}
+          {fullName(user)}
           <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-off-black/5 text-off-black/50 align-middle">
             {user?.role === 'admin' ? 'admin' : 'staff'}
           </span>

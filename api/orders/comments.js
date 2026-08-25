@@ -8,7 +8,7 @@
 
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { loadActiveUser, recordAudit } from '../_lib/users.js'
+import { loadActiveUser, recordAudit, fullName } from '../_lib/users.js'
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
@@ -68,15 +68,18 @@ export default async function handler(req, res) {
         imageUrl = publicUrl
       }
 
-      // authorName is denormalised alongside authorId so a comment still says
-      // who wrote it after that person's account is deleted.
+      // The session token carries no name, only id/email/role, so read the
+      // author rather than stamping an email onto every comment. authorName is
+      // denormalised alongside authorId so a comment still says who wrote it
+      // after that person's account is deleted.
+      const author = await loadActiveUser(actor)
       const comment = await prisma.orderComment.create({
         data: {
           orderId,
           text: text || null,
           imageUrl,
-          authorId: actor.isSystem ? null : actor.id,
-          authorName: actor.name || actor.email || null,
+          authorId: author?.isSystem ? null : author?.id ?? null,
+          authorName: (author && !author.isSystem ? fullName(author) : null) || actor.email || null,
         }
       })
 

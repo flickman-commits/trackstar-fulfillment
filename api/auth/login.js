@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     // Re-read so a deactivated account cannot keep browsing on a live token.
     const user = await prisma.user.findUnique({
       where: { id: actor.id },
-      select: { id: true, email: true, name: true, role: true, isActive: true },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true },
     })
     if (!user || !user.isActive) {
       res.setHeader('Set-Cookie', buildSessionCookie(req, { clear: true }))
@@ -82,12 +82,14 @@ export default async function handler(req, res) {
     const created = await prisma.user.create({
       data: {
         email,
-        name: email.split('@')[0],
+        // No name to go on yet: the invite flow is where a real one gets set,
+        // and My Account is where it gets corrected.
+        firstName: email.split('@')[0],
         passwordHash: hashPassword(shared),
         role: 'admin',
         lastLoginAt: new Date(),
       },
-      select: { id: true, email: true, name: true, role: true },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true },
     })
     console.log(`[auth/login] Bootstrapped first admin: ${created.email}`)
     res.setHeader('Set-Cookie', buildSessionCookie(req, { token: createSessionToken(created) }))
@@ -109,7 +111,10 @@ export default async function handler(req, res) {
 
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
 
-  const actor = { id: user.id, email: user.email, name: user.name, role: user.role }
+  const actor = {
+    id: user.id, email: user.email, role: user.role,
+    firstName: user.firstName, lastName: user.lastName,
+  }
   res.setHeader('Set-Cookie', buildSessionCookie(req, { token: createSessionToken(actor) }))
   return res.status(200).json({ ok: true, user: actor })
 }

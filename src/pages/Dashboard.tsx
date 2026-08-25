@@ -534,12 +534,9 @@ function getGreeting(): string {
   return 'Good evening'
 }
 
-/** "Matt Flickman" -> "Matt". Falls back to the part of an email before the @. */
-function firstName(user: { name?: string | null; email?: string | null } | null): string {
-  const fromName = (user?.name || '').trim().split(/\s+/)[0]
-  if (fromName) return fromName
-  const fromEmail = (user?.email || '').split('@')[0]
-  return fromEmail || 'there'
+/** The name to greet someone by. Falls back to the part of an email before the @. */
+function greetingName(user: { firstName?: string | null; email?: string | null } | null): string {
+  return (user?.firstName || '').trim() || (user?.email || '').split('@')[0] || 'there'
 }
 
 function formatLastUpdated(date: Date): string {
@@ -2307,7 +2304,7 @@ Thank you!`
             </div>
             <div className="hidden md:block">
               <h1 className="text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1">
-                {getGreeting()}, {firstName(currentUser)}
+                {getGreeting()}, {greetingName(currentUser)}
               </h1>
               <p className="text-sm md:text-base text-off-black/60">
                 Last updated {formatLastUpdated(lastUpdated)}

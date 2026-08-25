@@ -9,7 +9,7 @@
  */
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { requireAdminRole } from '../_lib/users.js'
+import { requireAdminRole, fullName } from '../_lib/users.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       where,
       orderBy: { createdAt: 'desc' },
       take: limit,
-      include: { user: { select: { name: true, email: true } } },
+      include: { user: { select: { firstName: true, lastName: true, email: true } } },
     })
 
     return res.status(200).json({
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
         createdAt: e.createdAt,
         // Prefer the live name; fall back to the email stamped at write time so
         // deleted accounts still show as someone rather than as nothing.
-        actor: e.user?.name || e.actorEmail,
+        actor: e.user ? fullName(e.user) : e.actorEmail,
         actorEmail: e.user?.email || e.actorEmail,
       })),
     })
