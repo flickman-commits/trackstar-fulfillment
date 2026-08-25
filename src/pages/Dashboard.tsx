@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, LogOut } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
@@ -8,6 +8,8 @@ import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
 import PricingCalculator from '@/components/PricingCalculator'
+import { PeoplePanel, ActivityPanel } from '@/components/TeamPanel'
+import { useAuth } from '@/lib/auth'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
 
@@ -179,6 +181,9 @@ interface OrderComment {
   text: string | null
   imageUrl: string | null
   createdAt: string
+  /** Denormalised at write time, so it survives the author's account being deleted. */
+  authorName: string | null
+  authorId: string | null
 }
 
 // Design status display config
@@ -562,7 +567,7 @@ const REVIEW_PRODUCTS: { name: string; link: string }[] = [
   { name: 'Twin Cities Marathon', link: 'https://yotpo.com/go/A3v2ZhPB' },
 ]
 
-type SettingsPanel = 'pricing' | 'reviews' | 'races' | 'lookup' | 'storefront' | 'diagnostics' | 'maintenance'
+type SettingsPanel = 'pricing' | 'reviews' | 'races' | 'lookup' | 'storefront' | 'people' | 'activity' | 'diagnostics' | 'maintenance'
 
 /**
  * Settings navigation. Grouped rather than a flat list because the panels do
@@ -598,6 +603,13 @@ const SETTINGS_NAV: {
     ],
   },
   {
+    group: 'Team',
+    items: [
+      { id: 'people', label: 'People', blurb: 'Who can sign in and what they are allowed to do', icon: UserCog },
+      { id: 'activity', label: 'Activity Log', blurb: 'Who did what, and when', icon: ScrollText },
+    ],
+  },
+  {
     group: 'System',
     items: [
       { id: 'diagnostics', label: 'Diagnostics', blurb: 'Test connections and run a full health check', icon: FlaskConical },
@@ -607,6 +619,7 @@ const SETTINGS_NAV: {
 ]
 
 export default function Dashboard() {
+  const { user: currentUser, signOut } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [raceFilter, setRaceFilter] = useState('')  // empty = show all races
@@ -2991,6 +3004,28 @@ Thank you!`
               >
                 <Settings className="w-4 h-4" />
               </button>
+              {/* Who you are signed in as. Small and out of the way, but never
+                  absent: with several people in the tool at once, "which
+                  account am I?" needs an answer that is always on screen. */}
+              {currentUser && (
+                <div className="flex items-center gap-2 pl-3 border-l border-border-gray/60">
+                  <span className="text-xs text-off-black/45">
+                    {currentUser.name}
+                    {currentUser.role === 'admin' && (
+                      <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded bg-off-black/5 text-off-black/50">
+                        admin
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    onClick={signOut}
+                    title="Sign out"
+                    className="p-2 text-off-black/30 hover:text-off-black/60 transition-colors rounded-full hover:bg-off-black/5"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -3183,6 +3218,8 @@ Thank you!`
                   </div>
 
                   {settingsPanel === 'pricing' && <PricingCalculator />}
+                  {settingsPanel === 'people' && <PeoplePanel />}
+                  {settingsPanel === 'activity' && <ActivityPanel />}
 
                   {settingsPanel === 'reviews' && (
                     <div>
@@ -4242,7 +4279,8 @@ Thank you!`
                                   {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
                                   <div className="flex items-center justify-between mt-1.5">
                                     <span className="text-xs text-off-black/40">
-                                      {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                      {comment.authorName ? `${comment.authorName} · ` : ''}
+                                {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                     </span>
                                     <button onClick={() => deleteComment(comment.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
                                   </div>
@@ -4572,7 +4610,8 @@ Thank you!`
                                   {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
                                   <div className="flex items-center justify-between mt-2">
                                     <span className="text-xs text-off-black/40">
-                                      {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                      {comment.authorName ? `${comment.authorName} · ` : ''}
+                                {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                     </span>
                                     <button
                                       onClick={() => deleteComment(comment.id)}
@@ -5192,7 +5231,8 @@ Thank you!`
                               {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
                               <div className="flex items-center justify-between mt-1.5">
                                 <span className="text-xs text-off-black/40">
-                                  {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                  {comment.authorName ? `${comment.authorName} · ` : ''}
+                                {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                 </span>
                                 <button onClick={() => deleteComment(comment.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
                               </div>
@@ -5681,6 +5721,7 @@ Thank you!`
                             {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
                             <div className="flex items-center justify-between mt-2">
                               <span className="text-xs text-off-black/40">
+                                {comment.authorName ? `${comment.authorName} · ` : ''}
                                 {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                               </span>
                               <button

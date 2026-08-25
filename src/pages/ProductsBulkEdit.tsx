@@ -36,6 +36,8 @@ interface Batch {
   description: string
   count: number
   undoneAt: string | null
+  actorEmail: string | null
+  undoneBy: string | null
 }
 
 type PriceMode = 'set' | 'percent' | 'amount'
@@ -520,6 +522,8 @@ export default function ProductsBulkEdit() {
                         <p className="text-sm text-off-black truncate">{b.description}</p>
                         <p className="text-xs text-off-black/40">
                           {b.count} variant{b.count === 1 ? '' : 's'} · {new Date(b.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                          {b.actorEmail && ` · ${b.actorEmail}`}
+                          {b.undoneBy && ` · undone by ${b.undoneBy}`}
                         </p>
                       </div>
                       {b.undoneAt ? (

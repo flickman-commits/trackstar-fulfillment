@@ -184,8 +184,13 @@ model OrderComment {
   text      String?
   imageUrl  String?
   createdAt DateTime @default(now())
+  // Who wrote it. Nullable because every comment written before sign-ins
+  // existed has no author, and inventing one would be a lie.
+  authorId   String?
+  authorName String?
 
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
 }
@@ -577,6 +582,92 @@ model ProductEditBatch {
   // [{ variantId, productId, productTitle, size, frame, before, after }]
   changes     Json
   undoneAt    DateTime?
+  // Who applied it, and who undid it. Null on batches from before sign-ins.
+  actorId     String?
+  actorEmail  String?
+  undoneBy    String?
+
+  actor       User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
+}
+
+/**
+ * A person who can sign in to the fulfillment tool.
+ *
+ * Replaces the single shared ADMIN_PASSWORD. The shared password could not be
+ * revoked for one person without rotating it for everyone, and it made every
+ * action anonymous - with several contractors working in a tool that can
+ * rewrite 116 live prices in one click, "who did this" needs an answer.
+ *
+ * Roles are deliberately only two. `admin` can do the irreversible things
+ * (bulk price writes, variant deletion, cache and research wipes) and manage
+ * users; `staff` can do everything else, which is the actual day to day work.
+ * More roles can come when a real access difference appears, rather than
+ * inventing a hierarchy nobody needs yet.
+ */
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  // scrypt, stored as "scrypt:<saltHex>:<hashHex>". Null while an invite is
+  // outstanding, which is also what blocks sign-in until they set one.
+  passwordHash String?
+  role         String    @default("staff") // "admin" | "staff"
+  isActive     Boolean   @default(true)
+  // Invite flow: a single-use token that lets someone set their first password.
+  inviteToken     String?   @unique
+  inviteExpiresAt DateTime?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  comments     OrderComment[]
+  editBatches  ProductEditBatch[]
+  auditEvents  AuditEvent[]
+
+  @@index([email])
+}
+
+/**
+ * Who did something consequential, and to what.
+ *
+ * Deliberately separate from the domain tables: an audit row must survive the
+ * thing it describes being edited or deleted, so it stores plain text rather
+ * than foreign keys to the affected record.
+ */
+model AuditEvent {
+  id         String   @id @default(cuid())
+  // "price.apply", "variant.delete", "research.clear", "user.invite", ...
+  action     String
+  // Human summary, e.g. "Set price to $100.00 on 116 variants".
+  summary    String
+  // Anything worth keeping: filters used, counts, affected ids.
+  detail     Json?
+  userId     String?
+  // Denormalised so the row still names a person after a user is deleted.
+  actorEmail String
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([action, createdAt])
+}
+
+/**
+ * Topline waitlist signups.
+ *
+ * This table was created outside Prisma and already exists in the database.
+ * It is mapped here so `prisma db push` stops proposing to drop it - it is not
+ * managed by this app, but silently deleting someone else's table is not a
+ * migration, it is data loss.
+ */
+model ToplineWaitlist {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String   @unique
+  source    String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("topline_waitlist")
 }

@@ -48,6 +48,13 @@ const routes = [
   { method: 'get',    path: '/api/auth/login',             handler: '../api/auth/login.js' },
   { method: 'post',   path: '/api/auth/login',             handler: '../api/auth/login.js' },
   { method: 'delete', path: '/api/auth/login',             handler: '../api/auth/login.js' },
+  { method: 'get',    path: '/api/auth/accept-invite',     handler: '../api/auth/accept-invite.js' },
+  { method: 'post',   path: '/api/auth/accept-invite',     handler: '../api/auth/accept-invite.js' },
+  // People + the who-did-what log
+  { method: 'get',    path: '/api/admin/users',            handler: '../api/admin/users.js' },
+  { method: 'post',   path: '/api/admin/users',            handler: '../api/admin/users.js' },
+  { method: 'delete', path: '/api/admin/users',            handler: '../api/admin/users.js' },
+  { method: 'get',    path: '/api/admin/audit',            handler: '../api/admin/audit.js' },
   // Proofs & Approval
   { method: 'get',    path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'post',   path: '/api/proofs',                 handler: '../api/proofs/index.js' },

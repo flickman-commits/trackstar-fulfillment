@@ -8,11 +8,13 @@
 
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { loadActiveUser, recordAudit } from '../_lib/users.js'
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  const actor = requireAdmin(req, res)
+  if (!actor) return
 
   try {
     if (req.method === 'GET') {
@@ -66,8 +68,16 @@ export default async function handler(req, res) {
         imageUrl = publicUrl
       }
 
+      // authorName is denormalised alongside authorId so a comment still says
+      // who wrote it after that person's account is deleted.
       const comment = await prisma.orderComment.create({
-        data: { orderId, text: text || null, imageUrl }
+        data: {
+          orderId,
+          text: text || null,
+          imageUrl,
+          authorId: actor.isSystem ? null : actor.id,
+          authorName: actor.name || actor.email || null,
+        }
       })
 
       console.log(`[comments] Added to order ${order.orderNumber}: ${text ? 'text' : ''}${imageUrl ? ' +image' : ''}`)
@@ -99,6 +109,16 @@ export default async function handler(req, res) {
       const comment = await prisma.orderComment.findUnique({ where: { id: commentId } })
       if (!comment) return res.status(404).json({ error: 'Comment not found' })
 
+      // Anyone may delete their own comment; deleting someone else's is an
+      // admin action. Tidying up after yourself should not need a promotion,
+      // and editing the record of what a colleague said should not be casual.
+      const me = await loadActiveUser(actor)
+      if (!me) return res.status(401).json({ error: 'Your account is no longer active. Sign in again.' })
+      const isOwn = comment.authorId && comment.authorId === me.id
+      if (!isOwn && me.role !== 'admin') {
+        return res.status(403).json({ error: 'Only an admin can delete someone else\'s comment.' })
+      }
+
       // Clean up image from Supabase Storage if present
       if (comment.imageUrl) {
         try {
@@ -117,6 +137,12 @@ export default async function handler(req, res) {
 
       await prisma.orderComment.delete({ where: { id: commentId } })
       console.log(`[comments] Deleted comment ${commentId}`)
+      await recordAudit({
+        action: 'comment.delete',
+        summary: `Deleted a comment on order ${comment.orderId}${isOwn ? ' (their own)' : ` by ${comment.authorName || 'unknown'}`}`,
+        detail: { commentId, orderId: comment.orderId, text: comment.text },
+        actor: me,
+      })
       return res.status(200).json({ success: true })
     }
 

@@ -28,6 +28,7 @@
 import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { requireAdminRole, recordAudit } from '../_lib/users.js'
 import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
 import { shopifyFetch, shopifyGraphQL } from '../../server/services/shopifyAuth.js'
@@ -57,6 +58,27 @@ function buildPortalUrl(token) {
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : (process.env.APP_BASE_URL || 'https://trackstar-fulfillment.vercel.app')
   return `${base.replace(/\/$/, '')}/approve/${token}`
+}
+
+/**
+ * One-line, human-readable description of a gated action for the audit log.
+ * Written for someone scanning the log later, so it names the thing acted on
+ * rather than restating the action key.
+ */
+function describeAction(action, body) {
+  const order = body.orderNumber ? `order ${body.orderNumber}` : null
+  switch (action) {
+    case 'clear-race-cache':   return 'Cleared the race results cache'
+    case 'clear-research':     return `Cleared research on ${order || 'an order'}`
+    case 'merge-race':         return `Merged race "${body.from || '?'}" into "${body.into || body.to || '?'}"`
+    case 'delete-creator':     return `Deleted creator ${body.creatorId || body.id || '?'}`
+    case 'create-discount':    return `Created discount code ${body.code || '?'}`
+    case 'message-customer':   return `Messaged the customer on ${order || 'an order'}`
+    case 'notify-custom-delay':return `Sent a delay notice on ${order || 'an order'}`
+    case 'customers-served-set':return `Set the customers-served count to ${body.count ?? '?'}`
+    case 'set-race-shorthand': return `Set the shorthand for "${body.race || '?'}" to "${body.shorthand || '?'}"`
+    default:                   return action
+  }
 }
 
 export default async function handler(req, res) {
@@ -168,8 +190,38 @@ export default async function handler(req, res) {
     // Public POST actions — auth'd by the caller's own token inside the
     // handler, not by the admin secret. Everything else requires admin.
     const PUBLIC_POST_ACTIONS = new Set(['creator-onboard', 'create-public-invite'])
+    let actor = null
     if (!PUBLIC_POST_ACTIONS.has(action)) {
-      if (!requireAdmin(req, res)) return
+      actor = requireAdmin(req, res)
+      if (!actor) return
+    }
+
+    // Actions that throw work away, spend money, or reach a customer. These
+    // re-check the database for an active admin rather than trusting the
+    // session token, and leave a line in the audit log naming who ran them.
+    // Everything else stays open to staff: the point is to make the few
+    // irreversible things deliberate, not to make the daily work need a
+    // permission slip.
+    const ADMIN_ONLY_ACTIONS = new Set([
+      'clear-race-cache',
+      'clear-research',
+      'merge-race',
+      'delete-creator',
+      'create-discount',
+      'message-customer',
+      'notify-custom-delay',
+      'customers-served-set',
+      'set-race-shorthand',
+    ])
+    if (ADMIN_ONLY_ACTIONS.has(action)) {
+      const admin = await requireAdminRole(req, res, actor)
+      if (!admin) return
+      await recordAudit({
+        action: `order.${action}`,
+        summary: describeAction(action, body),
+        detail: body,
+        actor: admin,
+      })
     }
 
     switch (action) {

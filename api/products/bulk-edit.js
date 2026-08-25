@@ -19,6 +19,7 @@
 
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { requireAdminRole, recordAudit } from '../_lib/users.js'
 import {
   fetchVariantCatalog,
   applyVariantPrices,
@@ -33,7 +34,8 @@ const MAX_BATCH = 1000
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  const actor = requireAdmin(req, res)
+  if (!actor) return
 
   try {
     if (req.method === 'GET') {
@@ -49,6 +51,8 @@ export default async function handler(req, res) {
             description: b.description,
             count: Array.isArray(b.changes) ? b.changes.length : 0,
             undoneAt: b.undoneAt,
+            actorEmail: b.actorEmail,
+            undoneBy: b.undoneBy,
           })),
         })
       }
@@ -62,6 +66,18 @@ export default async function handler(req, res) {
     }
 
     const { action } = req.body || {}
+
+    // Reading the catalog is open to everyone; changing the live store is not.
+    // A mistyped price here reaches customers within seconds, and a variant
+    // delete cannot be fully undone (Shopify mints new ids on restore), so the
+    // write paths re-check the database rather than trusting the session token.
+    // Dry runs are exempt: they change nothing and are how you check your work.
+    const isDryRun = action === 'delete' && (req.body?.dryRun === true)
+    if (!isDryRun && ['apply', 'delete', 'undo'].includes(action)) {
+      const admin = await requireAdminRole(req, res, actor)
+      if (!admin) return
+      req.actingUser = admin
+    }
 
     if (action === 'apply') {
       const { variantIds, price, filters, description } = req.body
@@ -116,6 +132,8 @@ export default async function handler(req, res) {
         batch = await prisma.productEditBatch.create({
           data: {
             description: description || `Set price to $${target}`,
+            actorId: req.actingUser?.id || null,
+            actorEmail: req.actingUser?.email || actor.email || null,
             filters: filters || undefined,
             changes: toChange
               .filter(v => updatedIds.has(v.variantId))
@@ -129,6 +147,15 @@ export default async function handler(req, res) {
                 after: target,
               })),
           },
+        })
+      }
+
+      if (updated.length) {
+        await recordAudit({
+          action: 'price.apply',
+          summary: `Set ${updated.length} variant${updated.length === 1 ? '' : 's'} to $${target}`,
+          detail: { batchId: batch?.id || null, price: target, count: updated.length, description: description || null },
+          actor: req.actingUser || actor,
         })
       }
 
@@ -194,6 +221,8 @@ export default async function handler(req, res) {
         batch = await prisma.productEditBatch.create({
           data: {
             description: description || `Removed ${deleted.length} variants`,
+            actorId: req.actingUser?.id || null,
+            actorEmail: req.actingUser?.email || actor.email || null,
             // `kind` rides in filters because ProductEditBatch has no column for
             // it and adding one means a production migration for a discriminator.
             // The undo path reads it off the changes rows, which carry it too.
@@ -202,6 +231,15 @@ export default async function handler(req, res) {
               .filter(s => deletedIds.has(s.variantId))
               .map(s => ({ kind: 'delete', ...s })),
           },
+        })
+      }
+
+      if (deleted.length) {
+        await recordAudit({
+          action: 'variant.delete',
+          summary: `Deleted ${deleted.length} variant${deleted.length === 1 ? '' : 's'} from Shopify`,
+          detail: { batchId: batch?.id || null, count: deleted.length, description: description || null },
+          actor: req.actingUser || actor,
         })
       }
 
@@ -234,9 +272,15 @@ export default async function handler(req, res) {
         if (created.length === changes.length) {
           await prisma.productEditBatch.update({
             where: { id: batchId },
-            data: { undoneAt: new Date() },
+            data: { undoneAt: new Date(), undoneBy: req.actingUser?.email || actor.email || null },
           })
         }
+        await recordAudit({
+          action: 'variant.restore',
+          summary: `Restored ${created.length} of ${changes.length} deleted variants`,
+          detail: { batchId, restored: created.length, total: changes.length },
+          actor: req.actingUser || actor,
+        })
         return res.status(200).json({
           restored: created.length,
           total: changes.length,
@@ -255,9 +299,16 @@ export default async function handler(req, res) {
       if (updated.length === changes.length) {
         await prisma.productEditBatch.update({
           where: { id: batchId },
-          data: { undoneAt: new Date() },
+          data: { undoneAt: new Date(), undoneBy: req.actingUser?.email || actor.email || null },
         })
       }
+
+      await recordAudit({
+        action: 'price.undo',
+        summary: `Reverted ${updated.length} of ${changes.length} price changes`,
+        detail: { batchId, reverted: updated.length, total: changes.length },
+        actor: req.actingUser || actor,
+      })
 
       return res.status(200).json({
         reverted: updated.length,
