@@ -4708,25 +4708,30 @@ Thank you!`
                               <span>Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}</span>
                             </span>
                           )}
-                          {/* Discount codes sit with the product facts because
-                              that is what they will become: a partner code is
-                              the instruction to print the co-branded design.
-                              One chip per code, since an order can carry a
-                              product discount and a shipping one at once. */}
-                          {(selectedOrder.discountCodes || []).map((d) => (
-                            <span
-                              key={d.code}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-semibold bg-amber-100 text-amber-800 border-amber-300"
-                              title={
-                                d.amount
-                                  ? `${d.code} - ${d.type === 'percentage' ? 'percentage' : d.type === 'shipping' ? 'shipping' : 'fixed amount'} discount, $${d.amount} off`
-                                  : d.code
-                              }
-                            >
-                              Discount: {d.code}
-                            </span>
-                          ))}
                         </div>
+                        {/* Discounts get their own row rather than wrapping in
+                            with the size and order date. Those describe the
+                            product; a code describes how it was bought, and it
+                            is about to describe which design to print. One chip
+                            per code, since an order can carry a product
+                            discount and a shipping one at once. */}
+                        {(selectedOrder.discountCodes || []).length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            {(selectedOrder.discountCodes || []).map((d) => (
+                              <span
+                                key={d.code}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-semibold bg-amber-100 text-amber-800 border-amber-300"
+                                title={
+                                  d.amount
+                                    ? `${d.code} - ${d.type === 'percentage' ? 'percentage' : d.type === 'shipping' ? 'shipping' : 'fixed amount'} discount, $${d.amount} off`
+                                    : d.code
+                                }
+                              >
+                                Discount: {d.code}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
