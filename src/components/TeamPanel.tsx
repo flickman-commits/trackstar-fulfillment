@@ -307,16 +307,57 @@ export function PeoplePanel() {
 }
 
 export function AccountPanel() {
-  const { user, signOut } = useAuth()
-  const [open, setOpen] = useState(false)
+  const { user, signOut, refresh } = useAuth()
+
+  // The stored name is one string. It is split for editing because "first and
+  // last name" is how people think about their own name, and rejoined on save
+  // so there is still only one value to keep correct.
+  const [first, setFirst] = useState('')
+  const [last, setLast] = useState('')
+  const [savingName, setSavingName] = useState(false)
+
+  useEffect(() => {
+    const parts = (user?.name || '').trim().split(/\s+/).filter(Boolean)
+    setFirst(parts[0] || '')
+    setLast(parts.slice(1).join(' '))
+  }, [user?.name])
+
+  const [changingPassword, setChangingPassword] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
 
-  const save = async (e: React.FormEvent) => {
+  const nameChanged =
+    [first.trim(), last.trim()].filter(Boolean).join(' ') !== (user?.name || '').trim()
+
+  const saveName = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!first.trim()) { toast.error('First name is required'); return }
+    setSavingName(true)
+    try {
+      const res = await api('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'set-name', firstName: first, lastName: last }),
+      })
+      const data = await res.json()
+      if (!res.ok) toast.error(data.error || 'That did not work')
+      else {
+        toast.success('Name updated')
+        // Pull the session fresh so the greeting on the dashboard changes too,
+        // rather than staying stale until the next reload.
+        await refresh()
+      }
+    } catch {
+      toast.error('Could not reach the server')
+    } finally {
+      setSavingName(false)
+    }
+  }
+
+  const savePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (password !== confirm) { toast.error('Those two passwords do not match'); return }
-    setSaving(true)
+    setSavingPassword(true)
     try {
       const res = await api('/api/admin/users', {
         method: 'POST',
@@ -326,70 +367,104 @@ export function AccountPanel() {
       if (!res.ok) toast.error(data.error || 'That did not work')
       else {
         toast.success('Password changed')
-        setOpen(false); setPassword(''); setConfirm('')
+        setChangingPassword(false); setPassword(''); setConfirm('')
       }
     } finally {
-      setSaving(false)
+      setSavingPassword(false)
     }
   }
 
-  if (!open) {
-    return (
-      <div className="space-y-3">
-        <div>
-          <p className="text-sm font-medium text-off-black">
-            {user?.name}
-            <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-off-black/5 text-off-black/50 align-middle">
-              {user?.role === 'admin' ? 'admin' : 'staff'}
-            </span>
-          </p>
-          <p className="text-xs text-off-black/50">{user?.email}</p>
-        </div>
-        <p className="text-xs text-off-black/45 max-w-md">
+  return (
+    <div className="space-y-6 max-w-md">
+      <div>
+        <p className="text-sm font-medium text-off-black">
+          {user?.name}
+          <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-off-black/5 text-off-black/50 align-middle">
+            {user?.role === 'admin' ? 'admin' : 'staff'}
+          </span>
+        </p>
+        <p className="text-xs text-off-black/50">{user?.email}</p>
+        <p className="text-xs text-off-black/45 mt-2">
           {user?.role === 'admin'
             ? 'Admins can manage people and run the destructive actions.'
             : 'Ask an admin if you need to run something that is limited to admins.'}
         </p>
-        <div className="flex items-center gap-2 pt-1">
-          <button onClick={() => setOpen(true)} className={btnSecondary}>Change my password</button>
-          <button onClick={signOut} className={btnSecondary}>
+      </div>
+
+      <form onSubmit={saveName} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={fieldLabel}>First name</label>
+            <input
+              className={inputBase}
+              value={first}
+              onChange={e => setFirst(e.target.value)}
+              autoComplete="given-name"
+            />
+          </div>
+          <div>
+            <label className={fieldLabel}>Last name</label>
+            <input
+              className={inputBase}
+              value={last}
+              onChange={e => setLast(e.target.value)}
+              autoComplete="family-name"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="submit" className={btnPrimary} disabled={savingName || !nameChanged}>
+            {savingName && <Loader2 className="w-3 h-3 animate-spin" />} Save name
+          </button>
+          <span className="text-[11px] text-off-black/40">
+            Your first name is what the dashboard greets you by.
+          </span>
+        </div>
+      </form>
+
+      {changingPassword ? (
+        <form onSubmit={savePassword} className="rounded-lg border border-border-gray bg-subtle-gray/40 p-4 space-y-3">
+          <div>
+            <label className={fieldLabel}>New password</label>
+            <input
+              className={inputBase}
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="10 characters or more"
+            />
+          </div>
+          <div>
+            <label className={fieldLabel}>Confirm</label>
+            <input
+              className={inputBase}
+              type="password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="submit" className={btnPrimary} disabled={savingPassword}>
+              {savingPassword && <Loader2 className="w-3 h-3 animate-spin" />} Save password
+            </button>
+            <button type="button" className={btnSecondary} onClick={() => setChangingPassword(false)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex items-center gap-2 pt-1 border-t border-border-gray/60">
+          <button onClick={() => setChangingPassword(true)} className={`${btnSecondary} mt-4`}>
+            Change my password
+          </button>
+          <button onClick={signOut} className={`${btnSecondary} mt-4`}>
             <LogOut className="w-3 h-3" /> Sign out
           </button>
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <form onSubmit={save} className="rounded-lg border border-border-gray bg-subtle-gray/40 p-4 space-y-3 max-w-md">
-      <div>
-        <label className={fieldLabel}>New password</label>
-        <input
-          className={inputBase}
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          placeholder="10 characters or more"
-        />
-      </div>
-      <div>
-        <label className={fieldLabel}>Confirm</label>
-        <input
-          className={inputBase}
-          type="password"
-          autoComplete="new-password"
-          value={confirm}
-          onChange={e => setConfirm(e.target.value)}
-        />
-      </div>
-      <div className="flex items-center gap-2">
-        <button type="submit" className={btnPrimary} disabled={saving}>
-          {saving && <Loader2 className="w-3 h-3 animate-spin" />} Save
-        </button>
-        <button type="button" className={btnSecondary} onClick={() => setOpen(false)}>Cancel</button>
-      </div>
-    </form>
+      )}
+    </div>
   )
 }
 

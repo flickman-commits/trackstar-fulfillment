@@ -7,12 +7,15 @@
  *   POST   { action:'active', id, isActive }        deactivate / reactivate
  *   POST   { action:'reset', id }                   issue a fresh invite link
  *   POST   { action:'set-password', password }      change YOUR OWN password
+ *   POST   { action:'set-name', firstName, lastName } change YOUR OWN name
  *   DELETE { id }                                   remove an account
  *
- * Everything except set-password is admin-only: the roster is part of the
+ * Everything except set-password and set-name is admin-only: the roster is part of the
  * admin view, so a staff session cannot reach it by typing the URL either.
- * set-password is the exception because hiding the admin view must not also
- * take away someone's ability to change their own password.
+ * set-password and set-name are the exceptions: hiding the admin view must not
+ * take away someone's ability to manage their own account. Names are stored in
+ * one column and split on whitespace for display, so "first" and "last" are a
+ * presentation of one value rather than two fields to keep in step.
  *
  * Accounts are created without a password and with a single-use invite token.
  * Nobody types a colleague's password for them, and no password travels over
@@ -73,6 +76,26 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
       const { action } = body
+
+      // Changing your own name needs no role, only a live account.
+      if (action === 'set-name') {
+        const me = await loadActiveUser(actor)
+        if (!me || me.isSystem) return res.status(401).json({ error: 'Sign in again.' })
+        const first = String(body.firstName || '').trim()
+        const last = String(body.lastName || '').trim()
+        if (!first) return res.status(400).json({ error: 'First name is required' })
+        const name = [first, last].filter(Boolean).join(' ')
+        if (name.length > 80) return res.status(400).json({ error: 'That name is too long' })
+        const user = await prisma.user.update({
+          where: { id: me.id },
+          data: { name },
+          select: PUBLIC_FIELDS,
+        })
+        // Not audited. Someone correcting the spelling of their own name is
+        // not a consequential action, and logging it would bury the ones that
+        // are.
+        return res.status(200).json({ user: shape(user) })
+      }
 
       // Changing your own password needs no role, only a live account.
       if (action === 'set-password') {
