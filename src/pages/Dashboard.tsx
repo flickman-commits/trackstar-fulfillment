@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, LogOut } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
@@ -516,14 +516,30 @@ function NotAvailableField({ label }: { label: string }) {
   )
 }
 
-function getGreeting(timezone: string = 'America/New_York'): string {
-  const now = new Date()
-  const localTime = new Date(now.toLocaleString('en-US', { timeZone: timezone }))
-  const hour = localTime.getHours()
+/**
+ * Greeting for whoever is looking at the screen.
+ *
+ * This used to pick a timezone from which tab was open - custom orders meant
+ * Dan in New York, standard meant Elí in Costa Rica - which was a reasonable
+ * guess back when those were the only two people in the tool. It is wrong now
+ * that everyone signs in as themselves: it would tell a third person good
+ * evening because of the tab they clicked. The browser already knows what time
+ * it is where the person is sitting, so use that.
+ */
+function getGreeting(): string {
+  const hour = new Date().getHours()
 
   if (hour < 12) return 'Good morning'
   if (hour < 18) return 'Good afternoon'
   return 'Good evening'
+}
+
+/** "Matt Flickman" -> "Matt". Falls back to the part of an email before the @. */
+function firstName(user: { name?: string | null; email?: string | null } | null): string {
+  const fromName = (user?.name || '').trim().split(/\s+/)[0]
+  if (fromName) return fromName
+  const fromEmail = (user?.email || '').split('@')[0]
+  return fromEmail || 'there'
 }
 
 function formatLastUpdated(date: Date): string {
@@ -619,7 +635,7 @@ const SETTINGS_NAV: {
 ]
 
 export default function Dashboard() {
-  const { user: currentUser, isAdmin, signOut } = useAuth()
+  const { user: currentUser, isAdmin } = useAuth()
   /** The settings nav as this person sees it. Staff never see the Admin group. */
   const visibleNav = SETTINGS_NAV.filter((g) => !g.adminOnly || isAdmin)
   const visibleItems = visibleNav.flatMap((g) => g.items)
@@ -2291,7 +2307,7 @@ Thank you!`
             </div>
             <div className="hidden md:block">
               <h1 className="text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1">
-                {getGreeting(activeView === 'custom' ? 'America/New_York' : 'America/Costa_Rica')}, {activeView === 'custom' ? 'Dan' : 'Elí'}
+                {getGreeting()}, {firstName(currentUser)}
               </h1>
               <p className="text-sm md:text-base text-off-black/60">
                 Last updated {formatLastUpdated(lastUpdated)}
@@ -3009,28 +3025,6 @@ Thank you!`
               >
                 <Settings className="w-4 h-4" />
               </button>
-              {/* Who you are signed in as. Small and out of the way, but never
-                  absent: with several people in the tool at once, "which
-                  account am I?" needs an answer that is always on screen. */}
-              {currentUser && (
-                <div className="flex items-center gap-2 pl-3 border-l border-border-gray/60">
-                  <span className="text-xs text-off-black/45">
-                    {currentUser.name}
-                    {currentUser.role === 'admin' && (
-                      <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded bg-off-black/5 text-off-black/50">
-                        admin
-                      </span>
-                    )}
-                  </span>
-                  <button
-                    onClick={signOut}
-                    title="Sign out"
-                    className="p-2 text-off-black/30 hover:text-off-black/60 transition-colors rounded-full hover:bg-off-black/5"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}

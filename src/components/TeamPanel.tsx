@@ -15,7 +15,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Loader2, RefreshCw, UserPlus, Copy, Check } from 'lucide-react'
+import { Loader2, RefreshCw, UserPlus, Copy, Check, LogOut } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { btnPrimary, btnSecondary, btnDanger, btnGhost, inputBase, fieldLabel } from '@/lib/ui'
 
@@ -307,7 +307,7 @@ export function PeoplePanel() {
 }
 
 export function AccountPanel() {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const [open, setOpen] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -337,17 +337,25 @@ export function AccountPanel() {
     return (
       <div className="space-y-3">
         <div>
-          <p className="text-sm font-medium text-off-black">{user?.name}</p>
-          <p className="text-xs text-off-black/50">
-            {user?.email} · {user?.role === 'admin' ? 'Admin' : 'Staff'}
+          <p className="text-sm font-medium text-off-black">
+            {user?.name}
+            <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-off-black/5 text-off-black/50 align-middle">
+              {user?.role === 'admin' ? 'admin' : 'staff'}
+            </span>
           </p>
+          <p className="text-xs text-off-black/50">{user?.email}</p>
         </div>
         <p className="text-xs text-off-black/45 max-w-md">
           {user?.role === 'admin'
             ? 'Admins can manage people and run the destructive actions.'
             : 'Ask an admin if you need to run something that is limited to admins.'}
         </p>
-        <button onClick={() => setOpen(true)} className={btnSecondary}>Change my password</button>
+        <div className="flex items-center gap-2 pt-1">
+          <button onClick={() => setOpen(true)} className={btnSecondary}>Change my password</button>
+          <button onClick={signOut} className={btnSecondary}>
+            <LogOut className="w-3 h-3" /> Sign out
+          </button>
+        </div>
       </div>
     )
   }
