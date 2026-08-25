@@ -33,6 +33,31 @@ import { proposeEventIds, saveOverride, captureFixture, repairPlan } from '../..
 const ERROR_OUTCOMES = new Set(['upstream_error', 'rate_limited', 'bad_request'])
 const SUCCESS_OUTCOMES = new Set(['found', 'cached'])
 
+/**
+ * How stale the catalog snapshot may be before a page load refreshes it.
+ *
+ * Coverage is computed from a ShopifyProduct table, not from Shopify. That
+ * table only moved when somebody remembered to press "Sync catalog", so the
+ * denominator drifted quietly: it read 41 races we sell while Shopify actually
+ * had 44, on a snapshot eighteen days old, and nothing on screen said so.
+ *
+ * A full sync is ~7s, which is too slow to pay on every open and far too slow
+ * to be worth paying twice in a row. Refreshing only past this age keeps the
+ * number honest for anyone opening the panel while keeping the common case
+ * instant. The response carries the snapshot time either way, so staleness is
+ * visible rather than assumed.
+ */
+const CATALOG_MAX_AGE_MS = 10 * 60 * 1000
+
+/** When the catalog snapshot was last written. */
+async function newestCatalogSync() {
+  const newest = await prisma.shopifyProduct.findFirst({
+    orderBy: { syncedAt: 'desc' },
+    select: { syncedAt: true },
+  })
+  return newest?.syncedAt || null
+}
+
 /** Median is the headline because a handful of 25-60s timeouts drag the mean
  *  somewhere no real shopper ever experienced. p95 rides alongside it, since
  *  the median tells you what is typical and p95 tells you how bad the tail is,
@@ -133,6 +158,20 @@ export default async function handler(req, res) {
   const since = Number.isFinite(days) && days > 0
     ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
     : undefined
+
+  // Refresh the catalog snapshot first when it has gone stale, so coverage
+  // reflects what is on sale right now rather than whenever someone last
+  // pressed the button. Failure here is not fatal: a stale number with a
+  // visible timestamp beats an error page.
+  let catalogSyncedAt = await newestCatalogSync()
+  if (!catalogSyncedAt || Date.now() - catalogSyncedAt.getTime() > CATALOG_MAX_AGE_MS) {
+    try {
+      await syncProductCatalog()
+      catalogSyncedAt = await newestCatalogSync()
+    } catch (error) {
+      console.error('[lookup-health] catalog auto-sync failed:', error.message)
+    }
+  }
 
   const [entries, health, catalog] = await Promise.all([
     prisma.lookupLog.findMany({
@@ -277,6 +316,15 @@ export default async function handler(req, res) {
       needsScraper: catalog.needsScraper.length,
       activeProducts: catalog.products,
       onWizardTemplate: catalog.onWizardTemplate,
+      catalogSyncedAt,
+      // Per-cause counts so the card can say what the work actually is.
+      // "9 races need help" does not distinguish a missing event id from a
+      // scraper that throws, and those are completely different jobs.
+      needsHelpCauses: {
+        no_year: (needsHelpByCause[STATUS.NO_YEAR] || []).length,
+        broken: (needsHelpByCause[STATUS.BROKEN] || []).length,
+        drifted: (needsHelpByCause[STATUS.DRIFTED] || []).length,
+      },
       lastProbeAt: health.length
         ? health.reduce((max, h) => (h.checkedAt > max ? h.checkedAt : max), health[0].checkedAt)
         : null,

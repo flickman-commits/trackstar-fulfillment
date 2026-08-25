@@ -86,6 +86,10 @@ interface HealthPayload {
     activeProducts: number
     onWizardTemplate: number
     lastProbeAt: string | null
+    /** When the Shopify catalog snapshot behind Coverage was last written. */
+    catalogSyncedAt: string | null
+    byOutcome: Record<string, number>
+    needsHelpCauses: { no_year: number; broken: number; drifted: number }
   }
   needsHelp: Array<{
     race: string; year: number; status: Status; detail: string | null
@@ -157,9 +161,29 @@ const OUTCOME_COLOR: Record<string, string> = {
   off: 'text-off-black/40',
 }
 
-function fmtMs(ms: number | null) {
+/**
+ * Lookup timings in seconds.
+ *
+ * These were reported in milliseconds, which is the unit the instrument
+ * happens to use rather than the unit anyone thinks in. "385 ms" needs a
+ * conversion before it means anything; "0.385s" sits next to the 10s widget
+ * cap on the same scale. Sub-second keeps three decimals so the precision
+ * survives; above a second one is plenty.
+ */
+/** "6 missing years · 2 broken · 1 drifted", or '' when there is nothing to fix. */
+function causeSummary(c?: { no_year: number; broken: number; drifted: number }) {
+  if (!c) return ''
+  return [
+    c.no_year && `${c.no_year} missing year${c.no_year === 1 ? '' : 's'}`,
+    c.broken && `${c.broken} broken`,
+    c.drifted && `${c.drifted} drifted`,
+  ].filter(Boolean).join(' · ')
+}
+
+function fmtSecs(ms: number | null) {
   if (ms == null) return '-'
-  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms} ms`
+  const secs = ms / 1000
+  return `${secs.toFixed(secs < 1 ? 3 : 1)}s`
 }
 
 function fmtAgo(iso: string | null) {
@@ -353,7 +377,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
             <div className="flex items-center gap-3">
               {!embedded && <h2 className="text-base font-semibold text-off-black">Instant Lookup Dashboard</h2>}
               <span className="text-xs text-off-black/50">
-                Traffic: last 7 days · Probe: {fmtAgo(s?.lastProbeAt ?? null)}
+                Traffic: last 7 days · Probe: {fmtAgo(s?.lastProbeAt ?? null)} · Catalog: {fmtAgo(s?.catalogSyncedAt ?? null)}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -389,7 +413,20 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
               that mostly restated one number four ways. */}
           {s && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="rounded-lg border border-border-gray p-3" title={`${s.found} of ${s.attempts} attempts`}>
+              <div
+                className="rounded-lg border border-border-gray p-3 cursor-help"
+                title={
+                  'Share of real storefront lookups that returned a result.\n\n' +
+                  `Counted as success: a finisher was found on the timing site (${s.byOutcome?.found || 0}), ` +
+                  `or served from cache having been found earlier (${s.byOutcome?.cached || 0}).\n\n` +
+                  'Counted as failure: no matching runner, the site errored or timed out, ' +
+                  'or the request was rejected.\n\n' +
+                  'Excluded from the denominator: lookups for races where instant lookup is ' +
+                  'switched off, since nothing was attempted.\n\n' +
+                  'A low rate is not necessarily a fault. Shoppers search for names that did ' +
+                  'not run, and for races we have no scraper for.'
+                }
+              >
                 <p className="text-xs text-off-black/50">Success rate</p>
                 <p className="text-2xl font-semibold text-green-700">{s.successRate}%</p>
                 <p className="text-[11px] text-off-black/40 mt-0.5">{s.found} of {s.attempts} attempts</p>
@@ -397,21 +434,38 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
 
               <button
                 onClick={() => setShowNeedsHelp(v => !v)}
-                className={`rounded-lg border p-3 text-left transition-colors ${
+                title={
+                  'Races that HAVE a scraper but are not returning good results ' +
+                  'for every year in the window.\n\n' +
+                  'Missing year: the scraper works, but no event id is configured ' +
+                  'for that year. Usually a quick fix from the row below.\n\n' +
+                  'Broken: the scraper threw, timed out, or the timing site errored.\n\n' +
+                  'Drifted: the site responded but returned the wrong runner, so the ' +
+                  'scraper needs updating to match a changed page.\n\n' +
+                  'Races with NO scraper at all are not counted here. They are in ' +
+                  'Coverage, because writing one is a different job.'
+                }
+                className={`rounded-lg border p-3 text-left transition-colors cursor-pointer ${
                   s.racesNeedingHelp > 0
                     ? 'border-red-200 bg-red-50/50 hover:bg-red-50'
                     : 'border-border-gray hover:bg-subtle-gray'
                 }`}
               >
                 <p className="text-xs text-off-black/50 flex items-center gap-1">
-                  Races needing help
+                  Scrapers to fix
                   {s.racesNeedingHelp > 0 && <AlertTriangle className="w-3 h-3 text-red-600" />}
                 </p>
                 <p className={`text-2xl font-semibold ${s.racesNeedingHelp > 0 ? 'text-red-700' : 'text-off-black'}`}>
                   {s.racesNeedingHelp}
                 </p>
+                {/* Say what the work is. "9 races need help" reads as one job;
+                    it is really three, and a missing event id is a two-minute
+                    fix while a broken scraper is an afternoon. */}
                 <p className="text-[11px] text-off-black/40 mt-0.5">
-                  {s.cellsNeedingHelp} race-years · click to {showNeedsHelp ? 'hide' : 'see'}
+                  {causeSummary(s.needsHelpCauses) || `${s.cellsNeedingHelp} race-years`}
+                </p>
+                <p className="text-[11px] text-off-black/35 mt-0.5">
+                  {s.cellsNeedingHelp} race-year{s.cellsNeedingHelp === 1 ? '' : 's'} · click to {showNeedsHelp ? 'hide' : 'see'}
                 </p>
               </button>
 
@@ -420,7 +474,15 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                   wrote a scraper for, which is the worst category of all. */}
               <button
                 onClick={() => setShowNeedsScraper(v => !v)}
-                className={`rounded-lg border p-3 text-left transition-colors ${
+                title={
+                  `Distinct races across ${s.activeProducts} active Shopify products, ` +
+                  'counting how many have a scraper returning good results.\n\n' +
+                  'Read live from Shopify: the snapshot refreshes itself when it is ' +
+                  'more than 10 minutes old, so this follows the store without anyone ' +
+                  'pressing Sync catalog. The header shows when it last ran.\n\n' +
+                  'Several products can point at one race, so this counts races, not listings.'
+                }
+                className={`rounded-lg border p-3 text-left transition-colors cursor-pointer ${
                   s.needsScraper > 0
                     ? 'border-orange-200 bg-orange-50/40 hover:bg-orange-50'
                     : 'border-border-gray hover:bg-subtle-gray'
@@ -433,10 +495,10 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                 </p>
               </button>
 
-              <div className="rounded-lg border border-border-gray p-3" title={`p95 ${fmtMs(s.p95Ms)} - the tail the 10s cap has to absorb`}>
+              <div className="rounded-lg border border-border-gray p-3" title={`p95 ${fmtSecs(s.p95Ms)} - the tail the 10s cap has to absorb`}>
                 <p className="text-xs text-off-black/50">Median lookup</p>
-                <p className="text-2xl font-semibold text-off-black">{fmtMs(s.medianMs)}</p>
-                <p className="text-[11px] text-off-black/40 mt-0.5">p95 {fmtMs(s.p95Ms)}</p>
+                <p className="text-2xl font-semibold text-off-black">{fmtSecs(s.medianMs)}</p>
+                <p className="text-[11px] text-off-black/40 mt-0.5">p95 {fmtSecs(s.p95Ms)}</p>
               </div>
             </div>
           )}
@@ -549,7 +611,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                     <td className={`px-3 py-2 ${OUTCOME_COLOR[e.outcome] || 'text-off-black/60'}`}>
                       {e.outcome}{e.cached ? ' (cache)' : ''}
                     </td>
-                    <td className="px-6 py-2 text-right text-off-black/60">{fmtMs(e.ms)}</td>
+                    <td className="px-6 py-2 text-right text-off-black/60">{fmtSecs(e.ms)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -613,7 +675,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                         {r.traffic.total || <span className="text-off-black/25">0</span>}
                         {r.traffic.errors > 0 && <span className="ml-1 text-red-700 text-xs">({r.traffic.errors} err)</span>}
                       </td>
-                      <td className="px-3 py-2.5 text-right text-off-black/70">{fmtMs(r.traffic.medianMs)}</td>
+                      <td className="px-3 py-2.5 text-right text-off-black/70">{fmtSecs(r.traffic.medianMs)}</td>
                       <td className="px-6 py-2.5 text-right">
                         <ChevronRight className={`w-4 h-4 text-off-black/30 inline transition-transform ${isOpen ? 'rotate-90' : ''}`} />
                       </td>
@@ -651,7 +713,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                                       {y.detail || STATUS_META[y.status].blurb}
                                       {y.probeName && y.status === 'live' && (
                                         <span className="text-off-black/40">
-                                          {' '}· verified {y.probeName}{y.expectBib ? ` #${y.expectBib}` : ''} in {fmtMs(y.ms)}
+                                          {' '}· verified {y.probeName}{y.expectBib ? ` #${y.expectBib}` : ''} in {fmtSecs(y.ms)}
                                         </span>
                                       )}
                                     </span>
@@ -702,7 +764,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                                           <td className="py-1 pr-2 text-off-black/70">{e.year ?? '-'}</td>
                                           <td className="py-1 pr-2 font-mono text-off-black/80 truncate max-w-[130px]">{e.name}</td>
                                           <td className={`py-1 pr-2 ${OUTCOME_COLOR[e.outcome] || 'text-off-black/60'}`}>{e.outcome}</td>
-                                          <td className="py-1 text-right text-off-black/50">{fmtMs(e.ms)}</td>
+                                          <td className="py-1 text-right text-off-black/50">{fmtSecs(e.ms)}</td>
                                         </tr>
                                       ))}
                                     </tbody>
