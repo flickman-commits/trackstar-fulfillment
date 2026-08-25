@@ -630,6 +630,8 @@ export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false)
   const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>('pricing')
   const [settingsQuery, setSettingsQuery] = useState('')
+  /** Trailing 30-day share of orders bought as gifts. See /api/orders/gift-stats. */
+  const [giftStats, setGiftStats] = useState<{ percent: number | null; gifts: number; total: number; days: number } | null>(null)
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
   type HealthCheck = { status: 'ok' | 'warn' | 'error'; detail?: string | null; latency?: string }
   type HealthResults = { overall: string; checks: Record<string, HealthCheck>; error?: string }
@@ -1096,6 +1098,15 @@ export default function Dashboard() {
       setIsSavingRace(false)
     }
   }
+
+  useEffect(() => {
+    let cancelled = false
+    apiFetch(`/api/orders/gift-stats?days=30`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!cancelled && d) setGiftStats(d) })
+      .catch(() => { /* a stat is not worth surfacing an error for */ })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!showSettings) return
@@ -2269,6 +2280,21 @@ Thank you!`
               <p className="text-sm md:text-base text-off-black/60">
                 Last updated {formatLastUpdated(lastUpdated)}
               </p>
+              {/* Gift rate reads as a tag rather than a sentence: it is a
+                  standing statistic, not part of the freshness line, and the
+                  tag shape stops it competing with the greeting. Hidden
+                  entirely when nothing was asked, so it never claims a
+                  confident 0%. */}
+              {giftStats && giftStats.percent !== null && (
+                <span
+                  title={`${giftStats.gifts} of ${giftStats.total} orders in the last ${giftStats.days} days were marked as a gift at checkout`}
+                  className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md border text-xs font-medium bg-amber-100 text-amber-800 border-amber-300 cursor-help"
+                >
+                  <span>🎁</span>
+                  <span><span className="font-semibold">{giftStats.percent}%</span> gifting rate</span>
+                  <span className="text-amber-700/60">({giftStats.days} days)</span>
+                </span>
+              )}
             </div>
           </div>
 
@@ -2537,9 +2563,6 @@ Thank you!`
                                     <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
                                       {order.lineItemIndex + 1}/{itemCount}
                                     </span>
-                                  )}
-                                  {order.isGift && (
-                                    <span className="text-xs">🎁</span>
                                   )}
                                 </>
                               )}
@@ -2850,9 +2873,6 @@ Thank you!`
                                   <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
                                     Item {order.lineItemIndex + 1} of {itemCount}
                                   </span>
-                                )}
-                                {order.isGift && (
-                                  <span className="px-1.5 py-0.5 bg-pink-50 text-pink-600 text-[10px] font-medium rounded">🎁 Gift</span>
                                 )}
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>

@@ -30,6 +30,7 @@ const routes = [
   { method: 'post', path: '/api/orders/refresh-weather',     handler: '../api/orders/refresh-weather.js' },
   { method: 'post', path: '/api/orders/refresh-shopify-data', handler: '../api/orders/refresh-shopify-data.js' },
   { method: 'post', path: '/api/orders/refresh-etsy-data',  handler: '../api/orders/refresh-etsy-data.js' },
+  { method: 'get',  path: '/api/orders/gift-stats',          handler: '../api/orders/gift-stats.js' },
   { method: 'get',  path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
   { method: 'post', path: '/api/orders/comments',            handler: '../api/orders/comments.js' },
   { method: 'delete', path: '/api/orders/comments',          handler: '../api/orders/comments.js' },
