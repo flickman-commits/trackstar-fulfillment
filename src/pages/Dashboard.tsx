@@ -539,17 +539,6 @@ function greetingName(user: { firstName?: string | null; email?: string | null }
   return (user?.firstName || '').trim() || (user?.email || '').split('@')[0] || 'there'
 }
 
-function formatLastUpdated(date: Date): string {
-  return date.toLocaleString('en-US', {
-    timeZone: 'America/New_York',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  })
-}
-
 // Date and pace are now pre-formatted by the API for direct copy to Illustrator
 // Date: MM.DD.YY (e.g., "11.02.25")
 // Pace: X:XX / mi (e.g., "7:15 / mi")
@@ -772,7 +761,6 @@ export default function Dashboard() {
   const [customersServedCount, setCustomersServedCount] = useState<number | null>(null)
   const [customersServedInput, setCustomersServedInput] = useState('')
   const [isLoadingCounter, setIsLoadingCounter] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   // Store possible matches per order for ambiguous results (not persisted to DB)
   const [possibleMatchesMap, setPossibleMatchesMap] = useState<Record<string, Array<{ name: string; bib: string; time: string; pace?: string; city?: string; state?: string; eventType?: string; resultsUrl?: string }>>>({})
@@ -828,7 +816,6 @@ export default function Dashboard() {
       })
 
       setOrders(transformedOrders)
-      setLastUpdated(new Date())
 
       // Hydrate possibleMatchesMap from persisted research records so the
       // accept-button picker shows up even after a page reload (not just
@@ -1207,8 +1194,7 @@ export default function Dashboard() {
 
         // Update orders list
         setOrders(freshOrders)
-        setLastUpdated(new Date())
-
+  
         // Update selected order with fresh data
         const updatedOrder = freshOrders.find(o => o.orderNumber === orderNumber)
         if (import.meta.env.DEV) console.log('[Research] Looking for order:', orderNumber)
@@ -2306,22 +2292,17 @@ Thank you!`
               <h1 className="text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1">
                 {getGreeting()}, {greetingName(currentUser)}
               </h1>
-              <p className="text-sm md:text-base text-off-black/60">
-                Last updated {formatLastUpdated(lastUpdated)}
-              </p>
-              {/* Gift rate reads as a tag rather than a sentence: it is a
-                  standing statistic, not part of the freshness line, and the
-                  tag shape stops it competing with the greeting. Hidden
-                  entirely when nothing was asked, so it never claims a
-                  confident 0%. */}
+              {/* The gift rate is the one standing statistic under the
+                  greeting now. Hidden entirely when nothing was asked, so it
+                  never claims a confident 0%. */}
               {giftStats && giftStats.percent !== null && (
                 <span
                   title={`${giftStats.gifts} of ${giftStats.total} orders in the last ${giftStats.days} days were marked as a gift at checkout`}
                   className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md border text-xs font-medium bg-amber-100 text-amber-800 border-amber-300 cursor-help"
                 >
                   <span>🎁</span>
-                  <span><span className="font-semibold">{giftStats.percent}%</span> gifting rate</span>
-                  <span className="text-amber-700/60">({giftStats.days} days)</span>
+                  <span>Trackstar&apos;s Gifting Rate: <span className="font-semibold">{giftStats.percent}%</span></span>
+                  <span className="text-amber-700/60">(last {giftStats.days}d)</span>
                 </span>
               )}
             </div>
