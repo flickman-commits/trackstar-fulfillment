@@ -12,7 +12,7 @@ import CreatorApply from '@/pages/CreatorApply'
 import Monopoly from '@/pages/Monopoly'
 import MonopolyModel from '@/pages/MonopolyModel'
 import ProductsBulkEdit from '@/pages/ProductsBulkEdit'
-import { SignInGate } from '@/lib/auth'
+import { SignInGate, RequireAdmin } from '@/lib/auth'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -163,9 +163,12 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/orders/:orderId" element={<OrderDetails />} />
-                <Route path="/creators" element={<CreatorsHome />} />
-                <Route path="/products" element={<ProductsBulkEdit />} />
-                <Route path="/briefs" element={<BriefsAdmin />} />
+                {/* Admin view: the creator programme, the bulk product editor
+                    and the brief admin all change things outside the day to day
+                    fulfillment work. */}
+                <Route path="/creators" element={<RequireAdmin><CreatorsHome /></RequireAdmin>} />
+                <Route path="/products" element={<RequireAdmin><ProductsBulkEdit /></RequireAdmin>} />
+                <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>
             </SignInGate>

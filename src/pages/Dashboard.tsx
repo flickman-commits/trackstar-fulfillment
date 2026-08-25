@@ -8,7 +8,7 @@ import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
 import PricingCalculator from '@/components/PricingCalculator'
-import { PeoplePanel, ActivityPanel } from '@/components/TeamPanel'
+import { PeoplePanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import { useAuth } from '@/lib/auth'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
@@ -567,7 +567,7 @@ const REVIEW_PRODUCTS: { name: string; link: string }[] = [
   { name: 'Twin Cities Marathon', link: 'https://yotpo.com/go/A3v2ZhPB' },
 ]
 
-type SettingsPanel = 'pricing' | 'reviews' | 'races' | 'lookup' | 'storefront' | 'people' | 'activity' | 'diagnostics' | 'maintenance'
+type SettingsPanel = 'pricing' | 'reviews' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'activity' | 'diagnostics' | 'maintenance'
 
 /**
  * Settings navigation. Grouped rather than a flat list because the panels do
@@ -580,6 +580,9 @@ type SettingsPanel = 'pricing' | 'reviews' | 'races' | 'lookup' | 'storefront' |
  */
 const SETTINGS_NAV: {
   group: string
+  /** Hidden entirely from staff. The endpoints behind these refuse a staff
+      session too, so this is presentation, not the enforcement. */
+  adminOnly?: boolean
   items: { id: SettingsPanel; label: string; blurb: string; icon: typeof Settings }[]
 }[] = [
   {
@@ -594,24 +597,21 @@ const SETTINGS_NAV: {
     items: [
       { id: 'races', label: 'Race Database', blurb: 'Race dates, locations and weather', icon: CloudSun },
       { id: 'lookup', label: 'Instant Lookup', blurb: 'Which races work, which need help', icon: Search },
-    ],
-  },
-  {
-    group: 'Storefront',
-    items: [
       { id: 'storefront', label: 'Customers Served', blurb: 'The counter shown on the Shopify storefront', icon: Users },
     ],
   },
   {
-    group: 'Team',
+    group: 'Account',
     items: [
-      { id: 'people', label: 'People', blurb: 'Who can sign in and what they are allowed to do', icon: UserCog },
-      { id: 'activity', label: 'Activity Log', blurb: 'Who did what, and when', icon: ScrollText },
+      { id: 'account', label: 'My Account', blurb: 'Your role and your password', icon: UserCog },
     ],
   },
   {
-    group: 'System',
+    group: 'Admin',
+    adminOnly: true,
     items: [
+      { id: 'people', label: 'People', blurb: 'Who can sign in and what they are allowed to do', icon: Users },
+      { id: 'activity', label: 'Activity Log', blurb: 'Who did what, and when', icon: ScrollText },
       { id: 'diagnostics', label: 'Diagnostics', blurb: 'Test connections and run a full health check', icon: FlaskConical },
       { id: 'maintenance', label: 'Maintenance', blurb: 'Cache and research resets - destructive', icon: Settings },
     ],
@@ -619,7 +619,10 @@ const SETTINGS_NAV: {
 ]
 
 export default function Dashboard() {
-  const { user: currentUser, signOut } = useAuth()
+  const { user: currentUser, isAdmin, signOut } = useAuth()
+  /** The settings nav as this person sees it. Staff never see the Admin group. */
+  const visibleNav = SETTINGS_NAV.filter((g) => !g.adminOnly || isAdmin)
+  const visibleItems = visibleNav.flatMap((g) => g.items)
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [raceFilter, setRaceFilter] = useState('')  // empty = show all races
@@ -2340,6 +2343,7 @@ Thank you!`
               )}
             </div>
             <div className="hidden md:flex items-end">
+              {isAdmin && (
               <Link
                 to="/creators"
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
@@ -2347,6 +2351,7 @@ Thank you!`
                 <Users className="w-4 h-4" />
                 Creators
               </Link>
+              )}
             </div>
           </div>
         </div>
@@ -3160,7 +3165,7 @@ Thank you!`
                   </div>
                 </div>
                 <nav className="flex-1 overflow-y-auto p-2">
-                  {SETTINGS_NAV.map((group) => {
+                  {visibleNav.map((group) => {
                     const items = group.items.filter((i) =>
                       !settingsQuery.trim() ||
                       (i.label + ' ' + i.blurb).toLowerCase().includes(settingsQuery.trim().toLowerCase())
@@ -3194,10 +3199,10 @@ Thank you!`
                 <div className="h-[68px] flex items-center justify-between px-5 border-b border-border-gray flex-shrink-0">
                   <div className="min-w-0">
                     <h2 className="text-base font-semibold text-off-black truncate">
-                      {SETTINGS_NAV.flatMap((g) => g.items).find((i) => i.id === settingsPanel)?.label ?? 'Settings'}
+                      {visibleItems.find((i) => i.id === settingsPanel)?.label ?? 'Settings'}
                     </h2>
                     <p className="text-xs text-off-black/45 truncate">
-                      {SETTINGS_NAV.flatMap((g) => g.items).find((i) => i.id === settingsPanel)?.blurb ?? ''}
+                      {visibleItems.find((i) => i.id === settingsPanel)?.blurb ?? ''}
                     </p>
                   </div>
                   <button onClick={() => setShowSettings(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none flex-shrink-0 ml-4">×</button>
@@ -3206,7 +3211,7 @@ Thank you!`
                 <div className="flex-1 overflow-y-auto p-5">
                   {/* Mobile nav — the sidebar is hidden under md. */}
                   <div className="md:hidden mb-4 flex flex-wrap gap-1.5">
-                    {SETTINGS_NAV.flatMap((g) => g.items).map((item) => (
+                    {visibleItems.map((item) => (
                       <button
                         key={item.id}
                         onClick={() => setSettingsPanel(item.id)}
@@ -3218,8 +3223,9 @@ Thank you!`
                   </div>
 
                   {settingsPanel === 'pricing' && <PricingCalculator />}
-                  {settingsPanel === 'people' && <PeoplePanel />}
-                  {settingsPanel === 'activity' && <ActivityPanel />}
+                  {settingsPanel === 'account' && <AccountPanel />}
+                  {settingsPanel === 'people' && isAdmin && <PeoplePanel />}
+                  {settingsPanel === 'activity' && isAdmin && <ActivityPanel />}
 
                   {settingsPanel === 'reviews' && (
                     <div>
@@ -3652,7 +3658,7 @@ Thank you!`
                     </div>
                   )}
 
-                  {settingsPanel === 'diagnostics' && (
+                  {settingsPanel === 'diagnostics' && isAdmin && (
                     <div className="space-y-4 divide-y divide-border-gray [&>div+div]:pt-4">
                 {/* Test Connections — granular Artelo / Shopify / Etsy diagnostics */}
                 <div>
@@ -3793,7 +3799,7 @@ Thank you!`
                     </div>
                   )}
 
-                  {settingsPanel === 'maintenance' && (
+                  {settingsPanel === 'maintenance' && isAdmin && (
                     <div className="space-y-4">
                 {/* Danger zone */}
                 <div>

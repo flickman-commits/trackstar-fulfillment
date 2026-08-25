@@ -1,12 +1,17 @@
 /**
  * Settings workspaces for people and accountability.
  *
- *   <PeoplePanel />   who can sign in, what they may do
- *   <ActivityPanel /> the audit log of consequential actions
+ *   <PeoplePanel />   who can sign in, what they may do   (admin only)
+ *   <ActivityPanel /> the audit log of consequential actions (admin only)
+ *   <AccountPanel />  your own account                    (everyone)
  *
- * Both are readable by anyone signed in. Only admins see the controls that
- * change anything, and the server enforces that separately: hiding a button is
- * a courtesy to the person, not a security boundary.
+ * People and Activity are part of the admin view: staff do not see them in the
+ * settings nav at all, and the endpoints behind them refuse a staff session, so
+ * the roster and the log are not reachable by typing a URL either.
+ *
+ * AccountPanel exists so that hiding the admin view does not also take away a
+ * staff member's ability to change their own password. It is the one piece of
+ * the old People panel everyone still needs.
  */
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
@@ -76,7 +81,7 @@ function InviteLink({ url, onDismiss }: { url: string; onDismiss: () => void }) 
 }
 
 export function PeoplePanel() {
-  const { user, isAdmin } = useAuth()
+  const { user } = useAuth()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -152,7 +157,7 @@ export function PeoplePanel() {
           <button onClick={load} className={btnGhost} disabled={loading}>
             <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
-          {isAdmin && (
+          {(
             <button onClick={() => setShowInvite(v => !v)} className={btnPrimary}>
               <UserPlus className="w-3 h-3" /> Invite someone
             </button>
@@ -162,7 +167,7 @@ export function PeoplePanel() {
 
       {inviteUrl && <InviteLink url={inviteUrl} onDismiss={() => setInviteUrl('')} />}
 
-      {showInvite && isAdmin && (
+      {showInvite && (
         <form onSubmit={invite} className="rounded-lg border border-border-gray bg-subtle-gray/40 p-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -171,7 +176,7 @@ export function PeoplePanel() {
                 className={inputBase}
                 value={form.name}
                 onChange={e => setForm({ ...form, name: e.target.value })}
-                placeholder="Ellie"
+                placeholder="Name"
               />
             </div>
             <div>
@@ -182,7 +187,7 @@ export function PeoplePanel() {
                 required
                 value={form.email}
                 onChange={e => setForm({ ...form, email: e.target.value })}
-                placeholder="ellie@trackstar.art"
+                placeholder="fast@trackstar.art"
               />
             </div>
             <div>
@@ -221,7 +226,7 @@ export function PeoplePanel() {
                 <th className="text-left font-medium px-3 py-2">Person</th>
                 <th className="text-left font-medium px-3 py-2">Role</th>
                 <th className="text-left font-medium px-3 py-2">Last seen</th>
-                {isAdmin && <th className="text-right font-medium px-3 py-2">Actions</th>}
+                <th className="text-right font-medium px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -241,7 +246,7 @@ export function PeoplePanel() {
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    {isAdmin && m.isActive ? (
+                    {m.isActive ? (
                       <select
                         className="text-xs bg-white border border-border-gray rounded px-2 py-1"
                         value={m.role}
@@ -258,7 +263,7 @@ export function PeoplePanel() {
                   <td className="px-3 py-2 text-off-black/55">
                     {m.isActive ? ago(m.lastLoginAt) : 'Deactivated'}
                   </td>
-                  {isAdmin && (
+                  {(
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1.5">
                         {busyId === m.id && <Loader2 className="w-3 h-3 animate-spin text-off-black/40" />}
@@ -297,12 +302,12 @@ export function PeoplePanel() {
         </div>
       )}
 
-      <ChangeOwnPassword />
     </div>
   )
 }
 
-function ChangeOwnPassword() {
+export function AccountPanel() {
+  const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -330,7 +335,20 @@ function ChangeOwnPassword() {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className={btnSecondary}>Change my password</button>
+      <div className="space-y-3">
+        <div>
+          <p className="text-sm font-medium text-off-black">{user?.name}</p>
+          <p className="text-xs text-off-black/50">
+            {user?.email} · {user?.role === 'admin' ? 'Admin' : 'Staff'}
+          </p>
+        </div>
+        <p className="text-xs text-off-black/45 max-w-md">
+          {user?.role === 'admin'
+            ? 'Admins can manage people and run the destructive actions.'
+            : 'Ask an admin if you need to run something that is limited to admins.'}
+        </p>
+        <button onClick={() => setOpen(true)} className={btnSecondary}>Change my password</button>
+      </div>
     )
   }
 

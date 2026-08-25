@@ -1,7 +1,7 @@
 /**
  * /api/admin/users - manage who can sign in.
  *
- *   GET                                   list everyone (any signed-in user)
+ *   GET                                   list everyone (admin only)
  *   POST   { action:'invite', email, name, role }   create an account + invite link
  *   POST   { action:'role', id, role }              promote / demote
  *   POST   { action:'active', id, isActive }        deactivate / reactivate
@@ -9,15 +9,15 @@
  *   POST   { action:'set-password', password }      change YOUR OWN password
  *   DELETE { id }                                   remove an account
  *
- * Every write except set-password is admin-only.
+ * Everything except set-password is admin-only: the roster is part of the
+ * admin view, so a staff session cannot reach it by typing the URL either.
+ * set-password is the exception because hiding the admin view must not also
+ * take away someone's ability to change their own password.
  *
  * Accounts are created without a password and with a single-use invite token.
  * Nobody types a colleague's password for them, and no password travels over
  * Slack: the admin sends a link, the person chooses their own.
  *
- * Listing is open to any signed-in user on purpose. Knowing who else has
- * access is not a secret from the people who already have it, and it is how a
- * staff member works out who to ask to run an admin action.
  */
 import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
@@ -62,6 +62,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      if (!await requireAdminRole(req, res, actor)) return
       const users = await prisma.user.findMany({
         orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
         select: PUBLIC_FIELDS,

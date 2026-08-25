@@ -3,16 +3,19 @@
  *
  *   GET ?limit=100&action=price.apply&userId=...
  *
- * Readable by any signed-in user. A log only some people can see is a log the
- * rest cannot use to answer "what happened to this order?", which is most of
- * the reason to keep one. It is append-only: nothing here writes or deletes.
+ * Admin only, as part of the admin view. It is append-only regardless:
+ * nothing in this file writes or deletes, so the log cannot be edited from
+ * the application at all.
  */
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { requireAdminRole } from '../_lib/users.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  const actor = requireAdmin(req, res)
+  if (!actor) return
+  if (!await requireAdminRole(req, res, actor)) return
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 

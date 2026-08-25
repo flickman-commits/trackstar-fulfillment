@@ -37,6 +37,13 @@ export default async function handler(req, res) {
   const actor = requireAdmin(req, res)
   if (!actor) return
 
+  // The whole bulk editor is part of the admin view, reads included: the
+  // catalog it returns carries every price in the store. The write paths below
+  // check again anyway, because the read gate is not what protects them.
+  const admin = await requireAdminRole(req, res, actor)
+  if (!admin) return
+  req.actingUser = admin
+
   try {
     if (req.method === 'GET') {
       if (req.query.action === 'batches') {
@@ -66,18 +73,6 @@ export default async function handler(req, res) {
     }
 
     const { action } = req.body || {}
-
-    // Reading the catalog is open to everyone; changing the live store is not.
-    // A mistyped price here reaches customers within seconds, and a variant
-    // delete cannot be fully undone (Shopify mints new ids on restore), so the
-    // write paths re-check the database rather than trusting the session token.
-    // Dry runs are exempt: they change nothing and are how you check your work.
-    const isDryRun = action === 'delete' && (req.body?.dryRun === true)
-    if (!isDryRun && ['apply', 'delete', 'undo'].includes(action)) {
-      const admin = await requireAdminRole(req, res, actor)
-      if (!admin) return
-      req.actingUser = admin
-    }
 
     if (action === 'apply') {
       const { variantIds, price, filters, description } = req.body
