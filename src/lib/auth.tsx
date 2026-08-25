@@ -12,6 +12,7 @@
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -122,6 +123,54 @@ const submit =
   'hover:opacity-90 rounded-md transition-opacity disabled:opacity-50'
 
 /**
+ * Password field with a reveal toggle.
+ *
+ * Typing a long password blind is where sign-in attempts go wrong, and the
+ * usual response - retyping it repeatedly - does not tell you whether the
+ * problem is your fingers or the server. Being able to look removes one of
+ * those two explanations.
+ *
+ * Defaults to hidden, and does not persist the choice: revealing is a
+ * deliberate act each time, not a setting that leaves a password on screen for
+ * whoever walks past next.
+ */
+export function PasswordInput({ value, onChange, placeholder, autoComplete, autoFocus, className }: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  autoComplete?: string
+  autoFocus?: boolean
+  className?: string
+}) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div className="relative">
+      <input
+        type={visible ? 'text' : 'password'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${className || field} pr-11`}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        autoFocus={autoFocus}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible(v => !v)}
+        // Outside the tab order: someone tabbing from email to password to
+        // submit should not land on this on the way past.
+        tabIndex={-1}
+        aria-label={visible ? 'Hide password' : 'Show password'}
+        title={visible ? 'Hide password' : 'Show password'}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-off-black/35 hover:text-off-black/70 transition-colors"
+      >
+        {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  )
+}
+
+/**
  * Sign-in, invite acceptance, and the gate around everything private.
  *
  * Replaces the old shared-password prompt. The shared password is not gone
@@ -196,8 +245,16 @@ function SignInForm({ onDone }: { onDone: (u: CurrentUser) => void }) {
         body: JSON.stringify({ email, password }),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.ok) onDone(data.user)
-      else setError(data.error || 'Could not sign in')
+      if (res.ok) {
+        onDone(data.user)
+      } else if (res.status >= 500) {
+        // Worth spelling out. A server fault used to surface here as a bare
+        // "could not sign in", which reads exactly like a rejected password
+        // and sends people off retyping something that was already correct.
+        setError('The server had a problem. This is not your password, so try again shortly.')
+      } else {
+        setError(data.error || 'Could not sign in')
+      }
     } catch {
       setError('Could not reach the server')
     } finally {
@@ -223,11 +280,9 @@ function SignInForm({ onDone }: { onDone: (u: CurrentUser) => void }) {
             autoFocus
           />
           <label className="block text-body-sm font-medium text-off-black mt-4 mb-2">Password</label>
-          <input
-            type="password"
+          <PasswordInput
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={field}
+            onChange={setPassword}
             placeholder="Password"
             autoComplete="current-password"
           />
@@ -316,23 +371,21 @@ function AcceptInvite({ token, onDone }: { token: string; onDone: (u: CurrentUse
           <p className="text-xs text-off-black/50 mt-1 mb-4">
             {invitee?.email ? `Choose a password for ${invitee.email}.` : 'Loading...'}
           </p>
-          <input
-            type="password"
+          <PasswordInput
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={field}
+            onChange={setPassword}
             placeholder="New password (10 characters or more)"
             autoComplete="new-password"
             autoFocus
           />
-          <input
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className={`${field} mt-3`}
-            placeholder="Confirm password"
-            autoComplete="new-password"
-          />
+          <div className="mt-3">
+            <PasswordInput
+              value={confirm}
+              onChange={setConfirm}
+              placeholder="Confirm password"
+              autoComplete="new-password"
+            />
+          </div>
           {error && <p className="text-red-500 text-body-sm mt-3">{error}</p>}
           <button type="submit" disabled={submitting || !invitee} className={submit}>
             {submitting ? 'Saving...' : 'Set password and sign in'}

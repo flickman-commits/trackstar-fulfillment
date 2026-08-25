@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Loader2, RefreshCw, UserPlus, Copy, Check, LogOut } from 'lucide-react'
-import { useAuth, fullName } from '@/lib/auth'
+import { useAuth, fullName, PasswordInput } from '@/lib/auth'
 import { btnPrimary, btnSecondary, btnDanger, btnGhost, inputBase, fieldLabel } from '@/lib/ui'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -437,23 +437,21 @@ export function AccountPanel() {
         <form onSubmit={savePassword} className="rounded-lg border border-border-gray bg-subtle-gray/40 p-4 space-y-3">
           <div>
             <label className={fieldLabel}>New password</label>
-            <input
+            <PasswordInput
               className={inputBase}
-              type="password"
               autoComplete="new-password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={setPassword}
               placeholder="10 characters or more"
             />
           </div>
           <div>
             <label className={fieldLabel}>Confirm</label>
-            <input
+            <PasswordInput
               className={inputBase}
-              type="password"
               autoComplete="new-password"
               value={confirm}
-              onChange={e => setConfirm(e.target.value)}
+              onChange={setConfirm}
             />
           </div>
           <div className="flex items-center gap-2">
