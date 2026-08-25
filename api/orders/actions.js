@@ -199,7 +199,7 @@ export default async function handler(req, res) {
     // Actions that throw work away, spend money, or reach a customer. These
     // re-check the database for an active admin rather than trusting the
     // session token, and leave a line in the audit log naming who ran them.
-    // Everything else stays open to staff: the point is to make the few
+    // Everything else stays open to team members: the point is to make the few
     // irreversible things deliberate, not to make the daily work need a
     // permission slip.
     const ADMIN_ONLY_ACTIONS = new Set([

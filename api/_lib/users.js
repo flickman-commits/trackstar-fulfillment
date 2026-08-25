@@ -6,7 +6,9 @@
  * stolen password list.
  *
  * Roles are two: `admin` can do the irreversible things and manage people,
- * `staff` does the day to day work. Anything not explicitly marked destructive
+ * `staff` does the day to day work. The stored value stays "staff" while the
+ * UI calls it "Team member": it is baked into every issued session token, so
+ * renaming it would sign everyone out to change a word only the screen shows. Anything not explicitly marked destructive
  * is open to both, because inventing a permission matrix nobody has asked for
  * makes the tool harder to use without making it safer.
  */

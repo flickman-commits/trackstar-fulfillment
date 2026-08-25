@@ -582,8 +582,8 @@ type SettingsPanel = 'pricing' | 'reviews' | 'races' | 'lookup' | 'storefront' |
  */
 const SETTINGS_NAV: {
   group: string
-  /** Hidden entirely from staff. The endpoints behind these refuse a staff
-      session too, so this is presentation, not the enforcement. */
+  /** Hidden from anyone who is not an admin. The endpoints behind these refuse
+      a non-admin session too, so this is presentation, not the enforcement. */
   adminOnly?: boolean
   items: { id: SettingsPanel; label: string; blurb: string; icon: typeof Settings }[]
 }[] = [
@@ -622,7 +622,7 @@ const SETTINGS_NAV: {
 
 export default function Dashboard() {
   const { user: currentUser, isAdmin } = useAuth()
-  /** The settings nav as this person sees it. Staff never see the Admin group. */
+  /** The settings nav as this person sees it. Only admins see the Admin group. */
   const visibleNav = SETTINGS_NAV.filter((g) => !g.adminOnly || isAdmin)
   const visibleItems = visibleNav.flatMap((g) => g.items)
   const [orders, setOrders] = useState<Order[]>([])

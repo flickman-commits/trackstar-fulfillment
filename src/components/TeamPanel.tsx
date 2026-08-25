@@ -5,12 +5,12 @@
  *   <ActivityPanel /> the audit log of consequential actions (admin only)
  *   <AccountPanel />  your own account                    (everyone)
  *
- * People and Activity are part of the admin view: staff do not see them in the
- * settings nav at all, and the endpoints behind them refuse a staff session, so
- * the roster and the log are not reachable by typing a URL either.
+ * People and Activity are part of the admin view: team members do not see them
+ * in the settings nav at all, and the endpoints behind them refuse a non-admin
+ * session, so the roster and the log are not reachable by typing a URL either.
  *
  * AccountPanel exists so that hiding the admin view does not also take away a
- * staff member's ability to change their own password. It is the one piece of
+ * team member's ability to change their own password. It is the one piece of
  * the old People panel everyone still needs.
  */
 import { useState, useEffect, useCallback } from 'react'
@@ -20,6 +20,23 @@ import { useAuth, fullName, PasswordInput } from '@/lib/auth'
 import { btnPrimary, btnSecondary, btnDanger, btnGhost, inputBase, fieldLabel } from '@/lib/ui'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
+
+/**
+ * What each role is called on screen.
+ *
+ * The stored value stays "staff": it is written into every session token and
+ * checked by every gated endpoint, so renaming it would be a migration that
+ * signs everyone out to change a word nobody sees. This maps the value to the
+ * label instead, which is the only place the word was ever visible.
+ */
+const ROLE_LABEL: Record<string, string> = {
+  admin: 'Admin',
+  staff: 'Team member',
+}
+
+function roleLabel(role?: string) {
+  return ROLE_LABEL[role || ''] || role || ''
+}
 
 interface TeamMember {
   id: string
@@ -209,7 +226,7 @@ export function PeoplePanel() {
                 value={form.role}
                 onChange={e => setForm({ ...form, role: e.target.value as 'admin' | 'staff' })}
               >
-                <option value="staff">Staff</option>
+                <option value="staff">Team member</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -264,13 +281,16 @@ export function PeoplePanel() {
                         className="text-xs bg-white border border-border-gray rounded px-2 py-1"
                         value={m.role}
                         disabled={busyId === m.id}
-                        onChange={e => post({ action: 'role', id: m.id, role: e.target.value }, `${m.name} is now ${e.target.value}`)}
+                        onChange={e => post(
+                          { action: 'role', id: m.id, role: e.target.value },
+                          `${m.name} is now ${roleLabel(e.target.value).toLowerCase()}`
+                        )}
                       >
-                        <option value="staff">Staff</option>
+                        <option value="staff">Team member</option>
                         <option value="admin">Admin</option>
                       </select>
                     ) : (
-                      <span className="capitalize text-off-black/70">{m.role}</span>
+                      <span className="text-off-black/70">{roleLabel(m.role)}</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-off-black/55">
@@ -391,7 +411,7 @@ export function AccountPanel() {
         <p className="text-sm font-medium text-off-black">
           {fullName(user)}
           <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-off-black/5 text-off-black/50 align-middle">
-            {user?.role === 'admin' ? 'admin' : 'staff'}
+            {roleLabel(user?.role).toLowerCase()}
           </span>
         </p>
         <p className="text-xs text-off-black/50">{user?.email}</p>

@@ -85,10 +85,10 @@ export function AuthProvider({ user, setUser, children }: {
 /**
  * Wraps a page that is part of the admin view.
  *
- * Staff get a plain explanation rather than a redirect: bouncing someone to
- * the dashboard makes a link look broken, when the honest answer is that this
- * page is not theirs. The APIs behind these pages refuse a staff session
- * independently, so this is the signpost and not the lock.
+ * Team members get a plain explanation rather than a redirect: bouncing
+ * someone to the dashboard makes a link look broken, when the honest answer is
+ * that this page is not theirs. The APIs behind these pages refuse a non-admin
+ * session independently, so this is the signpost and not the lock.
  */
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useAuth()
@@ -99,7 +99,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
         <div className={card}>
           <p className="text-body-sm font-medium text-off-black">This page is admin only</p>
           <p className="text-xs text-off-black/50 mt-2">
-            You are signed in as {fullName(user) || 'staff'}. Ask an admin if you need access.
+            You are signed in as {fullName(user) || 'a team member'}. Ask an admin if you need access.
           </p>
           <a
             href="/"

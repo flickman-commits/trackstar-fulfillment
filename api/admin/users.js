@@ -11,7 +11,7 @@
  *   DELETE { id }                                   remove an account
  *
  * Everything except set-password and set-name is admin-only: the roster is part of the
- * admin view, so a staff session cannot reach it by typing the URL either.
+ * admin view, so a non-admin session cannot reach it by typing the URL either.
  * set-password and set-name are the exceptions: hiding the admin view must not
  * take away someone's ability to manage their own account.
  *
@@ -148,7 +148,9 @@ export default async function handler(req, res) {
 
       if (action === 'role') {
         const role = body.role
-        if (!ROLES.includes(role)) return res.status(400).json({ error: 'Role must be admin or staff' })
+        if (!ROLES.includes(role)) {
+          return res.status(400).json({ error: 'Role must be admin or team member' })
+        }
         // Demoting the last admin locks everyone out of user management, and
         // the only way back is database access. Refuse rather than explain.
         if (target.role === 'admin' && role !== 'admin' && await lastAdmin(target.id)) {
