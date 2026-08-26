@@ -17,7 +17,7 @@
  * only changes when we deploy a new config.
  */
 import { setCors } from '../_lib/auth.js'
-import { isRacePublicSafe, getCanonicalRaceName } from '../../server/scrapers/index.js'
+import { isRacePublicSafe, getCanonicalRaceName, getCoveredYears } from '../../server/scrapers/index.js'
 import { parseRaceNameFromTitle } from '../../server/scrapers/raceNameNormalization.js'
 import { checkRateLimit } from '../../server/lib/publicRateLimit.js'
 
@@ -70,6 +70,10 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     hasLookup: isRacePublicSafe(resolvedRace),
+    // The years we can definitely look up, or null when any year is derivable
+    // (a {year}-pattern config). The storefront uses this to skip the search for
+    // a year that is genuinely outside an explicit-id race's map.
+    coveredYears: getCoveredYears(resolvedRace),
     raceCanonical,
   })
 }

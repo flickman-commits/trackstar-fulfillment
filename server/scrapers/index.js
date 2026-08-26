@@ -382,6 +382,55 @@ export function getCanonicalRaceName(raceName) {
   return config ? config.raceName : null
 }
 
+// Platform-specific names for the "year -> id" map a config carries. A config
+// that has any of these knows exactly which years it can look up.
+const YEAR_ID_FIELDS = ['eventIds', 'raceIds', 'eventCodes']
+
+function explicitYearsOf(obj) {
+  if (!obj) return []
+  const out = []
+  for (const field of YEAR_ID_FIELDS) {
+    if (obj[field]) out.push(...Object.keys(obj[field]).map(Number))
+  }
+  return out
+}
+
+/**
+ * The set of years we can DEFINITELY look up for a race, or null when coverage
+ * is not knowable without probing.
+ *
+ * Returns a year array only when the config resolves every year through an
+ * explicit id map (eventIds/raceIds/eventCodes) at the base and, if present,
+ * the fallback. In that case a year outside the union genuinely has no data, so
+ * the storefront can skip the search for it. Returns null the moment anything
+ * derives a URL from the year itself (a `{year}` pattern), because then any year
+ * is derivable and only a real lookup can say whether results exist. Null is the
+ * safe answer: it keeps the old "just search" behaviour.
+ *
+ * @param {string} raceName
+ * @returns {number[]|null}
+ */
+export function getCoveredYears(raceName) {
+  const config = findConfigForRace(raceName)
+  if (!config) return null
+
+  const baseYears = explicitYearsOf(config)
+  if (baseYears.length === 0) return null // base derives from a {year} pattern
+  // A fallback with no explicit ids also derives from a pattern, so we cannot
+  // claim any year is uncovered.
+  if (config.fallback && explicitYearsOf(config.fallback).length === 0) return null
+
+  const years = new Set(baseYears)
+  explicitYearsOf(config.fallback).forEach(y => years.add(y))
+  if (config.yearOverrides) {
+    for (const [year, override] of Object.entries(config.yearOverrides)) {
+      years.add(Number(year))
+      explicitYearsOf(override).forEach(y => years.add(y))
+    }
+  }
+  return [...years].filter(Number.isFinite).sort((a, b) => a - b)
+}
+
 /**
  * List of primary race names safe to expose via the public lookup endpoint.
  * Used to render the "instant lookup available" badge on the storefront.
