@@ -24,7 +24,7 @@
  */
 import { useState } from 'react'
 import { UNIT_PROGRAM } from '@/lib/monopolyCopy'
-import { MONOPOLY, CARD_OUTLINE, UI_RADIUS } from './monopolyTheme'
+import { CARD_OUTLINE, UI_RADIUS } from './monopolyTheme'
 
 
 const { commission, sliderMax } = UNIT_PROGRAM
@@ -37,74 +37,54 @@ export function EarnItBack() {
   const earned = units * commission
 
   return (
-    <div className="mt-8">
-      <h3 style={{ fontSize: 18, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
+    // One card rather than a heading, a paragraph and then a card. This is a
+    // secondary revenue line sitting under the thing that actually has to
+    // land, and at full size it was pulling attention off the fee and what
+    // the fee buys. Everything it needs to say fits in a box a third the
+    // height.
+    <div
+      className="mt-8 px-5 py-4"
+      style={{ backgroundColor: '#367F5C', border: CARD_OUTLINE, borderRadius: UI_RADIUS }}
+    >
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.01em' }}>
         Earn Commission Selling the Game
       </h3>
-      <p className="mt-2" style={{ fontSize: 15, color: MONOPOLY.inkMuted, lineHeight: 1.55, maxWidth: '44rem' }}>
-        Each race will get a unique link to sell Marathon Monopoly through. Orders attributed to you
-        will earn you a <strong style={{ color: MONOPOLY.ink }}>{money(commission)} commission</strong>{' '}
-        per game sold. Trackstar will hold all the inventory and do all the fulfillment, so you do
-        not have to worry about anything on that end.
+      <p className="mt-1" style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45, maxWidth: '46rem' }}>
+        Each race gets a unique link. You earn {money(commission)} on every game sold through it,
+        and Trackstar holds the inventory and does the fulfillment.
       </p>
 
-      <div
-        className="mt-4 px-5 py-5 sm:px-6"
-        style={{ backgroundColor: '#367F5C', border: CARD_OUTLINE, borderRadius: UI_RADIUS }}
-      >
-        <label
-          htmlFor="earn-units"
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.75)',
-          }}
-        >
-          Drag to set how many units you sell
-        </label>
+      {/* Slider and answer on one row. Stacked, this ran to four bands of
+          vertical space for what is one sentence with two numbers in it. */}
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
         <input
           id="earn-units"
+          aria-label="Units you sell"
           type="range"
           min={25}
           max={sliderMax}
           step={25}
           value={units}
           onChange={(e) => setUnits(Number(e.target.value))}
-          className="mt-3 w-full"
+          className="w-full sm:w-80 sm:shrink-0"
           style={{ accentColor: '#FFFFFF' }}
         />
-
-        {/* Two sentences rather than a stat block with labels. The number that
-            moves is set large inside the sentence it belongs to, so what the
-            slider does is legible without anything explaining which figure is
-            which. The tier selector went with it: nothing here varies by tier,
-            so it was a control that changed a number nobody was reading. */}
-        <div className="mt-5 flex flex-col gap-3">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
-              If you sell
-            </span>
-            <span style={{ fontSize: 40, fontWeight: 700, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.04em' }}>
-              {units}
-            </span>
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
-              units
-            </span>
-          </div>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
-              You make
-            </span>
-            <span style={{ fontSize: 40, fontWeight: 700, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.04em' }}>
-              {money(earned)}
-            </span>
-          </div>
-        </div>
+        <p
+          className="flex flex-wrap items-baseline gap-x-1.5 whitespace-nowrap"
+          style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 700 }}
+        >
+          Sell
+          <span style={{ fontSize: 22, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.03em' }}>
+            {units}
+          </span>
+          units, make
+          <span style={{ fontSize: 22, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.03em' }}>
+            {money(earned)}
+          </span>
+        </p>
       </div>
 
-      <p className="mt-3" style={{ fontSize: 13, color: MONOPOLY.inkMuted, lineHeight: 1.55, maxWidth: '44rem' }}>
+      <p className="mt-2.5" style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
         *Units are first come, first served across every race. Nothing is reserved, and once the
         first run sells out, it is sold out.
       </p>
