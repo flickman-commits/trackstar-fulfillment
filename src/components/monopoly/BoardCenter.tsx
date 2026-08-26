@@ -25,6 +25,13 @@ const TRACK_DEEP = '#A63D1D'
 const SKY_NAVY = '#414D6C'
 const SKY_ORANGE = '#E1662C'
 
+/**
+ * The upright art square, as a percentage of the diamond panel. The inscribed
+ * square is 70.7%; going wider trades corners the panel clips anyway for a
+ * scene that reaches the board's diagonal edges.
+ */
+const ART_PCT = 92
+
 /** Where the skyline stands and the track starts, in scene units. */
 const HORIZON = 58
 
@@ -82,25 +89,22 @@ const RUNNERS = [
 
 export function BoardCenter() {
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      {/* The four diagonal rules that close the centre off from the track. */}
-      {(['tl', 'tr', 'bl', 'br'] as const).map((c) => (
-        <span
-          key={c}
-          aria-hidden="true"
-          className="absolute"
-          style={{
-            width: '30%',
-            borderTop: '0.16cqw dashed rgba(35,31,32,0.4)',
-            top: c[0] === 't' ? '13%' : undefined,
-            bottom: c[0] === 'b' ? '13%' : undefined,
-            left: c[1] === 'l' ? '-6%' : undefined,
-            right: c[1] === 'r' ? '-6%' : undefined,
-            transform: `rotate(${c === 'tl' ? 45 : c === 'tr' ? -45 : c === 'bl' ? -45 : 45}deg)`,
-          }}
-        />
-      ))}
-
+    /* The panel is a diamond on screen because the board is. The art inside it
+       is not: on the printed board the wordmark and the scene read upright
+       while the space labels run on the diagonal. Counter-rotating and sizing
+       puts the art upright inside it, which is the composition the render
+       shows. Sized past the inscribed square on purpose: the panel clips to
+       the diamond, so the skyline runs out to the diagonal edges and gets cut
+       by them rather than stopping short of them in mid-air. */
+    <div
+      className="absolute left-1/2 top-1/2"
+      style={{
+        width: `${ART_PCT}%`,
+        height: `${ART_PCT}%`,
+        transform: 'translate(-50%, -50%) rotate(-45deg)',
+      }}
+    >
+      <div className="relative h-full w-full overflow-hidden">
       {/* Wordmark, upright and centred, exactly as it prints. Falls back to
           nothing rather than a broken image if the file is ever missing. */}
       <img
@@ -186,13 +190,18 @@ export function BoardCenter() {
       <DeckWell label="Community Chest" accent="#5BA4D9" side="right" />
 
       {/* The code that ships on the box. Live, so the board itself is the demo
-          of the Board Guide rather than a picture of one. */}
+          of the Board Guide rather than a picture of one.
+
+          Centred under the wordmark rather than tucked in a corner: the panel
+          clips to a diamond, and the corners of an upright box inside a
+          diamond are the first thing to go. The vertical centreline is the
+          widest the safe area ever gets. */}
       <a
         href={BOARD_GUIDE_QR_TARGET}
         target="_blank"
         rel="noopener noreferrer"
         className="absolute flex flex-col items-center"
-        style={{ left: '4%', top: '5%', width: '15%' }}
+        style={{ left: '50%', top: '25%', width: '11.5%', transform: 'translateX(-50%)' }}
         title="Scan or click for the Board Guide"
       >
         <span
@@ -222,6 +231,7 @@ export function BoardCenter() {
           Board Guide
         </span>
       </a>
+      </div>
     </div>
   )
 }

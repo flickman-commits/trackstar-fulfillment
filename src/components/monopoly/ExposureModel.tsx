@@ -172,6 +172,20 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
             </div>
           </div>
 
+          {/* The CPM argument wins on price and then hands the buyer a reason
+              to discount it: cheap impressions are still rented impressions.
+              This is the line that makes the comparison unfair in our favour,
+              so it sits inside the same card rather than three paragraphs
+              away. It is a claim about this printed edition, not a promise of
+              a space in whatever comes after it. */}
+          <p
+            className="mt-4"
+            style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', lineHeight: 1.6, maxWidth: '40rem' }}
+          >
+            And an Instagram ad is gone in ten seconds. Your space on this board is printed once
+            and it is there for good.
+          </p>
+
           {pricedTiers.length > 0 && (
             <label className="mt-5 flex flex-wrap items-center gap-2" style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
               Priced at

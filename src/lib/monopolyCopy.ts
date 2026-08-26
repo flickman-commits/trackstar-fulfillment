@@ -431,34 +431,6 @@ export const COMMUNITY_FEEDBACK = [
  * Deliberately not promised as a permanent URL with permanent hosting. It ships
  * with Edition One and lives as long as the edition does, same as the space.
  */
-/**
- * The case a spreadsheet cannot make.
- *
- * The exposure model answers "is this a good media buy", and a race director
- * who thinks in CPMs is well served by it. Nobody was being served on the other
- * side: the reason a race actually wants this is that a board on a shelf says
- * something about them no campaign can, and the page had nowhere to say it.
- *
- * Deliberately free of numbers. An earlier version put an impression count and
- * a per-year figure in here and it read as a media plan with nicer adjectives,
- * which is the section directly below this one. Anything countable belongs
- * there. This section is allowed to be about how it feels.
- */
-export const BRAND_VALUE = [
-  {
-    title: 'Prestige',
-    body: 'There are 22 spaces and there will never be more. Being one of them is a statement about where your race sits, made permanently, in a form nobody can buy their way into later.',
-  },
-  {
-    title: 'Permanence',
-    body: 'This is not a campaign that ends. It is an object that sits in a cupboard and comes out at Thanksgiving, year after year, and your race is on the table every time it does.',
-  },
-  {
-    title: 'The company you keep',
-    body: 'A board full of the best marathons in the country is a board you want to be on. Nobody needs that explained to them, and the board says it every time it comes off the shelf.',
-  },
-]
-
 export const BOARD_GUIDE = {
   /** Where the code on the box lands. */
   url: 'trackstar.art/pages/board-guide',

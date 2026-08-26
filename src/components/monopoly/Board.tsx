@@ -17,6 +17,13 @@ import { MONOPOLY, UI_RADIUS } from './monopolyTheme'
 import { GROUP_LABELS, edgeFor, gridPosition } from './../../lib/monopolyBoardLayout'
 import { BoardCenter } from './BoardCenter'
 
+/**
+ * Side of the largest square that fits inside its own bounding box once turned
+ * 45°, as a percentage. The board is laid out at this size and then rotated,
+ * so the diamond exactly fills the square the page gives it.
+ */
+const INSCRIBED_PCT = (1 / Math.SQRT2) * 100
+
 interface Props {
   spaces: BoardSpaceData[]
   selectedPosition: number | null
@@ -36,10 +43,29 @@ export function Board({
   const hoveredSpace = hovered == null ? null : ordered.find((s) => s.position === hovered) || null
 
   return (
-    <div
-      style={{ containerType: 'inline-size' }}
-      className="relative aspect-square w-full select-none"
-    >
+    <div className="relative aspect-square w-full select-none">
+      {/* The board is printed on the diagonal, so it is shown on the diagonal.
+          Two things make that work rather than just look tilted:
+
+          1. The container query context sits on THIS box, not the outer one.
+             `cqw` resolves against layout size, which a transform does not
+             change, so putting the context outside would keep every font and
+             rule at its old physical size while the board itself shrank by
+             √2 — text overflowing its own spaces. Sized to the inscribed
+             square, one `cqw` is one percent of the board's actual edge again.
+
+          2. Everything that has to stay upright — the centre panel, the hover
+             card — counter-rotates by the same 45°. The space labels do not:
+             they run on the diagonal on the printed board too. */}
+      <div
+        className="absolute left-1/2 top-1/2"
+        style={{
+          containerType: 'inline-size',
+          width: `${INSCRIBED_PCT}%`,
+          height: `${INSCRIBED_PCT}%`,
+          transform: 'translate(-50%, -50%) rotate(45deg)',
+        }}
+      >
       <div
         className="grid h-full w-full"
         style={{
@@ -76,6 +102,7 @@ export function Board({
         >
           <BoardCenter />
         </div>
+      </div>
       </div>
     </div>
   )
@@ -133,7 +160,7 @@ function SpaceTooltip({ space }: { space: BoardSpaceData }) {
       style={{
         left: `${left}cqw`,
         top: `${top}cqw`,
-        transform: 'translate(-50%, -50%)',
+        transform: 'translate(-50%, -50%) rotate(-45deg)',
         backgroundColor: MONOPOLY.black,
         color: '#FFFFFF',
         borderRadius: `${UI_RADIUS / 10}cqw`,
