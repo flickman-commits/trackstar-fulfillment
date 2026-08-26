@@ -78,7 +78,9 @@ export const SLOT_INCLUDES = [
   "Your race's name on Marathon Monopoly: Edition One",
   'Creative approval of your marks',
   '5 complimentary units shipped to your office',
+  'A framed Title Deed of your race, sent to your office',
   'Featured in the Board Guide - a digital landing page where you can explain more about your race',
+  'The opportunity to make $20 per unit sold through your partner link',
   'First right of refusal on your space in any future edition',
 ]
 

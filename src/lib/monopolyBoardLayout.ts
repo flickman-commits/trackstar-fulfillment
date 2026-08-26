@@ -42,11 +42,12 @@ export const GROUP_LABELS: Record<ColorGroup, string> = {
 }
 
 /**
- * Gameboard Mint, PMS 9525C, straight from the Monopoly brand spec. The board
- * surface is the single most recognizable color in the system, so it is worth
- * being exact rather than close.
+ * The printed edition's field. Sampled off the render rather than taken from
+ * the brand spec: Monopoly's Gameboard Mint is the classic surface, but this
+ * edition prints on a warm cream, and a mint board next to a cream box on the
+ * same page reads as two different products.
  */
-export const BOARD_FELT = '#CCE7D3'
+export const BOARD_FELT = '#F6E9D2'
 
 /**
  * Where a space sits on the perimeter. Drives color-band edge and text

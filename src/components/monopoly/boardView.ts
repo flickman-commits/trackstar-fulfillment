@@ -14,10 +14,10 @@ export const STATUS_COLORS: Record<SpaceStatus, { fill: string; text: string; la
   reserved: { fill: '#F7C948', text: '#231F20', label: 'Reserved' },
   sold: { fill: '#231F20', text: '#FFFFFF', label: 'Signed' },
   hold: { fill: '#ED1C24', text: '#FFFFFF', label: 'On hold' },
-  not_for_sale: { fill: '#E8E4DC', text: '#8A857C', label: 'Not for sale' },
+  not_for_sale: { fill: '#E4D7BE', text: '#8A8071', label: 'Not for sale' },
 }
 
-const PAPER = '#FBF9F4'
+const PAPER = '#EFE2C9'
 
 /**
  * Space fill. Open inventory is the brightest thing on the board so it reads at
@@ -25,13 +25,13 @@ const PAPER = '#FBF9F4'
  * for sale recede furthest.
  */
 export function fillFor(space: BoardSpace): string {
-  if (space.status === 'available') return '#FFFFFF'
+  if (space.status === 'available') return '#FDF6E7'
   if (space.status === 'not_for_sale') return PAPER
-  return '#F0EBE4'
+  return '#EBDCBE'
 }
 
 export function textColorFor(space: BoardSpace): string {
-  return space.status === 'not_for_sale' ? '#6B655C' : '#231F20'
+  return space.status === 'not_for_sale' ? '#6B6252' : '#231F20'
 }
 
 /** Only the states actually on the board are worth a legend row. */

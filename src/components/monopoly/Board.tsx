@@ -15,8 +15,7 @@ import { BoardSpace, CORNER_CQW, SPACE_CQW } from './BoardSpace'
 import { STATUS_COLORS } from './boardView'
 import { MONOPOLY, UI_RADIUS } from './monopolyTheme'
 import { GROUP_LABELS, edgeFor, gridPosition } from './../../lib/monopolyBoardLayout'
-
-const LOGO_SRC = '/Marathon Monopoly Logo.png'
+import { BoardCenter } from './BoardCenter'
 
 interface Props {
   spaces: BoardSpaceData[]
@@ -47,8 +46,8 @@ export function Board({
           gridTemplateColumns: '1.55fr repeat(9, 1fr) 1.55fr',
           gridTemplateRows: '1.55fr repeat(9, 1fr) 1.55fr',
           backgroundColor: BOARD_FELT,
-          border: '0.35cqw solid #231F20',
-          boxShadow: '0 2cqw 5cqw rgba(35,31,32,0.2)',
+          border: '0.45cqw solid #231F20',
+          boxShadow: 'inset 0 0 0 0.14cqw rgba(35,31,32,0.35), 0 2cqw 5cqw rgba(35,31,32,0.2)',
         }}
       >
         {ordered.map((space) => (
@@ -68,36 +67,14 @@ export function Board({
             cut off and printed sideways. */}
         {hoveredSpace && <SpaceTooltip space={hoveredSpace} />}
 
-        {/* Center medallion: the wordmark plus the two card decks. This is the
-            single cue that makes the whole thing read as Monopoly before anyone
-            reads a word on it. */}
+        {/* Center panel: the printed edition's own artwork, not a generic
+            Monopoly middle. Drawn in BoardCenter so this file stays about
+            geometry. */}
         <div
           style={{ gridArea: '2 / 2 / 11 / 11' }}
-          className="relative flex items-center justify-center overflow-hidden"
+          className="relative overflow-hidden"
         >
-          {/* Chance and Community Chest, angled into opposite quadrants the way
-              they sit on the original. The deck names are fixed by the license;
-              the card contents are where the running edition lives. */}
-          <CardDeck label="Chance" color="#F7941D" corner="topRight" />
-          <CardDeck label="Community Chest" color="#5BA4D9" corner="bottomLeft" />
-
-          {/* The real Marathon Monopoly artwork, angled 45° the way the wordmark
-              sits on the printed board. Falls back to nothing rather than a
-              broken image if the file is ever missing. */}
-          <img
-            src={LOGO_SRC}
-            alt="Marathon Monopoly"
-            style={{
-              transform: 'rotate(-45deg)',
-              width: '46%',
-              height: 'auto',
-              filter: 'drop-shadow(0 0.4cqw 1cqw rgba(35,31,32,0.22))',
-            }}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none'
-            }}
-          />
-
+          <BoardCenter />
         </div>
       </div>
     </div>
@@ -192,51 +169,3 @@ function SpaceTooltip({ space }: { space: BoardSpaceData }) {
   )
 }
 
-/**
- * A card deck resting on the board's center. Rotated the same 45° as the
- * wordmark so the three elements read as one composition rather than three
- * things that happen to be in the middle.
- */
-function CardDeck({
-  label,
-  color,
-  corner,
-}: {
-  label: string
-  color: string
-  corner: 'topRight' | 'bottomLeft'
-}) {
-  const isTopRight = corner === 'topRight'
-  return (
-    <div
-      className="absolute flex items-center justify-center"
-      style={{
-        top: isTopRight ? '12%' : undefined,
-        right: isTopRight ? '11%' : undefined,
-        bottom: isTopRight ? undefined : '12%',
-        left: isTopRight ? undefined : '11%',
-        width: '25%',
-        height: '15%',
-        backgroundColor: color,
-        border: '0.18cqw solid #1A1A1A',
-        transform: 'rotate(-45deg)',
-        boxShadow: '0.3cqw 0.3cqw 0 rgba(26,26,26,0.22)',
-      }}
-    >
-      <span
-        style={{
-          fontSize: '1.15cqw',
-          fontWeight: 700,
-          letterSpacing: '0.1cqw',
-          textTransform: 'uppercase',
-          color: '#1A1A1A',
-          textAlign: 'center',
-          lineHeight: 1.1,
-          padding: '0 4%',
-        }}
-      >
-        {label}
-      </span>
-    </div>
-  )
-}

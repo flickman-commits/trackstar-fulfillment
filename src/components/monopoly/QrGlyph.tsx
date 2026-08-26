@@ -16,7 +16,7 @@ import { MONOPOLY } from './monopolyTheme'
 
 export const BOARD_GUIDE_QR_TARGET = 'https://www.trackstar.art/pages/board-guide'
 
-export function QrGlyph({ size = 132 }: { size?: number }) {
+export function QrGlyph({ size = 132 }: { size?: number | string }) {
   return (
     <svg
       width={size}

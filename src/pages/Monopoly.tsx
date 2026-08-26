@@ -401,26 +401,33 @@ export default function Monopoly() {
         </p>
         <PackageTiers tiers={data.tiers} highlightTierKey={personalizedTierKey} />
 
-        {/* The offset was the last line of a paragraph nobody read to the end
-            of. It is the one thing here that lowers the number, so it gets to
-            be an object rather than a clause.
+        {/* What the fee actually buys. This is the section that has to land,
+            so it goes directly under the price and gets the room: a race
+            director deciding on a number wants to see what the number is for,
+            not a calculator for a secondary revenue line.
 
-            It now carries both routes. Wholesale alone asked a race to hold
-            stock, which is the one thing organizers said they will not do, so
-            the offer only ever worked for races that already run a store. */}
-        <EarnItBack />
-
-        {/* What the fee actually buys, listed once here rather than repeated
-            in every tier row. Nothing in it varies by tier, so a per-row copy
-            was five chances to disagree with itself. */}
-        <div className="mt-10">
-          <h3 className="mb-3" style={{ fontSize: 17, fontWeight: 700, color: MONOPOLY.ink }}>
+            Listed once here rather than repeated per tier. Nothing in it
+            varies by tier, so a per-row copy was seven chances to disagree
+            with itself. */}
+        <div className="mt-12">
+          <h3 className="mb-5" style={{ fontSize: 26, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.025em' }}>
             Purchasing a race slot includes
           </h3>
-          <ul className="flex flex-col gap-2" style={{ maxWidth: '40rem' }}>
+          <ul
+            className="grid gap-x-10 gap-y-4 md:grid-cols-2"
+            style={{ maxWidth: '62rem' }}
+          >
             {SLOT_INCLUDES.map((item, i) => (
-              <li key={item} className="flex gap-2.5" style={{ fontSize: 17, color: MONOPOLY.inkMuted, lineHeight: 1.55 }}>
-                <span aria-hidden="true" style={{ color: MONOPOLY.red, fontWeight: 700 }}>
+              <li
+                key={item}
+                className="flex gap-3"
+                style={{ fontSize: 19, color: MONOPOLY.ink, lineHeight: 1.5 }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="shrink-0"
+                  style={{ color: MONOPOLY.red, fontWeight: 700, fontSize: 22, lineHeight: 1.35 }}
+                >
                   +
                 </span>
                 <span>
@@ -431,12 +438,18 @@ export default function Monopoly() {
             ))}
           </ul>
           {/* Small, and said once. It is a scope note, not a sales point. */}
-          <p className="mt-4" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '40rem' }}>
+          <p className="mt-5" style={{ fontSize: 14, color: MONOPOLY.inkMuted, lineHeight: 1.6, maxWidth: '40rem' }}>
             *{SLOT_INCLUDES_NOTE}
           </p>
-          <div className="mt-8">
-            <CtaButton />
-          </div>
+        </div>
+
+        {/* Below the slot list on purpose, and deliberately quiet. It is a real
+            offer but a secondary one, and at full size it was pulling attention
+            off the thing a race is actually buying. */}
+        <EarnItBack />
+
+        <div className="mt-10">
+          <CtaButton />
         </div>
 
         {SHOW_AVAILABILITY_TABLE && (
