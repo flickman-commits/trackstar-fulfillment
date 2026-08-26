@@ -8,6 +8,7 @@
  */
 import type { BrandPrice, PackageTier } from '@/lib/monopolyTypes'
 import { formatMoney } from '@/lib/monopolyMath'
+import { UNIT_ALLOCATION } from '@/lib/monopolyCopy'
 import { GROUP_COLORS } from '@/lib/monopolyBoardLayout'
 
 interface Props {
@@ -16,6 +17,9 @@ interface Props {
   /** Highlighted when the visitor arrived on a personalized link. */
   highlightTierKey?: string
 }
+
+/** Read off the allocation so a change to the run moves this too. */
+const PRINT_RUN = UNIT_ALLOCATION.reduce((sum, row) => sum + row.units, 0)
 
 export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
   return (
@@ -29,6 +33,7 @@ export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
             <tr style={{ borderBottom: '2px solid #1A1A1A' }}>
               <Th>Tier</Th>
               <Th align="right">Fee</Th>
+              <Th align="right">Per box</Th>
               <Th align="right">Open</Th>
             </tr>
           </thead>
@@ -83,6 +88,13 @@ export function PackageTiers({ tiers, brandPricing, highlightTierKey }: Props) {
                     <strong style={{ color: '#1A1A1A', fontSize: 16 }}>
                       {tier.fee != null ? formatMoney(tier.fee) : 'n/a'}
                     </strong>
+                  </Td>
+                  {/* A race director divides the fee by the run in their head
+                      within about four seconds of seeing it. Doing it for them
+                      is both friendlier and safer: it lands next to the number
+                      that makes it look reasonable rather than on a napkin. */}
+                  <Td align="right" muted>
+                    {tier.fee != null ? `$${(tier.fee / PRINT_RUN).toFixed(2)}` : 'n/a'}
                   </Td>
                   <Td align="right" muted>
                     {tier.slotsRemaining} / {tier.slotsTotal}

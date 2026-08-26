@@ -158,8 +158,17 @@ export function ExposureModel({ tiers, initialTierKey }: Props) {
                 cheaper", which reads as a broken number rather than as the
                 honest answer. That happens at the top of the ladder, where a
                 slot is priced level with Instagram by design. */}
+            {/* Dark Blue is priced above the point where the same impressions
+                could be bought on Instagram, because that slot is anchoring
+                rather than a number we expect to sell. Saying "the same as
+                Instagram" there would overstate it, so a tier that costs more
+                says so and the argument moves to permanence instead. */}
             <div style={{ fontSize: 34, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.03em' }}>
-              {savingsPct >= 1 ? `${savingsPct}% cheaper` : 'the same as Instagram'}
+              {savingsPct >= 1
+                ? `${savingsPct}% cheaper`
+                : savingsPct <= -1
+                  ? 'and it never stops running'
+                  : 'the same as Instagram'}
             </div>
           </div>
 

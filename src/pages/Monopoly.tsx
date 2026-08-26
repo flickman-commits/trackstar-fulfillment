@@ -27,6 +27,7 @@ import { MONOPOLY, UI_RADIUS, CARD_OUTLINE, HAND_FONT, guilloche } from '@/compo
 import { buildFixturePayload } from '@/lib/monopolyFixture'
 import {
   BOARD_GUIDE,
+  BRAND_VALUE,
   COMMIT_STEPS,
   LAUNCH_PLAN,
   PRODUCT_SHOTS,
@@ -528,6 +529,30 @@ export default function Monopoly() {
         </div>
       </Section>
 
+      {/* ═══ BRAND VALUE ═══
+          Sits immediately before the exposure model on purpose. That section
+          answers whether this is a good media buy, which is the wrong first
+          question to put to a race whose whole identity is not being corporate.
+          This one answers why they would want it at all, and the numbers below
+          then back it up rather than leading.
+
+          Nothing countable in here. An earlier draft carried an impression
+          count and a per-year figure and it read as a media plan with better
+          adjectives, which is precisely the section underneath it. */}
+      <Section dark>
+        <SectionHeading>Brand value</SectionHeading>
+        <p className="mb-9 mt-3" style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, maxWidth: '46rem' }}>
+          Every other place you can put your race's name is rented. You stop paying and you stop
+          existing. This one you buy once.
+        </p>
+
+        <div className="grid gap-8 md:grid-cols-3">
+          {BRAND_VALUE.map((c) => (
+            <Beat key={c.title} dark title={c.title} body={c.body} />
+          ))}
+        </div>
+      </Section>
+
       {/* ═══ RETURN ON INVESTMENT ═══ */}
       <Section muted>
         <SectionHeading>Return on investment</SectionHeading>
@@ -657,7 +682,7 @@ export default function Monopoly() {
       {/* ═══ CTA ═══ */}
       <Section dark>
         <div className="mx-auto max-w-2xl text-center">
-          <H2 dark>Marathon Monopoly is only going to get printed once. Are you in?</H2>
+          <H2 dark>Marathon Monopoly is happening. Are you in?</H2>
           <div className="mt-8">
             <CtaButton />
           </div>
