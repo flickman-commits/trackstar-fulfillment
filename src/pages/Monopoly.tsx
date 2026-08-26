@@ -337,9 +337,39 @@ export default function Monopoly() {
             Here are a few of the strategies, amongst others, that we will use to get eyeballs on
             this product.
           </p>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Titles only, six across. These six are a list of things we are
+              doing, not six arguments to read: each one explains itself in
+              four words, and the paragraph under it was restating the title
+              at greater length. Stripped back, the whole plan reads in one
+              glance instead of one screen. */}
+          <div className="grid gap-3 grid-cols-3 lg:grid-cols-6">
             {[...SALES_PLAN, ...LAUNCH_PLAN].map((item) => (
-              <Beat key={item.title} card title={item.title} body={item.body} />
+              <div
+                key={item.title}
+                className="flex items-center justify-center px-2 py-3.5 text-center sm:px-3 sm:py-4"
+                style={{
+                  border: `2px solid ${MONOPOLY.red}`,
+                  borderRadius: UI_RADIUS,
+                  backgroundColor: MONOPOLY.paper,
+                }}
+              >
+                <h3
+                  style={{
+                    // Three tiles across a phone leaves about 80px of content
+                    // width, and "Simultaneous" does not fit that at 16px. The
+                    // clamp scales the type with the viewport instead of
+                    // letting the longest word break its own card.
+                    fontSize: 'clamp(12px, 3.1vw, 16px)',
+                    fontWeight: 700,
+                    letterSpacing: '-0.015em',
+                    lineHeight: 1.25,
+                    color: MONOPOLY.ink,
+                    textWrap: 'balance',
+                  }}
+                >
+                  {item.title}
+                </h3>
+              </div>
             ))}
           </div>
         </div>
