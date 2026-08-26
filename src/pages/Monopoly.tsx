@@ -405,9 +405,27 @@ export default function Monopoly() {
                   backgroundColor: MONOPOLY.paper,
                 }}
               >
-                <blockquote style={{ fontSize: 16, color: MONOPOLY.ink, lineHeight: 1.5 }}>
-                  “{item.quote}”
-                </blockquote>
+                <div>
+                  {/* The mark does the work the inline quotes were doing, and
+                      does it before the reader starts the sentence rather than
+                      as punctuation they scan past. */}
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: 'block',
+                      fontSize: 56,
+                      lineHeight: 0.72,
+                      fontWeight: 700,
+                      color: MONOPOLY.red,
+                      fontFamily: 'Georgia, serif',
+                    }}
+                  >
+                    “
+                  </span>
+                  <blockquote className="mt-2" style={{ fontSize: 16, color: MONOPOLY.ink, lineHeight: 1.5 }}>
+                    {item.quote}
+                  </blockquote>
+                </div>
                 <figcaption style={{ fontSize: 26, fontWeight: 700, color: MONOPOLY.ink, letterSpacing: '-0.02em' }}>
                   {item.name}
                 </figcaption>

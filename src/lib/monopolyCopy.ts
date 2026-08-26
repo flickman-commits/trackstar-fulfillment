@@ -373,13 +373,13 @@ export const COMMUNITY_FEEDBACK = [
   },
   {
     quote:
-      'Great idea. I would order for sure. If it is personalized maybe a bit more. Jail should be DNF.',
+      'Great idea. I would order for sure. Jail should be DNF.',
     name: 'Pat',
     price: '$50 to $60',
   },
   {
     quote:
-      'Yes, absolutely. So many ideas: new gel disagrees with you at mile 18, go back N spaces. You win a lottery entry into the London marathon, jump ahead N spaces. Favorite shoe company drops new carbon plate race shoes 6 weeks before your next race, pay $300.',
+      "Yes, absolutely. I'd order.",
     name: 'Dave',
     price: 'Not exceeding $49',
   },
