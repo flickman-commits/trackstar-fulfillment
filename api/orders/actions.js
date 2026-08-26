@@ -61,6 +61,20 @@ function buildPortalUrl(token) {
 }
 
 /**
+ * How an order reads in the audit log: type, number, and who it is for.
+ *
+ * The type is spelled out because a custom order and a standard one are
+ * different amounts of work, and "completed 3743" alone tells you nothing
+ * about which queue it left.
+ */
+function describeOrder(order) {
+  const label = { custom: 'custom order', race_partner: 'race partner order' }[order.trackstarOrderType]
+    || 'standard order'
+  const who = [order.runnerName, order.raceName].filter(Boolean).join(' - ')
+  return `${label} ${order.orderNumber}${who ? ` (${who})` : ''}`
+}
+
+/**
  * One-line, human-readable description of a gated action for the audit log.
  * Written for someone scanning the log later, so it names the thing acted on
  * rather than restating the action key.
@@ -232,11 +246,11 @@ export default async function handler(req, res) {
       case 'clear-research':
         return await handleClearResearch(body, res)
       case 'complete':
-        return await handleComplete(body, res)
+        return await handleComplete(body, res, actor)
       case 'photo-placed':
         return await handlePhotoPlaced(body, res)
       case 'reopen':
-        return await handleReopen(body, res)
+        return await handleReopen(body, res, actor)
       case 'design-status':
         return await handleDesignStatus(body, res)
       case 'notify-custom-delay':
@@ -416,7 +430,17 @@ async function handleClearResearch({ raceName }, res) {
 }
 
 // --- complete ---
-async function handleComplete({ orderNumber }, res) {
+/**
+ * Marking an order done is logged even though it is not an admin action.
+ *
+ * It is the one piece of everyday fulfillment work in the audit log, because
+ * it is the moment an order stops being anyone's problem, and "who marked this
+ * shipped?" is a question that gets asked about real orders. Everything else
+ * routine stays out: a log that records every refresh is one nobody reads.
+ *
+ * Deliberately NOT gated to admins. Completing orders is the job.
+ */
+async function handleComplete({ orderNumber }, res, actor) {
   if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
 
   const existing = await prisma.order.findFirst({ where: { orderNumber } })
@@ -438,6 +462,19 @@ async function handleComplete({ orderNumber }, res) {
   })
 
   console.log(`[actions/complete] Order ${orderNumber} marked as completed`)
+
+  await recordAudit({
+    action: 'order.complete',
+    summary: `Completed ${describeOrder(existing)}`,
+    detail: {
+      orderNumber,
+      orderType: existing.trackstarOrderType,
+      runnerName: existing.runnerName,
+      raceName: existing.raceName,
+    },
+    actor,
+  })
+
   return res.status(200).json({ success: true, order })
 }
 
@@ -467,7 +504,12 @@ async function handlePhotoPlaced({ orderNumber, placed = true }, res) {
 // Un-completes an order. Restores status based on whether we have research
 // data: 'ready' if found, otherwise 'pending'. This brings the order back
 // into the active queue so it can be edited / re-researched / re-fulfilled.
-async function handleReopen({ orderNumber }, res) {
+/**
+ * Logged alongside complete, because a completion record that can be silently
+ * undone is worse than no record: the log would still say an order was
+ * finished long after someone put it back in the queue.
+ */
+async function handleReopen({ orderNumber }, res, actor) {
   if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
 
   const existing = await prisma.order.findFirst({
@@ -488,6 +530,19 @@ async function handleReopen({ orderNumber }, res) {
   })
 
   console.log(`[actions/reopen] Order ${orderNumber} re-opened (status: completed → ${newStatus})`)
+
+  await recordAudit({
+    action: 'order.reopen',
+    summary: `Reopened ${describeOrder(existing)}`,
+    detail: {
+      orderNumber,
+      orderType: existing.trackstarOrderType,
+      runnerName: existing.runnerName,
+      raceName: existing.raceName,
+      newStatus,
+    },
+    actor,
+  })
   return res.status(200).json({ success: true, order })
 }
 

@@ -18,6 +18,14 @@ import prisma from './prisma.js'
 
 export const ROLES = ['admin', 'staff']
 
+/**
+ * What a role is called in anything a person reads - audit summaries, errors.
+ * The stored value stays "staff"; only the wording changes.
+ */
+export function roleLabel(role) {
+  return role === 'admin' ? 'admin' : 'team member'
+}
+
 /** "Matt Hickman", or just "Matt" when no last name is set. */
 export function fullName(user) {
   return [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim()

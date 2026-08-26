@@ -24,7 +24,7 @@ import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import {
-  ROLES, hashPassword, normalizeEmail, isValidEmail, fullName,
+  ROLES, hashPassword, normalizeEmail, isValidEmail, fullName, roleLabel,
   loadActiveUser, requireAdminRole, recordAudit,
 } from '../_lib/users.js'
 
@@ -134,7 +134,7 @@ export default async function handler(req, res) {
         })
         await recordAudit({
           action: 'user.invite',
-          summary: `Invited ${email} as ${role}`,
+          summary: `Invited ${email} as ${roleLabel(role)}`,
           detail: { email, role },
           actor: admin,
         })
@@ -159,7 +159,7 @@ export default async function handler(req, res) {
         const user = await prisma.user.update({ where: { id: target.id }, data: { role }, select: PUBLIC_FIELDS })
         await recordAudit({
           action: 'user.role',
-          summary: `Changed ${target.email} from ${target.role} to ${role}`,
+          summary: `Changed ${target.email} from ${roleLabel(target.role)} to ${roleLabel(role)}`,
           detail: { userId: target.id, from: target.role, to: role },
           actor: admin,
         })
