@@ -16,6 +16,7 @@
  */
 
 import prisma from '../_lib/prisma.js'
+import { ensureApprovalToken, touchApprovalToken } from '../_lib/approvalToken.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { alertError } from '../_lib/alerts.js'
 import { createClient } from '@supabase/supabase-js'
@@ -28,7 +29,7 @@ import fs from 'fs'
 // Disable Vercel's default body parser for multipart support
 export const config = { api: { bodyParser: false } }
 
-const APPROVAL_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
+
 
 function parseBody(req) {
   return new Promise((resolve, reject) => {
@@ -212,8 +213,14 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'Invalid approval link. Please contact us for assistance.' })
       }
       if (new Date() > approvalToken.expiresAt) {
-        return res.status(410).json({ error: 'This approval link has expired. Please contact us for a new link.' })
+        return res.status(410).json({
+          error: 'This approval link has expired. Reply to the email it came in and we will send you a new one.',
+        })
       }
+
+      // They are here and using it, so the order is live. Keep the link alive
+      // for another full window rather than counting down from the send.
+      touchApprovalToken(approvalToken.orderId)
 
       if (req.method === 'GET') {
         const proofs = await prisma.proof.findMany({
@@ -334,8 +341,11 @@ export default async function handler(req, res) {
       })
       if (!approvalToken) return res.status(404).json({ error: 'Invalid link. Please contact us for assistance.' })
       if (new Date() > approvalToken.expiresAt) {
-        return res.status(410).json({ error: 'This link has expired. Please contact us for a new one.' })
+        return res.status(410).json({
+          error: 'This link has expired. Reply to the email it came in and we will send you a new one.',
+        })
       }
+      touchApprovalToken(approvalToken.orderId)
 
       const message = await prisma.orderMessage.create({
         data: { orderId: approvalToken.orderId, sender: 'customer', body: text, readByDesigner: false }
@@ -383,16 +393,11 @@ export default async function handler(req, res) {
         const order = await prisma.order.findUnique({ where: { id: orderId } })
         if (!order) return res.status(404).json({ error: 'Order not found' })
 
-        const newToken = crypto.randomUUID()
-        const expiresAt = new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS)
+        // Reuse, do not rotate. Rotating here is what left partners holding
+        // links that had not just lapsed but had become permanently wrong.
+        const approvalToken = await ensureApprovalToken(orderId)
 
-        const approvalToken = await prisma.approvalToken.upsert({
-          where: { orderId },
-          create: { orderId, token: newToken, expiresAt },
-          update: { token: newToken, expiresAt }
-        })
-
-        console.log(`[approval-token] Generated token for order ${order.orderNumber}`)
+        console.log(`[approval-token] Issued token for order ${order.orderNumber}`)
         return res.status(200).json({
           approvalToken,
           approvalUrl: buildApprovalUrl(req, approvalToken.token)
@@ -416,14 +421,9 @@ export default async function handler(req, res) {
       if (!order) return res.status(404).json({ error: 'Order not found' })
       if (!order.customerEmail) return res.status(400).json({ error: 'Order has no customer email' })
 
-      // Upsert approval token
-      const newToken = crypto.randomUUID()
-      const expiresAt = new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS)
-      const approvalToken = await prisma.approvalToken.upsert({
-        where: { orderId },
-        create: { orderId, token: newToken, expiresAt },
-        update: { token: newToken, expiresAt }
-      })
+      // Same token as every previous send for this order, with the clock
+      // pushed out, so an earlier email keeps working alongside this one.
+      const approvalToken = await ensureApprovalToken(orderId)
       const approvalUrl = buildApprovalUrl(req, approvalToken.token)
 
       // Detect if this is a revision re-send
@@ -723,12 +723,7 @@ export default async function handler(req, res) {
         data: { orderId, version, batch, imageUrl: publicUrl, thumbnailUrl, fileName, status: 'pending' }
       })
 
-      let approvalToken = await prisma.approvalToken.findUnique({ where: { orderId } })
-      if (!approvalToken) {
-        approvalToken = await prisma.approvalToken.create({
-          data: { orderId, token: crypto.randomUUID(), expiresAt: new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS) }
-        })
-      }
+      const approvalToken = await ensureApprovalToken(orderId)
 
       const approvalUrl = buildApprovalUrl(req, approvalToken.token)
       console.log(`[proofs] Uploaded v${version} for order ${order.orderNumber}`)

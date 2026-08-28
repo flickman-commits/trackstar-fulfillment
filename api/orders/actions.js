@@ -27,6 +27,7 @@
 
 import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
+import { ensureApprovalToken } from '../_lib/approvalToken.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireAdminRole, recordAudit } from '../_lib/users.js'
 import { alertError } from '../_lib/alerts.js'
@@ -36,20 +37,6 @@ import { getRaceShorthands } from '../../server/scrapers/index.js'
 import WeatherService from '../../server/services/WeatherService.js'
 import { Resend } from 'resend'
 import { runWeeklyAdsDebrief, isFridayFourPmEastern } from '../../server/services/weeklyAdsDebrief.js'
-
-const APPROVAL_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
-
-// Ensure an ApprovalToken exists for an order; create one if missing. Returns
-// the (existing or new) token row. Mirrors the proofs endpoint's token logic.
-async function ensureApprovalToken(orderId) {
-  const existing = await prisma.approvalToken.findUnique({ where: { orderId } })
-  if (existing && new Date() < existing.expiresAt) return existing
-  return prisma.approvalToken.upsert({
-    where: { orderId },
-    create: { orderId, token: crypto.randomUUID(), expiresAt: new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS) },
-    update: { token: crypto.randomUUID(), expiresAt: new Date(Date.now() + APPROVAL_TOKEN_EXPIRY_MS) },
-  })
-}
 
 // Build the customer-facing approval/portal URL. Prod uses the Vercel
 // production URL; falls back to APP_BASE_URL for other environments.
