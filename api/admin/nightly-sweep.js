@@ -4,7 +4,15 @@
  *   GET  ?cached=1[&format=markdown]  → LAST NIGHT'S finished report, without
  *                                       re-running anything. This is what the
  *                                       morning email reads.
- *   GET  (cron: Bearer CRON_SECRET)   → run the sweep
+ *   GET  (cron: Bearer CRON_SECRET)   → run the sweep. Kept for a manual or
+ *                                       scripted trigger; there is deliberately
+ *                                       no Vercel cron on this any more. The
+ *                                       nightly Claude Code routine is the only
+ *                                       scheduler, because a cron quietly
+ *                                       producing a report while the agent is
+ *                                       dead is how you get a healthy-looking
+ *                                       email for a week without noticing the
+ *                                       fixing half stopped.
  *   GET  (admin session / secret)     → run the sweep, return JSON
  *   GET  ?dryRun=1                    → run it without moving the baseline
  *   POST {before, after}              → the agent files its finished run:

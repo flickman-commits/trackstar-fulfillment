@@ -19,6 +19,12 @@ The worst outcome available to you is a bad PR.
 Replaces the older coverage-check routine, which reported and stopped. The
 difference here is that you are allowed to fix things — under the rules below.
 
+**You are the only scheduler.** There is no Vercel cron on the sweep any more.
+If this routine does not run, no report is stored, and the morning email says
+how long it has been rather than rendering stale numbers as today's. That is
+deliberate: a cron quietly producing a report while the agent is broken is how
+you get a healthy-looking email for a week without noticing.
+
 ## The shape of the run
 
 Sweep → fix → sweep again → file the report. The second sweep is not
