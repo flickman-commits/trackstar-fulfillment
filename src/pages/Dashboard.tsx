@@ -67,7 +67,7 @@ interface Order {
   officialPace?: string
   researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null
   // How the result was obtained: scraper vs. customer-confirmed in the widget
-  researchSource?: 'scraper' | 'customer_verified' | null
+  researchSource?: 'scraper' | 'customer_verified' | 'customer_supplied' | null
   // Detailed Instant Lookup widget outcome — how the shopper arrived at their
   // result. See server schema Order.lookupOutcome for the enum.
   lookupOutcome?:
@@ -2006,6 +2006,13 @@ export default function Dashboard() {
       o.status !== 'completed' &&
       o.hasScraperAvailable === true &&
       o.researchStatus !== 'found' &&
+      // The customer already gave us their bib and time. Re-scraping cannot
+      // improve on that and regularly makes it worse: a common surname comes
+      // back as a page of strangers, and the order reads unresolved when
+      // nothing was ever missing. The single-order Research button still works
+      // if someone genuinely wants to go looking.
+      o.researchSource !== 'customer_supplied' &&
+      o.researchSource !== 'customer_verified' &&
       (o.trackstarOrderType || 'standard') === 'standard' &&
       (o.effectiveRaceYear || o.raceYear)
     )
@@ -2169,6 +2176,9 @@ Thank you!`
     // Customer confirmed an official-results match in the Instant Lookup widget
     // — trusted, no scrape needed. Shown ahead of the generic ready/found labels.
     if (order.researchSource === 'customer_verified') return { icon: '🟣', label: 'Customer-verified' }
+    // Their own numbers, never matched against official results. Distinct icon
+    // so it does not read as a confirmed match at a glance.
+    if (order.researchSource === 'customer_supplied') return { icon: '✍️', label: 'Customer-entered' }
     if (order.status === 'ready') return { icon: '✅', label: 'Ready' }
     if (order.researchStatus === 'found') return { icon: '✅', label: 'Researched' }
     if (order.researchStatus === 'no_scraper') return { icon: '🚧', label: 'No scraper for this race' }
@@ -3572,7 +3582,7 @@ Thank you!`
                               <div className="flex items-center justify-between gap-3">
                                 <span className="text-sm font-semibold text-off-black w-12 shrink-0 tabular-nums">{race.year}</span>
                                 <div className="flex-1 flex items-center gap-4 text-xs text-off-black/50 min-w-0">
-                                  {race.raceDate && <span>{new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })}</span>}
+                                  {race.raceDate && <span>{new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })}</span>}
                                   {race.location && <span className="truncate">{race.location}</span>}
                                   {race.weatherCondition && <span>{race.weatherCondition.charAt(0).toUpperCase() + race.weatherCondition.slice(1)}</span>}
                                   {race.weatherTemp && <span>{race.weatherTemp}</span>}
@@ -5072,8 +5082,20 @@ Thank you!`
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-green-600 text-sm">✓</span>
                             <h4 className="text-xs font-semibold text-green-700 uppercase tracking-tight">
-                              {selectedOrder.researchSource === 'customer_verified' ? 'Customer-Verified Result' : 'Research Results'}
+                              {selectedOrder.researchSource === 'customer_verified'
+                                ? 'Customer-Verified Result'
+                                : selectedOrder.researchSource === 'customer_supplied'
+                                  ? 'Entered by the Customer'
+                                  : 'Research Results'}
                             </h4>
+                            {selectedOrder.researchSource === 'customer_supplied' && (
+                              <span
+                                className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold bg-blue-100 text-blue-700 border border-blue-300"
+                                title="These are the customer's own numbers, typed or edited at checkout. They were never matched against official results, so print exactly what is here and do not go looking for a better answer."
+                              >
+                                ✍️ Customer's own numbers
+                              </span>
+                            )}
                             {selectedOrder.researchSource === 'customer_verified' && (
                               <span
                                 className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold"

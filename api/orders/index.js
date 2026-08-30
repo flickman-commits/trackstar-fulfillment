@@ -10,12 +10,28 @@ import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 /**
  * Format date as MM.DD.YY (e.g., "12.02.18")
  */
+/**
+ * A race date is a CALENDAR DAY, not an instant, so read it in UTC.
+ *
+ * Local getters were rendering 138 of the 166 stored races a day early. Most
+ * rows are written as UTC midnight, and anywhere west of Greenwich that is the
+ * previous evening: New York City Marathon 2026 is stored 2026-11-01 and was
+ * printing as 10.31, which is Halloween rather than race day. The date goes on
+ * the poster, so the off-by-one was reaching customers.
+ *
+ * UTC is right for both write styles in the database. Rows written as UTC
+ * midnight read back as the intended day, and rows written as local midnight
+ * (resolveRaceDate's new Date(y, m-1, d), which is 04:00Z in New York) still
+ * land on the same UTC day. It also matches raceDateIso below, which has
+ * always used toISOString - the panel and its own edit field were disagreeing
+ * about what day the race was.
+ */
 function formatRaceDate(date) {
   if (!date) return null
   const d = new Date(date)
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const year = String(d.getFullYear()).slice(-2)
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  const year = String(d.getUTCFullYear()).slice(-2)
   return `${month}.${day}.${year}`
 }
 

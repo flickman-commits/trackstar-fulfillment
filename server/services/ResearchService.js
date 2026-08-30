@@ -115,24 +115,36 @@ export class ResearchService {
   }
 
   /**
-   * Apply a CUSTOMER-VERIFIED result instead of scraping the runner.
+   * Use the CUSTOMER'S OWN runner data instead of scraping for it.
    *
-   * When the shopper confirmed an official-results match in the storefront
-   * Instant Lookup widget (Order.lookupVerified === true), we trust their
-   * finish time / bib / pace / event and skip the expensive, ambiguity-prone
-   * runner scrape (Tier 2). We STILL fetch race-level data (Tier 1: date,
-   * location, weather) because the poster needs it and the customer doesn't
-   * provide it — that fetch is best-effort, with a minimal Race fallback so the
-   * verified runner data always lands.
+   * Two cases arrive here, and the difference is only how much we trust the
+   * numbers - not whether we use them:
    *
-   * Produces a RunnerResearch row with researchStatus='found' and
-   * source='customer_verified', and marks the order 'ready' — the same shape
-   * the dashboard already reads, so no UI change is required.
+   *   verified: true  - the shopper confirmed an official-results match in the
+   *                     Instant Lookup widget (Order.lookupVerified === true).
+   *   verified: false - the shopper typed the numbers, or edited what the
+   *                     widget found (lookupOutcome 'edited_by_customer' and
+   *                     friends). Their numbers are still the ones going on the
+   *                     poster, so scraping for a "better" answer is not just
+   *                     wasted work, it is actively harmful: on a common
+   *                     surname the scrape comes back with a list of strangers
+   *                     and the order lands in the queue looking unresolved.
+   *
+   * Either way we STILL fetch race-level data (Tier 1: date, location,
+   * weather) because the poster needs it and the customer does not supply it.
+   * That fetch is best-effort, with a minimal Race fallback so the runner data
+   * always lands.
+   *
+   * Produces a RunnerResearch row with researchStatus='found' and marks the
+   * order 'ready'. `source` records which of the two it was, so the dashboard
+   * can be honest about where the numbers came from.
    *
    * @param {string} orderNumber
+   * @param {Object} [opts]
+   * @param {boolean} [opts.verified=true] - false for typed/edited entries
    * @returns {Promise<Object>} { race, runnerResearch, order }
    */
-  async applyVerifiedResult(orderNumber) {
+  async applyVerifiedResult(orderNumber, { verified = true } = {}) {
     const order = await prisma.order.findFirst({ where: { orderNumber } })
     if (!order) throw new Error(`Order not found: ${orderNumber}`)
 
@@ -178,8 +190,10 @@ export class ResearchService {
       eventType: order.customerEventType || null,
       yearFound: effectiveRaceYear,
       researchStatus: 'found',
-      source: 'customer_verified',
-      researchNotes: 'Customer-confirmed via Instant Lookup (matched official results)',
+      source: verified ? 'customer_verified' : 'customer_supplied',
+      researchNotes: verified
+        ? 'Customer-confirmed via Instant Lookup (matched official results)'
+        : 'Entered by the customer at checkout, not matched against official results. Their numbers, used as given.',
       resultsUrl: race.resultsUrl || null,
       possibleMatches: null,
     }
@@ -199,7 +213,7 @@ export class ResearchService {
       data: { status: 'ready', researchedAt: new Date() }
     })
 
-    console.log(`[ResearchService] Applied customer-verified result for ${orderNumber} (bib ${researchData.bibNumber}, ${researchData.officialTime})`)
+    console.log(`[ResearchService] Applied ${verified ? 'customer-verified' : 'customer-supplied'} result for ${orderNumber} (bib ${researchData.bibNumber}, ${researchData.officialTime})`)
     return { race, runnerResearch, order }
   }
 

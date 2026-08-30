@@ -103,8 +103,11 @@ const TRUST_TAGS: Record<string, { label: string; sublabel?: string; tone: TagTo
     title: 'The customer skipped Instant Lookup and typed their details in by hand.',
   },
   edited_by_customer: {
-    label: 'Customer typed', tone: 'blue',
-    title: 'The customer changed the time, pace or bib on the review screen, so these are their numbers rather than the official result.',
+    // "Edited" not "typed": Instant Lookup did find something and they changed
+    // it. Whoever fulfills this should know the numbers were overridden on
+    // purpose, not entered from a blank form.
+    label: 'Customer edited', tone: 'blue',
+    title: 'Instant Lookup found a result and the customer changed the time, pace or bib on the review screen. These are their numbers, not the official ones - print them as given.',
   },
   // No data at all. A human has to look it up.
   async_no_match: {
@@ -211,6 +214,9 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   } else if (o.researchSource === 'customer_verified') {
     tags.push({ key: 'trust', label: 'Verified', sublabel: 'by customer', tone: 'green',
       title: 'The customer confirmed an official-results match before checkout.' })
+  } else if (o.researchSource === 'customer_supplied') {
+    tags.push({ key: 'trust', label: 'Customer entered', tone: 'blue',
+      title: 'The customer typed these numbers at checkout. They were never matched against official results - print them as given.' })
   }
 
   // Customer choices about what prints.

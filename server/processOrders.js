@@ -1047,6 +1047,12 @@ export async function processOrders(options = {}) {
                 // official results — that's the data worth trusting. The
                 // resulting RunnerResearch row simply has null time/pace, and
                 // the order's hadNoTime flag drives the "No Time" badge.
+                // Did the shopper hand us usable numbers, verified or not?
+                // A time is enough on its own, and so is a bib: both are things
+                // only they can tell us for a race we may not even be able to
+                // scrape.
+                const customerSupplied = Boolean(dbOrder.customerFinishTime || dbOrder.customerBib)
+
                 if (dbOrder.lookupVerified === true) {
                   log(`[processOrders] ✅ Customer-verified result for ${dbOrder.orderNumber} - skipping runner scrape`)
                   try {
@@ -1057,6 +1063,23 @@ export async function processOrders(options = {}) {
                     results.researchFailed++
                     orderResult.researchStatus = 'error'
                     log(`[processOrders] ❌ Failed to apply customer-verified result: ${verifyError.message}`)
+                  }
+                } else if (dbOrder.lookupVerified === false && customerSupplied) {
+                  // They typed or edited their own numbers. Those are the
+                  // numbers going on the poster, so a scrape cannot improve
+                  // them - it can only muddy them. On a common surname it comes
+                  // back with a page of strangers and the order sits in the
+                  // queue looking unresolved when nothing was ever missing.
+                  // Race-level data (date, weather) is still fetched.
+                  log(`[processOrders] ✍️  Customer-supplied result for ${dbOrder.orderNumber} - skipping runner scrape`)
+                  try {
+                    await researchService.applyVerifiedResult(dbOrder.orderNumber, { verified: false })
+                    results.researched++
+                    orderResult.researchStatus = 'customer_supplied'
+                  } catch (supplyError) {
+                    results.researchFailed++
+                    orderResult.researchStatus = 'error'
+                    log(`[processOrders] ❌ Failed to apply customer-supplied result: ${supplyError.message}`)
                   }
                 } else if (hasScraperForRace(dbOrder.raceName)) {
                   log(`[processOrders] Running research for ${dbOrder.orderNumber}...`)
