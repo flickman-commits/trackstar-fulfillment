@@ -110,6 +110,14 @@ Cap fixture captures at **10 per night**. These hit third-party timing sites,
 and hammering them gets us blocked — Sydney's firewall escalated against us
 inside one afternoon of over-probing.
 
+**One clean probe is not proof.** Eugene captured three fixtures, probed clean,
+and fifteen minutes later all three came back "found here before and is not
+found now". The site is intermittent, and a single pass caught it on a good
+minute. So a race that flips between live and drifted across probes is FLAKY,
+which is a Tier 2 flag, not a fix — report it as an unreliable source rather
+than claiming it works. Do not re-probe repeatedly hoping for a clean run;
+that is both dishonest and how we get rate-limited.
+
 ## Step 3: Tier 1 — ship config changes, but only what you can PROVE
 
 You may commit and merge scraper config changes **only** when the change is
