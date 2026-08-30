@@ -19,11 +19,22 @@ The worst outcome available to you is a bad PR.
 Replaces the older coverage-check routine, which reported and stopped. The
 difference here is that you are allowed to fix things — under the rules below.
 
-## Step 1: get the report
+## The shape of the run
+
+Sweep → fix → sweep again → file the report. The second sweep is not
+bookkeeping: comparing the two passes is how "what got fixed" is established.
+You do not get to tell us what you fixed, we check. A fix that did not actually
+clear its finding shows up as still outstanding, which is what you want at 1am
+with nobody watching.
+
+## Step 1: the first sweep
 
 ```
-GET /api/admin/nightly-sweep          # header: x-admin-secret
+GET /api/admin/nightly-sweep?dryRun=1     # header: x-admin-secret
 ```
+
+`dryRun=1` so the baseline does not move before you have done the work. Keep
+this response — you hand it back at the end as `before`.
 
 Every finding carries `kind`, `subject`, `severity`, `detail`, and an `action`
 of `tier0_auto`, `tier1_fixable`, or `tier2_flag`. `delta.new` is what appeared
@@ -112,20 +123,31 @@ Database migrations or schema changes · destructive actions (clearing research,
 deleting, merging races) · bulk price edits · messaging customers · force-pushing
 · merging anything whose gates did not pass.
 
-## Step 5: report
+## Step 5: sweep again, then file the report
 
-Post the Slack report — the sweep endpoint already formats it. Add, in your own
-words:
+Re-run the sweep, then POST both passes:
 
-- what you fixed (Tier 0), with counts
-- what you shipped (Tier 1), with the PR link and **the evidence**: which runner
-  and which finish time proved the config
-- what needs Matt (Tier 2), most consequential first
-- what you deliberately did not do, and why
+```
+GET  /api/admin/nightly-sweep                       → this is `after`
+POST /api/admin/nightly-sweep  { before, after, notes }
+```
+
+The endpoint works out what was found, what was fixed, what your fixes
+introduced, and what is still standing — then renders the report and stores it.
+**Matt's existing morning email reads that stored report**; you are not sending
+a separate notification. One more channel is how a report stops being read.
+
+`notes` is your own narrative, kept separate from the computed sections so a
+claim can never be mistaken for a verified fact. Put in it:
+
+- what you shipped, with the PR link and **the evidence**: which runner, which
+  finish time and pace proved the config
+- what you chose not to do, and why
+- anything you were unsure about
+
+Say it plainly. If nothing needed doing, one line. Do not pad the report to look
+busy, and do not soften a finding to make the night look clean — a confident
+wrong answer at 1am is worse than a flagged question.
 
 Record consequential actions in the audit log so overnight work sits alongside
 human work and "who did this?" has an answer.
-
-Write plainly. If nothing needed doing, say that in one line — do not pad the
-report to look busy. And if you were unsure about something, say you were
-unsure; a confident wrong answer at 1am is worse than a flagged question.

@@ -115,3 +115,94 @@ export function formatSweepForSlack(report) {
 
   return out.join('\n')
 }
+
+
+/**
+ * The finished nightly report, as Markdown, for the morning email.
+ *
+ * Ordered the way you would want to read it half awake: what we found, what we
+ * fixed, then what still needs you. The last section is the point of the whole
+ * exercise and is meant to be short - ideally empty.
+ *
+ * Markdown rather than Slack mrkdwn because this is written to be embedded in
+ * the existing daily email rather than posted as yet another notification.
+ */
+export function formatSweepAsMarkdown(combined) {
+  const c = combined.counts
+  const out = []
+
+  out.push('## Overnight system sweep')
+  out.push('')
+
+  if (!combined.healthy) {
+    out.push('> **Some checks could not run tonight**, so this is not a full picture:')
+    for (const f of combined.failedChecks) out.push(`> - \`${f.name}\` — ${f.error}`)
+    out.push('')
+  }
+
+  out.push(
+    `**${c.fixed} fixed** · **${c.found} new** · ` +
+    `**${c.remaining} still open** (${c.remainingHigh} high)`
+  )
+  out.push('')
+
+  if (c.fixed) {
+    out.push('### Fixed overnight')
+    for (const [kind, items] of group(combined.fixed)) {
+      out.push(`- **${label(kind)}** (${items.length})`)
+      for (const f of items.slice(0, 5)) out.push(`  - ${f.subject}`)
+      if (items.length > 5) out.push(`  - …and ${items.length - 5} more`)
+    }
+    out.push('')
+  }
+
+  if (c.found) {
+    out.push('### New tonight')
+    for (const [kind, items] of group(combined.found)) {
+      out.push(`- **${label(kind)}** (${items.length})`)
+      for (const f of items.slice(0, 5)) out.push(`  - ${f.subject} — ${f.detail}`)
+      if (items.length > 5) out.push(`  - …and ${items.length - 5} more`)
+    }
+    out.push('')
+  }
+
+  // A fix that broke something else. Rare, and never worth burying.
+  if (c.introduced) {
+    out.push('### ⚠️ Appeared after the fixes ran')
+    for (const f of combined.introduced) out.push(`- ${label(f.kind)} — ${f.subject}: ${f.detail}`)
+    out.push('')
+  }
+
+  const high = combined.remaining.filter(f => f.severity === 'high')
+  out.push('### Needs you')
+  if (!high.length) {
+    out.push('Nothing high-severity outstanding.')
+  } else {
+    for (const [kind, items] of group(high)) {
+      out.push(`- **${label(kind)}** (${items.length})`)
+      for (const f of items.slice(0, 6)) out.push(`  - ${f.subject} — ${f.detail}`)
+      if (items.length > 6) out.push(`  - …and ${items.length - 6} more`)
+    }
+  }
+  out.push('')
+
+  const rest = combined.remaining.filter(f => f.severity !== 'high')
+  if (rest.length) {
+    out.push(`<details><summary>Standing backlog (${rest.length})</summary>`)
+    out.push('')
+    for (const [kind, items] of group(rest)) out.push(`- ${label(kind)}: ${items.length}`)
+    out.push('')
+    out.push('</details>')
+    out.push('')
+  }
+
+  const s = combined.stats || {}
+  out.push(
+    `_${s.catalog?.activeProducts ?? '?'} live products · ` +
+    `${s.catalog?.racesSold ?? '?'} races sold · ` +
+    `${s.scrapers?.racesConfigured ?? '?'} scrapers · ` +
+    `${s.orders?.openOrders ?? '?'} open orders_`
+  )
+
+  return out.join('\n')
+}

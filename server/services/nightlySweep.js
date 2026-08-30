@@ -347,6 +347,9 @@ function fingerprint(f) {
 
 const LAST_REPORT_KEY = 'nightly_sweep_last'
 
+/** Where the finished, human-readable report is parked for the morning email. */
+export const NIGHTLY_REPORT_KEY = 'nightly_sweep_report'
+
 /**
  * What changed since last night.
  *
@@ -405,6 +408,54 @@ async function withDelta(report, { persist = true } = {}) {
  *   new baseline. Skipping the computation instead made a dry run report
  *   "0 new" alongside "first run", which is two contradictory things at once.
  */
+/**
+ * Combine the before-fixes and after-fixes passes into one story.
+ *
+ * The agent runs the sweep, fixes what it may, then runs it again. Comparing
+ * the two passes is how "what got fixed" is established, and it matters that
+ * it works this way round: the agent does not get to TELL us what it fixed,
+ * we check. A fix that did not actually clear the finding shows up as still
+ * outstanding, which is exactly what you want at 1am with nobody watching.
+ *
+ * @param {Object} before - the sweep as it stood at the start of the run
+ * @param {Object} after  - the sweep re-run once the fixes were applied
+ */
+export function combineSweepPasses(before, after) {
+  const key = f => `${f.kind}::${f.subject}`
+  const afterKeys = new Set(after.findings.map(key))
+
+  // Present at the start, gone at the end: fixed during this run.
+  const fixed = before.findings.filter(f => !afterKeys.has(key(f)))
+
+  // Present at the end but not at the start. Usually a fix that exposed a
+  // fresh problem, and always worth surfacing rather than quietly folding
+  // into the backlog.
+  const beforeKeys = new Set(before.findings.map(key))
+  const introduced = after.findings.filter(f => !beforeKeys.has(key(f)))
+
+  return {
+    startedAt: before.startedAt,
+    finishedAt: after.finishedAt,
+    healthy: before.healthy && after.healthy,
+    failedChecks: [...before.failedChecks, ...after.failedChecks],
+    // What tonight's sweep turned up that yesterday's did not.
+    found: before.delta?.new || [],
+    fixed,
+    introduced,
+    // Still standing once the fixes were done. This is the "needs attention"
+    // list, and the hope is that it is short.
+    remaining: after.findings,
+    stats: after.stats,
+    counts: {
+      found: (before.delta?.new || []).length,
+      fixed: fixed.length,
+      introduced: introduced.length,
+      remaining: after.findings.length,
+      remainingHigh: after.findings.filter(f => f.severity === 'high').length,
+    },
+  }
+}
+
 export async function runNightlySweep({ persistBaseline = true } = {}) {
   const startedAt = new Date()
 
