@@ -113,6 +113,8 @@ export class MultiSportAustraliaScraper extends BaseScraper {
    * @param {string} config.raceName
    * @param {string} config.location
    * @param {string} config.raceSlug - e.g. 'sydney-marathon' (slug template, year appended)
+   * @param {Object} [config.raceSlugs] - year -> full slug, for years whose URL
+   *                  does not follow the {raceSlug}-{year} pattern
    * @param {Object} [config.eventIds] - year -> { marathon: 1 } event ID map
    * @param {number} [config.defaultMarathonEventId=1]
    * @param {Function} config.calculateDate
@@ -122,7 +124,11 @@ export class MultiSportAustraliaScraper extends BaseScraper {
     this.config = config
     this.tag = config.tag || config.raceName
     this.baseUrl = 'https://www.multisportaustralia.com.au'
-    this.raceSlug = `${config.raceSlug}-${year}`
+    // Most years follow {raceSlug}-{year}, but a race that was renamed keeps
+    // its old slug for the editions run under the old name. Sydney 2022 is
+    // still filed as blackmores-sydney-running-festival-2022; the computed
+    // sydney-marathon-2022 is a hard 404.
+    this.raceSlug = config.raceSlugs?.[year] || `${config.raceSlug}-${year}`
   }
 
   async getRaceInfo() {

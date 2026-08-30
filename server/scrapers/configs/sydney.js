@@ -12,6 +12,20 @@ export default {
   tag: 'Sydney Marathon',
   location: 'Sydney, Australia',
   raceSlug: 'sydney-marathon',
+  /**
+   * Years whose URL does not follow {raceSlug}-{year}.
+   *
+   * The event was the Blackmores Sydney Running Festival until it rebranded,
+   * and MultiSport Australia kept the original slug for that edition. The
+   * computed sydney-marathon-2022 is a hard 404 (verified), so without this
+   * every 2022 order failed at the first request.
+   *
+   * Source: the official race site's past-results page links 2022 to
+   * multisportaustralia.com.au/races/blackmores-sydney-running-festival-2022.
+   */
+  raceSlugs: {
+    2022: 'blackmores-sydney-running-festival-2022',
+  },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   defaultMarathonEventId: 1,
