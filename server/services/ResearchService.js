@@ -344,14 +344,26 @@ export class ResearchService {
     const scraper = getScraperForRace(raceName, year)
     let results = await scraper.searchRunner(runnerName)
 
-    // If the initial search returned candidates (close matches that didn't pass
-    // namesMatch), surface them as 'ambiguous' so the dashboard shows the
-    // possible-match picker instead of just "Runner not found".
+    // Candidates that did not pass namesMatch are SUGGESTIONS, not matches.
+    //
+    // This used to relabel them 'ambiguous', which put "More than one match -
+    // pick the right runner" above a list of people who are not the customer.
+    // Sydney 2026 order 3858 searched for Jesus Perez and offered Oscar Perez
+    // Araujo, Maria Elba Alvarez Perez and three other Perezes: the surname is
+    // all they share. Telling someone to pick one of those is how a stranger's
+    // name ends up printed on a poster, which is the same failure as the
+    // Baxter mix-up, just routed through a person instead of an auto-accept.
+    //
+    // The status stays not_found, because that is what happened. The
+    // candidates still ride along and the picker still renders - they are
+    // genuinely useful when the customer typed "Jim" and the results say
+    // "James" - but the screen now has to ask for a confirmation rather than a
+    // choice. Real ambiguity, where several finishers truly share the name,
+    // still comes back from the scraper as ambiguous and is untouched here.
     if (!results.found && !results.ambiguous && results.possibleMatches?.length > 0) {
-      console.log(`[ResearchService] Initial search returned ${results.possibleMatches.length} candidates - marking ambiguous`)
-      results.ambiguous = true
-      results.researchStatus = 'ambiguous'
-      results.researchNotes = `No exact match for "${runnerName}". ${results.possibleMatches.length} possible match${results.possibleMatches.length > 1 ? 'es' : ''} found - please verify.`
+      console.log(`[ResearchService] ${results.possibleMatches.length} near-name suggestions (not a match)`)
+      results.researchStatus = 'not_found'
+      results.researchNotes = `No match for "${runnerName}". ${results.possibleMatches.length} runner${results.possibleMatches.length > 1 ? 's' : ''} with a similar name - confirm before accepting.`
     }
 
     // Last-name fallback: if full name not found AND no candidates surfaced yet,
@@ -375,12 +387,14 @@ export class ResearchService {
           fallbackResults.researchNotes = `Found as "${foundName}" (searched by last name "${lastName}")`
           results = fallbackResults
         } else if (fallbackResults.ambiguous || fallbackResults.possibleMatches?.length > 0) {
-          // Surface the candidates as ambiguous so user can pick
-          console.log(`[ResearchService] Last-name fallback surfaced ${fallbackResults.possibleMatches?.length || 0} candidates`)
+          // Surname-only hits are suggestions by construction: we deliberately
+          // threw the first name away to get them. Same reasoning as above -
+          // surface them, but never as "matches".
+          console.log(`[ResearchService] Last-name fallback surfaced ${fallbackResults.possibleMatches?.length || 0} suggestions`)
           results = fallbackResults
-          results.ambiguous = true
-          results.researchStatus = 'ambiguous'
-          results.researchNotes = `No exact match for "${runnerName}". Found ${fallbackResults.possibleMatches?.length || 'multiple'} runner(s) with last name "${lastName}" - please verify.`
+          results.ambiguous = false
+          results.researchStatus = 'not_found'
+          results.researchNotes = `No match for "${runnerName}". Found ${fallbackResults.possibleMatches?.length || 'multiple'} runner(s) sharing the last name "${lastName}" - confirm before accepting.`
         } else {
           console.log(`[ResearchService] Last name fallback also returned no results`)
         }

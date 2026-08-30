@@ -4930,7 +4930,9 @@ Thank you!`
                           : status === 'upstream_error'
                             ? 'Timing site is down'
                           : status === 'not_found'
-                            ? 'Runner not found'
+                            ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
+                                ? 'Runner not found - similar names below'
+                                : 'Runner not found')
                           : status === 'ambiguous'
                             ? 'More than one match'
                           : null
@@ -4948,10 +4950,27 @@ Thank you!`
                           : status === 'upstream_error'
                             ? 'The timing site is slow or down right now. Nothing is wrong with this order. Retry the lookup in a couple of minutes.'
                           : status === 'not_found'
-                            ? 'Check the runner name and year are right, then research again. If it still comes up empty, look it up by hand.'
-                          : status === 'ambiguous'
                             ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
-                                ? 'Pick the right runner from the matches below.'
+                                // Suggestions, not matches. The list below shares
+                                // a surname with the customer and nothing else, so
+                                // the ask is "confirm", never "choose".
+                                ? `We could not find ${selectedOrder.runnerName} in these results. The runners below have a similar name - only accept one if you can confirm on the results site that it is the same person. Otherwise look it up by hand.`
+                                : 'Check the runner name and year are right, then research again. If it still comes up empty, look it up by hand.')
+                          : status === 'ambiguous'
+                            // Ask for a confirmation, never a bare choice. Even
+                            // in real same-name ambiguity, guessing puts a
+                            // stranger's finish time on a customer's poster -
+                            // and every record written before this was fixed is
+                            // stored as 'ambiguous' whether or not anyone
+                            // actually matched, so this copy has to be safe for
+                            // both. The bib is what separates two people.
+                            ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
+                                // Only promise the bib when we actually have
+                                // one. Records written before the search-row
+                                // parser captured bibs have none, and pointing
+                                // at a column that is not there is worse than
+                                // saying nothing.
+                                ? `More than one finisher has a name close to ${selectedOrder.runnerName}. Confirm on the results site which one is the customer before accepting${possibleMatchesMap[selectedOrder.orderNumber].some(m => m.bib) ? ' - the bib is the reliable way to tell them apart' : ''}.`
                                 : 'Several runners share this name. Look them up on the results site to confirm which one is right.')
                           : null
                         if (!fix) return null
