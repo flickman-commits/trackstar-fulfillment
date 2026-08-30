@@ -258,7 +258,12 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '2:08:31',
     expectedChipPace: '4:54',
     expectedBib: null,
-    notes: 'Sydney 2025 - verifies net_time extraction + Cloudflare bypass',
+    notes:
+      'Sydney 2025 - verifies net_time extraction. CURRENTLY BLOCKED: MultiSport ' +
+      'Australia firewalls /results/individuals/ ("Request Blocked - matched a ' +
+      'security rule") even with a valid Cloudflare clearance cookie, so no chip ' +
+      'time is reachable. Kept, not deleted: the day the block lifts this fixture ' +
+      'is what proves the scraper still parses net_time correctly.',
   },
 
   // ── RaceRoster ────────────────────────────────────────────────────────

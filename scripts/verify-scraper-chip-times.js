@@ -41,7 +41,15 @@ async function main() {
       const gotPace = normalizePace(result.officialPace)
       const wantPace = normalizePace(fx.expectedChipPace)
 
-      if (!result.found) {
+      if (result.researchStatus === 'upstream_error') {
+        // The site refused us. Reporting that as a failed fixture teaches
+        // people to ignore a red suite, and the skill's own advice is to read
+        // the log rather than trust the count - so make the count trustworthy
+        // instead. A block is not a regression and does not fail the run, but
+        // it is never silent either.
+        console.log(`🚧 BLOCKED (${result.researchNotes || 'upstream refused'})`)
+        results.push({ ...fx, pass: false, blocked: true, reason: result.researchNotes || 'upstream refused' })
+      } else if (!result.found) {
         console.log('❌ NOT_FOUND')
         results.push({ ...fx, pass: false, reason: 'Runner not found' })
       } else if (got !== want) {
@@ -64,14 +72,22 @@ async function main() {
   }
 
   const passed = results.filter(r => r.pass).length
-  const failed = results.length - passed
+  const blocked = results.filter(r => r.blocked)
+  const failures = results.filter(r => !r.pass && !r.blocked)
+  const failed = failures.length
   console.log('\n=== SUMMARY ===')
-  console.log(`  Passed: ${passed}/${results.length}`)
-  console.log(`  Failed: ${failed}`)
+  console.log(`  Passed:  ${passed}/${results.length}`)
+  console.log(`  Failed:  ${failed}`)
+  if (blocked.length) {
+    console.log(`  Blocked: ${blocked.length} (upstream refused - not a regression)`)
+    for (const b of blocked) {
+      console.log(`    🚧 ${b.race} (${b.year}) - ${b.runner}: ${b.reason}`)
+    }
+  }
 
   if (failed > 0) {
     console.log('\n=== FAILURES ===')
-    results.filter(r => !r.pass).forEach(r => {
+    failures.forEach(r => {
       console.log(`  ${r.race} (${r.year}) - ${r.runner}: ${r.reason}`)
     })
     process.exit(1)

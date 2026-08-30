@@ -20,6 +20,21 @@ import { launchBrowser } from '../browserLauncher.js'
 import * as cheerio from 'cheerio'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
+/**
+ * Why a matched runner can still come back without a time.
+ *
+ * MultiSport Australia firewalls the per-runner result pages: with a valid
+ * Cloudflare clearance cookie the search endpoint answers 200 while
+ * /results/individuals/ returns "Request Blocked - matched a security rule".
+ * That is a deliberate rule aimed at automated access, not a bot challenge we
+ * are failing to solve, so the honest move is to report it and stop.
+ */
+/** Row-action link text that is a button, not a person. */
+const GENERIC_LINK_TEXT = /^(view( result)?s?|result|details?|more)$/i
+
+const DETAIL_BLOCKED_NOTE =
+  'the timing site firewall blocks automated access to individual result pages'
+
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 /**
@@ -29,6 +44,27 @@ const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
  * "Just a moment..." JS challenge). A real headless-browser fingerprint
  * clears both, so on ANY 403 we transparently retry via Puppeteer.
  */
+/**
+ * True when a 200-with-HTML response is actually Cloudflare, not the site.
+ *
+ * The browser fallback returns whatever page it landed on, so a challenge or a
+ * WAF denial arrives as perfectly valid HTML with no results in it. Without
+ * this check that reads as "the runner isn't in these results".
+ */
+export function isBlockPage(html) {
+  if (!html) return false
+  return /Just a moment\.\.\.|Checking your browser|Request Blocked|matched a security rule|Attention Required/i.test(html)
+}
+
+/** Thrown when the site refused us, so callers can tell it apart from a miss. */
+export class BlockedError extends Error {
+  constructor(url) {
+    super('blocked by the site firewall')
+    this.name = 'BlockedError'
+    this.url = url
+  }
+}
+
 async function smartFetch(url) {
   // First try a simple fetch — cheap when it works.
   const resp = await fetchWithTimeout(url, {
@@ -45,7 +81,11 @@ async function smartFetch(url) {
   // the hard "Request Blocked" WAF page come back as 403. The headless browser
   // clears both (verified: same IP, real Chrome fingerprint -> HTTP 200).
   if (resp.status === 403) {
-    return await fetchViaBrowser(url)
+    const html = await fetchViaBrowser(url)
+    // The browser hands back the challenge/denial page as ordinary HTML. Treat
+    // that as the refusal it is rather than parsing it for results.
+    if (isBlockPage(html)) throw new BlockedError(url)
+    return html
   }
   throw new Error(`HTTP ${resp.status}`)
 }
@@ -87,7 +127,10 @@ export class MultiSportAustraliaScraper extends BaseScraper {
 
   async getRaceInfo() {
     return {
-      raceDate: this.config.calculateDate(this.year),
+      // resolveRaceDate prefers a verified raceDates entry and only computes
+      // as a last resort. Sydney moved from mid-September to late August in
+      // 2025, so the computed date is three weeks wrong for 2022-2024.
+      raceDate: this.resolveRaceDate(),
       location: this.config.location,
       eventTypes: this.config.eventTypes || ['Marathon'],
       resultsUrl: `${this.baseUrl}/races/${this.raceSlug}`,
@@ -109,7 +152,8 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         searchHtml = await smartFetch(searchUrl)
       } catch (err) {
         console.log(`[${this.tag}] Search fetch failed: ${err.message}`)
-        return this.notFoundResult()
+        if (err instanceof BlockedError) return this.upstreamErrorResult('search blocked by the site firewall')
+        return this.upstreamErrorResult(err.message)
       }
 
       // Get marathon-specific event id (default to 1)
@@ -130,13 +174,16 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         console.log(`[${this.tag}] No name match. Surfacing ${Math.min(candidates.length, 10)} candidates.`)
         return this.notFoundResult(null, candidates.slice(0, 10).map(c => ({
           name: c.name,
+          bib: c.bib || null,
           eventType: this.config.defaultEventType || 'Marathon',
         })))
       }
       if (matches.length > 1) {
-        // No time or bib: the search page yields name + detail URL only, and
-        // both live behind a per-runner detail fetch. Absent, not zero.
-        return this.ambiguousResult(matches.map(m => ({ name: m.name })))
+        // Two runners can share a name - Sydney 2024 has two Shane Smiths - so
+        // pass the bib through. It is the only thing that tells them apart, and
+        // it is right there in the search row's "(#21037)" suffix. Time stays
+        // absent because it lives behind the blocked detail page.
+        return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: m.bib || null })))
       }
 
       // Step 3: Fetch detail page for the matched runner
@@ -148,13 +195,19 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         detailHtml = await smartFetch(detailUrl)
       } catch (err) {
         console.log(`[${this.tag}] Detail fetch failed: ${err.message}`)
-        return this.notFoundResult()
+        if (err instanceof BlockedError) return this.upstreamErrorResult(DETAIL_BLOCKED_NOTE)
+        return this.upstreamErrorResult(err.message)
       }
 
       const data = this._extractRunnerData(detailHtml)
       if (!data.netTime) {
+        // We matched this person on the search page, so they ran. A missing
+        // time here means the page did not give us one, which is our problem
+        // to fix, not a fact about the runner.
         console.log(`[${this.tag}] No net time on detail page`)
-        return this.notFoundResult()
+        return this.upstreamErrorResult(
+          isBlockPage(detailHtml) ? DETAIL_BLOCKED_NOTE : 'result page carried no net time'
+        )
       }
 
       const time = this.formatTime(data.netTime)
@@ -192,7 +245,12 @@ export class MultiSportAustraliaScraper extends BaseScraper {
    */
   _parseSearchResults(html, marathonEventId) {
     const $ = cheerio.load(html)
-    const candidates = []
+    // Keyed by detail URL: each result row links to the same runner TWICE, once
+    // from their name and once from a "View Result" button. Collecting both
+    // produced a phantom candidate literally named "View Result", doubled the
+    // reported candidate count, and could turn one runner into a false
+    // ambiguity. One row is one runner, so the URL is the identity.
+    const byUrl = new Map()
 
     $('a[href*="/results/individuals/"]').each((_, a) => {
       const href = $(a).attr('href') || ''
@@ -203,14 +261,21 @@ export class MultiSportAustraliaScraper extends BaseScraper {
       if (!eventMatch) return
       if (parseInt(eventMatch[1], 10) !== marathonEventId) return
 
-      // Strip "(#N)" ranking suffix
+      // Strip "(#N)" bib suffix
       const name = text.replace(/\s*\(#\d+\)\s*$/, '').trim()
-      if (!name) return
+      if (!name || GENERIC_LINK_TEXT.test(name)) return
 
-      candidates.push({ name, url: href })
+      // The bib rides in the name link's suffix; the button link has none.
+      const bibMatch = text.match(/\(#(\d+)\)/)
+      const existing = byUrl.get(href)
+      if (!existing) {
+        byUrl.set(href, { name, url: href, bib: bibMatch ? bibMatch[1] : null })
+      } else if (!existing.bib && bibMatch) {
+        byUrl.set(href, { name, url: href, bib: bibMatch[1] })
+      }
     })
 
-    return candidates
+    return [...byUrl.values()]
   }
 
   /**

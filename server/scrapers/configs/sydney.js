@@ -24,9 +24,36 @@ export default {
   keywords: ['sydney'],
   keywordRequiresMarathon: true,
   /**
-   * Sydney Marathon is typically the last Sunday of August.
-   * (2024: Sept 15, 2025: Aug 31 — variable, generally late Aug / early Sep)
-   * Use last Sunday of August as a reasonable default.
+   * Verified dates, not computed ones.
+   *
+   * Sydney moved from mid-September to late August when it joined the Abbott
+   * World Marathon Majors in 2025. The old "last Sunday of August" rule is
+   * therefore three weeks early for every edition before that: it returns
+   * Aug 28 for 2022 (really Sept 18), Aug 27 for 2023 (really Sept 17) and
+   * Aug 25 for 2024 (really Sept 15).
+   *
+   * That mattered more than it looks. The race date drives the weather printed
+   * on the poster, and MultiSport Australia firewalls the per-runner result
+   * pages, so for these years there is no scraped date to override the guess.
+   * A 2024 Sydney print would have carried late-August weather for a race run
+   * in the middle of September.
+   *
+   * Sources: 2026 Aug 30 and 2025 Aug 31 per Wikipedia and the official race
+   * site; 2024 Sept 15 (goandrace, Race Roster); 2023 Sept 17 (NSW Taxi
+   * Council road-closure notice); 2022 Sept 18 (Blackmores Sydney Running
+   * Festival, Race Roster).
+   */
+  raceDates: {
+    2022: '2022-09-18',
+    2023: '2023-09-17',
+    2024: '2024-09-15',
+    2025: '2025-08-31',
+    2026: '2026-08-30',
+  },
+  /**
+   * Fallback for years not listed above. Last Sunday of August, which matches
+   * the post-2025 Majors slot and agrees with both verified dates since the
+   * move. Do not trust it for anything before 2025.
    */
   calculateDate(year) {
     const aug31 = new Date(year, 7, 31) // August 31
