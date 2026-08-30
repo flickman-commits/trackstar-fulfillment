@@ -48,24 +48,37 @@ async function storeRenderedReport(combined, notes = null) {
 }
 
 /**
- * The shape combineSweepPasses produces, from a single sweep with no fixes.
- * Used when the sweep runs on its own: everything it found is still standing,
- * because nothing acted on it.
+ * The shape combineSweepPasses produces, from a single sweep run on its own.
+ *
+ * "Fixed" here means "was a finding at the last sweep and is not one now",
+ * which is the only thing a standalone run can honestly claim. It does not
+ * assert who fixed it - an agent, a person during the day, or a timing site
+ * that came back up all look identical from here, and all three are worth
+ * seeing. Hardcoding this empty made the cron drop cleared findings silently:
+ * they vanished off the list with nothing to say they had gone.
+ *
+ * The delta stores fingerprints rather than whole findings, so they are parsed
+ * back into the minimal shape the report renders.
  */
 function asUnfixedReport(report) {
+  const resolved = (report.delta?.resolved || []).map(fp => {
+    const [kind, ...rest] = String(fp).split('::')
+    return { kind, subject: rest.join('::'), severity: 'medium', detail: 'No longer reported.' }
+  })
+
   return {
     startedAt: report.startedAt,
     finishedAt: report.finishedAt,
     healthy: report.healthy,
     failedChecks: report.failedChecks,
     found: report.delta?.new || [],
-    fixed: [],
+    fixed: resolved,
     introduced: [],
     remaining: report.findings,
     stats: report.stats,
     counts: {
       found: (report.delta?.new || []).length,
-      fixed: 0,
+      fixed: resolved.length,
       introduced: 0,
       remaining: report.findings.length,
       remainingHigh: report.findings.filter(f => f.severity === 'high').length,
