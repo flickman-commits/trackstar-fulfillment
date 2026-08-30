@@ -27,6 +27,7 @@
  */
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { agentActor } from '../_lib/agentToken.js'
 import { runNightlySweep, combineSweepPasses, NIGHTLY_REPORT_KEY } from '../../server/services/nightlySweep.js'
 import { formatSweepForSlack, formatSweepAsMarkdown, formatSweepBrief } from '../../server/services/nightlySweepReport.js'
 
@@ -134,7 +135,9 @@ export default async function handler(req, res) {
     wantsCached && reportToken && presented && presented === reportToken
   )
 
-  if (!isCron && !isReportReader && !requireAdmin(req, res)) return
+  // The nightly agent carries its own narrowly-scoped token; see _lib/agentToken.
+  const isAgent = Boolean(agentActor(req))
+  if (!isCron && !isReportReader && !isAgent && !requireAdmin(req, res)) return
 
   const dryRun = req.query?.dryRun === '1' || req.query?.dryRun === 'true'
 

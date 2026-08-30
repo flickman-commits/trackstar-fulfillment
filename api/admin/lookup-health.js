@@ -18,6 +18,7 @@
  * not "what happened at 09:32".
  */
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { agentActor } from '../_lib/agentToken.js'
 import prisma from '../_lib/prisma.js'
 import {
   buildCoverageGrid,
@@ -96,7 +97,9 @@ function timingStats(entries) {
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  // The nightly agent may reach the repair actions here and nothing else. Its
+  // token is checked against a fixed allowlist rather than a role.
+  if (!agentActor(req) && !requireAdmin(req, res)) return
 
   res.setHeader('Cache-Control', 'private, no-store, max-age=0')
 
