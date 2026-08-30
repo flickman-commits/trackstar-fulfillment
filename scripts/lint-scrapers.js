@@ -99,11 +99,13 @@ for (const fx of fixtures) {
   }
 }
 
-// The window the coverage grid cares about, matching scrapers/index.js.
-const COVERED_YEARS = (() => {
-  const now = new Date().getFullYear()
-  return [now, now - 1, now - 2, now - 3]
-})()
+// Borrowed from the coverage grid rather than recomputed. Hand-rolling the
+// window here made this gate disagree with the nightly sweep: lint called
+// Boston's dates verified while the sweep correctly reported 2022 missing,
+// because the grid covers five years and this counted four. Two definitions of
+// "covered" is one too many.
+const { coveredYears } = await import('../server/lib/scraperHealth.js')
+const COVERED_YEARS = coveredYears()
 
 // 5. Verify every config file imports cleanly
 const CONFIGS_DIR = path.resolve(__dirname, '../server/scrapers/configs')
