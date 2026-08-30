@@ -34,7 +34,7 @@ export class CompetitiveTimingScraper extends BaseScraper {
 
   async getRaceInfo() {
     return {
-      raceDate: this.config.calculateDate(this.year),
+      raceDate: this.resolveRaceDate(),
       location: this.config.location,
       eventTypes: this.config.eventTypes || ['Marathon', 'Half Marathon'],
       resultsUrl: `https://competitivetiming.com/events/${this.raceSlug}/${this.year}/marathon/results`,

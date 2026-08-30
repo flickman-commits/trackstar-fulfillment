@@ -82,7 +82,7 @@ export class ChronoTrackScraper extends BaseScraper {
 
   async getRaceInfo() {
     return {
-      raceDate: this.config.calculateDate(this.year),
+      raceDate: this.resolveRaceDate(),
       location: this.config.location,
       eventTypes: this.config.eventTypes || ['Marathon', 'Half Marathon'],
       resultsUrl: this._resultsUrl(),

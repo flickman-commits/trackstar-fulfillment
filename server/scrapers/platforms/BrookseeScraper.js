@@ -25,7 +25,7 @@ export class BrookseeScraper extends BaseScraper {
   async getRaceInfo() {
     console.log(`[${this.tag} ${this.year}] Fetching race info...`)
 
-    const raceDate = this.config.calculateDate(this.year)
+    const raceDate = this.resolveRaceDate()
     console.log(`[${this.tag} ${this.year}] Race date: ${raceDate.toDateString()}`)
 
     return {

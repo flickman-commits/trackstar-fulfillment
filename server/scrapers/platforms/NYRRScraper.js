@@ -44,7 +44,7 @@ export class NYRRScraper extends BaseScraper {
           console.log(`[${this.tag} ${this.year}] Got event details from API`)
 
           return {
-            raceDate: apiDate ?? this.config.calculateDate(this.year),
+            raceDate: this.resolveRaceDate(apiDate),
             location: this.config.location,
             eventTypes: this.config.eventTypes || ['Marathon'],
             resultsUrl: `https://results.nyrr.org/event/${this.eventCode}/finishers`,
@@ -57,7 +57,7 @@ export class NYRRScraper extends BaseScraper {
     }
 
     // Fallback to calculated date
-    const raceDate = this.config.calculateDate(this.year)
+    const raceDate = this.resolveRaceDate()
     console.log(`[${this.tag} ${this.year}] Using calculated race date: ${raceDate.toDateString()}`)
 
     return {

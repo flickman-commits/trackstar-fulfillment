@@ -20,6 +20,19 @@ export default {
   keywords: ['new york', 'nyc'],
   keywordRequiresMarathon: true,
   /**
+   * Verified dates, not computed ones.
+   *
+   * Source: the per-year Wikipedia articles for the 2023-2025 editions; 2026
+   * (the 50th running of the five-borough course) is confirmed as Sunday
+   * November 1 by NYRR listings.
+   */
+  raceDates: {
+    2023: '2023-11-05',
+    2024: '2024-11-03',
+    2025: '2025-11-02',
+    2026: '2026-11-01',
+  },
+  /**
    * NYC Marathon is always the first Sunday of November
    */
   calculateDate(year) {

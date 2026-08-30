@@ -34,7 +34,7 @@ export class XacteScraper extends BaseScraper {
   async getRaceInfo() {
     console.log(`[${this.tag} ${this.year}] Fetching race info...`)
 
-    const raceDate = this.config.calculateDate(this.year)
+    const raceDate = this.resolveRaceDate()
     const eventTypes = this.config.eventTypes || ['Marathon']
     const eventId = this.eventId || 'unknown'
 

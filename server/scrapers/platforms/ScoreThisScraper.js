@@ -87,7 +87,7 @@ export class ScoreThisScraper extends BaseScraper {
     }
 
     // Otherwise build dynamically from date + raceCode
-    const date = this.config.calculateDate(this.year)
+    const date = this.resolveRaceDate()
     const yyyy = date.getFullYear()
     const mm = String(date.getMonth() + 1).padStart(2, '0')
     const dd = String(date.getDate()).padStart(2, '0')
@@ -97,7 +97,7 @@ export class ScoreThisScraper extends BaseScraper {
   async getRaceInfo() {
     console.log(`[${this.tag} ${this.year}] Fetching race info...`)
 
-    const raceDate = this.config.calculateDate(this.year)
+    const raceDate = this.resolveRaceDate()
     const raceId = this._buildRaceId()
     const eventTypes = this.config.eventTypes || ['Marathon']
 

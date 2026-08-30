@@ -54,7 +54,7 @@ export class MikaTimingScraper extends BaseScraper {
     }
 
     if (!raceDate) {
-      raceDate = this.config.calculateDate(this.year)
+      raceDate = this.resolveRaceDate()
       console.log(`[${this.tag} ${this.year}] Using fallback date: ${raceDate.toDateString()}`)
     } else {
       console.log(`[${this.tag} ${this.year}] Parsed date from HTML: ${raceDate.toDateString()}`)

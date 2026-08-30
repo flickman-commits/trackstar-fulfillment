@@ -62,7 +62,7 @@ export class MTECResultsScraper extends BaseScraper {
       : null
 
     return {
-      raceDate: this.config.calculateDate(this.year),
+      raceDate: this.resolveRaceDate(),
       location: this.config.location,
       eventTypes: this.config.eventTypes || ['Marathon', 'Half Marathon'],
       resultsUrl,

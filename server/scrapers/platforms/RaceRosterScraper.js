@@ -35,7 +35,7 @@ export class RaceRosterScraper extends BaseScraper {
     console.log(`[${this.tag} ${this.year}] Fetching race info...`)
 
     const eventCode = this.config.eventCodes?.[this.year]
-    let raceDate = this.config.calculateDate(this.year)
+    let raceDate = this.resolveRaceDate()
 
     // If we have an event code, try to fetch the actual date from the API
     if (eventCode) {

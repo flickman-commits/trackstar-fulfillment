@@ -32,7 +32,7 @@ export class TokyoMarathonScraper extends BaseScraper {
 
   async getRaceInfo() {
     return {
-      raceDate: this.config.calculateDate(this.year),
+      raceDate: this.resolveRaceDate(),
       location: this.config.location,
       eventTypes: this.config.eventTypes || ['Marathon'],
       resultsUrl: this.baseUrl,

@@ -99,6 +99,12 @@ for (const fx of fixtures) {
   }
 }
 
+// The window the coverage grid cares about, matching scrapers/index.js.
+const COVERED_YEARS = (() => {
+  const now = new Date().getFullYear()
+  return [now, now - 1, now - 2, now - 3]
+})()
+
 // 5. Verify every config file imports cleanly
 const CONFIGS_DIR = path.resolve(__dirname, '../server/scrapers/configs')
 const configFiles = fs.readdirSync(CONFIGS_DIR).filter(f => f.endsWith('.js'))
@@ -114,7 +120,26 @@ for (const file of configFiles) {
     if (!cfg.aliases || !Array.isArray(cfg.aliases) || cfg.aliases.length === 0) {
       errors.push(`${file}: missing or empty 'aliases'`)
     }
-    console.log(`  ✓ ${file.padEnd(25)} (${cfg.platform})`)
+    // Race dates must be VERIFIED, not computed.
+    //
+    // calculateDate encodes a rule like "third Sunday of August", and races
+    // move. Sydney switched from mid-September to late August in 2025 and the
+    // rule silently returned a date three weeks wrong for every earlier
+    // edition. The date is printed on the poster, so a wrong one ships.
+    //
+    // resolveRaceDate prefers a scraped date, then a raceDates entry, and only
+    // computes as a last resort. This warns for every year that would still
+    // land on that last resort, so the remaining gap is visible and countable
+    // rather than invisible.
+    const missing = COVERED_YEARS.filter(y => !cfg.raceDates?.[y])
+    if (missing.length) {
+      warnings.push(
+        `${file}: no verified raceDates for ${missing.join(', ')} - ` +
+        `these fall back to a computed date. Look the real dates up and pin them.`
+      )
+    }
+
+    console.log(`  ✓ ${file.padEnd(25)} (${cfg.platform})${missing.length ? `  [${missing.length} computed year(s)]` : '  [dates verified]'}`)
   } catch (e) {
     errors.push(`${file}: failed to import - ${e.message}`)
   }

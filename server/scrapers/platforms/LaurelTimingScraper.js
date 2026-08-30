@@ -47,7 +47,7 @@ export class LaurelTimingScraper extends BaseScraper {
     const raceId = this.config.raceIds?.[this.year] || null
     const slug = this.config.slug
     return {
-      raceDate: this.config.calculateDate(this.year),
+      raceDate: this.resolveRaceDate(),
       location: this.config.location,
       eventTypes: this.config.eventTypes || Object.values(this.config.events || {}),
       resultsUrl: (slug && raceId)

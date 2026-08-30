@@ -69,7 +69,7 @@ export class MyChipTimeScraper extends BaseScraper {
 
     // Fallback to calculated date
     if (!raceDate) {
-      raceDate = this.config.calculateDate(this.year)
+      raceDate = this.resolveRaceDate()
       console.log(`[${this.tag} ${this.year}] Using fallback date: ${raceDate.toDateString()}`)
     }
 
