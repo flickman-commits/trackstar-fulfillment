@@ -468,6 +468,22 @@ export function getSupportedRaces() {
  *
  * @returns {Array<{raceName, platform, publicSafe, explicitYears, fallbackYears, hasYearPattern}>}
  */
+/**
+ * The VERIFIED (pinned) race dates per race, as opposed to computed ones.
+ *
+ * The nightly sweep needs to tell the two apart: a pinned date was looked up
+ * from a source, a computed one is a rule guessing. getRaceConfigSummaries
+ * deliberately returns the computed date because callers there want "when is
+ * this race", not "do we actually know".
+ */
+export function getVerifiedRaceDates() {
+  const out = {}
+  for (const config of ALL_CONFIGS) {
+    out[config.raceName] = config.raceDates ? { ...config.raceDates } : {}
+  }
+  return out
+}
+
 export function getRaceConfigSummaries(years = []) {
   return ALL_CONFIGS.map(config => {
     const explicitYears = config.eventIds ? Object.keys(config.eventIds).map(Number).sort() : []

@@ -55,6 +55,8 @@ const routes = [
   { method: 'post',   path: '/api/admin/users',            handler: '../api/admin/users.js' },
   { method: 'delete', path: '/api/admin/users',            handler: '../api/admin/users.js' },
   { method: 'get',    path: '/api/admin/audit',            handler: '../api/admin/audit.js' },
+  // Nightly health sweep (cron runs it; admins can pull the JSON any time)
+  { method: 'get',    path: '/api/admin/nightly-sweep',    handler: '../api/admin/nightly-sweep.js' },
   // Proofs & Approval
   { method: 'get',    path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   { method: 'post',   path: '/api/proofs',                 handler: '../api/proofs/index.js' },

@@ -20,6 +20,10 @@
     {
       "path": "/api/orders/actions?action=weekly-ads-debrief",
       "schedule": "0 21 * * 5"
+    },
+    {
+      "path": "/api/admin/nightly-sweep",
+      "schedule": "0 5 * * *"
     }
   ],
   "functions": {
