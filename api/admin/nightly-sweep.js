@@ -22,6 +22,57 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { runNightlySweep, combineSweepPasses, NIGHTLY_REPORT_KEY } from '../../server/services/nightlySweep.js'
 import { formatSweepForSlack, formatSweepAsMarkdown, formatSweepBrief } from '../../server/services/nightlySweepReport.js'
 
+/**
+ * Park a rendered report where the morning digest reads it.
+ *
+ * Called from BOTH paths on purpose. The agent's POST stores the richer
+ * version with what it fixed, but the cron has to store one too - otherwise a
+ * night when the agent does not run leaves yesterday's report sitting there,
+ * and the digest renders stale numbers as if they were this morning's. That is
+ * the failure mode this whole design is supposed to avoid: a section that
+ * looks fine because nothing updated it.
+ */
+async function storeRenderedReport(combined, notes = null) {
+  const stored = {
+    ...combined,
+    notes,
+    markdown: formatSweepAsMarkdown(combined),
+    storedAt: new Date().toISOString(),
+  }
+  await prisma.systemConfig.upsert({
+    where: { key: NIGHTLY_REPORT_KEY },
+    create: { key: NIGHTLY_REPORT_KEY, value: JSON.stringify(stored) },
+    update: { value: JSON.stringify(stored) },
+  })
+  return stored
+}
+
+/**
+ * The shape combineSweepPasses produces, from a single sweep with no fixes.
+ * Used when the sweep runs on its own: everything it found is still standing,
+ * because nothing acted on it.
+ */
+function asUnfixedReport(report) {
+  return {
+    startedAt: report.startedAt,
+    finishedAt: report.finishedAt,
+    healthy: report.healthy,
+    failedChecks: report.failedChecks,
+    found: report.delta?.new || [],
+    fixed: [],
+    introduced: [],
+    remaining: report.findings,
+    stats: report.stats,
+    counts: {
+      found: (report.delta?.new || []).length,
+      fixed: 0,
+      introduced: 0,
+      remaining: report.findings.length,
+      remainingHigh: report.findings.filter(f => f.severity === 'high').length,
+    },
+  }
+}
+
 async function postToSlack(text) {
   const url = process.env.SLACK_DM_WEBHOOK_URL || process.env.SLACK_PROOF_WEBHOOK_URL
   if (!url) {
@@ -98,20 +149,21 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'before and after sweep reports are required' })
       }
       const combined = combineSweepPasses(before, after)
-      const markdown = formatSweepAsMarkdown(combined)
       // notes is the agent's own narrative - PR links, what it chose not to do.
       // Kept separate from the computed sections so a claim can never be
       // mistaken for a verified fact.
-      const stored = { ...combined, notes, markdown, storedAt: new Date().toISOString() }
-      await prisma.systemConfig.upsert({
-        where: { key: NIGHTLY_REPORT_KEY },
-        create: { key: NIGHTLY_REPORT_KEY, value: JSON.stringify(stored) },
-        update: { value: JSON.stringify(stored) },
-      })
-      return res.status(200).json({ ok: true, counts: combined.counts, markdown })
+      const stored = await storeRenderedReport(combined, notes)
+      return res.status(200).json({ ok: true, counts: combined.counts, markdown: stored.markdown })
     }
 
     const report = await runNightlySweep({ persistBaseline: !dryRun })
+
+    // Store the report on every real run, so the digest always has something
+    // from THIS morning even if no agent ran. A dry run deliberately does not,
+    // since it is a preview and must not overwrite the night's record.
+    if (!dryRun) {
+      await storeRenderedReport(asUnfixedReport(report))
+    }
 
     // Slack is opt-in now that the report rides along in the morning email.
     // One more notification channel is how a report stops being read.
