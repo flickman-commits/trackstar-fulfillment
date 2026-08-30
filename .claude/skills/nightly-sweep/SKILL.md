@@ -179,6 +179,17 @@ Database migrations or schema changes · destructive actions (clearing research,
 deleting, merging races) · bulk price edits · messaging customers · force-pushing
 · merging anything whose gates did not pass.
 
+**Never commit straight to main.** Changes reach production through a pull
+request or not at all, and that holds for documentation as much as for code.
+
+**And if you cannot run, do not write about it in the repository.** A blocked
+run once committed a status file to main describing its own blocker. The
+content was accurate and it still should not have happened: a checked-in
+status note goes stale the moment the problem is fixed, nobody updates it, and
+it is the wrong channel. File the report instead — a POST carrying only
+`notes` is accepted precisely so a run that could not sweep can still say why.
+Then stop. An agent that cannot do its job should get smaller, not busier.
+
 ## Step 5: sweep again, then file the report
 
 Re-run the sweep, then POST both passes:
