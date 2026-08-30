@@ -206,3 +206,52 @@ export function formatSweepAsMarkdown(combined) {
 
   return out.join('\n')
 }
+
+
+/**
+ * The email-sized version.
+ *
+ * The full report runs to a couple of hundred findings, and a daily email is
+ * not the place to read a backlog. This is the one line you want at 7am plus
+ * the things that actually need a person, capped hard. Everything else stays
+ * in the JSON for when you go looking.
+ *
+ * Deliberately says nothing when there is nothing to say. A section that
+ * writes a paragraph every morning to prove it ran is a section you stop
+ * reading, and then the morning it matters goes past unnoticed.
+ */
+export function formatSweepBrief(stored, { maxItems = 6 } = {}) {
+  const c = stored.counts || {}
+  const out = []
+
+  // A sweep that could not finish leads, because the alternative is a healthy
+  // looking section built from checks that never ran.
+  if (stored.healthy === false) {
+    out.push(`⚠️ **Sweep incomplete** — ${(stored.failedChecks || []).map(f => f.name).join(', ')} did not run.`)
+    out.push('')
+  }
+
+  const parts = []
+  if (c.fixed) parts.push(`**${c.fixed}** fixed overnight`)
+  if (c.found) parts.push(`**${c.found}** new`)
+  parts.push(`**${c.remainingHigh || 0}** need attention`)
+  out.push(parts.join(' · '))
+
+  const high = (stored.remaining || []).filter(f => f.severity === 'high')
+  if (high.length) {
+    out.push('')
+    for (const [kind, items] of group(high).slice(0, 4)) {
+      const names = items.slice(0, maxItems).map(f => f.subject).join(', ')
+      const more = items.length > maxItems ? `, +${items.length - maxItems} more` : ''
+      out.push(`- **${label(kind)}** — ${names}${more}`)
+    }
+  }
+
+  // The agent's own narrative: what it shipped, what it deliberately left.
+  if (stored.notes) {
+    out.push('')
+    out.push(stored.notes)
+  }
+
+  return out.join('\n')
+}

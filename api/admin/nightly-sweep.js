@@ -20,7 +20,7 @@
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { runNightlySweep, combineSweepPasses, NIGHTLY_REPORT_KEY } from '../../server/services/nightlySweep.js'
-import { formatSweepForSlack, formatSweepAsMarkdown } from '../../server/services/nightlySweepReport.js'
+import { formatSweepForSlack, formatSweepAsMarkdown, formatSweepBrief } from '../../server/services/nightlySweepReport.js'
 
 async function postToSlack(text) {
   const url = process.env.SLACK_DM_WEBHOOK_URL || process.env.SLACK_PROOF_WEBHOOK_URL
@@ -45,7 +45,24 @@ export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
 
   const isCron = req.headers['authorization'] === `Bearer ${process.env.CRON_SECRET}`
-  if (!isCron && !requireAdmin(req, res)) return
+  const wantsCached = req.query?.cached === '1' || req.query?.cached === 'true'
+
+  /**
+   * A token that can do exactly one thing: read last night's stored report.
+   *
+   * The daily digest lives in a different project and only needs this one
+   * value. Handing it ADMIN_SECRET would put a key to every admin endpoint,
+   * destructive ones included, into a second codebase's environment for the
+   * sake of one GET. This grants no writes and reaches nothing else, so the
+   * worst it can leak is a health summary.
+   */
+  const reportToken = process.env.NIGHTLY_REPORT_READ_TOKEN
+  const presented = req.headers['x-report-token']
+  const isReportReader = Boolean(
+    wantsCached && reportToken && presented && presented === reportToken
+  )
+
+  if (!isCron && !isReportReader && !requireAdmin(req, res)) return
 
   const dryRun = req.query?.dryRun === '1' || req.query?.dryRun === 'true'
 
@@ -53,15 +70,22 @@ export default async function handler(req, res) {
     // ── The morning read. Deliberately does NOT re-run the sweep: the numbers
     // must be the ones the agent actually acted on overnight, not a fresh set
     // taken hours later that no longer matches what it says it fixed.
-    if (req.query?.cached === '1' || req.query?.cached === 'true') {
+    if (wantsCached) {
       const row = await prisma.systemConfig.findUnique({ where: { key: NIGHTLY_REPORT_KEY } })
       if (!row?.value) {
+        // 404 rather than an empty 200 so a consumer can tell "the agent has
+        // not run" from "the agent ran and found nothing", and omit its
+        // section instead of rendering a blank one.
         return res.status(404).json({ error: 'No nightly report stored yet.' })
       }
       const stored = JSON.parse(row.value)
+
       if (req.query?.format === 'markdown') {
+        const brief = req.query?.brief === '1' || req.query?.brief === 'true'
         res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
-        return res.status(200).send(stored.markdown)
+        return res.status(200).send(
+          brief ? formatSweepBrief(stored) : stored.markdown
+        )
       }
       return res.status(200).json(stored)
     }
