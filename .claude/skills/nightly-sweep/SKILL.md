@@ -45,6 +45,48 @@ If `healthy` is false, some checks did not run. Say so at the top of the Slack
 report. **A partial sweep is not a clean sweep**, and it must never be reported
 as one.
 
+## The nightly budget — read this before fixing anything
+
+There are currently **167 findings marked fixable**. You are not going to fix
+167 things tonight and you must not try. Most of that is standing backlog: 123
+race-years that have never been probed do not become urgent by being counted
+again, and attempting them all means 123 requests to timing sites in one
+sitting, which is how we get blocked. Sydney's firewall escalated against us
+inside a single afternoon of over-probing, and a blocked platform is a worse
+outcome than an unprobed one.
+
+Hard caps per night:
+
+| Budget | Limit |
+|---|---|
+| Fixture captures | **10** |
+| Race dates researched | **5** |
+| Pull requests opened | **3** |
+| Total third-party requests | **~60** |
+| Wall clock | **~40 minutes** |
+
+Stop early and report if any of these happen:
+
+- three consecutive third-party requests fail or return 403 — something is
+  rate-limiting us and continuing makes it worse
+- a gate fails twice on the same race — it is not a config problem, flag it
+- you are unsure and there is nobody to ask
+
+Work in this order, and stop when a budget runs out:
+
+1. **Tier 0 that unblocks a live order.** Research that ran over customer data,
+   an expired approval link on an open order, a race that has run but whose
+   orders still say otherwise. These affect someone who has paid us.
+2. **Anything in `delta.new`.** New means something changed today, which is the
+   only part of the report that is actually news.
+3. **High severity before medium.**
+4. **Backlog, a slice at a time.** Prefer races with real order volume over
+   ones nobody has bought.
+
+Leaving 150 findings untouched is the correct outcome of a night's work. The
+backlog shrinking slowly and verifiably beats it lurching and taking a timing
+site's goodwill with it.
+
 ## Step 2: Tier 0 — just do it
 
 Safe, reversible, no judgment. Use the existing endpoints; never hand-roll a
