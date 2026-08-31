@@ -11,10 +11,15 @@ The judgment half of the nightly upkeep. The other half — `/api/admin/nightly-
 already ran and established the facts with production credentials. You read
 those facts and decide what to do about them.
 
+**You reach Trackstar through MCP tools, not HTTP.** The cloud sandbox's egress
+proxy refuses direct requests to fast.trackstar.art - curl will fail and no
+amount of retrying changes that - while MCP traffic is allowed. If you find
+yourself writing a curl command against Trackstar, stop: use the tools.
+
 **You do not have database credentials and must not go looking for them.** Every
-change you make reaches production one of two ways: an existing API endpoint
-built for that job, or a pull request. That boundary is the whole safety story.
-The worst outcome available to you is a bad PR.
+change you make reaches production one of two ways: an MCP tool built for that
+job, or a pull request. That boundary is the whole safety story. The worst
+outcome available to you is a bad PR.
 
 Replaces the older coverage-check routine, which reported and stopped. The
 difference here is that you are allowed to fix things — under the rules below.
@@ -35,12 +40,9 @@ with nobody watching.
 
 ## Step 1: the first sweep
 
-```
-GET /api/admin/nightly-sweep?dryRun=1     # header: x-admin-secret
-```
-
-`dryRun=1` so the baseline does not move before you have done the work. Keep
-this response — you hand it back at the end as `before`.
+Call **`run_sweep`**. It sweeps and returns what it found; the full report stays
+server-side as the "before" state, so you never have to carry two hundred
+findings around in your context.
 
 Every finding carries `kind`, `subject`, `severity`, `detail`, and an `action`
 of `tier0_auto`, `tier1_fixable`, or `tier2_flag`. `delta.new` is what appeared
@@ -100,11 +102,15 @@ database write.
 
 | Finding | Do this |
 |---|---|
-| `no_probe` (a few, not all) | `POST /api/admin/lookup-health {action:'capture-fixture', race, year}` |
-| `missing_weather` | `POST /api/orders/refresh-weather` for that race |
-| `race_run_but_not_researched` | Re-research those orders |
-| `researched_over_customer_data` | Re-apply the customer's own numbers |
-| `approval_link_expired` on an open order | Extend it via the proofs token endpoint |
+| `no_probe` (a few, not all) | `capture_fixture`, then **`probe_scrapers`** on that race |
+| `selling_without_scraper` appearing new | `sync_catalog` first, to confirm it is real and not a stale snapshot |
+
+**`capture_fixture` alone clears nothing.** It stores a known finisher; only
+`probe_scrapers` turns that into a live-or-drifted verdict. A run that captured
+fixtures and reported them as fixed was wrong, and the second sweep caught it.
+
+Findings that need an endpoint you do not have - weather, re-research,
+approval links - are Tier 2 for you. Flag them.
 
 Cap fixture captures at **10 per night**. These hit third-party timing sites,
 and hammering them gets us blocked — Sydney's firewall escalated against us
@@ -126,7 +132,7 @@ lint only proves the file is shaped correctly.
 
 ### Adding or fixing a year config
 
-1. Discover the event id — `POST /api/admin/lookup-health {action:'discover-ids', race, years}`,
+1. Discover the event id — `discover_event_ids` with `apply: false` to preview,
    or read it off the platform's own listing. **Never extrapolate an id from an
    adjacent year.** Ids are not sequential and the offsets are not stable.
 2. Open the event and confirm the title or date is the year you think it is.
@@ -190,17 +196,14 @@ it is the wrong channel. File the report instead — a POST carrying only
 `notes` is accepted precisely so a run that could not sweep can still say why.
 Then stop. An agent that cannot do its job should get smaller, not busier.
 
-## Step 5: sweep again, then file the report
+## Step 5: file the report
 
-Re-run the sweep, then POST both passes:
+Call **`finish_sweep`** with your notes. It re-sweeps, compares against the
+before state from `run_sweep`, works out what was found, fixed, and introduced,
+and stores the report.
 
-```
-GET  /api/admin/nightly-sweep                       → this is `after`
-POST /api/admin/nightly-sweep  { before, after, notes }
-```
-
-The endpoint works out what was found, what was fixed, what your fixes
-introduced, and what is still standing — then renders the report and stores it.
+Call it even if you fixed nothing. A night with no repairs is a normal night;
+a night with no report looks like a broken agent.
 **Matt's existing morning email reads that stored report**; you are not sending
 a separate notification. One more channel is how a report stops being read.
 

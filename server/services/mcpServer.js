@@ -36,7 +36,7 @@
  */
 
 import crypto from 'crypto'
-import { TOOLS, callTool, OPEN_TOOLS } from './mcpTools.js'
+import { callTool, OPEN_TOOLS, toolTier, toolsFor } from './mcpTools.js'
 
 /** Protocol versions we know how to speak, newest first. */
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05']
@@ -87,8 +87,16 @@ export async function handleMcpRequest(req, res, presented) {
 
   // Auth is checked HERE, after the body is parsed, because what a caller is
   // allowed to do depends on which method they asked for.
-  const expected = process.env.MCP_TOKEN
-  const authorized = Boolean(expected && presented && safeEqual(presented, expected))
+  // Two credentials, two tiers. The write token also grants read, so the
+  // nightly routine needs only one connector rather than two.
+  const readToken = process.env.MCP_TOKEN
+  const writeToken = process.env.MCP_WRITE_TOKEN
+  const tier =
+    (writeToken && presented && safeEqual(presented, writeToken)) ? 'repair'
+    : (readToken && presented && safeEqual(presented, readToken)) ? 'read'
+    : 'none'
+  const authorized = tier !== 'none'
+  const expected = readToken
   const diagnosing = method === 'tools/call' && OPEN_TOOLS.has(params?.name)
   const open = diagnosing
     || OPEN_METHODS.has(method)
@@ -146,11 +154,30 @@ export async function handleMcpRequest(req, res, presented) {
     }
 
     if (method === 'tools/list') {
-      return res.status(200).json(ok(id, { tools: TOOLS }))
+      // A read caller is not shown the repair tools at all. Listing tools it
+      // cannot use invites it to try, and then to explain the failure to
+      // someone as though it were a fault.
+      return res.status(200).json(ok(id, { tools: toolsFor(tier) }))
     }
 
     if (method === 'tools/call') {
       const { name, arguments: args } = params
+
+      // Per-tool gate: a read credential cannot reach a repair tool even
+      // though it authenticated fine for everything else.
+      if (toolTier(name) === 'repair' && tier !== 'repair') {
+        return res.status(200).json(ok(id, {
+          isError: true,
+          content: [{
+            type: 'text',
+            text:
+              `"${name}" changes production and needs the write credential, which this ` +
+              'connector does not carry. This is deliberate, not a fault: the read ' +
+              'connector is for looking things up. Only the nightly routine repairs.',
+          }],
+        }))
+      }
+
       try {
         // Header names only - never values - so a transcript cannot leak one.
         const context = {
