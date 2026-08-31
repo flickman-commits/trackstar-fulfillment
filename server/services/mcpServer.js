@@ -45,13 +45,17 @@ const SERVER_INFO = { name: 'trackstar', version: '0.1.0' }
 /**
  * Methods that answer without a token.
  *
- * The connector dialog probes the server BEFORE offering anywhere to put a
- * header, so refusing the handshake failed its check with a 404 and pushed you
- * into manual configuration. These reveal a name, a version and a sentence of
- * description - nothing worth protecting - while tools/list and tools/call
- * stay behind the token.
+ * The connector probes the server before offering anywhere to put a header,
+ * and it lists tools at connect time too - so keeping either behind the token
+ * meant connecting successfully and then being told "this connector has no
+ * tools available".
+ *
+ * What these three give away is a name, a version, and the names, descriptions
+ * and argument shapes of four tools. That is a menu, not a meal: every one of
+ * them returns nothing without a token, because tools/call is NOT on this list
+ * and never should be. The data stays shut.
  */
-const OPEN_METHODS = new Set(['initialize', 'ping'])
+const OPEN_METHODS = new Set(['initialize', 'ping', 'tools/list'])
 
 function safeEqual(a, b) {
   const aBuf = Buffer.from(String(a))
