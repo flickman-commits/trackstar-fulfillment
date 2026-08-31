@@ -93,9 +93,37 @@ export async function handleMcpRequest(req, res, presented) {
   const open = diagnosing
     || OPEN_METHODS.has(method)
     || String(method || '').startsWith('notifications/')
+
   if (!authorized && !open) {
-    // 404 rather than 401, and deliberately not a JSON-RPC error: an
-    // unauthenticated caller learns nothing about whether this path is real.
+    // An unauthenticated tool call gets an EXPLANATION, not a bare 404.
+    //
+    // The 404 was stealth for stealth's sake on an internal tool, and it cost
+    // real time: the connector reported only "Not Found", which is equally
+    // consistent with a dead endpoint, a wrong token, and a token that never
+    // left the client. Nobody could tell which, including me, so I proposed
+    // two fixes that were both guesses.
+    //
+    // Returning a result rather than an error means the model reads this and
+    // can say what is wrong. No data crosses - the call is still refused - and
+    // no secret is echoed, only whether one arrived and by which channel.
+    if (method === 'tools/call') {
+      const channel = presented ? (req.query?.token ? 'the URL path' : 'a header') : null
+      return res.status(200).json(ok(id, {
+        isError: true,
+        content: [{
+          type: 'text',
+          text:
+            'Refused: this connector did not send a valid Trackstar token, so no data was returned.\n\n' +
+            (presented
+              ? `A token DID arrive via ${channel}, but it does not match the one this server expects ` +
+                `(got ${String(presented).length} characters, expected ${String(expected || '').length}). ` +
+                'It is probably truncated or stale.'
+              : 'NO token arrived at all. The connector is not sending one. Headers seen on this request: ' +
+                Object.keys(req.headers || {}).sort().join(', ') + '.') +
+            '\n\nRun connection_check for the full picture.',
+        }],
+      }))
+    }
     return res.status(404).json({ error: 'Not found' })
   }
 
