@@ -32,6 +32,14 @@ import { NIGHTLY_REPORT_KEY } from './nightlySweep.js'
 /** Tool definitions, in the shape MCP's tools/list expects. */
 export const TOOLS = [
   {
+    name: 'connection_check',
+    description:
+      'Diagnostic. Reports what credential material this server actually received on ' +
+      'the request, without echoing any secret. Use when other tools return "Not Found" ' +
+      'to find out whether the token is reaching the server and by which channel.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'nightly_report',
     description:
       'The most recent overnight health sweep of the fulfillment tool: what was found, ' +
@@ -86,6 +94,35 @@ export const TOOLS = [
 const text = value => ({
   content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }],
 })
+
+/**
+ * What arrived, and through which door.
+ *
+ * Every other tool answering "Not Found" tells you only that the token did not
+ * match - not whether one was sent at all, nor whether it came by header or by
+ * path. Guessing between those is what this replaces.
+ *
+ * Deliberately echoes NO secret: presence, length and channel are enough to
+ * tell "nothing arrived" from "something arrived and is wrong", which is the
+ * whole question.
+ */
+function connectionCheck(context = {}) {
+  const { presented, headerNames = [], viaPath } = context
+  const expected = process.env.MCP_TOKEN
+  return text({
+    tokenReachedServer: Boolean(presented),
+    channel: presented ? (viaPath ? 'url path' : 'header') : 'none',
+    presentedLength: presented ? String(presented).length : 0,
+    expectedLength: expected ? String(expected).length : 0,
+    matches: Boolean(expected && presented && String(presented) === String(expected)),
+    serverHasTokenConfigured: Boolean(expected),
+    // Names only. A value here would put a secret in a transcript.
+    headersSeen: headerNames,
+    hint: presented
+      ? 'A token arrived. If matches is false, the value is wrong or truncated.'
+      : 'No token arrived. The connector is not sending one - check the URL has the token in its path, or that the header saved.',
+  })
+}
 
 const HANDLERS = {
   async nightly_report({ full = false } = {}) {
@@ -190,8 +227,12 @@ const HANDLERS = {
 }
 
 /** Run a tool by name. Throws on an unknown name so the caller can answer -32602. */
-export async function callTool(name, args = {}) {
+export async function callTool(name, args = {}, context = {}) {
+  if (name === 'connection_check') return connectionCheck(context)
   const handler = HANDLERS[name]
   if (!handler) throw new Error(`Unknown tool: ${name}`)
   return await handler(args || {})
 }
+
+/** Tools that answer without a token. Only the diagnostic; never any data. */
+export const OPEN_TOOLS = new Set(['connection_check'])

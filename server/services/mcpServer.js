@@ -36,7 +36,7 @@
  */
 
 import crypto from 'crypto'
-import { TOOLS, callTool } from './mcpTools.js'
+import { TOOLS, callTool, OPEN_TOOLS } from './mcpTools.js'
 
 /** Protocol versions we know how to speak, newest first. */
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05']
@@ -89,7 +89,10 @@ export async function handleMcpRequest(req, res, presented) {
   // allowed to do depends on which method they asked for.
   const expected = process.env.MCP_TOKEN
   const authorized = Boolean(expected && presented && safeEqual(presented, expected))
-  const open = OPEN_METHODS.has(method) || String(method || '').startsWith('notifications/')
+  const diagnosing = method === 'tools/call' && OPEN_TOOLS.has(params?.name)
+  const open = diagnosing
+    || OPEN_METHODS.has(method)
+    || String(method || '').startsWith('notifications/')
   if (!authorized && !open) {
     // 404 rather than 401, and deliberately not a JSON-RPC error: an
     // unauthenticated caller learns nothing about whether this path is real.
@@ -121,7 +124,13 @@ export async function handleMcpRequest(req, res, presented) {
     if (method === 'tools/call') {
       const { name, arguments: args } = params
       try {
-        return res.status(200).json(ok(id, await callTool(name, args)))
+        // Header names only - never values - so a transcript cannot leak one.
+        const context = {
+          presented,
+          viaPath: Boolean(req.query?.token),
+          headerNames: Object.keys(req.headers || {}).sort(),
+        }
+        return res.status(200).json(ok(id, await callTool(name, args, context)))
       } catch (toolError) {
         // A tool that failed is a result, not a transport error: reporting it
         // as isError lets the model read what went wrong and adapt, where a
