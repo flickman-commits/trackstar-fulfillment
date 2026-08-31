@@ -55,55 +55,61 @@ as one.
 
 ## The nightly quota — you are expected to fill it
 
-**A night where you fix nothing is a failed night, not a quiet one.** The
-backlog does not clear itself, and nobody is going to work through 120 untested
-race-years by hand. Clearing them is the job.
+**A night where you fix nothing is a failed night, not a quiet one.** The goal
+is to clear the standing backlog in about a week, not to nibble at it forever.
+Nobody is going to work through 120 untested race-years and 43 unverified race
+dates by hand. Clearing them is the job.
 
-The first version of this said "leaving 150 findings untouched is correct",
-which was written to stop an agent hammering a timing site. It over-corrected: a
-run read it, found nothing new, and stopped having done nothing. Both of those
-are wasted nights.
+### Be realistic about the two things we actually guard against
 
-### What the real constraint is
+**Cost is not one of them.** This runs on Haiku. A heavy night is a few hundred
+thousand tokens on the cheapest model available. Do not ration yourself to save
+money - it is not a meaningful saving and the work matters more.
 
-Not tokens. This runs on Haiku and a full working night costs less than a print.
-Not our servers. It is the THIRD-PARTY timing sites, and that limit is
-**per-site, not overall**. Forty requests spread across sixteen platforms is
-nothing; forty at one platform is how Sydney's firewall ended up blocking us.
+**Hammering one timing site is.** That is the real risk, and it is per-site.
+Sydney's firewall blocked us after dozens of rapid page loads at a single host
+in one afternoon. A probe is one search request; fifteen of those spread over an
+hour is nothing. Sixty at one host in five minutes is not.
 
-The untested backlog is spread thin: 25 on Athlinks, 21 RaceRoster, 17 RTRT, 11
-Mika, 9 Brooksee, and single digits across eleven more.
+So: go wide across platforms, not deep into one. The backlog is spread over
+sixteen of them, which is what makes a big night safe.
 
 ### Per night
 
 | Budget | Limit |
 |---|---|
-| Race-years touched **per timing platform** | **6** |
-| Race-years touched **in total** | **50** |
-| Race dates researched and pinned | 5 |
-| Pull requests opened | 3 |
-| Wall clock | ~25 minutes |
+| Race-years touched **per timing platform** | **12** |
+| Race-years touched **in total** | **60** |
+| Race dates researched and verified | **10** |
+| Pull requests opened | **5** |
+| Wall clock | ~45 minutes |
 
-The per-platform number is the one that matters. The total is a backstop.
+At this rate the untested backlog clears in roughly two to three nights and the
+unverified dates in four or five. That is the intent.
 
-PRs stay at 3 because the constraint there is Matt's review capacity, not
-politeness. Dates stay at 5 because each needs real corroboration and that is
-slow, careful work.
-
-### What to spend it on, in order
+### Every night, work these in order
 
 1. **Tier 0 that unblocks a live order.** Someone has paid us. Always first.
 2. **Anything in `newTonight`.** New means something changed today.
-3. **High severity that is actually fixable** - not the Tier 2 flags.
-4. **Backlog, filling the quota.** Spread across platforms rather than draining
-   one. Prefer races with real order volume, but do not stop when you run out of
-   popular ones: an untested race-year is untested whoever bought it.
+3. **Untested race-years** - `capture_fixture` then `probe_scrapers`. Spread
+   across platforms. This is the biggest pile and the easiest to clear.
+4. **Missing year configs** (`no_year`) - `discover_event_ids` where the
+   platform has a listing we can query; flag the rest for a human.
+5. **Unverified race dates.** Research the real date, corroborate it, and pin it
+   if the bar in Step 3 is met. Prefer races with order volume.
+6. **Upcoming races.** Check the calendar for anything running in the next eight
+   weeks that we sell. A year config should exist BEFORE race day, so orders do
+   not pile up waiting. A race that has not run yet cannot be verified against
+   results, so this is preparation and flagging only.
+
+If you run out of one category, move to the next. Do not stop because the
+urgent work is done - the backlog IS the work on a normal night.
 
 ### Stop early only if
 
-- three consecutive requests to the same platform fail or return 403 - back off
-  that platform for the night, and carry on with the others
-- a gate fails twice on the same race - flag it, do not keep trying
+- three consecutive requests to the **same platform** fail or return 403 - back
+  off that one platform for the night and carry on with the others
+- a gate fails twice on the same race - flag it and move on
 - you genuinely cannot tell whether something is safe
 
 Running out of budget is a normal ending. Running out of nerve is not.
