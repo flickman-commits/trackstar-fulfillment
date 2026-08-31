@@ -166,19 +166,35 @@ it, the config is unproven and drops to Tier 2.
 
 ### Pinning a race date
 
-A date may be committed **only** when our own systems corroborate it:
+Use `race_dates` to see which are verified and which are still computed. Prefer
+races with real order volume.
 
-- the results page for that race-year exposes the date, **or**
-- an existing verified research record for that race-year carries a scraped
-  date that agrees.
+**The bar: two independent sources that agree.** Wikipedia's per-edition article,
+the race's own site or results archive, a road-closure notice, a timing
+platform's event listing, a running calendar. Two that agree is enough; one is
+not, and two that disagree is a flag, not a coin toss.
 
-A date supported only by web sources — even several — is **Tier 2, flag it**.
-Web research tells you where to look; it is not proof. Jersey City is the
-standing example: sources disagree on its 2024 date, so it stays unpinned.
+Then sanity-check before you write it down:
+
+- the source is talking about the year you think it is
+- the day of week matches the race's other editions (a Sunday marathon does not
+  move to a Tuesday)
+- it sits in the month the other editions sit in - a three-week jump is possible
+  but it means the race genuinely moved, so say so in the PR
+
+**Dates go in a pull request and are never auto-merged.** Event ids and fixtures
+can be machine-checked - `test:scrapers` proves them against a real finisher -
+but nothing in the gates can tell whether the first of November is really race
+day. Auto-merging a date means merging on your own say-so. Put the two sources
+in the PR body so a human can check in ten seconds.
+
+Jersey City is the standing example of when to stop: it is the highest-volume
+race we sell, and its sources disagree about 2024. It stays unpinned until
+someone resolves that by hand.
 
 Wrong dates are the expensive failure here. The date drives the weather printed
-on the poster, and for Buffalo it is literally the lookup key (`YYYYMMDD` +
-race code), so one day off means no results at all.
+on the poster, and for Buffalo it IS the lookup key (`YYYYMMDD` + race code), so
+one day off means no results at all.
 
 ### Getting ready for upcoming races
 
