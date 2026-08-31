@@ -59,6 +59,8 @@ const routes = [
   { method: 'get',    path: '/api/admin/nightly-sweep',    handler: '../api/admin/nightly-sweep.js' },
   // Trackstar MCP. paramAdapter copies :token into req.query, matching how
   // Vercel resolves the [token] dynamic segment.
+  { method: 'get',    path: '/api/mcp',                    handler: '../api/mcp/index.js' },
+  { method: 'post',   path: '/api/mcp',                    handler: '../api/mcp/index.js' },
   { method: 'get',    path: '/api/mcp/:token',             handler: '../api/mcp/[token].js', paramAdapter: true },
   { method: 'post',   path: '/api/mcp/:token',             handler: '../api/mcp/[token].js', paramAdapter: true },
   { method: 'post',   path: '/api/admin/nightly-sweep',    handler: '../api/admin/nightly-sweep.js' },
