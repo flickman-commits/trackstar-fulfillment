@@ -42,6 +42,17 @@ import { TOOLS, callTool } from './mcpTools.js'
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05']
 const SERVER_INFO = { name: 'trackstar', version: '0.1.0' }
 
+/**
+ * Methods that answer without a token.
+ *
+ * The connector dialog probes the server BEFORE offering anywhere to put a
+ * header, so refusing the handshake failed its check with a 404 and pushed you
+ * into manual configuration. These reveal a name, a version and a sentence of
+ * description - nothing worth protecting - while tools/list and tools/call
+ * stay behind the token.
+ */
+const OPEN_METHODS = new Set(['initialize', 'ping'])
+
 function safeEqual(a, b) {
   const aBuf = Buffer.from(String(a))
   const bBuf = Buffer.from(String(b))
@@ -67,15 +78,19 @@ export async function handleMcpRequest(req, res, presented) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const expected = process.env.MCP_TOKEN
-  if (!expected || !presented || !safeEqual(presented, expected)) {
-    // 404 rather than 401: an unauthenticated caller learns nothing about
-    // whether this path is a real endpoint.
-    return res.status(404).json({ error: 'Not found' })
-  }
-
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
   const { id = null, method, params = {} } = body
+
+  // Auth is checked HERE, after the body is parsed, because what a caller is
+  // allowed to do depends on which method they asked for.
+  const expected = process.env.MCP_TOKEN
+  const authorized = Boolean(expected && presented && safeEqual(presented, expected))
+  const open = OPEN_METHODS.has(method) || String(method || '').startsWith('notifications/')
+  if (!authorized && !open) {
+    // 404 rather than 401, and deliberately not a JSON-RPC error: an
+    // unauthenticated caller learns nothing about whether this path is real.
+    return res.status(404).json({ error: 'Not found' })
+  }
 
   try {
     // Notifications carry no id and expect no result. Answering one with a
