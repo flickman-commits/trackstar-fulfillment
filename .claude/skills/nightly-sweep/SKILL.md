@@ -53,47 +53,60 @@ If `healthy` is false, some checks did not run. Say so at the top of the Slack
 report. **A partial sweep is not a clean sweep**, and it must never be reported
 as one.
 
-## The nightly budget — read this before fixing anything
+## The nightly quota — you are expected to fill it
 
-There are currently **167 findings marked fixable**. You are not going to fix
-167 things tonight and you must not try. Most of that is standing backlog: 123
-race-years that have never been probed do not become urgent by being counted
-again, and attempting them all means 123 requests to timing sites in one
-sitting, which is how we get blocked. Sydney's firewall escalated against us
-inside a single afternoon of over-probing, and a blocked platform is a worse
-outcome than an unprobed one.
+**A night where you fix nothing is a failed night, not a quiet one.** The
+backlog does not clear itself, and nobody is going to work through 120 untested
+race-years by hand. Clearing them is the job.
 
-Hard caps per night:
+The first version of this said "leaving 150 findings untouched is correct",
+which was written to stop an agent hammering a timing site. It over-corrected: a
+run read it, found nothing new, and stopped having done nothing. Both of those
+are wasted nights.
+
+### What the real constraint is
+
+Not tokens. This runs on Haiku and a full working night costs less than a print.
+Not our servers. It is the THIRD-PARTY timing sites, and that limit is
+**per-site, not overall**. Forty requests spread across sixteen platforms is
+nothing; forty at one platform is how Sydney's firewall ended up blocking us.
+
+The untested backlog is spread thin: 25 on Athlinks, 21 RaceRoster, 17 RTRT, 11
+Mika, 9 Brooksee, and single digits across eleven more.
+
+### Per night
 
 | Budget | Limit |
 |---|---|
-| Fixture captures | **10** |
-| Race dates researched | **5** |
-| Pull requests opened | **3** |
-| Total third-party requests | **~60** |
-| Wall clock | **~40 minutes** |
+| Race-years touched **per timing platform** | **6** |
+| Race-years touched **in total** | **50** |
+| Race dates researched and pinned | 5 |
+| Pull requests opened | 3 |
+| Wall clock | ~25 minutes |
 
-Stop early and report if any of these happen:
+The per-platform number is the one that matters. The total is a backstop.
 
-- three consecutive third-party requests fail or return 403 — something is
-  rate-limiting us and continuing makes it worse
-- a gate fails twice on the same race — it is not a config problem, flag it
-- you are unsure and there is nobody to ask
+PRs stay at 3 because the constraint there is Matt's review capacity, not
+politeness. Dates stay at 5 because each needs real corroboration and that is
+slow, careful work.
 
-Work in this order, and stop when a budget runs out:
+### What to spend it on, in order
 
-1. **Tier 0 that unblocks a live order.** Research that ran over customer data,
-   an expired approval link on an open order, a race that has run but whose
-   orders still say otherwise. These affect someone who has paid us.
-2. **Anything in `delta.new`.** New means something changed today, which is the
-   only part of the report that is actually news.
-3. **High severity before medium.**
-4. **Backlog, a slice at a time.** Prefer races with real order volume over
-   ones nobody has bought.
+1. **Tier 0 that unblocks a live order.** Someone has paid us. Always first.
+2. **Anything in `newTonight`.** New means something changed today.
+3. **High severity that is actually fixable** - not the Tier 2 flags.
+4. **Backlog, filling the quota.** Spread across platforms rather than draining
+   one. Prefer races with real order volume, but do not stop when you run out of
+   popular ones: an untested race-year is untested whoever bought it.
 
-Leaving 150 findings untouched is the correct outcome of a night's work. The
-backlog shrinking slowly and verifiably beats it lurching and taking a timing
-site's goodwill with it.
+### Stop early only if
+
+- three consecutive requests to the same platform fail or return 403 - back off
+  that platform for the night, and carry on with the others
+- a gate fails twice on the same race - flag it, do not keep trying
+- you genuinely cannot tell whether something is safe
+
+Running out of budget is a normal ending. Running out of nerve is not.
 
 ## Step 2: Tier 0 — just do it
 
