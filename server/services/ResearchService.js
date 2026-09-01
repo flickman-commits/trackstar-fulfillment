@@ -459,6 +459,27 @@ export class ResearchService {
       return existingResearch
     }
 
+    // A blocked detail page is a settled answer, not a retry.
+    //
+    // 'time_unavailable' means we matched the runner and got their bib, and the
+    // only missing piece sits behind a firewall that will refuse us again.
+    // Without this, every research pass relaunches a browser for each Sydney
+    // order to rediscover the same bib and the same block. That is sixteen
+    // Chromium launches against a site that rate-limited us at around
+    // twenty-five, so the retries were a good way to lose the access we have.
+    //
+    // Unlike the 'found' branch above, this one re-checks the name. The stored
+    // result is only settled for the runner it was looked up for, so correcting
+    // a misspelling still triggers a fresh search.
+    if (
+      existingResearch &&
+      existingResearch.researchStatus === 'time_unavailable' &&
+      existingResearch.runnerName === runnerName
+    ) {
+      console.log(`[ResearchService] Cached match with no available time for order ${order.orderNumber}`)
+      return existingResearch
+    }
+
     // Fetch from scraper using effective values (shared, DB-free search core)
     const results = await this.findRunner(raceName, raceYear, runnerName)
 
