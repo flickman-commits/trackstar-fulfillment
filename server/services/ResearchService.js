@@ -349,11 +349,17 @@ export class ResearchService {
    * @param {string} raceName - Race name (alias/fuzzy names are resolved)
    * @param {number} year - Race year
    * @param {string} runnerName - Full name to search for
+   * @param {Object} [opts]
+   * @param {boolean} [opts.skipLastNameFallback] - Skip step 3. The fallback is
+   *   a second full search, which on a browser-driven platform means a second
+   *   Chromium launch and roughly doubles the wall clock. Callers on a deadline
+   *   (the public endpoint, 9s) turn it off rather than blow the budget and
+   *   report a timeout as if the timing site were down.
    * @returns {Promise<Object>} Normalized scraper result (found, ambiguous,
    *   possibleMatches, bibNumber, officialTime, officialPace, eventType,
    *   researchStatus, researchNotes, rawData, ...)
    */
-  async findRunner(raceName, year, runnerName) {
+  async findRunner(raceName, year, runnerName, { skipLastNameFallback = false } = {}) {
     console.log(`[ResearchService] Searching for runner: ${runnerName}`)
     const scraper = getScraperForRace(raceName, year)
     let results = await scraper.searchRunner(runnerName)
@@ -392,7 +398,7 @@ export class ResearchService {
     // cases is how every Sydney order ended up showing a list of unrelated
     // people who happen to share a surname - the search had already found the
     // right runner, and we discarded them to go ask a worse question.
-    if (results.researchStatus === 'not_found' && !results.found && !results.ambiguous) {
+    if (!skipLastNameFallback && results.researchStatus === 'not_found' && !results.found && !results.ambiguous) {
       const nameParts = runnerName.trim().split(/\s+/)
       if (nameParts.length >= 2) {
         const lastName = nameParts[nameParts.length - 1]

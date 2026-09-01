@@ -26,6 +26,20 @@ export default {
   raceSlugs: {
     2022: 'blackmores-sydney-running-festival-2022',
   },
+  /**
+   * The per-runner result pages are behind a WAF we cannot clear.
+   *
+   * Not a transient failure and not worth retrying: a headless browser gets
+   * through to the search listing but is refused on every detail page, every
+   * time. Fetching one costs about five seconds and a second Chromium launch
+   * to arrive at a guaranteed 403, which is what pushed a matching lookup to
+   * 9.7s and past the public endpoint's 9s cap.
+   *
+   * With this set, a unique name match returns straight from the search row -
+   * name and bib, no time. That is everything this site will give us. Remove
+   * the flag if MultiSport ever opens the detail pages up.
+   */
+  detailPagesBlocked: true,
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   defaultMarathonEventId: 1,

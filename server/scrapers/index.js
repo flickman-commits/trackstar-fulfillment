@@ -354,10 +354,26 @@ export function hasScraperForRace(raceName) {
 }
 
 /**
- * Platforms that spin up a headless browser (Puppeteer). Too slow/heavy to run
- * on a public, unauthenticated, serverless endpoint — excluded from public lookup.
+ * Platforms too slow to serve from the public, unauthenticated, serverless
+ * endpoint, which has a hard 9s budget.
+ *
+ * The rule used to be "spins up a headless browser", and multisport-australia
+ * was in here on that basis. A browser is not itself the problem: what blew
+ * the budget was launching TWO of them, one for the search listing and a
+ * second for the per-runner detail page. Sydney's detail pages are permanently
+ * walled off, so that second launch spent five seconds earning a guaranteed
+ * 403. With detailPagesBlocked set on the config it returns from the search row
+ * alone, and a matching lookup went from 9.7s to 5.0s - inside the budget.
+ *
+ * runsignup stays out: it still needs the second fetch to get a time.
+ *
+ * The measure that matters is wall-clock against the 9s cap, so time any
+ * platform before taking it out of this set.
  */
-const PUPPETEER_PLATFORMS = new Set(['runsignup', 'multisport-australia'])
+const PUPPETEER_PLATFORMS = new Set(['runsignup'])
+
+/** Every platform that drives a browser, fast enough for public use or not. */
+const BROWSER_PLATFORMS = new Set(['runsignup', 'multisport-australia'])
 
 /**
  * Whether a race is safe to expose via the public results-lookup endpoint.
@@ -365,6 +381,17 @@ const PUPPETEER_PLATFORMS = new Set(['runsignup', 'multisport-australia'])
  * @param {string} raceName - Name of the race
  * @returns {boolean}
  */
+/**
+ * Does this race's scraper drive a headless browser?
+ *
+ * Not a health signal - it is a cost one. A browser fetch is several seconds,
+ * so a caller on a deadline uses this to decide how many of them it can afford.
+ */
+export function raceNeedsBrowser(raceName) {
+  const config = findConfigForRace(raceName)
+  return !!config && BROWSER_PLATFORMS.has(config.platform)
+}
+
 export function isRacePublicSafe(raceName) {
   const config = findConfigForRace(raceName)
   return !!config && !PUPPETEER_PLATFORMS.has(config.platform)
@@ -551,6 +578,7 @@ export default {
   getSupportedRaces,
   getRaceShorthands,
   isRacePublicSafe,
+  raceNeedsBrowser,
   getPublicSafeRaces,
   getCanonicalRaceName
 }

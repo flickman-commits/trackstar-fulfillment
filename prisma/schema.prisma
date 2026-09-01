@@ -257,7 +257,7 @@ model LookupLog {
   race      String?
   year      Int?
   name      String   // anonymized: "M.H.(11)"
-  outcome   String   // found | suggestions | not_found | off | upstream_error | rate_limited | bad_request | cached
+  outcome   String   // found | suggestions | time_unavailable | not_found | off | upstream_error | rate_limited | bad_request | cached
   status    Int?
   ms        Int?
   ip        String   // anonymized: "73.21.x.x"
