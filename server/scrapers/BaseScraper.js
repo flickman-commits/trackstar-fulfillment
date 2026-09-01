@@ -343,8 +343,11 @@ export class BaseScraper {
    * @param {string} name - the matched runner as the results page spells it
    * @param {string|null} bib - from the search row, the thing that proves identity
    * @param {string} reason - why the time is missing
+   * @param {string|null} resultsUrl - this runner's own result page. We cannot
+   *   read it, but a person in a real browser can, and it is where they have to
+   *   go to copy the time. Handing it over saves them searching for it.
    */
-  identityOnlyResult(name, bib, reason) {
+  identityOnlyResult(name, bib, reason, resultsUrl = null) {
     return {
       found: false,
       bibNumber: bib ? String(bib) : null,
@@ -355,6 +358,7 @@ export class BaseScraper {
       researchStatus: 'time_unavailable',
       researchNotes: `Matched ${name}${bib ? ` (bib ${bib})` : ''} in the ${this.raceName} ${this.year} results, but ${reason}.`,
       possibleMatches: null,
+      resultsUrl: resultsUrl || null,
       rawData: { name, bib: bib || null }
     }
   }

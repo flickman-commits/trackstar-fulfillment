@@ -209,7 +209,9 @@ export class MultiSportAustraliaScraper extends BaseScraper {
       // search row is all there is and asking again just costs five seconds.
       if (this.config.detailPagesBlocked) {
         console.log(`[${this.tag}] Detail pages known blocked - returning search-row match`)
-        return this.identityOnlyResult(match.name, match.bib, DETAIL_BLOCKED_NOTE)
+        return this.identityOnlyResult(
+          match.name, match.bib, DETAIL_BLOCKED_NOTE, `${this.baseUrl}${match.url}`
+        )
       }
 
       const detailUrl = `${this.baseUrl}${match.url}`
@@ -223,7 +225,7 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         // have their bib. Losing the detail page costs us the time, not the
         // identity, so do not throw the match away.
         if (err instanceof BlockedError) {
-          return this.identityOnlyResult(match.name, match.bib, DETAIL_BLOCKED_NOTE)
+          return this.identityOnlyResult(match.name, match.bib, DETAIL_BLOCKED_NOTE, detailUrl)
         }
         return this.upstreamErrorResult(err.message)
       }
@@ -237,7 +239,8 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         return this.identityOnlyResult(
           match.name,
           data.bib || match.bib,
-          isBlockPage(detailHtml) ? DETAIL_BLOCKED_NOTE : 'the result page carried no net time'
+          isBlockPage(detailHtml) ? DETAIL_BLOCKED_NOTE : 'the result page carried no net time',
+          detailUrl
         )
       }
 

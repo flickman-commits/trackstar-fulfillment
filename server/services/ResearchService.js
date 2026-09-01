@@ -471,10 +471,17 @@ export class ResearchService {
     // Unlike the 'found' branch above, this one re-checks the name. The stored
     // result is only settled for the runner it was looked up for, so correcting
     // a misspelling still triggers a fresh search.
+    //
+    // The resultsUrl condition also makes this self-healing. Rows written
+    // before we started capturing the runner's result page have none, and
+    // without that check they would be pinned in place forever, permanently
+    // missing the one link that makes them actionable. Missing URL means
+    // re-scrape once, capture it, and settle from then on.
     if (
       existingResearch &&
       existingResearch.researchStatus === 'time_unavailable' &&
-      existingResearch.runnerName === runnerName
+      existingResearch.runnerName === runnerName &&
+      existingResearch.resultsUrl
     ) {
       console.log(`[ResearchService] Cached match with no available time for order ${order.orderNumber}`)
       return existingResearch

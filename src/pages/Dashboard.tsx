@@ -5132,7 +5132,7 @@ Thank you!`
                             // The identity is settled - this is a copy job, not
                             // a search. Say so, or the operator re-researches
                             // an order that will never come back any better.
-                            ? `We matched ${selectedOrder.runnerName} in the ${raceLabel} results and the bib above is confirmed, but the timing site blocks the page that holds the finish time. Look up that bib on the results site and enter the time by hand. Researching again will not help.`
+                            ? `We matched ${selectedOrder.runnerName} in the ${raceLabel} results and the bib above is confirmed, but the timing site blocks the page that holds the finish time. Open their result page below and enter the time by hand. Researching again will not help.`
                           : status === 'not_found'
                             ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
                                 // Suggestions, not matches. The list below shares
@@ -5165,6 +5165,24 @@ Thank you!`
                               <h4 className={`text-xs font-semibold ${headingColor} uppercase tracking-tight mb-1.5`}>{heading}</h4>
                             )}
                             <p className={`text-body-sm ${textPrimary}`}>{fix}</p>
+                            {/* The runner's own result page, straight from the
+                                timing site's search listing. We cannot read it -
+                                that is the whole reason this box exists - but a
+                                person in a normal browser can, and this saves
+                                them searching the field for a name we already
+                                matched. Deliberately here rather than only in
+                                the Details header, because this is where the
+                                instruction to copy the time is. */}
+                            {status === 'time_unavailable' && selectedOrder.resultsUrl && (
+                              <a
+                                href={selectedOrder.resultsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 bg-white border border-amber-300 rounded-md text-xs font-medium text-amber-900 hover:bg-amber-50 transition-colors"
+                              >
+                                Open {selectedOrder.bibNumber ? `bib ${selectedOrder.bibNumber}` : 'this runner'} on the results site ↗
+                              </a>
+                            )}
                           </div>
                         )
                       })()}
