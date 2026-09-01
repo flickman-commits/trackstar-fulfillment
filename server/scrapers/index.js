@@ -354,23 +354,27 @@ export function hasScraperForRace(raceName) {
 }
 
 /**
- * Platforms too slow to serve from the public, unauthenticated, serverless
- * endpoint, which has a hard 9s budget.
+ * Platforms excluded from the public, unauthenticated results-lookup endpoint.
  *
- * The rule used to be "spins up a headless browser", and multisport-australia
- * was in here on that basis. A browser is not itself the problem: what blew
- * the budget was launching TWO of them, one for the search listing and a
- * second for the per-runner detail page. Sydney's detail pages are permanently
- * walled off, so that second launch spent five seconds earning a guaranteed
- * 403. With detailPagesBlocked set on the config it returns from the search row
- * alone, and a matching lookup went from 9.7s to 5.0s - inside the budget.
+ * Speed is the smaller reason. multisport-australia is here because MultiSport
+ * Australia rate-limits hard: about 25 browser launches from one IP during
+ * testing got that IP blocked, and it had not cleared 90 seconds later. Public
+ * lookups are shopper-driven, so the volume is uncapped in a way order research
+ * is not, and every block comes back as "the timing site is down" plus an alert.
  *
- * runsignup stays out: it still needs the second fetch to get a time.
+ * The failure we are actually avoiding is the second-order one. Sustained
+ * public traffic could get the Vercel egress IPs blocked, which would take out
+ * Sydney research in the fulfillment tool as well - a thing that works today,
+ * spent to add a storefront lookup that could never return a finish time
+ * anyway, because the detail pages are walled off.
  *
- * The measure that matters is wall-clock against the 9s cap, so time any
- * platform before taking it out of this set.
+ * Order research is fine on the same platform: a handful of lookups a day, off
+ * a different code path, nowhere near the limit.
+ *
+ * runsignup is here for the original reason, speed: it still needs a second
+ * browser launch to get a time, which does not fit the endpoint's 9s budget.
  */
-const PUPPETEER_PLATFORMS = new Set(['runsignup'])
+const PUPPETEER_PLATFORMS = new Set(['runsignup', 'multisport-australia'])
 
 /** Every platform that drives a browser, fast enough for public use or not. */
 const BROWSER_PLATFORMS = new Set(['runsignup', 'multisport-australia'])
