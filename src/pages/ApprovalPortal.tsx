@@ -542,24 +542,17 @@ export default function ApprovalPortal() {
         <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <img src="/trackstar-logo.png" alt="Trackstar" className="h-6" />
-            <div className="text-right">
-              {isPartner ? (
-                <>
-                  {/* Their name, not ours, and no order number. A partner is not
-                      tracking a purchase - they are looking at work we brought
-                      them, so the header says whose it is and who made it. */}
-                  <p style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>{partnerName}</p>
-                  <span style={{ color: '#666666', fontSize: '13px' }}>Design options presented by Trackstar</span>
-                </>
-              ) : (
-                <>
-                  {order?.customerName && (
-                    <p style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>{order.customerName}</p>
-                  )}
-                  <span style={{ color: '#666666', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</span>
-                </>
-              )}
-            </div>
+            {/* Partners get the logo alone. Their name is the page title
+                rather than a line in the corner, and there is no order number
+                to track. */}
+            {!isPartner && (
+              <div className="text-right">
+                {order?.customerName && (
+                  <p style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>{order.customerName}</p>
+                )}
+                <span style={{ color: '#666666', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -567,11 +560,23 @@ export default function ApprovalPortal() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-4 py-4">
         <div className="mb-4">
-          <h1 style={{ color: '#1A1A1A', fontSize: '24px', fontWeight: 700, marginBottom: '4px', letterSpacing: '-0.01em' }}>
-            {order?.customerName
-              ? `Hey ${order.customerName}.`
-              : isPartner ? 'Design options for our partnership.' : 'Your design is ready.'}
+          {/* The partner's own name is the headline - a touch larger and
+              heavier than the customer greeting it replaces, because here it
+              is the subject of the page rather than a salutation. */}
+          <h1 style={{
+            color: '#1A1A1A',
+            fontSize: isPartner ? '28px' : '24px',
+            fontWeight: isPartner ? 800 : 700,
+            marginBottom: '4px',
+            letterSpacing: '-0.01em',
+          }}>
+            {isPartner
+              ? partnerName
+              : order?.customerName ? `Hey ${order.customerName}.` : 'Your design is ready.'}
           </h1>
+          {isPartner && (
+            <p style={{ color: '#666666', fontSize: '14px', marginBottom: '8px' }}>presented by Trackstar</p>
+          )}
           {hasPendingProofs ? (
             <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>
               {/* A partner is a collaborator, so the ask is an opinion rather
@@ -580,7 +585,7 @@ export default function ApprovalPortal() {
               {isPartner
                 ? (pendingProofs.length === 1
                     ? "Take a look and let us know what you think. Feel free to leave comments on how you'd like things revised."
-                    : "We've got several design options for our partnership. Choose your favorite below. Feel free to leave comments on how you'd like things revised.")
+                    : "Choose your favorite below. Feel free to leave comments on how you'd like things revised.")
                 : (pendingProofs.length === 1
                     ? "Take a look and let us know what you think."
                     : `We've prepared ${pendingProofs.length} options. Pick your favorite.`)
