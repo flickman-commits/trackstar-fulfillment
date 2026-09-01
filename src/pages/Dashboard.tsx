@@ -66,7 +66,7 @@ interface Order {
   bibNumber?: string
   officialTime?: string
   officialPace?: string
-  researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null
+  researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'time_unavailable' | 'race_not_run' | null
   // How the result was obtained: scraper vs. customer-confirmed in the widget
   researchSource?: 'scraper' | 'customer_verified' | 'customer_supplied' | null
   // Detailed Instant Lookup widget outcome — how the shopper arrived at their
@@ -271,7 +271,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     officialTime: order.officialTime as string | undefined,
     officialPace: order.officialPace as string | undefined,
     eventType: order.eventType as string | undefined,
-    researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null,
+    researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'time_unavailable' | 'race_not_run' | null,
     researchNotes: order.researchNotes as string | undefined,
     resultsUrl: order.resultsUrl as string | undefined,
     // Weather
@@ -2177,6 +2177,7 @@ Thank you!`
     // missing year, and this is a dev gap rather than a date problem.
     if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Year not configured' }
     if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site unreachable, retry' }
+    if (order.researchStatus === 'time_unavailable') return { icon: '⏱', label: 'Runner matched, time needs manual entry' }
     if (order.researchStatus === 'ambiguous') return { icon: '❓', label: 'Multiple matches' }
     // A future race is a wait, not a failure.
     if (order.researchStatus === 'race_not_run' || (order.researchStatus === 'not_found' && raceNotRunYet(order))) {
@@ -2487,7 +2488,7 @@ Thank you!`
                             </div>
                             {order.status === 'ready' && order.bibNumber && (
                               <div className="text-xs text-green-600 mt-0.5">
-                                Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime}
+                                Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime || 'time needed'}
                               </div>
                             )}
                           </div>
@@ -2719,7 +2720,7 @@ Thank you!`
                                   that used to live here is now a tag. */}
                               {order.status === 'ready' && order.bibNumber && (
                                 <div className="text-xs text-green-600 mt-1 leading-tight">
-                                  Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime}
+                                  Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime || 'time needed'}
                                 </div>
                               )}
                             </td>
@@ -4891,6 +4892,25 @@ Thank you!`
                         </div>
                       </div>
                     )}
+                    {/* Customer's own numbers. Loud, because the whole point is
+                        that nobody goes looking for a "better" answer: we
+                        deliberately skip the scrape for these orders, so
+                        anything on screen came from the shopper and is the
+                        only version that is correct. */}
+                    {selectedOrder.researchSource === 'customer_supplied' && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                        <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-tight mb-1.5">
+                          Customer hand entered this data
+                        </h4>
+                        <p className="text-body-sm text-blue-900">
+                          Please use exactly what they entered. These numbers came
+                          from the shopper at checkout, not from the timing site,
+                          so do not research this order or correct the spelling.
+                          If something looks wrong, ask them rather than changing it.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Research Status */}
                     {selectedOrder.researchStatus && selectedOrder.researchStatus !== 'found' && (
                       <div>
@@ -4919,6 +4939,8 @@ Thank you!`
                             ? 'Year not configured'
                           : status === 'upstream_error'
                             ? 'Timing site is down'
+                          : status === 'time_unavailable'
+                            ? 'Runner matched, time missing'
                           : status === 'not_found'
                             ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
                                 ? 'Runner not found - similar names below'
@@ -4939,6 +4961,11 @@ Thank you!`
                             ? `The scraper works but ${raceLabel} is not wired up yet. A developer needs to add this year's event IDs. Research it by hand in the meantime.`
                           : status === 'upstream_error'
                             ? 'The timing site is slow or down right now. Nothing is wrong with this order. Retry the lookup in a couple of minutes.'
+                          : status === 'time_unavailable'
+                            // The identity is settled - this is a copy job, not
+                            // a search. Say so, or the operator re-researches
+                            // an order that will never come back any better.
+                            ? `We matched ${selectedOrder.runnerName} in the ${raceLabel} results and the bib above is confirmed, but the timing site blocks the page that holds the finish time. Look up that bib on the results site and enter the time by hand. Researching again will not help.`
                           : status === 'not_found'
                             ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
                                 // Suggestions, not matches. The list below shares

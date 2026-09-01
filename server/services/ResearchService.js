@@ -384,7 +384,15 @@ export class ResearchService {
     // try searching by last name only. This catches the rare case where the
     // upstream search itself didn't even return the runner because the FIRST
     // name doesn't match what the upstream indexes.
-    if (!results.found && !results.ambiguous) {
+    //
+    // Only when the search genuinely came back empty. Any other status means
+    // we already know something: 'time_unavailable' means we matched the
+    // person and only the clock is missing, and 'upstream_error' means the
+    // site failed rather than the runner being absent. Falling back in those
+    // cases is how every Sydney order ended up showing a list of unrelated
+    // people who happen to share a surname - the search had already found the
+    // right runner, and we discarded them to go ask a worse question.
+    if (results.researchStatus === 'not_found' && !results.found && !results.ambiguous) {
       const nameParts = runnerName.trim().split(/\s+/)
       if (nameParts.length >= 2) {
         const lastName = nameParts[nameParts.length - 1]

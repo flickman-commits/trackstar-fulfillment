@@ -201,7 +201,12 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         detailHtml = await smartFetch(detailUrl)
       } catch (err) {
         console.log(`[${this.tag}] Detail fetch failed: ${err.message}`)
-        if (err instanceof BlockedError) return this.upstreamErrorResult(DETAIL_BLOCKED_NOTE)
+        // We already matched this person by name on the search page and we
+        // have their bib. Losing the detail page costs us the time, not the
+        // identity, so do not throw the match away.
+        if (err instanceof BlockedError) {
+          return this.identityOnlyResult(match.name, match.bib, DETAIL_BLOCKED_NOTE)
+        }
         return this.upstreamErrorResult(err.message)
       }
 
@@ -211,8 +216,10 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         // time here means the page did not give us one, which is our problem
         // to fix, not a fact about the runner.
         console.log(`[${this.tag}] No net time on detail page`)
-        return this.upstreamErrorResult(
-          isBlockPage(detailHtml) ? DETAIL_BLOCKED_NOTE : 'result page carried no net time'
+        return this.identityOnlyResult(
+          match.name,
+          data.bib || match.bib,
+          isBlockPage(detailHtml) ? DETAIL_BLOCKED_NOTE : 'the result page carried no net time'
         )
       }
 

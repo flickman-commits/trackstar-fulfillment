@@ -328,6 +328,38 @@ export class BaseScraper {
   }
 
   /**
+   * We know WHO ran, but not their time.
+   *
+   * The search page identified exactly one strong name match and handed us a
+   * bib, then the per-runner detail page - the only place the finish time
+   * lives - refused us. Sydney does this on every order: MultiSport Australia
+   * fronts its result pages with a WAF that a headless browser does not clear.
+   *
+   * Reporting that as not_found or upstream_error throws away a confirmed
+   * identity and sends the operator to a list of strangers who share a
+   * surname. The identity is the hard part and we have it; the time is one
+   * field to copy by hand.
+   *
+   * @param {string} name - the matched runner as the results page spells it
+   * @param {string|null} bib - from the search row, the thing that proves identity
+   * @param {string} reason - why the time is missing
+   */
+  identityOnlyResult(name, bib, reason) {
+    return {
+      found: false,
+      bibNumber: bib ? String(bib) : null,
+      officialTime: null,
+      officialPace: null,
+      eventType: this.config?.defaultEventType || null,
+      yearFound: this.year,
+      researchStatus: 'time_unavailable',
+      researchNotes: `Matched ${name}${bib ? ` (bib ${bib})` : ''} in the ${this.raceName} ${this.year} results, but ${reason}.`,
+      possibleMatches: null,
+      rawData: { name, bib: bib || null }
+    }
+  }
+
+  /**
    * Year exists in the scraper config space but no event/result IDs are wired
    * up for this specific year (typical case: race just happened and we haven't
    * added the new year yet). Distinct from "runner not found" — surfaces in the
