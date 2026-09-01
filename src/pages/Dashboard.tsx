@@ -9,6 +9,7 @@ import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
+import StatsPanel from '@/components/StatsPanel'
 import { useAuth } from '@/lib/auth'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
@@ -648,8 +649,6 @@ export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false)
   const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>('pricing')
   const [settingsQuery, setSettingsQuery] = useState('')
-  /** Trailing 30-day share of orders bought as gifts. See /api/orders/gift-stats. */
-  const [giftStats, setGiftStats] = useState<{ percent: number | null; gifts: number; total: number; days: number } | null>(null)
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
   type HealthCheck = { status: 'ok' | 'warn' | 'error'; detail?: string | null; latency?: string }
   type HealthResults = { overall: string; checks: Record<string, HealthCheck>; error?: string }
@@ -1114,15 +1113,6 @@ export default function Dashboard() {
       setIsSavingRace(false)
     }
   }
-
-  useEffect(() => {
-    let cancelled = false
-    apiFetch(`/api/orders/gift-stats?days=30`)
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (!cancelled && d) setGiftStats(d) })
-      .catch(() => { /* a stat is not worth surfacing an error for */ })
-    return () => { cancelled = true }
-  }, [])
 
   useEffect(() => {
     if (!showSettings) return
@@ -2302,19 +2292,7 @@ Thank you!`
               <h1 className="text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1">
                 {getGreeting()}, {greetingName(currentUser)}
               </h1>
-              {/* The gift rate is the one standing statistic under the
-                  greeting now. Hidden entirely when nothing was asked, so it
-                  never claims a confident 0%. */}
-              {giftStats && giftStats.percent !== null && (
-                <span
-                  title={`${giftStats.gifts} of ${giftStats.total} orders in the last ${giftStats.days} days were marked as a gift at checkout`}
-                  className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md border text-xs font-medium bg-amber-100 text-amber-800 border-amber-300 cursor-help"
-                >
-                  <span>🎁</span>
-                  <span>Trackstar&apos;s Gifting Rate: <span className="font-semibold">{giftStats.percent}%</span></span>
-                  <span className="text-amber-700/60">(last {giftStats.days}d)</span>
-                </span>
-              )}
+
             </div>
           </div>
 
@@ -2359,6 +2337,8 @@ Thank you!`
             </div>
           </div>
         </div>
+
+        {!isLoading && <StatsPanel />}
 
         {/* Orders to Personalize Section */}
         {!isLoading && (
