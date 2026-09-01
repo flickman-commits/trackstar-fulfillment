@@ -76,16 +76,13 @@ export default function StatsPanel() {
   const ranges = data?.ranges ?? DEFAULT_RANGES
 
   return (
-    <section className="mb-4 md:mb-6">
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold text-off-black/50 uppercase tracking-wider">Stats</h2>
-          {data && (
-            <span className="text-[11px] text-off-black/35 tabular-nums">
-              {data.orderCount} order{data.orderCount === 1 ? '' : 's'}
-            </span>
-          )}
-        </div>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-off-black/50">
+          {data
+            ? `${data.orderCount} order${data.orderCount === 1 ? '' : 's'} in this window, straight from Shopify. Cancelled and test orders are left out.`
+            : 'Straight from Shopify.'}
+        </p>
         <div className="flex items-center gap-2">
           <div className={segmentGroup}>
             {ranges.map(r => (
@@ -113,7 +110,7 @@ export default function StatsPanel() {
           <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {data?.metrics.map(m => (
             <div
               key={m.key}
@@ -130,6 +127,11 @@ export default function StatsPanel() {
               </p>
               {/* The denominator, always. A rate without it is unreadable. */}
               <p className="text-[11px] text-off-black/40 mt-0.5">{m.detail}</p>
+              {/* A caveat that changes how the number should be read belongs on
+                  the card, not in a tooltip nobody hovers. */}
+              {m.note && (
+                <p className="text-[11px] text-off-black/45 mt-2 pt-2 border-t border-border-gray/60">{m.note}</p>
+              )}
             </div>
           ))}
         </div>

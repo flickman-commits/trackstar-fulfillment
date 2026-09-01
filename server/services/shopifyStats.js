@@ -13,22 +13,21 @@
  * a note. Nothing else needs touching - the endpoint and the dashboard both
  * iterate whatever is in the list.
  *
- * ─── Denominators are the whole game ───
+ * ─── Denominators ───
  *
- * Every metric here is a percentage, and the arguments are all about what goes
- * underneath the line. Two worked examples, both measured rather than assumed:
+ *   Gift rate. The order's Shopify TAG, over every order in the window. An
+ *   earlier version read a line-item "Gift" property, which is how the store
+ *   used to record this and is no longer the source of truth. The tag is set
+ *   per order and needs no interpretation - a blank property once forced a
+ *   choice between 66% and 84% depending on how you read a non-answer, and this
+ *   has no such ambiguity.
  *
- *   Gift rate. 71 of 73 recent orders carried the Gift question. 47 answered
- *   "This is a gift", 9 answered "This is for me", and 15 left it blank.
- *   Counting blanks as "not a gift" gives 66%; excluding them gives 84%. We
- *   exclude, because a shopper who skipped the question did not tell us they
- *   were not gifting - and `unanswered` is reported so the choice is visible.
- *
- *   Photo add-on. Measured against orders that COULD have added one, meaning
- *   orders containing a personalized print. Gift cards and anything else the
- *   add-on is not offered on would otherwise pad the denominator and understate
- *   the rate. In the last 30 days zero add-ons appeared on a non-eligible
- *   order, which is what makes that definition trustworthy rather than tidy.
+ *   Photo add-on. Orders containing the "Photo Add-On" product, over orders
+ *   containing at least one print. Matched by TITLE because that product
+ *   carries no SKU at all. Eligibility cannot be SKU-only either: prints are
+ *   normally `...-s1p-...` but Personalized Chicago ships as plain `chi`, so
+ *   the rule accepts either the SKU pattern or a print/poster title. Gift cards
+ *   stay out of the denominator, which is the point of having one.
  */
 
 import { shopifyFetch } from './shopifyAuth.js'
@@ -69,25 +68,24 @@ export function rangeWindow(key) {
 
 /* ── line-item helpers, derived from what the store actually sends ─────── */
 
-const propValue = (li, name) =>
-  (li?.properties || []).find(p => String(p?.name).trim().toLowerCase() === name)?.value
-
-const hasProp = (li, name) =>
-  (li?.properties || []).some(p => String(p?.name).trim().toLowerCase() === name)
-
-/** The paid photo add-on, which rides as its own line item. */
-export const isPhotoAddon = li =>
-  hasProp(li, '_addon_for') || /photo\s*add-?on/i.test(String(li?.title || ''))
+/**
+ * The paid photo add-on. Matched on title: when a shopper takes it, Shopify
+ * adds a line item literally called "Photo Add-On", and that product carries no
+ * SKU to match on instead.
+ */
+export const isPhotoAddon = li => /^photo\s*add-?on$/i.test(String(li?.title || '').trim())
 
 /**
- * A personalized race print: the thing the add-on attaches to, and therefore
- * what makes an order eligible for it. Checked against several property names
- * because the wizard has shipped more than one spelling over time.
+ * A print: what makes an order eligible for the add-on.
+ *
+ * Two ways to be one, because neither alone covers the catalogue. Print SKUs
+ * are normally `sydney-s1p-12x18-bl-pok-am`, but Personalized Chicago ships as
+ * plain `chi`, so a SKU-only rule silently drops it. The title fallback catches
+ * that without letting gift cards in.
  */
-export const isPersonalizedPrint = li =>
+export const isPrint = li =>
   !isPhotoAddon(li) &&
-  ['runner name (first & last)', 'runner name', 'race name', '_gc_ext_personalized_order']
-    .some(n => hasProp(li, n))
+  (/-s1p-/i.test(String(li?.sku || '')) || /\b(print|poster)\b/i.test(String(li?.title || '')))
 
 /* ── the metrics ──────────────────────────────────────────────────────── */
 
@@ -96,25 +94,18 @@ export const METRICS = [
     key: 'gift_rate',
     label: 'Gifting rate',
     unit: '%',
-    describe: 'Share of shoppers who said the print was a gift, out of those who answered the question.',
+    describe: 'Share of orders tagged "gift" in Shopify.',
     compute(orders) {
-      let answered = 0, gifts = 0, unanswered = 0
-      for (const o of orders) {
-        // One answer per ORDER, not per item: a three-print order is one
-        // shopper making one decision.
-        const raw = (o.line_items || []).map(li => propValue(li, 'gift')).find(v => v !== undefined)
-        if (raw === undefined) continue
-        if (!String(raw).trim()) { unanswered++; continue }
-        answered++
-        if (/this is a gift/i.test(String(raw))) gifts++
-      }
+      const gifts = orders.filter(o =>
+        String(o.tags || '')
+          .split(',')
+          .some(t => t.trim().toLowerCase() === 'gift')
+      ).length
       return {
         numerator: gifts,
-        denominator: answered,
-        detail: `${gifts} of ${answered} who answered`,
-        note: unanswered
-          ? `${unanswered} saw the question and skipped it, and are left out rather than counted as "not a gift".`
-          : null,
+        denominator: orders.length,
+        detail: `${gifts} of ${orders.length} orders`,
+        note: null,
       }
     },
   },
@@ -122,20 +113,30 @@ export const METRICS = [
     key: 'photo_addon_rate',
     label: 'Photo add-on take rate',
     unit: '%',
-    describe: 'Share of orders containing a personalized print that also bought the photo add-on.',
+    describe: 'Share of orders containing a print that also bought the Photo Add-On.',
     compute(orders) {
-      let eligible = 0, took = 0
+      let eligible = 0, took = 0, firstSeen = null
       for (const o of orders) {
         const items = o.line_items || []
-        if (!items.some(isPersonalizedPrint)) continue
+        if (!items.some(isPrint)) continue
         eligible++
-        if (items.some(isPhotoAddon)) took++
+        if (items.some(isPhotoAddon)) {
+          took++
+          if (!firstSeen || o.created_at < firstSeen) firstSeen = o.created_at
+        }
       }
       return {
         numerator: took,
         denominator: eligible,
-        detail: `${took} of ${eligible} eligible orders`,
-        note: 'Measured against orders that could have added one, not all orders.',
+        detail: `${took} of ${eligible} orders with a print`,
+        // Say what was measured, not what it implies. firstSeen is the
+        // earliest add-on order INSIDE this window, which is not the same as
+        // the date the add-on launched - on a 30-day window it is just the
+        // oldest one that happens to fall in range. Asserting a launch date
+        // from it would be inventing a fact.
+        note: firstSeen
+          ? `The add-on is recent: the earliest one in this window is ${String(firstSeen).slice(0, 10)}. Longer windows include orders placed before it was offered, so the rate reads low.`
+          : null,
       }
     },
   },
@@ -150,7 +151,7 @@ export const METRICS = [
  * leaving them in quietly moves every percentage on the page.
  */
 async function fetchOrders({ since, until }) {
-  const fields = 'id,name,created_at,cancelled_at,test,line_items,financial_status'
+  const fields = 'id,name,created_at,cancelled_at,test,tags,line_items,financial_status'
   let endpoint =
     `/orders.json?status=any&limit=250&fields=${fields}` +
     `&created_at_min=${since.toISOString()}&created_at_max=${until.toISOString()}`

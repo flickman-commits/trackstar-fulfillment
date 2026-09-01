@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
@@ -570,7 +570,7 @@ const REVIEW_PRODUCTS: { name: string; link: string }[] = [
   { name: 'Twin Cities Marathon', link: 'https://yotpo.com/go/A3v2ZhPB' },
 ]
 
-type SettingsPanel = 'pricing' | 'reviews' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'activity' | 'diagnostics' | 'maintenance'
+type SettingsPanel = 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'activity' | 'diagnostics' | 'maintenance'
 
 /**
  * Settings navigation. Grouped rather than a flat list because the panels do
@@ -593,6 +593,7 @@ const SETTINGS_NAV: {
     items: [
       { id: 'pricing', label: 'Pricing Calculator', blurb: 'Costs, retail and margin across DTC and wholesale', icon: DollarSign },
       { id: 'reviews', label: 'Request Reviews', blurb: 'Copy a review request message for any product', icon: Star },
+      { id: 'stats', label: 'Stats', blurb: 'Gifting rate, add-on take rate and more, from Shopify', icon: BarChart3 },
     ],
   },
   {
@@ -2338,8 +2339,6 @@ Thank you!`
           </div>
         </div>
 
-        {!isLoading && <StatsPanel />}
-
         {/* Orders to Personalize Section */}
         {!isLoading && (
         <section className="flex-1 flex flex-col min-h-0 pb-4">
@@ -3185,6 +3184,7 @@ Thank you!`
                   </div>
 
                   {settingsPanel === 'pricing' && <PricingCalculator />}
+                  {settingsPanel === 'stats' && <StatsPanel />}
                   {settingsPanel === 'account' && <AccountPanel />}
                   {settingsPanel === 'people' && isAdmin && <PeoplePanel />}
                   {settingsPanel === 'activity' && isAdmin && <ActivityPanel />}
