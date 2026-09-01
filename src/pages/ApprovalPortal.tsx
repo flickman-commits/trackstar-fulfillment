@@ -35,6 +35,10 @@ interface OrderInfo {
   customerName: string | null
   customerEmail: string | null
   raceName: string
+  // Partner rows reuse raceName as the partner name and customerName as the
+  // partner contact, so nothing new is fetched here - we only need to know
+  // which kind of order this is to know how to address them.
+  trackstarOrderType?: 'standard' | 'custom' | 'race_partner'
   designStatus: string
   designerNote: string | null
 }
@@ -451,6 +455,14 @@ export default function ApprovalPortal() {
   const pastProofs = proofs.filter(p => p.status !== 'pending')
   const hasPendingProofs = pendingProofs.length > 0
 
+  // Race organizers, charities, and anyone else we co-brand with all land here.
+  // The stored type is still 'race_partner' - it predates the charities - but
+  // the portal only cares that this is a partner rather than a customer.
+  const isPartner = order?.trackstarOrderType === 'race_partner'
+  // Partner rows carry the organization in raceName; customerName is the
+  // contact there, so it cannot stand in as the name on the header.
+  const partnerName = order?.raceName || 'Our partner'
+
   // Approve confirmation modal — prevents fat-finger approvals, especially
   // on mobile. Reads the proof out of state so the same modal handles any
   // option the customer picked.
@@ -531,10 +543,22 @@ export default function ApprovalPortal() {
           <div className="flex items-center justify-between">
             <img src="/trackstar-logo.png" alt="Trackstar" className="h-6" />
             <div className="text-right">
-              {order?.customerName && (
-                <p style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>{order.customerName}</p>
+              {isPartner ? (
+                <>
+                  {/* Their name, not ours, and no order number. A partner is not
+                      tracking a purchase - they are looking at work we brought
+                      them, so the header says whose it is and who made it. */}
+                  <p style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>{partnerName}</p>
+                  <span style={{ color: '#666666', fontSize: '13px' }}>Design options presented by Trackstar</span>
+                </>
+              ) : (
+                <>
+                  {order?.customerName && (
+                    <p style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>{order.customerName}</p>
+                  )}
+                  <span style={{ color: '#666666', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</span>
+                </>
               )}
-              <span style={{ color: '#666666', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</span>
             </div>
           </div>
         </div>
@@ -544,24 +568,39 @@ export default function ApprovalPortal() {
       <div className="max-w-3xl mx-auto px-4 py-4">
         <div className="mb-4">
           <h1 style={{ color: '#1A1A1A', fontSize: '24px', fontWeight: 700, marginBottom: '4px', letterSpacing: '-0.01em' }}>
-            {order?.customerName ? `Hey ${order.customerName}.` : 'Your design is ready.'}
+            {order?.customerName
+              ? `Hey ${order.customerName}.`
+              : isPartner ? 'Design options for our partnership.' : 'Your design is ready.'}
           </h1>
           {hasPendingProofs ? (
             <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>
-              {pendingProofs.length === 1
-                ? "Take a look and let us know what you think."
-                : `We've prepared ${pendingProofs.length} options. Pick your favorite.`
+              {/* A partner is a collaborator, so the ask is an opinion rather
+                  than a transaction: no count of what they bought, and an
+                  explicit invitation to say what they want changed. */}
+              {isPartner
+                ? (pendingProofs.length === 1
+                    ? "Take a look and let us know what you think. Feel free to leave comments on how you'd like things revised."
+                    : "We've got several design options for our partnership. Choose your favorite below. Feel free to leave comments on how you'd like things revised.")
+                : (pendingProofs.length === 1
+                    ? "Take a look and let us know what you think."
+                    : `We've prepared ${pendingProofs.length} options. Pick your favorite.`)
               }
             </p>
           ) : (
             <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>
-              We're working on your revisions. Check back soon.
+              {isPartner
+                ? "We're working on those revisions now. We'll be in touch shortly."
+                : "We're working on your revisions. Check back soon."}
             </p>
           )}
           {/* "Don't email us" callout — light purple, sits right under the
               subheader so customers see it before they even scroll to the
-              designs. Brand purple #4600D6 at low opacity. */}
-          {hasPendingProofs && (
+              designs. Brand purple #4600D6 at low opacity.
+
+              Customers only. Telling a partner not to email us reads as a
+              support policy, and that relationship runs on email in both
+              directions. */}
+          {hasPendingProofs && !isPartner && (
             <div style={{ marginTop: '14px', padding: '10px 14px', backgroundColor: 'rgba(70, 0, 214, 0.06)', border: '1px solid rgba(70, 0, 214, 0.18)', borderRadius: '6px' }}>
               <p style={{ color: '#1A1A1A', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
                 <strong style={{ color: '#4600D6' }}>Please don't email us with revisions</strong> - tap <strong>Request Revision to this Design</strong> on the design you want changed.

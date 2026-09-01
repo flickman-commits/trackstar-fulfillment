@@ -121,7 +121,9 @@ interface Order {
   hasOverrides?: boolean
   // Trackstar order type and custom order fields
   trackstarOrderType?: 'standard' | 'custom' | 'race_partner'
-  // Race partner fields (only populated when trackstarOrderType === 'race_partner')
+  // Partner fields (only populated when trackstarOrderType === 'race_partner').
+  // The stored value keeps its 'race_partner' name; only the labels changed,
+  // when charities and other co-branded partners joined the same view.
   partnerName?: string | null
   partnerContactName?: string | null
   // Creator sample fields (only populated when source === 'creator_sample')
@@ -774,7 +776,7 @@ export default function Dashboard() {
   const [newRaceValues, setNewRaceValues] = useState({ raceName: '', year: new Date().getFullYear().toString(), raceDate: '', location: '' })
   // Tab switcher: standard vs custom order view
   const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner'>('standard')
-  // "New Race Partner" modal state
+  // "New Partner" modal state
   const [showNewRacePartner, setShowNewRacePartner] = useState(false)
   const [newPartnerValues, setNewPartnerValues] = useState({ partnerName: '', raceYear: String(new Date().getFullYear()), contactName: '', contactEmail: '' })
   const [isCreatingPartner, setIsCreatingPartner] = useState(false)
@@ -874,12 +876,12 @@ export default function Dashboard() {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || `Create failed (${res.status})`)
       }
-      setToast({ message: 'Race partner added', type: 'success' })
+      setToast({ message: 'Partner added', type: 'success' })
       setShowNewRacePartner(false)
       setNewPartnerValues({ partnerName: '', raceYear: String(new Date().getFullYear()), contactName: '', contactEmail: '' })
       await fetchOrders()
     } catch (e) {
-      setToast({ message: e instanceof Error ? e.message : 'Failed to create race partner', type: 'error' })
+      setToast({ message: e instanceof Error ? e.message : 'Failed to create partner', type: 'error' })
     } finally {
       setIsCreatingPartner(false)
     }
@@ -2308,7 +2310,7 @@ Thank you!`
                 >
                   <ImagePlus className="w-4 h-4" />
                   <span className="md:hidden">New Partner</span>
-                  <span className="hidden md:inline">New Race Partner</span>
+                  <span className="hidden md:inline">New Partner</span>
                 </button>
               ) : (
                 <button
@@ -2347,8 +2349,8 @@ Thank you!`
           <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
             <div className="flex items-center gap-3">
               <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
-                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : 'Race Partners'}</span>
-                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : 'Race Partners'}</span>
+                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : 'Partners'}</span>
+                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : 'Partners'}</span>
               </h2>
               <span className="hidden md:inline px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
                 {ordersToFulfill.length}
@@ -2364,7 +2366,7 @@ Thank you!`
               >
                 <option value="standard">Standard</option>
                 <option value="custom">Custom</option>
-                <option value="race_partner">Race Partners</option>
+                <option value="race_partner">Partners</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
                 <ChevronDownIcon className="w-3.5 h-3.5 text-off-black/40" />
@@ -2379,7 +2381,7 @@ Thank you!`
               {([
                 ['standard', 'Standard'],
                 ['custom', 'Custom'],
-                ['race_partner', 'Race Partners'],
+                ['race_partner', 'Partners'],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
@@ -2539,7 +2541,7 @@ Thank you!`
                     )}
                   </>
                 ) : (
-                  /* Custom Designs / Race Partners - Mobile Cards */
+                  /* Custom Designs / Partners - Mobile Cards */
                   <>
                     {filteredOrders.map((order) => {
                       const designConfig = DESIGN_STATUS_CONFIG[order.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started
@@ -2577,7 +2579,7 @@ Thank you!`
                           <div className="mt-1">
                             <span className="text-sm text-off-black font-medium">
                               {isPartner
-                                ? (order.partnerName || order.raceName || 'Race Partner')
+                                ? (order.partnerName || order.raceName || 'Partner')
                                 : (order.effectiveRunnerName || order.runnerName || 'Unknown Runner')}
                             </span>
                           </div>
@@ -2654,7 +2656,7 @@ Thank you!`
 
                 {filteredOrders.length === 0 && !searchQuery && (
                   <div className="text-center py-12 text-off-black/40 text-sm">
-                    {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet - click "New Race Partner" to add one'}
+                    {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No partners yet - click "New Partner" to add one'}
                   </div>
                 )}
                 {searchQuery && filteredOrders.length === 0 && filteredCompletedOrders.length === 0 && (
@@ -2780,11 +2782,11 @@ Thank you!`
                   </>
                 ) : activeView === 'race_partner' ? (
                   <>
-                    {/* Race Partners Table */}
+                    {/* Partners Table */}
                     <thead className="bg-subtle-gray border-b border-border-gray sticky top-0 z-10">
                       <tr>
                         <th className="text-left pl-6 pr-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-44">Design Status</th>
-                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Race Partner</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Partner</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-24">Year</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Contact</th>
                         <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden lg:table-cell">Proofs</th>
@@ -2807,7 +2809,7 @@ Thank you!`
                             </td>
                             <td className="px-3 py-4">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-off-black">{order.partnerName || order.raceName || 'Race Partner'}</span>
+                                <span className="text-sm font-medium text-off-black">{order.partnerName || order.raceName || 'Partner'}</span>
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
@@ -2957,7 +2959,7 @@ Thank you!`
 
               {filteredOrders.length === 0 && !searchQuery && (
                 <div className="hidden md:block text-center py-16 text-off-black/40 text-sm">
-                  {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet - click "New Race Partner" to add one'}
+                  {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No partners yet - click "New Partner" to add one'}
                 </div>
               )}
 
@@ -3907,7 +3909,7 @@ Thank you!`
                     </span>
                     <h3 className="text-heading-md text-off-black">
                       {selectedOrder.trackstarOrderType === 'race_partner'
-                        ? (selectedOrder.partnerName || selectedOrder.raceName || 'Race Partner')
+                        ? (selectedOrder.partnerName || selectedOrder.raceName || 'Partner')
                         : `Order ${selectedOrder.displayOrderNumber}`}
                     </h3>
                     {selectedOrder.trackstarOrderType === 'custom' && (
@@ -3917,7 +3919,7 @@ Thank you!`
                     )}
                     {selectedOrder.trackstarOrderType === 'race_partner' && (
                       <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs font-medium rounded">
-                        race partner
+                        partner
                       </span>
                     )}
                     {selectedOrder.hasOverrides && (
@@ -4473,7 +4475,7 @@ Thank you!`
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                             {selectedOrder.trackstarOrderType === 'race_partner' ? (
                               <>
-                                <CopyableField label="Partner" value={selectedOrder.partnerName || selectedOrder.raceName || 'Race Partner'} />
+                                <CopyableField label="Partner" value={selectedOrder.partnerName || selectedOrder.raceName || 'Partner'} />
                                 <StaticField label="Year" value={String(selectedOrder.raceYear || 'N/A')} />
                                 {selectedOrder.partnerContactName && (
                                   <CopyableField label="Contact" value={selectedOrder.partnerContactName} />
@@ -5852,7 +5854,7 @@ Thank you!`
           </div>
         )}
 
-        {/* New Race Partner Modal */}
+        {/* New Partner Modal */}
         {showNewRacePartner && (
           <div
             className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
@@ -5863,7 +5865,7 @@ Thank you!`
             <div className="bg-white rounded-md max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-heading-md text-off-black">New Race Partner</h3>
+                  <h3 className="text-heading-md text-off-black">New Partner</h3>
                   <button onClick={() => setShowNewRacePartner(false)} className="text-off-black/40 hover:text-off-black text-2xl leading-none">×</button>
                 </div>
                 <div className="space-y-4">
