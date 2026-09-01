@@ -22,12 +22,20 @@
  *   choice between 66% and 84% depending on how you read a non-answer, and this
  *   has no such ambiguity.
  *
- *   Photo add-on. Orders containing the "Photo Add-On" product, over orders
- *   containing at least one print. Matched by TITLE because that product
- *   carries no SKU at all. Eligibility cannot be SKU-only either: prints are
- *   normally `...-s1p-...` but Personalized Chicago ships as plain `chi`, so
- *   the rule accepts either the SKU pattern or a print/poster title. Gift cards
- *   stay out of the denominator, which is the point of having one.
+ *   Photo add-on. Orders containing the "Photo Add-On" product, over every
+ *   order placed since the add-on went live. Matched by TITLE because that
+ *   product carries no SKU.
+ *
+ *   There is deliberately no eligibility test. An earlier version tried to
+ *   filter the denominator to "orders containing a print", first by SKU pattern
+ *   and then by title. The SKU pattern was not reliable - prints are usually
+ *   `...-s1p-...` but Personalized Chicago ships as plain `chi` - and in
+ *   practice essentially every order contains a print anyway, so the filter
+ *   excluded nothing while adding a way to be wrong. Every order counts.
+ *
+ *   The denominator IS clamped to the launch date, which is a different thing:
+ *   orders placed before the add-on existed could not have bought it, and
+ *   leaving them in makes the rate read low for no reason.
  */
 
 import { shopifyFetch } from './shopifyAuth.js'
@@ -76,16 +84,19 @@ export function rangeWindow(key) {
 export const isPhotoAddon = li => /^photo\s*add-?on$/i.test(String(li?.title || '').trim())
 
 /**
- * A print: what makes an order eligible for the add-on.
+ * When the Photo Add-On went on sale publicly.
  *
- * Two ways to be one, because neither alone covers the catalogue. Print SKUs
- * are normally `sydney-s1p-12x18-bl-pok-am`, but Personalized Chicago ships as
- * plain `chi`, so a SKU-only rule silently drops it. The title fallback catches
- * that without letting gift cards in.
+ * Orders before this could not have bought it, so they are dropped from that
+ * metric's denominator. Without the clamp a 90-day window reports 9% when the
+ * real take-up since launch is roughly double.
  */
-export const isPrint = li =>
-  !isPhotoAddon(li) &&
-  (/-s1p-/i.test(String(li?.sku || '')) || /\b(print|poster)\b/i.test(String(li?.title || '')))
+export const PHOTO_ADDON_LAUNCH = '2026-07-26'
+
+/** The order's calendar date in the business timezone, as YYYY-MM-DD. */
+const businessDate = iso =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(iso))
 
 /* ── the metrics ──────────────────────────────────────────────────────── */
 
@@ -113,29 +124,18 @@ export const METRICS = [
     key: 'photo_addon_rate',
     label: 'Photo add-on take rate',
     unit: '%',
-    describe: 'Share of orders containing a print that also bought the Photo Add-On.',
+    describe: 'Share of orders that bought the Photo Add-On, counting only orders placed since it launched.',
     compute(orders) {
-      let eligible = 0, took = 0, firstSeen = null
-      for (const o of orders) {
-        const items = o.line_items || []
-        if (!items.some(isPrint)) continue
-        eligible++
-        if (items.some(isPhotoAddon)) {
-          took++
-          if (!firstSeen || o.created_at < firstSeen) firstSeen = o.created_at
-        }
-      }
+      // Every order counts, except those placed before the add-on existed.
+      const since = orders.filter(o => businessDate(o.created_at) >= PHOTO_ADDON_LAUNCH)
+      const took = since.filter(o => (o.line_items || []).some(isPhotoAddon)).length
+      const excluded = orders.length - since.length
       return {
         numerator: took,
-        denominator: eligible,
-        detail: `${took} of ${eligible} orders with a print`,
-        // Say what was measured, not what it implies. firstSeen is the
-        // earliest add-on order INSIDE this window, which is not the same as
-        // the date the add-on launched - on a 30-day window it is just the
-        // oldest one that happens to fall in range. Asserting a launch date
-        // from it would be inventing a fact.
-        note: firstSeen
-          ? `The add-on is recent: the earliest one in this window is ${String(firstSeen).slice(0, 10)}. Longer windows include orders placed before it was offered, so the rate reads low.`
+        denominator: since.length,
+        detail: `${took} of ${since.length} orders`,
+        note: excluded
+          ? `${excluded} order${excluded === 1 ? '' : 's'} placed before the add-on launched on ${PHOTO_ADDON_LAUNCH} are left out, since they could not have bought it.`
           : null,
       }
     },
