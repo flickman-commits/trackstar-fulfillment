@@ -301,7 +301,11 @@ export default async function handler(req, res) {
           : null,
         // Comment count for notes indicator
         commentCount: order._count?.comments || 0,
-        // Proof count for proof indicator
+        // Proof count. For a partner this is also the options-sent count:
+        // their portal lists every proof on the order, and there is no
+        // separate send step to distinguish (partners have email disabled and
+        // get their link by hand, which is why proofSentAt is null on every
+        // partner row).
         proofCount: order._count?.proofs || 0,
         // When proofs were last sent (for follow-up tracking)
         proofSentAt: order.proofSentAt,

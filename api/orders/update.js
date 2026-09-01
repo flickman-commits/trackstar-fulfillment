@@ -19,7 +19,12 @@ export default async function handler(req, res) {
     const { orderNumber, yearOverride, raceNameOverride, runnerNameOverride, raceId, weatherTemp, weatherCondition, raceDate, raceAction, raceData,
       // Manual corrections to the result itself. Elí sometimes needs to use the
       // runner's own watch time rather than the official one we scraped.
-      bibNumber, officialTime, officialPace } = req.body
+      bibNumber, officialTime, officialPace,
+      // Partner details. Partner rows have no columns of their own: the
+      // organization lives in raceName and the contact in customerName /
+      // customerEmail. Named separately here so a caller cannot reach a real
+      // customer's email through this door by accident.
+      partnerName, partnerContactName, partnerEmail } = req.body
 
     // Race-specific operations (no orderNumber required)
     if (raceAction === 'update' && raceId) {
@@ -93,6 +98,36 @@ export default async function handler(req, res) {
 
     if (!existingOrder) {
       return res.status(404).json({ error: 'Order not found' })
+    }
+
+    // Partner details, and only ever on a partner row. The same three columns
+    // on a standard order belong to a real shopper, and overwriting a
+    // customer's email from a partner form is the kind of mistake that is
+    // silent until something bounces.
+    if (partnerName !== undefined || partnerContactName !== undefined || partnerEmail !== undefined) {
+      if (existingOrder.trackstarOrderType !== 'race_partner') {
+        return res.status(400).json({ error: 'Partner details can only be edited on a partner order' })
+      }
+      // The partner name is the heading on their approval portal, so an empty
+      // one would leave that page addressed to nobody.
+      if (partnerName !== undefined) {
+        if (!String(partnerName).trim()) {
+          return res.status(400).json({ error: 'Partner name cannot be empty' })
+        }
+        updateData.raceName = String(partnerName).trim()
+      }
+      if (partnerContactName !== undefined) {
+        updateData.customerName = String(partnerContactName).trim() || null
+      }
+      if (partnerEmail !== undefined) {
+        const email = String(partnerEmail).trim()
+        // Approval links are emailed here, so a typo means the partner never
+        // hears from us and nothing looks wrong on our end.
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return res.status(400).json({ error: 'That does not look like a valid email address' })
+        }
+        updateData.customerEmail = email || null
+      }
     }
 
     // If order was missing_year and we're setting a year override, change status to pending

@@ -575,7 +575,7 @@ export default function ApprovalPortal() {
               : order?.customerName ? `Hey ${order.customerName}.` : 'Your design is ready.'}
           </h1>
           {isPartner && (
-            <p style={{ color: '#666666', fontSize: '14px', marginBottom: '8px' }}>presented by Trackstar</p>
+            <p style={{ color: '#666666', fontSize: '14px', marginBottom: '8px' }}>Design options presented by Trackstar</p>
           )}
           {hasPendingProofs ? (
             <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>

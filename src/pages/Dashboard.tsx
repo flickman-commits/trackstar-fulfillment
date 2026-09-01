@@ -339,6 +339,15 @@ function mapOrder(order: Record<string, unknown>): Order {
     // placement sign-off that gates completion.
     photoPath: order.photoPath as string | null | undefined,
     photoPlacedAt: order.photoPlacedAt as string | null | undefined,
+    // Counts and send timestamps. The API has always returned these and this
+    // whitelist has always dropped them, so everything downstream read
+    // undefined: the partner list's options column, the notes-and-comments
+    // icon, the proof count beside "Proofs & Approval", and the follow-up
+    // warnings that count days since a send. None of them were broken; they
+    // were never receiving a number.
+    commentCount: order.commentCount as number | undefined,
+    proofCount: order.proofCount as number | undefined,
+    proofSentAt: order.proofSentAt as string | null | undefined,
   }
 }
 
@@ -373,6 +382,153 @@ function CopyableField({ label, value }: { label: React.ReactNode; value: string
 }
 
 // Static field without copy button
+/**
+ * Partner details, readable at a glance and editable in place.
+ *
+ * These three values are not cosmetic. The partner name is the heading on
+ * their approval portal and the email is where the approval link goes, so a
+ * typo made when the partner was created is invisible here and obvious to
+ * them. Editing used to mean a database change.
+ *
+ * Partner rows have no columns of their own - the organization lives in
+ * raceName, the contact in customerName and customerEmail - which is why the
+ * API takes these under partner-specific names and refuses them on any other
+ * kind of order.
+ */
+function PartnerInfoFields({
+  order,
+  onSaved,
+  onToast,
+}: {
+  order: Order
+  onSaved: () => Promise<void>
+  onToast: (t: { message: string; type: 'success' | 'error' }) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const initial = () => ({
+    partnerName: order.partnerName || order.raceName || '',
+    partnerContactName: order.partnerContactName || '',
+    partnerEmail: order.customerEmail || '',
+  })
+  const [values, setValues] = useState(initial)
+
+  const start = () => { setValues(initial()); setEditing(true) }
+  const cancel = () => { setValues(initial()); setEditing(false) }
+
+  const save = async () => {
+    if (!values.partnerName.trim()) {
+      onToast({ message: 'Partner name is required', type: 'error' })
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await apiFetch('/api/orders/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderNumber: order.orderNumber,
+          partnerName: values.partnerName.trim(),
+          partnerContactName: values.partnerContactName.trim(),
+          partnerEmail: values.partnerEmail.trim(),
+        }),
+      })
+      if (!res.ok) {
+        // The endpoint explains itself on a bad email or an empty name, so
+        // show what it said rather than a generic failure.
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to save partner details')
+      }
+      onToast({ message: 'Partner details saved', type: 'success' })
+      setEditing(false)
+      await onSaved()
+    } catch (e) {
+      onToast({ message: e instanceof Error ? e.message : 'Failed to save partner details', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputClass = 'w-44 px-2 py-1 border border-border-gray rounded text-body-sm text-right focus:outline-none focus:ring-2 focus:ring-off-black/20'
+
+  if (!editing) {
+    return (
+      <>
+        <CopyableField label="Partner" value={order.partnerName || order.raceName || 'Partner'} />
+        <StaticField label="Year" value={String(order.raceYear || 'N/A')} />
+        {order.partnerContactName
+          ? <CopyableField label="Contact" value={order.partnerContactName} />
+          : <StaticField label="Contact" value="Not set" />}
+        {order.customerEmail
+          ? <CopyableField label="Email" value={order.customerEmail} />
+          : <StaticField label="Email" value="Not set" />}
+        <div className="pt-1 flex justify-end">
+          <button
+            onClick={start}
+            className="flex items-center gap-1.5 text-xs font-medium text-off-black/60 hover:text-off-black transition-colors"
+          >
+            <Pencil className="w-3 h-3" />
+            Edit details
+          </button>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div className="flex justify-between items-center">
+        <span className="text-body-sm text-off-black/60">Partner</span>
+        <input
+          type="text"
+          value={values.partnerName}
+          onChange={e => setValues(v => ({ ...v, partnerName: e.target.value }))}
+          className={inputClass}
+        />
+      </div>
+      {/* Year stays read-only: it is part of how the partner row was created
+          and nothing on this screen is the right place to renumber it. */}
+      <StaticField label="Year" value={String(order.raceYear || 'N/A')} />
+      <div className="flex justify-between items-center">
+        <span className="text-body-sm text-off-black/60">Contact</span>
+        <input
+          type="text"
+          value={values.partnerContactName}
+          onChange={e => setValues(v => ({ ...v, partnerContactName: e.target.value }))}
+          placeholder="Contact name"
+          className={inputClass}
+        />
+      </div>
+      <div className="flex justify-between items-center">
+        <span className="text-body-sm text-off-black/60">Email</span>
+        <input
+          type="email"
+          value={values.partnerEmail}
+          onChange={e => setValues(v => ({ ...v, partnerEmail: e.target.value }))}
+          placeholder="name@example.com"
+          className={inputClass}
+        />
+      </div>
+      <div className="pt-1 flex justify-end gap-2">
+        <button
+          onClick={cancel}
+          disabled={saving}
+          className="px-3 py-1 text-xs font-medium text-off-black/60 hover:text-off-black transition-colors disabled:opacity-40"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-3 py-1 text-xs font-medium bg-off-black text-white rounded hover:opacity-90 transition-opacity disabled:opacity-40"
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
+    </>
+  )
+}
+
 function StaticField({ label, value, flag }: { label: string; value: string; flag?: boolean }) {
   return (
     <div className="flex justify-between items-center">
@@ -2789,7 +2945,7 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Partner</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-24">Year</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Contact</th>
-                        <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden lg:table-cell">Proofs</th>
+                        <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Options Sent</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-gray">
@@ -2821,9 +2977,17 @@ Thank you!`
                             <td className="px-3 py-4 hidden md:table-cell">
                               <span className="text-sm text-off-black/70">{order.partnerContactName || order.customerEmail || '-'}</span>
                             </td>
-                            <td className="px-3 pr-6 py-4 text-sm text-off-black/60 hidden lg:table-cell">
+                            {/* Every proof on a partner order is an option on
+                                their portal, so the count is the whole story.
+                                This column read as empty for two reasons: it
+                                was hidden below 1024px, and proofCount was
+                                being dropped by mapOrder before it ever
+                                reached the row. */}
+                            <td className="px-3 pr-6 py-4 text-sm text-off-black/60">
                               {(order.proofCount ?? 0) > 0 ? (
-                                <span className="px-2 py-0.5 bg-off-black/5 rounded text-xs font-medium">{order.proofCount} proof{order.proofCount === 1 ? '' : 's'}</span>
+                                <span className="px-2 py-0.5 bg-off-black/5 rounded text-xs font-medium">
+                                  {order.proofCount} option{order.proofCount === 1 ? '' : 's'}
+                                </span>
                               ) : (
                                 <span className="text-off-black/30 text-xs">None</span>
                               )}
@@ -4474,16 +4638,17 @@ Thank you!`
                         <CollapsibleSection title={selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Info' : 'Design Info'} defaultOpen={ds === 'not_started' || ds === 'in_progress'}>
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                             {selectedOrder.trackstarOrderType === 'race_partner' ? (
-                              <>
-                                <CopyableField label="Partner" value={selectedOrder.partnerName || selectedOrder.raceName || 'Partner'} />
-                                <StaticField label="Year" value={String(selectedOrder.raceYear || 'N/A')} />
-                                {selectedOrder.partnerContactName && (
-                                  <CopyableField label="Contact" value={selectedOrder.partnerContactName} />
-                                )}
-                                {selectedOrder.customerEmail && (
-                                  <CopyableField label="Email" value={selectedOrder.customerEmail} />
-                                )}
-                              </>
+                              <PartnerInfoFields
+                                key={selectedOrder.orderNumber}
+                                order={selectedOrder}
+                                onToast={setToast}
+                                onSaved={async () => {
+                                  await fetchOrders()
+                                  const refreshed = await apiFetch('/api/orders?type=race_partner').then(r => r.json())
+                                  const updated = refreshed.orders?.find((o: { orderNumber: string }) => o.orderNumber === selectedOrder.orderNumber)
+                                  if (updated) setSelectedOrder(prev => prev ? { ...prev, ...updated } : prev)
+                                }}
+                              />
                             ) : (
                               <>
                                 <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
