@@ -67,7 +67,6 @@ export class ScoreThisScraper extends BaseScraper {
    * @param {string[]} config.eventSearchOrder - e.g. ['marathon', 'half']
    * @param {Object} config.eventLabels - e.g. { marathon: 'Marathon', half: 'Half Marathon' }
    * @param {Object} config.distances - e.g. { marathon: 26.2, half: 13.1 }
-   * @param {Function} config.calculateDate - Returns Date for a given year
    */
   constructor(year, config) {
     super(config.raceName, year)
@@ -101,7 +100,7 @@ export class ScoreThisScraper extends BaseScraper {
     const raceId = this._buildRaceId()
     const eventTypes = this.config.eventTypes || ['Marathon']
 
-    console.log(`[${this.tag} ${this.year}] Race ID: ${raceId}, Date: ${raceDate.toDateString()}`)
+    console.log(`[${this.tag} ${this.year}] Race ID: ${raceId}, Date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
 
     return {
       raceDate,

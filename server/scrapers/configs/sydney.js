@@ -77,16 +77,5 @@ export default {
     2024: '2024-09-15',
     2025: '2025-08-31',
     2026: '2026-08-30',
-  },
-  /**
-   * Fallback for years not listed above. Last Sunday of August, which matches
-   * the post-2025 Majors slot and agrees with both verified dates since the
-   * move. Do not trust it for anything before 2025.
-   */
-  calculateDate(year) {
-    const aug31 = new Date(year, 7, 31) // August 31
-    const dayOfWeek = aug31.getDay()
-    const lastSunday = 31 - dayOfWeek
-    return new Date(year, 7, lastSunday)
   }
 }

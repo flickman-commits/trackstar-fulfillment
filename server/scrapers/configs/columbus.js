@@ -32,12 +32,5 @@ export default {
   raceSlugs: {
     2023: { marathon: '2023_Columbus_Marathon-Marathon', half: '2023_Columbus_Marathon-Half_Marathon' },
     2024: { marathon: '2024_Columbus_Marathon-Marathon', half: '2024_Columbus_Marathon-Half_Marathon' },
-  },
-  /** Third Sunday of October. */
-  calculateDate(year) {
-    const oct1 = new Date(year, 9, 1)
-    const dow = oct1.getDay()
-    const firstSunday = dow === 0 ? 1 : 1 + (7 - dow)
-    return new Date(year, 9, firstSunday + 14)
   }
 }

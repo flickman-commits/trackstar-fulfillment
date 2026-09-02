@@ -24,6 +24,10 @@ export default {
     2025: { tenMiler: { id: 6554, distance: 16093 } },
   },
 
+  raceDates: {
+    2024: '2024-10-13',
+    2025: '2025-10-12',
+  },
   eventTypes: ['10 Miler'],
   defaultEventType: '10 Miler',
   eventSearchOrder: ['tenMiler'],
@@ -36,13 +40,5 @@ export default {
     'Army 10 Miler',
   ],
   keywords: ['army ten-miler', 'army ten miler', 'army 10-miler', 'army 10 miler'],
-  keywordRequiresMarathon: false,
-
-  /** Second Sunday of October. */
-  calculateDate(year) {
-    const oct1 = new Date(year, 9, 1)
-    const dow = oct1.getDay()
-    const firstSunday = dow === 0 ? 1 : 1 + (7 - dow)
-    return new Date(year, 9, firstSunday + 7)
-  }
+  keywordRequiresMarathon: false
 }

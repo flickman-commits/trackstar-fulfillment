@@ -30,18 +30,12 @@ export default {
    * marathon-dates page.
    */
   raceDates: {
+    2010: '2010-04-19',
+    2018: '2018-04-16',
+    2022: '2022-04-18',
     2023: '2023-04-17',
     2024: '2024-04-15',
     2025: '2025-04-21',
     2026: '2026-04-20',
-  },
-  /**
-   * Boston Marathon is Patriots' Day — third Monday of April.
-   */
-  calculateDate(year) {
-    const apr1 = new Date(year, 3, 1)
-    const dayOfWeek = apr1.getDay()
-    const daysUntilFirstMonday = dayOfWeek === 1 ? 0 : (8 - dayOfWeek) % 7
-    return new Date(year, 3, 1 + daysUntilFirstMonday + 14)
   }
 }

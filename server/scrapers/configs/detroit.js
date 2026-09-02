@@ -65,12 +65,5 @@ export default {
     2023: '2023-10-15',
     2024: '2024-10-20',
     2025: '2025-10-19',
-  },
-  /** Third Sunday of October — agrees with all four verified dates above. */
-  calculateDate(year) {
-    const oct1 = new Date(year, 9, 1)
-    const dow = oct1.getDay()
-    const firstSunday = dow === 0 ? 1 : 1 + (7 - dow)
-    return new Date(year, 9, firstSunday + 14)
   }
 }

@@ -113,13 +113,11 @@ export class BaseScraper {
    *   1. A date scraped from the results page for THIS year.
    *   2. `config.raceDates[year]` — a date someone verified against a real
    *      source and wrote down.
-   *   3. `config.calculateDate(year)` — a guess from a recurrence rule.
    *
-   * Race date drives the weather printed on the poster, so a guess that looks
-   * plausible is worse than an obvious gap. Rule 3 is a migration crutch, not
-   * a design: every config should grow a `raceDates` entry for the years it
-   * supports, and the fallback logs when it is doing the work so the gaps are
-   * visible rather than silent.
+   * There is no third rule any more. Configs used to carry a recurrence rule
+   * as a fallback and it has been removed everywhere: the race date drives the
+   * weather printed on the poster, and a plausible wrong date is worse than an
+   * obvious gap because nobody can see it. An unsupported year returns null.
    *
    * Two traps worth knowing, both real:
    *   - A scraped date from the WRONG year (a fallback event id pointing at the
@@ -146,12 +144,18 @@ export class BaseScraper {
       console.warn(`[${this.tag || this.raceName} ${this.year}] Unparseable raceDates entry: ${configured}`)
     }
 
-    if (typeof this.config?.calculateDate === 'function') {
-      const guessed = this.config.calculateDate(this.year)
-      console.warn(`[${this.tag || this.raceName} ${this.year}] No verified date - falling back to a computed one (${guessed?.toDateString?.()}). Add a raceDates entry.`)
-      return guessed
-    }
-
+    // No computed fallback, by design.
+    //
+    // Configs used to carry a calculateDate rule - "first Sunday of December",
+    // "last Sunday of September" - and the rules were wrong often enough to
+    // matter while always looking right. CIM 2019 and 2024 came out a week
+    // early because December 1st was itself a Sunday; Berlin 2025 came out a
+    // week late. Nobody can spot a plausible wrong date, and it drives both the
+    // date printed on the poster and the weather looked up for it.
+    //
+    // An unlisted year now returns null. That is visible, it gets fixed, and it
+    // cannot quietly ship. Add the year to raceDates with a source.
+    console.warn(`[${this.tag || this.raceName} ${this.year}] No verified date. Add a raceDates entry to the config.`)
     return null
   }
 

@@ -55,13 +55,5 @@ export default {
     'Surf City Half Marathon',
   ],
   keywords: ['surf city'],
-  keywordRequiresMarathon: true,
-
-  /** First Sunday of February. */
-  calculateDate(year) {
-    const feb1 = new Date(year, 1, 1)
-    const dow = feb1.getDay()
-    const firstSunday = dow === 0 ? 1 : 1 + (7 - dow)
-    return new Date(year, 1, firstSunday)
-  }
+  keywordRequiresMarathon: true
 }

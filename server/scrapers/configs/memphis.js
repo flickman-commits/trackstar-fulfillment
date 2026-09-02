@@ -55,10 +55,5 @@ export default {
     2023: '2023-12-02',
     2024: '2024-12-07',
     2025: '2025-12-06',
-  },
-  /** First Saturday of December — agrees with every verified date above. */
-  calculateDate(year) {
-    const dec1 = new Date(year, 11, 1)
-    return new Date(year, 11, 1 + ((6 - dec1.getDay() + 7) % 7))
   }
 }

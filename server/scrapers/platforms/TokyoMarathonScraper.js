@@ -21,7 +21,6 @@ export class TokyoMarathonScraper extends BaseScraper {
    * @param {Object} config
    * @param {string} config.raceName
    * @param {string} config.location
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)

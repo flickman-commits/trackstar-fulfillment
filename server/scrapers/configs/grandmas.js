@@ -15,6 +15,12 @@ export default {
   raceName: "Grandma's Marathon",
   tag: 'Grandmas',
   location: 'Duluth, MN',
+  raceDates: {
+    2004: '2004-06-19',
+    2005: '2005-06-18',
+    2024: '2024-06-22',
+    2026: '2026-06-20',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: { marathon: 'Marathon', half: 'Half Marathon' },
@@ -46,12 +52,5 @@ export default {
       marathon: "2026_Grandma%27s_Marathon-Marathon",
       half: "2026_Grandma%27s_Marathon-Half_Marathon",
     },
-  },
-  /** Third Saturday of June. */
-  calculateDate(year) {
-    const jun1 = new Date(year, 5, 1)
-    const dow = jun1.getDay()
-    const firstSat = dow === 6 ? 1 : 1 + ((6 - dow + 7) % 7)
-    return new Date(year, 5, firstSat + 14)
   }
 }

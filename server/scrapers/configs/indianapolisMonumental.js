@@ -40,12 +40,5 @@ export default {
     2023: 1068355,
     2024: 1093873,
     2025: 1127034,
-  },
-  /** Approx: second Saturday of November (date varies year to year). */
-  calculateDate(year) {
-    const nov1 = new Date(year, 10, 1)
-    const dow = nov1.getDay()
-    const firstSat = dow === 6 ? 1 : 1 + ((6 - dow + 7) % 7)
-    return new Date(year, 10, firstSat + 7)
   }
 }

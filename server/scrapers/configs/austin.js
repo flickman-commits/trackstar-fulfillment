@@ -9,6 +9,9 @@ export default {
   location: 'Austin, TX',
   parseMode: 'columns',
   endpoint: 'searchResultGen.php',
+  raceDates: {
+    2026: '2026-02-15',
+  },
   eventTypes: ['Marathon', 'Half Marathon', '5K'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
   eventLabels: {
@@ -25,14 +28,5 @@ export default {
   eventIds: {
     2026: { marathon: '17035', halfMarathon: '17034' }
     // Add more years as they become available
-  },
-  /**
-   * Austin Marathon is typically the third Sunday of February
-   */
-  calculateDate(year) {
-    const feb1 = new Date(year, 1, 1)
-    const dayOfWeek = feb1.getDay()
-    const daysUntilFirstSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 1, 1 + daysUntilFirstSunday + 14)
   }
 }

@@ -28,6 +28,11 @@ export default {
   location: 'Philadelphia, PA',
   parseMode: 'simple',
   endpoint: 'searchResultGen.php',
+  raceDates: {
+    2024: '2024-11-24',
+    2025: '2025-11-23',
+    2026: '2026-11-22',
+  },
   eventTypes: ['Marathon'],
   eventSearchOrder: ['marathon'],
   eventLabels: {
@@ -43,25 +48,5 @@ export default {
   eventIds: {
     2024: { marathon: '16165' },
     2025: { marathon: '16897' },
-  },
-  /**
-   * Philadelphia Marathon is the Sunday BEFORE Thanksgiving — i.e. four days
-   * before the fourth Thursday of November.
-   *
-   * This used to compute the third Sunday of November, which is only sometimes
-   * the same day. It gets 2026 wrong by a week (Nov 15 vs the real Nov 22), and
-   * 2026 has no results page to scrape a date from, so the computed value is
-   * the one that sticks. Race date drives the weather we print on the poster,
-   * so a week's drift is a wrong poster, not just a wrong record.
-   *
-   * Checks out against every edition we can verify: 2022 Nov 20, 2023 Nov 19,
-   * 2024 Nov 24, 2025 Nov 23, 2026 Nov 22.
-   */
-  calculateDate(year) {
-    // Fourth Thursday of November = Thanksgiving.
-    const nov1 = new Date(year, 10, 1)
-    const firstThursday = 1 + ((4 - nov1.getDay() + 7) % 7)
-    const thanksgiving = firstThursday + 21
-    return new Date(year, 10, thanksgiving - 4)
   }
 }

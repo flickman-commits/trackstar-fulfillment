@@ -33,6 +33,9 @@ export default {
   tag: 'Eugene',
   baseUrl: 'https://results.laurelt.com/eug',
   location: 'Eugene, OR',
+  raceDates: {
+    2026: '2026-04-26',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['Marathon', 'Half Marathon'],
   eventLabels: {
@@ -53,14 +56,5 @@ export default {
     2023: { ...ATHLINKS_BASE, eventIds: { 2023: 1049896 } },
     2024: { ...ATHLINKS_BASE, eventIds: { 2024: 1079485 } },
     2025: { ...ATHLINKS_BASE, eventIds: { 2025: 1110368 } },
-  },
-  /**
-   * Eugene Marathon is typically the last Sunday in April
-   */
-  calculateDate(year) {
-    const apr30 = new Date(year, 3, 30)
-    const dayOfWeek = apr30.getDay()
-    const lastSunday = 30 - dayOfWeek
-    return new Date(year, 3, lastSunday)
   }
 }

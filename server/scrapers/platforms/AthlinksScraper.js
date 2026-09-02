@@ -24,7 +24,6 @@ export class AthlinksScraper extends BaseScraper {
    * @param {Object} config.eventIds   - year -> Athlinks eventId
    * @param {Object} [config.courseMap] - distance key -> course-name regex
    *                  (e.g. { marathon: /marathon/i, half: /half/i })
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)

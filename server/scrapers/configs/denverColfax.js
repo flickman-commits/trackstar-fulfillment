@@ -27,6 +27,11 @@ export default {
     },
   },
 
+  raceDates: {
+    2022: '2022-05-15',
+    2025: '2025-05-18',
+    2026: '2026-05-17',
+  },
   eventTypes: ['Marathon', 'Half Marathon', '10 Miler'],
   defaultEventType: 'Marathon',
   eventSearchOrder: ['marathon', 'half', 'tenMiler'],
@@ -42,24 +47,5 @@ export default {
     'Denver Marathon',
   ],
   keywords: ['colfax', 'denver'],
-  keywordRequiresMarathon: true,
-
-  /**
-   * Denver Colfax Marathon is typically held on the third Sunday of May
-   * 2025: May 18
-   */
-  calculateDate(year) {
-    const knownDates = {
-      2025: new Date(2025, 4, 18),
-      2026: new Date(2026, 4, 17),
-    }
-
-    if (knownDates[year]) return knownDates[year]
-
-    // Fallback: third Sunday of May
-    const may1 = new Date(year, 4, 1)
-    const dayOfWeek = may1.getDay()
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 4, 1 + daysUntilSunday + 14)
-  }
+  keywordRequiresMarathon: true
 }

@@ -42,12 +42,5 @@ export default {
     2024: 1073139,
     2025: 1099290,
     2026: 1133881,
-  },
-  /** Third Sunday of February. */
-  calculateDate(year) {
-    const feb1 = new Date(year, 1, 1)
-    const dow = feb1.getDay()
-    const firstSunday = dow === 0 ? 1 : 1 + (7 - dow)
-    return new Date(year, 1, firstSunday + 14)
   }
 }

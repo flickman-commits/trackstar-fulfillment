@@ -27,18 +27,11 @@ export default {
    * future-event-dates page.
    */
   raceDates: {
+    2011: '2011-10-09',
+    2021: '2021-10-10',
     2023: '2023-10-08',
     2024: '2024-10-13',
     2025: '2025-10-12',
     2026: '2026-10-11',
-  },
-  /**
-   * Chicago Marathon is the second Sunday of October
-   */
-  calculateDate(year) {
-    const oct1 = new Date(year, 9, 1)
-    const dayOfWeek = oct1.getDay()
-    const daysUntilFirstSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 9, 1 + daysUntilFirstSunday + 7)
   }
 }

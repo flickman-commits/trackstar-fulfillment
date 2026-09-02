@@ -18,6 +18,9 @@ export default {
   tag: 'JerseyCity',
   location: 'Jersey City, NJ',
   eventPrefix: 'JCM-JERSEYCITYMARATHON',
+  raceDates: {
+    2026: '2026-04-19',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: {
@@ -44,15 +47,5 @@ export default {
     'The Jersey City Marathon & Half Marathon Marquee Experience at Newport',
   ],
   keywords: ['jersey city'],
-  keywordRequiresMarathon: false,
-  /**
-   * Jersey City Marathon is typically the 2nd or 3rd Sunday of April.
-   * Use second Sunday of April as approximation.
-   */
-  calculateDate(year) {
-    const apr1 = new Date(year, 3, 1)
-    const dayOfWeek = apr1.getDay()
-    const firstSunday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek
-    return new Date(year, 3, firstSunday + 7) // Second Sunday
-  }
+  keywordRequiresMarathon: false
 }

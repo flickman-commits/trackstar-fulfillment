@@ -15,6 +15,9 @@ export default {
   raceName: 'Oakland Marathon',
   tag: 'Oakland',
   location: 'Oakland, CA',
+  raceDates: {
+    2026: '2026-03-22',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
   eventLabels: {
@@ -26,6 +29,7 @@ export default {
     'Oakland Marathon 2026',
     'Oakland Half Marathon',
     'The Oakland Marathon',
+    'Oakland Marathon (+ Half Marathon)',
   ],
   keywords: ['oakland'],
   keywordRequiresMarathon: true,
@@ -47,14 +51,5 @@ export default {
       marathon: 253779,
       halfMarathon: 253780,
     },
-  },
-  /**
-   * Oakland Marathon is typically the third Sunday of March
-   */
-  calculateDate(year) {
-    const mar1 = new Date(year, 2, 1)
-    const dayOfWeek = mar1.getDay()
-    const daysUntilFirstSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 2, 1 + daysUntilFirstSunday + 14)
   }
 }

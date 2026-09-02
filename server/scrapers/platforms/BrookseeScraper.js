@@ -26,7 +26,7 @@ export class BrookseeScraper extends BaseScraper {
     console.log(`[${this.tag} ${this.year}] Fetching race info...`)
 
     const raceDate = this.resolveRaceDate()
-    console.log(`[${this.tag} ${this.year}] Race date: ${raceDate.toDateString()}`)
+    console.log(`[${this.tag} ${this.year}] Race date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
 
     return {
       raceDate,

@@ -19,6 +19,9 @@ export default {
   tag: 'Mesa',
   baseUrl: 'https://mesamarathon.com',
   location: 'Mesa, AZ',
+  raceDates: {
+    2026: '2026-02-14',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['Marathon', 'Half Marathon'],
   eventLabels: {
@@ -39,14 +42,5 @@ export default {
     2024: '166942',
     2025: '167137',
     2026: '167534',
-  },
-  /**
-   * Mesa Marathon is typically the second Saturday of February
-   */
-  calculateDate(year) {
-    const feb1 = new Date(year, 1, 1)
-    const dayOfWeek = feb1.getDay()
-    const daysUntilFirstSat = dayOfWeek === 6 ? 0 : 6 - dayOfWeek
-    return new Date(year, 1, 1 + daysUntilFirstSat + 7)
   }
 }

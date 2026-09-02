@@ -23,6 +23,9 @@ export default {
   tag: 'OC',
   location: 'Costa Mesa, CA',
   masterEventId: 3234,
+  raceDates: {
+    2026: '2026-05-03',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: {
@@ -56,14 +59,5 @@ export default {
     2024: 1072997,
     2025: 1107977,
     2026: 1130297,
-  },
-  /**
-   * OC Marathon is the first Sunday of May.
-   */
-  calculateDate(year) {
-    const may1 = new Date(year, 4, 1)
-    const dayOfWeek = may1.getDay()
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 4, 1 + daysUntilSunday)
   }
 }

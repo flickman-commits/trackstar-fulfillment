@@ -127,7 +127,6 @@ export class MultiSportAustraliaScraper extends BaseScraper {
    *                  does not follow the {raceSlug}-{year} pattern
    * @param {Object} [config.eventIds] - year -> { marathon: 1 } event ID map
    * @param {number} [config.defaultMarathonEventId=1]
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)

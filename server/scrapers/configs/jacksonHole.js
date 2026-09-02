@@ -38,12 +38,5 @@ export default {
     2023: 1056937,
     2024: 1086641,
     2025: 1118710,
-  },
-  /** Fourth Saturday of September. */
-  calculateDate(year) {
-    const sep1 = new Date(year, 8, 1)
-    const dow = sep1.getDay()
-    const firstSat = dow === 6 ? 1 : 1 + ((6 - dow + 7) % 7)
-    return new Date(year, 8, firstSat + 21)
   }
 }

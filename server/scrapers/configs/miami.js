@@ -37,11 +37,5 @@ export default {
     2023: 1042170,
     2024: 1039374,
     2025: 1087859,
-  },
-  /** Approx: last Sunday of January (drifts into early February some years). */
-  calculateDate(year) {
-    const jan31 = new Date(year, 0, 31)
-    const dow = jan31.getDay()
-    return new Date(year, 0, 31 - dow)
   }
 }

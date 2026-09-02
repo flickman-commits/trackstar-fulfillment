@@ -35,7 +35,6 @@ export class LaurelTimingScraper extends BaseScraper {
    * @param {Object} config.events           - { marathon: 'Marathon', half: 'Half Marathon' }
    * @param {string[]} config.eventSearchOrder - e.g. ['marathon', 'half']
    * @param {Object} config.distances        - { marathon: 26.2, half: 13.1 }
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)

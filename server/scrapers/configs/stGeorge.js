@@ -30,12 +30,5 @@ export default {
   raceIds: {
     2024: 167341,
     2025: 167737,
-  },
-  /** First Saturday of October. */
-  calculateDate(year) {
-    const oct1 = new Date(year, 9, 1)
-    const dow = oct1.getDay()
-    const firstSat = dow === 6 ? 1 : 1 + ((6 - dow + 7) % 7)
-    return new Date(year, 9, firstSat)
   }
 }

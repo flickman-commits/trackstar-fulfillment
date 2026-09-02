@@ -20,6 +20,9 @@ export default {
   raceName: 'Pittsburgh Marathon',
   tag: 'Pittsburgh',
   location: 'Pittsburgh, PA',
+  raceDates: {
+    2026: '2026-05-03',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
   eventLabels: {
@@ -47,14 +50,5 @@ export default {
       marathon: 261999,
       halfMarathon: 262000,
     },
-  },
-  /**
-   * Pittsburgh Marathon is the first Sunday of May.
-   */
-  calculateDate(year) {
-    const may1 = new Date(year, 4, 1)
-    const dayOfWeek = may1.getDay()
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 4, 1 + daysUntilSunday)
   }
 }

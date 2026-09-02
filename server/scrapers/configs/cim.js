@@ -23,7 +23,9 @@ export default {
   aliases: [
     'California International Marathon',
     'CIM Marathon',
-    'CIM'
+    'CIM',
+    // How these rows are actually named in the database.
+    'California International Marathon (CIM)',
   ],
   keywords: ['california international', 'cim'],
   keywordRequiresMarathon: false, // 'cim' alone is enough

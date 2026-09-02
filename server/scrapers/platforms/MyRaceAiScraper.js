@@ -14,7 +14,6 @@ export class MyRaceAiScraper extends BaseScraper {
    * @param {string} config.raceName
    * @param {string} config.location
    * @param {string} config.raceIdPattern - e.g. 'cim_{year}'
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)

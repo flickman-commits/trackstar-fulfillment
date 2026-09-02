@@ -527,22 +527,16 @@ export function getRaceConfigSummaries(years = []) {
     // noise: Jackson Hole 2026 is in September and was being counted as work
     // to do.
     //
-    // Verified dates first. Configs are moving off computed dates - CIM has
-    // none left, because "first Sunday of December" was a week wrong whenever
-    // December 1st fell on a Sunday - so calculateDate is now a fallback for
-    // the configs that still have one, not the source. A year with neither is
-    // null, which the callers already handle as "date unknown".
+    // Verified dates only. Computed dates are gone from every config, so a
+    // year we have not pinned is null - which the callers already handle as
+    // "date unknown", and which the sweep should surface as work to do.
     const raceDates = {}
     for (const year of years) {
       try {
         const pinned = config.raceDates?.[year]
-        if (pinned) {
-          const [y, m, d] = String(pinned).split('-').map(Number)
-          raceDates[year] = y && m && d ? new Date(y, m - 1, d).toISOString() : null
-          continue
-        }
-        const d = config.calculateDate?.(year)
-        raceDates[year] = d instanceof Date && !isNaN(d.valueOf()) ? d.toISOString() : null
+        if (!pinned) { raceDates[year] = null; continue }
+        const [y, m, d] = String(pinned).split('-').map(Number)
+        raceDates[year] = y && m && d ? new Date(y, m - 1, d).toISOString() : null
       } catch {
         raceDates[year] = null
       }

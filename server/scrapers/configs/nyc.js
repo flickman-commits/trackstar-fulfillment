@@ -27,18 +27,11 @@ export default {
    * November 1 by NYRR listings.
    */
   raceDates: {
+    2006: '2006-11-05',
+    2015: '2015-11-01',
     2023: '2023-11-05',
     2024: '2024-11-03',
     2025: '2025-11-02',
     2026: '2026-11-01',
-  },
-  /**
-   * NYC Marathon is always the first Sunday of November
-   */
-  calculateDate(year) {
-    const nov1 = new Date(year, 10, 1)
-    const dayOfWeek = nov1.getDay()
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 10, 1 + daysUntilSunday)
   }
 }

@@ -61,16 +61,5 @@ export default {
     2024: 1071102,
     2025: 1101910,
     2026: 1136201,
-  },
-  /**
-   * Chevron Houston Marathon is held on the second or third Sunday of
-   * January. (2024-01-14, 2025-01-18, 2026-01-11.)
-   */
-  calculateDate(year) {
-    // Find the second Sunday of January as an approximation
-    const jan1 = new Date(year, 0, 1)
-    const dayOfWeek = jan1.getDay()
-    const firstSunday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek
-    return new Date(year, 0, firstSunday + 7) // Second Sunday
   }
 }
