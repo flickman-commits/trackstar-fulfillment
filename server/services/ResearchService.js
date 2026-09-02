@@ -14,6 +14,49 @@ import { getScraperForRace, hasScraperForRace } from '../scrapers/index.js'
 import WeatherService from './WeatherService.js'
 
 const prisma = new PrismaClient()
+
+/**
+ * Race distance in miles for an event type, or null when we cannot be sure.
+ *
+ * Pace is just time over distance, so a missing pace is always recoverable -
+ * but only if the distance is right. It cannot come from the race config:
+ * plenty of these events run several distances off one results page (Austin
+ * lists a marathon, a half and a 5K), so config.distanceMiles would hand a
+ * half-marathoner a marathon pace, which is nearly double and looks perfectly
+ * reasonable printed on a poster.
+ *
+ * The event type is the only thing that actually says how far this runner ran,
+ * so that is what this keys on. Anything unrecognised returns null and the
+ * pace stays empty, which is the honest answer and the one Eli can spot.
+ */
+const EVENT_DISTANCE_MILES = {
+  'marathon': 26.2,
+  'half marathon': 13.1,
+  'half': 13.1,
+  '10 miler': 10,
+  '10k': 6.2137,
+  '5k': 3.1069,
+}
+
+export function distanceForEventType(eventType) {
+  if (!eventType) return null
+  return EVENT_DISTANCE_MILES[String(eventType).trim().toLowerCase()] ?? null
+}
+
+/** Minutes-per-mile for a finish time, or null if we cannot say. */
+export function derivePace(officialTime, eventType) {
+  const miles = distanceForEventType(eventType)
+  if (!officialTime || !miles) return null
+  const parts = String(officialTime).split(':').map(Number)
+  if (parts.some(Number.isNaN)) return null
+  const seconds = parts.length === 3
+    ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+    : parts.length === 2 ? parts[0] * 60 + parts[1] : null
+  if (!seconds) return null
+  const perMile = Math.round(seconds / miles)
+  return `${Math.floor(perMile / 60)}:${String(perMile % 60).padStart(2, '0')}`
+}
+
 const weatherService = new WeatherService()
 
 export class ResearchService {
@@ -254,12 +297,34 @@ export class ResearchService {
     }
 
     if (race) {
-      // Update existing race with new data
-      race = await prisma.race.update({
-        where: { id: race.id },
-        data: raceData
-      })
-      console.log(`[ResearchService] Updated race record: ${race.id}`)
+      // Fill the gaps, never overwrite what is already there.
+      //
+      // This used to write raceData wholesale, which quietly undid manual
+      // corrections. The cache check above needs raceDate AND location AND
+      // resultsUrl to all be present, so a race missing any one of them - CIM
+      // 2024, 2025 and 2026 all had no location - re-fetched on every single
+      // research call and stamped the config's values back over the row. Eli
+      // fixed a CIM date by hand, the next lookup on that race put the wrong
+      // one back, and from the outside the tool looks like it is corrupting
+      // its own data.
+      //
+      // A person editing a race date or a city is making a deliberate
+      // correction to something we got wrong. It outranks anything the config
+      // can tell us, so only absent fields get written.
+      const gapFill = {}
+      for (const [key, value] of Object.entries(raceData)) {
+        const current = race[key]
+        const isEmpty = current === null || current === undefined
+          || (Array.isArray(current) && current.length === 0)
+        if (isEmpty && value !== null && value !== undefined) gapFill[key] = value
+      }
+
+      if (Object.keys(gapFill).length > 0) {
+        race = await prisma.race.update({ where: { id: race.id }, data: gapFill })
+        console.log(`[ResearchService] Filled missing race fields (${Object.keys(gapFill).join(', ')}): ${race.id}`)
+      } else {
+        console.log(`[ResearchService] Race record already complete, left as is: ${race.id}`)
+      }
     } else {
       // Create new race record
       race = await prisma.race.create({
@@ -497,7 +562,14 @@ export class ResearchService {
       runnerName: runnerName, // Store the name actually used for search
       bibNumber: results.bibNumber,
       officialTime: results.officialTime,
-      officialPace: results.officialPace,
+      // Backstop for every scraper at once. MyRace hands back paceTime: null
+      // for whole races - CIM 2019 for all of them - and the scraper passed
+      // that straight through, so orders showed a finish time next to
+      // "Pending research" where the pace goes. Rather than patch that race by
+      // race, derive it here whenever we have a time and know the distance.
+      // The scraper's own value always wins; this only fills a hole.
+      officialPace: results.officialPace
+        || derivePace(results.officialTime, results.eventType),
       eventType: results.eventType,
       yearFound: results.yearFound,
       // Pass through the scraper's specific status if it returned one (e.g.
