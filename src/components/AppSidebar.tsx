@@ -16,9 +16,12 @@ import type { LucideIcon } from 'lucide-react'
  * the bottom because it is the one you reach for least and always want in the
  * same place.
  *
- * Grey rather than a brand colour on purpose: the rail is chrome, and the
- * dashboard behind it already uses purple for things that matter (approve
- * buttons, the research queue). A purple rail would compete with them.
+ * Dark grey rather than a brand colour, and the same dark grey as the
+ * storefront footer card, so the tool borrows a shape the brand already uses.
+ * Not purple: the dashboard behind it uses purple for things that act - approve
+ * buttons, the research queue - and a purple rail would compete with them.
+ * Against the dark ground the current tile is a white card, which is the
+ * strongest contrast available and needs no colour at all.
  *
  * Desktop only. On mobile the screen is a single column of orders and a fixed
  * rail would eat a third of it.
@@ -46,15 +49,15 @@ function Tile({ item, active }: { item: Item; active?: boolean }) {
       <span
         className={`flex items-center justify-center w-11 h-11 rounded-xl transition-all ${
           active
-            ? 'bg-white text-off-black shadow-[0_1px_3px_rgba(0,0,0,0.12)]'
-            : 'text-off-black/55 group-hover:bg-white/70 group-hover:text-off-black'
+            ? 'bg-white text-[#242424] shadow-[0_1px_3px_rgba(0,0,0,0.25)]'
+            : 'text-white/55 group-hover:bg-white/10 group-hover:text-white'
         }`}
       >
         <Icon className="w-[18px] h-[18px]" />
       </span>
       <span
         className={`text-[10px] leading-tight text-center max-w-[68px] truncate ${
-          active ? 'text-off-black font-semibold' : 'text-off-black/50 font-medium group-hover:text-off-black/75'
+          active ? 'text-white font-semibold' : 'text-white/50 font-medium group-hover:text-white/80'
         }`}
       >
         {item.label}
@@ -99,14 +102,14 @@ export default function AppSidebar({
   ]
 
   return (
-    <aside className="hidden md:flex fixed left-2.5 top-2.5 bottom-2.5 w-[76px] z-30 flex-col rounded-2xl bg-[#E4E3DF] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+    <aside className="hidden md:flex fixed left-3 top-3 bottom-3 w-[78px] z-30 flex-col rounded-[22px] bg-[#242424] shadow-[0_2px_10px_rgba(0,0,0,0.10)]">
       <div className="flex-1 flex flex-col gap-0.5 px-1.5 pt-2.5 overflow-y-auto">
         {items.map(item => (
           <Tile key={item.id} item={item} active={activeId === item.id} />
         ))}
       </div>
       {/* Pinned, and separated so it does not read as one of the tools. */}
-      <div className="px-1.5 pb-2.5 pt-2 mt-1 border-t border-black/[0.07]">
+      <div className="px-1.5 pb-2.5 pt-2 mt-1 border-t border-white/[0.10]">
         <Tile
           item={{ id: 'settings', label: 'Settings', icon: Settings, onClick: onOpenSettings, title: 'Settings' }}
           active={activeId === 'settings'}
