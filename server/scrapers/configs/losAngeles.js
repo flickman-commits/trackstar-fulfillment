@@ -48,6 +48,10 @@ export default {
     },
   },
 
+  raceDates: {
+    2024: '2024-03-17',
+    2026: '2026-03-08',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   defaultEventType: 'Marathon',
   eventSearchOrder: ['marathon', 'half'],
@@ -63,26 +67,5 @@ export default {
     'ASICS LA Marathon',
   ],
   keywords: ['los angeles', 'la marathon', 'asics la'],
-  keywordRequiresMarathon: false,
-
-  /**
-   * LA Marathon is typically held on a Sunday in mid-March
-   * 2026: March 8
-   * 2025: March 9
-   */
-  calculateDate(year) {
-    // Use known dates when available, otherwise estimate second Sunday of March
-    const knownDates = {
-      2026: new Date(2026, 2, 8),
-      2025: new Date(2025, 2, 9),
-    }
-
-    if (knownDates[year]) return knownDates[year]
-
-    // Fallback: estimate second Sunday of March
-    const march1 = new Date(year, 2, 1)
-    const dayOfWeek = march1.getDay()
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 2, 1 + daysUntilSunday + 7) // Second Sunday
-  }
+  keywordRequiresMarathon: false
 }

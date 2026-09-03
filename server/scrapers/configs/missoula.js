@@ -24,6 +24,9 @@ export default {
   // Competitive Timing slug (used by the 2026 yearOverride below).
   raceSlug: 'missoula-marathon',
   location: 'Missoula, MT',
+  raceDates: {
+    2026: '2026-06-28',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: { marathon: 'Marathon', half: 'Half Marathon' },
@@ -51,11 +54,5 @@ export default {
   // raceSlug, so no per-event config is needed.
   yearOverrides: {
     2026: { platform: 'competitivetiming' },
-  },
-  /** Last Sunday of June. */
-  calculateDate(year) {
-    const jun30 = new Date(year, 5, 30)
-    const dow = jun30.getDay() // 0 = Sunday
-    return new Date(year, 5, 30 - dow)
-  },
+  }
 }

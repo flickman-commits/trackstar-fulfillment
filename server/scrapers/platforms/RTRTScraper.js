@@ -73,7 +73,6 @@ export class RTRTScraper extends BaseScraper {
    * @param {string} config.appId
    * @param {string} config.appToken
    * @param {number} config.distanceMiles - for pace calculation (default 26.2)
-   * @param {Function} config.calculateDate
    * @param {Function} [config.buildEventId] - optional custom event ID builder
    */
   constructor(year, config) {
@@ -95,7 +94,7 @@ export class RTRTScraper extends BaseScraper {
     console.log(`[${this.tag} ${this.year}] Fetching race info...`)
 
     const raceDate = this.resolveRaceDate()
-    console.log(`[${this.tag} ${this.year}] Approximate race date: ${raceDate.toDateString()}`)
+    console.log(`[${this.tag} ${this.year}] Approximate race date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
 
     return {
       raceDate,

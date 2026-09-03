@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText } from 'lucide-react'
+import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
@@ -9,6 +9,7 @@ import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
+import StatsPanel from '@/components/StatsPanel'
 import { useAuth } from '@/lib/auth'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
@@ -65,7 +66,7 @@ interface Order {
   bibNumber?: string
   officialTime?: string
   officialPace?: string
-  researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null
+  researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'time_unavailable' | 'race_not_run' | null
   // How the result was obtained: scraper vs. customer-confirmed in the widget
   researchSource?: 'scraper' | 'customer_verified' | 'customer_supplied' | null
   // Detailed Instant Lookup widget outcome — how the shopper arrived at their
@@ -120,7 +121,9 @@ interface Order {
   hasOverrides?: boolean
   // Trackstar order type and custom order fields
   trackstarOrderType?: 'standard' | 'custom' | 'race_partner'
-  // Race partner fields (only populated when trackstarOrderType === 'race_partner')
+  // Partner fields (only populated when trackstarOrderType === 'race_partner').
+  // The stored value keeps its 'race_partner' name; only the labels changed,
+  // when charities and other co-branded partners joined the same view.
   partnerName?: string | null
   partnerContactName?: string | null
   // Creator sample fields (only populated when source === 'creator_sample')
@@ -270,7 +273,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     officialTime: order.officialTime as string | undefined,
     officialPace: order.officialPace as string | undefined,
     eventType: order.eventType as string | undefined,
-    researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'race_not_run' | null,
+    researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'time_unavailable' | 'race_not_run' | null,
     researchNotes: order.researchNotes as string | undefined,
     resultsUrl: order.resultsUrl as string | undefined,
     // Weather
@@ -336,6 +339,15 @@ function mapOrder(order: Record<string, unknown>): Order {
     // placement sign-off that gates completion.
     photoPath: order.photoPath as string | null | undefined,
     photoPlacedAt: order.photoPlacedAt as string | null | undefined,
+    // Counts and send timestamps. The API has always returned these and this
+    // whitelist has always dropped them, so everything downstream read
+    // undefined: the partner list's options column, the notes-and-comments
+    // icon, the proof count beside "Proofs & Approval", and the follow-up
+    // warnings that count days since a send. None of them were broken; they
+    // were never receiving a number.
+    commentCount: order.commentCount as number | undefined,
+    proofCount: order.proofCount as number | undefined,
+    proofSentAt: order.proofSentAt as string | null | undefined,
   }
 }
 
@@ -370,6 +382,153 @@ function CopyableField({ label, value }: { label: React.ReactNode; value: string
 }
 
 // Static field without copy button
+/**
+ * Partner details, readable at a glance and editable in place.
+ *
+ * These three values are not cosmetic. The partner name is the heading on
+ * their approval portal and the email is where the approval link goes, so a
+ * typo made when the partner was created is invisible here and obvious to
+ * them. Editing used to mean a database change.
+ *
+ * Partner rows have no columns of their own - the organization lives in
+ * raceName, the contact in customerName and customerEmail - which is why the
+ * API takes these under partner-specific names and refuses them on any other
+ * kind of order.
+ */
+function PartnerInfoFields({
+  order,
+  onSaved,
+  onToast,
+}: {
+  order: Order
+  onSaved: () => Promise<void>
+  onToast: (t: { message: string; type: 'success' | 'error' }) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const initial = () => ({
+    partnerName: order.partnerName || order.raceName || '',
+    partnerContactName: order.partnerContactName || '',
+    partnerEmail: order.customerEmail || '',
+  })
+  const [values, setValues] = useState(initial)
+
+  const start = () => { setValues(initial()); setEditing(true) }
+  const cancel = () => { setValues(initial()); setEditing(false) }
+
+  const save = async () => {
+    if (!values.partnerName.trim()) {
+      onToast({ message: 'Partner name is required', type: 'error' })
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await apiFetch('/api/orders/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderNumber: order.orderNumber,
+          partnerName: values.partnerName.trim(),
+          partnerContactName: values.partnerContactName.trim(),
+          partnerEmail: values.partnerEmail.trim(),
+        }),
+      })
+      if (!res.ok) {
+        // The endpoint explains itself on a bad email or an empty name, so
+        // show what it said rather than a generic failure.
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to save partner details')
+      }
+      onToast({ message: 'Partner details saved', type: 'success' })
+      setEditing(false)
+      await onSaved()
+    } catch (e) {
+      onToast({ message: e instanceof Error ? e.message : 'Failed to save partner details', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputClass = 'w-44 px-2 py-1 border border-border-gray rounded text-body-sm text-right focus:outline-none focus:ring-2 focus:ring-off-black/20'
+
+  if (!editing) {
+    return (
+      <>
+        <CopyableField label="Partner" value={order.partnerName || order.raceName || 'Partner'} />
+        <StaticField label="Year" value={String(order.raceYear || 'N/A')} />
+        {order.partnerContactName
+          ? <CopyableField label="Contact" value={order.partnerContactName} />
+          : <StaticField label="Contact" value="Not set" />}
+        {order.customerEmail
+          ? <CopyableField label="Email" value={order.customerEmail} />
+          : <StaticField label="Email" value="Not set" />}
+        <div className="pt-1 flex justify-end">
+          <button
+            onClick={start}
+            className="flex items-center gap-1.5 text-xs font-medium text-off-black/60 hover:text-off-black transition-colors"
+          >
+            <Pencil className="w-3 h-3" />
+            Edit details
+          </button>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div className="flex justify-between items-center">
+        <span className="text-body-sm text-off-black/60">Partner</span>
+        <input
+          type="text"
+          value={values.partnerName}
+          onChange={e => setValues(v => ({ ...v, partnerName: e.target.value }))}
+          className={inputClass}
+        />
+      </div>
+      {/* Year stays read-only: it is part of how the partner row was created
+          and nothing on this screen is the right place to renumber it. */}
+      <StaticField label="Year" value={String(order.raceYear || 'N/A')} />
+      <div className="flex justify-between items-center">
+        <span className="text-body-sm text-off-black/60">Contact</span>
+        <input
+          type="text"
+          value={values.partnerContactName}
+          onChange={e => setValues(v => ({ ...v, partnerContactName: e.target.value }))}
+          placeholder="Contact name"
+          className={inputClass}
+        />
+      </div>
+      <div className="flex justify-between items-center">
+        <span className="text-body-sm text-off-black/60">Email</span>
+        <input
+          type="email"
+          value={values.partnerEmail}
+          onChange={e => setValues(v => ({ ...v, partnerEmail: e.target.value }))}
+          placeholder="name@example.com"
+          className={inputClass}
+        />
+      </div>
+      <div className="pt-1 flex justify-end gap-2">
+        <button
+          onClick={cancel}
+          disabled={saving}
+          className="px-3 py-1 text-xs font-medium text-off-black/60 hover:text-off-black transition-colors disabled:opacity-40"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-3 py-1 text-xs font-medium bg-off-black text-white rounded hover:opacity-90 transition-opacity disabled:opacity-40"
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
+    </>
+  )
+}
+
 function StaticField({ label, value, flag }: { label: string; value: string; flag?: boolean }) {
   return (
     <div className="flex justify-between items-center">
@@ -506,6 +665,37 @@ function PendingField({ label }: { label: string }) {
   )
 }
 
+/**
+ * A missing race date, presented as work rather than as waiting.
+ *
+ * Race dates used to be computed from a recurrence rule, so a blank one really
+ * did mean "research has not run yet" and "Pending research" was true. The
+ * rules were wrong often enough to matter while always looking plausible - CIM
+ * came out a week early in two separate years, Berlin 2025 a week late - so
+ * they were deleted, and a year nobody has verified now shows nothing at all.
+ *
+ * Only 2 of our 19 timing platforms hand back a real date, so for almost every
+ * race this blank is never going to fill itself. Saying "Pending research"
+ * would send Eli off to wait for something that is not coming. It is one
+ * field, he can read it off the results page, and the button puts him in the
+ * editor that already exists.
+ */
+function MissingDateField({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div className="flex justify-between items-center">
+      <span className="text-body-sm text-off-black/60">Date</span>
+      <button
+        onClick={onAdd}
+        className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded hover:bg-warning-amber/20 transition-colors"
+        title="No verified date for this race year. Enter it and the weather fills in from it."
+      >
+        <Pencil className="w-3 h-3" />
+        Add date
+      </button>
+    </div>
+  )
+}
+
 // Not available field (no scraper for this race)
 function NotAvailableField({ label }: { label: string }) {
   return (
@@ -569,7 +759,7 @@ const REVIEW_PRODUCTS: { name: string; link: string }[] = [
   { name: 'Twin Cities Marathon', link: 'https://yotpo.com/go/A3v2ZhPB' },
 ]
 
-type SettingsPanel = 'pricing' | 'reviews' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'activity' | 'diagnostics' | 'maintenance'
+type SettingsPanel = 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'activity' | 'diagnostics' | 'maintenance'
 
 /**
  * Settings navigation. Grouped rather than a flat list because the panels do
@@ -592,6 +782,7 @@ const SETTINGS_NAV: {
     items: [
       { id: 'pricing', label: 'Pricing Calculator', blurb: 'Costs, retail and margin across DTC and wholesale', icon: DollarSign },
       { id: 'reviews', label: 'Request Reviews', blurb: 'Copy a review request message for any product', icon: Star },
+      { id: 'stats', label: 'Stats', blurb: 'Gifting rate, add-on take rate and more, from Shopify', icon: BarChart3 },
     ],
   },
   {
@@ -648,8 +839,6 @@ export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false)
   const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>('pricing')
   const [settingsQuery, setSettingsQuery] = useState('')
-  /** Trailing 30-day share of orders bought as gifts. See /api/orders/gift-stats. */
-  const [giftStats, setGiftStats] = useState<{ percent: number | null; gifts: number; total: number; days: number } | null>(null)
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
   type HealthCheck = { status: 'ok' | 'warn' | 'error'; detail?: string | null; latency?: string }
   type HealthResults = { overall: string; checks: Record<string, HealthCheck>; error?: string }
@@ -774,7 +963,7 @@ export default function Dashboard() {
   const [newRaceValues, setNewRaceValues] = useState({ raceName: '', year: new Date().getFullYear().toString(), raceDate: '', location: '' })
   // Tab switcher: standard vs custom order view
   const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner'>('standard')
-  // "New Race Partner" modal state
+  // "New Partner" modal state
   const [showNewRacePartner, setShowNewRacePartner] = useState(false)
   const [newPartnerValues, setNewPartnerValues] = useState({ partnerName: '', raceYear: String(new Date().getFullYear()), contactName: '', contactEmail: '' })
   const [isCreatingPartner, setIsCreatingPartner] = useState(false)
@@ -874,12 +1063,12 @@ export default function Dashboard() {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || `Create failed (${res.status})`)
       }
-      setToast({ message: 'Race partner added', type: 'success' })
+      setToast({ message: 'Partner added', type: 'success' })
       setShowNewRacePartner(false)
       setNewPartnerValues({ partnerName: '', raceYear: String(new Date().getFullYear()), contactName: '', contactEmail: '' })
       await fetchOrders()
     } catch (e) {
-      setToast({ message: e instanceof Error ? e.message : 'Failed to create race partner', type: 'error' })
+      setToast({ message: e instanceof Error ? e.message : 'Failed to create partner', type: 'error' })
     } finally {
       setIsCreatingPartner(false)
     }
@@ -1114,15 +1303,6 @@ export default function Dashboard() {
       setIsSavingRace(false)
     }
   }
-
-  useEffect(() => {
-    let cancelled = false
-    apiFetch(`/api/orders/gift-stats?days=30`)
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (!cancelled && d) setGiftStats(d) })
-      .catch(() => { /* a stat is not worth surfacing an error for */ })
-    return () => { cancelled = true }
-  }, [])
 
   useEffect(() => {
     if (!showSettings) return
@@ -2186,6 +2366,7 @@ Thank you!`
     // missing year, and this is a dev gap rather than a date problem.
     if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Year not configured' }
     if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site unreachable, retry' }
+    if (order.researchStatus === 'time_unavailable') return { icon: '⏱', label: 'Runner matched, time needs manual entry' }
     if (order.researchStatus === 'ambiguous') return { icon: '❓', label: 'Multiple matches' }
     // A future race is a wait, not a failure.
     if (order.researchStatus === 'race_not_run' || (order.researchStatus === 'not_found' && raceNotRunYet(order))) {
@@ -2302,19 +2483,7 @@ Thank you!`
               <h1 className="text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1">
                 {getGreeting()}, {greetingName(currentUser)}
               </h1>
-              {/* The gift rate is the one standing statistic under the
-                  greeting now. Hidden entirely when nothing was asked, so it
-                  never claims a confident 0%. */}
-              {giftStats && giftStats.percent !== null && (
-                <span
-                  title={`${giftStats.gifts} of ${giftStats.total} orders in the last ${giftStats.days} days were marked as a gift at checkout`}
-                  className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md border text-xs font-medium bg-amber-100 text-amber-800 border-amber-300 cursor-help"
-                >
-                  <span>🎁</span>
-                  <span>Trackstar&apos;s Gifting Rate: <span className="font-semibold">{giftStats.percent}%</span></span>
-                  <span className="text-amber-700/60">(last {giftStats.days}d)</span>
-                </span>
-              )}
+
             </div>
           </div>
 
@@ -2328,7 +2497,7 @@ Thank you!`
                 >
                   <ImagePlus className="w-4 h-4" />
                   <span className="md:hidden">New Partner</span>
-                  <span className="hidden md:inline">New Race Partner</span>
+                  <span className="hidden md:inline">New Partner</span>
                 </button>
               ) : (
                 <button
@@ -2367,8 +2536,8 @@ Thank you!`
           <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
             <div className="flex items-center gap-3">
               <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
-                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : 'Race Partners'}</span>
-                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : 'Race Partners'}</span>
+                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : 'Partners'}</span>
+                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : 'Partners'}</span>
               </h2>
               <span className="hidden md:inline px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
                 {ordersToFulfill.length}
@@ -2384,7 +2553,7 @@ Thank you!`
               >
                 <option value="standard">Standard</option>
                 <option value="custom">Custom</option>
-                <option value="race_partner">Race Partners</option>
+                <option value="race_partner">Partners</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
                 <ChevronDownIcon className="w-3.5 h-3.5 text-off-black/40" />
@@ -2399,7 +2568,7 @@ Thank you!`
               {([
                 ['standard', 'Standard'],
                 ['custom', 'Custom'],
-                ['race_partner', 'Race Partners'],
+                ['race_partner', 'Partners'],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
@@ -2508,7 +2677,7 @@ Thank you!`
                             </div>
                             {order.status === 'ready' && order.bibNumber && (
                               <div className="text-xs text-green-600 mt-0.5">
-                                Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime}
+                                Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime || 'time needed'}
                               </div>
                             )}
                           </div>
@@ -2559,7 +2728,7 @@ Thank you!`
                     )}
                   </>
                 ) : (
-                  /* Custom Designs / Race Partners - Mobile Cards */
+                  /* Custom Designs / Partners - Mobile Cards */
                   <>
                     {filteredOrders.map((order) => {
                       const designConfig = DESIGN_STATUS_CONFIG[order.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started
@@ -2597,7 +2766,7 @@ Thank you!`
                           <div className="mt-1">
                             <span className="text-sm text-off-black font-medium">
                               {isPartner
-                                ? (order.partnerName || order.raceName || 'Race Partner')
+                                ? (order.partnerName || order.raceName || 'Partner')
                                 : (order.effectiveRunnerName || order.runnerName || 'Unknown Runner')}
                             </span>
                           </div>
@@ -2674,7 +2843,7 @@ Thank you!`
 
                 {filteredOrders.length === 0 && !searchQuery && (
                   <div className="text-center py-12 text-off-black/40 text-sm">
-                    {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet - click "New Race Partner" to add one'}
+                    {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No partners yet - click "New Partner" to add one'}
                   </div>
                 )}
                 {searchQuery && filteredOrders.length === 0 && filteredCompletedOrders.length === 0 && (
@@ -2740,7 +2909,7 @@ Thank you!`
                                   that used to live here is now a tag. */}
                               {order.status === 'ready' && order.bibNumber && (
                                 <div className="text-xs text-green-600 mt-1 leading-tight">
-                                  Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime}
+                                  Bib {order.bibNumber} · {order.hadNoTime ? 'No time' : order.officialTime || 'time needed'}
                                 </div>
                               )}
                             </td>
@@ -2800,14 +2969,14 @@ Thank you!`
                   </>
                 ) : activeView === 'race_partner' ? (
                   <>
-                    {/* Race Partners Table */}
+                    {/* Partners Table */}
                     <thead className="bg-subtle-gray border-b border-border-gray sticky top-0 z-10">
                       <tr>
                         <th className="text-left pl-6 pr-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-44">Design Status</th>
-                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Race Partner</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Partner</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-24">Year</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Contact</th>
-                        <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden lg:table-cell">Proofs</th>
+                        <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Options Sent</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-gray">
@@ -2827,7 +2996,7 @@ Thank you!`
                             </td>
                             <td className="px-3 py-4">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-off-black">{order.partnerName || order.raceName || 'Race Partner'}</span>
+                                <span className="text-sm font-medium text-off-black">{order.partnerName || order.raceName || 'Partner'}</span>
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
@@ -2839,9 +3008,17 @@ Thank you!`
                             <td className="px-3 py-4 hidden md:table-cell">
                               <span className="text-sm text-off-black/70">{order.partnerContactName || order.customerEmail || '-'}</span>
                             </td>
-                            <td className="px-3 pr-6 py-4 text-sm text-off-black/60 hidden lg:table-cell">
+                            {/* Every proof on a partner order is an option on
+                                their portal, so the count is the whole story.
+                                This column read as empty for two reasons: it
+                                was hidden below 1024px, and proofCount was
+                                being dropped by mapOrder before it ever
+                                reached the row. */}
+                            <td className="px-3 pr-6 py-4 text-sm text-off-black/60">
                               {(order.proofCount ?? 0) > 0 ? (
-                                <span className="px-2 py-0.5 bg-off-black/5 rounded text-xs font-medium">{order.proofCount} proof{order.proofCount === 1 ? '' : 's'}</span>
+                                <span className="px-2 py-0.5 bg-off-black/5 rounded text-xs font-medium">
+                                  {order.proofCount} option{order.proofCount === 1 ? '' : 's'}
+                                </span>
                               ) : (
                                 <span className="text-off-black/30 text-xs">None</span>
                               )}
@@ -2977,7 +3154,7 @@ Thank you!`
 
               {filteredOrders.length === 0 && !searchQuery && (
                 <div className="hidden md:block text-center py-16 text-off-black/40 text-sm">
-                  {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No race partners yet - click "New Race Partner" to add one'}
+                  {activeView === 'standard' ? 'No orders to personalize' : activeView === 'custom' ? 'No custom designs' : 'No partners yet - click "New Partner" to add one'}
                 </div>
               )}
 
@@ -3205,6 +3382,7 @@ Thank you!`
                   </div>
 
                   {settingsPanel === 'pricing' && <PricingCalculator />}
+                  {settingsPanel === 'stats' && <StatsPanel />}
                   {settingsPanel === 'account' && <AccountPanel />}
                   {settingsPanel === 'people' && isAdmin && <PeoplePanel />}
                   {settingsPanel === 'activity' && isAdmin && <ActivityPanel />}
@@ -3926,7 +4104,7 @@ Thank you!`
                     </span>
                     <h3 className="text-heading-md text-off-black">
                       {selectedOrder.trackstarOrderType === 'race_partner'
-                        ? (selectedOrder.partnerName || selectedOrder.raceName || 'Race Partner')
+                        ? (selectedOrder.partnerName || selectedOrder.raceName || 'Partner')
                         : `Order ${selectedOrder.displayOrderNumber}`}
                     </h3>
                     {selectedOrder.trackstarOrderType === 'custom' && (
@@ -3936,7 +4114,7 @@ Thank you!`
                     )}
                     {selectedOrder.trackstarOrderType === 'race_partner' && (
                       <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs font-medium rounded">
-                        race partner
+                        partner
                       </span>
                     )}
                     {selectedOrder.hasOverrides && (
@@ -4491,16 +4669,17 @@ Thank you!`
                         <CollapsibleSection title={selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Info' : 'Design Info'} defaultOpen={ds === 'not_started' || ds === 'in_progress'}>
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                             {selectedOrder.trackstarOrderType === 'race_partner' ? (
-                              <>
-                                <CopyableField label="Partner" value={selectedOrder.partnerName || selectedOrder.raceName || 'Race Partner'} />
-                                <StaticField label="Year" value={String(selectedOrder.raceYear || 'N/A')} />
-                                {selectedOrder.partnerContactName && (
-                                  <CopyableField label="Contact" value={selectedOrder.partnerContactName} />
-                                )}
-                                {selectedOrder.customerEmail && (
-                                  <CopyableField label="Email" value={selectedOrder.customerEmail} />
-                                )}
-                              </>
+                              <PartnerInfoFields
+                                key={selectedOrder.orderNumber}
+                                order={selectedOrder}
+                                onToast={setToast}
+                                onSaved={async () => {
+                                  await fetchOrders()
+                                  const refreshed = await apiFetch('/api/orders?type=race_partner').then(r => r.json())
+                                  const updated = refreshed.orders?.find((o: { orderNumber: string }) => o.orderNumber === selectedOrder.orderNumber)
+                                  if (updated) setSelectedOrder(prev => prev ? { ...prev, ...updated } : prev)
+                                }}
+                              />
                             ) : (
                               <>
                                 <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
@@ -4911,6 +5090,25 @@ Thank you!`
                         </div>
                       </div>
                     )}
+                    {/* Customer's own numbers. Loud, because the whole point is
+                        that nobody goes looking for a "better" answer: we
+                        deliberately skip the scrape for these orders, so
+                        anything on screen came from the shopper and is the
+                        only version that is correct. */}
+                    {selectedOrder.researchSource === 'customer_supplied' && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                        <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-tight mb-1.5">
+                          Customer hand entered this data
+                        </h4>
+                        <p className="text-body-sm text-blue-900">
+                          Please use exactly what they entered. These numbers came
+                          from the shopper at checkout, not from the timing site,
+                          so do not research this order or correct the spelling.
+                          If something looks wrong, ask them rather than changing it.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Research Status */}
                     {selectedOrder.researchStatus && selectedOrder.researchStatus !== 'found' && (
                       <div>
@@ -4939,6 +5137,8 @@ Thank you!`
                             ? 'Year not configured'
                           : status === 'upstream_error'
                             ? 'Timing site is down'
+                          : status === 'time_unavailable'
+                            ? 'Runner matched, time missing'
                           : status === 'not_found'
                             ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
                                 ? 'Runner not found - similar names below'
@@ -4959,6 +5159,11 @@ Thank you!`
                             ? `The scraper works but ${raceLabel} is not wired up yet. A developer needs to add this year's event IDs. Research it by hand in the meantime.`
                           : status === 'upstream_error'
                             ? 'The timing site is slow or down right now. Nothing is wrong with this order. Retry the lookup in a couple of minutes.'
+                          : status === 'time_unavailable'
+                            // The identity is settled - this is a copy job, not
+                            // a search. Say so, or the operator re-researches
+                            // an order that will never come back any better.
+                            ? `We matched ${selectedOrder.runnerName} in the ${raceLabel} results and the bib above is confirmed, but the timing site blocks the page that holds the finish time. Open their result page below and enter the time by hand. Researching again will not help.`
                           : status === 'not_found'
                             ? (possibleMatchesMap[selectedOrder.orderNumber]?.length
                                 // Suggestions, not matches. The list below shares
@@ -4991,6 +5196,24 @@ Thank you!`
                               <h4 className={`text-xs font-semibold ${headingColor} uppercase tracking-tight mb-1.5`}>{heading}</h4>
                             )}
                             <p className={`text-body-sm ${textPrimary}`}>{fix}</p>
+                            {/* The runner's own result page, straight from the
+                                timing site's search listing. We cannot read it -
+                                that is the whole reason this box exists - but a
+                                person in a normal browser can, and this saves
+                                them searching the field for a name we already
+                                matched. Deliberately here rather than only in
+                                the Details header, because this is where the
+                                instruction to copy the time is. */}
+                            {status === 'time_unavailable' && selectedOrder.resultsUrl && (
+                              <a
+                                href={selectedOrder.resultsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 bg-white border border-amber-300 rounded-md text-xs font-medium text-amber-900 hover:bg-amber-50 transition-colors"
+                              >
+                                Open {selectedOrder.bibNumber ? `bib ${selectedOrder.bibNumber}` : 'this runner'} on the results site ↗
+                              </a>
+                            )}
                           </div>
                         )
                       })()}
@@ -5514,8 +5737,10 @@ Thank you!`
                             </div>
                           ) : selectedOrder.raceDate ? (
                             <CopyableField label="Date" value={selectedOrder.raceDate} />
-                          ) : selectedOrder.hasScraperAvailable ? (
-                            <PendingField label="Date" />
+                          ) : selectedOrder.raceId ? (
+                            // Whether or not a scraper exists, nothing is going
+                            // to supply this date but a person. Ask for it.
+                            <MissingDateField onAdd={() => startEditingWeather(selectedOrder)} />
                           ) : (
                             <NotAvailableField label="Date" />
                           )}
@@ -5845,7 +6070,7 @@ Thank you!`
           </div>
         )}
 
-        {/* New Race Partner Modal */}
+        {/* New Partner Modal */}
         {showNewRacePartner && (
           <div
             className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
@@ -5856,7 +6081,7 @@ Thank you!`
             <div className="bg-white rounded-md max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-heading-md text-off-black">New Race Partner</h3>
+                  <h3 className="text-heading-md text-off-black">New Partner</h3>
                   <button onClick={() => setShowNewRacePartner(false)} className="text-off-black/40 hover:text-off-black text-2xl leading-none">×</button>
                 </div>
                 <div className="space-y-4">

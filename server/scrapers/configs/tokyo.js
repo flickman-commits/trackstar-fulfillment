@@ -11,22 +11,19 @@ export default {
   raceName: 'Tokyo Marathon',
   tag: 'Tokyo Marathon',
   location: 'Tokyo, Japan',
+  raceDates: {
+    2023: '2023-03-05',
+    2025: '2025-03-02',
+    2026: '2026-03-01',
+  },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
   aliases: [
     'Tokyo Marathon',
     'TOKYO MARATHON',
+    'Tokyo World Major Race',
   ],
   keywords: ['tokyo'],
-  keywordRequiresMarathon: true,
-  /**
-   * Tokyo Marathon is the first Sunday of March.
-   */
-  calculateDate(year) {
-    const mar1 = new Date(year, 2, 1)
-    const dayOfWeek = mar1.getDay()
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 2, 1 + daysUntilSunday)
-  }
+  keywordRequiresMarathon: true
 }

@@ -25,6 +25,9 @@ export default {
   // URL parameter, so these strings must match the dropdown options on the
   // results page exactly. Skipping "Virtual" and "Wheelchair" — add them
   // later if a customer order ever needs one.
+  raceDates: {
+    2026: '2026-05-24',
+  },
   eventTypes: [
     'Marathon',
     'Marathon - 2 Person Relay',
@@ -65,24 +68,5 @@ export default {
    */
   raceIds: {
     2026: 167930,
-  },
-
-  /**
-   * Vermont City Marathon is held on the Sunday of Memorial Day weekend
-   * (the Sunday before Memorial Day Monday). Same scheduling rule as
-   * Buffalo Marathon.
-   */
-  calculateDate(year) {
-    // Memorial Day = last Monday of May
-    const may31 = new Date(year, 4, 31)
-    const dayOfWeek = may31.getDay() // 0=Sun, 1=Mon, ...
-    const daysBackToMonday = dayOfWeek === 1 ? 0 : (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
-    const memorialDay = new Date(year, 4, 31 - daysBackToMonday)
-
-    // Race is the Sunday before Memorial Day
-    const raceDay = new Date(memorialDay)
-    raceDay.setDate(memorialDay.getDate() - 1)
-
-    return raceDay
   }
 }

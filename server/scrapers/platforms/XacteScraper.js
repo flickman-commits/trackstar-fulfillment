@@ -21,7 +21,6 @@ export class XacteScraper extends BaseScraper {
    * @param {Object} config.subEvents - { 2026: { marathon: { id: 6584, distance: 42195 }, half: { id: 6585, distance: 21097 } } }
    * @param {string[]} config.eventSearchOrder - e.g. ['marathon', 'half']
    * @param {Object} config.eventLabels - e.g. { marathon: 'Marathon', half: 'Half Marathon' }
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)
@@ -38,7 +37,7 @@ export class XacteScraper extends BaseScraper {
     const eventTypes = this.config.eventTypes || ['Marathon']
     const eventId = this.eventId || 'unknown'
 
-    console.log(`[${this.tag} ${this.year}] Event ID: ${eventId}, Date: ${raceDate.toDateString()}`)
+    console.log(`[${this.tag} ${this.year}] Event ID: ${eventId}, Date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
 
     return {
       raceDate,

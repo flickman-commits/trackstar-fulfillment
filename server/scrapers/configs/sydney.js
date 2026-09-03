@@ -26,6 +26,20 @@ export default {
   raceSlugs: {
     2022: 'blackmores-sydney-running-festival-2022',
   },
+  /**
+   * The per-runner result pages are behind a WAF we cannot clear.
+   *
+   * Not a transient failure and not worth retrying: a headless browser gets
+   * through to the search listing but is refused on every detail page, every
+   * time. Fetching one costs about five seconds and a second Chromium launch
+   * to arrive at a guaranteed 403, which is what pushed a matching lookup to
+   * 9.7s and past the public endpoint's 9s cap.
+   *
+   * With this set, a unique name match returns straight from the search row -
+   * name and bib, no time. That is everything this site will give us. Remove
+   * the flag if MultiSport ever opens the detail pages up.
+   */
+  detailPagesBlocked: true,
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   defaultMarathonEventId: 1,
@@ -63,16 +77,5 @@ export default {
     2024: '2024-09-15',
     2025: '2025-08-31',
     2026: '2026-08-30',
-  },
-  /**
-   * Fallback for years not listed above. Last Sunday of August, which matches
-   * the post-2025 Majors slot and agrees with both verified dates since the
-   * move. Do not trust it for anything before 2025.
-   */
-  calculateDate(year) {
-    const aug31 = new Date(year, 7, 31) // August 31
-    const dayOfWeek = aug31.getDay()
-    const lastSunday = 31 - dayOfWeek
-    return new Date(year, 7, lastSunday)
   }
 }

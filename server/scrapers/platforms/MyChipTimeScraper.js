@@ -22,7 +22,6 @@ export class MyChipTimeScraper extends BaseScraper {
    * @param {string} config.parseMode - 'columns' or 'searchevent'
    * @param {string} config.endpoint - 'searchResultGen.php' or 'searchevent.php'
    * @param {Object} config.eventIds - year -> { marathon: id, halfMarathon: id }
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)
@@ -59,7 +58,7 @@ export class MyChipTimeScraper extends BaseScraper {
             console.warn(`[${this.tag} ${this.year}] Ignoring scraped date ${scraped.toDateString()}: wrong year`)
           } else if (scraped) {
             raceDate = scraped
-            console.log(`[${this.tag} ${this.year}] Scraped race date: ${raceDate.toDateString()}`)
+            console.log(`[${this.tag} ${this.year}] Scraped race date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
           }
         }
       } catch (error) {
@@ -70,7 +69,7 @@ export class MyChipTimeScraper extends BaseScraper {
     // Fallback to calculated date
     if (!raceDate) {
       raceDate = this.resolveRaceDate()
-      console.log(`[${this.tag} ${this.year}] Using fallback date: ${raceDate.toDateString()}`)
+      console.log(`[${this.tag} ${this.year}] Using fallback date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
     }
 
     return {

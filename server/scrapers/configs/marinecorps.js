@@ -8,6 +8,11 @@ export default {
   tag: 'MCM',
   location: 'Arlington, VA',
   eventPrefix: 'MCM',
+  raceDates: {
+    2023: '2023-10-29',
+    2024: '2024-10-27',
+    2025: '2025-10-26',
+  },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
@@ -18,15 +23,5 @@ export default {
     'MCM'
   ],
   keywords: ['marine corps', 'mcm'],
-  keywordRequiresMarathon: true,
-  /**
-   * MCM is typically the last Sunday of October
-   */
-  calculateDate(year) {
-    const date = new Date(year, 9, 31) // October 31
-    const day = date.getDay()
-    const offset = day === 0 ? 0 : day
-    date.setDate(31 - offset)
-    return date
-  }
+  keywordRequiresMarathon: true
 }

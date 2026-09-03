@@ -14,6 +14,9 @@ export default {
   location: 'Dallas, TX',
   parseMode: 'columns',
   endpoint: 'searchResultGen.php',
+  raceDates: {
+    2025: '2025-12-14',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
   eventLabels: {
@@ -36,12 +39,5 @@ export default {
     2023: { marathon: '15519', halfMarathon: '15518' },
     2024: { marathon: '16249', halfMarathon: '16248' },
     2025: { marathon: '16993', halfMarathon: '16991' },
-  },
-  /** Second Sunday of December (occasionally third). */
-  calculateDate(year) {
-    const dec1 = new Date(year, 11, 1)
-    const dow = dec1.getDay()
-    const firstSunday = dow === 0 ? 1 : 1 + (7 - dow)
-    return new Date(year, 11, firstSunday + 7)
   }
 }

@@ -39,6 +39,9 @@ export default {
     half: 13.1,
   },
 
+  raceDates: {
+    2026: '2026-05-24',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   defaultEventType: 'Marathon',
   eventSearchOrder: ['marathon', 'half'],
@@ -53,23 +56,5 @@ export default {
     'Buffalo Half Marathon',
   ],
   keywords: ['buffalo'],
-  keywordRequiresMarathon: true,
-
-  /**
-   * Buffalo Marathon is held on the last Sunday in May (day before Memorial Day).
-   * Memorial Day = last Monday of May.
-   */
-  calculateDate(year) {
-    // Find the last Monday of May (Memorial Day)
-    const may31 = new Date(year, 4, 31) // May 31
-    const dayOfWeek = may31.getDay() // 0=Sun, 1=Mon, ...
-    const daysBackToMonday = dayOfWeek === 1 ? 0 : (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
-    const memorialDay = new Date(year, 4, 31 - daysBackToMonday)
-
-    // Race is the Sunday before Memorial Day
-    const raceDay = new Date(memorialDay)
-    raceDay.setDate(memorialDay.getDate() - 1)
-
-    return raceDay
-  }
+  keywordRequiresMarathon: true
 }

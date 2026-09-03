@@ -41,16 +41,5 @@ export default {
       halfMarathon: 252327,
       ultra: 252329,
     },
-  },
-  /**
-   * Cowtown Marathon is typically the last Saturday of February
-   * (race weekend spans Sat-Sun, with marathon on Sunday)
-   */
-  calculateDate(year) {
-    // Find last day of February, then back up to the last Saturday
-    const lastFeb = new Date(year, 2, 0) // last day of Feb
-    const dayOfWeek = lastFeb.getDay()
-    const daysBack = dayOfWeek >= 6 ? dayOfWeek - 6 : dayOfWeek + 1
-    return new Date(year, 1, lastFeb.getDate() - daysBack)
   }
 }

@@ -35,12 +35,5 @@ export default {
     2023: { marathon: 150711, halfMarathon: 150712 },
     2024: { marathon: 204275, halfMarathon: 204279 },
     2025: { marathon: 241768, halfMarathon: 241368 },
-  },
-  /** Third Saturday of September. */
-  calculateDate(year) {
-    const sep1 = new Date(year, 8, 1)
-    const dow = sep1.getDay()
-    const firstSat = dow === 6 ? 1 : 1 + ((6 - dow + 7) % 7)
-    return new Date(year, 8, firstSat + 14)
   }
 }

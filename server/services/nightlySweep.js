@@ -121,10 +121,12 @@ async function raceDateCheck() {
   const configs = getRaceConfigSummaries(years)
   const findings = []
 
-  // Which races still lean on a computed date. calculateDate encodes a rule
-  // like "third Sunday of August" and races move: Sydney shifted to late
-  // August in 2025 and its rule was three weeks wrong for years, silently,
-  // with the wrong weather printed on every poster.
+  // Which race-years have no verified date. There is no computed fallback any
+  // more, so these now resolve to no date at all rather than to a rule's guess
+  // - the rules moved with the races and were wrong silently (Sydney shifted
+  // to late August in 2025 and its rule was three weeks off for years). A gap
+  // here is real work: the order shows no date and no weather until it is
+  // filled in.
   const verified = getVerifiedRaceDates()
   for (const cfg of configs) {
     const pinned = verified[cfg.raceName] || {}
@@ -134,7 +136,7 @@ async function raceDateCheck() {
         severity: 'medium',
         kind: 'race_date_computed',
         subject: cfg.raceName,
-        detail: `No verified date for ${missing.join(', ')} - falling back to a computed one.`,
+        detail: `No verified date for ${missing.join(', ')} - those orders will show no date and no weather.`,
         action: 'tier1_fixable',
         years: missing,
       })

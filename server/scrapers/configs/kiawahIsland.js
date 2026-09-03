@@ -28,15 +28,5 @@ export default {
     2023: { marathon: 429213, half: 434417 },
     2022: { marathon: 360433, half: 360431 },
     2021: { marathon: 294549, half: 294548 }
-  },
-  /**
-   * Kiawah Island Marathon is typically the second Saturday of December
-   */
-  calculateDate(year) {
-    const dec1 = new Date(year, 11, 1)
-    const dayOfWeek = dec1.getDay()
-    const daysUntilSaturday = dayOfWeek === 6 ? 0 : (6 - dayOfWeek + 7) % 7
-    const firstSaturday = 1 + daysUntilSaturday
-    return new Date(year, 11, firstSaturday + 7)
   }
 }

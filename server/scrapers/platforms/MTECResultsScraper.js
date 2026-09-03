@@ -41,7 +41,6 @@ export class MTECResultsScraper extends BaseScraper {
    * @param {Object} config.eventLabels     - { marathon: 'Marathon', half: 'Half Marathon' }
    * @param {Object} config.distances       - { marathon: 26.2, half: 13.1 }
    * @param {Object} [config.raceSlugs]     - year → { marathon: 'url-slug', half: 'url-slug' } for resultsUrl
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)

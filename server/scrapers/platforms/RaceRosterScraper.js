@@ -22,7 +22,6 @@ export class RaceRosterScraper extends BaseScraper {
    * @param {Object} config.subEventIds - year -> { marathon: id, halfMarathon: id, ... }
    * @param {string[]} config.eventSearchOrder - e.g. ['marathon', 'halfMarathon']
    * @param {Object} config.eventLabels - e.g. { marathon: 'Marathon', halfMarathon: 'Half Marathon' }
-   * @param {Function} config.calculateDate - (year) => Date
    */
   constructor(year, config) {
     super(config.raceName, year)
@@ -49,7 +48,7 @@ export class RaceRosterScraper extends BaseScraper {
       }
     }
 
-    console.log(`[${this.tag} ${this.year}] Race date: ${raceDate.toDateString()}`)
+    console.log(`[${this.tag} ${this.year}] Race date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
 
     return {
       raceDate,

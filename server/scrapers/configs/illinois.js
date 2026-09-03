@@ -17,6 +17,9 @@ export default {
   tag: 'Illinois',
   location: 'Champaign-Urbana, IL',
   eventPrefix: 'IL',
+  raceDates: {
+    2026: '2026-04-25',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: {
@@ -41,15 +44,5 @@ export default {
     'Illinois Half Marathon',
   ],
   keywords: ['illinois'],
-  keywordRequiresMarathon: true,
-  /**
-   * Illinois Marathon is typically the last Saturday of April.
-   */
-  calculateDate(year) {
-    const apr30 = new Date(year, 3, 30)
-    const dayOfWeek = apr30.getDay()
-    // Saturday = 6. Days to subtract to reach the most recent Saturday from Apr 30.
-    const daysBack = (dayOfWeek - 6 + 7) % 7
-    return new Date(year, 3, 30 - daysBack)
-  }
+  keywordRequiresMarathon: true
 }

@@ -16,7 +16,7 @@
  */
 import { setCors } from '../_lib/auth.js'
 import { researchService } from '../../server/services/ResearchService.js'
-import { isRacePublicSafe, getCanonicalRaceName } from '../../server/scrapers/index.js'
+import { isRacePublicSafe, raceNeedsBrowser, getCanonicalRaceName } from '../../server/scrapers/index.js'
 import { parseRaceNameFromTitle } from '../../server/scrapers/raceNameNormalization.js'
 import {
   checkRateLimit,
@@ -150,7 +150,14 @@ export default async function handler(req, res) {
     // Promise.race doesn't cancel the scrape, but returning does: Vercel
     // freezes the function the moment the handler resolves.
     const result = await Promise.race([
-      researchService.findRunner(resolvedRace, year, name),
+      // A browser-driven race gets one search and no last-name fallback. That
+      // fallback is a second Chromium launch, and two of them is about ten
+      // seconds against a nine second cap: the shopper would get a timeout
+      // dressed up as "the timing site is down", plus an alert, on what is
+      // usually just a typo. One search, then manual entry.
+      researchService.findRunner(resolvedRace, year, name, {
+        skipLastNameFallback: raceNeedsBrowser(resolvedRace),
+      }),
       new Promise(resolve =>
         setTimeout(
           () => resolve({
@@ -195,6 +202,36 @@ export default async function handler(req, res) {
           pace: m.pace ?? null,
           eventType: m.eventType ?? null,
         })),
+      }
+    } else if (result.researchStatus === 'time_unavailable') {
+      // We know exactly who they are and we have their bib. We just cannot
+      // reach the page holding the finish time, and for Sydney we never will.
+      //
+      // Routed through the suggestions state rather than the found state on
+      // purpose. `found` promises a complete result and the widget prints the
+      // time straight onto the review screen; handing it a null there would
+      // show a confirmed-looking card with a blank where the time goes. The
+      // suggestions card already treats bib and time as optional, so a single
+      // entry reads as "this is you, now type your time" and the shopper lands
+      // in manual entry with the identity settled.
+      //
+      // The widget has no first-class "confirmed runner, missing time" state.
+      // It lives in the trackstar-theme repo. This is the honest use of what
+      // is there today, not the ideal screen.
+      outcome = 'time_unavailable'
+      payload = {
+        found: false,
+        instant: true,
+        raceCanonical,
+        fallbackRequired: true,
+        truncated: false,
+        suggestions: [{
+          name: result.rawData?.name || name,
+          bib: result.bibNumber ?? null,
+          time: null,
+          pace: null,
+          eventType: result.eventType ?? null,
+        }],
       }
     } else if (result.researchStatus === 'upstream_error') {
       // Scraper reached its retries and the timing site is still down. Surface

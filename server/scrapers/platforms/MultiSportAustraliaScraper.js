@@ -90,6 +90,16 @@ async function smartFetch(url) {
   throw new Error(`HTTP ${resp.status}`)
 }
 
+/**
+ * One fresh browser per fetch. Deliberately not pooled.
+ *
+ * Sharing a browser across fetches is the obvious optimisation - launching
+ * Chromium is two to three seconds and a missed lookup loads two pages - and
+ * it does not work here. Measured: the first request through a reused browser
+ * succeeds, and every request after it on that same browser comes back as the
+ * WAF block page. Cloudflare is fingerprinting the session, so the clean
+ * launch is the thing buying us access. Pay for it.
+ */
 async function fetchViaBrowser(url) {
   let browser = null
   try {
@@ -117,7 +127,6 @@ export class MultiSportAustraliaScraper extends BaseScraper {
    *                  does not follow the {raceSlug}-{year} pattern
    * @param {Object} [config.eventIds] - year -> { marathon: 1 } event ID map
    * @param {number} [config.defaultMarathonEventId=1]
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)
@@ -194,6 +203,16 @@ export class MultiSportAustraliaScraper extends BaseScraper {
 
       // Step 3: Fetch detail page for the matched runner
       const match = matches[0]
+
+      // Unless we already know that page is walled off, in which case the
+      // search row is all there is and asking again just costs five seconds.
+      if (this.config.detailPagesBlocked) {
+        console.log(`[${this.tag}] Detail pages known blocked - returning search-row match`)
+        return this.identityOnlyResult(
+          match.name, match.bib, DETAIL_BLOCKED_NOTE, `${this.baseUrl}${match.url}`
+        )
+      }
+
       const detailUrl = `${this.baseUrl}${match.url}`
       console.log(`[${this.tag}] Fetching detail: ${detailUrl}`)
       let detailHtml
@@ -201,7 +220,12 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         detailHtml = await smartFetch(detailUrl)
       } catch (err) {
         console.log(`[${this.tag}] Detail fetch failed: ${err.message}`)
-        if (err instanceof BlockedError) return this.upstreamErrorResult(DETAIL_BLOCKED_NOTE)
+        // We already matched this person by name on the search page and we
+        // have their bib. Losing the detail page costs us the time, not the
+        // identity, so do not throw the match away.
+        if (err instanceof BlockedError) {
+          return this.identityOnlyResult(match.name, match.bib, DETAIL_BLOCKED_NOTE, detailUrl)
+        }
         return this.upstreamErrorResult(err.message)
       }
 
@@ -211,8 +235,11 @@ export class MultiSportAustraliaScraper extends BaseScraper {
         // time here means the page did not give us one, which is our problem
         // to fix, not a fact about the runner.
         console.log(`[${this.tag}] No net time on detail page`)
-        return this.upstreamErrorResult(
-          isBlockPage(detailHtml) ? DETAIL_BLOCKED_NOTE : 'result page carried no net time'
+        return this.identityOnlyResult(
+          match.name,
+          data.bib || match.bib,
+          isBlockPage(detailHtml) ? DETAIL_BLOCKED_NOTE : 'the result page carried no net time',
+          detailUrl
         )
       }
 

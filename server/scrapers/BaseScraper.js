@@ -113,13 +113,11 @@ export class BaseScraper {
    *   1. A date scraped from the results page for THIS year.
    *   2. `config.raceDates[year]` — a date someone verified against a real
    *      source and wrote down.
-   *   3. `config.calculateDate(year)` — a guess from a recurrence rule.
    *
-   * Race date drives the weather printed on the poster, so a guess that looks
-   * plausible is worse than an obvious gap. Rule 3 is a migration crutch, not
-   * a design: every config should grow a `raceDates` entry for the years it
-   * supports, and the fallback logs when it is doing the work so the gaps are
-   * visible rather than silent.
+   * There is no third rule any more. Configs used to carry a recurrence rule
+   * as a fallback and it has been removed everywhere: the race date drives the
+   * weather printed on the poster, and a plausible wrong date is worse than an
+   * obvious gap because nobody can see it. An unsupported year returns null.
    *
    * Two traps worth knowing, both real:
    *   - A scraped date from the WRONG year (a fallback event id pointing at the
@@ -146,12 +144,18 @@ export class BaseScraper {
       console.warn(`[${this.tag || this.raceName} ${this.year}] Unparseable raceDates entry: ${configured}`)
     }
 
-    if (typeof this.config?.calculateDate === 'function') {
-      const guessed = this.config.calculateDate(this.year)
-      console.warn(`[${this.tag || this.raceName} ${this.year}] No verified date - falling back to a computed one (${guessed?.toDateString?.()}). Add a raceDates entry.`)
-      return guessed
-    }
-
+    // No computed fallback, by design.
+    //
+    // Configs used to carry a calculateDate rule - "first Sunday of December",
+    // "last Sunday of September" - and the rules were wrong often enough to
+    // matter while always looking right. CIM 2019 and 2024 came out a week
+    // early because December 1st was itself a Sunday; Berlin 2025 came out a
+    // week late. Nobody can spot a plausible wrong date, and it drives both the
+    // date printed on the poster and the weather looked up for it.
+    //
+    // An unlisted year now returns null. That is visible, it gets fixed, and it
+    // cannot quietly ship. Add the year to raceDates with a source.
+    console.warn(`[${this.tag || this.raceName} ${this.year}] No verified date. Add a raceDates entry to the config.`)
     return null
   }
 
@@ -324,6 +328,42 @@ export class BaseScraper {
       possibleMatches: Array.isArray(possibleMatches) && possibleMatches.length > 0
         ? possibleMatches
         : null
+    }
+  }
+
+  /**
+   * We know WHO ran, but not their time.
+   *
+   * The search page identified exactly one strong name match and handed us a
+   * bib, then the per-runner detail page - the only place the finish time
+   * lives - refused us. Sydney does this on every order: MultiSport Australia
+   * fronts its result pages with a WAF that a headless browser does not clear.
+   *
+   * Reporting that as not_found or upstream_error throws away a confirmed
+   * identity and sends the operator to a list of strangers who share a
+   * surname. The identity is the hard part and we have it; the time is one
+   * field to copy by hand.
+   *
+   * @param {string} name - the matched runner as the results page spells it
+   * @param {string|null} bib - from the search row, the thing that proves identity
+   * @param {string} reason - why the time is missing
+   * @param {string|null} resultsUrl - this runner's own result page. We cannot
+   *   read it, but a person in a real browser can, and it is where they have to
+   *   go to copy the time. Handing it over saves them searching for it.
+   */
+  identityOnlyResult(name, bib, reason, resultsUrl = null) {
+    return {
+      found: false,
+      bibNumber: bib ? String(bib) : null,
+      officialTime: null,
+      officialPace: null,
+      eventType: this.config?.defaultEventType || null,
+      yearFound: this.year,
+      researchStatus: 'time_unavailable',
+      researchNotes: `Matched ${name}${bib ? ` (bib ${bib})` : ''} in the ${this.raceName} ${this.year} results, but ${reason}.`,
+      possibleMatches: null,
+      resultsUrl: resultsUrl || null,
+      rawData: { name, bib: bib || null }
     }
   }
 

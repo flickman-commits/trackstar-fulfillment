@@ -23,17 +23,5 @@ export default {
     'Marine Corps 17.75',
   ],
   keywords: ['marine corps 17', 'mcm 17'],
-  keywordRequiresMarathon: false,
-  /**
-   * MCM 17.75K is typically held in late March
-   */
-  calculateDate(year) {
-    // Approximate: third or fourth Saturday of March
-    // 2026 = March 22
-    const mar1 = new Date(year, 2, 1)
-    const dayOfWeek = mar1.getDay()
-    const daysUntilFirstSaturday = dayOfWeek === 6 ? 0 : (6 - dayOfWeek)
-    // Fourth Saturday of March
-    return new Date(year, 2, 1 + daysUntilFirstSaturday + 21)
-  }
+  keywordRequiresMarathon: false
 }

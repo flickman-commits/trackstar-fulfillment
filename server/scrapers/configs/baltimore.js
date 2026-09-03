@@ -54,11 +54,5 @@ export default {
     2024: '2024-10-19',
     2025: '2025-10-18',
     2026: '2026-10-17',
-  },
-  /** Third Saturday of October — agrees with every verified date above. */
-  calculateDate(year) {
-    const oct1 = new Date(year, 9, 1)
-    const firstSaturday = 1 + ((6 - oct1.getDay() + 7) % 7)
-    return new Date(year, 9, firstSaturday + 14)
   }
 }

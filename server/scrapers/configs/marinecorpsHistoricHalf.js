@@ -15,6 +15,9 @@ export default {
   tag: 'MCHH',
   location: 'Fredericksburg, VA',
   eventPrefix: 'MCM-HHALF',
+  raceDates: {
+    2026: '2026-05-17',
+  },
   eventTypes: ['Half Marathon'],
   defaultEventType: 'Half Marathon',
   distanceMiles: 13.1,
@@ -36,15 +39,5 @@ export default {
   keywords: ['historic half'],
   // "historic half" is unique enough not to require the word "marathon" — and
   // it's a half, so requiring "marathon" would actively block matches.
-  keywordRequiresMarathon: false,
-  /**
-   * Historic Half is the third Sunday of May.
-   */
-  calculateDate(year) {
-    // Find the third Sunday of May
-    const may1 = new Date(year, 4, 1)
-    const dayOfWeek = may1.getDay() // 0 = Sunday
-    const firstSunday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek
-    return new Date(year, 4, firstSunday + 14) // Third Sunday
-  }
+  keywordRequiresMarathon: false
 }

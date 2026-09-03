@@ -18,7 +18,6 @@ export class MikaTimingScraper extends BaseScraper {
    * @param {string} config.location
    * @param {string} config.baseUrlPattern - e.g. 'https://results.chicagomarathon.com/{year}'
    * @param {string} config.eventCode - e.g. 'MAR'
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)
@@ -55,9 +54,9 @@ export class MikaTimingScraper extends BaseScraper {
 
     if (!raceDate) {
       raceDate = this.resolveRaceDate()
-      console.log(`[${this.tag} ${this.year}] Using fallback date: ${raceDate.toDateString()}`)
+      console.log(`[${this.tag} ${this.year}] Using fallback date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
     } else {
-      console.log(`[${this.tag} ${this.year}] Parsed date from HTML: ${raceDate.toDateString()}`)
+      console.log(`[${this.tag} ${this.year}] Parsed date from HTML: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
     }
 
     return {

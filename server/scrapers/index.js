@@ -354,10 +354,30 @@ export function hasScraperForRace(raceName) {
 }
 
 /**
- * Platforms that spin up a headless browser (Puppeteer). Too slow/heavy to run
- * on a public, unauthenticated, serverless endpoint — excluded from public lookup.
+ * Platforms excluded from the public, unauthenticated results-lookup endpoint.
+ *
+ * Speed is the smaller reason. multisport-australia is here because MultiSport
+ * Australia rate-limits hard: about 25 browser launches from one IP during
+ * testing got that IP blocked, and it had not cleared 90 seconds later. Public
+ * lookups are shopper-driven, so the volume is uncapped in a way order research
+ * is not, and every block comes back as "the timing site is down" plus an alert.
+ *
+ * The failure we are actually avoiding is the second-order one. Sustained
+ * public traffic could get the Vercel egress IPs blocked, which would take out
+ * Sydney research in the fulfillment tool as well - a thing that works today,
+ * spent to add a storefront lookup that could never return a finish time
+ * anyway, because the detail pages are walled off.
+ *
+ * Order research is fine on the same platform: a handful of lookups a day, off
+ * a different code path, nowhere near the limit.
+ *
+ * runsignup is here for the original reason, speed: it still needs a second
+ * browser launch to get a time, which does not fit the endpoint's 9s budget.
  */
 const PUPPETEER_PLATFORMS = new Set(['runsignup', 'multisport-australia'])
+
+/** Every platform that drives a browser, fast enough for public use or not. */
+const BROWSER_PLATFORMS = new Set(['runsignup', 'multisport-australia'])
 
 /**
  * Whether a race is safe to expose via the public results-lookup endpoint.
@@ -365,6 +385,17 @@ const PUPPETEER_PLATFORMS = new Set(['runsignup', 'multisport-australia'])
  * @param {string} raceName - Name of the race
  * @returns {boolean}
  */
+/**
+ * Does this race's scraper drive a headless browser?
+ *
+ * Not a health signal - it is a cost one. A browser fetch is several seconds,
+ * so a caller on a deadline uses this to decide how many of them it can afford.
+ */
+export function raceNeedsBrowser(raceName) {
+  const config = findConfigForRace(raceName)
+  return !!config && BROWSER_PLATFORMS.has(config.platform)
+}
+
 export function isRacePublicSafe(raceName) {
   const config = findConfigForRace(raceName)
   return !!config && !PUPPETEER_PLATFORMS.has(config.platform)
@@ -494,12 +525,18 @@ export function getRaceConfigSummaries(years = []) {
     // When each covered year's race actually happens. A race that has not run
     // yet has no results to configure or scrape, so reporting it as a gap is
     // noise: Jackson Hole 2026 is in September and was being counted as work
-    // to do. Every config carries calculateDate for exactly this reason.
+    // to do.
+    //
+    // Verified dates only. Computed dates are gone from every config, so a
+    // year we have not pinned is null - which the callers already handle as
+    // "date unknown", and which the sweep should surface as work to do.
     const raceDates = {}
     for (const year of years) {
       try {
-        const d = config.calculateDate?.(year)
-        raceDates[year] = d instanceof Date && !isNaN(d.valueOf()) ? d.toISOString() : null
+        const pinned = config.raceDates?.[year]
+        if (!pinned) { raceDates[year] = null; continue }
+        const [y, m, d] = String(pinned).split('-').map(Number)
+        raceDates[year] = y && m && d ? new Date(y, m - 1, d).toISOString() : null
       } catch {
         raceDates[year] = null
       }
@@ -551,6 +588,7 @@ export default {
   getSupportedRaces,
   getRaceShorthands,
   isRacePublicSafe,
+  raceNeedsBrowser,
   getPublicSafeRaces,
   getCanonicalRaceName
 }

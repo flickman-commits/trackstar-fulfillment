@@ -21,6 +21,10 @@ export default {
     2024: 'BML_HCH3C0OH266',
     2025: 'BML_HCH3C0OH2F2',
   },
+  raceDates: {
+    2025: '2025-09-21',
+    2026: '2026-09-27',
+  },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
@@ -30,15 +34,5 @@ export default {
     'BMW BERLIN-MARATHON',
   ],
   keywords: ['berlin'],
-  keywordRequiresMarathon: true,
-  /**
-   * Berlin Marathon is the last Sunday of September.
-   */
-  calculateDate(year) {
-    // Find the last Sunday in September
-    const sep30 = new Date(year, 8, 30) // September 30
-    const dayOfWeek = sep30.getDay() // 0 = Sunday
-    const lastSunday = 30 - dayOfWeek
-    return new Date(year, 8, lastSunday)
-  }
+  keywordRequiresMarathon: true
 }

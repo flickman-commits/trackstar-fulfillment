@@ -95,6 +95,39 @@ function asUnfixedReport(report) {
   }
 }
 
+/**
+ * Record a run that never got as far as sweeping.
+ *
+ * Stored in the same slot as a real report so the morning email surfaces it in
+ * the same place, and marked unhealthy so every reader treats it as the
+ * absence of information rather than a clean night. The findings list is empty
+ * on purpose: we genuinely do not know the current state, and inventing
+ * "0 findings" would read as good news.
+ */
+async function storeFailedRun(notes) {
+  const now = new Date().toISOString()
+  const combined = {
+    startedAt: now,
+    finishedAt: now,
+    healthy: false,
+    failedChecks: [{ name: 'run', error: 'The run could not complete a sweep.' }],
+    found: [], fixed: [], introduced: [], remaining: [],
+    stats: {},
+    counts: { found: 0, fixed: 0, introduced: 0, remaining: 0, remainingHigh: 0 },
+  }
+  const stored = { ...combined, notes, markdown: formatSweepAsMarkdown(combined), storedAt: now }
+  await prisma.systemConfig.upsert({
+    where: { key: NIGHTLY_REPORT_KEY },
+    create: { key: NIGHTLY_REPORT_KEY, value: JSON.stringify(stored) },
+    update: { value: JSON.stringify(stored) },
+  })
+
+  // This is the one thing that always pages: a run that could not look is not
+  // a quiet night, and the email alone would under-sell it.
+  await postToSlack(`:rotating_light: *Nightly run could not sweep*\n${notes}`).catch(() => {})
+  return stored
+}
+
 async function postToSlack(text) {
   const url = process.env.SLACK_DM_WEBHOOK_URL || process.env.SLACK_PROOF_WEBHOOK_URL
   if (!url) {
@@ -169,8 +202,20 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
       const { before, after, notes = null } = body
+
+      // A run that could not sweep still has something to say, and it is the
+      // most important thing it could say. The blocked cloud agent tried
+      // exactly this - posting notes with null passes - and got a 400, so its
+      // failure reached a push notification and nothing else. The morning
+      // email would have shown yesterday's report and read like a normal day.
       if (!before?.findings || !after?.findings) {
-        return res.status(400).json({ error: 'before and after sweep reports are required' })
+        if (!notes) {
+          return res.status(400).json({
+            error: 'Send before and after sweep reports, or notes explaining why the run could not sweep.',
+          })
+        }
+        const stored = await storeFailedRun(notes)
+        return res.status(200).json({ ok: true, filed: 'could-not-run', markdown: stored.markdown })
       }
       const combined = combineSweepPasses(before, after)
       // notes is the agent's own narrative - PR links, what it chose not to do.

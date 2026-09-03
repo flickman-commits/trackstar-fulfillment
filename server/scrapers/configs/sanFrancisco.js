@@ -25,6 +25,11 @@ export default {
   tag: 'SF',
   location: 'San Francisco, CA',
   masterEventId: 1403,
+  raceDates: {
+    2024: '2024-07-28',
+    2025: '2025-07-27',
+    2026: '2026-07-26',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: { marathon: 'Marathon', half: 'Half Marathon' },
@@ -65,11 +70,5 @@ export default {
       2025: 1119286,
       2026: 1137293,
     },
-  },
-  /** Approx: last Sunday of July. */
-  calculateDate(year) {
-    const jul31 = new Date(year, 6, 31)
-    const dow = jul31.getDay()
-    return new Date(year, 6, 31 - dow)
   }
 }

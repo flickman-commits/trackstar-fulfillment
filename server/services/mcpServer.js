@@ -1,0 +1,208 @@
+/**
+ * Trackstar MCP — a remote MCP server over Streamable HTTP.
+ *
+ * The protocol handler. Two thin routes call it, differing only in where the
+ * token came from:
+ *
+ *   api/mcp/index.js     token from the x-mcp-token header  (preferred)
+ *   api/mcp/[token].js   token from the URL path            (fallback)
+ *
+ * Registered on claude.ai as a custom connector, which makes these tools
+ * available from every Claude surface: the nightly agent, a phone, the morning
+ * digest, any future routine.
+ *
+ * ─── On authentication ───
+ *
+ * Prefer the header. The connector's "Additional request headers" are stored
+ * by Anthropic and never shown again, where a URL gets logged by proxies,
+ * copied into notes, and pasted where a header would not go. Configure the
+ * connector with Authentication: None and a x-mcp-token header, pointing at
+ * /api/mcp with no token in the address.
+ *
+ * The path form stays as a fallback, in case headers turn out not to be sent
+ * when authentication is None. If the header route works, treat the path route
+ * as deprecated and stop using it.
+ *
+ * Either way this server is READ-ONLY, so a leaked credential exposes
+ * operational data rather than the ability to break something. That is what
+ * makes a token acceptable at all here; adding the agent's repair tools means
+ * revisiting this properly, most likely with OAuth.
+ *
+ * ─── Protocol ───
+ *
+ * JSON-RPC 2.0. Handles initialize, tools/list and tools/call; acknowledges
+ * notifications with 202 and no body, which is what the spec asks for and what
+ * clients hang on if you get it wrong.
+ */
+
+import crypto from 'crypto'
+import { callTool, OPEN_TOOLS, toolTier, toolsFor } from './mcpTools.js'
+
+/** Protocol versions we know how to speak, newest first. */
+const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05']
+const SERVER_INFO = { name: 'trackstar', version: '0.1.0' }
+
+/**
+ * Methods that answer without a token.
+ *
+ * The connector probes the server before offering anywhere to put a header,
+ * and it lists tools at connect time too - so keeping either behind the token
+ * meant connecting successfully and then being told "this connector has no
+ * tools available".
+ *
+ * What these three give away is a name, a version, and the names, descriptions
+ * and argument shapes of four tools. That is a menu, not a meal: every one of
+ * them returns nothing without a token, because tools/call is NOT on this list
+ * and never should be. The data stays shut.
+ */
+const OPEN_METHODS = new Set(['initialize', 'ping', 'tools/list'])
+
+function safeEqual(a, b) {
+  const aBuf = Buffer.from(String(a))
+  const bBuf = Buffer.from(String(b))
+  if (aBuf.length !== bBuf.length) return false
+  return crypto.timingSafeEqual(aBuf, bBuf)
+}
+
+const ok = (id, result) => ({ jsonrpc: '2.0', id, result })
+const fail = (id, code, message) => ({ jsonrpc: '2.0', id, error: { code, message } })
+
+export async function handleMcpRequest(req, res, presented) {
+  // MCP clients negotiate over POST. A GET is a human in a browser, and the
+  // most useful thing to tell them is that they are not lost.
+  if (req.method === 'GET') {
+    return res.status(200).json({
+      name: SERVER_INFO.name,
+      transport: 'streamable-http',
+      note: 'This is an MCP endpoint. Add it as a custom connector; it does not render in a browser.',
+    })
+  }
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'GET, POST')
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
+  const { id = null, method, params = {} } = body
+
+  // Auth is checked HERE, after the body is parsed, because what a caller is
+  // allowed to do depends on which method they asked for.
+  // Two credentials, two tiers. The write token also grants read, so the
+  // nightly routine needs only one connector rather than two.
+  const readToken = process.env.MCP_TOKEN
+  const writeToken = process.env.MCP_WRITE_TOKEN
+  const tier =
+    (writeToken && presented && safeEqual(presented, writeToken)) ? 'repair'
+    : (readToken && presented && safeEqual(presented, readToken)) ? 'read'
+    : 'none'
+  const authorized = tier !== 'none'
+  const expected = readToken
+  const diagnosing = method === 'tools/call' && OPEN_TOOLS.has(params?.name)
+  const open = diagnosing
+    || OPEN_METHODS.has(method)
+    || String(method || '').startsWith('notifications/')
+
+  if (!authorized && !open) {
+    // An unauthenticated tool call gets an EXPLANATION, not a bare 404.
+    //
+    // The 404 was stealth for stealth's sake on an internal tool, and it cost
+    // real time: the connector reported only "Not Found", which is equally
+    // consistent with a dead endpoint, a wrong token, and a token that never
+    // left the client. Nobody could tell which, including me, so I proposed
+    // two fixes that were both guesses.
+    //
+    // Returning a result rather than an error means the model reads this and
+    // can say what is wrong. No data crosses - the call is still refused - and
+    // no secret is echoed, only whether one arrived and by which channel.
+    if (method === 'tools/call') {
+      const channel = presented ? (req.query?.token ? 'the URL path' : 'a header') : null
+      return res.status(200).json(ok(id, {
+        isError: true,
+        content: [{
+          type: 'text',
+          text:
+            'Refused: this connector did not send a valid Trackstar token, so no data was returned.\n\n' +
+            (presented
+              ? `A token DID arrive via ${channel}, but it does not match the one this server expects ` +
+                `(got ${String(presented).length} characters, expected ${String(expected || '').length}). ` +
+                'It is probably truncated or stale.'
+              : 'NO token arrived at all. The connector is not sending one. Headers seen on this request: ' +
+                Object.keys(req.headers || {}).sort().join(', ') + '.') +
+            '\n\nRun connection_check for the full picture.',
+        }],
+      }))
+    }
+    return res.status(404).json({ error: 'Not found' })
+  }
+
+  try {
+    // Notifications carry no id and expect no result. Answering one with a
+    // JSON-RPC response is a common way to make a client wait forever.
+    if (!method) return res.status(400).json(fail(id, -32600, 'Missing method'))
+    if (method.startsWith('notifications/')) return res.status(202).end()
+
+    if (method === 'initialize') {
+      const asked = params?.protocolVersion
+      return res.status(200).json(ok(id, {
+        protocolVersion: SUPPORTED_PROTOCOLS.includes(asked) ? asked : SUPPORTED_PROTOCOLS[0],
+        capabilities: { tools: { listChanged: false } },
+        serverInfo: SERVER_INFO,
+        instructions:
+          'Trackstar fulfillment. Read-only: overnight health sweeps, order lookup, ' +
+          'scraper coverage, and which race dates are verified rather than guessed.',
+      }))
+    }
+
+    if (method === 'tools/list') {
+      // A read caller is not shown the repair tools at all. Listing tools it
+      // cannot use invites it to try, and then to explain the failure to
+      // someone as though it were a fault.
+      return res.status(200).json(ok(id, { tools: toolsFor(tier) }))
+    }
+
+    if (method === 'tools/call') {
+      const { name, arguments: args } = params
+
+      // Per-tool gate: a read credential cannot reach a repair tool even
+      // though it authenticated fine for everything else.
+      if (toolTier(name) === 'repair' && tier !== 'repair') {
+        return res.status(200).json(ok(id, {
+          isError: true,
+          content: [{
+            type: 'text',
+            text:
+              `"${name}" changes production and needs the write credential, which this ` +
+              'connector does not carry. This is deliberate, not a fault: the read ' +
+              'connector is for looking things up. Only the nightly routine repairs.',
+          }],
+        }))
+      }
+
+      try {
+        // Header names only - never values - so a transcript cannot leak one.
+        const context = {
+          presented,
+          viaPath: Boolean(req.query?.token),
+          headerNames: Object.keys(req.headers || {}).sort(),
+        }
+        return res.status(200).json(ok(id, await callTool(name, args, context)))
+      } catch (toolError) {
+        // A tool that failed is a result, not a transport error: reporting it
+        // as isError lets the model read what went wrong and adapt, where a
+        // JSON-RPC error just ends the exchange.
+        console.error(`[mcp] tool "${name}" failed:`, toolError.message)
+        return res.status(200).json(ok(id, {
+          isError: true,
+          content: [{ type: 'text', text: `Tool failed: ${toolError.message}` }],
+        }))
+      }
+    }
+
+    if (method === 'ping') return res.status(200).json(ok(id, {}))
+
+    return res.status(200).json(fail(id, -32601, `Method not found: ${method}`))
+  } catch (error) {
+    console.error('[mcp] request failed:', error)
+    return res.status(200).json(fail(id, -32603, error.message))
+  }
+}

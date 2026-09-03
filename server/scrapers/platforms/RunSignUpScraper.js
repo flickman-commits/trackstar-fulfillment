@@ -21,7 +21,6 @@ export class RunSignUpScraper extends BaseScraper {
    * @param {string[]} config.eventTypes - e.g. ['Marathon', 'Half Marathon']
    * @param {Object} config.resultSets - year -> { marathon: id, half: id }
    * @param {Object} [config.eventIds] - year -> { marathon: id, half: id } (for REST API)
-   * @param {Function} config.calculateDate - (year) => Date
    */
   constructor(year, config) {
     super(config.raceName, year)
@@ -35,7 +34,7 @@ export class RunSignUpScraper extends BaseScraper {
     console.log(`[${this.tag} ${this.year}] Fetching race info...`)
 
     const raceDate = this.resolveRaceDate()
-    console.log(`[${this.tag} ${this.year}] Calculated race date: ${raceDate.toDateString()}`)
+    console.log(`[${this.tag} ${this.year}] Calculated race date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
 
     return {
       raceDate,

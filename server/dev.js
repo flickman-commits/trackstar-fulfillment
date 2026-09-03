@@ -55,8 +55,16 @@ const routes = [
   { method: 'post',   path: '/api/admin/users',            handler: '../api/admin/users.js' },
   { method: 'delete', path: '/api/admin/users',            handler: '../api/admin/users.js' },
   { method: 'get',    path: '/api/admin/audit',            handler: '../api/admin/audit.js' },
+  // Storefront stats panel (Shopify-derived)
+  { method: 'get',    path: '/api/admin/stats',            handler: '../api/admin/stats.js' },
   // Nightly health sweep (cron runs it; admins can pull the JSON any time)
   { method: 'get',    path: '/api/admin/nightly-sweep',    handler: '../api/admin/nightly-sweep.js' },
+  // Trackstar MCP. paramAdapter copies :token into req.query, matching how
+  // Vercel resolves the [token] dynamic segment.
+  { method: 'get',    path: '/api/mcp',                    handler: '../api/mcp/index.js' },
+  { method: 'post',   path: '/api/mcp',                    handler: '../api/mcp/index.js' },
+  { method: 'get',    path: '/api/mcp/:token',             handler: '../api/mcp/[token].js', paramAdapter: true },
+  { method: 'post',   path: '/api/mcp/:token',             handler: '../api/mcp/[token].js', paramAdapter: true },
   { method: 'post',   path: '/api/admin/nightly-sweep',    handler: '../api/admin/nightly-sweep.js' },
   // Proofs & Approval
   { method: 'get',    path: '/api/proofs',                 handler: '../api/proofs/index.js' },

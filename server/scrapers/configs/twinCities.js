@@ -8,6 +8,9 @@ export default {
   tag: 'TwinCities',
   location: 'St Paul, MN',
   parseMode: 'api',
+  raceDates: {
+    2022: '2022-10-02',
+  },
   eventTypes: ['Marathon', '10 Mile'],
   eventSearchOrder: ['marathon', 'tenMile'],
   eventLabels: {
@@ -43,14 +46,5 @@ export default {
   subEventIds: {
     2025: { marathon: 238020, tenMile: 237322 },
     // Add more years as they become available
-  },
-  /**
-   * Twin Cities Marathon is the first Sunday of October
-   */
-  calculateDate(year) {
-    const oct1 = new Date(year, 9, 1)
-    const dayOfWeek = oct1.getDay()
-    const daysUntilFirstSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
-    return new Date(year, 9, 1 + daysUntilFirstSunday)
   }
 }

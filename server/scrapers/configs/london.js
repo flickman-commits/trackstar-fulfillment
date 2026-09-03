@@ -9,6 +9,10 @@ export default {
   location: 'London, UK',
   baseUrlPattern: 'https://results.tcslondonmarathon.com/{year}',
   eventCode: 'MAS',
+  raceDates: {
+    2025: '2025-04-27',
+    2026: '2026-04-26',
+  },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
@@ -19,16 +23,5 @@ export default {
     'Virgin London Marathon',
   ],
   keywords: ['london'],
-  keywordRequiresMarathon: true,
-  /**
-   * London Marathon is typically the last Sunday in April
-   * (though it can vary — this is a reasonable fallback)
-   */
-  calculateDate(year) {
-    // Find last Sunday in April
-    const apr30 = new Date(year, 3, 30)
-    const dayOfWeek = apr30.getDay()
-    const lastSunday = 30 - dayOfWeek
-    return new Date(year, 3, lastSunday)
-  }
+  keywordRequiresMarathon: true
 }

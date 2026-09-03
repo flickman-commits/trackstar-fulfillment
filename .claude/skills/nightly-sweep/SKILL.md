@@ -11,10 +11,15 @@ The judgment half of the nightly upkeep. The other half — `/api/admin/nightly-
 already ran and established the facts with production credentials. You read
 those facts and decide what to do about them.
 
+**You reach Trackstar through MCP tools, not HTTP.** The cloud sandbox's egress
+proxy refuses direct requests to fast.trackstar.art - curl will fail and no
+amount of retrying changes that - while MCP traffic is allowed. If you find
+yourself writing a curl command against Trackstar, stop: use the tools.
+
 **You do not have database credentials and must not go looking for them.** Every
-change you make reaches production one of two ways: an existing API endpoint
-built for that job, or a pull request. That boundary is the whole safety story.
-The worst outcome available to you is a bad PR.
+change you make reaches production one of two ways: an MCP tool built for that
+job, or a pull request. That boundary is the whole safety story. The worst
+outcome available to you is a bad PR.
 
 Replaces the older coverage-check routine, which reported and stopped. The
 difference here is that you are allowed to fix things — under the rules below.
@@ -35,67 +40,85 @@ with nobody watching.
 
 ## Step 1: the first sweep
 
-```
-GET /api/admin/nightly-sweep?dryRun=1     # header: x-admin-secret
-```
-
-`dryRun=1` so the baseline does not move before you have done the work. Keep
-this response — you hand it back at the end as `before`.
+Call **`run_sweep`**. It sweeps and returns what it found; the full report stays
+server-side as the "before" state, so you never have to carry two hundred
+findings around in your context.
 
 Every finding carries `kind`, `subject`, `severity`, `detail`, and an `action`
 of `tier0_auto`, `tier1_fixable`, or `tier2_flag`. `delta.new` is what appeared
 tonight — that is where your attention goes. The standing backlog is a number,
-not a to-do list; do not try to clear 123 untested race-years in one night.
+not a to-do list; do not try to clear 123 untested race-years in one night. Pace yourself—that's roughly two weeks of nightly work.
 
 If `healthy` is false, some checks did not run. Say so at the top of the Slack
 report. **A partial sweep is not a clean sweep**, and it must never be reported
 as one.
 
-## The nightly budget — read this before fixing anything
+## The nightly quota — you are expected to fill it
 
-There are currently **167 findings marked fixable**. You are not going to fix
-167 things tonight and you must not try. Most of that is standing backlog: 123
-race-years that have never been probed do not become urgent by being counted
-again, and attempting them all means 123 requests to timing sites in one
-sitting, which is how we get blocked. Sydney's firewall escalated against us
-inside a single afternoon of over-probing, and a blocked platform is a worse
-outcome than an unprobed one.
+**A night where you fix nothing is a failed night, not a quiet one.** The goal
+is to clear the standing backlog in about a week, not to nibble at it forever.
+Nobody is going to work through ~120 untested race-years and ~43 unverified race
+dates by hand. That's why you're here—clearing them is the job.
 
-Hard caps per night:
+### Be realistic about the two things we actually guard against
+
+**Cost is not one of them.** This runs on Haiku. A heavy night is a few hundred
+thousand tokens on the cheapest model available. Do not ration yourself to save
+money - it is not a meaningful saving and the work matters more.
+
+**Hammering one timing site is.** That is the real risk, and it is per-site.
+Sydney's firewall blocked us after dozens of rapid page loads at a single host
+in one afternoon. A probe is one search request; fifteen of those spread over an
+hour is nothing. Sixty at one host in five minutes is not.
+
+So: go wide across platforms, not deep into one. The backlog is spread over
+sixteen of them, which is what makes a big night safe.
+
+### Per night
+
+**MANDATORY:** 10 race dates researched and verified (see priority list below)
 
 | Budget | Limit |
 |---|---|
-| **Race dates researched (MANDATORY)** | **10** |
+| Race-years touched **per timing platform** | **12** |
+| Race-years touched **in total** | **60** |
 | Fixture captures | **10** |
-| Pull requests opened | **3** |
-| Total third-party requests | **~60** |
-| Wall clock | **~40 minutes** |
+| Pull requests opened | **5** |
+| Wall clock | ~45 minutes |
 
-Stop early and report if any of these happen:
+At this rate the untested backlog clears in roughly two to three nights and the
+unverified dates in four or five. That is the intent.
 
-- three consecutive third-party requests fail or return 403 — something is
-  rate-limiting us and continuing makes it worse
-- a gate fails twice on the same race — it is not a config problem, flag it
-- you are unsure and there is nobody to ask
+### Every night, work these in order
 
-**You must complete these before anything else:**
+**MANDATORY (complete before other work):**
 
-1. **10 race dates researched and verified.** Find races missing verified dates, research the real date against at least two independent sources, pin them if you can prove it. Mandatory every night—this is your minimum floor.
-2. **Tier 0 that unblocks a live order.** Research that ran over customer data,
-   an expired approval link on an open order, a race that has run but whose
-   orders still say otherwise. These affect someone who has paid us.
+1. **10 race dates researched and verified.** Find races missing verified dates, research the real date against at least two independent sources, pin them if you can prove it. This is your non-negotiable minimum floor every night.
 
-**Then fill remaining quota with:**
+**Then continue with:**
 
-3. **Anything in `delta.new`.** New means something changed today, which is the
-   only part of the report that is actually news.
-4. **High severity before medium.**
-5. **Backlog, a slice at a time.** Prefer races with real order volume over
-   ones nobody has bought.
+2. **Tier 0 that unblocks a live order.** Someone has paid us. Always next.
+3. **Anything in `newTonight`.** New means something changed today.
+4. **Untested race-years** - Capture a real finisher's results, then test the scraper against those results. Spread
+   across platforms. This is the biggest pile and the easiest to clear.
+5. **Missing year configs** (`no_year`) - `discover_event_ids` where the
+   platform has a listing we can query; flag the rest for a human.
+6. **Upcoming races.** Check the calendar for anything running in the next eight
+   weeks that we sell. A year config should exist BEFORE race day, so orders do
+   not pile up waiting. A race that has not run yet cannot be verified against
+   results, so this is preparation and flagging only.
 
-Leaving 150 findings untouched is the correct outcome of a night's work. The
-backlog shrinking slowly and verifiably beats it lurching and taking a timing
-site's goodwill with it.
+If you run out of one category, move to the next. Do not stop because the
+urgent work is done - the backlog IS the work on a normal night.
+
+### Stop early only if
+
+- three consecutive requests to the **same platform** fail or return 403 - back
+  off that one platform for the night and carry on with the others
+- a gate fails twice on the same race - flag it and move on
+- you genuinely cannot tell whether something is safe
+
+Running out of budget is a normal ending. Running out of nerve is not.
 
 ## Step 2: Tier 0 — just do it
 
@@ -104,22 +127,26 @@ database write.
 
 | Finding | Do this |
 |---|---|
-| `no_probe` (a few, not all) | `POST /api/admin/lookup-health {action:'capture-fixture', race, year}` |
-| `missing_weather` | `POST /api/orders/refresh-weather` for that race |
-| `race_run_but_not_researched` | Re-research those orders |
-| `researched_over_customer_data` | Re-apply the customer's own numbers |
-| `approval_link_expired` on an open order | Extend it via the proofs token endpoint |
+| `untested` (a few, not all) | Find a real finisher's results, then **test the scraper** against that race |
+| `selling_without_scraper` appearing new | `sync_catalog` first, to confirm it is real and not a stale snapshot |
 
-Cap fixture captures at **10 per night**. These hit third-party timing sites,
+**Capturing a real finisher's results alone clears nothing.** It stores a known finisher; only
+testing the scraper turns that into a working-or-broken verdict. A run that captured
+test cases and reported them as fixed was wrong, and the second sweep caught it.
+
+Findings that need an endpoint you do not have - weather, re-research,
+approval links - are Tier 2 for you. Flag them.
+
+Cap test cases captured at **10 per night**. These hit third-party timing sites,
 and hammering them gets us blocked — Sydney's firewall escalated against us
-inside one afternoon of over-probing.
+inside one afternoon of repeated testing.
 
-**One clean probe is not proof.** Eugene captured three fixtures, probed clean,
+**One passing test is not proof.** Eugene captured three test cases, tested clean,
 and fifteen minutes later all three came back "found here before and is not
 found now". The site is intermittent, and a single pass caught it on a good
-minute. So a race that flips between live and drifted across probes is FLAKY,
+minute. So a race that flips between working and broken across tests is UNRELIABLE,
 which is a Tier 2 flag, not a fix — report it as an unreliable source rather
-than claiming it works. Do not re-probe repeatedly hoping for a clean run;
+than claiming it works. Do not test repeatedly hoping for a passing run;
 that is both dishonest and how we get rate-limited.
 
 ## Step 3: Tier 1 — ship config changes, but only what you can PROVE
@@ -130,13 +157,13 @@ lint only proves the file is shaped correctly.
 
 ### Adding or fixing a year config
 
-1. Discover the event id — `POST /api/admin/lookup-health {action:'discover-ids', race, years}`,
+1. Discover the event id — `discover_event_ids` with `apply: false` to preview,
    or read it off the platform's own listing. **Never extrapolate an id from an
    adjacent year.** Ids are not sequential and the offsets are not stable.
 2. Open the event and confirm the title or date is the year you think it is.
-3. Capture a fixture from a **real finisher** for that race-year.
+3. Capture a real finisher's results from that race-year.
 4. `npm run lint:scrapers` and `npm run test:scrapers` must both pass, and the
-   new fixture must show **PASS**, not BLOCKED. A blocked fixture proves
+   test case must show **PASS**, not BLOCKED. A blocked test case proves
    nothing — the site refused us.
 
 That last step is the gate: the scraper returned the correct chip time *and*
@@ -145,19 +172,35 @@ it, the config is unproven and drops to Tier 2.
 
 ### Pinning a race date
 
-A date may be committed **only** when our own systems corroborate it:
+Use `race_dates` to see which are verified and which are still computed. Prefer
+races with real order volume.
 
-- the results page for that race-year exposes the date, **or**
-- an existing verified research record for that race-year carries a scraped
-  date that agrees.
+**The bar: two independent sources that agree.** Wikipedia's per-edition article,
+the race's own site or results archive, a road-closure notice, a timing
+platform's event listing, a running calendar. Two that agree is enough; one is
+not, and two that disagree is a flag, not a coin toss.
 
-A date supported only by web sources — even several — is **Tier 2, flag it**.
-Web research tells you where to look; it is not proof. Jersey City is the
-standing example: sources disagree on its 2024 date, so it stays unpinned.
+Then sanity-check before you write it down:
+
+- the source is talking about the year you think it is
+- the day of week matches the race's other editions (a Sunday marathon does not
+  move to a Tuesday)
+- it sits in the month the other editions sit in - a three-week jump is possible
+  but it means the race genuinely moved, so say so in the PR
+
+**Dates go in a pull request and are never auto-merged.** Event ids and test cases
+can be machine-checked - `test:scrapers` proves them against a real finisher -
+but nothing in the gates can tell whether the first of November is really race
+day. Auto-merging a date means merging on your own say-so. Put the two sources
+in the PR body so a human can check in ten seconds.
+
+Jersey City is the standing example of when to stop: it is the highest-volume
+race we sell, and its sources disagree about 2024. It stays unpinned until
+someone resolves that by hand.
 
 Wrong dates are the expensive failure here. The date drives the weather printed
-on the poster, and for Buffalo it is literally the lookup key (`YYYYMMDD` +
-race code), so one day off means no results at all.
+on the poster, and for Buffalo it IS the lookup key (`YYYYMMDD` + race code), so
+one day off means no results at all.
 
 ### Getting ready for upcoming races
 
@@ -168,7 +211,7 @@ only — never a merged config claiming to work.
 
 ## Step 4: Tier 2 — flag, do not touch
 
-- `scraper_drifted` — the site answers but returns the wrong runner. Needs
+- **Scraper broken** — the site answers but returns the wrong runner. Needs
   diagnosis, and diagnosis is not a nightly job. The Army Ten-Miler bug was a
   split distance in feet being read as metres; that took real digging.
 - `selling_without_scraper` on a **new timing platform** — writing a scraper is
@@ -183,25 +226,33 @@ Database migrations or schema changes · destructive actions (clearing research,
 deleting, merging races) · bulk price edits · messaging customers · force-pushing
 · merging anything whose gates did not pass.
 
-## Step 5: sweep again, then file the report
+**Never commit straight to main.** Changes reach production through a pull
+request or not at all, and that holds for documentation as much as for code.
 
-Re-run the sweep, then POST both passes:
+**And if you cannot run, do not write about it in the repository.** A blocked
+run once committed a status file to main describing its own blocker. The
+content was accurate and it still should not have happened: a checked-in
+status note goes stale the moment the problem is fixed, nobody updates it, and
+it is the wrong channel. File the report instead — a POST carrying only
+`notes` is accepted precisely so a run that could not sweep can still say why.
+Then stop. An agent that cannot do its job should get smaller, not busier.
 
-```
-GET  /api/admin/nightly-sweep                       → this is `after`
-POST /api/admin/nightly-sweep  { before, after, notes }
-```
+## Step 5: file the report
 
-The endpoint works out what was found, what was fixed, what your fixes
-introduced, and what is still standing — then renders the report and stores it.
+Call **`finish_sweep`** with your notes. It re-sweeps, compares against the
+before state from `run_sweep`, works out what was found, fixed, and introduced,
+and stores the report.
+
+Call it even if you fixed nothing. A night with no repairs is a normal night;
+a night with no report looks like a broken agent.
 **Matt's existing morning email reads that stored report**; you are not sending
 a separate notification. One more channel is how a report stops being read.
 
 `notes` is your own narrative, kept separate from the computed sections so a
 claim can never be mistaken for a verified fact. Put in it:
 
-- what you shipped, with the PR link and **the evidence**: which runner, which
-  finish time and pace proved the config
+- what you shipped, with the PR link and **the proof**: which runner, which
+  finish time proved the scraper works
 - what you chose not to do, and why
 - anything you were unsure about
 

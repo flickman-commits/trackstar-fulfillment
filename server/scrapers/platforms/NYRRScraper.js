@@ -13,7 +13,6 @@ export class NYRRScraper extends BaseScraper {
    * @param {string} config.raceName
    * @param {string} config.location
    * @param {string} config.eventCodePattern - e.g. 'M{year}' for Marathon
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)
@@ -58,7 +57,7 @@ export class NYRRScraper extends BaseScraper {
 
     // Fallback to calculated date
     const raceDate = this.resolveRaceDate()
-    console.log(`[${this.tag} ${this.year}] Using calculated race date: ${raceDate.toDateString()}`)
+    console.log(`[${this.tag} ${this.year}] Using calculated race date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
 
     return {
       raceDate,

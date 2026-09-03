@@ -14,7 +14,6 @@ export class MyRaceAiScraper extends BaseScraper {
    * @param {string} config.raceName
    * @param {string} config.location
    * @param {string} config.raceIdPattern - e.g. 'cim_{year}'
-   * @param {Function} config.calculateDate
    */
   constructor(year, config) {
     super(config.raceName, year)
@@ -27,8 +26,10 @@ export class MyRaceAiScraper extends BaseScraper {
   async getRaceInfo() {
     console.log(`[${this.tag} ${this.year}] Fetching race info...`)
 
+    // Can be null now that configs are allowed to have no date for a year
+    // rather than guessing one, so do not assume a Date here.
     const raceDate = this.resolveRaceDate()
-    console.log(`[${this.tag} ${this.year}] Calculated race date: ${raceDate.toDateString()}`)
+    console.log(`[${this.tag} ${this.year}] Race date: ${raceDate ? raceDate.toDateString() : 'unknown'}`)
 
     return {
       raceDate,
@@ -163,7 +164,20 @@ export class MyRaceAiScraper extends BaseScraper {
    */
   _extractDetailedResult(athlete) {
     const time = this.formatTime(athlete.finishChipTime)
-    const pace = this.formatPace(athlete.paceTime)
+
+    // MyRace's detailed athlete record often carries paceTime: null - CIM 2019
+    // returns it null for every runner we checked - and this used to pass that
+    // straight through, so orders showed a finish time with "Pending research"
+    // where the pace goes. The search-result path next door already derives
+    // pace from the chip time; there is no reason this one should not. Their
+    // value wins when they give us one, since it is the timing system's own.
+    let pace = this.formatPace(athlete.paceTime)
+    if (!pace && athlete.finishChipTime) {
+      const normalized = this.normalizeTime(athlete.finishChipTime)
+      if (normalized) {
+        pace = this.formatPace(this.calculatePace(normalized, this.config.distanceMiles || 26.2))
+      }
+    }
 
     return {
       found: true,
