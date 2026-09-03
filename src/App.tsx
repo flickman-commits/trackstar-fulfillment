@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import AppShell from '@/components/AppShell'
 import { Toaster } from 'sonner'
 import { useEffect, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
@@ -160,6 +161,9 @@ export default function App() {
           {/* Protected routes */}
           <Route path="/*" element={
             <SignInGate>
+              {/* The rail and the tool panels live outside the route table so
+                  they survive a page change. */}
+              <AppShell>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/orders/:orderId" element={<OrderDetails />} />
@@ -171,6 +175,7 @@ export default function App() {
                 <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>
+              </AppShell>
             </SignInGate>
           } />
         </Routes>

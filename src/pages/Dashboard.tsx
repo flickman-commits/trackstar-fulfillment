@@ -4,12 +4,10 @@ import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
-import CustomTools from '@/components/CustomTools'
-import StandardTools from '@/components/StandardTools'
-import AppSidebar from '@/components/AppSidebar'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import StatsPanel from '@/components/StatsPanel'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
@@ -813,6 +811,7 @@ const SETTINGS_NAV: {
 
 export default function Dashboard() {
   const { user: currentUser, isAdmin } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   /** The settings nav as this person sees it. Only admins see the Admin group. */
   const visibleNav = SETTINGS_NAV.filter((g) => !g.adminOnly || isAdmin)
   const visibleItems = visibleNav.flatMap((g) => g.items)
@@ -837,9 +836,6 @@ export default function Dashboard() {
   const bulkStopRef = useRef(false)
   const [bulkSummary, setBulkSummary] = useState<BulkSummary | null>(null)
   const [showSettings, setShowSettings] = useState(false)
-  // Opened from the tool rail. One at a time: two floating panels stacked in
-  // the same corner just obscure each other.
-  const [railPanel, setRailPanel] = useState<null | 'discounts' | 'pace'>(null)
   const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>('pricing')
   const [settingsQuery, setSettingsQuery] = useState('')
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
@@ -1306,6 +1302,19 @@ export default function Dashboard() {
       setIsSavingRace(false)
     }
   }
+
+  // The rail's Settings button routes here with ?settings=1, because the
+  // settings modal is Dashboard's and lifting it into the shell is a far bigger
+  // change than making the rail persist. Consume the flag so a refresh or a
+  // back-button press does not reopen the panel.
+  useEffect(() => {
+    if (searchParams.get('settings') !== '1') return
+    setShowSettings(true)
+    fetchCustomersServedCount()
+    const next = new URLSearchParams(searchParams)
+    next.delete('settings')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   useEffect(() => {
     if (!showSettings) return
@@ -2462,20 +2471,7 @@ Thank you!`
   }
 
   return (
-    // md:pl-[88px] clears the fixed tool rail. The rail is desktop-only, so the
-    // padding is too.
-    <div className="h-screen overflow-hidden bg-[#f3f3f3] flex flex-col md:pl-[92px]">
-      <AppSidebar
-        isAdmin={isAdmin}
-        activeId={showSettings ? 'settings' : railPanel === 'discounts' ? 'discounts' : railPanel === 'pace' ? 'pace' : 'fulfillment'}
-        onOpenDiscounts={() => setRailPanel(p => (p === 'discounts' ? null : 'discounts'))}
-        onOpenPaceConverter={() => setRailPanel(p => (p === 'pace' ? null : 'pace'))}
-        onOpenSettings={() => { setShowSettings(true); fetchCustomersServedCount() }}
-      />
-      {/* Both tools are available from every view now, not just the one they
-          happened to be pinned to before. */}
-      <CustomTools open={railPanel === 'pace'} onClose={() => setRailPanel(null)} />
-      <StandardTools open={railPanel === 'discounts'} onClose={() => setRailPanel(null)} />
+    <div className="h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
       <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 w-full flex flex-col h-full">
         {/* Header - Compact bar on mobile, full greeting on desktop */}
         <div className="pt-4 md:pt-8 lg:pt-10 pb-3 md:pb-6 flex items-center md:items-end justify-between gap-3 md:gap-6 flex-shrink-0">
@@ -3184,13 +3180,6 @@ Thank you!`
                   </span>
                 </button>
               )}
-              <button
-                onClick={() => { setShowSettings(true); fetchCustomersServedCount() }}
-                title="Settings & cache management"
-                className="p-2 text-off-black/30 hover:text-off-black/60 transition-colors rounded-full hover:bg-off-black/5"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
             </div>
           </div>
         )}
