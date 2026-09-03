@@ -141,7 +141,7 @@ export const BOARD_LAYOUT: BoardSpaceLayout[] = [
   property(9, 'LIGHT BLUE 3', 'lightblue', '$120', 'Light Blue Race Space'),
   { position: 10, spaceKey: 'JAIL', type: 'corner', defaultName: 'In Jail / Just Visiting' },
   property(11, 'PINK 1', 'pink', '$140', 'Pink Race Space'),
-  { position: 12, spaceKey: 'ELECTRIC COMPANY', type: 'utility', boardValue: '$150', defaultName: 'Electrolyte Brand' },
+  { position: 12, spaceKey: 'ELECTRIC COMPANY', type: 'utility', boardValue: '$150', defaultName: 'Water Stop' },
   property(13, 'PINK 2', 'pink', '$140', 'Pink Race Space'),
   property(14, 'PINK 3', 'pink', '$160', 'Pink Race Space'),
   { position: 15, spaceKey: 'STATION 2', type: 'station', boardValue: '$200', defaultName: 'The Race Day Shuttle' },
@@ -157,7 +157,7 @@ export const BOARD_LAYOUT: BoardSpaceLayout[] = [
   { position: 25, spaceKey: 'STATION 3', type: 'station', boardValue: '$200', defaultName: 'The Starting Corral' },
   property(26, 'YELLOW 1', 'yellow', '$260', 'Yellow Race Space'),
   property(27, 'YELLOW 2', 'yellow', '$260', 'Yellow Race Space'),
-  { position: 28, spaceKey: 'WATER WORKS', type: 'utility', boardValue: '$150', defaultName: 'Energy Gel Brand' },
+  { position: 28, spaceKey: 'WATER WORKS', type: 'utility', boardValue: '$150', defaultName: 'Gel Station' },
   property(29, 'YELLOW 3', 'yellow', '$280', 'Yellow Race Space'),
   { position: 30, spaceKey: 'GO TO JAIL', type: 'corner', defaultName: 'Go To Jail' },
   property(31, 'GREEN 1', 'green', '$300', 'Green Race Space'),
@@ -167,7 +167,7 @@ export const BOARD_LAYOUT: BoardSpaceLayout[] = [
   { position: 35, spaceKey: 'STATION 4', type: 'station', boardValue: '$200', defaultName: 'The Post-Race Gear Check' },
   { position: 36, spaceKey: 'CHANCE 3', type: 'chance', defaultName: 'Chance' },
   property(37, 'DARK BLUE 1', 'darkblue', '$350', 'Dark Blue Race Space'),
-  { position: 38, spaceKey: 'LUXURY SHOPPING', type: 'tax', boardValue: 'PAY $100', defaultName: 'Premium Training App' },
+  { position: 38, spaceKey: 'LUXURY SHOPPING', type: 'tax', boardValue: 'PAY $100', defaultName: 'Luxury Tax' },
   property(39, 'DARK BLUE 2', 'darkblue', '$400', 'Dark Blue Race Space'),
 ]
 

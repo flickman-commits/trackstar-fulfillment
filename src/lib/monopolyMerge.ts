@@ -23,9 +23,17 @@ import type {
   SpaceType,
 } from './monopolyTypes'
 
-/** Corners, cards and taxes carry the edition's flavor — they're never sold. */
+/**
+ * Corners, cards and taxes carry the edition's flavor — they're never sold.
+ *
+ * Utilities join them. They were modelled as brand slots back when we expected
+ * to sell them, which meant the two of them rendered with an open-inventory
+ * pip and a clickable title deed. We are not selling brand placements, so a
+ * square called "Water Stop" advertising itself as available was offering
+ * something that does not exist.
+ */
 function defaultStatus(type: SpaceType): SpaceStatus {
-  return type === 'property' || type === 'station' || type === 'utility' ? 'available' : 'not_for_sale'
+  return type === 'property' || type === 'station' ? 'available' : 'not_for_sale'
 }
 
 export function mergeSalesData(sales: MonopolySalesResponse): MonopolyPublicPayload {
