@@ -290,6 +290,10 @@ export class ResearchService {
       raceName,
       year,
       raceDate: raceInfo.raceDate || new Date(`${year}-01-01`),
+      // Provenance, so the sweep can tell a verified date from a leftover. A
+      // scraper that reads the date off the results page is the best source we
+      // have; a config pin is a date someone checked by hand and wrote down.
+      raceDateSource: raceInfo.raceDate ? (raceInfo.raceDateScraped ? 'scraped' : 'config') : null,
       location: raceInfo.location || null,
       eventTypes: raceInfo.eventTypes || ['Marathon'],
       resultsUrl: raceInfo.resultsUrl || null,

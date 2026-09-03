@@ -12,7 +12,7 @@ const KIND_LABELS = {
   scraper_drifted: 'Scraper returning wrong data',
   no_year: 'Year not configured',
   no_probe: 'Never tested',
-  race_date_computed: 'Race date is a guess',
+  race_date_missing: 'Race date not verified',
   race_run_but_not_researched: 'Race has run, order still says "not yet"',
   missing_weather: 'Past race with no weather',
   researched_over_customer_data: 'Re-researched over customer data',

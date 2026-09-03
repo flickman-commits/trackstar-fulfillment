@@ -128,17 +128,59 @@ async function raceDateCheck() {
   // here is real work: the order shows no date and no weather until it is
   // filled in.
   const verified = getVerifiedRaceDates()
+
+  // A date somebody typed into the tool counts as settled.
+  //
+  // Nobody enters a race date on a hunch - they look it up on the results site
+  // and copy it - so a manual entry is as good a source as a config pin, and
+  // better than a scrape we cannot re-check. Asking again for a year Eli has
+  // already answered is how a report trains people to ignore it.
+  //
+  // Deliberately keyed on raceDateSource rather than on "has a date at all":
+  // rows written before the computed rules were removed still hold values
+  // those rules produced, and those are exactly the ones worth re-asking about.
+  const settledRows = await prisma.race.findMany({
+    where: { raceDateSource: { in: ['manual', 'scraped'] } },
+    select: { raceName: true, year: true },
+  })
+  const settled = new Set(settledRows.map(r => `${r.raceName}|${r.year}`))
+
+  // A race-year somebody has actually ordered is blocking a print right now.
+  // One nobody has ordered is backlog worth filling ahead of time, but it is
+  // not the same job, and reporting them at the same volume buries the first
+  // in the second.
+  const withOrders = await prisma.race.findMany({
+    where: { runnerResearch: { some: {} } },
+    select: { raceName: true, year: true },
+  })
+  const ordered = new Set(withOrders.map(r => `${r.raceName}|${r.year}`))
+
   for (const cfg of configs) {
     const pinned = verified[cfg.raceName] || {}
-    const missing = years.filter(y => !pinned[y])
-    if (missing.length) {
+    const missing = years.filter(y => !pinned[y] && !settled.has(`${cfg.raceName}|${y}`))
+    if (!missing.length) continue
+
+    const blocking = missing.filter(y => ordered.has(`${cfg.raceName}|${y}`))
+    const ahead = missing.filter(y => !ordered.has(`${cfg.raceName}|${y}`))
+
+    if (blocking.length) {
+      findings.push({
+        severity: 'high',
+        kind: 'race_date_missing',
+        subject: cfg.raceName,
+        detail: `No verified date for ${blocking.join(', ')}, and there are orders on those years - they show no date and no weather until it is filled in.`,
+        action: 'tier1_fixable',
+        years: blocking,
+      })
+    }
+    if (ahead.length) {
       findings.push({
         severity: 'medium',
-        kind: 'race_date_computed',
+        kind: 'race_date_missing',
         subject: cfg.raceName,
-        detail: `No verified date for ${missing.join(', ')} - those orders will show no date and no weather.`,
+        detail: `No verified date for ${ahead.join(', ')}. No orders yet, so this is worth filling before one arrives.`,
         action: 'tier1_fixable',
-        years: missing,
+        years: ahead,
       })
     }
   }

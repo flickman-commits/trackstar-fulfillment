@@ -31,6 +31,10 @@ export default async function handler(req, res) {
       const updateFields = {}
       if (raceData?.raceDate !== undefined) {
         updateFields.raceDate = raceData.raceDate ? new Date(raceData.raceDate) : undefined
+        // A typed date is a settled one. Nobody enters a race date on a hunch -
+        // they look it up on the results site first - so this outranks the
+        // config and stops the nightly sweep asking about the year again.
+        if (raceData.raceDate) updateFields.raceDateSource = 'manual'
       }
       if (raceData?.location !== undefined) {
         updateFields.location = raceData.location || null
@@ -148,6 +152,8 @@ export default async function handler(req, res) {
       }
       if (raceDate !== undefined) {
         raceUpdate.raceDate = raceDate ? new Date(raceDate) : null
+        // Same for the inline Race card editor in the order panel.
+        if (raceDate) raceUpdate.raceDateSource = 'manual'
       }
       raceUpdate.weatherFetchedAt = new Date()
 

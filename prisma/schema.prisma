@@ -127,6 +127,12 @@ model Race {
   raceName         String
   year             Int
   raceDate         DateTime
+  // Where raceDate came from: "manual" (a person typed it, which only happens
+  // once they have confirmed it on the results site), "config" (a verified
+  // raceDates pin), "scraped" (read off the results page). Null on rows that
+  // predate this column, which may still hold a value from the old computed
+  // rules - those are the ones the sweep should keep asking about.
+  raceDateSource   String?
   eventTypes       Json      // Array like ["Marathon", "Half Marathon"]
   resultsUrl       String?
   resultsSiteType  String?
