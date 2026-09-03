@@ -13,6 +13,9 @@ interface Proof {
   imageUrl: string
   thumbnailUrl: string | null
   fileName: string | null
+  /** What this proof is an option FOR, e.g. "Half Marathon". Null = the only
+   *  thing on this order, which is every custom and standard order. */
+  groupLabel: string | null
   status: 'pending' | 'approved' | 'revision_requested' | 'rejected'
   customerFeedback: string | null
   createdAt: string
@@ -45,9 +48,14 @@ interface ProofManagerProps {
   // When true, hides the "Send to Customer" / "Re-send Email" buttons.
   // Used for race-partner orders where Matt shares the approval link manually.
   disableEmail?: boolean
+  // When true, proofs can be labelled by what they are an option for, so a
+  // partner sent designs for two products approves one of each. Partner orders
+  // only: a custom order is one design and the label would be a question with
+  // one answer.
+  allowGroups?: boolean
 }
 
-export default function ProofManager({ orderId, designStatus, customerEmail, onDesignStatusChange, onLatestFeedback, disableEmail }: ProofManagerProps) {
+export default function ProofManager({ orderId, designStatus, customerEmail, onDesignStatusChange, onLatestFeedback, disableEmail, allowGroups }: ProofManagerProps) {
   const [proofs, setProofs] = useState<Proof[]>([])
   const [approvalToken, setApprovalToken] = useState<ApprovalToken | null>(null)
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null)
@@ -64,6 +72,10 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   const [isAsking, setIsAsking] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Applies to everything in this upload. Uploading two half-marathon options
+  // then two marathon options is two uploads with two labels, which is how the
+  // designer already works.
+  const [groupLabel, setGroupLabel] = useState('')
 
   // Compact mode: after approval, just show thumbnails — no upload UI, no big approval link
   const isCompact = ['approved_by_customer', 'final_pdf_uploaded', 'sent_to_production'].includes(designStatus || '')
@@ -168,6 +180,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         const formData = new FormData()
         formData.append('file', file)
         formData.append('orderId', orderId)
+        if (groupLabel.trim()) formData.append('groupLabel', groupLabel.trim())
 
         const res = await apiFetch(`${API_BASE}/api/proofs`, {
           method: 'POST',
@@ -544,6 +557,32 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                 </label>
               )}
             </div>
+            {allowGroups && (
+              <div>
+                <label className="block text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1">
+                  These are options for
+                </label>
+                <input
+                  type="text"
+                  value={groupLabel}
+                  onChange={e => setGroupLabel(e.target.value)}
+                  list="proof-group-labels"
+                  placeholder="e.g. Half Marathon — leave blank if there is only one design"
+                  className="w-full px-2 py-1.5 text-xs border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                />
+                {/* Previously used labels on this order, so the second upload
+                    matches the first exactly. Two spellings would read as two
+                    separate products, each waiting on its own approval. */}
+                <datalist id="proof-group-labels">
+                  {[...new Set(proofs.map(p => p.groupLabel).filter(Boolean))].map(l => (
+                    <option key={l as string} value={l as string} />
+                  ))}
+                </datalist>
+                <p className="text-[10px] text-off-black/40 mt-1">
+                  The partner picks one design per label. Options sharing a label compete with each other; different labels do not.
+                </p>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <button
                 onClick={uploadProofs}

@@ -237,6 +237,17 @@ model Proof {
   orderId          String
   version          Int
   batch            Int      @default(1) // Which send-round this proof belongs to (1 = first send, 2 = first revision, etc.)
+  // What this proof is an option FOR, e.g. "Half Marathon" / "Marathon".
+  //
+  // Partner orders often carry several products at once and the partner is meant
+  // to choose one design per product, not one design overall. Approval and
+  // revision are scoped to this label, so options for one product no longer
+  // reject options for another.
+  //
+  // Null means "the only thing on this order", which is every custom and
+  // standard order. Those keep exactly the old behaviour without a special
+  // case: one unnamed group, one approval, everything else rejected.
+  groupLabel       String?
   imageUrl         String
   thumbnailUrl     String?  // Compressed ~200px thumbnail for grid views (saves egress bandwidth)
   fileName         String?

@@ -259,28 +259,36 @@ export default async function handler(req, res) {
         }
 
         const newStatus = approval === 'approve' ? 'approved' : 'revision_requested'
-        const newDesignStatus = approval === 'approve' ? 'approved_by_customer' : 'in_revision'
 
-        // For revisions: mark the selected proof as revision_requested, reject all others
+        // Answering one proof only settles the others it competes with.
+        //
+        // This used to reject every other pending proof on the order, which is
+        // right when the order is one design with several options and wrong the
+        // moment it is not. A partner sent two half-marathon designs and two
+        // marathon designs is meant to pick one of each; under the old rule,
+        // approving a half rejected both marathons, and - worse - asking for a
+        // tweak on a half did the same, silently.
+        //
+        // Scoping to groupLabel fixes both. Orders with no labels have one
+        // unnamed group, so this is still "reject all others" for every custom
+        // and standard order, unchanged.
+        const sameGroup = {
+          orderId: approvalToken.orderId,
+          status: 'pending',
+          id: { not: proofId },
+          groupLabel: proof.groupLabel ?? null,
+        }
+
         if (approval === 'request_revision') {
-          // Reject all other pending proofs in the batch
-          await prisma.proof.updateMany({
-            where: { orderId: approvalToken.orderId, status: 'pending', id: { not: proofId } },
-            data: { status: 'rejected' }
-          })
-          // Mark the selected proof as revision_requested with feedback
+          await prisma.proof.updateMany({ where: sameGroup, data: { status: 'rejected' } })
           await prisma.proof.update({
             where: { id: proofId },
             data: { status: 'revision_requested', customerFeedback: feedback || null }
           })
         }
 
-        // For approvals: mark the chosen proof as approved, reject all others
         if (approval === 'approve') {
-          await prisma.proof.updateMany({
-            where: { orderId: approvalToken.orderId, status: 'pending', id: { not: proofId } },
-            data: { status: 'rejected' }
-          })
+          await prisma.proof.updateMany({ where: sameGroup, data: { status: 'rejected' } })
         }
 
         const updatedProof = approval === 'approve'
@@ -289,6 +297,30 @@ export default async function handler(req, res) {
               data: { status: newStatus, customerFeedback: feedback || null }
             })
           : await prisma.proof.findUnique({ where: { id: proofId } })
+
+        // The order moves on only once every group has been answered. With a
+        // single unnamed group that is the first answer, as before; with four
+        // proofs across two products the partner can approve one and come back
+        // for the other without the order claiming to be finished.
+        const remaining = await prisma.proof.findMany({
+          where: { orderId: approvalToken.orderId },
+          select: { status: true, groupLabel: true },
+        })
+        const groups = new Map()
+        for (const p of remaining) {
+          const key = p.groupLabel ?? ''
+          if (!groups.has(key)) groups.set(key, [])
+          groups.get(key).push(p.status)
+        }
+        const settled = [...groups.values()].every(
+          statuses => statuses.some(st => st === 'approved' || st === 'revision_requested')
+        )
+        // A revision anywhere outranks an approval: the order is in revision
+        // until the redraw comes back, whatever else was approved.
+        const anyRevision = remaining.some(p => p.status === 'revision_requested')
+        const newDesignStatus = !settled
+          ? 'awaiting_review'
+          : anyRevision ? 'in_revision' : 'approved_by_customer'
 
         await prisma.order.update({
           where: { id: approvalToken.orderId },
@@ -594,7 +626,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { orderId, imageData, imageUrl, imageName } = body
+      const { orderId, imageData, imageUrl, imageName, groupLabel } = body
 
       if (!orderId) return res.status(400).json({ error: 'orderId is required' })
 
@@ -720,7 +752,12 @@ export default async function handler(req, res) {
 
       const fileName = uploadedFile?.originalFilename || imageName || null
       const proof = await prisma.proof.create({
-        data: { orderId, version, batch, imageUrl: publicUrl, thumbnailUrl, fileName, status: 'pending' }
+        data: {
+          orderId, version, batch, imageUrl: publicUrl, thumbnailUrl, fileName, status: 'pending',
+          // Trimmed to null so a stray space cannot create a second group that
+          // looks identical to the first and waits forever for its own approval.
+          groupLabel: typeof groupLabel === 'string' && groupLabel.trim() ? groupLabel.trim() : null,
+        }
       })
 
       const approvalToken = await ensureApprovalToken(orderId)

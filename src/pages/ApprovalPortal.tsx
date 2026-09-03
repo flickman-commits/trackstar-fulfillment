@@ -14,6 +14,9 @@ interface Proof {
   imageUrl: string
   thumbnailUrl: string | null
   fileName: string | null
+  /** What this proof is an option FOR. Null on custom/standard orders, where
+   *  every proof competes with every other. */
+  groupLabel: string | null
   status: 'pending' | 'approved' | 'revision_requested' | 'rejected'
   customerFeedback: string | null
   createdAt: string
@@ -190,7 +193,15 @@ export default function ApprovalPortal() {
       setFeedback('')
       setRevisingProofId(null)
       setRevisionOptionNum(optionIdx + 1)
-      setState('revision_submitted')
+      // Only finish the visit if there is nothing else to answer. On a partner
+      // order with designs for two products, asking for a tweak on one leaves
+      // the other still waiting - sending them to the thank-you screen would
+      // strand it.
+      const othersLeft = pendingProofs.some(
+        p => p.id !== targetProof.id && (p.groupLabel ?? '') !== (targetProof.groupLabel ?? '')
+      )
+      if (othersLeft) await fetchData()
+      else setState('revision_submitted')
     } catch {
       alert('Unable to submit. Please try again.')
     } finally {
@@ -452,6 +463,14 @@ export default function ApprovalPortal() {
 
   // ═══ READY — proof selection flow ═══
   const pendingProofs = proofs.filter(p => p.status === 'pending')
+  // How many distinct things they are choosing between. One unnamed group is
+  // the ordinary case and reads exactly as it always did.
+  const pendingGroups = [...new Set(pendingProofs.map(p => p.groupLabel ?? ''))]
+  /** Position of a proof within its own label, not within the whole list. */
+  const optionPosition = (proof: Proof) => {
+    const siblings = pendingProofs.filter(p => (p.groupLabel ?? '') === (proof.groupLabel ?? ''))
+    return { index: siblings.indexOf(proof) + 1, total: siblings.length }
+  }
   const pastProofs = proofs.filter(p => p.status !== 'pending')
   const hasPendingProofs = pendingProofs.length > 0
 
@@ -583,7 +602,12 @@ export default function ApprovalPortal() {
                   than a transaction: no count of what they bought, and an
                   explicit invitation to say what they want changed. */}
               {isPartner
-                ? (pendingProofs.length === 1
+                ? (pendingGroups.length > 1
+                    // Several products in one send. Saying "choose your
+                    // favorite" here would read as one pick when we need one
+                    // per product.
+                    ? `We've got designs for ${pendingGroups.length} pieces below: ${pendingGroups.map(g => g || 'your design').join(' and ')}. Choose your favorite for each. Feel free to leave comments on how you'd like things revised.`
+                    : pendingProofs.length === 1
                     ? "Take a look and let us know what you think. Feel free to leave comments on how you'd like things revised."
                     : "Choose your favorite below. Feel free to leave comments on how you'd like things revised.")
                 : (pendingProofs.length === 1
@@ -711,6 +735,7 @@ export default function ApprovalPortal() {
                     >
                       {pendingProofs.map((proof, idx) => {
                         const optionNum = idx + 1
+                        const pos = optionPosition(proof)
                         const isRevising = revisingProofId === proof.id
 
                         return (
@@ -726,14 +751,20 @@ export default function ApprovalPortal() {
                               {/* Option header — compact */}
                               <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
                                 <div className="flex items-center gap-2">
+                                  {/* Numbered within its own label. "Option 1 of
+                                      2" has to mean 1 of the 2 marathon designs,
+                                      not 1 of the 4 things on the page, or the
+                                      count tells them to make one choice when
+                                      they are making two. */}
                                   <span
                                     className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold"
                                     style={{ backgroundColor: '#E0E0E0', color: '#666666' }}
                                   >
-                                    {pendingProofs.length === 1 ? '✓' : optionNum}
+                                    {pos.total === 1 ? '✓' : pos.index}
                                   </span>
                                   <span style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 500 }}>
-                                    {pendingProofs.length === 1 ? 'Your Design' : `Option ${optionNum} of ${pendingProofs.length}`}
+                                    {proof.groupLabel ? `${proof.groupLabel} — ` : ''}
+                                    {pos.total === 1 ? 'Your Design' : `Option ${pos.index} of ${pos.total}`}
                                   </span>
                                 </div>
                               </div>
