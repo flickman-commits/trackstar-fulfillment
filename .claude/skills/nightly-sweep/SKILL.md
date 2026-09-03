@@ -65,8 +65,8 @@ Hard caps per night:
 
 | Budget | Limit |
 |---|---|
+| **Race dates researched (MANDATORY)** | **10** |
 | Fixture captures | **10** |
-| Race dates researched | **5** |
 | Pull requests opened | **3** |
 | Total third-party requests | **~60** |
 | Wall clock | **~40 minutes** |
@@ -78,15 +78,19 @@ Stop early and report if any of these happen:
 - a gate fails twice on the same race — it is not a config problem, flag it
 - you are unsure and there is nobody to ask
 
-Work in this order, and stop when a budget runs out:
+**You must complete these before anything else:**
 
-1. **Tier 0 that unblocks a live order.** Research that ran over customer data,
+1. **10 race dates researched and verified.** Find races missing verified dates, research the real date against at least two independent sources, pin them if you can prove it. Mandatory every night—this is your minimum floor.
+2. **Tier 0 that unblocks a live order.** Research that ran over customer data,
    an expired approval link on an open order, a race that has run but whose
    orders still say otherwise. These affect someone who has paid us.
-2. **Anything in `delta.new`.** New means something changed today, which is the
+
+**Then fill remaining quota with:**
+
+3. **Anything in `delta.new`.** New means something changed today, which is the
    only part of the report that is actually news.
-3. **High severity before medium.**
-4. **Backlog, a slice at a time.** Prefer races with real order volume over
+4. **High severity before medium.**
+5. **Backlog, a slice at a time.** Prefer races with real order volume over
    ones nobody has bought.
 
 Leaving 150 findings untouched is the correct outcome of a night's work. The
