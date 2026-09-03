@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
 import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3 } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
+import AppSidebar from '@/components/AppSidebar'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import StatsPanel from '@/components/StatsPanel'
@@ -837,6 +837,9 @@ export default function Dashboard() {
   const bulkStopRef = useRef(false)
   const [bulkSummary, setBulkSummary] = useState<BulkSummary | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  // Opened from the tool rail. One at a time: two floating panels stacked in
+  // the same corner just obscure each other.
+  const [railPanel, setRailPanel] = useState<null | 'discounts' | 'pace'>(null)
   const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>('pricing')
   const [settingsQuery, setSettingsQuery] = useState('')
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
@@ -2459,11 +2462,20 @@ Thank you!`
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
-      {/* Desktop-only helper tiles (pace converter + weather), Custom view only */}
-      {activeView === 'custom' && <CustomTools />}
-      {/* Desktop-only discount-code generator, Standard view only */}
-      {activeView === 'standard' && <StandardTools />}
+    // md:pl-[88px] clears the fixed tool rail. The rail is desktop-only, so the
+    // padding is too.
+    <div className="h-screen overflow-hidden bg-[#f3f3f3] flex flex-col md:pl-[92px]">
+      <AppSidebar
+        isAdmin={isAdmin}
+        activeId={showSettings ? 'settings' : railPanel === 'discounts' ? 'discounts' : railPanel === 'pace' ? 'pace' : 'fulfillment'}
+        onOpenDiscounts={() => setRailPanel(p => (p === 'discounts' ? null : 'discounts'))}
+        onOpenPaceConverter={() => setRailPanel(p => (p === 'pace' ? null : 'pace'))}
+        onOpenSettings={() => { setShowSettings(true); fetchCustomersServedCount() }}
+      />
+      {/* Both tools are available from every view now, not just the one they
+          happened to be pinned to before. */}
+      <CustomTools open={railPanel === 'pace'} onClose={() => setRailPanel(null)} />
+      <StandardTools open={railPanel === 'discounts'} onClose={() => setRailPanel(null)} />
       <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 w-full flex flex-col h-full">
         {/* Header - Compact bar on mobile, full greeting on desktop */}
         <div className="pt-4 md:pt-8 lg:pt-10 pb-3 md:pb-6 flex items-center md:items-end justify-between gap-3 md:gap-6 flex-shrink-0">
@@ -2513,17 +2525,6 @@ Thank you!`
                   <span className="md:hidden">{isImporting ? 'Importing…' : 'Import'}</span>
                   <span className="hidden md:inline">{isImporting ? 'Importing…' : 'Import New Orders'}</span>
                 </button>
-              )}
-            </div>
-            <div className="hidden md:flex items-end">
-              {isAdmin && (
-              <Link
-                to="/creators"
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
-              >
-                <Users className="w-4 h-4" />
-                Creators
-              </Link>
               )}
             </div>
           </div>

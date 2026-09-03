@@ -167,39 +167,36 @@ function CreatedView({ created, onReset }: { created: CreatedDiscount; onReset: 
   )
 }
 
-export default function StandardTools() {
-  const [open, setOpen] = useState(false)
+/**
+ * The discount panel, opened from the tool rail.
+ *
+ * This used to be a floating pill in the bottom-left corner, and only on the
+ * standard-orders view - on custom or partners it was simply not there. The
+ * rail owns the trigger now, so the panel is reachable from anywhere and this
+ * component is just the popup.
+ */
+export default function StandardTools({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [created, setCreated] = useState<CreatedDiscount | null>(null)
+  if (!open) return null
 
   return (
-    <div className="hidden md:flex fixed bottom-4 left-4 z-30 flex-col items-start gap-2">
-      {open && (
-        <div className="w-72 bg-white border border-border-gray rounded-xl shadow-lg p-4 mb-1">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-1.5">
-              <Ticket className="w-3.5 h-3.5 text-off-black/60" />
-              <p className="text-xs font-semibold text-off-black/70 uppercase tracking-wider">Create Discount</p>
-            </div>
-            <button onClick={() => setOpen(false)} className="text-off-black/30 hover:text-off-black/60">
-              <X className="w-4 h-4" />
-            </button>
+    // Anchored beside the rail rather than over it, so the tile you clicked
+    // stays visible and clickable.
+    <div className="hidden md:block fixed bottom-4 left-[100px] z-40">
+      <div className="w-72 bg-white border border-border-gray rounded-xl shadow-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5">
+            <Ticket className="w-3.5 h-3.5 text-off-black/60" />
+            <p className="text-xs font-semibold text-off-black/70 uppercase tracking-wider">Create Discount</p>
           </div>
-          {created
-            ? <CreatedView created={created} onReset={() => setCreated(null)} />
-            : <DiscountForm onCreated={setCreated} />}
+          <button onClick={onClose} className="text-off-black/30 hover:text-off-black/60">
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      )}
-
-      <button
-        onClick={() => setOpen(v => !v)}
-        className={`flex items-center gap-2 px-3 py-2 rounded-full shadow-md border text-sm font-medium transition-colors ${
-          open ? 'bg-off-black text-white border-off-black' : 'bg-white text-off-black border-border-gray hover:bg-gray-50'
-        }`}
-        title="Create a one-time discount code"
-      >
-        <Ticket className="w-4 h-4" />
-        Create Discount
-      </button>
+        {created
+          ? <CreatedView created={created} onReset={() => setCreated(null)} />
+          : <DiscountForm onCreated={setCreated} />}
+      </div>
     </div>
   )
 }

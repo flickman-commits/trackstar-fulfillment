@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Calculator, CloudSun, X, Copy, Check } from 'lucide-react'
+import { Calculator, X, Copy, Check } from 'lucide-react'
 
 // Two desktop-only helper tiles for the custom-order workflow, pinned to the
 // bottom-left of the Custom view:
@@ -143,53 +143,29 @@ function PaceConverter() {
   )
 }
 
-export default function CustomTools() {
-  const [openPace, setOpenPace] = useState(false)
+/**
+ * The pace converter, opened from the tool rail.
+ *
+ * Weather Lookup used to sit next to this as a second pill; it is a plain link
+ * to weatherspark, so it lives directly in the rail now and does not need a
+ * panel. Both used to appear only on the custom-orders view.
+ */
+export default function CustomTools({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null
 
   return (
-    // Desktop only — hidden on mobile. Fixed bottom-left, below modals (z-30).
-    <div className="hidden md:flex fixed bottom-4 left-4 z-30 flex-col items-start gap-2">
-      {/* Pace Converter popup */}
-      {openPace && (
-        <div className="w-64 bg-white border border-border-gray rounded-xl shadow-lg p-4 mb-1">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-1.5">
-              <Calculator className="w-3.5 h-3.5 text-off-black/60" />
-              <p className="text-xs font-semibold text-off-black/70 uppercase tracking-wider">Pace Converter</p>
-            </div>
-            <button onClick={() => setOpenPace(false)} className="text-off-black/30 hover:text-off-black/60">
-              <X className="w-4 h-4" />
-            </button>
+    <div className="hidden md:block fixed bottom-4 left-[100px] z-40">
+      <div className="w-64 bg-white border border-border-gray rounded-xl shadow-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5">
+            <Calculator className="w-3.5 h-3.5 text-off-black/60" />
+            <p className="text-xs font-semibold text-off-black/70 uppercase tracking-wider">Pace Converter</p>
           </div>
-          <PaceConverter />
+          <button onClick={onClose} className="text-off-black/30 hover:text-off-black/60">
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      )}
-
-      {/* Tiles */}
-      <div className="flex flex-col gap-2">
-        <button
-          onClick={() => setOpenPace(v => !v)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-full shadow-md border text-sm font-medium transition-colors ${
-            openPace
-              ? 'bg-off-black text-white border-off-black'
-              : 'bg-white text-off-black border-border-gray hover:bg-gray-50'
-          }`}
-          title="Convert a finish time to pace"
-        >
-          <Calculator className="w-4 h-4" />
-          Pace Converter
-        </button>
-
-        <a
-          href="https://weatherspark.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 px-3 py-2 rounded-full shadow-md border border-border-gray bg-white text-off-black text-sm font-medium hover:bg-gray-50 transition-colors"
-          title="Look up historical race-day weather on WeatherSpark"
-        >
-          <CloudSun className="w-4 h-4" />
-          Weather Lookup
-        </a>
+        <PaceConverter />
       </div>
     </div>
   )
