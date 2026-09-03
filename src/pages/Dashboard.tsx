@@ -665,6 +665,37 @@ function PendingField({ label }: { label: string }) {
   )
 }
 
+/**
+ * A missing race date, presented as work rather than as waiting.
+ *
+ * Race dates used to be computed from a recurrence rule, so a blank one really
+ * did mean "research has not run yet" and "Pending research" was true. The
+ * rules were wrong often enough to matter while always looking plausible - CIM
+ * came out a week early in two separate years, Berlin 2025 a week late - so
+ * they were deleted, and a year nobody has verified now shows nothing at all.
+ *
+ * Only 2 of our 19 timing platforms hand back a real date, so for almost every
+ * race this blank is never going to fill itself. Saying "Pending research"
+ * would send Eli off to wait for something that is not coming. It is one
+ * field, he can read it off the results page, and the button puts him in the
+ * editor that already exists.
+ */
+function MissingDateField({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div className="flex justify-between items-center">
+      <span className="text-body-sm text-off-black/60">Date</span>
+      <button
+        onClick={onAdd}
+        className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded hover:bg-warning-amber/20 transition-colors"
+        title="No verified date for this race year. Enter it and the weather fills in from it."
+      >
+        <Pencil className="w-3 h-3" />
+        Add date
+      </button>
+    </div>
+  )
+}
+
 // Not available field (no scraper for this race)
 function NotAvailableField({ label }: { label: string }) {
   return (
@@ -5706,8 +5737,10 @@ Thank you!`
                             </div>
                           ) : selectedOrder.raceDate ? (
                             <CopyableField label="Date" value={selectedOrder.raceDate} />
-                          ) : selectedOrder.hasScraperAvailable ? (
-                            <PendingField label="Date" />
+                          ) : selectedOrder.raceId ? (
+                            // Whether or not a scraper exists, nothing is going
+                            // to supply this date but a person. Ask for it.
+                            <MissingDateField onAdd={() => startEditingWeather(selectedOrder)} />
                           ) : (
                             <NotAvailableField label="Date" />
                           )}
