@@ -47,7 +47,7 @@ findings around in your context.
 Every finding carries `kind`, `subject`, `severity`, `detail`, and an `action`
 of `tier0_auto`, `tier1_fixable`, or `tier2_flag`. `delta.new` is what appeared
 tonight — that is where your attention goes. The standing backlog is a number,
-not a to-do list; do not try to clear 123 untested race-years in one night.
+not a to-do list; do not try to clear 123 untested race-years in one night. Pace yourself—that's roughly two weeks of nightly work.
 
 If `healthy` is false, some checks did not run. Say so at the top of the Slack
 report. **A partial sweep is not a clean sweep**, and it must never be reported
@@ -57,8 +57,8 @@ as one.
 
 **A night where you fix nothing is a failed night, not a quiet one.** The goal
 is to clear the standing backlog in about a week, not to nibble at it forever.
-Nobody is going to work through 120 untested race-years and 43 unverified race
-dates by hand. Clearing them is the job.
+Nobody is going to work through ~120 untested race-years and ~43 unverified race
+dates by hand. That's why you're here—clearing them is the job.
 
 ### Be realistic about the two things we actually guard against
 
@@ -91,7 +91,7 @@ unverified dates in four or five. That is the intent.
 
 1. **Tier 0 that unblocks a live order.** Someone has paid us. Always first.
 2. **Anything in `newTonight`.** New means something changed today.
-3. **Untested race-years** - `capture_fixture` then `probe_scrapers`. Spread
+3. **Untested race-years** - Capture a real finisher's results, then test the scraper against those results. Spread
    across platforms. This is the biggest pile and the easiest to clear.
 4. **Missing year configs** (`no_year`) - `discover_event_ids` where the
    platform has a listing we can query; flag the rest for a human.
@@ -121,26 +121,26 @@ database write.
 
 | Finding | Do this |
 |---|---|
-| `no_probe` (a few, not all) | `capture_fixture`, then **`probe_scrapers`** on that race |
+| `untested` (a few, not all) | Find a real finisher's results, then **test the scraper** against that race |
 | `selling_without_scraper` appearing new | `sync_catalog` first, to confirm it is real and not a stale snapshot |
 
-**`capture_fixture` alone clears nothing.** It stores a known finisher; only
-`probe_scrapers` turns that into a live-or-drifted verdict. A run that captured
-fixtures and reported them as fixed was wrong, and the second sweep caught it.
+**Capturing a real finisher's results alone clears nothing.** It stores a known finisher; only
+testing the scraper turns that into a working-or-broken verdict. A run that captured
+test cases and reported them as fixed was wrong, and the second sweep caught it.
 
 Findings that need an endpoint you do not have - weather, re-research,
 approval links - are Tier 2 for you. Flag them.
 
-Cap fixture captures at **10 per night**. These hit third-party timing sites,
+Cap test cases captured at **10 per night**. These hit third-party timing sites,
 and hammering them gets us blocked — Sydney's firewall escalated against us
-inside one afternoon of over-probing.
+inside one afternoon of repeated testing.
 
-**One clean probe is not proof.** Eugene captured three fixtures, probed clean,
+**One passing test is not proof.** Eugene captured three test cases, tested clean,
 and fifteen minutes later all three came back "found here before and is not
 found now". The site is intermittent, and a single pass caught it on a good
-minute. So a race that flips between live and drifted across probes is FLAKY,
+minute. So a race that flips between working and broken across tests is UNRELIABLE,
 which is a Tier 2 flag, not a fix — report it as an unreliable source rather
-than claiming it works. Do not re-probe repeatedly hoping for a clean run;
+than claiming it works. Do not test repeatedly hoping for a passing run;
 that is both dishonest and how we get rate-limited.
 
 ## Step 3: Tier 1 — ship config changes, but only what you can PROVE
@@ -155,9 +155,9 @@ lint only proves the file is shaped correctly.
    or read it off the platform's own listing. **Never extrapolate an id from an
    adjacent year.** Ids are not sequential and the offsets are not stable.
 2. Open the event and confirm the title or date is the year you think it is.
-3. Capture a fixture from a **real finisher** for that race-year.
+3. Capture a real finisher's results from that race-year.
 4. `npm run lint:scrapers` and `npm run test:scrapers` must both pass, and the
-   new fixture must show **PASS**, not BLOCKED. A blocked fixture proves
+   test case must show **PASS**, not BLOCKED. A blocked test case proves
    nothing — the site refused us.
 
 That last step is the gate: the scraper returned the correct chip time *and*
@@ -182,7 +182,7 @@ Then sanity-check before you write it down:
 - it sits in the month the other editions sit in - a three-week jump is possible
   but it means the race genuinely moved, so say so in the PR
 
-**Dates go in a pull request and are never auto-merged.** Event ids and fixtures
+**Dates go in a pull request and are never auto-merged.** Event ids and test cases
 can be machine-checked - `test:scrapers` proves them against a real finisher -
 but nothing in the gates can tell whether the first of November is really race
 day. Auto-merging a date means merging on your own say-so. Put the two sources
@@ -205,7 +205,7 @@ only — never a merged config claiming to work.
 
 ## Step 4: Tier 2 — flag, do not touch
 
-- `scraper_drifted` — the site answers but returns the wrong runner. Needs
+- **Scraper broken** — the site answers but returns the wrong runner. Needs
   diagnosis, and diagnosis is not a nightly job. The Army Ten-Miler bug was a
   split distance in feet being read as metres; that took real digging.
 - `selling_without_scraper` on a **new timing platform** — writing a scraper is
@@ -245,8 +245,8 @@ a separate notification. One more channel is how a report stops being read.
 `notes` is your own narrative, kept separate from the computed sections so a
 claim can never be mistaken for a verified fact. Put in it:
 
-- what you shipped, with the PR link and **the evidence**: which runner, which
-  finish time and pace proved the config
+- what you shipped, with the PR link and **the proof**: which runner, which
+  finish time proved the scraper works
 - what you chose not to do, and why
 - anything you were unsure about
 
