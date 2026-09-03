@@ -342,7 +342,7 @@ export default function Monopoly() {
               four words, and the paragraph under it was restating the title
               at greater length. Stripped back, the whole plan reads in one
               glance instead of one screen. */}
-          <div className="grid gap-3 grid-cols-3 lg:grid-cols-6">
+          <div className="grid gap-3 grid-cols-3 lg:grid-cols-5">
             {[...SALES_PLAN, ...LAUNCH_PLAN].map((item) => (
               <div
                 key={item.title}

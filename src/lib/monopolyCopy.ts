@@ -335,16 +335,14 @@ export const COMMIT_STEPS: CommitStep[] = [
  */
 export const SALES_PLAN: SalesPlanItem[] = [
   {
-    title: '22 race partners promoting at once',
-    body: 'Every race on the board has a reason to tell their runners. That is 22 lists behind one product, in one gifting window.',
+    title: "Race partners' expos and email lists",
+    body: 'Every race on the board has a reason to tell their runners. That is 22 email lists and 22 expo floors behind one product, in one gifting window.',
   },
   {
-    title: 'Gifted to media',
-    body: 'Units to running and lifestyle outlets early enough to make their holiday coverage.',
-  },
-  {
-    title: 'Seeded to running influencers',
-    body: 'Units in the hands of the creators runners already follow, ahead of launch.',
+    // Media and influencers were two tiles describing one move: put units in
+    // the hands of people who cover running, early.
+    title: 'Gifted to media and influencers',
+    body: 'Units with running and lifestyle outlets and with the creators runners already follow, early enough to make holiday coverage.',
   },
   {
     title: '2027 holiday gift guides',
@@ -523,9 +521,12 @@ export const UNIT_ALLOCATION = [
     note: 'Running media and creators, in hand before launch',
   },
   {
-    label: 'Up for grabs',
+    // "Up for grabs" was accurate and told a race director nothing. Naming the
+    // channels here is the answer to the question the row actually raises,
+    // which is who sells the other 1,844.
+    label: 'Trackstar audience (email + social), races promoting the product, paid ads + more',
     units: 1844,
-    note: 'Split between races selling through their own links, wholesale orders, and Trackstar\u2019s own audience. First come, first served. Wholesale units are available on request at $40 per unit, 25 unit minimum.',
+    note: 'First come, first served across every race \u2014 nothing is reserved, and once the first run sells out it is sold out. Wholesale units are available on request at $40 per unit, with a 25 unit minimum.',
   },
 ]
 
@@ -536,8 +537,8 @@ export const UNIT_ALLOCATION = [
  */
 export const LAUNCH_PLAN = [
   {
-    title: 'Simultaneous social media launch',
-    body: "To announce the launch of the product, we'll have 22 races post about it at the exact same time, driving intrigue and awareness.",
+    title: 'Coordinated social media launch',
+    body: 'All 22 races post about it at the same moment, so the announcement lands as one event rather than twenty-two.',
   },
   {
     title: 'Product photo shoot',
