@@ -404,7 +404,7 @@ export default function CreatorsHome() {
                 </h2>
                 <button
                   onClick={() => setShowInvite(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-off-black text-white text-xs font-medium rounded hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-dark-fill text-white text-xs font-medium rounded hover:opacity-90 transition-opacity"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   New Creator Invite
@@ -666,7 +666,7 @@ function InviteModal({ briefs, onClose, onCreated }: {
               </div>
               <button
                 onClick={onClose}
-                className="w-full px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
+                className="w-full px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
               >
                 Done
               </button>
@@ -747,7 +747,7 @@ function InviteModal({ briefs, onClose, onCreated }: {
                 <button
                   onClick={handleCreate}
                   disabled={isCreating}
-                  className="px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
+                  className="px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
                 >
                   {isCreating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {isCreating ? 'Creating…' : 'Generate Invite Link'}
@@ -1125,7 +1125,7 @@ function CreatorDrawer({
               <button
                 onClick={handleSave}
                 disabled={!isDirty || isSaving || isDeleting}
-                className="px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
+                className="px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
               >
                 {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {isSaving ? 'Saving…' : 'Save changes'}

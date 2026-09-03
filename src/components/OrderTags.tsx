@@ -280,7 +280,7 @@ export function HoverTip({
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none invisible absolute top-full z-50 mt-1 w-max max-w-[15rem] whitespace-normal rounded-md bg-off-black px-2.5 py-2 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-[opacity,visibility] duration-150 group-hover:visible group-hover:opacity-100 group-hover:delay-700 ${
+        className={`pointer-events-none invisible absolute top-full z-50 mt-1 w-max max-w-[15rem] whitespace-normal rounded-md bg-dark-fill px-2.5 py-2 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-[opacity,visibility] duration-150 group-hover:visible group-hover:opacity-100 group-hover:delay-700 ${
           align === 'center' ? 'left-1/2 -translate-x-1/2' : 'left-0'
         }`}
       >

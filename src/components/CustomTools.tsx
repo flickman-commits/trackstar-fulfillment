@@ -81,7 +81,7 @@ function PaceConverter() {
             onClick={() => setDistance(key)}
             className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
               distance === key
-                ? 'bg-off-black text-white'
+                ? 'bg-dark-fill text-white'
                 : 'bg-gray-100 text-off-black/60 hover:bg-gray-200'
             }`}
           >

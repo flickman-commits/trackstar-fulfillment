@@ -49,7 +49,7 @@ function Tile({ item, active }: { item: Item; active?: boolean }) {
       <span
         className={`flex items-center justify-center w-11 h-11 rounded-xl transition-all ${
           active
-            ? 'bg-white text-[#242424] shadow-[0_1px_3px_rgba(0,0,0,0.25)]'
+            ? 'bg-white text-dark-fill shadow-[0_1px_3px_rgba(0,0,0,0.25)]'
             : 'text-white/55 group-hover:bg-white/10 group-hover:text-white'
         }`}
       >
@@ -102,7 +102,7 @@ export default function AppSidebar({
   ]
 
   return (
-    <aside className="hidden md:flex fixed left-3 top-3 bottom-3 w-[78px] z-30 flex-col rounded-[22px] bg-[#242424] shadow-[0_2px_10px_rgba(0,0,0,0.10)]">
+    <aside className="hidden md:flex fixed left-3 top-3 bottom-3 w-[78px] z-30 flex-col rounded-[22px] bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.10)]">
       <div className="flex-1 flex flex-col gap-0.5 px-1.5 pt-2.5 overflow-y-auto">
         {items.map(item => (
           <Tile key={item.id} item={item} active={activeId === item.id} />

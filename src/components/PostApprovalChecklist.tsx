@@ -189,7 +189,7 @@ export default function PostApprovalChecklist({
       <button
         onClick={notifyEliAndSendToProduction}
         disabled={isSending}
-        className="w-full px-4 py-3 text-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
+        className="w-full px-4 py-3 text-sm font-medium text-white bg-dark-fill hover:opacity-90 rounded-md transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
       >
         {isSending ? (
           <><Loader2 className="w-4 h-4 animate-spin" /> Notifying Eli...</>

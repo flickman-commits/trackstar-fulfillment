@@ -518,7 +518,7 @@ function PartnerInfoFields({
         <button
           onClick={save}
           disabled={saving}
-          className="px-3 py-1 text-xs font-medium bg-off-black text-white rounded hover:opacity-90 transition-opacity disabled:opacity-40"
+          className="px-3 py-1 text-xs font-medium bg-dark-fill text-white rounded hover:opacity-90 transition-opacity disabled:opacity-40"
         >
           {saving ? 'Saving...' : 'Save'}
         </button>
@@ -2501,7 +2501,7 @@ Thank you!`
               {activeView === 'race_partner' ? (
                 <button
                   onClick={() => setShowNewRacePartner(true)}
-                  className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap"
+                  className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap"
                 >
                   <ImagePlus className="w-4 h-4" />
                   <span className="md:hidden">New Partner</span>
@@ -2511,7 +2511,7 @@ Thank you!`
                 <button
                   onClick={importOrders}
                   disabled={isImporting}
-                  className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isImporting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -2600,7 +2600,7 @@ Thank you!`
                     onChange={(e) => setRaceFilter(e.target.value)}
                     className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2.5 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors cursor-pointer ${
                       raceFilter
-                        ? 'bg-off-black text-white border-off-black'
+                        ? 'bg-dark-fill text-white border-dark-fill'
                         : 'bg-subtle-gray border-border-gray text-off-black'
                     }`}
                   >
@@ -3364,7 +3364,7 @@ Thank you!`
                       <button
                         key={item.id}
                         onClick={() => setSettingsPanel(item.id)}
-                        className={`px-2.5 py-1 text-xs rounded-md border ${settingsPanel === item.id ? 'bg-off-black text-white border-off-black' : 'bg-white text-off-black/60 border-border-gray'}`}
+                        className={`px-2.5 py-1 text-xs rounded-md border ${settingsPanel === item.id ? 'bg-dark-fill text-white border-dark-fill' : 'bg-white text-off-black/60 border-border-gray'}`}
                       >
                         {item.label}
                       </button>
@@ -4178,7 +4178,7 @@ Thank you!`
                               {mSteps.map((step, i) => (
                                 <div key={step.label} className="flex items-center gap-1 flex-1">
                                   <div className={`flex items-center gap-1.5 ${i < mSteps.length - 1 ? 'flex-1' : ''}`}>
-                                    <div className={`w-2 h-2 rounded-full shrink-0 ${step.active ? 'bg-off-black' : 'bg-off-black/15'}`} />
+                                    <div className={`w-2 h-2 rounded-full shrink-0 ${step.active ? 'bg-dark-fill' : 'bg-off-black/15'}`} />
                                     <span className={`text-[10px] font-medium whitespace-nowrap ${step.active ? 'text-off-black' : 'text-off-black/30'}`}>
                                       {step.label}
                                     </span>
@@ -4413,7 +4413,7 @@ Thank you!`
                               <button
                                 onClick={submitComment}
                                 disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
-                                className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                                className="px-4 py-1.5 text-xs bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
                               >
                                 {isSubmittingComment ? 'Adding...' : 'Add'}
                               </button>
@@ -4494,7 +4494,7 @@ Thank you!`
                         {progressSteps.map((step, i) => (
                           <div key={step.label} className="flex items-center gap-1 flex-1">
                             <div className={`flex items-center gap-1.5 ${i < progressSteps.length - 1 ? 'flex-1' : ''}`}>
-                              <div className={`w-2 h-2 rounded-full shrink-0 ${step.active ? 'bg-off-black' : 'bg-off-black/15'}`} />
+                              <div className={`w-2 h-2 rounded-full shrink-0 ${step.active ? 'bg-dark-fill' : 'bg-off-black/15'}`} />
                               <span className={`text-[10px] font-medium whitespace-nowrap ${step.active ? 'text-off-black' : 'text-off-black/30'}`}>
                                 {step.label}
                               </span>
@@ -4745,7 +4745,7 @@ Thank you!`
                               <button
                                 onClick={submitComment}
                                 disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
-                                className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                                className="px-4 py-1.5 text-xs bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
                               >
                                 {isSubmittingComment ? 'Adding...' : 'Add'}
                               </button>
@@ -5071,7 +5071,7 @@ Thank you!`
                               type="button"
                               onClick={() => downloadPersonalizationPhoto(selectedOrder)}
                               disabled={!photoUrl}
-                              className="mt-1.5 w-20 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded bg-off-black text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+                              className="mt-1.5 w-20 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded bg-dark-fill text-white hover:opacity-90 transition-opacity disabled:opacity-40"
                             >
                               <Download className="w-3 h-3" />
                               Download
@@ -5441,7 +5441,7 @@ Thank you!`
                           <button
                             onClick={submitComment}
                             disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
-                            className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                            className="px-4 py-1.5 text-xs bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
                           >
                             {isSubmittingComment ? 'Adding...' : 'Add'}
                           </button>
@@ -5728,9 +5728,14 @@ Thank you!`
                           ) : selectedOrder.raceDate ? (
                             <CopyableField label="Date" value={selectedOrder.raceDate} />
                           ) : selectedOrder.raceId ? (
-                            // Whether or not a scraper exists, nothing is going
-                            // to supply this date but a person. Ask for it.
+                            // The race row exists and has no date, which now
+                            // means nobody has verified one - computed dates are
+                            // gone, so waiting will not produce it. Ask.
                             <MissingDateField onAdd={() => startEditingWeather(selectedOrder)} />
+                          ) : selectedOrder.hasScraperAvailable ? (
+                            // No race row yet. Research creates one and fills in
+                            // whatever the config has, so this really is pending.
+                            <PendingField label="Date" />
                           ) : (
                             <NotAvailableField label="Date" />
                           )}
@@ -5867,7 +5872,7 @@ Thank you!`
                         <button
                           onClick={() => calculateWeather(selectedOrder)}
                           disabled={isCalculatingWeather || !weatherCalcCity.trim() || !weatherCalcDate}
-                          className="w-full px-3 py-2.5 text-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-40 flex items-center justify-center gap-1.5"
+                          className="w-full px-3 py-2.5 text-sm font-medium text-white bg-dark-fill hover:opacity-90 rounded-md transition-opacity disabled:opacity-40 flex items-center justify-center gap-1.5"
                         >
                           {isCalculatingWeather ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating…</> : 'Calculate & save'}
                         </button>
@@ -5934,7 +5939,7 @@ Thank you!`
                         <button
                           onClick={submitComment}
                           disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
-                          className="px-4 py-1.5 text-xs bg-off-black text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                          className="px-4 py-1.5 text-xs bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
                         >
                           {isSubmittingComment ? 'Adding...' : 'Add'}
                         </button>
@@ -6013,7 +6018,7 @@ Thank you!`
                      !isEditing && (
                       <button
                         onClick={() => markAsCompleted(selectedOrder.orderNumber)}
-                        className="flex-1 px-5 py-3 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium"
+                        className="flex-1 px-5 py-3 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium"
                       >
                         Mark as Completed
                       </button>
@@ -6030,7 +6035,7 @@ Thank you!`
                     )}
                     {selectedOrder.status === 'flagged' && !isEditing && (
                       <>
-                        <button className="flex-1 px-5 py-3 bg-off-black text-white rounded-md hover:opacity-90 transition-opacity font-medium">
+                        <button className="flex-1 px-5 py-3 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium">
                           Resolve Flag
                         </button>
                         <button
@@ -6126,7 +6131,7 @@ Thank you!`
                   <button
                     onClick={createRacePartner}
                     disabled={isCreatingPartner || !newPartnerValues.partnerName.trim()}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-off-black text-white text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                   >
                     {isCreatingPartner && <Loader2 className="w-4 h-4 animate-spin" />}
                     {isCreatingPartner ? 'Creating…' : 'Create'}

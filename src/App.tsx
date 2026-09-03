@@ -40,7 +40,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-off-black flex items-center justify-center px-4">
+        <div className="min-h-screen bg-dark-fill flex items-center justify-center px-4">
           <div className="text-center">
             <h1 className="text-2xl font-semibold text-white mb-2">Something went wrong</h1>
             <p className="text-white/60 text-body-sm mb-6">An unexpected error occurred.</p>
@@ -140,7 +140,7 @@ export default function App() {
           </Routes>
           <Toaster
             position="bottom-center"
-            toastOptions={{ className: '!bg-off-black !text-white !rounded-md' }}
+            toastOptions={{ className: '!bg-dark-fill !text-white !rounded-md' }}
           />
         </BrowserRouter>
       </ErrorBoundary>
@@ -182,7 +182,7 @@ export default function App() {
         <Toaster
           position="bottom-center"
           toastOptions={{
-            className: "!bg-off-black !text-white !rounded-md"
+            className: "!bg-dark-fill !text-white !rounded-md"
           }}
         />
       </BrowserRouter>

@@ -68,7 +68,7 @@ function DiscountForm({ onCreated }: { onCreated: (d: CreatedDiscount) => void }
             key={key}
             onClick={() => setValueType(key)}
             className={`flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              valueType === key ? 'bg-off-black text-white' : 'bg-gray-100 text-off-black/60 hover:bg-gray-200'
+              valueType === key ? 'bg-dark-fill text-white' : 'bg-gray-100 text-off-black/60 hover:bg-gray-200'
             }`}
           >
             {label}
@@ -128,7 +128,7 @@ function DiscountForm({ onCreated }: { onCreated: (d: CreatedDiscount) => void }
       <button
         onClick={create}
         disabled={!valid || creating}
-        className="w-full px-3 py-2.5 text-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-40 flex items-center justify-center gap-1.5"
+        className="w-full px-3 py-2.5 text-sm font-medium text-white bg-dark-fill hover:opacity-90 rounded-md transition-opacity disabled:opacity-40 flex items-center justify-center gap-1.5"
       >
         {creating ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : 'Create one-time code'}
       </button>

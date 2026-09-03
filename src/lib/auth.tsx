@@ -103,7 +103,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
           </p>
           <a
             href="/"
-            className="inline-block mt-4 px-4 py-2 text-body-sm font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity"
+            className="inline-block mt-4 px-4 py-2 text-body-sm font-medium text-white bg-dark-fill hover:opacity-90 rounded-md transition-opacity"
           >
             Back to fulfillment
           </a>
@@ -119,7 +119,7 @@ const field =
   'w-full px-4 py-3 text-body-sm border border-border-gray rounded-md bg-white ' +
   'focus:outline-none focus:ring-2 focus:ring-off-black/20 transition-colors'
 const submit =
-  'w-full mt-4 px-4 py-3 text-body-sm font-medium text-white bg-off-black ' +
+  'w-full mt-4 px-4 py-3 text-body-sm font-medium text-white bg-dark-fill ' +
   'hover:opacity-90 rounded-md transition-opacity disabled:opacity-50'
 
 /**

@@ -299,7 +299,7 @@ function OnboardingWizard({ data, token, onDone }: {
               <button
                 onClick={() => setStep((s) => (s + 1) as Step)}
                 disabled={!canProceed()}
-                className="inline-flex items-center gap-1 px-5 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 transition-opacity disabled:opacity-40"
+                className="inline-flex items-center gap-1 px-5 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 transition-opacity disabled:opacity-40"
               >
                 Next <ChevronRight className="w-4 h-4" />
               </button>
@@ -307,7 +307,7 @@ function OnboardingWizard({ data, token, onDone }: {
               <button
                 onClick={handleSubmit}
                 disabled={!canProceed() || isSubmitting}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 transition-opacity disabled:opacity-40"
+                className="inline-flex items-center gap-2 px-5 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 transition-opacity disabled:opacity-40"
               >
                 {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {isSubmitting ? 'Submitting…' : 'Agree + Submit'}
@@ -388,7 +388,7 @@ function StepContentAgreement({ briefs: _briefs, agreed, setAgreed }: {
             className="flex items-center justify-between gap-3 px-4 py-3 bg-subtle-gray border border-border-gray rounded-md"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <span className="shrink-0 w-6 h-6 rounded-full bg-off-black text-white text-xs font-semibold inline-flex items-center justify-center">
+              <span className="shrink-0 w-6 h-6 rounded-full bg-dark-fill text-white text-xs font-semibold inline-flex items-center justify-center">
                 {idx + 1}
               </span>
               <span className="text-sm font-medium text-off-black truncate">{brief.title}</span>
@@ -556,7 +556,7 @@ function StepProduct({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d
               onClick={() => setDraft({ ...draft, productSize: s })}
               className={`py-3 text-sm font-medium rounded border transition-colors ${
                 draft.productSize === s
-                  ? 'bg-off-black text-white border-off-black'
+                  ? 'bg-dark-fill text-white border-dark-fill'
                   : 'bg-white text-off-black border-border-gray hover:bg-subtle-gray'
               }`}
             >
@@ -575,7 +575,7 @@ function StepProduct({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d
               onClick={() => setDraft({ ...draft, frameType: f })}
               className={`w-full py-3 px-4 text-sm text-left rounded border transition-colors ${
                 draft.frameType === f
-                  ? 'bg-off-black text-white border-off-black'
+                  ? 'bg-dark-fill text-white border-dark-fill'
                   : 'bg-white text-off-black border-border-gray hover:bg-subtle-gray'
               }`}
             >
@@ -688,7 +688,7 @@ function CreatorDashboard({ data }: { data: PortalData }) {
             href="https://drive.google.com/drive/folders/16SZxJ-1wa6cbmVndkCGIaOmxZX-_pGsf?usp=sharing"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
           >
             Upload Content Here
           </a>

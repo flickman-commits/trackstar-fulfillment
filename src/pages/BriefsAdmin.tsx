@@ -82,7 +82,7 @@ export default function BriefsAdmin() {
             </Link>
             <button
               onClick={() => setEditing('new')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
             >
               <Plus className="w-4 h-4" />
               New Brief
@@ -321,7 +321,7 @@ function BriefEditor({ brief, onClose, onSaved }: {
             <button
               onClick={handleSave}
               disabled={isSaving || !draft.title.trim()}
-              className="px-4 py-2 bg-off-black text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
+              className="px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
             >
               {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {isSaving ? 'Saving…' : (isNew ? 'Create Brief' : 'Save Changes')}

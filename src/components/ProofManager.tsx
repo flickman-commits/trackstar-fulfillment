@@ -394,7 +394,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
             const isDesigner = m.sender === 'designer'
             return (
               <div key={m.id} className="flex" style={{ justifyContent: isDesigner ? 'flex-end' : 'flex-start' }}>
-                <div className={`max-w-[85%] px-2.5 py-1.5 rounded-lg ${isDesigner ? 'bg-off-black text-white' : 'bg-purple-50 text-off-black border border-purple-200'}`}>
+                <div className={`max-w-[85%] px-2.5 py-1.5 rounded-lg ${isDesigner ? 'bg-dark-fill text-white' : 'bg-purple-50 text-off-black border border-purple-200'}`}>
                   <p className="text-[9px] font-semibold opacity-60 mb-0.5">{isDesigner ? 'Dan' : 'Customer'}</p>
                   <p className="text-xs whitespace-pre-wrap leading-snug">{m.body}</p>
                 </div>
@@ -415,7 +415,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
       <button
         onClick={askCustomer}
         disabled={isAsking || !question.trim() || !customerEmail}
-        className="w-full px-3 py-2 text-xs font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
+        className="w-full px-3 py-2 text-xs font-medium text-white bg-dark-fill hover:opacity-90 rounded-md transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
       >
         {isAsking ? (
           <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending…</>
@@ -548,7 +548,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
               <button
                 onClick={uploadProofs}
                 disabled={isUploading}
-                className="flex-1 px-3 py-2 text-xs font-medium text-white bg-off-black hover:opacity-90 rounded-md transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="flex-1 px-3 py-2 text-xs font-medium text-white bg-dark-fill hover:opacity-90 rounded-md transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 {isUploading ? (
                   <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}...</>

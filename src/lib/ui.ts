@@ -23,7 +23,7 @@ const base =
   'text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 
 /** The one action a panel exists to perform. */
-export const btnPrimary = `${base} bg-off-black text-white hover:bg-off-black/85`
+export const btnPrimary = `${base} bg-dark-fill text-white hover:bg-off-black/85`
 
 /** Supporting actions. Visible, but never competing with the primary. */
 export const btnSecondary = `${base} bg-white border border-border-gray text-off-black/70 hover:bg-subtle-gray`
@@ -44,7 +44,7 @@ export const segment = (active: boolean, size: 'sm' | 'md' = 'sm') =>
   `${size === 'md' ? 'px-4 py-1.5 text-sm' : 'px-3 py-1.5 text-xs'} ` +
   `rounded-md font-medium transition-colors ${
     active
-      ? 'bg-off-black text-white'
+      ? 'bg-dark-fill text-white'
       : 'text-off-black/60 hover:text-off-black hover:bg-off-black/5'
   }`
 

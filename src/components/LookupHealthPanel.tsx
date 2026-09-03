@@ -813,7 +813,7 @@ export default function LookupHealthPanel({ onClose, embedded = false }: { onClo
                 <button onClick={() => { setIdPrompt(null); setIdValue('') }} className="text-xs px-3 py-1.5 rounded border border-border-gray hover:bg-subtle-gray">
                   Cancel
                 </button>
-                <button onClick={() => void submitId()} disabled={!idValue.trim()} className="text-xs px-3 py-1.5 rounded bg-off-black text-white hover:opacity-80 disabled:opacity-40">
+                <button onClick={() => void submitId()} disabled={!idValue.trim()} className="text-xs px-3 py-1.5 rounded bg-dark-fill text-white hover:opacity-80 disabled:opacity-40">
                   Save &amp; verify
                 </button>
               </div>

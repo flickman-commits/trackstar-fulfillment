@@ -14,6 +14,12 @@ export default {
         // Brand Colors
         'off-white': '#F6F5F2',
         'off-black': '#121212',
+        // The dark fill: every solid dark surface in the tool - filled buttons,
+        // the tool rail, toasts. Lifted from the storefront footer card so the
+        // app and the shop read as the same product. Deliberately separate from
+        // off-black, which stays #121212 for TEXT: body copy wants the extra
+        // contrast, a large filled panel does not.
+        'dark-fill': '#242424',
         'border-gray': '#E5E5E5',
         'subtle-gray': '#FAFAFA',
         'success-green': '#4CAF50',
