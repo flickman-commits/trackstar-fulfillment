@@ -76,6 +76,30 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   // then two marathon options is two uploads with two labels, which is how the
   // designer already works.
   const [groupLabel, setGroupLabel] = useState('')
+  const [relabelingId, setRelabelingId] = useState<string | null>(null)
+
+  /** Set or clear what an already-uploaded proof is an option for. */
+  const setProofGroup = async (proofId: string, label: string) => {
+    setRelabelingId(proofId)
+    try {
+      const res = await apiFetch(`${API_BASE}/api/proofs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set-group-label', proofId, groupLabel: label }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || 'Could not update the label')
+        return
+      }
+      const { proof } = await res.json()
+      setProofs(prev => prev.map(p => (p.id === proofId ? { ...p, groupLabel: proof.groupLabel } : p)))
+    } catch {
+      toast.error('Could not update the label')
+    } finally {
+      setRelabelingId(null)
+    }
+  }
 
   // Compact mode: after approval, just show thumbnails — no upload UI, no big approval link
   const isCompact = ['approved_by_customer', 'final_pdf_uploaded', 'sent_to_production'].includes(designStatus || '')
@@ -523,6 +547,32 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
 
       {/* Upload Proofs */}
       <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+        {allowGroups && (
+          <div className="mb-3">
+            <label className="block text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1">
+              These are options for
+            </label>
+            <input
+              type="text"
+              value={groupLabel}
+              onChange={e => setGroupLabel(e.target.value)}
+              list="proof-group-labels"
+              placeholder="e.g. Half Marathon, or leave blank if there is only one design"
+              className="w-full px-2 py-1.5 text-xs border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+            />
+            {/* Previously used labels on this order, so the second upload
+                matches the first exactly. Two spellings would read as two
+                separate products, each waiting on its own approval. */}
+            <datalist id="proof-group-labels">
+              {[...new Set(proofs.map(p => p.groupLabel).filter(Boolean))].map(l => (
+                <option key={l as string} value={l as string} />
+              ))}
+            </datalist>
+            <p className="text-[10px] text-off-black/40 mt-1">
+              The partner picks one design per label. Options sharing a label compete with each other; different labels do not.
+            </p>
+          </div>
+        )}
         {filePreviews.length > 0 ? (
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
@@ -557,32 +607,6 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                 </label>
               )}
             </div>
-            {allowGroups && (
-              <div>
-                <label className="block text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1">
-                  These are options for
-                </label>
-                <input
-                  type="text"
-                  value={groupLabel}
-                  onChange={e => setGroupLabel(e.target.value)}
-                  list="proof-group-labels"
-                  placeholder="e.g. Half Marathon — leave blank if there is only one design"
-                  className="w-full px-2 py-1.5 text-xs border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-                />
-                {/* Previously used labels on this order, so the second upload
-                    matches the first exactly. Two spellings would read as two
-                    separate products, each waiting on its own approval. */}
-                <datalist id="proof-group-labels">
-                  {[...new Set(proofs.map(p => p.groupLabel).filter(Boolean))].map(l => (
-                    <option key={l as string} value={l as string} />
-                  ))}
-                </datalist>
-                <p className="text-[10px] text-off-black/40 mt-1">
-                  The partner picks one design per label. Options sharing a label compete with each other; different labels do not.
-                </p>
-              </div>
-            )}
             <div className="flex items-center gap-2">
               <button
                 onClick={uploadProofs}
@@ -697,6 +721,31 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                 <Trash2 className="w-2.5 h-2.5 text-red-400" />
               )}
             </button>
+            {/* What this one is an option for. Editable while it is still
+                pending, because proofs are usually uploaded before anyone
+                decides how they group, and the label is what decides which
+                designs compete with each other. */}
+            {allowGroups && (
+              proof.status === 'pending' ? (
+                <input
+                  type="text"
+                  defaultValue={proof.groupLabel || ''}
+                  list="proof-group-labels"
+                  disabled={relabelingId === proof.id}
+                  onBlur={e => {
+                    const next = e.target.value.trim()
+                    if (next !== (proof.groupLabel || '')) setProofGroup(proof.id, next)
+                  }}
+                  placeholder="unlabelled"
+                  title="What this design is an option for"
+                  className="mt-1 w-14 px-1 py-0.5 text-[9px] text-center border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20 disabled:opacity-50"
+                />
+              ) : proof.groupLabel ? (
+                <p className="mt-1 w-14 text-[9px] text-center text-off-black/40 truncate" title={proof.groupLabel}>
+                  {proof.groupLabel}
+                </p>
+              ) : null
+            )}
           </div>
         )
 

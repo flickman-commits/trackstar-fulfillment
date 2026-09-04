@@ -625,6 +625,31 @@ export default async function handler(req, res) {
       return res.status(200).json({ proofs, messages })
     }
 
+    // Label (or relabel) an existing proof. Needed because proofs are often
+    // uploaded before anyone decides how they group, and because the label is
+    // the thing that decides what competes with what - getting it wrong after
+    // the fact should not mean deleting and re-uploading the artwork.
+    if (req.method === 'POST' && body.action === 'set-group-label') {
+      const { proofId, groupLabel } = body
+      if (!proofId) return res.status(400).json({ error: 'proofId is required' })
+
+      const existing = await prisma.proof.findUnique({ where: { id: proofId } })
+      if (!existing) return res.status(404).json({ error: 'Proof not found' })
+      // Once a proof is answered its label has already decided which siblings
+      // were rejected. Changing it now would rewrite that history.
+      if (existing.status !== 'pending') {
+        return res.status(400).json({ error: 'Only pending proofs can be relabelled' })
+      }
+
+      const proof = await prisma.proof.update({
+        where: { id: proofId },
+        data: {
+          groupLabel: typeof groupLabel === 'string' && groupLabel.trim() ? groupLabel.trim() : null,
+        },
+      })
+      return res.status(200).json({ success: true, proof })
+    }
+
     if (req.method === 'POST') {
       const { orderId, imageData, imageUrl, imageName, groupLabel } = body
 

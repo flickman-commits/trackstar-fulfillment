@@ -4652,6 +4652,7 @@ Thank you!`
                             onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
                             onLatestFeedback={setLatestFeedback}
                             disableEmail={selectedOrder.trackstarOrderType === 'race_partner'}
+                            allowGroups={selectedOrder.trackstarOrderType === 'race_partner'}
                           />
                         </CollapsibleSection>
                       )}

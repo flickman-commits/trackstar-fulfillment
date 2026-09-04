@@ -763,7 +763,7 @@ export default function ApprovalPortal() {
                                     {pos.total === 1 ? '✓' : pos.index}
                                   </span>
                                   <span style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 500 }}>
-                                    {proof.groupLabel ? `${proof.groupLabel} — ` : ''}
+                                    {proof.groupLabel ? `${proof.groupLabel}: ` : ''}
                                     {pos.total === 1 ? 'Your Design' : `Option ${pos.index} of ${pos.total}`}
                                   </span>
                                 </div>
