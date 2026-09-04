@@ -30,6 +30,11 @@ how long it has been rather than rendering stale numbers as today's. That is
 deliberate: a cron quietly producing a report while the agent is broken is how
 you get a healthy-looking email for a week without noticing.
 
+**Race configs live in `server/scrapers/configs/`.** Each race has one file
+(`boston.js`, `chicago.js`, etc.). The `raceDates` object inside holds
+year → date mappings. When you verify a date, add or update that entry,
+commit, and push — no searching required.
+
 ## The shape of the run
 
 Sweep → fix → sweep again → file the report. The second sweep is not
@@ -170,6 +175,10 @@ it, the config is unproven and drops to Tier 2.
 
 ### Pinning a race date
 
+Race config files are in `server/scrapers/configs/<race>.js` (one per race; the file
+name matches the config export). Each config has a `raceDates` object with year → date
+mappings.
+
 Use `race_dates` to see which are verified and which are still computed. Prefer
 races with real order volume.
 
@@ -192,9 +201,10 @@ Then sanity-check before you commit:
   but it means the race genuinely moved
 
 **Dates are verified and committed directly to production.** Once you have two
-independent sources that agree (or have researched your way to consensus), commit
-the date and push. Your notes in the report list the two sources as proof. In the
-audit log, record the sources for future reference.
+independent sources that agree (or have researched your way to consensus), add or
+update the `raceDates` entry in the config file, commit and push. Your notes in
+the report list the races, dates, and the two sources as proof. In the audit log,
+record the sources for future reference.
 
 Wrong dates are the expensive failure here. The date drives the weather printed
 on the poster, and for Buffalo it IS the lookup key (`YYYYMMDD` + race code), so
@@ -250,14 +260,15 @@ a separate notification. One more channel is how a report stops being read.
 `notes` is your own narrative, kept separate from the computed sections so a
 claim can never be mistaken for a verified fact. Put in it:
 
-- what you committed and pushed, with **the sources**: which dates, verified
-  against which independent sources
+- **verified and committed dates** — list each race, year, date, and the 2+ sources
+  that verified it (e.g. "Jersey City Marathon 2024: April 14 (MarathonGuide, Hoboken Girl)")
+- what else you shipped or fixed, if anything
 - what you chose not to do, and why (blocked issues, data problems, etc.)
 - anything you were unsure about
 
-Say it plainly. If nothing needed doing, one line. Do not pad the report to look
-busy, and do not soften a finding to make the night look clean — a confident
-wrong answer at 1am is worse than a flagged question.
+Say it plainly. If nothing needed doing except date verification, list the dates.
+Do not pad the report to look busy, and do not soften a finding to make the night
+look clean — a confident wrong answer at 1am is worse than a flagged question.
 
 Record sources in the audit log so dates can be traced back to their origins
 and human work can build on what the overnight run established.
