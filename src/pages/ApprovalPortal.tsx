@@ -76,6 +76,9 @@ export default function ApprovalPortal() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [showEarlierVersions, setShowEarlierVersions] = useState(false)
   const [activeSlide, setActiveSlide] = useState(0)
+  // Which product the partner is looking at. Null means "whichever comes
+  // first", so a single-product order needs no state at all.
+  const [activeGroup, setActiveGroup] = useState<string | null>(null)
   const carouselRef = useRef<HTMLDivElement>(null)
 
   const fetchData = useCallback(async () => {
@@ -170,7 +173,10 @@ export default function ApprovalPortal() {
     const targetProof = pendingProofs.find(p => p.id === proofId)
     if (!targetProof) return
 
-    const optionIdx = pendingProofs.indexOf(targetProof)
+    // Numbered within its own product, matching the card the partner clicked.
+    const optionIdx = pendingProofs
+      .filter(p => (p.groupLabel ?? '') === (targetProof.groupLabel ?? ''))
+      .indexOf(targetProof)
 
     setSubmitting(true)
     try {
@@ -466,10 +472,22 @@ export default function ApprovalPortal() {
   // How many distinct things they are choosing between. One unnamed group is
   // the ordinary case and reads exactly as it always did.
   const pendingGroups = [...new Set(pendingProofs.map(p => p.groupLabel ?? ''))]
-  /** Position of a proof within its own label, not within the whole list. */
-  const optionPosition = (proof: Proof) => {
-    const siblings = pendingProofs.filter(p => (p.groupLabel ?? '') === (proof.groupLabel ?? ''))
-    return { index: siblings.indexOf(proof) + 1, total: siblings.length }
+  // One product at a time. Seven designs for two products in a single strip is
+  // the confusion Matt's designer hit: nothing tells you where the marathons
+  // stop and the halves begin, so "Option 1 of 3" and a seven-dot rail
+  // disagree about what you are choosing between.
+  const currentGroup =
+    activeGroup !== null && pendingGroups.includes(activeGroup)
+      ? activeGroup
+      : pendingGroups[0] ?? ''
+  const visibleProofs = pendingProofs.filter(p => (p.groupLabel ?? '') === currentGroup)
+
+  // Switching product starts you at that product's first option, not wherever
+  // you happened to be scrolled in the last one.
+  const selectGroup = (group: string) => {
+    setActiveGroup(group)
+    setActiveSlide(0)
+    carouselRef.current?.scrollTo({ left: 0 })
   }
   const pastProofs = proofs.filter(p => p.status !== 'pending')
   const hasPendingProofs = pendingProofs.length > 0
@@ -709,13 +727,46 @@ export default function ApprovalPortal() {
             {/* Current batch of pending proofs — horizontal carousel */}
             {hasPendingProofs && (
               <>
+                {/* One pill per product. Same control as the dashboard's
+                    Standard / Custom / Partners switch, which is the pattern
+                    Matt pointed at. */}
+                {pendingGroups.length > 1 && (
+                  <div className="flex justify-center mb-4">
+                    <div
+                      className="inline-flex items-center gap-1 p-1 rounded-full"
+                      style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}
+                    >
+                      {pendingGroups.map(group => {
+                        const isActive = group === currentGroup
+                        const count = pendingProofs.filter(p => (p.groupLabel ?? '') === group).length
+                        return (
+                          <button
+                            key={group}
+                            onClick={() => selectGroup(group)}
+                            className="px-4 py-2 rounded-full transition-colors"
+                            style={{
+                              backgroundColor: isActive ? '#242424' : 'transparent',
+                              color: isActive ? '#FFFFFF' : '#666666',
+                              fontSize: '13px',
+                              fontWeight: isActive ? 600 : 500,
+                            }}
+                          >
+                            {group || 'Your design'}
+                            <span style={{ opacity: 0.6, marginLeft: '6px', fontSize: '12px' }}>{count}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Swipe affordance — only when there are multiple designs.
                     Shows on mobile (where arrow buttons used to be hidden);
                     on desktop the side arrows do the job. */}
-                {pendingProofs.length > 1 && (
+                {visibleProofs.length > 1 && (
                   <div className="md:hidden flex items-center justify-center gap-2 mb-3" style={{ color: '#666666', fontSize: '12px', fontWeight: 500 }}>
                     <ChevronLeft className="w-4 h-4" style={{ color: '#999999' }} />
-                    <span>Swipe to see {pendingProofs.length === 2 ? 'the other design' : `all ${pendingProofs.length} designs`}</span>
+                    <span>Swipe to see {visibleProofs.length === 2 ? 'the other design' : `all ${visibleProofs.length} designs`}</span>
                     <ChevronRight className="w-4 h-4" style={{ color: '#999999' }} />
                   </div>
                 )}
@@ -733,9 +784,8 @@ export default function ApprovalPortal() {
                         setActiveSlide(idx)
                       }}
                     >
-                      {pendingProofs.map((proof, idx) => {
+                      {visibleProofs.map((proof, idx) => {
                         const optionNum = idx + 1
-                        const pos = optionPosition(proof)
                         const isRevising = revisingProofId === proof.id
 
                         return (
@@ -751,20 +801,24 @@ export default function ApprovalPortal() {
                               {/* Option header — compact */}
                               <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
                                 <div className="flex items-center gap-2">
-                                  {/* Numbered within its own label. "Option 1 of
-                                      2" has to mean 1 of the 2 marathon designs,
-                                      not 1 of the 4 things on the page, or the
-                                      count tells them to make one choice when
-                                      they are making two. */}
+                                  {/* Both this and the buttons below count
+                                      within the visible product. They used to
+                                      disagree - the header said "Option 1 of 3"
+                                      over a button reading "Approve Option 2" -
+                                      because the header counted inside the group
+                                      and the buttons counted across every design
+                                      on the order. */}
                                   <span
                                     className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold"
                                     style={{ backgroundColor: '#E0E0E0', color: '#666666' }}
                                   >
-                                    {pos.total === 1 ? '✓' : pos.index}
+                                    {visibleProofs.length === 1 ? '✓' : optionNum}
                                   </span>
                                   <span style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 500 }}>
-                                    {proof.groupLabel ? `${proof.groupLabel}: ` : ''}
-                                    {pos.total === 1 ? 'Your Design' : `Option ${pos.index} of ${pos.total}`}
+                                    {/* The pill above already names the product,
+                                        so only repeat it when there is no pill. */}
+                                    {pendingGroups.length === 1 && proof.groupLabel ? `${proof.groupLabel}: ` : ''}
+                                    {visibleProofs.length === 1 ? 'Your Design' : `Option ${optionNum} of ${visibleProofs.length}`}
                                   </span>
                                 </div>
                               </div>
@@ -806,7 +860,7 @@ export default function ApprovalPortal() {
                                   style={{ backgroundColor: '#4600D6', color: '#FFFFFF' }}
                                 >
                                   <CheckCircle2 className="w-4 h-4" />
-                                  {pendingProofs.length === 1 ? 'Approve This Design' : `Approve Option ${optionNum}`}
+                                  {visibleProofs.length === 1 ? 'Approve This Design' : `Approve Option ${optionNum}`}
                                 </button>
                                 <button
                                   onClick={() => {
@@ -821,7 +875,7 @@ export default function ApprovalPortal() {
                                     border: '1px solid #1A1A1A'
                                   }}
                                 >
-                                  {isRevising ? 'Close revisions form' : (pendingProofs.length === 1 ? 'Request Revision to this Design' : `Request Revision to Option ${optionNum}`)}
+                                  {isRevising ? 'Close revisions form' : (visibleProofs.length === 1 ? 'Request Revision to this Design' : `Request Revision to Option ${optionNum}`)}
                                 </button>
 
                                 {/* Inline revisions form — expands below the
@@ -831,7 +885,7 @@ export default function ApprovalPortal() {
                                 {isRevising && (
                                   <div className="pt-3 mt-1 space-y-2" style={{ borderTop: '1px solid #F0EDE6' }}>
                                     <label htmlFor={`feedback-${proof.id}`} style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: 500, display: 'block' }}>
-                                      What changes would you like to {pendingProofs.length === 1 ? 'this design' : `Option ${optionNum}`}?
+                                      What changes would you like to {visibleProofs.length === 1 ? 'this design' : `Option ${optionNum}`}?
                                     </label>
                                     <textarea
                                       id={`feedback-${proof.id}`}
@@ -849,7 +903,7 @@ export default function ApprovalPortal() {
                                       className="w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
                                       style={{ backgroundColor: '#1A1A1A', color: '#FFFFFF' }}
                                     >
-                                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : `Send Revisions${pendingProofs.length > 1 ? ` for Option ${optionNum}` : ''}`}
+                                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : `Send Revisions${visibleProofs.length > 1 ? ` for Option ${optionNum}` : ''}`}
                                     </button>
                                   </div>
                                 )}
@@ -861,7 +915,7 @@ export default function ApprovalPortal() {
                     </div>
 
                     {/* Arrow buttons (desktop only) */}
-                    {pendingProofs.length > 1 && (
+                    {visibleProofs.length > 1 && (
                       <>
                         <button
                           onClick={() => {
@@ -880,7 +934,7 @@ export default function ApprovalPortal() {
                             if (!el) return
                             el.scrollTo({ left: el.scrollLeft + el.offsetWidth, behavior: 'smooth' })
                           }}
-                          className={`hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-9 h-9 items-center justify-center rounded-full transition-colors ${activeSlide >= pendingProofs.length - 1 ? 'opacity-30 pointer-events-none' : ''}`}
+                          className={`hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-9 h-9 items-center justify-center rounded-full transition-colors ${activeSlide >= visibleProofs.length - 1 ? 'opacity-30 pointer-events-none' : ''}`}
                           style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
                         >
                           <ChevronRight className="w-5 h-5" style={{ color: '#1A1A1A' }} />
@@ -890,9 +944,9 @@ export default function ApprovalPortal() {
                   </div>
 
                   {/* Dot indicators */}
-                  {pendingProofs.length > 1 && (
+                  {visibleProofs.length > 1 && (
                     <div className="flex items-center justify-center gap-1.5 mt-2">
-                      {pendingProofs.map((_, idx) => (
+                      {visibleProofs.map((_, idx) => (
                         <button
                           key={idx}
                           onClick={() => {
