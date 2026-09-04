@@ -76,24 +76,25 @@ sixteen of them, which is what makes a big night safe.
 
 ### Per night
 
-**MANDATORY:** 10 race dates researched and verified (see priority list below)
+**MANDATORY:** 50 race dates researched and verified
 
 | Budget | Limit |
 |---|---|
+| Race dates verified and committed | **50** |
 | Race-years touched **per timing platform** | **12** |
 | Race-years touched **in total** | **60** |
 | Fixture captures | **10** |
-| Pull requests opened | **5** |
-| Wall clock | ~45 minutes |
+| Wall clock | ~60 minutes |
 
-At this rate the untested backlog clears in roughly two to three nights and the
-unverified dates in four or five. That is the intent.
+Once the backlog of ~43 unverified dates clears, this moves to maintenance mode:
+check for new race dates on products we've added, and keep the system current.
+Cost is not a constraint—this runs on Haiku and a heavy night is negligible.
 
 ### Every night, work these in order
 
 **MANDATORY (complete before other work):**
 
-1. **10 race dates researched and verified.** Find races missing verified dates, research the real date against at least two independent sources, pin them if you can prove it. This is your non-negotiable minimum floor every night.
+1. **50 race dates researched and verified.** Find races with computed (guessed) dates. Research the actual date against at least two independent sources. Once you have agreement, commit and push. If sources conflict, research until you find consensus. This is your non-negotiable minimum every night until backlog clears.
 
 **Then continue with:**
 
@@ -127,27 +128,24 @@ database write.
 
 | Finding | Do this |
 |---|---|
-| `untested` (a few, not all) | Find a real finisher's results, then **test the scraper** against that race |
+| `untested` (a few, not all) | Find actual race results, then test the scraper against that race |
 | `selling_without_scraper` appearing new | `sync_catalog` first, to confirm it is real and not a stale snapshot |
 
-**Capturing a real finisher's results alone clears nothing.** It stores a known finisher; only
-testing the scraper turns that into a working-or-broken verdict. A run that captured
-test cases and reported them as fixed was wrong, and the second sweep caught it.
+**Testing a scraper requires actual results.** Finding results alone clears nothing; only
+testing the scraper tells you whether it works. A run that captured test data but never
+verified the scraper worked was wrong, and the second sweep caught it.
 
 Findings that need an endpoint you do not have - weather, re-research,
 approval links - are Tier 2 for you. Flag them.
 
-Cap test cases captured at **10 per night**. These hit third-party timing sites,
+Cap test verifications at **10 per night**. These hit third-party timing sites,
 and hammering them gets us blocked — Sydney's firewall escalated against us
-inside one afternoon of repeated testing.
+inside one afternoon of repeated queries.
 
-**One passing test is not proof.** Eugene captured three test cases, tested clean,
-and fifteen minutes later all three came back "found here before and is not
-found now". The site is intermittent, and a single pass caught it on a good
-minute. So a race that flips between working and broken across tests is UNRELIABLE,
-which is a Tier 2 flag, not a fix — report it as an unreliable source rather
-than claiming it works. Do not test repeatedly hoping for a passing run;
-that is both dishonest and how we get rate-limited.
+**One passing test is not proof.** A race that flips between working and broken across
+tests is unstable, not fixed. Report it as unreliable rather than claiming it works.
+Do not test repeatedly hoping for a passing run; that is both dishonest and how we get
+rate-limited.
 
 ## Step 3: Tier 1 — ship config changes, but only what you can PROVE
 
@@ -178,29 +176,30 @@ races with real order volume.
 **The bar: two independent sources that agree.** Wikipedia's per-edition article,
 the race's own site or results archive, a road-closure notice, a timing
 platform's event listing, a running calendar. Two that agree is enough; one is
-not, and two that disagree is a flag, not a coin toss.
+not.
 
-Then sanity-check before you write it down:
+If two sources disagree:
+- Search for a third independent source to break the tie
+- Favor the race's official website and official timing platform
+- Sanity-check: day of week consistency, month consistency with other years
+- If you still can't determine which is correct, flag it—don't guess
 
+Then sanity-check before you commit:
 - the source is talking about the year you think it is
 - the day of week matches the race's other editions (a Sunday marathon does not
   move to a Tuesday)
 - it sits in the month the other editions sit in - a three-week jump is possible
-  but it means the race genuinely moved, so say so in the PR
+  but it means the race genuinely moved
 
-**Dates go in a pull request and are never auto-merged.** Event ids and test cases
-can be machine-checked - `test:scrapers` proves them against a real finisher -
-but nothing in the gates can tell whether the first of November is really race
-day. Auto-merging a date means merging on your own say-so. Put the two sources
-in the PR body so a human can check in ten seconds.
-
-Jersey City is the standing example of when to stop: it is the highest-volume
-race we sell, and its sources disagree about 2024. It stays unpinned until
-someone resolves that by hand.
+**Dates are verified and committed directly to production.** Once you have two
+independent sources that agree (or have researched your way to consensus), commit
+the date and push. Your notes in the report list the two sources as proof. In the
+audit log, record the sources for future reference.
 
 Wrong dates are the expensive failure here. The date drives the weather printed
 on the poster, and for Buffalo it IS the lookup key (`YYYYMMDD` + race code), so
-one day off means no results at all.
+one day off means no results at all. That's why research and consensus matter—not
+bureaucracy.
 
 ### Getting ready for upcoming races
 
@@ -211,13 +210,13 @@ only — never a merged config claiming to work.
 
 ## Step 4: Tier 2 — flag, do not touch
 
-- **Scraper broken** — the site answers but returns the wrong runner. Needs
-  diagnosis, and diagnosis is not a nightly job. The Army Ten-Miler bug was a
-  split distance in feet being read as metres; that took real digging.
+- **Scraper malfunction** — the site responds but returns incorrect data. Needs
+  root cause diagnosis and is not a nightly job. The Army Ten-Miler bug was a
+  distance unit conversion error; that took real investigation.
 - `selling_without_scraper` on a **new timing platform** — writing a scraper is
   a build, not an upkeep task.
-- Any date or id you could not prove.
-- Every order red flag. These involve real customers and real money.
+- Any date or id you could not prove with multiple sources.
+- Every order issue. These involve real customers and real money.
 - Anything touching pricing, Shopify writes, or messaging customers.
 
 ## Never
@@ -251,14 +250,14 @@ a separate notification. One more channel is how a report stops being read.
 `notes` is your own narrative, kept separate from the computed sections so a
 claim can never be mistaken for a verified fact. Put in it:
 
-- what you shipped, with the PR link and **the proof**: which runner, which
-  finish time proved the scraper works
-- what you chose not to do, and why
+- what you committed and pushed, with **the sources**: which dates, verified
+  against which independent sources
+- what you chose not to do, and why (blocked issues, data problems, etc.)
 - anything you were unsure about
 
 Say it plainly. If nothing needed doing, one line. Do not pad the report to look
 busy, and do not soften a finding to make the night look clean — a confident
 wrong answer at 1am is worse than a flagged question.
 
-Record consequential actions in the audit log so overnight work sits alongside
-human work and "who did this?" has an answer.
+Record sources in the audit log so dates can be traced back to their origins
+and human work can build on what the overnight run established.
