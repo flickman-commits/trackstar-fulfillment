@@ -527,6 +527,43 @@ function PartnerInfoFields({
   )
 }
 
+/**
+ * Where a race date came from, at a glance.
+ *
+ * Most dates in the database were produced by a recurrence rule in a config
+ * file - "first Sunday of December" and the like. Those rules were wrong often
+ * enough to matter and never looked it: CIM came out a week early in two
+ * separate years, Berlin 2025 a week late. The rules are gone, and the backlog
+ * is being replaced with dates checked against a real source, but the two kinds
+ * sit side by side in this list and are indistinguishable without this.
+ *
+ * Verified covers all three trustworthy origins: a person typed it after
+ * looking it up, it is a config pin with a source behind it, or a scraper read
+ * it off the results page. Unverified means the row predates the cleanup and
+ * still holds whatever a rule produced. Amber rather than red because nothing
+ * is broken - it is unconfirmed, which is a different thing.
+ */
+function DateSourceBadge({ source }: { source: string | null }) {
+  const verified = source === 'manual' || source === 'config' || source === 'scraped'
+  const why = verified
+    ? { manual: 'Entered by hand after checking the results site',
+        config: 'Pinned in the race config against a verified source',
+        scraped: 'Read off the results page' }[source as 'manual' | 'config' | 'scraped']
+    : 'Left over from the old computed date rules. Nobody has confirmed it.'
+  return (
+    <span
+      title={why}
+      className={`px-1.5 py-0.5 rounded text-[10px] font-medium cursor-help shrink-0 ${
+        verified
+          ? 'bg-green-50 text-green-700 border border-green-200'
+          : 'bg-amber-50 text-amber-700 border border-amber-200'
+      }`}
+    >
+      {verified ? 'Verified' : 'Unverified'}
+    </span>
+  )
+}
+
 function StaticField({ label, value, flag }: { label: string; value: string; flag?: boolean }) {
   return (
     <div className="flex justify-between items-center">
@@ -953,7 +990,7 @@ export default function Dashboard() {
   // Store possible matches per order for ambiguous results (not persisted to DB)
   const [possibleMatchesMap, setPossibleMatchesMap] = useState<Record<string, Array<{ name: string; bib: string; time: string; pace?: string; city?: string; state?: string; eventType?: string; resultsUrl?: string }>>>({})
   // Race database state
-  const [races, setRaces] = useState<{ id: number; raceName: string; year: number; raceDate: string; location: string | null; weatherCondition: string | null; weatherTemp: string | null; weatherFetchedAt: string | null; _count?: { runnerResearch: number } }[]>([])
+  const [races, setRaces] = useState<{ id: number; raceName: string; year: number; raceDate: string; raceDateSource: string | null; location: string | null; weatherCondition: string | null; weatherTemp: string | null; weatherFetchedAt: string | null; _count?: { runnerResearch: number } }[]>([])
   const [isLoadingRaces, setIsLoadingRaces] = useState(false)
   const [editingRaceId, setEditingRaceId] = useState<number | null>(null)
   const [raceEditValues, setRaceEditValues] = useState({ raceDate: '', location: '', weatherCondition: '', weatherTemp: '' })
@@ -3424,6 +3461,21 @@ Thank you!`
                           {showAddRace ? 'Cancel' : '+ Add Race'}
                         </button>
                       </div>
+                      {/* Progress through the backlog. The nightly sweep is
+                          replacing computed dates with checked ones, and this
+                          is the only place the size of that job is visible. */}
+                      {races.length > 0 && (() => {
+                        const unverified = races.filter(
+                          r => !['manual', 'config', 'scraped'].includes(r.raceDateSource || '')
+                        ).length
+                        return (
+                          <span className="text-xs text-off-black/50">
+                            {unverified === 0
+                              ? `All ${races.length} dates verified`
+                              : `${races.length - unverified} of ${races.length} dates verified`}
+                          </span>
+                        )
+                      })()}
                     </div>
                     {/* Search bar — filters race groups by name (and location/year) */}
                     <div className="relative">
@@ -3750,7 +3802,12 @@ Thank you!`
                               <div className="flex items-center justify-between gap-3">
                                 <span className="text-sm font-semibold text-off-black w-12 shrink-0 tabular-nums">{race.year}</span>
                                 <div className="flex-1 flex items-center gap-4 text-xs text-off-black/50 min-w-0">
-                                  {race.raceDate && <span>{new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })}</span>}
+                                  {race.raceDate && (
+                                    <span className="flex items-center gap-1.5 shrink-0">
+                                      {new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })}
+                                      <DateSourceBadge source={race.raceDateSource} />
+                                    </span>
+                                  )}
                                   {race.location && <span className="truncate">{race.location}</span>}
                                   {race.weatherCondition && <span>{race.weatherCondition.charAt(0).toUpperCase() + race.weatherCondition.slice(1)}</span>}
                                   {race.weatherTemp && <span>{race.weatherTemp}</span>}
