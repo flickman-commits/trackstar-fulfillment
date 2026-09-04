@@ -52,6 +52,9 @@ export default {
   ],
   keywords: ['houston', 'chevron houston', 'aramco'],
   keywordRequiresMarathon: false,
+  raceDates: {
+    2026: '2026-01-11',
+  },
   eventIds: {
     2019: 711053,
     2020: 881836,

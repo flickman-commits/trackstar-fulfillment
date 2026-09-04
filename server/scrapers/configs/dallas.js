@@ -16,6 +16,7 @@ export default {
   endpoint: 'searchResultGen.php',
   raceDates: {
     2025: '2025-12-14',
+    2026: '2026-12-13',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],

@@ -19,6 +19,7 @@ export default {
   location: 'Jersey City, NJ',
   eventPrefix: 'JCM-JERSEYCITYMARATHON',
   raceDates: {
+    2024: '2024-04-14',
     2026: '2026-04-19',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
