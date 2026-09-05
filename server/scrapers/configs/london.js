@@ -10,8 +10,11 @@ export default {
   baseUrlPattern: 'https://results.tcslondonmarathon.com/{year}',
   eventCode: 'MAS',
   raceDates: {
-    2025: '2025-04-27',
     2026: '2026-04-26',
+    2025: '2025-04-27',
+    2024: '2024-04-21',
+    2023: '2023-04-23',
+    2022: '2022-10-02',
   },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',

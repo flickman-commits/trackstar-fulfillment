@@ -38,6 +38,10 @@ export default {
   keywordRequiresMarathon: true,
   raceDates: {
     2026: '2026-02-15',
+    2025: '2025-02-16',
+    2024: '2024-02-18',
+    2023: '2023-02-19',
+    2022: '2022-02-20',
   },
   eventIds: {
     2022: 1007295,

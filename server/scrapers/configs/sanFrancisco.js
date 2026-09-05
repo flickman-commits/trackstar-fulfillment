@@ -26,9 +26,11 @@ export default {
   location: 'San Francisco, CA',
   masterEventId: 1403,
   raceDates: {
-    2024: '2024-07-28',
-    2025: '2025-07-27',
     2026: '2026-07-26',
+    2025: '2025-07-27',
+    2024: '2024-07-28',
+    2023: '2023-07-23',
+    2022: '2022-07-24',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],

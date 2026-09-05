@@ -54,6 +54,9 @@ export default {
   keywordRequiresMarathon: false,
   raceDates: {
     2026: '2026-01-11',
+    2025: '2025-01-19',
+    2024: '2024-01-14',
+    2023: '2023-01-15',
   },
   eventIds: {
     2019: 711053,

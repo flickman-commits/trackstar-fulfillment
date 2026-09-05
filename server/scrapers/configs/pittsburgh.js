@@ -22,6 +22,10 @@ export default {
   location: 'Pittsburgh, PA',
   raceDates: {
     2026: '2026-05-03',
+    2025: '2025-05-03',
+    2024: '2024-05-05',
+    2023: '2023-05-07',
+    2022: '2022-05-01',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
