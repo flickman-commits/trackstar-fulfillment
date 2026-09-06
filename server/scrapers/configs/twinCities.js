@@ -10,6 +10,9 @@ export default {
   parseMode: 'api',
   raceDates: {
     2022: '2022-10-02',
+    2023: '2023-10-01',
+    2024: '2024-10-06',
+    2025: '2025-10-05',
     2026: '2026-10-04',
   },
   eventTypes: ['Marathon', '10 Mile'],

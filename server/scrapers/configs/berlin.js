@@ -22,8 +22,11 @@ export default {
     2025: 'BML_HCH3C0OH2F2',
   },
   raceDates: {
-    2025: '2025-09-21',
     2026: '2026-09-27',
+    2025: '2025-09-21',
+    2024: '2024-09-29',
+    2023: '2023-09-24',
+    2022: '2022-09-25',
   },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',

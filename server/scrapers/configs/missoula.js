@@ -26,6 +26,10 @@ export default {
   location: 'Missoula, MT',
   raceDates: {
     2026: '2026-06-28',
+    2025: '2025-06-29',
+    2024: '2024-06-30',
+    2023: '2023-06-25',
+    2022: '2022-06-26',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],

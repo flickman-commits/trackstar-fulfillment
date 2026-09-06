@@ -41,6 +41,10 @@ export default {
 
   raceDates: {
     2026: '2026-05-24',
+    2025: '2025-05-24',
+    2024: '2024-05-25',
+    2023: '2023-05-26',
+    2022: '2022-05-28',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   defaultEventType: 'Marathon',

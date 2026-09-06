@@ -32,6 +32,13 @@ export default {
   ],
   keywords: ['cowtown'],
   keywordRequiresMarathon: false,
+  raceDates: {
+    2026: '2026-02-28',
+    2025: '2025-02-23',
+    2024: '2024-02-25',
+    2023: '2023-02-26',
+    2022: '2022-02-27',
+  },
   eventCodes: {
     2026: 'n2pdbnrdvebtgty6',
   },
