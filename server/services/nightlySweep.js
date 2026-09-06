@@ -249,10 +249,19 @@ async function alertedFailureCheck() {
   const findings = []
   const since = new Date(Date.now() - days(7))
 
+  // Shoppers only. Local and internal traffic is logged to the same table, and
+  // counting it turns our own testing into a customer-facing incident: a run of
+  // Sydney lookups from a dev machine showed up as "11 of 17 storefront lookups
+  // failed (65%)" for a race that is not even in the public lookup. The whole
+  // point of this finding is that a real person hit it before buying.
+  //
+  // anonIp keeps the first two IPv6 groups, so ::1 lands as "::…".
+  const notLocal = { ip: { notIn: ['::…', '', 'unknown'] } }
+
   // ── Instant Lookup errors, from the log the endpoint already writes ──
   const lookupRows = await prisma.lookupLog.groupBy({
     by: ['race', 'outcome'],
-    where: { createdAt: { gte: since }, outcome: { in: ['upstream_error'] } },
+    where: { createdAt: { gte: since }, outcome: { in: ['upstream_error'] }, ...notLocal },
     _count: { _all: true },
   })
 
@@ -260,7 +269,7 @@ async function alertedFailureCheck() {
   // hundred good ones does not read the same as five out of five.
   const totals = await prisma.lookupLog.groupBy({
     by: ['race'],
-    where: { createdAt: { gte: since } },
+    where: { createdAt: { gte: since }, ...notLocal },
     _count: { _all: true },
   })
   const totalFor = race => totals.find(t => t.race === race)?._count._all || 0
