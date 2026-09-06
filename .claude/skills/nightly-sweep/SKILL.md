@@ -202,9 +202,9 @@ Then sanity-check before you commit:
 
 **Dates are verified and committed directly to production.** Once you have two
 independent sources that agree (or have researched your way to consensus), add or
-update the `raceDates` entry in the config file, commit and push. Your notes in
-the report list the races, dates, and the two sources as proof. In the audit log,
-record the sources for future reference.
+update the `raceDates` entry in the config file, commit and push. The sources go
+in the commit message and the audit log — not in the report, which gets a summary
+(see Step 5).
 
 Wrong dates are the expensive failure here. The date drives the weather printed
 on the poster, and for Buffalo it IS the lookup key (`YYYYMMDD` + race code), so
@@ -258,17 +258,36 @@ a night with no report looks like a broken agent.
 a separate notification. One more channel is how a report stops being read.
 
 `notes` is your own narrative, kept separate from the computed sections so a
-claim can never be mistaken for a verified fact. Put in it:
+claim can never be mistaken for a verified fact.
 
-- **verified and committed dates** — list each race, year, date, and the 2+ sources
-  that verified it (e.g. "Jersey City Marathon 2024: April 14 (MarathonGuide, Hoboken Girl)")
+**Write a short paragraph — a handful of sentences, plain English.** Matt reads
+it on a phone at 7am, directly under the computed sections that already name
+every finding. So: no markdown headings, no bullet walls, no per-date lists, and
+none of the internal vocabulary — "tier 0/1/2", "fixture", "probe", "delta",
+"audit trail" mean nothing outside this file. Cover:
+
+- how many dates you verified and roughly which races
 - what else you shipped or fixed, if anything
-- what you chose not to do, and why (blocked issues, data problems, etc.)
+- what you chose not to do, and why
 - anything you were unsure about
 
-Say it plainly. If nothing needed doing except date verification, list the dates.
-Do not pad the report to look busy, and do not soften a finding to make the night
-look clean — a confident wrong answer at 1am is worse than a flagged question.
+**Per-date sources do not belong here.** They go in the commit message and the
+audit log, which is what those are for. Fifty verified dates is one sentence
+naming the races, never fifty lines naming each date and its two sources — that
+is the single fastest way to make this report stop being read.
+
+A good night reads like this:
+
+> Verified 50 race dates across 16 races — Buffalo, Twin Cities, Houston,
+> Cowtown, Pittsburgh and 11 others, mostly 2022–2025 backfill. Two sources
+> agreed on every one; they're in the commit and the audit log. Nothing else
+> needed doing tonight: the 5 drifted scrapers and 9 races selling without one
+> all need a human. Left the three dead approval links alone — those touch live
+> orders.
+
+Say it plainly. Do not pad the report to look busy, and do not soften a finding
+to make the night look clean — a confident wrong answer at 1am is worse than a
+flagged question.
 
 Record sources in the audit log so dates can be traced back to their origins
 and human work can build on what the overnight run established.
