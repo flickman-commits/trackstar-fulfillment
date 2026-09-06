@@ -224,6 +224,104 @@ async function raceDateCheck() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────
+   6. What already alerted
+   ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The failures that have already pinged Slack.
+ *
+ * Two alerts fire in real time and then evaporate into a channel nobody reads
+ * back: the Instant Lookup error, when a shopper's lookup hits a timing site
+ * that is down or too slow, and "year not configured", when a scraper exists
+ * but that year's event IDs were never added. Both are exactly the kind of
+ * thing this sweep is for, and both were invisible to it.
+ *
+ * Neither needs new plumbing. The lookup errors are already rows in LookupLog,
+ * and the config gaps are already RunnerResearch rows with researchStatus
+ * 'year_not_configured'. This check reads what is there rather than trying to
+ * catch the alert as it goes past.
+ *
+ * A shopper-facing failure outranks an internal one. A lookup error happens on
+ * the storefront, to somebody deciding whether to buy; a missing year stalls an
+ * order Eli can still finish by hand.
+ */
+async function alertedFailureCheck() {
+  const findings = []
+  const since = new Date(Date.now() - days(7))
+
+  // ── Instant Lookup errors, from the log the endpoint already writes ──
+  const lookupRows = await prisma.lookupLog.groupBy({
+    by: ['race', 'outcome'],
+    where: { createdAt: { gte: since }, outcome: { in: ['upstream_error'] } },
+    _count: { _all: true },
+  })
+
+  // Total lookups per race over the same window, so one failure inside a
+  // hundred good ones does not read the same as five out of five.
+  const totals = await prisma.lookupLog.groupBy({
+    by: ['race'],
+    where: { createdAt: { gte: since } },
+    _count: { _all: true },
+  })
+  const totalFor = race => totals.find(t => t.race === race)?._count._all || 0
+
+  for (const row of lookupRows) {
+    if (!row.race) continue
+    const failed = row._count._all
+    const total = totalFor(row.race)
+    const pct = total ? Math.round((failed / total) * 100) : 100
+    findings.push({
+      severity: pct >= 50 || failed >= 5 ? 'high' : 'medium',
+      kind: 'lookup_failing',
+      subject: row.race,
+      detail: `${failed} of ${total} storefront lookups failed in the last 7 days (${pct}%). Shoppers hit this before they buy.`,
+      action: 'investigate',
+    })
+  }
+
+  // ── Years a scraper covers in principle but not in practice ──
+  const notConfigured = await prisma.runnerResearch.findMany({
+    where: { researchStatus: 'year_not_configured' },
+    include: {
+      race: { select: { raceName: true, year: true } },
+      order: { select: { orderNumber: true, status: true } },
+    },
+  })
+
+  // One finding per race-year, not per stuck order: adding the event IDs once
+  // clears every order behind it.
+  const byRaceYear = new Map()
+  for (const r of notConfigured) {
+    if (!r.race) continue
+    const key = `${r.race.raceName}|${r.race.year}`
+    if (!byRaceYear.has(key)) {
+      byRaceYear.set(key, { raceName: r.race.raceName, year: r.race.year, open: 0 })
+    }
+    if (r.order && r.order.status !== 'completed') byRaceYear.get(key).open++
+  }
+
+  for (const entry of byRaceYear.values()) {
+    const open = entry.open
+    findings.push({
+      severity: open > 0 ? 'high' : 'low',
+      kind: 'year_not_configured',
+      subject: `${entry.raceName} ${entry.year}`,
+      detail: open > 0
+        ? `The scraper exists but ${entry.year} event IDs are missing, and ${open} open order${open === 1 ? '' : 's'} cannot be looked up until they are added.`
+        : `The scraper exists but ${entry.year} event IDs are missing. No open orders, so this is groundwork.`,
+      action: 'tier1_fixable',
+      years: [entry.year],
+    })
+  }
+
+  return {
+    findings,
+    stats: { lookupErrorRaces: lookupRows.length, unconfiguredYears: byRaceYear.size },
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────────────────
    4. Order red flags - concrete only
    ──────────────────────────────────────────────────────────────────────── */
 
@@ -509,6 +607,7 @@ export async function runNightlySweep({ persistBaseline = true } = {}) {
     await check('race_dates', raceDateCheck),
     await check('orders', orderCheck),
     await check('commerce', commerceCheck),
+    await check('alerted_failures', alertedFailureCheck),
   ]
 
   const findings = checks.flatMap(c => (c.findings || []).map(f => ({ ...f, check: c.name })))

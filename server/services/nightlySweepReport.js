@@ -22,6 +22,9 @@ const KIND_LABELS = {
   photo_gate_bypassed: 'Photo order in production, photo unconfirmed',
   no_runner_data: 'No runner data and nothing that will produce it',
   new_discount_code: 'New discount code seen',
+  // Failures that already fired a Slack alert and would otherwise scroll away.
+  lookup_failing: 'Storefront lookups failing',
+  year_not_configured: 'Year missing from the scraper config',
 }
 
 const label = kind => KIND_LABELS[kind] || kind

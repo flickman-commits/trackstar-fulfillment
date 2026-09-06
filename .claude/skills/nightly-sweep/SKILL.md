@@ -107,9 +107,20 @@ Cost is not a constraint—this runs on Haiku and a heavy night is negligible.
 3. **Anything in `newTonight`.** New means something changed today.
 4. **Untested race-years** - Capture a real finisher's results, then test the scraper against those results. Spread
    across platforms. This is the biggest pile and the easiest to clear.
-5. **Missing year configs** (`no_year`) - `discover_event_ids` where the
-   platform has a listing we can query; flag the rest for a human.
-6. **Upcoming races.** Check the calendar for anything running in the next eight
+5. **Missing year configs** (`no_year`, `year_not_configured`) -
+   `discover_event_ids` where the platform has a listing we can query; flag the
+   rest for a human. `year_not_configured` is the same gap seen from the other
+   end: an order actually tried that year and could not be looked up. Those
+   carry an order number in `detail`, so do them first.
+6. **Storefront lookups failing** (`lookup_failing`) - a race whose Instant
+   Lookup is erroring for real shoppers, drawn from the last seven days of
+   LookupLog. This is the only finding that happens in front of a customer
+   rather than in front of Eli, so treat a high-severity one as urgent.
+   `probe_scrapers` that race first: a scraper that also fails a probe is a
+   broken scraper, while one that passes points at the timing site being slow
+   or blocking us, which is a flag-for-a-human, not a fix. Do not "fix" it by
+   removing the race from the public lookup without saying so in the report.
+7. **Upcoming races.** Check the calendar for anything running in the next eight
    weeks that we sell. A year config should exist BEFORE race day, so orders do
    not pile up waiting. A race that has not run yet cannot be verified against
    results, so this is preparation and flagging only.
