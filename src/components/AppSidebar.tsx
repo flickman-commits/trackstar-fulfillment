@@ -1,5 +1,6 @@
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, Users, Ticket, Calculator, CloudSun, Settings } from 'lucide-react'
+import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 /**
@@ -12,9 +13,11 @@ import type { LucideIcon } from 'lucide-react'
  * gear next to the completed-orders count. Two of those five were invisible
  * depending on which tab you were on.
  *
- * They are all here now, in one column, each as its own card. Settings sits at
- * the bottom because it is the one you reach for least and always want in the
- * same place.
+ * They are all here now, in one column. Fulfillment and Creators are places
+ * you go; Discounts, Pace and Weather are things you reach for mid-task, so
+ * those three sit behind a single Tools tile with a hover flyout. Settings sits
+ * at the bottom because it is the one you reach for least and always want in
+ * the same place.
  *
  * Dark grey rather than a brand colour, and the same dark grey as the
  * storefront footer card, so the tool borrows a shape the brand already uses.
@@ -78,6 +81,87 @@ function Tile({ item, active }: { item: Item; active?: boolean }) {
   return <button onClick={item.onClick} className={cls} title={item.title}>{inner}</button>
 }
 
+/**
+ * The three small utilities, folded into one tile with a flyout.
+ *
+ * Discounts, Pace and Weather each had their own tile, which made the rail
+ * read as five equal destinations when only two of them are places you go.
+ * These are things you reach for mid-task, so they sit behind one "Tools"
+ * tile and appear on hover, beside the rail, in the same dark card.
+ *
+ * Hover opens it, but click toggles it too, so it works from a keyboard and on
+ * a trackpad that never quite hovers. Closing is delayed a beat so crossing
+ * the gap between the tile and the menu does not slam it shut halfway.
+ */
+function ToolsTile({
+  active,
+  onOpenDiscounts,
+  onOpenPaceConverter,
+}: {
+  active: boolean
+  onOpenDiscounts: () => void
+  onOpenPaceConverter: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const closeTimer = useRef<number | null>(null)
+
+  const cancelClose = () => {
+    if (closeTimer.current) { window.clearTimeout(closeTimer.current); closeTimer.current = null }
+  }
+  const show = () => { cancelClose(); setOpen(true) }
+  const hide = () => { cancelClose(); closeTimer.current = window.setTimeout(() => setOpen(false), 160) }
+
+  const tools = [
+    { id: 'discounts', label: 'Discounts', hint: 'One-time discount code', icon: Ticket, onClick: onOpenDiscounts },
+    { id: 'pace', label: 'Pace Converter', hint: 'Finish time to pace', icon: Calculator, onClick: onOpenPaceConverter },
+    { id: 'weather', label: 'Weather Lookup', hint: 'Race-day weather on WeatherSpark', icon: CloudSun, href: 'https://weatherspark.com' },
+  ]
+
+  const rowCls = 'group/row flex items-center gap-3 w-full px-3 py-2 rounded-xl text-left hover:bg-white/10 transition-colors'
+  const rowInner = (t: (typeof tools)[number]) => {
+    const Icon = t.icon
+    return (
+      <>
+        <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.06] text-white/70 group-hover/row:text-white shrink-0">
+          <Icon className="w-4 h-4" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[13px] font-medium text-white leading-tight">{t.label}</span>
+          <span className="block text-[11px] text-white/45 leading-tight mt-0.5 truncate">{t.hint}</span>
+        </span>
+      </>
+    )
+  }
+
+  return (
+    <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
+      <Tile
+        item={{ id: 'tools', label: 'Tools', icon: Wrench, onClick: () => setOpen(o => !o), title: 'Discounts, pace converter and weather lookup' }}
+        active={active || open}
+      />
+      {open && (
+        // pl-2 rather than ml-2: the padding is part of the hover target, so
+        // the cursor never leaves the element while crossing to the menu.
+        <div className="absolute left-full top-0 pl-2 z-40">
+          <div className="w-60 p-1.5 rounded-2xl bg-dark-fill shadow-[0_6px_24px_rgba(0,0,0,0.25)] border border-white/[0.08]">
+            {tools.map(t =>
+              t.href ? (
+                <a key={t.id} href={t.href} target="_blank" rel="noopener noreferrer" className={rowCls} onClick={() => setOpen(false)}>
+                  {rowInner(t)}
+                </a>
+              ) : (
+                <button key={t.id} onClick={() => { t.onClick?.(); setOpen(false) }} className={rowCls}>
+                  {rowInner(t)}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AppSidebar({
   isAdmin,
   onOpenDiscounts,
@@ -96,17 +180,21 @@ export default function AppSidebar({
     { id: 'fulfillment', label: 'Fulfillment', icon: Package, to: '/', title: 'Orders to personalize, custom designs and partners' },
     // Creators is admin-only, same as the route behind it.
     ...(isAdmin ? [{ id: 'creators', label: 'Creators', icon: Users, to: '/creators', title: 'The creator programme' } as Item] : []),
-    { id: 'discounts', label: 'Discounts', icon: Ticket, onClick: onOpenDiscounts, title: 'Create a one-time discount code' },
-    { id: 'pace', label: 'Pace', icon: Calculator, onClick: onOpenPaceConverter, title: 'Convert a finish time to pace per mile or km' },
-    { id: 'weather', label: 'Weather', icon: CloudSun, href: 'https://weatherspark.com', title: 'Look up historical race-day weather on WeatherSpark' },
   ]
 
   return (
     <aside className="hidden md:flex fixed left-3 top-3 bottom-3 w-[78px] z-30 flex-col rounded-[22px] bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.10)]">
-      <div className="flex-1 flex flex-col gap-0.5 px-1.5 pt-2.5 overflow-y-auto">
+      {/* overflow-visible on purpose: overflow-y-auto would also clip on the
+          x axis and swallow the Tools flyout. Four tiles never need to scroll. */}
+      <div className="flex-1 flex flex-col gap-0.5 px-1.5 pt-2.5 overflow-visible">
         {items.map(item => (
           <Tile key={item.id} item={item} active={activeId === item.id} />
         ))}
+        <ToolsTile
+          active={activeId === 'discounts' || activeId === 'pace'}
+          onOpenDiscounts={onOpenDiscounts}
+          onOpenPaceConverter={onOpenPaceConverter}
+        />
       </div>
       {/* Pinned, and separated so it does not read as one of the tools. */}
       <div className="px-1.5 pb-2.5 pt-2 mt-1 border-t border-white/[0.10]">
