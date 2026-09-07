@@ -11,6 +11,7 @@
  */
 import { PrismaClient } from '@prisma/client'
 import { getScraperForRace, hasScraperForRace } from '../scrapers/index.js'
+import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
 import WeatherService from './WeatherService.js'
 
 const prisma = new PrismaClient()
@@ -282,6 +283,11 @@ export class ResearchService {
 
     // Fetch from scraper
     console.log(`[ResearchService] Fetching race data for: ${raceName} ${year}`)
+    // Dashboard event-id overrides live in a cache that only applies if
+    // someone loaded it. Until this call was here, only the repair tools
+    // loaded it, so a fix made in the UI never reached order research or the
+    // storefront lookup. Cached for 60s; cheap on a warm instance.
+    await ensureOverridesLoaded()
     const scraper = getScraperForRace(raceName, year)
     const raceInfo = await scraper.getRaceInfo()
 
@@ -430,6 +436,11 @@ export class ResearchService {
    */
   async findRunner(raceName, year, runnerName, { skipLastNameFallback = false } = {}) {
     console.log(`[ResearchService] Searching for runner: ${runnerName}`)
+    // Dashboard event-id overrides live in a cache that only applies if
+    // someone loaded it. Until this call was here, only the repair tools
+    // loaded it, so a fix made in the UI never reached order research or the
+    // storefront lookup. Cached for 60s; cheap on a warm instance.
+    await ensureOverridesLoaded()
     const scraper = getScraperForRace(raceName, year)
     let results = await scraper.searchRunner(runnerName)
 

@@ -194,3 +194,22 @@ export function requireAdmin(req, res) {
   res.status(401).json({ error: 'Unauthorized' })
   return false
 }
+
+/**
+ * Is this request from the scheduler? Vercel cron today, an in-process
+ * scheduler on a self-hosted server later. Crons present
+ * `Authorization: Bearer <CRON_SECRET>`.
+ *
+ * Fails closed: an unset CRON_SECRET means NO request is a cron request. The
+ * inline checks this replaces compared against the template string
+ * `Bearer ${process.env.CRON_SECRET}`, which an unset variable turned into the
+ * literal "Bearer undefined" - a password anyone could type. Constant-time
+ * compare, like every other secret in this file.
+ */
+export function isCronRequest(req) {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
+  const header = req.headers?.['authorization'] || ''
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) return false
+  return safeEqual(header.slice('Bearer '.length), secret)
+}

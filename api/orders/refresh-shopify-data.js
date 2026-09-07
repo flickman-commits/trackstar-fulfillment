@@ -2,10 +2,18 @@
  * POST /api/orders/refresh-shopify-data
  *
  * Handles two modes:
- *   1. Single order: { shopifyOrderId } — fetches personalization for one order
- *   2. Batch refresh: {} (no body) — re-fetches Shopify data for ALL orders
+ *   1. Single order: { shopifyOrderId } — re-fetches personalization for one order
+ *   2. Batch refresh: {} (no body) — re-fetches Shopify data for ALL Shopify orders
  *
- * Useful for updating orders when extraction logic changes
+ * Both modes go through refreshOrderFromShopify() so they cannot drift. The
+ * batch path used to call the Admin API directly with SHOPIFY_SHOP_URL and
+ * SHOPIFY_ACCESS_TOKEN, two variables nothing else in the app defines, so it
+ * failed on every order. It also keyed on the per-line-item orderNumber
+ * ("12345-1"), which is not a Shopify id, and reset every row to "pending".
+ * Now it walks distinct parent orders with the shared shopifyFetch client and
+ * keeps each row's status, exactly like the single-order path.
+ *
+ * Useful for updating orders when extraction logic changes.
  */
 
 import prisma from '../_lib/prisma.js'
@@ -13,10 +21,6 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { shopifyFetch } from '../../server/services/shopifyAuth.js'
 import { parseRaceNameFromTitle } from '../../server/scrapers/raceNameNormalization.js'
 import { resolveShopifyLineIndex } from '../../server/lib/lineItemMatching.js'
-
-// Fallback for batch mode (uses direct token auth)
-const SHOPIFY_SHOP_URL = process.env.SHOPIFY_SHOP_URL
-const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -31,11 +35,11 @@ export default async function handler(req, res) {
 
     // Single order mode — fetch personalization for one order
     if (shopifyOrderId) {
-      return await handleSingleOrder(req, res, shopifyOrderId)
+      return await handleSingleOrder(res, shopifyOrderId)
     }
 
     // Batch mode — refresh all orders
-    return await handleBatchRefresh(req, res)
+    return await handleBatchRefresh(res)
 
   } catch (error) {
     console.error('[API /orders/refresh-shopify-data] Error:', error)
@@ -48,57 +52,68 @@ export default async function handler(req, res) {
 }
 
 /**
- * Fetch personalization data from Shopify for a single order
+ * Re-fetch one Shopify order and update every line-item row that belongs to
+ * it. Returns a summary, or null when Shopify has no such order.
  */
-async function handleSingleOrder(req, res, shopifyOrderId) {
+async function refreshOrderFromShopify(shopifyOrderId) {
   const data = await shopifyFetch(`/orders/${shopifyOrderId}.json`)
   const shopifyOrder = data.order
-
-  if (!shopifyOrder) {
-    return res.status(404).json({ error: 'Order not found in Shopify' })
-  }
+  if (!shopifyOrder) return null
 
   const parsed = extractShopifyData(shopifyOrder.line_items)
   const notes = await fetchShopifyComments(shopifyOrderId)
 
-  // Update all line items for this order
   const existingOrders = await prisma.order.findMany({
     where: { parentOrderNumber: String(shopifyOrderId) }
   })
 
+  let updated = 0
   for (const existing of existingOrders) {
     // `existing.lineItemIndex` indexes ARTELO's items, not Shopify's. Using it
     // directly against line_items could land on the photo add-on and overwrite
     // the row's personalization with the add-on's (empty) properties.
     const shopifyIdx = resolveShopifyLineIndex({ ...existing, shopifyOrderData: shopifyOrder })
     const lineItem = shopifyIdx >= 0 ? shopifyOrder.line_items?.[shopifyIdx] : null
+    if (!lineItem) continue
 
-    if (lineItem) {
-      const lineItemData = extractShopifyData([lineItem])
+    const lineItemData = extractShopifyData([lineItem])
 
-      await prisma.order.update({
-        where: { id: existing.id },
-        data: {
-          raceName: lineItemData.raceName || existing.raceName,
-          runnerName: lineItemData.runnerName || existing.runnerName,
-          raceYear: lineItemData.raceYear || existing.raceYear,
-          hadNoTime: lineItemData.hadNoTime || false,
-          notes: notes || existing.notes,
-          shopifyOrderData: shopifyOrder,
-          status: lineItemData.needsAttention ? 'missing_year' : existing.status,
-          // Widget / Easify parity fields
-          customerBib: lineItemData.customerBib,
-          customerFinishTime: lineItemData.customerFinishTime,
-          customerPace: lineItemData.customerPace,
-          customerEventType: lineItemData.customerEventType,
-          lookupVerified: lineItemData.lookupVerified,
-          lookupOutcome: lineItemData.lookupOutcome,
-          photoPath: lineItemData.photoPath,
-          isGift: lineItemData.isGift
-        }
-      })
-    }
+    await prisma.order.update({
+      where: { id: existing.id },
+      data: {
+        raceName: lineItemData.raceName || existing.raceName,
+        runnerName: lineItemData.runnerName || existing.runnerName,
+        raceYear: lineItemData.raceYear || existing.raceYear,
+        hadNoTime: lineItemData.hadNoTime || false,
+        notes: notes || existing.notes,
+        shopifyOrderData: shopifyOrder,
+        status: lineItemData.needsAttention ? 'missing_year' : existing.status,
+        // Widget / Easify parity fields
+        customerBib: lineItemData.customerBib,
+        customerFinishTime: lineItemData.customerFinishTime,
+        customerPace: lineItemData.customerPace,
+        customerEventType: lineItemData.customerEventType,
+        lookupVerified: lineItemData.lookupVerified,
+        lookupOutcome: lineItemData.lookupOutcome,
+        photoPath: lineItemData.photoPath,
+        isGift: lineItemData.isGift
+      }
+    })
+    updated++
   }
+
+  return { shopifyOrder, parsed, notes, updated, rows: existingOrders.length }
+}
+
+/**
+ * Fetch personalization data from Shopify for a single order
+ */
+async function handleSingleOrder(res, shopifyOrderId) {
+  const result = await refreshOrderFromShopify(shopifyOrderId)
+  if (!result) {
+    return res.status(404).json({ error: 'Order not found in Shopify' })
+  }
+  const { shopifyOrder, parsed, notes } = result
 
   return res.status(200).json({
     success: true,
@@ -120,82 +135,41 @@ async function handleSingleOrder(req, res, shopifyOrderId) {
 }
 
 /**
- * Re-fetch Shopify data for ALL orders in the database
+ * Re-fetch Shopify data for ALL Shopify orders in the database.
+ * One Shopify order can be several rows (one per line item); fetch each
+ * parent once and let refreshOrderFromShopify fan out to its rows.
  */
-async function handleBatchRefresh(req, res) {
+async function handleBatchRefresh(res) {
   console.log('[API /orders/refresh-shopify-data] Starting batch refresh...')
 
-  const orders = await prisma.order.findMany({
+  const parents = await prisma.order.findMany({
     where: { source: 'shopify' },
-    select: { orderNumber: true }
+    select: { parentOrderNumber: true },
+    distinct: ['parentOrderNumber']
   })
 
-  console.log(`[Refresh] Found ${orders.length} Shopify orders to refresh`)
+  console.log(`[Refresh] Found ${parents.length} Shopify orders to refresh`)
 
-  const results = { total: orders.length, updated: 0, failed: 0, errors: [] }
+  const results = { total: parents.length, updated: 0, failed: 0, errors: [] }
 
-  for (const order of orders) {
+  for (const { parentOrderNumber } of parents) {
     try {
-      const orderNumber = order.orderNumber
-
-      const response = await fetch(`https://${SHOPIFY_SHOP_URL}/admin/api/2024-01/orders/${orderNumber}.json`, {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
+      const result = await refreshOrderFromShopify(parentOrderNumber)
+      if (!result) {
         results.failed++
-        results.errors.push({ orderNumber, error: `Shopify API ${response.status}` })
+        results.errors.push({ orderNumber: parentOrderNumber, error: 'No order data returned' })
         continue
       }
-
-      const data = await response.json()
-      const shopifyOrder = data.order
-
-      if (!shopifyOrder) {
-        results.failed++
-        results.errors.push({ orderNumber, error: 'No order data returned' })
-        continue
-      }
-
-      const parsed = extractShopifyData(shopifyOrder.line_items || [])
-      const notes = await fetchShopifyComments(shopifyOrder.id)
-
-      await prisma.order.update({
-        where: { orderNumber: String(orderNumber) },
-        data: {
-          raceName: parsed.raceName,
-          runnerName: parsed.runnerName,
-          raceYear: parsed.raceYear,
-          shopifyOrderData: shopifyOrder,
-          hadNoTime: parsed.hadNoTime,
-          notes: notes,
-          status: parsed.needsAttention ? 'missing_year' : 'pending',
-          // Widget / Easify parity fields
-          customerBib: parsed.customerBib,
-          customerFinishTime: parsed.customerFinishTime,
-          customerPace: parsed.customerPace,
-          customerEventType: parsed.customerEventType,
-          lookupVerified: parsed.lookupVerified,
-          lookupOutcome: parsed.lookupOutcome,
-          photoPath: parsed.photoPath,
-          isGift: parsed.isGift
-        }
-      })
-
-      results.updated++
-      console.log(`[Refresh] Updated order ${orderNumber}: ${parsed.runnerName} - ${parsed.raceName} (${parsed.raceYear})`)
-
+      results.updated += result.updated
+      console.log(`[Refresh] Updated ${result.updated}/${result.rows} rows for order ${parentOrderNumber}: ${result.parsed.runnerName} - ${result.parsed.raceName} (${result.parsed.raceYear})`)
     } catch (error) {
-      console.error(`[Refresh] Error processing order ${order.orderNumber}:`, error.message)
+      console.error(`[Refresh] Error processing order ${parentOrderNumber}:`, error.message)
       results.failed++
-      results.errors.push({ orderNumber: order.orderNumber, error: error.message })
+      results.errors.push({ orderNumber: parentOrderNumber, error: error.message })
     }
   }
 
-  console.log(`[Refresh] Complete: ${results.updated} updated, ${results.failed} failed`)
+  console.log(`[Refresh] Complete: ${results.updated} rows updated, ${results.failed} orders failed`)
   return res.status(200).json({ success: true, ...results })
 }
 

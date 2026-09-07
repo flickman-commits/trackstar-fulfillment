@@ -28,7 +28,7 @@
 import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors, requireAdmin, isCronRequest } from '../_lib/auth.js'
 import { requireAdminRole, recordAudit } from '../_lib/users.js'
 import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
@@ -93,16 +93,14 @@ export default async function handler(req, res) {
   // GET requests — used by Vercel cron (cron uses CRON_SECRET, not ADMIN_SECRET)
   if (req.method === 'GET') {
     if (action === 'monday-pipeline') {
-      const authHeader = req.headers['authorization']
-      if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      if (!isCronRequest(req)) {
         return res.status(401).json({ error: 'Unauthorized' })
       }
       return await handleMondayPipeline(res)
     }
     if (action === 'daily-design-update') {
       // Cron uses CRON_SECRET; manual runs (for debugging) use ADMIN_SECRET.
-      const cronAuth = req.headers['authorization']
-      const isCron = cronAuth === `Bearer ${process.env.CRON_SECRET}`
+      const isCron = isCronRequest(req)
       if (!isCron && !requireAdmin(req, res)) return
       return await handleDailyDesignUpdate(res)
     }
@@ -139,8 +137,7 @@ export default async function handler(req, res) {
     }
     if (action === 'health-check') {
       // Cron uses CRON_SECRET, manual uses ADMIN_SECRET
-      const cronAuth = req.headers['authorization']
-      const isCron = cronAuth === `Bearer ${process.env.CRON_SECRET}`
+      const isCron = isCronRequest(req)
       if (!isCron && !requireAdmin(req, res)) return
       return await handleHealthCheck(res, { sendSlack: isCron })
     }
@@ -149,8 +146,7 @@ export default async function handler(req, res) {
       // Cron fires twice (20:00 + 21:00 UTC Friday) to handle DST; the
       // function checks isFridayFourPmEastern() and skips if not 4pm ET.
       // Manual triggers (?dryRun=1 or just the action) bypass the guard.
-      const cronAuth = req.headers['authorization']
-      const isCron = cronAuth === `Bearer ${process.env.CRON_SECRET}`
+      const isCron = isCronRequest(req)
       if (!isCron && !requireAdmin(req, res)) return
       const dryRun = req.query?.dryRun === '1' || req.query?.dryRun === 'true'
       return await handleWeeklyAdsDebrief(res, { isCron, dryRun })

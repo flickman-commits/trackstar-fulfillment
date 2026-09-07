@@ -26,7 +26,7 @@
  * do with this report is write a bad pull request.
  */
 import prisma from '../_lib/prisma.js'
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors, requireAdmin, isCronRequest } from '../_lib/auth.js'
 import { agentActor } from '../_lib/agentToken.js'
 import { runNightlySweep, combineSweepPasses, NIGHTLY_REPORT_KEY } from '../../server/services/nightlySweep.js'
 import { formatSweepForSlack, formatSweepAsMarkdown, formatSweepBrief } from '../../server/services/nightlySweepReport.js'
@@ -150,7 +150,7 @@ async function postToSlack(text) {
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
 
-  const isCron = req.headers['authorization'] === `Bearer ${process.env.CRON_SECRET}`
+  const isCron = isCronRequest(req)
   const wantsCached = req.query?.cached === '1' || req.query?.cached === 'true'
 
   /**
