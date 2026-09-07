@@ -695,3 +695,127 @@ model ToplineWaitlist {
 
   @@map("topline_waitlist")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sales. The seed of the CRM.
+//
+// Company is the organisation the deal is with (a race or a charity), and
+// the deal's stage and cadence live on it. Contact is a person there.
+// Touch is one thing that happened between us: a draft, a send, a reply, a
+// call, a note. Enums rather than free strings, on purpose: the order tables
+// documented their statuses in comments and the code drifted from them.
+// Money is integer cents. There is no float price column anywhere in here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Pipeline {
+  RACE
+  CHARITY
+}
+
+enum DealStage {
+  NOT_CONTACTED
+  QUEUED          // a draft exists in Gmail, not yet sent
+  SENT
+  FOLLOWED_UP
+  REPLIED
+  CALL_BOOKED
+  PROPOSAL_SENT
+  INTERESTED
+  SIGNED
+  INVOICED
+  PAID
+  NEXT_YEAR       // "hit up next year": parked, not dead
+  PASSED
+  NOT_INTERESTED
+}
+
+enum TouchKind {
+  EMAIL_DRAFT
+  EMAIL_SENT
+  REPLY
+  CALL
+  NOTE
+}
+
+model Company {
+  id             String    @id @default(cuid())
+  pipeline       Pipeline
+  name           String
+  domain         String?   // "chicagomarathon.com"; the dedupe key when present
+  website        String?
+  city           String?
+  state          String?
+  // Race pipeline
+  runnerCount    Int?
+  raceDate       DateTime?
+  identityTags   String[]  @default([]) // "BQ Favorite", "Scenic/Destination", ...
+  courseLandmark String?
+  // Charity pipeline
+  tier           String?
+  dealValueCents Int?
+  units          Int?
+  // Deal
+  stage          DealStage @default(NOT_CONTACTED)
+  touchCount     Int       @default(0)
+  lastTouchAt    DateTime?
+  nextActionAt   DateTime?
+  nextAction     String?
+  notes          String?
+  // Provenance
+  source         String    // "csv" | "clickup" | "notion" | "manual"
+  externalId     String?   // ClickUp task id / Notion page id
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  contacts       Contact[]
+  touches        Touch[]
+
+  @@unique([pipeline, name])
+  @@index([pipeline, stage])
+  @@index([nextActionAt])
+  @@index([domain])
+}
+
+model Contact {
+  id           String    @id @default(cuid())
+  companyId    String
+  firstName    String
+  lastName     String    @default("")
+  email        String?   @unique
+  title        String?
+  linkedinUrl  String?
+  isPrimary    Boolean   @default(true)
+  // What we know about them, from Perplexity: { title, personInfo[], companyInfo[], sources[] }
+  research     Json?
+  researchedAt DateTime?
+  source       String
+  externalId   String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  touches      Touch[]
+
+  @@index([companyId])
+}
+
+model Touch {
+  id            String    @id @default(cuid())
+  companyId     String
+  contactId     String?
+  kind          TouchKind
+  touchNumber   Int?      // position in the cadence, 1-based
+  angle         String?   // "first-touch", "course-landmark", ...
+  subject       String?
+  body          String?   // plain text as approved
+  gmailDraftId  String?
+  gmailThreadId String?
+  sentAt        DateTime?
+  createdBy     String?   // actor email
+  createdAt     DateTime  @default(now())
+
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact       Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+}

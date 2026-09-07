@@ -75,6 +75,16 @@ const routes = [
   // Marathon Monopoly proposal page (gated behind MONOPOLY_PAGE_ENABLED).
   { method: 'get',    path: '/api/public/monopoly',        handler: '../api/public/monopoly.js' },
   { method: 'get',    path: '/api/admin/monopoly-model',   handler: '../api/admin/monopoly-model.js' },
+  // Sales: the pipeline, imports, research, drafting, and the Gmail connection.
+  { method: 'get',    path: '/api/sales/companies',        handler: '../api/sales/companies.js' },
+  { method: 'post',   path: '/api/sales/companies',        handler: '../api/sales/companies.js' },
+  { method: 'delete', path: '/api/sales/companies',        handler: '../api/sales/companies.js' },
+  { method: 'post',   path: '/api/sales/import',           handler: '../api/sales/import.js' },
+  { method: 'post',   path: '/api/sales/research',         handler: '../api/sales/research.js' },
+  { method: 'get',    path: '/api/sales/draft',            handler: '../api/sales/draft.js' },
+  { method: 'post',   path: '/api/sales/draft',            handler: '../api/sales/draft.js' },
+  { method: 'get',    path: '/api/sales/gmail',            handler: '../api/sales/gmail.js' },
+  { method: 'post',   path: '/api/sales/gmail',            handler: '../api/sales/gmail.js' },
 ]
 
 // Load all handlers and register routes

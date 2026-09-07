@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench } from 'lucide-react'
+import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 /**
@@ -180,6 +180,7 @@ export default function AppSidebar({
     { id: 'fulfillment', label: 'Fulfillment', icon: Package, to: '/', title: 'Orders to personalize, custom designs and partners' },
     // Creators is admin-only, same as the route behind it.
     ...(isAdmin ? [{ id: 'creators', label: 'Creators', icon: Users, to: '/creators', title: 'The creator programme' } as Item] : []),
+    ...(isAdmin ? [{ id: 'sales', label: 'Sales', icon: Send, to: '/sales', title: 'Outreach queue: races and charities' } as Item] : []),
   ]
 
   return (

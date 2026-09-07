@@ -1,0 +1,158 @@
+/**
+ * Gmail drafts in Matt's own account.
+ *
+ * Cold email lives or dies on deliverability, and mail from the account a
+ * person actually replies from beats anything sent through a transactional
+ * provider. So the tool never sends: it writes a draft into Gmail and Matt
+ * presses Send there. That also keeps a human on every outbound message.
+ *
+ * Auth is a one-time Google OAuth consent (gmail.compose scope: create drafts
+ * and send; the app only creates drafts). The refresh token is persisted in
+ * SystemConfig the same way the Etsy token is, so it survives cold starts.
+ *
+ * Setup, once, in Google Cloud Console:
+ *   1. Enable the Gmail API on a project.
+ *   2. Create an OAuth client (Web application). Authorized redirect URI:
+ *        <APP_URL>/api/sales/gmail?action=callback
+ *      for production, and http://localhost:5173/api/sales/gmail?action=callback
+ *      for local dev.
+ *   3. Put the client id and secret in GOOGLE_OAUTH_CLIENT_ID and
+ *      GOOGLE_OAUTH_CLIENT_SECRET.
+ *   4. Open Sales, press Connect Gmail.
+ */
+import { google } from 'googleapis'
+import prisma from '../../db.js'
+
+const SCOPES = ['https://www.googleapis.com/auth/gmail.compose']
+const KEY_REFRESH = 'gmail_refresh_token'
+const KEY_EMAIL = 'gmail_account_email'
+
+export function isGmailConfigured() {
+  return Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET)
+}
+
+function oauthClient(redirectUri) {
+  if (!isGmailConfigured()) throw new Error('Gmail is not configured: set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET')
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+    redirectUri,
+  )
+}
+
+async function getConfig(key) {
+  const row = await prisma.systemConfig.findUnique({ where: { key } })
+  return row?.value || null
+}
+
+async function setConfig(key, value) {
+  await prisma.systemConfig.upsert({ where: { key }, update: { value }, create: { key, value } })
+}
+
+/** Where Google should send the user back. Same handler, action=callback. */
+export function redirectUriFor(req) {
+  const proto = req.headers['x-forwarded-proto'] || 'https'
+  const host = req.headers['x-forwarded-host'] || req.headers.host || ''
+  const base = process.env.APP_URL || `${proto}://${host}`
+  return `${base.replace(/\/$/, '')}/api/sales/gmail?action=callback`
+}
+
+export function getAuthUrl(redirectUri) {
+  return oauthClient(redirectUri).generateAuthUrl({
+    access_type: 'offline',
+    // Force the consent screen so Google returns a refresh token even when
+    // the account has approved this app before.
+    prompt: 'consent',
+    scope: SCOPES,
+  })
+}
+
+/** Exchange the code Google sent back, persist the refresh token, record which account it is. */
+export async function completeConnection(code, redirectUri) {
+  const client = oauthClient(redirectUri)
+  const { tokens } = await client.getToken(code)
+  if (!tokens.refresh_token) {
+    throw new Error('Google did not return a refresh token. Remove the app under Google Account > Security > Third-party access and connect again.')
+  }
+  await setConfig(KEY_REFRESH, tokens.refresh_token)
+  client.setCredentials(tokens)
+  const gmail = google.gmail({ version: 'v1', auth: client })
+  const profile = await gmail.users.getProfile({ userId: 'me' })
+  const email = profile.data.emailAddress || ''
+  await setConfig(KEY_EMAIL, email)
+  return { email }
+}
+
+export async function disconnectGmail() {
+  await prisma.systemConfig.deleteMany({ where: { key: { in: [KEY_REFRESH, KEY_EMAIL] } } })
+}
+
+export async function gmailStatus() {
+  const configured = isGmailConfigured()
+  const refresh = configured ? await getConfig(KEY_REFRESH) : null
+  const email = refresh ? await getConfig(KEY_EMAIL) : null
+  return { configured, connected: Boolean(refresh), email }
+}
+
+async function gmailClient() {
+  const refresh = await getConfig(KEY_REFRESH)
+  if (!refresh) throw new Error('Gmail is not connected. Open Sales and press Connect Gmail.')
+  const client = oauthClient()
+  client.setCredentials({ refresh_token: refresh })
+  return google.gmail({ version: 'v1', auth: client })
+}
+
+/** RFC 2047 encode a header value when it is not plain ASCII. */
+function headerValue(s) {
+  const v = String(s || '')
+  return /^[\x20-\x7e]*$/.test(v) ? v : `=?utf-8?B?${Buffer.from(v, 'utf8').toString('base64')}?=`
+}
+
+function buildMime({ to, subject, html, inReplyTo }) {
+  const lines = [
+    `To: ${headerValue(to)}`,
+    `Subject: ${headerValue(subject)}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=utf-8',
+    'Content-Transfer-Encoding: base64',
+  ]
+  if (inReplyTo) {
+    lines.push(`In-Reply-To: ${inReplyTo}`)
+    lines.push(`References: ${inReplyTo}`)
+  }
+  const body = Buffer.from(html, 'utf8').toString('base64')
+  return `${lines.join('\r\n')}\r\n\r\n${body}`
+}
+
+function base64url(s) {
+  return Buffer.from(s, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * Plain text to the HTML the cadence templates use: Arial, 14px, one <p> per
+ * paragraph, <br> inside a paragraph. Keeps drafts looking like a person typed
+ * them rather than a newsletter.
+ */
+export function textToHtml(text) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const paragraphs = String(text || '').replace(/\r\n/g, '\n').split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
+  const inner = paragraphs.map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('\n')
+  return `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;">\n${inner}\n</div>`
+}
+
+/**
+ * Create a draft. Returns Gmail's draft id, the message id, and the thread id
+ * so a follow-up can land in the same thread later.
+ */
+export async function createDraft({ to, subject, html, threadId, inReplyTo }) {
+  const gmail = await gmailClient()
+  const raw = base64url(buildMime({ to, subject, html, inReplyTo }))
+  const message = { raw }
+  if (threadId) message.threadId = threadId
+  const res = await gmail.users.drafts.create({ userId: 'me', requestBody: { message } })
+  return {
+    draftId: res.data.id,
+    messageId: res.data.message?.id || null,
+    threadId: res.data.message?.threadId || threadId || null,
+  }
+}

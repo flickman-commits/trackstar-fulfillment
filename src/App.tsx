@@ -12,6 +12,7 @@ import CreatorApply from '@/pages/CreatorApply'
 import Monopoly from '@/pages/Monopoly'
 import MonopolyModel from '@/pages/MonopolyModel'
 import ProductsBulkEdit from '@/pages/ProductsBulkEdit'
+import Sales from '@/pages/Sales'
 import { SignInGate, RequireAdmin } from '@/lib/auth'
 
 interface ErrorBoundaryProps {
@@ -171,6 +172,7 @@ export default function App() {
                 <Route path="/creators" element={<RequireAdmin><CreatorsHome /></RequireAdmin>} />
                 <Route path="/products" element={<RequireAdmin><ProductsBulkEdit /></RequireAdmin>} />
                 <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
+                <Route path="/sales" element={<RequireAdmin><Sales /></RequireAdmin>} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>
               </AppShell>
