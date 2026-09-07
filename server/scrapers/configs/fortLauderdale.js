@@ -37,6 +37,10 @@ export default {
   keywords: ['fort lauderdale', 'ft. lauderdale', 'ft lauderdale', 'a1a'],
   keywordRequiresMarathon: true,
   raceDates: {
+    2022: '2022-02-20',
+    2023: '2023-02-19',
+    2024: '2024-02-18',
+    2025: '2025-02-16',
     2026: '2026-02-15',
   },
   eventIds: {
