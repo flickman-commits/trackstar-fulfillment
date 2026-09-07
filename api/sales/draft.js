@@ -8,7 +8,7 @@
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { draftVariants, queueDraft } from '../../server/domain/sales/drafting.js'
 import { llmInfo } from '../../server/lib/llm.js'
-import { isResearchConfigured } from '../../server/domain/sales/research.js'
+import { researchProvider } from '../../server/domain/sales/research.js'
 import { gmailStatus } from '../../server/domain/sales/gmail.js'
 
 export default async function handler(req, res) {
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       return res.status(200).json({
         llm: llmInfo(),
-        research: { configured: isResearchConfigured() },
+        research: { configured: researchProvider() !== null, provider: researchProvider() },
         gmail: await gmailStatus(),
       })
     }

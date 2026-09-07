@@ -86,3 +86,36 @@ test('extractJson survives the ways models wrap JSON', () => {
   assert.throws(() => extractJson(''), /empty/)
   assert.throws(() => extractJson('no json at all'), /no JSON/)
 })
+
+test('research picks a backend that can actually search the web', async () => {
+  const { researchProvider } = await import('./research.js')
+  const saved = { ...process.env }
+  const set = (vars) => {
+    for (const k of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'PERPLEXITY_API_KEY', 'RESEARCH_PROVIDER', 'LLM_PROVIDER', 'LLM_API_KEY', 'OPENAI_API_KEY']) delete process.env[k]
+    Object.assign(process.env, vars)
+  }
+  try {
+    set({ ANTHROPIC_API_KEY: 'x' })
+    assert.equal(researchProvider(), 'anthropic', 'Anthropic alone is enough - it searches server-side')
+
+    set({ ANTHROPIC_API_KEY: 'x', PERPLEXITY_API_KEY: 'y' })
+    assert.equal(researchProvider(), 'anthropic', 'with both, prefer the one already drafting')
+
+    set({ ANTHROPIC_API_KEY: 'x', PERPLEXITY_API_KEY: 'y', RESEARCH_PROVIDER: 'perplexity' })
+    assert.equal(researchProvider(), 'perplexity', 'the override wins')
+
+    set({ PERPLEXITY_API_KEY: 'y' })
+    assert.equal(researchProvider(), 'perplexity', 'falls back when Anthropic is absent')
+
+    // A local model can draft but cannot browse, so research must report off
+    // rather than answer from training data.
+    set({ LLM_PROVIDER: 'openai', LLM_API_KEY: 'local' })
+    assert.equal(researchProvider(), null, 'a local model cannot search')
+
+    set({})
+    assert.equal(researchProvider(), null, 'nothing configured')
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
+    Object.assign(process.env, saved)
+  }
+})

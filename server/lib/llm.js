@@ -27,6 +27,13 @@
  * model answered. That is deliberate: provider-specific structured-output
  * modes would tie prompts to one backend.
  *
+ * Web search: pass `webSearch: true` and Anthropic runs its own search tool
+ * server-side, so a question needing live facts needs no second vendor. An
+ * OpenAI-compatible endpoint gets no search - a local model on a GPU cannot
+ * browse - so callers must check `canSearch()` and have a plan when it is
+ * false, rather than silently receiving a confidently wrong answer built from
+ * training data.
+ *
  * Every call logs provider, model, tokens, elapsed and a caller-supplied
  * `purpose` so cost can be attributed per feature. When a ModelRun table
  * exists this is the one place to persist it.
@@ -34,6 +41,15 @@
 
 const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5'
 const DEFAULT_OPENAI_MODEL = 'gpt-4o'
+
+/** Anthropic's server-side search tool. Runs on their infrastructure, no beta header. */
+const WEB_SEARCH_TOOL = 'web_search_20260209'
+/**
+ * A server-tool turn that hits the server's own loop limit comes back with
+ * stop_reason "pause_turn" and has to be re-sent to continue. Bounded so a
+ * pathological question cannot bill forever.
+ */
+const MAX_RESUMES = 3
 
 function pickProvider() {
   const explicit = (process.env.LLM_PROVIDER || '').toLowerCase()
@@ -48,6 +64,18 @@ export function isLlmConfigured() {
   return pickProvider() !== null
 }
 
+/**
+ * Can the configured backend look things up on the live web?
+ *
+ * Only Anthropic can, via its server-side search tool. This is deliberately a
+ * separate question from "is a model configured": moving to a local model
+ * keeps drafting working and takes search away, and the caller should know
+ * that rather than find out from a hallucinated biography.
+ */
+export function canSearch() {
+  return pickProvider() === 'anthropic'
+}
+
 /** What is currently answering, for status panels. Never includes a key. */
 export function llmInfo() {
   const provider = pickProvider()
@@ -57,7 +85,7 @@ export function llmInfo() {
   const baseUrl = provider === 'openai'
     ? (process.env.LLM_BASE_URL || 'https://api.openai.com/v1')
     : undefined
-  return { configured: true, provider, model, baseUrl }
+  return { configured: true, provider, model, baseUrl, canSearch: provider === 'anthropic' }
 }
 
 /**
@@ -89,8 +117,11 @@ export function extractJson(text) {
  * @param {number}  [opts.temperature] OpenAI-compatible backends only (Anthropic 4.6+ rejects it).
  * @param {string}  [opts.model]      Override the configured model for this call.
  * @param {string}  [opts.purpose]    Short label for logs, e.g. "sales.draft".
+ * @param {boolean} [opts.webSearch]   Let the model search the live web (Anthropic only).
+ * @param {number}  [opts.maxSearches] Cap on searches per call. Default 5.
  * @returns {Promise<{ text: string, json?: any, provider: string, model: string,
- *   usage: { input: number, output: number }, ms: number }>}
+ *   usage: { input: number, output: number, searches: number }, ms: number,
+ *   sources: string[] }>}
  */
 export async function complete({
   system,
@@ -101,6 +132,8 @@ export async function complete({
   temperature = 0.7,
   model,
   purpose = 'llm',
+  webSearch = false,
+  maxSearches = 5,
 }) {
   const provider = pickProvider()
   if (!provider) {
@@ -112,28 +145,57 @@ export async function complete({
     : prompt
 
   let text = ''
-  let usage = { input: 0, output: 0 }
+  let usage = { input: 0, output: 0, searches: 0 }
   let usedModel = model
+  const sources = []
 
   if (provider === 'anthropic') {
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
     // No explicit key: the SDK resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or an `ant auth login` profile.
     const client = new Anthropic()
     usedModel = model || process.env.LLM_MODEL || DEFAULT_ANTHROPIC_MODEL
-    const response = await client.messages.create({
-      model: usedModel,
-      max_tokens: maxTokens,
-      system,
-      output_config: { effort },
-      messages: [{ role: 'user', content: userMessage }],
-    })
-    if (response.stop_reason === 'refusal') {
-      const why = response.stop_details?.explanation || response.stop_details?.category || 'no reason given'
-      throw new Error(`Model declined the request (${why})`)
+    const tools = webSearch
+      ? [{ type: WEB_SEARCH_TOOL, name: 'web_search', max_uses: maxSearches }]
+      : undefined
+
+    const messages = [{ role: 'user', content: userMessage }]
+    let response
+    for (let attempt = 0; ; attempt++) {
+      response = await client.messages.create({
+        model: usedModel,
+        max_tokens: maxTokens,
+        system,
+        output_config: { effort },
+        ...(tools ? { tools } : {}),
+        messages,
+      })
+      usage.input += response.usage?.input_tokens || 0
+      usage.output += response.usage?.output_tokens || 0
+      usage.searches += response.usage?.server_tool_use?.web_search_requests || 0
+
+      for (const block of response.content) {
+        if (block.type === 'text') text += (text ? '\n' : '') + block.text
+        // A search result's `content` is a list when the search worked and a
+        // bare error object when it did not, so check before iterating.
+        if (block.type === 'web_search_tool_result' && Array.isArray(block.content)) {
+          for (const r of block.content) if (r?.url) sources.push(r.url)
+        }
+      }
+
+      if (response.stop_reason === 'refusal') {
+        const why = response.stop_details?.explanation || response.stop_details?.category || 'no reason given'
+        throw new Error(`Model declined the request (${why})`)
+      }
+      // The server ran out of its own tool-loop budget mid-answer. Re-send with
+      // the paused turn appended and it picks up where it stopped; adding a
+      // "continue" message of our own would confuse it.
+      if (response.stop_reason !== 'pause_turn' || attempt >= MAX_RESUMES) break
+      messages.push({ role: 'assistant', content: response.content })
     }
-    text = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n')
-    usage = { input: response.usage?.input_tokens || 0, output: response.usage?.output_tokens || 0 }
   } else {
+    if (webSearch) {
+      throw new Error('This model cannot search the web. Web search needs the Anthropic backend; set ANTHROPIC_API_KEY or turn the feature off.')
+    }
     const baseUrl = (process.env.LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
     const apiKey = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || 'local'
     usedModel = model || process.env.LLM_MODEL || DEFAULT_OPENAI_MODEL
@@ -156,13 +218,13 @@ export async function complete({
     }
     const data = await res.json()
     text = data.choices?.[0]?.message?.content || ''
-    usage = { input: data.usage?.prompt_tokens || 0, output: data.usage?.completion_tokens || 0 }
+    usage = { input: data.usage?.prompt_tokens || 0, output: data.usage?.completion_tokens || 0, searches: 0 }
   }
 
   const ms = Date.now() - startedAt
-  console.log(`[llm] ${purpose} provider=${provider} model=${usedModel} in=${usage.input} out=${usage.output} ${ms}ms`)
+  console.log(`[llm] ${purpose} provider=${provider} model=${usedModel} in=${usage.input} out=${usage.output} searches=${usage.searches} ${ms}ms`)
 
-  const result = { text, provider, model: usedModel, usage, ms }
+  const result = { text, provider, model: usedModel, usage, ms, sources: [...new Set(sources)] }
   if (json) result.json = extractJson(text)
   return result
 }

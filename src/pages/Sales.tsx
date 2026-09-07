@@ -262,8 +262,13 @@ export default function Sales() {
               <span className={`px-2 py-1 rounded-md border ${status.llm.configured ? 'border-border-gray text-off-black/60' : 'border-red-300 text-red-700'}`} title={status.llm.model ? `${status.llm.provider}: ${status.llm.model}` : 'Set ANTHROPIC_API_KEY or an OpenAI-compatible endpoint'}>
                 {status.llm.configured ? `Model · ${status.llm.model}` : 'No model configured'}
               </span>
-              <span className={`px-2 py-1 rounded-md border ${status.research.configured ? 'border-border-gray text-off-black/60' : 'border-amber-300 text-amber-700'}`} title="Perplexity">
-                {status.research.configured ? 'Research on' : 'Research off'}
+              <span
+                className={`px-2 py-1 rounded-md border ${status.research.configured ? 'border-border-gray text-off-black/60' : 'border-amber-300 text-amber-700'}`}
+                title={status.research.configured
+                  ? `Contact research runs on ${status.research.provider}`
+                  : 'No backend can search the web. Set ANTHROPIC_API_KEY, or PERPLEXITY_API_KEY.'}
+              >
+                {status.research.configured ? `Research · ${status.research.provider}` : 'Research off'}
               </span>
               {status.gmail.connected ? (
                 <button onClick={async () => { await salesApi.gmailDisconnect(); loadStatus() }} className="px-2 py-1 rounded-md border border-border-gray text-off-black/60 hover:text-off-black" title="Disconnect">

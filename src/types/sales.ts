@@ -101,8 +101,8 @@ export interface DraftResult {
 }
 
 export interface SalesStatus {
-  llm: { configured: boolean; provider?: string; model?: string; baseUrl?: string }
-  research: { configured: boolean }
+  llm: { configured: boolean; provider?: string; model?: string; baseUrl?: string; canSearch?: boolean }
+  research: { configured: boolean; provider: 'anthropic' | 'perplexity' | null }
   gmail: { configured: boolean; connected: boolean; email: string | null }
 }
 
