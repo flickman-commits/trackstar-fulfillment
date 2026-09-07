@@ -11,8 +11,8 @@
  * first touch reply in the same Gmail thread when the cadence step says so.
  */
 import prisma from '../../db.js'
-import { complete } from '../../lib/llm.js'
-import { cadenceFor, pickIdentityTag, RACE_ONE_LINERS, HOUSE_STYLE, DEFAULT_SOCIAL_PROOF } from './angles.js'
+import { complete, isLlmConfigured } from '../../lib/llm.js'
+import { cadenceFor, pickIdentityTag, RACE_ONE_LINERS, HOUSE_STYLE, DEFAULT_SOCIAL_PROOF, templateFor, greetingName } from './angles.js'
 import { createDraft, textToHtml, gmailStatus } from './gmail.js'
 
 const VARIANT_COUNT = 5
@@ -26,6 +26,20 @@ function nextSeasonYear(raceDate) {
   const now = new Date()
   const y = raceDate ? new Date(raceDate).getFullYear() : now.getFullYear()
   return Math.max(y, now.getFullYear()) + (raceDate && new Date(raceDate) > now ? 0 : 1)
+}
+
+/** The model-free draft for a step, with the identity one-liner filled in. */
+function buildTemplate(company, contact, touchNumber, step) {
+  const tag = company.pipeline === 'RACE' ? pickIdentityTag(company.identityTags) : null
+  const oneLiner = touchNumber === 1 && tag && RACE_ONE_LINERS[tag] ? RACE_ONE_LINERS[tag](company) : null
+  return templateFor({
+    pipeline: company.pipeline,
+    angle: step.angle,
+    company,
+    contact,
+    oneLiner,
+    socialProof: undefined, // resolved inside templateFor via the default
+  })
 }
 
 /** What the company and its cadence say the next email is. */
@@ -52,13 +66,14 @@ You will be told which touch in the sequence this is and the one point it must m
 
 async function buildPrompt({ company, contact, touchNumber, step, previousTouches }) {
   const research = contact?.research || {}
-  const firstName = contact?.firstName || 'there'
+  const firstName = greetingName(contact)
   const lines = []
   lines.push(`Touch ${touchNumber} of ${cadenceFor(company.pipeline).length}. Angle: ${step.angle}.`)
   lines.push(`Point this email must make: ${step.purpose}`)
   lines.push(`Subject line rule: ${step.subject.replace('[Race Name]', company.name).replace('[Org Name]', company.name).replace('[next season year]', String(nextSeasonYear(company.raceDate)))}`)
   lines.push('')
   lines.push(`Recipient: ${firstName} ${contact?.lastName || ''}`.trim() + (contact?.title ? `, ${contact.title}` : ''))
+  if (firstName === 'there') lines.push('We do not know this person\'s name. Greet them as "Hey there," and never guess a name.')
   lines.push(`Organisation: ${company.name}${company.city ? ` (${company.city}${company.state ? `, ${company.state}` : ''})` : ''}`)
   if (company.pipeline === 'RACE') {
     if (company.runnerCount) lines.push(`Field size: about ${company.runnerCount.toLocaleString()} runners`)
@@ -102,20 +117,47 @@ export async function draftVariants({ companyId, contactId }) {
   if (!contact) throw new Error('This company has no contact to write to')
 
   const { touchNumber, step, exhausted } = await nextStepFor(company)
+
+  // No model, no problem: the cadence's own copy is a real first draft. This
+  // is what keeps the tool usable when the API account runs dry or when it is
+  // pointed at a local model that is not running.
+  if (!isLlmConfigured()) {
+    return {
+      touchNumber, step, exhausted, contact, company,
+      variants: [buildTemplate(company, contact, touchNumber, step)],
+      model: 'template',
+      source: 'template',
+    }
+  }
+
   const previousTouches = await prisma.touch.findMany({
     where: { companyId, kind: { in: ['EMAIL_DRAFT', 'EMAIL_SENT'] } },
     orderBy: { createdAt: 'asc' },
     select: { touchNumber: true, subject: true, body: true },
   })
 
-  const { json, model, provider } = await complete({
+  let json, model, provider
+  try {
+    ({ json, model, provider } = await complete({
     system: buildSystem(company.pipeline),
     prompt: await buildPrompt({ company, contact, touchNumber, step, previousTouches }),
     json: true,
     effort: 'low',
-    maxTokens: 3000,
-    purpose: `sales.draft.t${touchNumber}`,
-  })
+      maxTokens: 3000,
+      purpose: `sales.draft.t${touchNumber}`,
+    }))
+  } catch (err) {
+    // Out of credit, rate limited, endpoint down: hand back the template with
+    // the reason attached rather than an empty screen. The work still moves.
+    console.warn(`[sales.draft] model failed (${err.message}); falling back to the template`)
+    return {
+      touchNumber, step, exhausted, contact, company,
+      variants: [buildTemplate(company, contact, touchNumber, step)],
+      model: 'template',
+      source: 'template',
+      warning: `Wrote this from the template: ${err.message}`,
+    }
+  }
 
   const raw = Array.isArray(json?.variants) ? json.variants : Array.isArray(json) ? json : []
   const variants = raw
@@ -124,7 +166,7 @@ export async function draftVariants({ companyId, contactId }) {
     .slice(0, VARIANT_COUNT)
   if (!variants.length) throw new Error('The model returned no usable variants')
 
-  return { touchNumber, step, exhausted, variants, contact, company, model: `${provider}/${model}` }
+  return { touchNumber, step, exhausted, variants, contact, company, model: `${provider}/${model}`, source: 'model' }
 }
 
 /**

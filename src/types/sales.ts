@@ -98,6 +98,10 @@ export interface DraftResult {
   contactId: string
   companyId: string
   model: string
+  /** 'model' when a model wrote it, 'template' when the cadence copy did. */
+  source?: 'model' | 'template'
+  /** Set when the model was meant to write it and could not. */
+  warning?: string
 }
 
 export interface SalesStatus {

@@ -88,6 +88,11 @@ export default function Composer({
       {draft && (
         <p className="text-xs text-off-black/55 bg-subtle-gray border border-border-gray rounded-md px-3 py-2 mb-3">
           <span className="font-semibold text-off-black/70">This email's job:</span> {draft.step.purpose}
+          {draft.source === 'template' && (
+            <span className="block mt-1 text-amber-700">
+              Written from the cadence template, not a model. Edit it before you send.
+            </span>
+          )}
         </p>
       )}
 

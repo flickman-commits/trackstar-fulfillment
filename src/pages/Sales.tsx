@@ -101,13 +101,15 @@ export default function Sales() {
   /** Research (if needed) and draft for one company. Silent when prefetching. */
   const prepare = useCallback(async (c: Company, opts: { silent: boolean; force?: boolean; contactId?: string | null }) => {
     const target = (opts.contactId && c.contacts.find(x => x.id === opts.contactId)) || c.contacts[0]
-    if (!target?.email || !status?.llm.configured) return
+    // No model is not a reason to skip: draftVariants falls back to the
+    // cadence's own copy, which is still a real draft to edit and send.
+    if (!target?.email) return
     const key = `${c.id}:${target.id}`
     if (inFlight.current.has(key)) return
     if (!opts.force && prepared[c.id]) return
     inFlight.current.add(key)
     try {
-      if (!target.research && status.research.configured) {
+      if (!target.research && status?.research.configured) {
         if (!opts.silent) setResearching(true)
         try {
           const r = await salesApi.research(target.id)
@@ -120,7 +122,10 @@ export default function Sales() {
       try {
         const draft = await salesApi.variants(c.id, target.id)
         setPrepared(prev => ({ ...prev, [c.id]: { draft, variants: draft.variants } }))
-        if (!opts.silent) setVariantIndex(0)
+        if (!opts.silent) {
+          setVariantIndex(0)
+          if (draft.warning) toast.warning(draft.warning)
+        }
       } catch (e) { if (!opts.silent) toast.error(`Drafting failed: ${(e as Error).message}`) }
       finally { if (!opts.silent) setDrafting(false) }
     } finally {
@@ -143,7 +148,7 @@ export default function Sales() {
     })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id, status?.llm.configured])
+  }, [selected?.id, status])
 
   const move = useCallback((delta: number) => {
     if (!companies.length) return
@@ -259,8 +264,13 @@ export default function Sales() {
         <div className="flex items-center gap-2 text-xs">
           {status && (
             <>
-              <span className={`px-2 py-1 rounded-md border ${status.llm.configured ? 'border-border-gray text-off-black/60' : 'border-red-300 text-red-700'}`} title={status.llm.model ? `${status.llm.provider}: ${status.llm.model}` : 'Set ANTHROPIC_API_KEY or an OpenAI-compatible endpoint'}>
-                {status.llm.configured ? `Model · ${status.llm.model}` : 'No model configured'}
+              <span
+                className={`px-2 py-1 rounded-md border ${status.llm.configured ? 'border-border-gray text-off-black/60' : 'border-amber-300 text-amber-700'}`}
+                title={status.llm.model
+                  ? `${status.llm.provider}: ${status.llm.model}`
+                  : 'No model configured. Drafts come from the cadence templates; edit and send them as normal. Set ANTHROPIC_API_KEY, or LLM_PROVIDER=openai with LLM_BASE_URL and LLM_API_KEY.'}
+              >
+                {status.llm.configured ? `Model · ${status.llm.model}` : 'Templates only · no model'}
               </span>
               <span
                 className={`px-2 py-1 rounded-md border ${status.research.configured ? 'border-border-gray text-off-black/60' : 'border-amber-300 text-amber-700'}`}

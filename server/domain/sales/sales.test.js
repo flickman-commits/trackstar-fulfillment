@@ -142,3 +142,16 @@ test('the web search tool version matches what the model can do', async () => {
   // An unknown model gets the conservative choice, not the one that 400s.
   assert.equal(webSearchToolFor('some-future-model', 5).type, 'web_search_20250305')
 })
+
+test('a mailbox is never used as a first name in a greeting', async () => {
+  const { greetingName } = await import('./angles.js')
+  // Real names pass through.
+  assert.equal(greetingName({ firstName: 'Kerri', email: 'kerri.powell@themmrf.org' }), 'Kerri')
+  assert.equal(greetingName({ firstName: 'Jean-Luc', email: 'jl@x.org' }), 'Jean-Luc')
+  // The importer's email-prefix fallback must not reach an email.
+  assert.equal(greetingName({ firstName: 'usaf.marathon', email: 'usaf.marathon@us.af.mil' }), 'there')
+  assert.equal(greetingName({ firstName: 'info', email: 'info@race.org' }), 'there')
+  assert.equal(greetingName({ firstName: 'runner2026', email: 'x@y.org' }), 'there')
+  assert.equal(greetingName({ firstName: '', email: 'a@b.org' }), 'there')
+  assert.equal(greetingName(null), 'there')
+})
