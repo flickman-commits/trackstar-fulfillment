@@ -7,8 +7,8 @@
  * CSV text comes in the JSON body; a lead list is kilobytes, not megabytes,
  * so there is no reason for multipart here.
  */
-import { setCors, requireAdmin } from '../_lib/auth.js'
-import { recordAudit } from '../_lib/users.js'
+import { setCors } from '../_lib/auth.js'
+import { recordAudit, requireAdminOnly } from '../_lib/users.js'
 import { parseCsv } from '../../server/lib/csv.js'
 import { csvToRecords } from '../../server/domain/sales/columns.js'
 import { importRecords } from '../../server/domain/sales/importer.js'
@@ -17,7 +17,7 @@ const MAX_CSV_BYTES = 2 * 1024 * 1024
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = await requireAdminOnly(req, res)
   if (!actor) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 

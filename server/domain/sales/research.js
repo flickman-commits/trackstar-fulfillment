@@ -7,10 +7,12 @@
  *
  * Two backends, and the default is whatever is already configured:
  *
- *   anthropic   The same model that writes the emails, with Anthropic's
- *               server-side web search. Nothing extra to set up, one vendor,
- *               and it goes through server/lib/llm.js like every other model
- *               call. This is the default whenever Anthropic is configured.
+ *   anthropic   Anthropic's server-side web search, on the cheapest model
+ *               rather than the one that writes the emails - reading pages and
+ *               filling in a JSON shape does not need the expensive one.
+ *               Nothing extra to set up, one vendor, and it goes through
+ *               server/lib/llm.js like every other model call. This is the
+ *               default whenever Anthropic is configured.
  *   perplexity  Kept because it is twenty lines and it is the escape hatch if
  *               search quality ever disappoints. Set RESEARCH_PROVIDER=perplexity
  *               to force it; it is also used automatically if Anthropic is not
@@ -83,21 +85,33 @@ function shape(parsed, { model, extraSources = [], raw = '' }) {
 }
 
 /**
- * Searches are billed per search ($10 per 1,000 at the time of writing) on top
- * of tokens, and the pages the model reads come back as input tokens, so this
- * is the one call in Sales with a cost worth capping. Five searches is plenty
- * to find a person and their organisation.
+ * Reading a few pages and filling in a fixed JSON shape is the cheapest kind
+ * of work there is, so research runs on the cheapest model rather than the one
+ * that writes the emails. Drafting still uses whatever LLM_MODEL says.
  *
- * RESEARCH_MAX_SEARCHES and RESEARCH_MODEL exist so both dials can be turned
- * without a deploy. Both default to the same model and budget as everything
- * else, so leaving them unset changes nothing.
+ * Cost is dominated by the search fee, not the model: searches bill at $10 per
+ * 1,000 on top of tokens, so five searches costs 5c per contact whichever
+ * model reads the results. Both dials move without a deploy.
  */
+const DEFAULT_RESEARCH_MODEL = 'claude-haiku-4-5'
+/**
+ * If the cheap model cannot do the job - it is retired, or it rejects the
+ * search tool - fall back once rather than failing the whole lookup. Loudly,
+ * so a permanent fallback shows up in the logs instead of silently doubling
+ * the bill forever.
+ */
+const FALLBACK_RESEARCH_MODEL = process.env.RESEARCH_FALLBACK_MODEL || 'claude-sonnet-5'
+
 const MAX_SEARCHES = Number(process.env.RESEARCH_MAX_SEARCHES) > 0
   ? Number(process.env.RESEARCH_MAX_SEARCHES)
   : 5
 
-async function viaAnthropic(prompt) {
-  const { json, text, model, provider, sources, usage } = await complete({
+function researchModel() {
+  return process.env.RESEARCH_MODEL || DEFAULT_RESEARCH_MODEL
+}
+
+async function askAnthropic(prompt, model) {
+  return complete({
     system: SYSTEM,
     prompt,
     json: true,
@@ -105,9 +119,22 @@ async function viaAnthropic(prompt) {
     maxSearches: MAX_SEARCHES,
     effort: 'low',
     maxTokens: 2000,
-    model: process.env.RESEARCH_MODEL || undefined,
+    model,
     purpose: 'sales.research',
   })
+}
+
+async function viaAnthropic(prompt) {
+  const first = researchModel()
+  let result
+  try {
+    result = await askAnthropic(prompt, first)
+  } catch (err) {
+    if (first === FALLBACK_RESEARCH_MODEL) throw err
+    console.warn(`[sales.research] ${first} failed (${err.message}); retrying once on ${FALLBACK_RESEARCH_MODEL}. If this repeats, set RESEARCH_MODEL=${FALLBACK_RESEARCH_MODEL}.`)
+    result = await askAnthropic(prompt, FALLBACK_RESEARCH_MODEL)
+  }
+  const { json, text, model, provider, sources, usage } = result
   return shape(json, { model: `${provider}/${model} (${usage.searches} searches)`, extraSources: sources, raw: text })
 }
 

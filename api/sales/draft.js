@@ -5,7 +5,8 @@
  *   POST { action:'variants', companyId, contactId? }       five drafts for the next touch
  *   POST { action:'queue', companyId, contactId, subject, body }  file the chosen one
  */
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors } from '../_lib/auth.js'
+import { requireAdminOnly } from '../_lib/users.js'
 import { draftVariants, queueDraft } from '../../server/domain/sales/drafting.js'
 import { llmInfo } from '../../server/lib/llm.js'
 import { researchProvider } from '../../server/domain/sales/research.js'
@@ -13,7 +14,9 @@ import { gmailStatus } from '../../server/domain/sales/gmail.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  // Admin-only, and every model call costs money, so the role is checked
+  // against the database rather than trusted from the session token.
+  const actor = await requireAdminOnly(req, res)
   if (!actor) return
 
   try {

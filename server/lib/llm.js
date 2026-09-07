@@ -42,8 +42,31 @@
 const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5'
 const DEFAULT_OPENAI_MODEL = 'gpt-4o'
 
-/** Anthropic's server-side search tool. Runs on their infrastructure, no beta header. */
-const WEB_SEARCH_TOOL = 'web_search_20260209'
+/**
+ * Anthropic's server-side search tool. Runs on their infrastructure, no beta
+ * header. Two versions, and the right one depends on the model:
+ *
+ *   web_search_20260209  Claude 4.6 and later. Filters results with code
+ *                        before they reach the context window, so a
+ *                        search-heavy turn costs far fewer input tokens.
+ *   web_search_20250305  Everything older. Every result lands in context.
+ *
+ * The newer one defaults to being called from inside code execution, which a
+ * model without programmatic tool calling cannot do - sending it to such a
+ * model returns a 400. So older models get the basic tool, called directly.
+ */
+const SEARCH_MODERN = 'web_search_20260209'
+const SEARCH_BASIC = 'web_search_20250305'
+
+/** Model families that support dynamic filtering (Claude 4.6 and later). */
+const MODERN_SEARCH_MODELS = /^claude-(fable|mythos)-5|^claude-opus-(5|4-6|4-7|4-8)|^claude-sonnet-(5|4-6)/
+
+export function webSearchToolFor(model, maxUses) {
+  const modern = MODERN_SEARCH_MODELS.test(model || '')
+  return modern
+    ? { type: SEARCH_MODERN, name: 'web_search', max_uses: maxUses }
+    : { type: SEARCH_BASIC, name: 'web_search', max_uses: maxUses, allowed_callers: ['direct'] }
+}
 /**
  * A server-tool turn that hits the server's own loop limit comes back with
  * stop_reason "pause_turn" and has to be re-sent to continue. Bounded so a
@@ -154,9 +177,7 @@ export async function complete({
     // No explicit key: the SDK resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or an `ant auth login` profile.
     const client = new Anthropic()
     usedModel = model || process.env.LLM_MODEL || DEFAULT_ANTHROPIC_MODEL
-    const tools = webSearch
-      ? [{ type: WEB_SEARCH_TOOL, name: 'web_search', max_uses: maxSearches }]
-      : undefined
+    const tools = webSearch ? [webSearchToolFor(usedModel, maxSearches)] : undefined
 
     const messages = [{ role: 'user', content: userMessage }]
     let response

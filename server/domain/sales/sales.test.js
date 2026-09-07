@@ -119,3 +119,26 @@ test('research picks a backend that can actually search the web', async () => {
     Object.assign(process.env, saved)
   }
 })
+
+test('the web search tool version matches what the model can do', async () => {
+  const { webSearchToolFor } = await import('../../lib/llm.js')
+
+  // Claude 4.6 and later get dynamic filtering, which keeps irrelevant search
+  // results out of the context window.
+  for (const m of ['claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-fable-5-1']) {
+    assert.equal(webSearchToolFor(m, 5).type, 'web_search_20260209', m)
+  }
+
+  // Older models must use the basic tool called directly. The newer tool
+  // defaults to being called from code execution, which they cannot do, and
+  // the API answers that with a 400.
+  for (const m of ['claude-haiku-4-5', 'claude-sonnet-4-5', 'claude-opus-4-5']) {
+    const tool = webSearchToolFor(m, 5)
+    assert.equal(tool.type, 'web_search_20250305', m)
+    assert.deepEqual(tool.allowed_callers, ['direct'], m)
+  }
+
+  assert.equal(webSearchToolFor('claude-haiku-4-5', 3).max_uses, 3)
+  // An unknown model gets the conservative choice, not the one that 400s.
+  assert.equal(webSearchToolFor('some-future-model', 5).type, 'web_search_20250305')
+})

@@ -15,6 +15,7 @@
 
 import crypto from 'crypto'
 import prisma from './prisma.js'
+import { requireAdmin } from './auth.js'
 
 export const ROLES = ['admin', 'staff']
 
@@ -102,6 +103,23 @@ export async function requireAdminRole(req, res, actor) {
     return null
   }
   return user
+}
+
+/**
+ * Authenticate AND require the admin role, in one call.
+ *
+ * `requireAdmin` is a misnomer inherited from when this app had one shared
+ * password: it means "signed in". Endpoints that should be admin-only need
+ * both, and forgetting the second half is an easy mistake to make, so this
+ * pairs them. Returns the actor, or null after responding 401/403.
+ *
+ * Cron and internal tooling authenticating with the shared secret pass, the
+ * same as everywhere else - loadActiveUser treats them as admin by definition.
+ */
+export async function requireAdminOnly(req, res) {
+  const actor = requireAdmin(req, res)
+  if (!actor) return null
+  return await requireAdminRole(req, res, actor)
 }
 
 /** Append-only record of who did something consequential. */

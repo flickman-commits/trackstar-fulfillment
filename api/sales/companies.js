@@ -15,8 +15,8 @@
  * written to yet that has someone to write to.
  */
 import prisma from '../_lib/prisma.js'
-import { setCors, requireAdmin } from '../_lib/auth.js'
-import { requireAdminRole, recordAudit } from '../_lib/users.js'
+import { setCors } from '../_lib/auth.js'
+import { requireAdminOnly, recordAudit } from '../_lib/users.js'
 
 const PIPELINES = new Set(['RACE', 'CHARITY'])
 const STAGES = new Set(['NOT_CONTACTED', 'QUEUED', 'SENT', 'FOLLOWED_UP', 'REPLIED', 'CALL_BOOKED', 'PROPOSAL_SENT', 'INTERESTED', 'SIGNED', 'INVOICED', 'PAID', 'NEXT_YEAR', 'PASSED', 'NOT_INTERESTED'])
@@ -91,7 +91,9 @@ async function listCompanies(query) {
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  // Admin-only. Staff accounts exist to fulfil orders; the sales pipeline
+  // and its contact details are not part of that job.
+  const actor = await requireAdminOnly(req, res)
   if (!actor) return
 
   try {
@@ -188,7 +190,6 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
-      if (!await requireAdminRole(req, res, actor)) return
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
       if (!body.id) return res.status(400).json({ error: 'id is required' })
       const company = await prisma.company.delete({ where: { id: String(body.id) } })

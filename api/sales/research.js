@@ -1,15 +1,18 @@
 /**
  * POST /api/sales/research  { contactId, force? }
  *
- * Research one contact with Perplexity and store it on the row. Cached after
- * the first run unless `force` is set.
+ * Research one contact and store it on the row. Cached after the first run
+ * unless `force` is set. The backend is chosen in domain/sales/research.js.
  */
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors } from '../_lib/auth.js'
+import { requireAdminOnly } from '../_lib/users.js'
 import { researchContact } from '../../server/domain/sales/research.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  // Sales is admin-only: the pipeline and everyone's contact details are
+  // not part of the fulfillment job the staff accounts exist for.
+  if (!await requireAdminOnly(req, res)) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {

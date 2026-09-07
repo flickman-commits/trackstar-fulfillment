@@ -8,12 +8,14 @@
  * Google returns the browser to /api/sales/gmail-callback, which is its own
  * file because Google rejects a redirect URI containing a query string.
  */
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors } from '../_lib/auth.js'
+import { requireAdminOnly } from '../_lib/users.js'
 import { getAuthUrl, disconnectGmail, gmailStatus, redirectUriFor, isGmailConfigured } from '../../server/domain/sales/gmail.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  // Admin-only: this connects a mailbox and can draft mail as its owner.
+  if (!await requireAdminOnly(req, res)) return
 
   try {
     const action = req.method === 'GET'

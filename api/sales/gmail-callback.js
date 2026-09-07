@@ -10,12 +10,13 @@
  * success and failure the browser ends up back on /sales with a flag the page
  * turns into a toast.
  */
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors } from '../_lib/auth.js'
+import { requireAdminOnly } from '../_lib/users.js'
 import { completeConnection, redirectUriFor, originFor } from '../../server/domain/sales/gmail.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  if (!await requireAdminOnly(req, res)) return
 
   const base = originFor(req)
   const back = (query) => {
