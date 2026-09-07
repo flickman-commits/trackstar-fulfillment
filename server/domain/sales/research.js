@@ -7,12 +7,12 @@
  *
  * Two backends, and the default is whatever is already configured:
  *
- *   anthropic   Anthropic's server-side web search, on the cheapest model
- *               rather than the one that writes the emails - reading pages and
- *               filling in a JSON shape does not need the expensive one.
- *               Nothing extra to set up, one vendor, and it goes through
- *               server/lib/llm.js like every other model call. This is the
- *               default whenever Anthropic is configured.
+ *   anthropic   Anthropic's server-side web search, on a cheaper model than
+ *               the one that writes the emails - reading pages and filling in
+ *               a JSON shape does not need the expensive one. Nothing extra to
+ *               set up, one vendor, and it goes through server/lib/llm.js like
+ *               every other model call. The default whenever Anthropic is
+ *               configured.
  *   perplexity  Kept because it is twenty lines and it is the escape hatch if
  *               search quality ever disappoints. Set RESEARCH_PROVIDER=perplexity
  *               to force it; it is also used automatically if Anthropic is not
@@ -85,22 +85,26 @@ function shape(parsed, { model, extraSources = [], raw = '' }) {
 }
 
 /**
- * Reading a few pages and filling in a fixed JSON shape is the cheapest kind
- * of work there is, so research runs on the cheapest model rather than the one
- * that writes the emails. Drafting still uses whatever LLM_MODEL says.
+ * Research runs on Sonnet rather than the model that writes the emails.
  *
- * Cost is dominated by the search fee, not the model: searches bill at $10 per
- * 1,000 on top of tokens, so five searches costs 5c per contact whichever
- * model reads the results. Both dials move without a deploy.
+ * Not simply the cheapest per token - Haiku is - because the cheaper model
+ * turns out no cheaper here. Only Claude 4.6 and later can filter search
+ * results before they reach the context window; Haiku loads every raw result,
+ * so its lower rate is spent on a much larger pile of input tokens. Sonnet
+ * filters first and lands in the same place for a fraction of Opus.
+ *
+ * Cost is dominated by the search fee either way: searches bill at $10 per
+ * 1,000 on top of tokens, so five searches is 5c per contact whichever model
+ * reads them. RESEARCH_MAX_SEARCHES is the dial that actually moves the bill.
  */
-const DEFAULT_RESEARCH_MODEL = 'claude-haiku-4-5'
+const DEFAULT_RESEARCH_MODEL = 'claude-sonnet-5'
 /**
  * If the cheap model cannot do the job - it is retired, or it rejects the
  * search tool - fall back once rather than failing the whole lookup. Loudly,
  * so a permanent fallback shows up in the logs instead of silently doubling
  * the bill forever.
  */
-const FALLBACK_RESEARCH_MODEL = process.env.RESEARCH_FALLBACK_MODEL || 'claude-sonnet-5'
+const FALLBACK_RESEARCH_MODEL = process.env.RESEARCH_FALLBACK_MODEL || 'claude-opus-5'
 
 const MAX_SEARCHES = Number(process.env.RESEARCH_MAX_SEARCHES) > 0
   ? Number(process.env.RESEARCH_MAX_SEARCHES)

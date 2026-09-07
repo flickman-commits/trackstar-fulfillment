@@ -125,6 +125,28 @@ async function gmailClient() {
   return google.gmail({ version: 'v1', auth: client })
 }
 
+/**
+ * Google revokes a refresh token for several ordinary reasons, and every one
+ * of them surfaces as the same opaque `invalid_grant`: the consent was
+ * withdrawn, the password changed, or - the one that bites here - the OAuth
+ * app is still in "Testing", where Google expires refresh tokens after seven
+ * days. Forget the dead token so the UI offers Connect again rather than
+ * showing a broken button, and say what to do about it.
+ */
+function isRevokedToken(err) {
+  const text = `${err?.message || ''} ${err?.response?.data?.error || ''}`
+  return /invalid_grant|invalid_token|unauthorized_client/i.test(text)
+}
+
+async function handleGmailError(err) {
+  if (!isRevokedToken(err)) throw err
+  await prisma.systemConfig.deleteMany({ where: { key: KEY_REFRESH } })
+  throw new Error(
+    'Gmail disconnected: Google rejected the saved credential. Press Connect Gmail again. '
+    + 'If this keeps happening weekly, the OAuth consent screen is still in Testing, which expires refresh tokens after 7 days - set it to Internal, or publish it.'
+  )
+}
+
 /** RFC 2047 encode a header value when it is not plain ASCII. */
 function headerValue(s) {
   const v = String(s || '')
@@ -172,7 +194,12 @@ export async function createDraft({ to, subject, html, threadId, inReplyTo }) {
   const raw = base64url(buildMime({ to, subject, html, inReplyTo }))
   const message = { raw }
   if (threadId) message.threadId = threadId
-  const res = await gmail.users.drafts.create({ userId: 'me', requestBody: { message } })
+  let res
+  try {
+    res = await gmail.users.drafts.create({ userId: 'me', requestBody: { message } })
+  } catch (err) {
+    await handleGmailError(err)
+  }
   return {
     draftId: res.data.id,
     messageId: res.data.message?.id || null,
