@@ -33,7 +33,11 @@ export default async function handler(req, res) {
     if (!body.companyId) return res.status(400).json({ error: 'companyId is required' })
 
     if (body.action === 'variants') {
-      const out = await draftVariants({ companyId: String(body.companyId), contactId: body.contactId ? String(body.contactId) : undefined })
+      const out = await draftVariants({
+        companyId: String(body.companyId),
+        contactId: body.contactId ? String(body.contactId) : undefined,
+        useTemplate: Boolean(body.useTemplate),
+      })
       const { company, contact, ...rest } = out
       return res.status(200).json({ ...rest, contactId: contact.id, companyId: company.id })
     }

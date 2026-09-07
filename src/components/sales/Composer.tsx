@@ -79,7 +79,7 @@ export default function Composer({
               <Check className="w-3.5 h-3.5" /> Mark sent
             </button>
           )}
-          <button onClick={onRegenerate} disabled={drafting || !contact} className={btnGhost} title="Write five new variants">
+          <button onClick={onRegenerate} disabled={drafting || !contact} className={btnGhost} title={draft?.source === 'template' ? 'Rebuild this draft from the template' : 'Write five new variants'}>
             <RefreshCw className={`w-3.5 h-3.5 ${drafting ? 'animate-spin' : ''}`} /> Regenerate
           </button>
         </div>
@@ -101,7 +101,7 @@ export default function Composer({
         {drafting ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-off-black/50">
             <Loader2 className="w-5 h-5 animate-spin" />
-            Writing five ways to say it…
+            {variants.length === 1 && draft?.source === 'template' ? 'Filling in the template…' : 'Writing five ways to say it…'}
           </div>
         ) : !current ? (
           <div className="flex-1 flex items-center justify-center text-sm text-off-black/40 px-6 text-center">

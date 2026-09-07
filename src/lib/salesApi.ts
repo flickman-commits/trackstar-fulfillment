@@ -55,8 +55,9 @@ export const salesApi = {
   research: (contactId: string, force = false) =>
     post<{ contact: Contact; research: Research; cached: boolean }>('/api/sales/research', { contactId, force }),
 
-  variants: (companyId: string, contactId?: string) =>
-    post<DraftResult>('/api/sales/draft', { action: 'variants', companyId, contactId }),
+  /** `useTemplate` asks for the cadence copy even when a model is available. */
+  variants: (companyId: string, contactId?: string, useTemplate = false) =>
+    post<DraftResult>('/api/sales/draft', { action: 'variants', companyId, contactId, useTemplate }),
 
   queue: (body: { companyId: string; contactId: string; subject: string; body: string }) =>
     post<{ touch: Touch; gmailDraft: boolean; gmailConnected: boolean }>('/api/sales/draft', { action: 'queue', ...body }),

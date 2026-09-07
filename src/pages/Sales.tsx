@@ -22,10 +22,16 @@ import { useDocumentHead } from '@/lib/useDocumentHead'
  * there the email is already waiting.
  */
 
-type Prepared = { draft: DraftResult; variants: Variant[] }
+type Prepared = {
+  draft: DraftResult
+  variants: Variant[]
+  /** The mode this was produced under, so flipping the switch invalidates it. */
+  template: boolean
+}
 
 const PIPELINE_KEY = 'sales.pipeline'
 const VIEW_KEY = 'sales.view'
+const AI_KEY = 'sales.ai'
 
 export default function Sales() {
   useDocumentHead({ title: 'Sales · Trackstar' })
@@ -37,6 +43,15 @@ export default function Sales() {
   })
   const [view, setView] = useState<ListView>(() => {
     try { return (localStorage.getItem(VIEW_KEY) as ListView) || 'due' } catch { return 'due' }
+  })
+  /**
+   * Whether the model does the work. Off means research is skipped and drafts
+   * come from the cadence templates - free, instant, and still sendable after
+   * an edit. Remembered per browser, because whether an email is worth paying
+   * for is a decision that changes with the day rather than with the deal.
+   */
+  const [aiOn, setAiOn] = useState<boolean>(() => {
+    try { return localStorage.getItem(AI_KEY) !== 'off' } catch { return true }
   })
   const [q, setQ] = useState('')
   const [companies, setCompanies] = useState<Company[]>([])
@@ -56,6 +71,7 @@ export default function Sales() {
 
   useEffect(() => { try { localStorage.setItem(PIPELINE_KEY, pipeline) } catch { /* ignore */ } }, [pipeline])
   useEffect(() => { try { localStorage.setItem(VIEW_KEY, view) } catch { /* ignore */ } }, [view])
+  useEffect(() => { try { localStorage.setItem(AI_KEY, aiOn ? 'on' : 'off') } catch { /* ignore */ } }, [aiOn])
 
   // Gmail's OAuth round trip lands back here with a flag in the query string.
   useEffect(() => {
@@ -95,6 +111,8 @@ export default function Sales() {
     return company.contacts.find(c => c.id === contactId) || company.contacts[0] || null
   }, [company, contactId])
 
+  // A configured model that is switched off is not in use.
+  const aiActive = aiOn && Boolean(status?.llm.configured)
   const current = selectedId ? prepared[selectedId] : undefined
   const variants = useMemo(() => current?.variants || [], [current])
 
@@ -106,10 +124,15 @@ export default function Sales() {
     if (!target?.email) return
     const key = `${c.id}:${target.id}`
     if (inFlight.current.has(key)) return
-    if (!opts.force && prepared[c.id]) return
+    // A draft written by the model is stale the moment the switch says
+    // templates, and vice versa. Comparing the mode it was REQUESTED under -
+    // not the mode it came back as - matters, because a model failure returns
+    // a template and must not then look permanently stale and retry forever.
+    const cached = prepared[c.id]
+    if (!opts.force && cached && cached.template === !aiActive) return
     inFlight.current.add(key)
     try {
-      if (!target.research && status?.research.configured) {
+      if (aiActive && !target.research && status?.research.configured) {
         if (!opts.silent) setResearching(true)
         try {
           const r = await salesApi.research(target.id)
@@ -120,8 +143,8 @@ export default function Sales() {
       }
       if (!opts.silent) setDrafting(true)
       try {
-        const draft = await salesApi.variants(c.id, target.id)
-        setPrepared(prev => ({ ...prev, [c.id]: { draft, variants: draft.variants } }))
+        const draft = await salesApi.variants(c.id, target.id, !aiActive)
+        setPrepared(prev => ({ ...prev, [c.id]: { draft, variants: draft.variants, template: !aiActive } }))
         if (!opts.silent) {
           setVariantIndex(0)
           if (draft.warning) toast.warning(draft.warning)
@@ -131,7 +154,7 @@ export default function Sales() {
     } finally {
       inFlight.current.delete(key)
     }
-  }, [prepared, status])
+  }, [prepared, status, aiActive])
 
   // On selection: load full detail (history), prepare this one, then the next one quietly.
   useEffect(() => {
@@ -148,7 +171,7 @@ export default function Sales() {
     })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id, status])
+  }, [selected?.id, status, aiActive])
 
   const move = useCallback((delta: number) => {
     if (!companies.length) return
@@ -162,9 +185,11 @@ export default function Sales() {
     const next = current.variants.slice()
     next[variantIndex] = v
     setPrepared(prev => ({ ...prev, [selectedId]: { ...current, variants: next } }))
+
   }
 
   const regenerate = () => { if (company) prepare(company, { silent: false, force: true, contactId }) }
+
 
   const queue = useCallback(async () => {
     const v = variants[variantIndex]
@@ -237,6 +262,7 @@ export default function Sales() {
   }
   const research = async (force: boolean) => {
     if (!contact || !company) return
+    if (!aiOn) { toast.error('Turn AI on to research a contact.'); return }
     setResearching(true)
     try {
       const r = await salesApi.research(contact.id, force)
@@ -264,8 +290,31 @@ export default function Sales() {
         <div className="flex items-center gap-2 text-xs">
           {status && (
             <>
+              {/* The switch sits first because it changes what every other
+                  chip means: with AI off, the model and research chips are
+                  describing something that is configured but not running. */}
+              <button
+                onClick={() => setAiOn(v => !v)}
+                disabled={!status.llm.configured}
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${
+                  aiActive
+                    ? 'border-dark-fill bg-dark-fill text-white'
+                    : 'border-border-gray text-off-black/55 hover:text-off-black'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                title={!status.llm.configured
+                  ? 'No model is configured, so drafts always come from the templates.'
+                  : aiActive
+                    ? 'AI is writing the drafts and researching contacts. Click to switch to the free templates.'
+                    : 'Drafts come from the cadence templates and research is skipped. Click to use the model.'}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${aiActive ? 'bg-white' : 'bg-off-black/30'}`} />
+                AI {aiActive ? 'on' : 'off'}
+              </button>
               <span
-                className={`px-2 py-1 rounded-md border ${status.llm.configured ? 'border-border-gray text-off-black/60' : 'border-amber-300 text-amber-700'}`}
+                className={`px-2 py-1 rounded-md border ${
+                  !status.llm.configured ? 'border-amber-300 text-amber-700'
+                  : aiActive ? 'border-border-gray text-off-black/60'
+                  : 'border-border-gray text-off-black/35 line-through'}`}
                 title={status.llm.model
                   ? `${status.llm.provider}: ${status.llm.model}`
                   : 'No model configured. Drafts come from the cadence templates; edit and send them as normal. Set ANTHROPIC_API_KEY, or LLM_PROVIDER=openai with LLM_BASE_URL and LLM_API_KEY.'}
@@ -273,7 +322,10 @@ export default function Sales() {
                 {status.llm.configured ? `Model · ${status.llm.model}` : 'Templates only · no model'}
               </span>
               <span
-                className={`px-2 py-1 rounded-md border ${status.research.configured ? 'border-border-gray text-off-black/60' : 'border-amber-300 text-amber-700'}`}
+                className={`px-2 py-1 rounded-md border ${
+                  !status.research.configured ? 'border-amber-300 text-amber-700'
+                  : aiActive ? 'border-border-gray text-off-black/60'
+                  : 'border-border-gray text-off-black/35 line-through'}`}
                 title={status.research.configured
                   ? `Contact research runs on ${status.research.provider}`
                   : 'No backend can search the web. Set ANTHROPIC_API_KEY, or PERPLEXITY_API_KEY.'}

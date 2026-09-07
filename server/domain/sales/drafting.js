@@ -107,7 +107,7 @@ async function buildPrompt({ company, contact, touchNumber, step, previousTouche
 /**
  * @returns {Promise<{ touchNumber, step, exhausted, variants: Array<{subject, body}>, contact, company, model }>}
  */
-export async function draftVariants({ companyId, contactId }) {
+export async function draftVariants({ companyId, contactId, useTemplate = false }) {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     include: { contacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] } },
@@ -118,10 +118,12 @@ export async function draftVariants({ companyId, contactId }) {
 
   const { touchNumber, step, exhausted } = await nextStepFor(company)
 
-  // No model, no problem: the cadence's own copy is a real first draft. This
-  // is what keeps the tool usable when the API account runs dry or when it is
-  // pointed at a local model that is not running.
-  if (!isLlmConfigured()) {
+  // Either there is no model, or the operator asked for the template. Same
+  // answer: the cadence's own copy is a real first draft. This is what keeps
+  // the tool usable when the API account runs dry, when it points at a local
+  // model that is not running, or when a model is simply not worth the money
+  // for this particular email.
+  if (useTemplate || !isLlmConfigured()) {
     return {
       touchNumber, step, exhausted, contact, company,
       variants: [buildTemplate(company, contact, touchNumber, step)],
