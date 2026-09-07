@@ -1,5 +1,6 @@
 {
   "framework": "vite",
+  "installCommand": "npm ci --include=dev",
   "crons": [
     {
       "path": "/api/orders/actions?action=monday-pipeline",
