@@ -12,7 +12,9 @@ export default {
   tag: 'Tokyo Marathon',
   location: 'Tokyo, Japan',
   raceDates: {
+    2022: '2022-03-06',
     2023: '2023-03-05',
+    2024: '2024-03-03',
     2025: '2025-03-02',
     2026: '2026-03-01',
   },

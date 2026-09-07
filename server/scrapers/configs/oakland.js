@@ -16,6 +16,10 @@ export default {
   tag: 'Oakland',
   location: 'Oakland, CA',
   raceDates: {
+    2022: '2022-03-20',
+    2023: '2023-03-19',
+    2024: '2024-03-17',
+    2025: '2025-03-23',
     2026: '2026-03-22',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
