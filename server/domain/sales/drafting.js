@@ -12,7 +12,7 @@
  */
 import prisma from '../../db.js'
 import { complete, isLlmConfigured } from '../../lib/llm.js'
-import { cadenceFor, pickIdentityTag, RACE_ONE_LINERS, HOUSE_STYLE, DEFAULT_SOCIAL_PROOF, templateFor, greetingName } from './angles.js'
+import { cadenceFor, pickIdentityTag, RACE_ONE_LINERS, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateFor, greetingName } from './angles.js'
 import { createDraft, textToHtml, gmailStatus } from './gmail.js'
 
 const VARIANT_COUNT = 5
@@ -50,16 +50,23 @@ export async function nextStepFor(company) {
   return { touchNumber, step, cadenceLength: cadence.length, exhausted: company.touchCount >= cadence.length }
 }
 
+const RACE_CONTEXT = `Trackstar makes personalized race prints in partnership with iconic US marathons: the runner's name, finish time, pace, race-day weather and the course map, on archival paper. Race partners get a co-branded print for their finishers with no work on their side and a revenue share on every order.`
+
+const CHARITY_CONTEXT = `Trackstar makes personalized marathon posters: the runner's name, finish time, pace, race-day weather and the course map, on archival paper, shipped to the runner 7 to 10 days after the race.
+
+The charity program sells these to marathon charity teams, the nonprofits that hold guaranteed race entries and give them to runners in exchange for a fundraising commitment. The pitch is recognition: a way to honour someone who just raised several thousand dollars, and something with the charity's logo on it that keeps them fundraising next year. Trackstar handles the design, the orders and the fulfillment, so it is turnkey for the charity.
+
+Two tiers exist, but a cold email never names either the numbers or the terms. Money never flows back to the charity: there is no revenue share, no commission and no donation-back, deliberately.`
+
 function buildSystem(pipeline) {
-  const who = pipeline === 'CHARITY'
-    ? 'Trackstar makes custom race prints: a finisher keepsake with the runner\'s name, time and the course map. The charity program gives an organisation\'s runners a co-branded print, Trackstar handles design, orders and fulfillment, and a share of every order is paid back to the cause.'
-    : 'Trackstar makes custom race prints in partnership with iconic US marathons: a finisher keepsake with the runner\'s name, time, and the race\'s logo and course map. Partners get a co-branded print for their finishers with no work on their side and a revenue share on every order.'
+  const charity = pipeline === 'CHARITY'
   return `You write cold and follow-up emails for Matt, founder of Trackstar.
 
-${who}
+${charity ? CHARITY_CONTEXT : RACE_CONTEXT}
 
 House style, which overrides anything else:
 ${HOUSE_STYLE}
+${charity ? `\nRules specific to charity outreach, which override the house style where they disagree:\n${CHARITY_RULES}` : ''}
 
 You will be told which touch in the sequence this is and the one point it must make. Every variant makes that point; they differ in angle, opening, and phrasing, not in purpose.`
 }

@@ -69,7 +69,9 @@ test('identity tags pick the strongest angle available', () => {
 test('each cadence step states its purpose and its follow-up gap', () => {
   for (const pipeline of ['RACE', 'CHARITY']) {
     const cadence = cadenceFor(pipeline)
-    assert.ok(cadence.length >= 5, `${pipeline} cadence is too short`)
+    // Length is a business decision per pipeline (races run six touches,
+    // charities three), so assert the shape rather than a number.
+    assert.ok(cadence.length >= 1, `${pipeline} cadence is empty`)
     cadence.forEach((step, i) => {
       assert.equal(step.touch, i + 1, `${pipeline} touch numbers must be sequential`)
       assert.ok(step.purpose.length > 20, `${pipeline} touch ${step.touch} has no purpose`)
@@ -154,4 +156,91 @@ test('a mailbox is never used as a first name in a greeting', async () => {
   assert.equal(greetingName({ firstName: 'runner2026', email: 'x@y.org' }), 'there')
   assert.equal(greetingName({ firstName: '', email: 'a@b.org' }), 'there')
   assert.equal(greetingName(null), 'there')
+})
+
+// ── Copy rules from the Trackstar Charity Program docs in Notion ─────────────
+// These are the mistakes that are expensive and invisible: they read fine and
+// have to be walked back on the call, or worse, create a tax problem for the
+// charity. Locked down here so an edit to the copy cannot reintroduce them.
+
+const allCopy = async () => {
+  const a = await import('./angles.js')
+  const strings = []
+  for (const pipeline of ['RACE', 'CHARITY']) {
+    for (const step of a.cadenceFor(pipeline)) {
+      const t = a.templateFor({
+        pipeline, angle: step.angle,
+        company: { name: 'Test Org', pipeline, identityTags: [], raceDate: null },
+        contact: { firstName: 'Sam', email: 'sam@test.org' },
+      })
+      strings.push({ pipeline, angle: step.angle, ...t })
+    }
+  }
+  return { a, strings }
+}
+
+test('no dashes of any kind in copy that goes to a person', async () => {
+  const { a, strings } = await allCopy()
+  for (const s of strings) {
+    assert.ok(!/[—–]/.test(s.subject), `em/en dash in ${s.pipeline} ${s.angle} subject`)
+    assert.ok(!/[—–]/.test(s.body), `em/en dash in ${s.pipeline} ${s.angle} body`)
+  }
+  for (const [tag, fn] of Object.entries(a.RACE_ONE_LINERS)) {
+    const line = fn({ name: 'Test Race', city: 'Testville', courseLandmark: 'the bridge' })
+    assert.ok(!/[—–]/.test(line), `em/en dash in the "${tag}" one-liner`)
+  }
+})
+
+test('charity copy never implies money flows back to the charity', async () => {
+  const { strings } = await allCopy()
+  for (const s of strings.filter(x => x.pipeline === 'CHARITY')) {
+    const text = `${s.subject} ${s.body}`.toLowerCase()
+    for (const banned of ['revenue share', 'rev share', 'donation back', 'donate back', 'commission', 'share of every', 'percentage of']) {
+      assert.ok(!text.includes(banned), `"${banned}" appears in the charity ${s.angle} email. The program deliberately offers none of these.`)
+    }
+  }
+})
+
+test('a charity cold email quotes no price, percentage or minimum', async () => {
+  const { strings } = await allCopy()
+  for (const s of strings.filter(x => x.pipeline === 'CHARITY')) {
+    const text = `${s.subject} ${s.body}`
+    assert.ok(!text.includes('$'), `a price appears in the charity ${s.angle} email`)
+    assert.ok(!text.includes('%'), `a percentage appears in the charity ${s.angle} email`)
+    assert.ok(!/\b50[ -]?unit/i.test(text), `the unit minimum appears in the charity ${s.angle} email`)
+  }
+})
+
+test('charity outreach says posters, not prints', async () => {
+  const { strings } = await allCopy()
+  const first = strings.find(s => s.pipeline === 'CHARITY' && s.angle === 'first-touch')
+  assert.match(`${first.subject} ${first.body}`, /poster/i)
+})
+
+test('the charity cadence is three touches, four days apart', async () => {
+  const { a } = await allCopy()
+  const cadence = a.cadenceFor('CHARITY')
+  assert.equal(cadence.length, 3, 'three touches, then the org is parked')
+  for (const step of cadence) assert.equal(step.nextActionDays, 4, `touch ${step.touch} follows up after 4 days`)
+})
+
+test('a template with nothing specific to say leaves an obvious blank', async () => {
+  const a = await import('./angles.js')
+  // No identity tag and no research: there is no honest opening line, so the
+  // draft must not look finished.
+  const t = a.templateFor({
+    pipeline: 'CHARITY', angle: 'first-touch',
+    company: { name: 'Test Org', pipeline: 'CHARITY', identityTags: [], raceDate: null },
+    contact: { firstName: 'Sam', email: 'sam@test.org' },
+  })
+  assert.ok(t.body.includes(a.NEEDS_OPENER), 'the opener must be left as a visible placeholder')
+
+  // A real one-liner is used as given.
+  const withLine = a.templateFor({
+    pipeline: 'RACE', angle: 'first-touch', oneLiner: 'Something true about them.',
+    company: { name: 'Test Race', pipeline: 'RACE', identityTags: [], raceDate: null },
+    contact: { firstName: 'Sam', email: 'sam@test.org' },
+  })
+  assert.ok(withLine.body.includes('Something true about them.'))
+  assert.ok(!withLine.body.includes(a.NEEDS_OPENER))
 })

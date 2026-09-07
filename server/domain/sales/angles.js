@@ -20,14 +20,14 @@ export const RACE_IDENTITY_PRIORITY = [
 ]
 
 export const RACE_ONE_LINERS = {
-  'BQ Favorite': r => `${r.name} is one of the most iconic BQ courses in the country — your finishers earn that.`,
-  'Fast/Flat/PR': r => `Runners come to ${r.name} to chase PRs — we help them remember the ones they catch.`,
+  'BQ Favorite': r => `${r.name} is one of the most iconic BQ courses in the country, and your finishers earn that.`,
+  'Fast/Flat/PR': r => `Runners come to ${r.name} to chase PRs, and we help them remember the ones they catch.`,
   'Scenic/Destination': r => `From ${r.courseLandmark || 'the start'} to the finish line, ${r.name} is one of the most photogenic courses we've seen.`,
-  'Non-profit/Mission': r => `${r.name} runners aren't just crossing a finish line — they're running for something bigger.`,
-  'Large Series': r => `${r.name} is one of the marquee events in its series — we'd love to be part of it.`,
-  'Premium/Prestige': r => `${r.name} is a bucket-list race for a reason — your finishers deserve something worthy of the achievement.`,
-  'Community/Local': r => `${r.name} is the heart of ${r.city || 'its city'}'s running community — we want to help your finishers celebrate that.`,
-  'New/Growing': r => `${r.name} is building something special — and we'd love to be part of the next chapter.`,
+  'Non-profit/Mission': r => `${r.name} runners aren't just crossing a finish line, they're running for something bigger.`,
+  'Large Series': r => `${r.name} is one of the marquee events in its series, and we'd love to be part of it.`,
+  'Premium/Prestige': r => `${r.name} is a bucket-list race for a reason, and your finishers deserve something worth keeping.`,
+  'Community/Local': r => `${r.name} is the heart of ${r.city || 'its city'}'s running community, and we want to help your finishers celebrate that.`,
+  'New/Growing': r => `${r.name} is building something special, and we'd love to be part of the next chapter.`,
 }
 
 /** Pick the single strongest tag the race carries, or null. */
@@ -79,36 +79,48 @@ export const RACE_CADENCE = [
   },
 ]
 
+/**
+ * Charity: three touches, four days apart, then park it.
+ *
+ * Shorter and slower than the race cadence on purpose. The runbook is explicit:
+ * follow up four days after each touch, and after three touches with no reply
+ * move the org to Passed and move on. Charity staff are a small world and a
+ * six-email sequence to someone who is not interested costs more than it wins.
+ */
 export const CHARITY_CADENCE = [
   {
     touch: 1, days: 0, angle: 'first-touch',
-    purpose: 'Introduce the Trackstar charity program: a co-branded finisher print for their runners, with a share of every order going back to the cause, at no cost or work to the organisation. Reference the race(s) their team runs. Ask for a quick chat.',
-    subject: `Custom race prints for [Org Name] runners`,
-    nextActionDays: 3,
+    purpose: [
+      'Five short paragraphs, in this order.',
+      '1. One line that is specific and true about THEIR team. Use the research. Never a generic opener and never a pitch.',
+      '2. Who I am: I ran the NYC Marathon with New York Urban League two years ago, had a great experience, and that is what made me start Trackstar. We make personalized marathon posters and work with 20 race partners now.',
+      '3. The offer in one sentence: we opened a charity program this year and I would like this team in it. It costs them nothing to get started, and there is a co-branded tier if they want their logo built into the design.',
+      '4. One ask: any interest in being part of the pilot.',
+      '5. A P.S. pointing at the attached co-branded example.',
+    ].join('\n'),
+    subject: '[Team Name] - personalized marathon posters',
+    nextActionDays: 4,
   },
   {
-    touch: 2, days: 3, angle: 'how-it-works',
-    purpose: 'Three sentences on mechanics: Trackstar designs the print, handles orders and fulfillment, and sends a payout per order. Their runners get a keepsake, the charity gets a new revenue line. Ask for a quick chat.',
+    touch: 2, days: 4, angle: 'recognition',
+    purpose: [
+      'Short. Lead with what we learned from other charity teams: the runners who need something are the ones who already hit their fundraising minimum and have nothing left to chase.',
+      'Say a few partners use these as a reward for their top fundraisers, which costs the charity nothing to set up.',
+      'Recognition, not an incentive. Do not say "raise $X and get one".',
+      'One ask: worth a quick call.',
+    ].join('\n'),
     subject: 'Re: the original subject (reply in thread)',
     nextActionDays: 4,
   },
   {
-    touch: 3, days: 4, angle: 'do-you-have-this-covered',
-    purpose: 'Two sentences. Do they already have a finisher keepsake or fundraising add-on for this season?',
-    subject: `Quick question for [Org Name]`,
-    nextActionDays: 7,
-  },
-  {
-    touch: 4, days: 7, angle: 'social-proof',
-    purpose: 'Lead with the social proof numbers provided. Say their runners would love these. Ask if a quick call is worth it.',
-    subject: `What we're seeing this season`,
-    nextActionDays: 7,
-  },
-  {
-    touch: 5, days: 7, angle: 'better-person',
-    purpose: 'One line. Is there a better person on their team to talk to about a charity print partnership?',
+    touch: 3, days: 4, angle: 'better-person',
+    purpose: [
+      'Two or three lines, and say plainly this is the last one.',
+      'Ask whether someone else on their team handles runner rewards.',
+      'Offer to leave it if the timing is wrong. No new pitch, no numbers.',
+    ].join('\n'),
     subject: 'Re: the original subject (reply in thread)',
-    nextActionDays: 7,
+    nextActionDays: 4,
   },
 ]
 
@@ -146,6 +158,13 @@ export function greetingName(contact) {
   return looksLikeMailbox ? 'there' : raw
 }
 
+/**
+ * The unmissable placeholder for the one line a template can never write.
+ * Square brackets and capitals so it cannot be mistaken for finished copy,
+ * and so a draft carrying it is easy to spot in Gmail before sending.
+ */
+export const NEEDS_OPENER = '[WRITE ONE SPECIFIC, TRUE LINE ABOUT THIS TEAM. Their race, a fundraising milestone, a recent post. Never send this generic.]'
+
 /** `[Race Name]` and friends, filled in from the row. */
 function fill(text, { company, contact, socialProof, oneLiner }) {
   const seasonYear = (() => {
@@ -161,7 +180,11 @@ function fill(text, { company, contact, socialProof, oneLiner }) {
     .replaceAll('[Landmark]', company.courseLandmark || 'your finish line')
     .replaceAll('[Season Year]', String(seasonYear))
     .replaceAll('[Social Proof]', socialProof || DEFAULT_SOCIAL_PROOF)
-    .replaceAll('[One-liner]', oneLiner || `${company.name} runners deserve something worth keeping.`)
+    // "Never send a generic first line" is a hard rule, and a template cannot
+    // know anything specific about this org. So when there is no real opener
+    // to fill in, leave a blank that is obviously unfinished rather than a
+    // plausible sentence someone might send by accident.
+    .replaceAll('[One-liner]', oneLiner || NEEDS_OPENER)
 }
 
 const RACE_TEMPLATES = {
@@ -193,30 +216,22 @@ const RACE_TEMPLATES = {
 
 const CHARITY_TEMPLATES = {
   'first-touch': {
-    subject: 'Custom race prints for [Org Name] runners',
-    body: `Hey [First Name],\n\nI'm Matt, founder at Trackstar. We make custom race prints: a finisher's name, time and course map on something they hang on a wall.\n\nWe do a version for charity teams. Your runners get a keepsake from the race they ran for you, we handle the design, orders and shipping, and a share of every order comes back to [Org Name]. No cost and no work on your side.\n\nWorth a quick chat?\n\nMatt`,
+    subject: '[Org Name] - personalized marathon posters',
+    body: `Hey [First Name],\n\n[One-liner]\n\nI'm Matt, founder at Trackstar. I ran the NYC Marathon with New York Urban League two years ago and had a wonderful experience, which is actually what made me start this company. We make personalized marathon posters, and we work with 20 race partners now.\n\nWe just opened up a charity program this year and I'd love to have [Org Name] in it. It costs you nothing to get started, and there's a co-branded tier if you want your logo built into the design like the one attached.\n\nAny interest in being part of the pilot? Happy to hop on a quick call.\n\nMatt\n\nP.S. Attached a co-branded example so you can see what these look like with a charity logo built in.`,
   },
-  'how-it-works': {
-    subject: 'Re: prints for [Org Name] runners',
-    body: `Hey [First Name],\n\nQuick version of how it works: we design the print for the race your team runs, host it, take the orders and ship them. You share a link. We send a payout per order.\n\nYour runners get something to keep, and it adds a revenue line that costs you nothing to run.\n\nOpen to fifteen minutes?\n\nMatt`,
-  },
-  'do-you-have-this-covered': {
-    subject: 'Quick question for [Org Name]',
-    body: `Hey [First Name],\n\nQuick one: do you already have a finisher keepsake or a fundraising add-on lined up for this season?\n\nMatt`,
-  },
-  'social-proof': {
-    subject: "What we're seeing this season",
-    body: `Hey [First Name],\n\n[Social Proof]\n\nI think your runners would go for these too. Worth fifteen minutes?\n\nMatt`,
+  'recognition': {
+    subject: 'Re: [Org Name] posters',
+    body: `Hey [First Name],\n\nOne thing we keep hearing from charity teams: the runners who need something are the ones who already hit their minimum and have nothing left to chase.\n\nA few partners are using these as a reward for their top fundraisers for exactly that reason. Costs nothing on your end to set up.\n\nWorth a quick call?\n\nMatt`,
   },
   'better-person': {
-    subject: 'Re: prints for [Org Name] runners',
-    body: `Hey [First Name],\n\nIs there a better person on your team to talk to about a charity print partnership?\n\nMatt`,
+    subject: 'Re: [Org Name] posters',
+    body: `Hey [First Name],\n\nLast one from me. Is there someone else on your team who handles runner rewards for [Org Name]?\n\nHappy to leave it here if the timing isn't right.\n\nMatt`,
   },
 }
 
 /**
  * A ready-to-edit draft for one step, with no model involved.
- * Returns { subject, body } — always, so the composer is never empty.
+ * Returns { subject, body } always, so the composer is never empty.
  */
 export function templateFor({ pipeline, angle, company, contact, socialProof, oneLiner }) {
   const table = pipeline === 'CHARITY' ? CHARITY_TEMPLATES : RACE_TEMPLATES
@@ -229,13 +244,34 @@ export function templateFor({ pipeline, angle, company, contact, socialProof, on
 export const HOUSE_STYLE = `
 - Write as Matt, founder of Trackstar. First person singular. Sign off with just "Matt".
 - Open with "Hey [First Name]," on its own line, then a blank line.
+- NEVER use an em dash or an en dash. Not once, anywhere. Use a comma, a full stop, or rewrite the sentence.
 - Under 120 words. Shorter is better on every follow-up.
 - Short paragraphs, one idea each. No bullet points.
-- No "I hope you're well", no "I'd love to", no "inspiring", no exclamation marks.
-- Mention research only when it is relevant to a race print. Never recite facts back at them.
-- One ask, at the end, phrased as a question.
-- Subject lines: seven words or fewer, casual, no colons unless the template uses one.
+- Contractions, short sentences, slightly loose. If it reads like marketing copy, rewrite it.
+- No "I hope you're well", no "I'd love to" as an opener, no "inspiring", no exclamation marks beyond one.
+- The opening line must be something specific and true about THEM. Never a generic opener.
+- Mention research only where it is relevant. Never recite facts back at them.
+- ONE ask, at the end, phrased as a question.
+- Say "the NYC Marathon" for the race and "NYC" only for a location.
+- Turnaround, whenever it comes up, is 7 to 10 days after the race.
+- Subject lines: seven words or fewer, lower case, no colons unless the template uses one.
 - Return the body as plain text with blank lines between paragraphs. No HTML.
+`.trim()
+
+/**
+ * Charity rules that do not apply to races. From the Trackstar Charity Program
+ * Overview and the first-touch template in Notion; several of these are the
+ * difference between a good email and one that has to be walked back on the
+ * call.
+ */
+export const CHARITY_RULES = `
+- Say "posters", not "prints", in cold outreach. A cold reader parses "poster" faster. Switch to "prints" once they reply.
+- NO numbers in a first email. Never mention the unit minimum, the discount percentages, or any price. That is what the call is for.
+- Do NOT promise a co-branded design. "There is a co-branded tier" is the ceiling of what we commit to before a conversation.
+- There is NO revenue share, no commission and no donation-back. Never imply money flows back to the charity. Affiliate income can create taxable income for a 501(c)(3) and stalls their legal review, so we deliberately do not offer it.
+- Lead with the co-branded tier. It is the visual we reach out with.
+- Frame the product as recognition, not an incentive. "A reward for your top fundraisers" lands; "raise $X and get one" reads as a gift and comes out of a budget that is usually already spent.
+- Use the team's own brand name for its running team, not the parent charity's legal name.
 `.trim()
 
 /** Default social-proof line, editable in Settings later. */
