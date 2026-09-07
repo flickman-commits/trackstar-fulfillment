@@ -1811,9 +1811,13 @@ export default function Dashboard() {
   }
 
   // Fetch orders on mount and when view changes
-  // Only show full loading spinner on initial load; show subtle refresh indicator on view switch
+  // Only show full loading spinner on initial load; show subtle refresh indicator on view switch.
+  // The count is read through a ref so a changing order count does not re-run
+  // the effect and restart the poll.
+  const hasOrdersRef = useRef(false)
+  useEffect(() => { hasOrdersRef.current = orders.length > 0 }, [orders.length])
   useEffect(() => {
-    if (orders.length === 0) {
+    if (!hasOrdersRef.current) {
       setIsLoading(true)
     } else {
       setIsRefreshing(true)

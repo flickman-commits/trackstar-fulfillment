@@ -783,6 +783,9 @@ function CreatorDrawer({
   const [isEditingSample, setIsEditingSample] = useState(false)
   const [isEditingShipping, setIsEditingShipping] = useState(false)
 
+  // Reset the draft only when a different creator opens. Keying on the whole
+  // object would wipe in-progress edits every time the parent re-renders.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setDraft(creator) }, [creator.id])
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(creator)

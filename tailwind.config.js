@@ -24,10 +24,6 @@ export default {
         'subtle-gray': '#FAFAFA',
         'success-green': '#4CAF50',
         'warning-amber': '#F59E0B',
-        // Legacy aliases (for gradual migration)
-        'turbo-beige': '#F6F5F2',
-        'turbo-blue': '#121212',
-        'turbo-black': '#121212',
         // System Colors
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -95,8 +91,6 @@ export default {
       },
       animation: {
         'wave-pulse': 'wave-pulse 4s ease-in-out infinite',
-        rainbow: 'rainbow var(--speed, 2s) infinite linear',
-        'rainbow-border': 'rainbow-border 2s linear infinite',
       },
       keyframes: {
         'wave-pulse': {
@@ -105,24 +99,6 @@ export default {
           },
           '50%': {
             opacity: 0.7
-          }
-        },
-        rainbow: {
-          '0%': {
-            'background-position': '0%'
-          },
-          '100%': {
-            'background-position': '200%'
-          }
-        },
-        'rainbow-border': {
-          '0%': {
-            'border-image-source': 'linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000)',
-            'border-image-slice': '1'
-          },
-          '100%': {
-            'border-image-source': 'linear-gradient(225deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000)',
-            'border-image-slice': '1'
           }
         },
         fadeIn: {

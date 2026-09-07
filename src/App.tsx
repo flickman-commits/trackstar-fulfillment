@@ -4,7 +4,6 @@ import { Toaster } from 'sonner'
 import { useEffect, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import Dashboard from '@/pages/Dashboard'
-import OrderDetails from '@/pages/OrderDetails'
 import ApprovalPortal from '@/pages/ApprovalPortal'
 import CreatorsHome from '@/pages/CreatorsHome'
 import BriefsAdmin from '@/pages/BriefsAdmin'
@@ -166,7 +165,6 @@ export default function App() {
               <AppShell>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/orders/:orderId" element={<OrderDetails />} />
                 {/* Admin view: the creator programme, the bulk product editor
                     and the brief admin all change things outside the day to day
                     fulfillment work. */}

@@ -104,6 +104,11 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   // Compact mode: after approval, just show thumbnails — no upload UI, no big approval link
   const isCompact = ['approved_by_customer', 'final_pdf_uploaded', 'sent_to_production'].includes(designStatus || '')
 
+  // Latest callback without making it a fetch dependency: the parent passes an
+  // inline function, and refetching proofs on every parent render is wrong.
+  const onLatestFeedbackRef = useRef(onLatestFeedback)
+  useEffect(() => { onLatestFeedbackRef.current = onLatestFeedback }, [onLatestFeedback])
+
   const fetchData = useCallback(async () => {
     try {
       const [proofsRes, tokenRes] = await Promise.all([
@@ -117,7 +122,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         setMessages(data.messages || [])
         // Expose latest customer feedback for revision banner
         const revisionProof = [...data.proofs].reverse().find((p: Proof) => p.status === 'revision_requested' && p.customerFeedback)
-        onLatestFeedback?.(revisionProof?.customerFeedback || null)
+        onLatestFeedbackRef.current?.(revisionProof?.customerFeedback || null)
       }
 
       if (tokenRes.ok) {

@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "Order" ADD COLUMN "hadNoTime" BOOLEAN NOT NULL DEFAULT false;

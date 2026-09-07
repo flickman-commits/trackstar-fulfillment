@@ -158,9 +158,9 @@ export default function PricingCalculator() {
   const overrideNum = discountOverride.trim() === '' ? null : Number(discountOverride)
   const discountPct = channel !== 'wholesale' ? 0
     : (overrideNum !== null && Number.isFinite(overrideNum) ? overrideNum : (activeTier ? activeTier.discount * 100 : 0))
-  const excludedSizes = data?.assumptions.wholesaleExcludedSizes ?? []
 
   const computed = useMemo(() => {
+    const excludedSizes = data?.assumptions.wholesaleExcludedSizes ?? []
     if (!data) return []
     const a = data.assumptions
     const qty = data.quantity

@@ -41,3 +41,6 @@ products_export.csv
 # stay out of the repo and out of any directory Vite serves.
 .image-source/
 public/Marathon Monopoly*.jpeg
+
+# Claude Code worktrees are scratch checkouts, never source
+.claude/worktrees/

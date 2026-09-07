@@ -1,6 +1,6 @@
 # Scripts
 
-This directory contains utility scripts for the FM Turbo project.
+This directory contains utility and one-off data-fix scripts for the Trackstar fulfillment tool.
 
 ## Austin Marathon Results
 
