@@ -34,6 +34,10 @@ export default {
   baseUrl: 'https://results.laurelt.com/eug',
   location: 'Eugene, OR',
   raceDates: {
+    2022: '2022-05-01',
+    2023: '2023-04-30',
+    2024: '2024-04-28',
+    2025: '2025-04-27',
     2026: '2026-04-26',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
