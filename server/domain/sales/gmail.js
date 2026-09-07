@@ -10,12 +10,19 @@
  * and send; the app only creates drafts). The refresh token is persisted in
  * SystemConfig the same way the Etsy token is, so it survives cold starts.
  *
- * Setup, once, in Google Cloud Console:
- *   1. Enable the Gmail API on a project.
- *   2. Create an OAuth client (Web application). Authorized redirect URI:
- *        <APP_URL>/api/sales/gmail?action=callback
- *      for production, and http://localhost:5173/api/sales/gmail?action=callback
- *      for local dev.
+ * This is NOT the GOOGLE_SERVICE_ACCOUNT_* pair that googleSheets.js uses. A
+ * service account has no mailbox of its own and cannot write into a person's
+ * Gmail without domain-wide delegation, which would let it impersonate every
+ * user in the domain. A far bigger grant than "let this app draft as me", so
+ * this uses an ordinary OAuth client instead.
+ *
+ * Setup, once, in Google Cloud Console (the same project is fine):
+ *   1. Enable the Gmail API.
+ *   2. Create an OAuth client, type "Web application". Authorized redirect URIs:
+ *        https://fast.trackstar.art/api/sales/gmail-callback
+ *        http://localhost:3000/api/sales/gmail-callback
+ *      Google rejects a redirect URI containing a query string, which is why
+ *      the callback has its own path rather than ?action=callback.
  *   3. Put the client id and secret in GOOGLE_OAUTH_CLIENT_ID and
  *      GOOGLE_OAUTH_CLIENT_SECRET.
  *   4. Open Sales, press Connect Gmail.
@@ -49,12 +56,28 @@ async function setConfig(key, value) {
   await prisma.systemConfig.upsert({ where: { key }, update: { value }, create: { key, value } })
 }
 
-/** Where Google should send the user back. Same handler, action=callback. */
-export function redirectUriFor(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https'
+/**
+ * The origin this deployment is reachable at.
+ *
+ * Local dev has to use its own host or the OAuth round trip would bounce to
+ * production mid-flow. Everything else uses the canonical domain, so preview
+ * deployments do not each need a registered redirect URI of their own.
+ */
+export function originFor(req) {
   const host = req.headers['x-forwarded-host'] || req.headers.host || ''
-  const base = process.env.APP_URL || `${proto}://${host}`
-  return `${base.replace(/\/$/, '')}/api/sales/gmail?action=callback`
+  const isLocal = host.startsWith('localhost') || host.startsWith('127.0.0.1')
+  if (isLocal) return `http://${host}`
+  return (process.env.APP_BASE_URL || process.env.APP_URL || `https://${host}`).replace(/\/$/, '')
+}
+
+/**
+ * Where Google sends the browser back. Its own path, no query string: Google
+ * rejects a redirect URI that carries one. Must match a URI registered on the
+ * OAuth client exactly, and must be identical on the consent request and the
+ * token exchange.
+ */
+export function redirectUriFor(req) {
+  return `${originFor(req)}/api/sales/gmail-callback`
 }
 
 export function getAuthUrl(redirectUri) {

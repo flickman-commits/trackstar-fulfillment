@@ -3,20 +3,13 @@
  *
  *   GET  ?action=status     { configured, connected, email }
  *   GET  ?action=connect    redirects to Google's consent screen
- *   GET  ?action=callback   Google sends the browser back here; stores the token, returns to /sales
  *   POST { action:'disconnect' }
  *
- * The callback arrives as a top-level navigation, so the session cookie
- * (SameSite=Lax) comes with it and requireAdmin works as usual.
+ * Google returns the browser to /api/sales/gmail-callback, which is its own
+ * file because Google rejects a redirect URI containing a query string.
  */
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { getAuthUrl, completeConnection, disconnectGmail, gmailStatus, redirectUriFor, isGmailConfigured } from '../../server/domain/sales/gmail.js'
-
-function appUrl(req) {
-  const proto = req.headers['x-forwarded-proto'] || 'https'
-  const host = req.headers['x-forwarded-host'] || req.headers.host || ''
-  return (process.env.APP_URL || `${proto}://${host}`).replace(/\/$/, '')
-}
+import { getAuthUrl, disconnectGmail, gmailStatus, redirectUriFor, isGmailConfigured } from '../../server/domain/sales/gmail.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -32,20 +25,6 @@ export default async function handler(req, res) {
     if (action === 'connect') {
       if (!isGmailConfigured()) return res.status(400).json({ error: 'Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET first' })
       res.setHeader('Location', getAuthUrl(redirectUriFor(req)))
-      return res.status(302).end()
-    }
-
-    if (action === 'callback') {
-      const code = String(req.query?.code || '')
-      const base = appUrl(req)
-      if (!code) { res.setHeader('Location', `${base}/sales?gmail=denied`); return res.status(302).end() }
-      try {
-        const { email } = await completeConnection(code, redirectUriFor(req))
-        res.setHeader('Location', `${base}/sales?gmail=connected&account=${encodeURIComponent(email)}`)
-      } catch (err) {
-        console.error('[API /sales/gmail] callback failed', err)
-        res.setHeader('Location', `${base}/sales?gmail=error&reason=${encodeURIComponent(err.message.slice(0, 120))}`)
-      }
       return res.status(302).end()
     }
 

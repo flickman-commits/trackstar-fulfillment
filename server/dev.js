@@ -84,6 +84,7 @@ const routes = [
   { method: 'get',    path: '/api/sales/draft',            handler: '../api/sales/draft.js' },
   { method: 'post',   path: '/api/sales/draft',            handler: '../api/sales/draft.js' },
   { method: 'get',    path: '/api/sales/gmail',            handler: '../api/sales/gmail.js' },
+  { method: 'get',    path: '/api/sales/gmail-callback',   handler: '../api/sales/gmail-callback.js' },
   { method: 'post',   path: '/api/sales/gmail',            handler: '../api/sales/gmail.js' },
 ]
 

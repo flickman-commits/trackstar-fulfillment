@@ -52,7 +52,10 @@ function newInvite() {
 function inviteUrl(req, token) {
   const proto = req.headers['x-forwarded-proto'] || 'https'
   const host = req.headers['x-forwarded-host'] || req.headers.host || ''
-  const base = process.env.APP_URL || `${proto}://${host}`
+  // APP_BASE_URL is the repo's name for the canonical origin; APP_URL was a
+  // second spelling that nothing ever set, so invite links quietly used
+  // whatever host the request came in on, preview deployments included.
+  const base = process.env.APP_BASE_URL || process.env.APP_URL || `${proto}://${host}`
   return `${base.replace(/\/$/, '')}/?invite=${token}`
 }
 
