@@ -82,15 +82,30 @@ function shape(parsed, { model, extraSources = [], raw = '' }) {
   }
 }
 
+/**
+ * Searches are billed per search ($10 per 1,000 at the time of writing) on top
+ * of tokens, and the pages the model reads come back as input tokens, so this
+ * is the one call in Sales with a cost worth capping. Five searches is plenty
+ * to find a person and their organisation.
+ *
+ * RESEARCH_MAX_SEARCHES and RESEARCH_MODEL exist so both dials can be turned
+ * without a deploy. Both default to the same model and budget as everything
+ * else, so leaving them unset changes nothing.
+ */
+const MAX_SEARCHES = Number(process.env.RESEARCH_MAX_SEARCHES) > 0
+  ? Number(process.env.RESEARCH_MAX_SEARCHES)
+  : 5
+
 async function viaAnthropic(prompt) {
   const { json, text, model, provider, sources, usage } = await complete({
     system: SYSTEM,
     prompt,
     json: true,
     webSearch: true,
-    maxSearches: 5,
+    maxSearches: MAX_SEARCHES,
     effort: 'low',
     maxTokens: 2000,
+    model: process.env.RESEARCH_MODEL || undefined,
     purpose: 'sales.research',
   })
   return shape(json, { model: `${provider}/${model} (${usage.searches} searches)`, extraSources: sources, raw: text })
