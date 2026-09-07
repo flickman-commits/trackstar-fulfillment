@@ -25,6 +25,8 @@ export default {
   raceSlug: 'missoula-marathon',
   location: 'Missoula, MT',
   raceDates: {
+    2024: '2024-06-30',
+    2025: '2025-06-29',
     2026: '2026-06-28',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
