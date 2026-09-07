@@ -9,9 +9,11 @@ export default {
   location: 'Arlington, VA',
   eventPrefix: 'MCM',
   raceDates: {
+    2022: '2022-10-30',
     2023: '2023-10-29',
     2024: '2024-10-27',
     2025: '2025-10-26',
+    2026: '2026-10-25',
   },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
