@@ -53,6 +53,10 @@ export default {
   keywords: ['houston', 'chevron houston', 'aramco'],
   keywordRequiresMarathon: false,
   raceDates: {
+    2022: '2022-01-16',
+    2023: '2023-01-15',
+    2024: '2024-01-14',
+    2025: '2025-01-19',
     2026: '2026-01-11',
   },
   eventIds: {
