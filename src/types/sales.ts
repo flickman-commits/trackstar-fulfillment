@@ -104,6 +104,14 @@ export interface DraftResult {
   warning?: string
 }
 
+export interface Mockup {
+  id: string
+  name: string
+  size: number | null
+  contentType: string
+  previewUrl: string | null
+}
+
 export interface SalesStatus {
   llm: { configured: boolean; provider?: string; model?: string; baseUrl?: string; canSearch?: boolean }
   research: { configured: boolean; provider: 'anthropic' | 'perplexity' | null }

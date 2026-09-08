@@ -3,7 +3,7 @@
  * so the Sales screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { Company, Contact, DraftResult, ImportPreview, ImportResult, Pipeline, Research, SalesStatus, Touch, DealStage } from '@/types/sales'
+import type { Company, Contact, DraftResult, ImportPreview, ImportResult, Mockup, Pipeline, Research, SalesStatus, Touch, DealStage } from '@/types/sales'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -59,8 +59,17 @@ export const salesApi = {
   variants: (companyId: string, contactId?: string, useTemplate = false) =>
     post<DraftResult>('/api/sales/draft', { action: 'variants', companyId, contactId, useTemplate }),
 
-  queue: (body: { companyId: string; contactId: string; subject: string; body: string }) =>
-    post<{ touch: Touch; gmailDraft: boolean; gmailConnected: boolean }>('/api/sales/draft', { action: 'queue', ...body }),
+  queue: (body: { companyId: string; contactId: string; subject: string; body: string; mockupId?: string }) =>
+    post<{ touch: Touch; gmailDraft: boolean; gmailConnected: boolean; mockup: { id: string; name: string } | null }>('/api/sales/draft', { action: 'queue', ...body }),
+
+  mockups: (companyId?: string) =>
+    request<{ configured: boolean; mockups: Mockup[]; selectedId: string | null }>(
+      `/api/sales/mockups${companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''}`),
+
+  uploadMockup: (file: { filename: string; contentType: string; data: string }) =>
+    post<{ mockup: Mockup }>('/api/sales/mockups', { action: 'upload', ...file }),
+
+  deleteMockup: (id: string) => post<{ success: true }>('/api/sales/mockups', { action: 'delete', id }),
 
   importPreview: (csv: string, pipeline: Pipeline) =>
     post<ImportPreview>('/api/sales/import', { csv, pipeline, dryRun: true }),

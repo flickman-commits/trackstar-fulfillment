@@ -14,6 +14,7 @@ import prisma from '../../db.js'
 import { complete, isLlmConfigured } from '../../lib/llm.js'
 import { cadenceFor, pickIdentityTag, RACE_ONE_LINERS, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateFor, greetingName } from './angles.js'
 import { createDraft, textToHtml, gmailStatus } from './gmail.js'
+import { pickMockup, readMockup, isMockupStorageConfigured } from './mockups.js'
 
 const VARIANT_COUNT = 5
 
@@ -182,7 +183,16 @@ export async function draftVariants({ companyId, contactId, useTemplate = false 
  * File the chosen email: Gmail draft (when connected), Touch row, cadence
  * clock. Returns the touch and whether a Gmail draft was created.
  */
-export async function queueDraft({ companyId, contactId, subject, body, actor }) {
+/**
+ * Touches whose copy points at an attached example, so filing one without an
+ * image would send a promise the message does not keep. The charity runbook
+ * puts it plainly: no attachment, no send.
+ */
+function requiresMockup(pipeline, touchNumber) {
+  return pipeline === 'CHARITY' && touchNumber === 1
+}
+
+export async function queueDraft({ companyId, contactId, subject, body, mockupId, actor }) {
   const company = await prisma.company.findUnique({ where: { id: companyId } })
   if (!company) throw new Error('Company not found')
   const contact = await prisma.contact.findUnique({ where: { id: contactId } })
@@ -202,10 +212,29 @@ export async function queueDraft({ companyId, contactId, subject, body, actor })
     threadId = first?.gmailThreadId || null
   }
 
+  // Attach the co-branded example. Auto-picked from the org's races unless the
+  // operator chose one.
+  let attachment = null
+  let mockup = null
+  if (isMockupStorageConfigured()) {
+    try {
+      mockup = await pickMockup(company, { preferId: mockupId })
+      if (mockup) attachment = await readMockup(mockup.id)
+    } catch (err) {
+      console.warn(`[sales.draft] could not attach a mockup: ${err.message}`)
+    }
+  }
+  if (!attachment && requiresMockup(company.pipeline, touchNumber)) {
+    throw new Error(
+      'A charity first touch has to carry a co-branded example: the copy points at it and the runbook says no attachment, no send. '
+      + 'Upload a mockup under Mockups, then file this again.'
+    )
+  }
+
   let gmail = null
   const status = await gmailStatus()
   if (status.connected) {
-    gmail = await createDraft({ to: contact.email, subject: subject.trim(), html: textToHtml(body), threadId })
+    gmail = await createDraft({ to: contact.email, subject: subject.trim(), html: textToHtml(body), threadId, attachment })
   }
 
   const now = new Date()
@@ -241,5 +270,10 @@ export async function queueDraft({ companyId, contactId, subject, body, actor })
     }),
   ])
 
-  return { touch, gmailDraft: Boolean(gmail), gmailConnected: status.connected }
+  return {
+    touch,
+    gmailDraft: Boolean(gmail),
+    gmailConnected: status.connected,
+    mockup: mockup ? { id: mockup.id, name: mockup.name } : null,
+  }
 }

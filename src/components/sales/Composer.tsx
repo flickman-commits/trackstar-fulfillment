@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Check } from 'lucide-react'
 import { btnPrimary, btnSecondary, btnGhost, inputBase } from '@/lib/ui'
-import type { Company, Contact, DraftResult, Variant } from '@/types/sales'
+import { Paperclip } from 'lucide-react'
+import type { Company, Contact, DraftResult, Mockup, Variant } from '@/types/sales'
 
 /**
  * The middle column: the email you are about to file.
@@ -19,6 +20,10 @@ export default function Composer({
   drafting,
   queueing,
   gmailConnected,
+  mockups,
+  mockupId,
+  onMockupChange,
+  onManageMockups,
   onChange,
   onPrev,
   onNext,
@@ -34,6 +39,10 @@ export default function Composer({
   drafting: boolean
   queueing: boolean
   gmailConnected: boolean
+  mockups: Mockup[]
+  mockupId: string | null
+  onMockupChange: (id: string) => void
+  onManageMockups: () => void
   onChange: (v: Variant) => void
   onPrev: () => void
   onNext: () => void
@@ -51,6 +60,11 @@ export default function Composer({
 
   const current = variants[index]
   const hasQueuedDraft = company.lastTouch?.kind === 'EMAIL_DRAFT' && !company.lastTouch.sentAt
+  // The charity runbook's hard rule: the first email points at an attached
+  // example, so filing one without an image sends a promise it does not keep.
+  const mockupRequired = company.pipeline === 'CHARITY' && draft?.touchNumber === 1
+  const chosen = mockups.find(m => m.id === mockupId) || null
+  const missingRequired = mockupRequired && !chosen
   const kbd = 'inline-flex h-5 items-center gap-1 rounded border border-white/30 bg-white/10 px-1.5 font-mono text-[10px] font-medium'
   const kbdDark = 'inline-flex h-5 items-center rounded border border-off-black/20 bg-off-black/5 px-1.5 font-mono text-[10px] font-medium text-off-black/60'
 
@@ -129,6 +143,32 @@ export default function Composer({
         )}
       </div>
 
+      {/* What goes out with it */}
+      <div className="flex items-center gap-2 mt-3 text-xs">
+        <Paperclip className={`w-3.5 h-3.5 shrink-0 ${missingRequired ? 'text-red-600' : 'text-off-black/40'}`} />
+        {mockups.length > 0 ? (
+          <>
+            <select
+              value={mockupId || ''}
+              onChange={e => onMockupChange(e.target.value)}
+              className={`bg-transparent max-w-[240px] truncate focus:outline-none ${missingRequired ? 'text-red-600' : 'text-off-black/70'}`}
+            >
+              <option value="">No attachment</option>
+              {mockups.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+            {chosen?.previewUrl && (
+              <img src={chosen.previewUrl} alt="" className="h-7 w-auto rounded border border-border-gray" />
+            )}
+          </>
+        ) : (
+          <span className={missingRequired ? 'text-red-600' : 'text-off-black/50'}>No mockups uploaded</span>
+        )}
+        <button onClick={onManageMockups} className={btnGhost}>Manage</button>
+        {missingRequired && (
+          <span className="text-red-600">A charity first touch has to carry one.</span>
+        )}
+      </div>
+
       {/* Variant nav + file it */}
       <div className="flex items-center justify-between mt-3">
         <div className="flex items-center gap-2">
@@ -147,7 +187,7 @@ export default function Composer({
         </div>
         <button
           onClick={onQueue}
-          disabled={!current || queueing || drafting || !contact?.email}
+          disabled={!current || queueing || drafting || !contact?.email || missingRequired}
           className={`${btnPrimary} px-4 py-2 text-sm`}
           title={gmailConnected ? 'Create the draft in Gmail' : 'Gmail is not connected; the draft is saved here only'}
         >

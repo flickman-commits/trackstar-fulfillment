@@ -244,3 +244,52 @@ test('a template with nothing specific to say leaves an obvious blank', async ()
   assert.ok(withLine.body.includes('Something true about them.'))
   assert.ok(!withLine.body.includes(a.NEEDS_OPENER))
 })
+
+// ── The message Gmail actually receives ──────────────────────────────────────
+// A malformed multipart does not throw, it just renders wrong in someone's
+// inbox, so the structure is asserted here rather than discovered later.
+
+test('a message with no attachment is a plain html part', async () => {
+  const { buildMime } = await import('./gmail.js')
+  const mime = buildMime({ to: 'a@b.org', subject: 'hello', html: '<div>hi</div>' })
+  assert.match(mime, /^To: a@b\.org\r\n/)
+  assert.match(mime, /Content-Type: text\/html; charset=utf-8/)
+  assert.ok(!mime.includes('multipart'), 'no attachment means no multipart wrapper')
+})
+
+test('an attached mockup is embedded inline and survives the encoding', async () => {
+  const { buildMime } = await import('./gmail.js')
+  // A one-pixel PNG: real binary, including bytes that a utf8 round trip would mangle.
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+  const mime = buildMime({
+    to: 'a@b.org', subject: 'hello', html: '<div>hi</div>',
+    attachment: { filename: 'Berlin_SIR_Mockup.png', contentType: 'image/png', bytes: png },
+  })
+
+  const boundary = mime.match(/boundary="([^"]+)"/)?.[1]
+  assert.ok(boundary, 'a multipart message needs a boundary')
+  assert.match(mime, /Content-Type: multipart\/related;/)
+  assert.ok(mime.includes(`--${boundary}--`), 'the multipart must be closed')
+
+  // The html references the image by the same Content-ID the part declares.
+  const cid = mime.match(/Content-ID: <([^>]+)>/)?.[1]
+  assert.ok(cid, 'the image part needs a Content-ID')
+  // The html part is base64 too, so decode it before looking for the reference.
+  const htmlPart = mime.split(`--${boundary}`)[1]
+  const htmlBody = htmlPart.split('\r\n\r\n').slice(1).join('\r\n\r\n').trim()
+  const html = Buffer.from(htmlBody, 'base64').toString('utf8')
+  assert.ok(html.includes(`cid:${cid}`), 'the html must reference the image by cid')
+  assert.match(html, /<img[^>]+width="600"/, 'the image should be sized for email')
+  assert.ok(html.trim().endsWith('</div>'), 'the image goes inside the body wrapper')
+  assert.match(mime, /Content-Disposition: inline; filename="Berlin_SIR_Mockup\.png"/)
+
+  // The image bytes come back byte for byte.
+  const imagePart = mime.split(`--${boundary}`)[2]
+  const payload = imagePart.split('\r\n\r\n').slice(1).join('\r\n\r\n').replace(/\r\n--$/, '').trim()
+  assert.deepEqual(Buffer.from(payload, 'base64'), png, 'the attachment must decode back to the original bytes')
+
+  // Every base64 line stays within the 76-character limit MIME requires.
+  for (const line of payload.split('\r\n')) {
+    assert.ok(line.length <= 76, `base64 line too long: ${line.length}`)
+  }
+})

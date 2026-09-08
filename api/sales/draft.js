@@ -49,6 +49,7 @@ export default async function handler(req, res) {
         contactId: String(body.contactId),
         subject: String(body.subject || ''),
         body: String(body.body || ''),
+        mockupId: body.mockupId ? String(body.mockupId) : undefined,
         actor,
       })
       return res.status(200).json(out)

@@ -4,10 +4,11 @@ import { toast } from 'sonner'
 import { Upload, Search, Mail, Loader2, ChevronDown } from 'lucide-react'
 import { salesApi, type ListView } from '@/lib/salesApi'
 import { btnSecondary, btnGhost, inputBase, segment, segmentGroup } from '@/lib/ui'
-import { STAGE_LABEL, type Company, type Contact, type DraftResult, type Pipeline, type SalesStatus, type Variant, type DealStage } from '@/types/sales'
+import { STAGE_LABEL, type Company, type Contact, type DraftResult, type Mockup, type Pipeline, type SalesStatus, type Variant, type DealStage } from '@/types/sales'
 import Composer from '@/components/sales/Composer'
 import DetailPane from '@/components/sales/DetailPane'
 import ImportModal from '@/components/sales/ImportModal'
+import MockupsModal from '@/components/sales/MockupsModal'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 
 /**
@@ -67,6 +68,10 @@ export default function Sales() {
   const [drafting, setDrafting] = useState(false)
   const [queueing, setQueueing] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [mockupsOpen, setMockupsOpen] = useState(false)
+  const [mockups, setMockups] = useState<Mockup[]>([])
+  /** Which example goes out with this one. Auto-picked per org, overridable. */
+  const [mockupId, setMockupId] = useState<string | null>(null)
   const inFlight = useRef(new Set<string>())
 
   useEffect(() => { try { localStorage.setItem(PIPELINE_KEY, pipeline) } catch { /* ignore */ } }, [pipeline])
@@ -163,6 +168,11 @@ export default function Sales() {
     setVariantIndex(0)
     setContactId(null)
     salesApi.company(selected.id).then(r => { if (!cancelled) setDetail(r.company) }).catch(() => {})
+    // Signed preview URLs are short-lived, so refresh them with the selection
+    // rather than holding one list for the whole session.
+    salesApi.mockups(selected.id)
+      .then(r => { if (!cancelled) { setMockups(r.mockups); setMockupId(r.selectedId) } })
+      .catch(() => {})
     prepare(selected, { silent: false }).then(() => {
       if (cancelled) return
       const idx = companies.findIndex(c => c.id === selected.id)
@@ -196,8 +206,16 @@ export default function Sales() {
     if (!company || !contact?.email || !v || queueing) return
     setQueueing(true)
     try {
-      const r = await salesApi.queue({ companyId: company.id, contactId: contact.id, subject: v.subject, body: v.body })
-      toast.success(r.gmailDraft ? `Draft in Gmail for ${contact.firstName}` : `Saved. Connect Gmail to get drafts in your inbox.`)
+      const r = await salesApi.queue({
+        companyId: company.id, contactId: contact.id,
+        subject: v.subject, body: v.body,
+        mockupId: mockupId || undefined,
+      })
+      toast.success(
+        r.gmailDraft
+          ? `Draft in Gmail for ${contact.firstName}${r.mockup ? ` with ${r.mockup.name}` : ''}`
+          : 'Saved. Connect Gmail to get drafts in your inbox.',
+      )
       setPrepared(prev => { const n = { ...prev }; delete n[company.id]; return n })
       // The person leaves Due/New once a draft exists; step forward first so the selection survives the refetch.
       const idx = companies.findIndex(c => c.id === company.id)
@@ -211,7 +229,7 @@ export default function Sales() {
       }
     } catch (e) { toast.error((e as Error).message) }
     finally { setQueueing(false) }
-  }, [variants, variantIndex, company, contact, queueing, companies, view, loadList])
+  }, [variants, variantIndex, company, contact, queueing, companies, view, loadList, mockupId])
 
   // Keyboard: I/K people, J/L variants, Cmd+Enter file.
   useEffect(() => {
@@ -415,6 +433,10 @@ export default function Sales() {
           drafting={drafting}
           queueing={queueing}
           gmailConnected={Boolean(status?.gmail.connected)}
+          mockups={mockups}
+          mockupId={mockupId}
+          onMockupChange={id => setMockupId(id || null)}
+          onManageMockups={() => setMockupsOpen(true)}
           onChange={updateVariant}
           onPrev={() => setVariantIndex(i => Math.max(0, i - 1))}
           onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
@@ -437,6 +459,16 @@ export default function Sales() {
       </div>
 
       {importOpen && <ImportModal onClose={() => setImportOpen(false)} onImported={() => { loadList(); setImportOpen(false) }} />}
+      {mockupsOpen && (
+        <MockupsModal
+          onClose={() => setMockupsOpen(false)}
+          onChanged={next => {
+            setMockups(next)
+            // Keep a selection that still exists after a delete.
+            setMockupId(prev => (prev && next.some(m => m.id === prev) ? prev : next[0]?.id ?? null))
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -27,6 +27,7 @@
  *      GOOGLE_OAUTH_CLIENT_SECRET.
  *   4. Open Sales, press Connect Gmail.
  */
+import crypto from 'crypto'
 import { google } from 'googleapis'
 import prisma from '../../db.js'
 
@@ -153,24 +154,74 @@ function headerValue(s) {
   return /^[\x20-\x7e]*$/.test(v) ? v : `=?utf-8?B?${Buffer.from(v, 'utf8').toString('base64')}?=`
 }
 
-function buildMime({ to, subject, html, inReplyTo }) {
-  const lines = [
+/** base64, wrapped at 76 characters as the MIME spec requires. */
+function base64Lines(buf) {
+  return (buf.toString('base64').match(/.{1,76}/g) || []).join('\r\n')
+}
+
+/**
+ * Build the message.
+ *
+ * With no attachment this is a plain text/html part. With one it becomes
+ * multipart/related carrying the image with a Content-ID, and the HTML
+ * references it as <img src="cid:...">. related rather than mixed on purpose:
+ * the image then renders inside the body, where it does its job, instead of
+ * sitting at the bottom as a file the reader has to decide to open. Gmail
+ * still shows it as an attachment too, so the copy's "attached" stays true.
+ */
+export function buildMime({ to, subject, html, inReplyTo, attachment }) {
+  const headers = [
     `To: ${headerValue(to)}`,
     `Subject: ${headerValue(subject)}`,
     'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=utf-8',
-    'Content-Transfer-Encoding: base64',
   ]
   if (inReplyTo) {
-    lines.push(`In-Reply-To: ${inReplyTo}`)
-    lines.push(`References: ${inReplyTo}`)
+    headers.push(`In-Reply-To: ${inReplyTo}`)
+    headers.push(`References: ${inReplyTo}`)
   }
-  const body = Buffer.from(html, 'utf8').toString('base64')
-  return `${lines.join('\r\n')}\r\n\r\n${body}`
+
+  if (!attachment) {
+    headers.push('Content-Type: text/html; charset=utf-8', 'Content-Transfer-Encoding: base64')
+    return `${headers.join('\r\n')}\r\n\r\n${base64Lines(Buffer.from(html, 'utf8'))}`
+  }
+
+  const boundary = `ts_${crypto.randomBytes(16).toString('hex')}`
+  const cid = `mockup_${crypto.randomBytes(8).toString('hex')}`
+  const filename = attachment.filename || 'mockup.png'
+  // The image goes above the sign-off, where the copy points at it.
+  const withImage = html.replace(
+    '</div>',
+    `<p><img src="cid:${cid}" alt="Trackstar co-branded print example" width="600" style="max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0;" /></p>\n</div>`,
+  )
+
+  headers.push(`Content-Type: multipart/related; boundary="${boundary}"; type="text/html"`)
+  return [
+    headers.join('\r\n'),
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset=utf-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    base64Lines(Buffer.from(withImage, 'utf8')),
+    `--${boundary}`,
+    `Content-Type: ${attachment.contentType || 'image/png'}; name="${filename}"`,
+    'Content-Transfer-Encoding: base64',
+    `Content-ID: <${cid}>`,
+    `Content-Disposition: inline; filename="${filename}"`,
+    '',
+    base64Lines(attachment.bytes),
+    `--${boundary}--`,
+    '',
+  ].join('\r\n')
 }
 
+/**
+ * Gmail wants the whole RFC 822 message base64url encoded. The message is
+ * built as a string with every binary part already base64'd inside it, so
+ * latin1 round-trips it byte for byte; utf8 would re-encode the high bytes.
+ */
 function base64url(s) {
-  return Buffer.from(s, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return Buffer.from(s, 'latin1').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 /**
@@ -189,9 +240,9 @@ export function textToHtml(text) {
  * Create a draft. Returns Gmail's draft id, the message id, and the thread id
  * so a follow-up can land in the same thread later.
  */
-export async function createDraft({ to, subject, html, threadId, inReplyTo }) {
+export async function createDraft({ to, subject, html, threadId, inReplyTo, attachment }) {
   const gmail = await gmailClient()
-  const raw = base64url(buildMime({ to, subject, html, inReplyTo }))
+  const raw = base64url(buildMime({ to, subject, html, inReplyTo, attachment }))
   const message = { raw }
   if (threadId) message.threadId = threadId
   let res
