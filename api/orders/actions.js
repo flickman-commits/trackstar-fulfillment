@@ -71,7 +71,10 @@ function describeAction(action, body) {
   switch (action) {
     case 'clear-race-cache':   return 'Cleared the race results cache'
     case 'clear-research':     return `Cleared research on ${order || 'an order'}`
-    case 'merge-race':         return `Merged race "${body.from || '?'}" into "${body.into || body.to || '?'}"`
+    // The handler's fields are aliasName / canonicalName. This read from and
+    // into, which nothing sends, so every merge was logged as "?" into "?" -
+    // an audit line that cannot answer the one question it exists for.
+    case 'merge-race':         return `Merged race "${body.aliasName || body.from || '?'}" into "${body.canonicalName || body.into || body.to || '?'}"`
     case 'delete-creator':     return `Deleted creator ${body.creatorId || body.id || '?'}`
     case 'create-discount':    return `Created discount code ${body.code || '?'}`
     case 'message-customer':   return `Messaged the customer on ${order || 'an order'}`
