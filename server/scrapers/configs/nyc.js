@@ -29,6 +29,8 @@ export default {
   raceDates: {
     2006: '2006-11-05',
     2015: '2015-11-01',
+    // NYRR's own listing (startDateTime) and Wikipedia's edition page agree.
+    2019: '2019-11-03',
     2022: '2022-11-06',
     2023: '2023-11-05',
     2024: '2024-11-03',

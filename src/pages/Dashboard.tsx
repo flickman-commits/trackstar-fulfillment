@@ -990,7 +990,7 @@ export default function Dashboard() {
   // Store possible matches per order for ambiguous results (not persisted to DB)
   const [possibleMatchesMap, setPossibleMatchesMap] = useState<Record<string, Array<{ name: string; bib: string; time: string; pace?: string; city?: string; state?: string; eventType?: string; resultsUrl?: string }>>>({})
   // Race database state
-  const [races, setRaces] = useState<{ id: number; raceName: string; year: number; raceDate: string; raceDateSource: string | null; location: string | null; weatherCondition: string | null; weatherTemp: string | null; weatherFetchedAt: string | null; _count?: { runnerResearch: number } }[]>([])
+  const [races, setRaces] = useState<{ id: number; raceName: string; year: number; raceDate: string | null; raceDateSource: string | null; location: string | null; weatherCondition: string | null; weatherTemp: string | null; weatherFetchedAt: string | null; _count?: { runnerResearch: number } }[]>([])
   const [isLoadingRaces, setIsLoadingRaces] = useState(false)
   const [editingRaceId, setEditingRaceId] = useState<number | null>(null)
   const [raceEditValues, setRaceEditValues] = useState({ raceDate: '', location: '', weatherCondition: '', weatherTemp: '' })

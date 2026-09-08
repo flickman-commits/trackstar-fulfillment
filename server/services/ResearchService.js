@@ -10,7 +10,7 @@
  *   - Stored in RunnerResearch table
  */
 import { PrismaClient } from '@prisma/client'
-import { getScraperForRace, hasScraperForRace } from '../scrapers/index.js'
+import { getScraperForRace, hasScraperForRace, getCanonicalRaceName } from '../scrapers/index.js'
 import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
 import WeatherService from './WeatherService.js'
 
@@ -211,15 +211,8 @@ export class ResearchService {
     }
     if (!race) {
       // Minimal race row so RunnerResearch (which requires raceId) can be written.
-      race = await prisma.race.upsert({
-        where: { raceName_year: { raceName: effectiveRaceName, year: effectiveRaceYear } },
-        update: {},
-        create: {
-          raceName: effectiveRaceName,
-          year: effectiveRaceYear,
-          raceDate: new Date(`${effectiveRaceYear}-01-01`),
-          eventTypes: order.customerEventType ? [order.customerEventType] : ['Marathon'],
-        }
+      race = await this.findOrCreateRaceRow(effectiveRaceName, effectiveRaceYear, {
+        eventTypes: order.customerEventType ? [order.customerEventType] : ['Marathon'],
       })
     }
 
@@ -267,13 +260,42 @@ export class ResearchService {
    * @param {number} year
    * @returns {Promise<Object>} Race record
    */
+  /**
+   * The race row for a race-year, found by either its exact name or its
+   * canonical one, and created under the canonical one.
+   *
+   * Rows used to be keyed on whatever name the order carried, so "NYC
+   * Marathon" and "New York City Marathon" became two rows for the same race,
+   * with orders split between them. That is how Eli's NYC 2019 order landed on
+   * a brand-new row with no date while the older row for the same race already
+   * held the right one. Existing rows keep their names; only new ones are
+   * canonical, so nothing already linked moves.
+   *
+   * No date is written when none is known. The old code stored January 1st as
+   * a stand-in, which then got weather computed for it and printed on posters
+   * as if it were real. A null date is visible; a fake one is not.
+   */
+  async findOrCreateRaceRow(raceName, year, extra = {}) {
+    const canonical = getCanonicalRaceName(raceName) || raceName
+    let race = await prisma.race.findUnique({ where: { raceName_year: { raceName, year } } })
+    if (!race && canonical !== raceName) {
+      race = await prisma.race.findUnique({ where: { raceName_year: { raceName: canonical, year } } })
+    }
+    if (!race) {
+      race = await prisma.race.create({
+        data: { raceName: canonical, year, raceDate: null, eventTypes: ['Marathon'], ...extra },
+      })
+    }
+    return race
+  }
+
   async getOrFetchRaceData(raceName, year) {
-    // Check cache first
-    let race = await prisma.race.findUnique({
-      where: {
-        raceName_year: { raceName, year }
-      }
-    })
+    // Check cache first, under either name for the reasons in findOrCreateRaceRow.
+    const canonical = getCanonicalRaceName(raceName) || raceName
+    let race = await prisma.race.findUnique({ where: { raceName_year: { raceName, year } } })
+    if (!race && canonical !== raceName) {
+      race = await prisma.race.findUnique({ where: { raceName_year: { raceName: canonical, year } } })
+    }
 
     // If we have complete race data (including resultsUrl), return it
     if (race && race.raceDate && race.location && race.resultsUrl) {
@@ -293,9 +315,10 @@ export class ResearchService {
 
     // Prepare race data
     const raceData = {
-      raceName,
+      raceName: race ? race.raceName : canonical,
       year,
-      raceDate: raceInfo.raceDate || new Date(`${year}-01-01`),
+      // Null when unknown. Never a stand-in date - see findOrCreateRaceRow.
+      raceDate: raceInfo.raceDate || null,
       // Provenance, so the sweep can tell a verified date from a leftover. A
       // scraper that reads the date off the results page is the best source we
       // have; a config pin is a date someone checked by hand and wrote down.

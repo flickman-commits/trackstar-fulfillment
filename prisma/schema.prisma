@@ -126,7 +126,7 @@ model Race {
   id               Int       @id @default(autoincrement())
   raceName         String
   year             Int
-  raceDate         DateTime
+  raceDate         DateTime? // null = nobody has verified one yet. Never a placeholder.
   // Where raceDate came from: "manual" (a person typed it, which only happens
   // once they have confirmed it on the results site), "config" (a verified
   // raceDates pin), "scraped" (read off the results page). Null on rows that

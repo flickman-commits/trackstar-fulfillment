@@ -36,14 +36,19 @@ export class NYRRScraper extends BaseScraper {
       if (response.ok) {
         const data = await response.json()
         if (data.eventDetails) {
-          const apiDate = data.eventDetails.eventDate
-            ? new Date(data.eventDetails.eventDate)
-            : null
+          // The field is startDateTime ("2019-11-03T08:30:00"). This read
+          // eventDate, which the API does not return, so NYRR never supplied a
+          // date it has carried all along and every NYC year fell through.
+          const raw = data.eventDetails.startDateTime || data.eventDetails.eventDate
+          const apiDate = raw ? new Date(raw) : null
 
           console.log(`[${this.tag} ${this.year}] Got event details from API`)
 
+          const raceDate = this.resolveRaceDate(apiDate)
           return {
-            raceDate: this.resolveRaceDate(apiDate),
+            raceDate,
+            // Provenance: read off the timing site, not a config pin.
+            raceDateScraped: Boolean(apiDate && raceDate && raceDate.getTime() === apiDate.getTime()),
             location: this.config.location,
             eventTypes: this.config.eventTypes || ['Marathon'],
             resultsUrl: `https://results.nyrr.org/event/${this.eventCode}/finishers`,
