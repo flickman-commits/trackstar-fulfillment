@@ -722,10 +722,10 @@ function MissingDateField({ onAdd }: { onAdd: () => void }) {
       <button
         onClick={onAdd}
         className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded hover:bg-warning-amber/20 transition-colors"
-        title="No verified date for this race year. Enter it and the weather fills in from it."
+        title="No verified date for this race year. Click to enter it; the weather fills in from it."
       >
         <Pencil className="w-3 h-3" />
-        Add date
+        Not researched
       </button>
     </div>
   )
