@@ -169,9 +169,14 @@ export default function ProofFullscreen({
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >
-          {/* min-w/h-full keeps a fitted image centred; once the image is wider
-              than this, the container scrolls instead of clipping the edges. */}
-          <div className="min-w-full min-h-full flex items-center justify-center p-2 sm:p-4">
+          {/* Two different jobs, so two different boxes.
+              Fitted: a definite h-full, because the image's max-h-full is a
+              percentage and a percentage needs a parent with a real height to
+              resolve against. min-h-full is not that, which is why a tall print
+              rendered at natural size and ran off the bottom of the screen.
+              Zoomed: min-w/min-h so the oversized image can push the container
+              out and be scrolled around instead of clipped. */}
+          <div className={`flex items-center justify-center p-2 sm:p-4 ${zoomed ? 'min-w-full min-h-full' : 'w-full h-full'}`}>
             {pdf ? (
               <Suspense fallback={<Loader2 className="w-7 h-7 animate-spin" style={{ color: '#888' }} />}>
                 <PdfViewer url={proof.imageUrl} maxHeight={Math.round(window.innerHeight * 0.85)} />
