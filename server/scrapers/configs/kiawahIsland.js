@@ -8,6 +8,13 @@ export default {
   tag: 'Kiawah',
   raceId: 68851,
   location: 'Kiawah Island, SC',
+  raceDates: {
+    2022: '2022-12-10',
+    2023: '2023-12-09',
+    2024: '2024-12-14',
+    2025: '2025-12-13',
+    2026: '2026-12-12',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: {

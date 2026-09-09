@@ -15,6 +15,13 @@ export default {
   tag: 'StGeorge',
   location: 'St. George, UT',
   slug: 'stg',
+  raceDates: {
+    2022: '2022-10-01',
+    2023: '2023-10-07',
+    2024: '2024-10-05',
+    2025: '2025-10-04',
+    2026: '2026-10-03',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   events: { marathon: 'Marathon', half: 'Half Marathon' },

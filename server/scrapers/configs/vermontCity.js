@@ -26,6 +26,10 @@ export default {
   // results page exactly. Skipping "Virtual" and "Wheelchair" — add them
   // later if a customer order ever needs one.
   raceDates: {
+    2022: '2022-05-29',
+    2023: '2023-05-28',
+    2024: '2024-05-26',
+    2025: '2025-05-25',
     2026: '2026-05-24',
   },
   eventTypes: [

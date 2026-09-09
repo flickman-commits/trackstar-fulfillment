@@ -17,6 +17,10 @@ export default {
   tag: 'JacksonHole',
   location: 'Jackson, WY',
   masterEventId: 119816,
+  raceDates: {
+    2025: '2025-09-27',
+    2026: '2026-09-26',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: { marathon: 'Marathon', half: 'Half Marathon' },

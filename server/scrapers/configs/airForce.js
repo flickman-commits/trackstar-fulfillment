@@ -12,6 +12,13 @@ export default {
   raceName: 'Air Force Marathon',
   tag: 'AirForce',
   location: 'Dayton, OH',
+  raceDates: {
+    2022: '2022-09-17',
+    2023: '2023-09-16',
+    2024: '2024-09-21',
+    2025: '2025-09-20',
+    2026: '2026-09-18',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
   eventLabels: {
