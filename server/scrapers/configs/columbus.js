@@ -14,6 +14,9 @@ export default {
   raceName: 'Columbus Marathon',
   tag: 'Columbus',
   location: 'Columbus, OH',
+  raceDates: {
+    2026: '2026-10-18',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: { marathon: 'Marathon', half: 'Half Marathon' },

@@ -16,6 +16,13 @@ export default {
   raceName: 'Cowtown Marathon',
   tag: 'Cowtown',
   location: 'Fort Worth, TX',
+  raceDates: {
+    2022: '2022-02-27',
+    2023: '2023-02-26',
+    2024: '2024-02-25',
+    2025: '2025-02-23',
+    2026: '2026-02-28',
+  },
   eventTypes: ['Marathon', 'Half Marathon', 'Ultra Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon', 'ultra'],
   eventLabels: {

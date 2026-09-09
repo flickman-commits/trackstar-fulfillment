@@ -15,6 +15,8 @@ export default {
   parseMode: 'columns',
   endpoint: 'searchResultGen.php',
   raceDates: {
+    2022: '2022-12-11',
+    2024: '2024-12-15',
     2025: '2025-12-14',
     2026: '2026-12-13',
   },
