@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
-import { CheckCircle2, XCircle, Loader2, AlertTriangle, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, AlertTriangle, X, Maximize2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const PdfViewer = lazy(() => import('@/components/PdfViewer'))
+
+import ProofFullscreen from '@/components/ProofFullscreen'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -74,6 +76,8 @@ export default function ApprovalPortal() {
   // approvals (especially on mobile). Stores the proof being confirmed.
   const [confirmApproveProofId, setConfirmApproveProofId] = useState<string | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  // Which option full screen is showing, or null when it is closed.
+  const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null)
   const [showEarlierVersions, setShowEarlierVersions] = useState(false)
   const [activeSlide, setActiveSlide] = useState(0)
   // Which product the partner is looking at. Null means "whichever comes
@@ -216,6 +220,96 @@ export default function ApprovalPortal() {
   }
 
   // ═══ LOADING ═══
+  // ═══ Derived from state, so it must sit above the early returns below.
+  // Hooks cannot run conditionally, and the arrow-key effect lives here. ═══
+  const pendingProofs = proofs.filter(p => p.status === 'pending')
+
+  // How many distinct things they are choosing between. One unnamed group is
+  // the ordinary case and reads exactly as it always did.
+  const pendingGroups = [...new Set(pendingProofs.map(p => p.groupLabel ?? ''))]
+  // One product at a time. Seven designs for two products in a single strip is
+  // the confusion Matt's designer hit: nothing tells you where the marathons
+  // stop and the halves begin, so "Option 1 of 3" and a seven-dot rail
+  // disagree about what you are choosing between.
+  const currentGroup =
+    activeGroup !== null && pendingGroups.includes(activeGroup)
+      ? activeGroup
+      : pendingGroups[0] ?? ''
+  const visibleProofs = pendingProofs.filter(p => (p.groupLabel ?? '') === currentGroup)
+
+  /**
+   * Scroll the carousel to an option, measured off the slide itself.
+   *
+   * Every caller used to compute `index * offsetWidth`, which ignores the
+   * gap-3 between slides. The error compounds - by the third option it lands
+   * 24px short, snap pulls it back to the previous slide, and you end up one
+   * option behind where you asked to be. Reading the child's real position has
+   * no such drift whatever the gap or padding is.
+   */
+  const slideOffset = useCallback((i: number) => {
+    const el = carouselRef.current
+    const child = el?.children?.[i] as HTMLElement | undefined
+    if (!el || !child) return null
+    return child.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft
+  }, [])
+
+  const goToSlide = useCallback((i: number, behavior: ScrollBehavior = 'smooth') => {
+    const left = slideOffset(i)
+    setActiveSlide(i)
+    const el = carouselRef.current
+    if (!el || left === null) return
+
+    // A mandatory snap container cancels smooth scrollTo outright in some
+    // engines: the call returns, nothing moves, and the carousel silently
+    // ignores the dots, the arrows and the arrow keys. That is why none of
+    // them worked. Ask for smooth, then check whether it actually started, and
+    // jump if it did not. Only a scroll that never began gets corrected, so
+    // browsers where smooth works still animate.
+    const before = el.scrollLeft
+    el.scrollTo({ left, behavior })
+    if (behavior !== 'smooth' || Math.abs(left - before) < 2) return
+    window.setTimeout(() => {
+      const now = carouselRef.current
+      if (now && Math.abs(now.scrollLeft - before) < 2) {
+        now.scrollTo({ left, behavior: 'auto' })
+      }
+    }, 150)
+  }, [slideOffset])
+
+  /** Which slide is currently centred, by proximity rather than by arithmetic. */
+  const nearestSlide = useCallback(() => {
+    const el = carouselRef.current
+    if (!el) return 0
+    let best = 0, bestDist = Infinity
+    for (let i = 0; i < el.children.length; i++) {
+      const left = slideOffset(i)
+      if (left === null) continue
+      const d = Math.abs(left - el.scrollLeft)
+      if (d < bestDist) { bestDist = d; best = i }
+    }
+    return best
+  }, [slideOffset])
+
+  // Left and right move through the options on the page too, not only in full
+  // screen. Guarded on the focused element so the arrow keys still edit text
+  // when somebody is typing revision notes, and skipped while full screen is
+  // open because that has its own handler.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (fullscreenIndex !== null) return
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      const count = visibleProofs.length
+      if (count < 2) return
+      e.preventDefault()
+      const next = Math.min(count - 1, Math.max(0, nearestSlide() + (e.key === 'ArrowRight' ? 1 : -1)))
+      goToSlide(next)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreenIndex, visibleProofs.length, goToSlide, nearestSlide])
+
   if (state === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
@@ -467,27 +561,12 @@ export default function ApprovalPortal() {
     )
   }
 
-  // ═══ READY — proof selection flow ═══
-  const pendingProofs = proofs.filter(p => p.status === 'pending')
-  // How many distinct things they are choosing between. One unnamed group is
-  // the ordinary case and reads exactly as it always did.
-  const pendingGroups = [...new Set(pendingProofs.map(p => p.groupLabel ?? ''))]
-  // One product at a time. Seven designs for two products in a single strip is
-  // the confusion Matt's designer hit: nothing tells you where the marathons
-  // stop and the halves begin, so "Option 1 of 3" and a seven-dot rail
-  // disagree about what you are choosing between.
-  const currentGroup =
-    activeGroup !== null && pendingGroups.includes(activeGroup)
-      ? activeGroup
-      : pendingGroups[0] ?? ''
-  const visibleProofs = pendingProofs.filter(p => (p.groupLabel ?? '') === currentGroup)
-
   // Switching product starts you at that product's first option, not wherever
   // you happened to be scrolled in the last one.
   const selectGroup = (group: string) => {
     setActiveGroup(group)
     setActiveSlide(0)
-    carouselRef.current?.scrollTo({ left: 0 })
+    carouselRef.current?.scrollTo({ left: 0, behavior: 'auto' })
   }
   const pastProofs = proofs.filter(p => p.status !== 'pending')
   const hasPendingProofs = pendingProofs.length > 0
@@ -548,6 +627,26 @@ export default function ApprovalPortal() {
             </div>
           </div>
         </div>
+      )}
+
+      {fullscreenIndex !== null && visibleProofs[fullscreenIndex] && (
+        <ProofFullscreen
+          proofs={visibleProofs}
+          index={fullscreenIndex}
+          onIndexChange={setFullscreenIndex}
+          onClose={() => {
+            const landOn = fullscreenIndex
+            setFullscreenIndex(null)
+            // Come back to whatever they navigated to in there, rather than
+            // dumping them at the option they opened.
+            if (landOn !== null) goToSlide(landOn)
+          }}
+          counterLabel={
+            (pendingGroups.length === 1 && visibleProofs[fullscreenIndex].groupLabel
+              ? `${visibleProofs[fullscreenIndex].groupLabel}: ` : '') +
+            (visibleProofs.length === 1 ? 'Your design' : `Option ${fullscreenIndex + 1} of ${visibleProofs.length}`)
+          }
+        />
       )}
 
       {/* Lightbox */}
@@ -777,11 +876,7 @@ export default function ApprovalPortal() {
                       className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2"
                       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
                       onScroll={() => {
-                        const el = carouselRef.current
-                        if (!el) return
-                        const slideWidth = el.offsetWidth
-                        const idx = Math.round(el.scrollLeft / slideWidth)
-                        setActiveSlide(idx)
+                        setActiveSlide(nearestSlide())
                       }}
                     >
                       {visibleProofs.map((proof, idx) => {
@@ -824,7 +919,19 @@ export default function ApprovalPortal() {
                               </div>
 
                               {/* Proof display — fits viewport, 1:1 max */}
-                              <div style={{ backgroundColor: '#F5F5F5', maxHeight: 'calc(100vh - 280px)' }} className="flex items-center justify-center overflow-hidden">
+                              <div className="relative" style={{ backgroundColor: '#F5F5F5', maxHeight: 'calc(100vh - 280px)' }}>
+                              {/* Clicking the artwork opens full screen too, but
+                                  that is not discoverable on its own. */}
+                              <button
+                                onClick={() => setFullscreenIndex(idx)}
+                                className="absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors"
+                                style={{ backgroundColor: 'rgba(255,255,255,0.94)', color: '#1A1A1A', border: '1px solid #E0E0E0' }}
+                                title="View this design full screen"
+                              >
+                                <Maximize2 className="w-3.5 h-3.5" />
+                                Full screen
+                              </button>
+                              <div className="flex items-center justify-center overflow-hidden" style={{ maxHeight: 'calc(100vh - 280px)' }}>
                                 {isPdf(proof.imageUrl) ? (
                                   <div className="w-full flex items-center justify-center" style={{ maxHeight: 'calc(100vh - 280px)' }}>
                                     <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin" style={{ color: '#666666' }} /></div>}>
@@ -833,7 +940,7 @@ export default function ApprovalPortal() {
                                   </div>
                                 ) : (
                                   <div
-                                    onClick={() => setLightboxUrl(proof.imageUrl)}
+                                    onClick={() => setFullscreenIndex(idx)}
                                     className="w-full flex items-center justify-center cursor-zoom-in"
                                     style={{ maxHeight: 'calc(100vh - 280px)' }}
                                   >
@@ -847,6 +954,7 @@ export default function ApprovalPortal() {
                                     />
                                   </div>
                                 )}
+                              </div>
                               </div>
 
                               {/* Per-card action buttons — each design carries its
@@ -918,22 +1026,14 @@ export default function ApprovalPortal() {
                     {visibleProofs.length > 1 && (
                       <>
                         <button
-                          onClick={() => {
-                            const el = carouselRef.current
-                            if (!el) return
-                            el.scrollTo({ left: el.scrollLeft - el.offsetWidth, behavior: 'smooth' })
-                          }}
+                          onClick={() => goToSlide(Math.max(0, nearestSlide() - 1))}
                           className={`hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-9 h-9 items-center justify-center rounded-full transition-colors ${activeSlide === 0 ? 'opacity-30 pointer-events-none' : ''}`}
                           style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
                         >
                           <ChevronLeft className="w-5 h-5" style={{ color: '#1A1A1A' }} />
                         </button>
                         <button
-                          onClick={() => {
-                            const el = carouselRef.current
-                            if (!el) return
-                            el.scrollTo({ left: el.scrollLeft + el.offsetWidth, behavior: 'smooth' })
-                          }}
+                          onClick={() => goToSlide(Math.min(visibleProofs.length - 1, nearestSlide() + 1))}
                           className={`hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-9 h-9 items-center justify-center rounded-full transition-colors ${activeSlide >= visibleProofs.length - 1 ? 'opacity-30 pointer-events-none' : ''}`}
                           style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
                         >
@@ -949,9 +1049,7 @@ export default function ApprovalPortal() {
                       {visibleProofs.map((_, idx) => (
                         <button
                           key={idx}
-                          onClick={() => {
-                            carouselRef.current?.scrollTo({ left: idx * (carouselRef.current?.offsetWidth || 0), behavior: 'smooth' })
-                          }}
+                          onClick={() => goToSlide(idx)}
                           className="rounded-full transition-all"
                           style={{
                             width: idx === activeSlide ? '24px' : '8px',
