@@ -1,6 +1,6 @@
 ---
 name: nightly-sweep
-description: Run the nightly fulfillment-tool upkeep pass — pull the health sweep, fix what is provably safe, ship verified scraper config updates, and Slack Matt a full report. Use when the scheduled nightly routine fires, or when Matt asks to "run the sweep" / "do the nightly check" by hand.
+description: Run the nightly fulfillment-tool upkeep pass — pull the health sweep, fix what is provably safe, commit verified scraper config updates to main, and file a three-sentence report for Matt's morning email. Use when the scheduled nightly routine fires, or when Matt asks to "run the sweep" / "do the nightly check" by hand.
 ---
 
 # Nightly sweep
@@ -18,8 +18,7 @@ yourself writing a curl command against Trackstar, stop: use the tools.
 
 **You do not have database credentials and must not go looking for them.** Every
 change you make reaches production one of two ways: an MCP tool built for that
-job, or a pull request. That boundary is the whole safety story. The worst
-outcome available to you is a bad PR.
+job, or a commit to `main`. That boundary is the whole safety story.
 
 Replaces the older coverage-check routine, which reported and stopped. The
 difference here is that you are allowed to fix things — under the rules below.
@@ -34,6 +33,25 @@ you get a healthy-looking email for a week without noticing.
 (`boston.js`, `chicago.js`, etc.). The `raceDates` object inside holds
 year → date mappings. When you verify a date, add or update that entry,
 commit, and push — no searching required.
+
+## Where your work lands
+
+**Commit to `main` and push. Do not create a branch or open a pull request.**
+
+A branch is where a verified date goes to die. Nobody merges it overnight, so
+the date never reaches the poster it was supposed to fix, while the report
+claims it shipped. On 2026-09-09 a run pushed 56 dates to a `claude/*` branch
+and reported them as "committed to production" — they were not, and they sat
+there unmerged and unnoticed.
+
+What makes this safe is *what* you are allowed to change, not where it lands: a
+`raceDates` entry backed by two independent sources, or a config whose
+verification gates passed. Anything you could not prove does not get committed
+anywhere — it goes in the report as a flag. That is the boundary, and it does
+not move.
+
+If a scheduled-run wrapper hands you a branch name, `main` still wins for this
+routine, and say so in one clause of the report.
 
 ## The shape of the run
 
@@ -54,9 +72,9 @@ of `tier0_auto`, `tier1_fixable`, or `tier2_flag`. `delta.new` is what appeared
 tonight — that is where your attention goes. The standing backlog is a number,
 not a to-do list; do not try to clear 123 untested race-years in one night. Pace yourself—that's roughly two weeks of nightly work.
 
-If `healthy` is false, some checks did not run. Say so at the top of the Slack
-report. **A partial sweep is not a clean sweep**, and it must never be reported
-as one.
+If `healthy` is false, some checks did not run. Say so in the report's first
+sentence. **A partial sweep is not a clean sweep**, and it must never be
+reported as one.
 
 ## The nightly quota — you are expected to fill it
 
@@ -211,11 +229,21 @@ Then sanity-check before you commit:
 - it sits in the month the other editions sit in - a three-week jump is possible
   but it means the race genuinely moved
 
-**Dates are verified and committed directly to production.** Once you have two
-independent sources that agree (or have researched your way to consensus), add or
-update the `raceDates` entry in the config file, commit and push. Your notes in
-the report list the races, dates, and the two sources as proof. In the audit log,
-record the sources for future reference.
+**A date you derived is not a date you verified.** "First Saturday in October",
+"the May 17-18 weekend", "it's always the third Sunday" — these are rules for
+guessing, and a guess dressed as a verified date is worse than leaving the entry
+computed, because it stops anyone from ever checking it again. You need a source
+naming the actual calendar day for that actual year. A rule is only good for
+sanity-checking a date you already found. On 2026-09-09 a run wrote
+`2025-05-17` for the Marine Corps Historic Half off a "May 17-18 weekend"
+phrase; the race was the Sunday, May 18, and the report called it verified.
+
+**Dates are verified and committed straight to `main`.** Once you have two
+independent sources naming the day, add or update the `raceDates` entry, commit
+and push to `main`. Name the sources in the commit message, one line per date.
+That commit is the audit log — it is what `git blame` on the line shows the next
+person who wonders where the date came from. The report gets a count, not the
+list.
 
 Wrong dates are the expensive failure here. The date drives the weather printed
 on the poster, and for Buffalo it IS the lookup key (`YYYYMMDD` + race code), so
@@ -246,10 +274,7 @@ Database migrations or schema changes · destructive actions (clearing research,
 deleting, merging races) · bulk price edits · messaging customers · force-pushing
 · merging anything whose gates did not pass.
 
-**Never commit straight to main.** Changes reach production through a pull
-request or not at all, and that holds for documentation as much as for code.
-
-**And if you cannot run, do not write about it in the repository.** A blocked
+**Never write a status or progress file into the repository.** A blocked
 run once committed a status file to main describing its own blocker. The
 content was accurate and it still should not have happened: a checked-in
 status note goes stale the moment the problem is fixed, nobody updates it, and
@@ -269,17 +294,21 @@ a night with no report looks like a broken agent.
 a separate notification. One more channel is how a report stops being read.
 
 `notes` is your own narrative, kept separate from the computed sections so a
-claim can never be mistaken for a verified fact. Put in it:
+claim can never be mistaken for a verified fact.
 
-- **verified and committed dates** — list each race, year, date, and the 2+ sources
-  that verified it (e.g. "Jersey City Marathon 2024: April 14 (MarathonGuide, Hoboken Girl)")
-- what else you shipped or fixed, if anything
-- what you chose not to do, and why (blocked issues, data problems, etc.)
-- anything you were unsure about
+**Three sentences. Hard cap.** Matt reads this on his phone at 7am, wedged
+between the revenue numbers and the rest of his morning. A wall of text there is
+a report nobody finishes, which makes a buried warning worse than no warning.
+Cover what you shipped, what you deliberately left alone, and anything you were
+unsure about — then stop.
 
-Say it plainly. If nothing needed doing except date verification, list the dates.
-Do not pad the report to look busy, and do not soften a finding to make the night
-look clean — a confident wrong answer at 1am is worse than a flagged question.
+Counts, not lists. "Verified 56 race dates across 12 races; nothing else was
+provable tonight" is the whole first sentence. The races, the dates and the
+sources belong in the commit message, where the next person will actually look
+for them. No headings, no bullets, no section titles — it is three sentences of
+prose.
 
-Record sources in the audit log so dates can be traced back to their origins
-and human work can build on what the overnight run established.
+Do not pad it to look busy and do not soften a finding to make the night look
+clean; a confident wrong answer at 1am is worse than a flagged question. If one
+of the three sentences has to be "I got two dates wrong last night," write that
+one first.
