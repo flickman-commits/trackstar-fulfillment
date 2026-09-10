@@ -18,6 +18,10 @@ export default {
   location: 'Champaign-Urbana, IL',
   eventPrefix: 'IL',
   raceDates: {
+    2022: '2022-04-30',
+    2023: '2023-04-29',
+    2024: '2024-04-27',
+    2025: '2025-04-26',
     2026: '2026-04-25',
   },
   eventTypes: ['Marathon', 'Half Marathon'],

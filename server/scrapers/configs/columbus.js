@@ -15,6 +15,10 @@ export default {
   tag: 'Columbus',
   location: 'Columbus, OH',
   raceDates: {
+    2022: '2022-10-16',
+    2023: '2023-10-15',
+    2024: '2024-10-20',
+    2025: '2025-10-19',
     2026: '2026-10-18',
   },
   eventTypes: ['Marathon', 'Half Marathon'],

@@ -16,6 +16,7 @@ export default {
   location: 'Fredericksburg, VA',
   eventPrefix: 'MCM-HHALF',
   raceDates: {
+    2022: '2022-05-22',
     2023: '2023-05-21',
     2024: '2024-05-19',
     2025: '2025-05-18',

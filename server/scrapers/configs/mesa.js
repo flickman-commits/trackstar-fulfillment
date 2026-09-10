@@ -20,6 +20,10 @@ export default {
   baseUrl: 'https://mesamarathon.com',
   location: 'Mesa, AZ',
   raceDates: {
+    2022: '2022-02-12',
+    2023: '2023-02-11',
+    2024: '2024-02-10',
+    2025: '2025-02-08',
     2026: '2026-02-14',
   },
   eventTypes: ['Marathon', 'Half Marathon'],

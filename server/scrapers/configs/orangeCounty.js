@@ -24,6 +24,10 @@ export default {
   location: 'Costa Mesa, CA',
   masterEventId: 3234,
   raceDates: {
+    2022: '2022-05-01',
+    2023: '2023-05-07',
+    2024: '2024-05-05',
+    2025: '2025-05-04',
     2026: '2026-05-03',
   },
   eventTypes: ['Marathon', 'Half Marathon'],

@@ -14,6 +14,13 @@ export default {
   tag: 'SurfCity',
   location: 'Huntington Beach, CA',
 
+  raceDates: {
+    2022: '2022-02-06',
+    2023: '2023-02-05',
+    2024: '2024-02-04',
+    2025: '2025-02-02',
+    2026: '2026-02-01',
+  },
   eventIds: {
     2024: 2531,
     2025: 2571,

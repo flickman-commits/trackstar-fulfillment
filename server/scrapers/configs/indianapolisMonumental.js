@@ -26,6 +26,13 @@ export default {
   },
   distances: { marathon: 26.2, half: 13.1 },
   distanceMiles: 26.2,
+  raceDates: {
+    2022: '2022-11-05',
+    2023: '2023-10-28',
+    2024: '2024-11-09',
+    2025: '2025-11-08',
+    2026: '2026-11-07',
+  },
   aliases: [
     'Indianapolis Monumental Marathon',
     'Monumental Marathon',
