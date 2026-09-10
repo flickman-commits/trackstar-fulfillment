@@ -119,6 +119,14 @@ Cost is not a constraint—this runs on Haiku and a heavy night is negligible.
 
 1. **50 race dates researched and verified.** Find races with computed (guessed) dates. Research the actual date against at least two independent sources. Once you have agreement, commit and push. If sources conflict, research until you find consensus. This is your non-negotiable minimum every night until backlog clears.
 
+**The quota never outranks the bar.** If the sources are not there, the honest
+night is a short one. Twenty solid dates and a sentence saying the rest were not
+findable beats fifty with seven guesses buried in them. A wrong date is not a
+smaller version of a missing date: a missing one shows up as a build warning
+every time until somebody fixes it, while a wrong one looks finished forever and
+quietly prints the wrong weather on a poster. Report the number you actually
+verified, not the number you were asked for.
+
 **Then continue with:**
 
 2. **Tier 0 that unblocks a live order.** Someone has paid us. Always next.
@@ -237,6 +245,18 @@ naming the actual calendar day for that actual year. A rule is only good for
 sanity-checking a date you already found. On 2026-09-09 a run wrote
 `2025-05-17` for the Marine Corps Historic Half off a "May 17-18 weekend"
 phrase; the race was the Sunday, May 18, and the report called it verified.
+
+**A marathon and its race weekend are different things.** Most events spread
+distances across two days and the full is usually the Sunday, so a source
+saying "February 28 - March 1" is telling you the weekend, not the race. Pin
+the day the marathon ran. Seven of the 56 dates committed on 2026-09-09 were
+the wrong end of a weekend range, all off by exactly one day.
+
+`npm run build` now fails on this. If a race runs Sunday in most of its pinned
+years and you add a Saturday, the build stops and names the year. **Run it
+before you push** — it is the only check here that is not you grading your own
+work. It does not prove a date is right, it only catches the one-day-off case,
+which is the mistake that has actually shipped.
 
 **Dates are verified and committed straight to `main`.** Once you have two
 independent sources naming the day, add or update the `raceDates` entry, commit

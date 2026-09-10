@@ -25,6 +25,9 @@ const FIXTURES_PATH = path.resolve(__dirname, '../server/scrapers/__tests__/chip
 const errors = []
 const warnings = []
 
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const dayOf = iso => new Date(`${iso}T12:00:00Z`).getUTCDay()
+
 // 1. Read all platform files
 const platformFiles = fs.readdirSync(PLATFORMS_DIR)
   .filter(f => f.endsWith('Scraper.js') && f !== 'BaseScraper.js')
@@ -139,6 +142,39 @@ for (const file of configFiles) {
         `${file}: no verified raceDates for ${missing.join(', ')} - ` +
         `these fall back to a computed date. Look the real dates up and pin them.`
       )
+    }
+
+    // Race WEEKEND is not race DAY.
+    //
+    // Every wrong date this repo has shipped came from the same move: a source
+    // says "February 28 - March 1" or "the May 17-18 weekend", and the first
+    // day gets pinned when the marathon was actually the second. Seven such
+    // dates went in on 2026-09-09, and denverColfax 2023 had been sitting wrong
+    // before that. It is one day off, which is exactly small enough that
+    // nobody notices until the poster prints the wrong weather.
+    //
+    // A marathon keeps its weekday. A Saturday among four Sundays is a bug
+    // until proven otherwise, and proving otherwise means listing the year in
+    // raceDatesWeekdayExceptions with a reason.
+    const dated = Object.entries(cfg.raceDates || {})
+      .filter(([, d]) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    if (dated.length >= 3) {
+      const tally = {}
+      for (const [, d] of dated) tally[dayOf(d)] = (tally[dayOf(d)] || 0) + 1
+      const [modal, modalCount] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]
+      const exempt = new Set((cfg.raceDatesWeekdayExceptions || []).map(String))
+      if (modalCount > dated.length / 2) {
+        for (const [year, d] of dated) {
+          if (String(dayOf(d)) === modal || exempt.has(String(year))) continue
+          errors.push(
+            `${file}: raceDates.${year} = ${d} falls on a ${DAYS[dayOf(d)]}, but this race ` +
+            `runs ${DAYS[modal]} in ${modalCount} of ${dated.length} pinned years. ` +
+            `Usually this means a race-weekend range was read and the wrong end pinned — ` +
+            `check whether the marathon is the other day. If ${year} genuinely moved, add ` +
+            `it to raceDatesWeekdayExceptions in this config with a comment saying why.`
+          )
+        }
+      }
     }
 
     console.log(`  ✓ ${file.padEnd(25)} (${cfg.platform})${missing.length ? `  [${missing.length} computed year(s)]` : '  [dates verified]'}`)
