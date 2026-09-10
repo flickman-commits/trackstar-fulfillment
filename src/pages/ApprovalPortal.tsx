@@ -6,6 +6,38 @@ const PdfViewer = lazy(() => import('@/components/PdfViewer'))
 
 import ProofFullscreen from '@/components/ProofFullscreen'
 
+/**
+ * The portal's surface, matched to the storefront.
+ *
+ * The shop moved to sections-as-cards on a warm off-white, so the page a
+ * partner lands on from a text message should not look like a different
+ * company's admin panel. Named here rather than sprinkled as hex literals,
+ * because the same six values were previously spelled twelve different ways
+ * down this file.
+ *
+ * INK is the storefront's own Inter stack, copied from custom-pdp.css rather
+ * than approximated.
+ */
+const T = {
+  page: '#F6F5F2',
+  card: '#FFFFFF',
+  line: '#E7E4DD',
+  ink: '#1A1A1A',
+  muted: '#6B6B6B',
+  faint: '#9A9A9A',
+  accent: '#4600D6',
+  bar: '#242424',
+  radius: 16,
+  font: "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+  /** One card. Used for every section so they cannot drift apart. */
+  cardStyle: {
+    backgroundColor: '#FFFFFF',
+    border: '1px solid #E7E4DD',
+    borderRadius: 16,
+    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+  } as const,
+}
+
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
 interface Proof {
@@ -312,7 +344,7 @@ export default function ApprovalPortal() {
 
   if (state === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: T.page, fontFamily: T.font }}>
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" style={{ color: '#666666' }} />
           <p style={{ color: '#666666', fontSize: '14px' }}>Loading your design...</p>
@@ -324,7 +356,7 @@ export default function ApprovalPortal() {
   // ═══ ERROR ═══
   if (state === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: T.page, fontFamily: T.font }}>
         <div className="text-center max-w-sm">
           <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
           <XCircle className="w-12 h-12 mx-auto mb-4" style={{ color: '#4600D6' }} />
@@ -338,7 +370,7 @@ export default function ApprovalPortal() {
   // ═══ EXPIRED ═══
   if (state === 'expired') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: T.page, fontFamily: T.font }}>
         <div className="text-center max-w-sm">
           <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
           <AlertTriangle className="w-12 h-12 mx-auto mb-4" style={{ color: '#4600D6' }} />
@@ -364,7 +396,7 @@ export default function ApprovalPortal() {
     const sortedBatches = [...batchMap.entries()].sort((a, b) => b[0] - a[0])
 
     return (
-      <div className="min-h-screen" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen" style={{ backgroundColor: T.page, fontFamily: T.font }}>
         {/* Lightbox */}
         {lightboxUrl && (
           <div
@@ -543,7 +575,7 @@ export default function ApprovalPortal() {
   // ═══ REVISION SUBMITTED — success state ═══
   if (state === 'revision_submitted') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: T.page, fontFamily: T.font }}>
         <div className="text-center max-w-sm">
           <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
           <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(200, 85, 61, 0.1)' }}>
@@ -590,7 +622,7 @@ export default function ApprovalPortal() {
     : null
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F6F5F2', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+    <div className="min-h-screen" style={{ backgroundColor: T.page, fontFamily: T.font }}>
       {/* Approve confirmation modal */}
       {proofBeingConfirmed && (
         <div
@@ -673,23 +705,43 @@ export default function ApprovalPortal() {
         </div>
       )}
 
-      {/* Header — light bar */}
-      <div style={{ backgroundColor: '#F0F0F0', borderBottom: '1px solid #E0E0E0' }}>
-        <div className="max-w-3xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <img src="/trackstar-logo.png" alt="Trackstar" className="h-6" />
-            {/* Partners get the logo alone. Their name is the page title
-                rather than a line in the corner, and there is no order number
-                to track. */}
-            {!isPartner && (
-              <div className="text-right">
-                {order?.customerName && (
-                  <p style={{ color: '#1A1A1A', fontSize: '14px', fontWeight: 500 }}>{order.customerName}</p>
-                )}
-                <span style={{ color: '#666666', fontSize: '13px' }}>Order #{order?.displayOrderNumber || order?.parentOrderNumber}</span>
-              </div>
-            )}
-          </div>
+      {/* A floating dark pill rather than a full-width bar, per the reference
+          Matt sent, and the same dark grey as the tool's own rail so the two
+          Trackstar surfaces rhyme.
+
+          The logo sits in a white chip. The asset is purple artwork on a light
+          background with no alpha channel, so dropped straight onto the dark
+          bar it would show as a pale rectangle - and the purple is too close to
+          the bar in value to knock out cleanly. A white chip keeps the mark on
+          the ground it was drawn for. A proper light-on-dark lockup would let
+          it sit directly on the bar. */}
+      <div className="max-w-3xl mx-auto px-4 pt-3 pb-1">
+        <div
+          className="flex items-center justify-between gap-3 pl-1.5 pr-1.5 py-1.5"
+          style={{ backgroundColor: T.bar, borderRadius: 999 }}
+        >
+          <span
+            className="flex items-center justify-center shrink-0 overflow-hidden"
+            // #F3F3F3 is the logo file's own background, sampled from the
+            // asset, so the chip and the artwork meet with no visible seam.
+            style={{ backgroundColor: '#F3F3F3', borderRadius: 999, padding: '2px 10px' }}
+          >
+            <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 w-auto" />
+          </span>
+          {/* Partners get the logo alone. Their name is the page title rather
+              than a line in the corner, and there is no order number to track. */}
+          {!isPartner && (
+            <span className="flex items-center gap-2 pr-2 min-w-0">
+              {order?.customerName && (
+                <span className="truncate" style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: 500 }}>
+                  {order.customerName}
+                </span>
+              )}
+              <span className="shrink-0" style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px' }}>
+                #{order?.displayOrderNumber || order?.parentOrderNumber}
+              </span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -711,7 +763,24 @@ export default function ApprovalPortal() {
               : order?.customerName ? `Hey ${order.customerName}.` : 'Your design is ready.'}
           </h1>
           {isPartner && (
-            <p style={{ color: '#666666', fontSize: '14px', marginBottom: '8px' }}>Design options presented by Trackstar</p>
+            // A pill, all caps, purple on white, per Matt. It reads as a
+            // credit line rather than a sentence, which is what it is.
+            <span
+              className="inline-block mb-3"
+              style={{
+                backgroundColor: T.card,
+                color: T.accent,
+                border: `1px solid ${T.line}`,
+                borderRadius: 8,
+                padding: '5px 10px',
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Presented by Trackstar
+            </span>
           )}
           {hasPendingProofs ? (
             <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>
@@ -747,14 +816,14 @@ export default function ApprovalPortal() {
               support policy, and that relationship runs on email in both
               directions. */}
           {hasPendingProofs && !isPartner && (
-            <div style={{ marginTop: '14px', padding: '10px 14px', backgroundColor: 'rgba(70, 0, 214, 0.06)', border: '1px solid rgba(70, 0, 214, 0.18)', borderRadius: '6px' }}>
+            <div style={{ marginTop: '14px', padding: '12px 16px', backgroundColor: 'rgba(70, 0, 214, 0.05)', border: '1px solid rgba(70, 0, 214, 0.15)', borderRadius: 12 }}>
               <p style={{ color: '#1A1A1A', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
                 <strong style={{ color: '#4600D6' }}>Please don't email us with revisions</strong> - tap <strong>Request Revision to this Design</strong> on the design you want changed.
               </p>
             </div>
           )}
           {order?.designerNote && (
-            <div style={{ marginTop: '16px', padding: '12px 16px', backgroundColor: '#FFFFFF', borderLeft: '3px solid #4600D6', borderRadius: '0 4px 4px 0' }}>
+            <div style={{ ...T.cardStyle, marginTop: '16px', padding: '14px 16px', borderLeft: `3px solid ${T.accent}` }}>
               <p style={{ color: '#666666', fontSize: '12px', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Note from our designer</p>
               <p style={{ color: '#1A1A1A', fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const, margin: 0 }}>{order.designerNote}</p>
             </div>
@@ -767,7 +836,7 @@ export default function ApprovalPortal() {
             hidden to keep the focus there (the conversation already did its job
             of getting us what we needed). */}
         {messages.length > 0 && !hasPendingProofs && (
-          <div className="mb-4" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0', padding: '16px' }}>
+          <div className="mb-4" style={{ ...T.cardStyle, padding: '18px' }}>
             <p style={{ color: '#666666', fontSize: '12px', fontWeight: 600, marginBottom: '12px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
               Questions from our designer
             </p>
@@ -833,7 +902,7 @@ export default function ApprovalPortal() {
                   <div className="flex justify-center mb-4">
                     <div
                       className="inline-flex items-center gap-1 p-1 rounded-full"
-                      style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}
+                      style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}
                     >
                       {pendingGroups.map(group => {
                         const isActive = group === currentGroup
@@ -844,7 +913,7 @@ export default function ApprovalPortal() {
                             onClick={() => selectGroup(group)}
                             className="px-4 py-2 rounded-full transition-colors"
                             style={{
-                              backgroundColor: isActive ? '#242424' : 'transparent',
+                              backgroundColor: isActive ? T.bar : 'transparent',
                               color: isActive ? '#FFFFFF' : '#666666',
                               fontSize: '13px',
                               fontWeight: isActive ? 600 : 500,
@@ -888,13 +957,14 @@ export default function ApprovalPortal() {
                             <div
                               className="overflow-hidden transition-all mx-1"
                               style={{
-                                backgroundColor: '#FFFFFF',
-                                border: isRevising ? '2px solid #1A1A1A' : '2px solid #E0E0E0',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+                                backgroundColor: T.card,
+                                border: isRevising ? `2px solid ${T.ink}` : `1px solid ${T.line}`,
+                                borderRadius: T.radius,
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                               }}
                             >
                               {/* Option header — compact */}
-                              <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E0E0E0' }}>
+                              <div className="flex items-center justify-between px-4 py-2.5" style={{ backgroundColor: '#FBFAF8', borderBottom: `1px solid ${T.line}` }}>
                                 <div className="flex items-center gap-2">
                                   {/* Both this and the buttons below count
                                       within the visible product. They used to
@@ -960,7 +1030,7 @@ export default function ApprovalPortal() {
                               {/* Per-card action buttons — each design carries its
                                   own Approve + Make Revisions. No separate
                                   "select then act" step. */}
-                              <div className="p-3 space-y-2" style={{ borderTop: '1px solid #E0E0E0' }}>
+                              <div className="p-3 space-y-2" style={{ borderTop: `1px solid ${T.line}` }}>
                                 <button
                                   onClick={() => setConfirmApproveProofId(proof.id)}
                                   disabled={submitting || isRevising}
