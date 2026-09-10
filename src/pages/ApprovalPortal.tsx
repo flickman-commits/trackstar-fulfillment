@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Loader2, AlertTriangle, X, Maximize2, ChevronDow
 const PdfViewer = lazy(() => import('@/components/PdfViewer'))
 
 import ProofFullscreen from '@/components/ProofFullscreen'
+import SlideToApprove from '@/components/SlideToApprove'
 
 /**
  * The portal's surface, matched to the storefront.
@@ -636,7 +637,9 @@ export default function ApprovalPortal() {
                 Approve {proofBeingConfirmedOptionNum && proofs.filter(p => p.status === 'pending').length > 1 ? `Option ${proofBeingConfirmedOptionNum}` : 'this design'}?
               </h3>
               <p style={{ color: '#666666', fontSize: '14px', margin: '0 0 20px', lineHeight: 1.55 }}>
-                We'll send this design straight to production. No more changes after this - last chance to request revisions if you spot anything.
+                {isPartner
+                  ? 'This locks in the design we will build the rest of the partnership around. No more changes after this - last chance to request revisions if you spot anything.'
+                  : "We'll send this design straight to production. No more changes after this - last chance to request revisions if you spot anything."}
               </p>
               <div className="flex gap-2">
                 <button
@@ -1036,10 +1039,22 @@ export default function ApprovalPortal() {
                                   own Approve + Make Revisions. No separate
                                   "select then act" step. */}
                               <div className="p-3 space-y-2" style={{ borderTop: `1px solid ${T.line}` }}>
+                                {/* Phones slide to approve, which replaces the
+                                    confirm dialog: the drag itself is the
+                                    guard against a stray tap. Desktop keeps
+                                    the button plus dialog. */}
+                                <div className="md:hidden">
+                                  <SlideToApprove
+                                    label={visibleProofs.length === 1 ? 'Slide to approve' : `Slide to approve Option ${optionNum}`}
+                                    disabled={submitting || isRevising}
+                                    busy={submitting}
+                                    onComplete={() => handleApprove(proof.id)}
+                                  />
+                                </div>
                                 <button
                                   onClick={() => setConfirmApproveProofId(proof.id)}
                                   disabled={submitting || isRevising}
-                                  className="w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 uppercase tracking-wide"
+                                  className="hidden md:flex w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-40 items-center justify-center gap-2 uppercase tracking-wide"
                                   style={{ backgroundColor: '#4600D6', color: '#FFFFFF' }}
                                 >
                                   <CheckCircle2 className="w-4 h-4" />
