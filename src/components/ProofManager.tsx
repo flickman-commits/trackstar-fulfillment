@@ -55,6 +55,60 @@ interface ProofManagerProps {
   allowGroups?: boolean
 }
 
+/**
+ * Compact picker for what a design is an option for. Existing labels on the
+ * order are offered first so a second upload matches the first spelling
+ * exactly; "New label" swaps the select for a small text input.
+ */
+function LabelPicker({ value, options, onChange, disabled, className = '' }: {
+  value: string
+  options: string[]
+  onChange: (label: string) => void
+  disabled?: boolean
+  className?: string
+}) {
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState('')
+  const commit = () => {
+    const next = draft.trim()
+    setAdding(false)
+    setDraft('')
+    if (next && next !== value) onChange(next)
+  }
+  if (adding) {
+    return (
+      <input
+        autoFocus
+        type="text"
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => {
+          if (e.key === 'Enter') commit()
+          if (e.key === 'Escape') { setAdding(false); setDraft('') }
+        }}
+        placeholder="e.g. Half Marathon"
+        className={`px-2 py-1 text-[11px] border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20 ${className}`}
+      />
+    )
+  }
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={e => {
+        if (e.target.value === '__new__') setAdding(true)
+        else onChange(e.target.value)
+      }}
+      className={`px-2 py-1 text-[11px] border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20 disabled:opacity-50 ${className}`}
+    >
+      <option value="">No label</option>
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+      <option value="__new__">New label…</option>
+    </select>
+  )
+}
+
 export default function ProofManager({ orderId, designStatus, customerEmail, onDesignStatusChange, onLatestFeedback, disableEmail, allowGroups }: ProofManagerProps) {
   const [proofs, setProofs] = useState<Proof[]>([])
   const [approvalToken, setApprovalToken] = useState<ApprovalToken | null>(null)
@@ -79,6 +133,16 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   // designer already works.
   const [groupLabel, setGroupLabel] = useState('')
   const [relabelingId, setRelabelingId] = useState<string | null>(null)
+  const [renamingLabel, setRenamingLabel] = useState<string | null>(null)
+
+  /** Rename a label across every pending proof that carries it. */
+  const renameGroup = async (from: string, to: string) => {
+    setRenamingLabel(null)
+    const next = to.trim()
+    if (next === from) return
+    const targets = proofs.filter(p => p.status === 'pending' && (p.groupLabel || '') === from)
+    for (const t of targets) await setProofGroup(t.id, next)
+  }
 
   /** Set or clear what an already-uploaded proof is an option for. */
   const setProofGroup = async (proofId: string, label: string) => {
@@ -423,6 +487,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   // Rendered in both compact and full modes so Dan can always reach the
   // customer. Disabled (with a hint) when there's no email on the order.
   const messagingOpen = showMessaging || awaitingDanReply
+  const labelOptions = [...new Set(proofs.map(p => p.groupLabel).filter((l): l is string => !!l))]
   const messagingBlock = (
     <div className="border border-border-gray rounded-md bg-white">
       <button
@@ -574,103 +639,69 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         </button>
       )}
 
-      {/* Upload Proofs */}
-      <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
-        {allowGroups && (
-          <div className="mb-3">
-            <label className="block text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1">
-              These are options for
-            </label>
-            <input
-              type="text"
-              value={groupLabel}
-              onChange={e => setGroupLabel(e.target.value)}
-              list="proof-group-labels"
-              placeholder="e.g. Half Marathon, or leave blank if there is only one design"
-              className="w-full px-2 py-1.5 text-xs border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
-            />
-            {/* Previously used labels on this order, so the second upload
-                matches the first exactly. Two spellings would read as two
-                separate products, each waiting on its own approval. */}
-            <datalist id="proof-group-labels">
-              {[...new Set(proofs.map(p => p.groupLabel).filter(Boolean))].map(l => (
-                <option key={l as string} value={l as string} />
-              ))}
-            </datalist>
-            <p className="text-[10px] text-off-black/40 mt-1">
-              The partner picks one design per label. Options sharing a label compete with each other; different labels do not.
-            </p>
-          </div>
-        )}
-        {filePreviews.length > 0 ? (
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-2">
-              {filePreviews.map((fp, idx) => (
-                <div key={idx} className="relative">
-                  {fp.preview === 'pdf' ? (
-                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border-gray bg-white">
-                      <span className="text-lg">📄</span>
-                      <p className="text-[10px] font-medium text-off-black truncate max-w-[120px]">{fp.name}</p>
-                    </div>
-                  ) : (
-                    <img src={fp.preview} alt={fp.name} className="h-16 w-16 object-cover rounded-md border border-border-gray" />
-                  )}
-                  <button
-                    onClick={() => removeFile(idx)}
-                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center hover:bg-red-600"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              ))}
-              {selectedFiles.length < 20 && (
-                <label className="cursor-pointer flex items-center justify-center h-16 w-16 rounded-md border-2 border-dashed border-border-gray hover:border-off-black/30 transition-colors">
-                  <ImagePlus className="w-4 h-4 text-off-black/30" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                </label>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={uploadProofs}
-                disabled={isUploading}
-                className="flex-1 px-3 py-2 text-xs font-medium text-white bg-dark-fill hover:opacity-90 rounded-md transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                {isUploading ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}...</>
+      {/* Upload Proofs. Small until files are chosen; the label picker only
+          shows once there is something to label. */}
+      {filePreviews.length > 0 ? (
+        <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {filePreviews.map((fp, idx) => (
+              <div key={idx} className="relative">
+                {fp.preview === 'pdf' ? (
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border-gray bg-white">
+                    <span className="text-lg">📄</span>
+                    <p className="text-[10px] font-medium text-off-black truncate max-w-[120px]">{fp.name}</p>
+                  </div>
                 ) : (
-                  <><Upload className="w-3.5 h-3.5" /> Upload {selectedFiles.length} proof{selectedFiles.length !== 1 ? 's' : ''}</>
+                  <img src={fp.preview} alt={fp.name} className="h-16 w-16 object-cover rounded-md border border-border-gray" />
                 )}
-              </button>
-              <button
-                onClick={clearFiles}
-                className="px-3 py-2 text-xs text-off-black/40 hover:text-off-black/60 transition-colors"
-              >
-                Clear
-              </button>
-            </div>
+                <button
+                  onClick={() => removeFile(idx)}
+                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center hover:bg-red-600"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            ))}
+            {selectedFiles.length < 20 && (
+              <label className="cursor-pointer flex items-center justify-center h-16 w-16 rounded-md border-2 border-dashed border-border-gray hover:border-off-black/30 transition-colors">
+                <ImagePlus className="w-4 h-4 text-off-black/30" />
+                <input type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" />
+              </label>
+            )}
           </div>
-        ) : (
-          <label className="cursor-pointer flex items-center justify-center gap-2 py-3 text-xs text-off-black/50 hover:text-off-black/70 transition-colors">
-            <ImagePlus className="w-4 h-4" />
-            <span>Choose proof images (up to 20) or paste from clipboard</span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+          <div className="flex items-center gap-2 flex-wrap">
+            {allowGroups && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-off-black/50 whitespace-nowrap">Options for</span>
+                <LabelPicker value={groupLabel} options={labelOptions} onChange={setGroupLabel} />
+              </div>
+            )}
+            <button
+              onClick={uploadProofs}
+              disabled={isUploading}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-dark-fill hover:opacity-90 rounded-md transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              {isUploading ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading {selectedFiles.length}...</>
+              ) : (
+                <><Upload className="w-3.5 h-3.5" /> Upload {selectedFiles.length} proof{selectedFiles.length !== 1 ? 's' : ''}</>
+              )}
+            </button>
+            <button onClick={clearFiles} className="px-2 py-1.5 text-xs text-off-black/40 hover:text-off-black/60 transition-colors">
+              Clear
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <label className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-subtle-gray transition-colors">
+            <ImagePlus className="w-3.5 h-3.5" />
+            Add proofs
+            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" />
           </label>
-        )}
-      </div>
+          <span className="text-[10px] text-off-black/35">or paste from the clipboard</span>
+        </div>
+      )}
 
       {/* Note for customer — visible when uploading or ready to send */}
       {showNoteField && (
@@ -750,30 +781,17 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                 <Trash2 className="w-2.5 h-2.5 text-red-400" />
               )}
             </button>
-            {/* What this one is an option for. Editable while it is still
-                pending, because proofs are usually uploaded before anyone
-                decides how they group, and the label is what decides which
-                designs compete with each other. */}
-            {allowGroups && (
-              proof.status === 'pending' ? (
-                <input
-                  type="text"
-                  defaultValue={proof.groupLabel || ''}
-                  list="proof-group-labels"
+            {/* Relabel on hover only, so a batch of seven does not show seven text boxes. */}
+            {allowGroups && proof.status === 'pending' && (
+              <div className="absolute inset-x-0 -bottom-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                <LabelPicker
+                  value={proof.groupLabel || ''}
+                  options={labelOptions}
                   disabled={relabelingId === proof.id}
-                  onBlur={e => {
-                    const next = e.target.value.trim()
-                    if (next !== (proof.groupLabel || '')) setProofGroup(proof.id, next)
-                  }}
-                  placeholder="unlabelled"
-                  title="What this design is an option for"
-                  className="mt-1 w-14 px-1 py-0.5 text-[9px] text-center border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20 disabled:opacity-50"
+                  onChange={label => setProofGroup(proof.id, label)}
+                  className="w-full !px-1 !py-0 !text-[9px]"
                 />
-              ) : proof.groupLabel ? (
-                <p className="mt-1 w-14 text-[9px] text-center text-off-black/40 truncate" title={proof.groupLabel}>
-                  {proof.groupLabel}
-                </p>
-              ) : null
+              </div>
             )}
           </div>
         )
@@ -793,9 +811,54 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
             {currentBatch.length > 0 && (
               <div>
                 <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Current batch ({currentBatch.length})</p>
-                <div className="flex flex-wrap gap-2">
-                  {[...currentBatch].reverse().map(renderThumbnail)}
-                </div>
+                {allowGroups && currentBatch.some(p => p.groupLabel) ? (
+                  <div className="space-y-2">
+                    {(() => {
+                      const groups = new Map<string, Proof[]>()
+                      currentBatch.forEach(p => {
+                        const k = p.groupLabel || ''
+                        if (!groups.has(k)) groups.set(k, [])
+                        groups.get(k)!.push(p)
+                      })
+                      return [...groups.entries()].map(([label, items]) => (
+                        <div key={label || '__none__'} className="border border-border-gray rounded-md p-2 bg-white">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            {renamingLabel === label ? (
+                              <input
+                                autoFocus
+                                type="text"
+                                defaultValue={label}
+                                onBlur={e => renameGroup(label, e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') renameGroup(label, (e.target as HTMLInputElement).value)
+                                  if (e.key === 'Escape') setRenamingLabel(null)
+                                }}
+                                className="px-2 py-0.5 text-[11px] border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setRenamingLabel(label)}
+                                className="text-[11px] font-semibold text-off-black/70 hover:text-off-black"
+                                title="Rename this label"
+                              >
+                                {label || 'No label'}
+                              </button>
+                            )}
+                            <span className="text-[10px] text-off-black/35">{items.length} option{items.length !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {[...items].reverse().map(renderThumbnail)}
+                          </div>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {[...currentBatch].reverse().map(renderThumbnail)}
+                  </div>
+                )}
               </div>
             )}
 
