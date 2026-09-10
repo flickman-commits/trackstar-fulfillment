@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw, MessageSquare } from 'lucide-react'
+import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw, MessageSquare, ExternalLink, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 
@@ -59,6 +59,8 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   const [proofs, setProofs] = useState<Proof[]>([])
   const [approvalToken, setApprovalToken] = useState<ApprovalToken | null>(null)
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null)
+  // Messaging is collapsed by default; it pops open when a customer reply is waiting.
+  const [showMessaging, setShowMessaging] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -420,16 +422,27 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   // ═══ Designer ↔ customer Q&A — compose a question + see replies ═══
   // Rendered in both compact and full modes so Dan can always reach the
   // customer. Disabled (with a hint) when there's no email on the order.
+  const messagingOpen = showMessaging || awaitingDanReply
   const messagingBlock = (
-    <div className="border border-border-gray rounded-md p-3 bg-white space-y-2">
-      <div className="flex items-center gap-1.5">
+    <div className="border border-border-gray rounded-md bg-white">
+      <button
+        type="button"
+        onClick={() => setShowMessaging(!messagingOpen)}
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-left"
+      >
         <MessageSquare className="w-3.5 h-3.5 text-off-black/50" />
         <p className="text-[11px] font-semibold text-off-black/60 uppercase tracking-wider">Message customer</p>
         {awaitingDanReply && (
           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-100 text-purple-700">New reply</span>
         )}
-      </div>
+        {messages.length > 0 && !awaitingDanReply && (
+          <span className="text-[10px] text-off-black/40">({messages.length})</span>
+        )}
+        <ChevronDown className={`w-3.5 h-3.5 text-off-black/40 ml-auto transition-transform ${messagingOpen ? 'rotate-180' : ''}`} />
+      </button>
 
+      {messagingOpen && (
+      <div className="px-3 pb-3 space-y-2">
       {messages.length > 0 && (
         <div className="space-y-1.5 max-h-48 overflow-y-auto">
           {messages.map(m => {
@@ -465,6 +478,8 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
           <><Send className="w-3.5 h-3.5" /> Email question to customer</>
         )}
       </button>
+      </div>
+      )}
     </div>
   )
 
@@ -515,7 +530,6 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   return (
     <div className="space-y-3" onPaste={handlePaste}>
       {lightbox}
-      {messagingBlock}
       {/* Approval Link — compact inline */}
       {approvalUrl ? (
         <div className="flex items-center gap-2">
@@ -532,6 +546,16 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
             {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
             {copied ? 'Copied' : 'Copy'}
           </button>
+          <a
+            href={approvalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2 py-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 rounded transition-colors flex items-center gap-1"
+            title="Open the portal in a new tab"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Open
+          </a>
           <button
             onClick={generateToken}
             className="text-[10px] text-off-black/30 hover:text-off-black/50 transition-colors"
@@ -801,6 +825,8 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
           </>
         )
       })()}
+
+      {messagingBlock}
     </div>
   )
 }
