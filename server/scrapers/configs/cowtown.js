@@ -21,7 +21,7 @@ export default {
     2023: '2023-02-26',
     2024: '2024-02-25',
     2025: '2025-02-23',
-    2026: '2026-02-28',
+    2026: '2026-03-01',
   },
   eventTypes: ['Marathon', 'Half Marathon', 'Ultra Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon', 'ultra'],

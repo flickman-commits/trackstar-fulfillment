@@ -17,7 +17,7 @@ export default {
     2023: '2023-09-16',
     2024: '2024-09-21',
     2025: '2025-09-20',
-    2026: '2026-09-18',
+    2026: '2026-09-19',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
