@@ -33,6 +33,14 @@ import { syncProductCatalog } from './shopifyProducts.js'
 /** Where run_sweep parks the pass-1 report for finish_sweep to collect. */
 const PENDING_SWEEP_KEY = 'nightly_sweep_pending'
 
+/**
+ * Hard cap on finish_sweep notes. Three sentences of plain prose land around
+ * 350; the 2026-09-09 report was 2,400 and unreadable on a phone. Generous
+ * enough that an honest note never trips it, tight enough that a bulleted
+ * per-race inventory always does.
+ */
+const NOTES_LIMIT = 700
+
 export const REPAIR_TOOLS = [
   {
     name: 'run_sweep',
@@ -46,12 +54,25 @@ export const REPAIR_TOOLS = [
     name: 'finish_sweep',
     description:
       'End a nightly run: re-sweeps, compares against the before state from run_sweep, ' +
-      'and files the report that Matt reads in his morning email. Pass notes describing ' +
-      'what you shipped and what you chose not to do. Call this even if you fixed nothing.',
+      'and files the report that Matt reads in his morning email. Call this even if you ' +
+      'fixed nothing. Be aware of what the comparison does NOT cover: it checks scrapers, ' +
+      'lookups, orders and event ids, but it never looks at race dates. Committing 56 dates ' +
+      'still returns fixed:0, and a date you got wrong will not show up here as anything. ' +
+      'Nothing verifies date work except you, so claim only what you actually sourced.',
     inputSchema: {
       type: 'object',
       properties: {
-        notes: { type: 'string', description: 'Your narrative: what shipped, with evidence, and what you left alone and why.' },
+        notes: {
+          type: 'string',
+          maxLength: 700,
+          description:
+            'THREE SENTENCES, plain prose. No headings, no bullets, no per-race lists - this ' +
+            'lands on a phone under the revenue numbers, where length buries the one line ' +
+            'that mattered. Give counts, never enumerations: "verified 21 race dates across ' +
+            '5 races" and stop. Races, dates and sources belong in the commit message, which ' +
+            'is where git blame sends the next person. Cover what shipped, what you ' +
+            'deliberately left alone, and anything you were unsure about.',
+        },
       },
       required: ['notes'],
     },
@@ -128,10 +149,17 @@ function actionable(report) {
       .filter(f => f.action === 'tier1_fixable')
       .slice(0, 25)
       .map(f => ({ kind: f.kind, subject: f.subject, platform: f.platform })),
+    // Deliberately no budget numbers here. This string used to carry its own
+    // ("10 fixtures, 5 race dates, 3 PRs a night") and drifted out of step with
+    // the skill, which by 2026-09 asked for 50 dates and called a quiet night a
+    // failed one. The agent got both every run and had no way to tell which was
+    // current. One place owns the quota, and it is not this file.
     reminder:
-      'Budget: 10 fixtures, 5 race dates, 3 PRs a night. Leaving most of the backlog ' +
-      'untouched is a correct night. Capturing a fixture does NOT clear a finding on its ' +
-      'own - probe_scrapers has to run afterwards, and one clean probe is not proof.',
+      'Quotas and budgets live in the nightly-sweep skill - follow it, not a number you ' +
+      'remember from a previous run. Two things this summary cannot show you: capturing a ' +
+      'fixture does NOT clear a finding on its own (probe_scrapers has to run afterwards), ' +
+      'and one clean probe is not proof, because a race that flips between live and drifted ' +
+      'is flaky rather than fixed.',
   }
 }
 
@@ -149,6 +177,22 @@ export const REPAIR_HANDLERS = {
   },
 
   async finish_sweep({ notes }) {
+    // Asking for brevity in the skill did not hold: the 2026-09-09 run filed
+    // 2.4KB of headings and per-race bullet lists into a phone-sized email.
+    // Enforced here because this is the last thing standing between an agent
+    // and Matt's inbox, and because a limit that only lives in prose is a
+    // suggestion. Checked before the re-sweep so a retry is cheap, and the
+    // pending baseline is left in place so the retry still has its before state.
+    if (typeof notes === 'string' && notes.length > NOTES_LIMIT) {
+      return text(
+        `Not filed. Notes are ${notes.length} characters; the limit is ${NOTES_LIMIT}. ` +
+        `This is a three-sentence report in a morning email, not a document: no headings, ` +
+        `no bullets, no per-race lists. Give counts ("verified 21 dates across 5 races") ` +
+        `and put the races, dates and sources in the commit message instead. Nothing else ` +
+        `has happened yet - call finish_sweep again with a shorter version.`
+      )
+    }
+
     const row = await prisma.systemConfig.findUnique({ where: { key: PENDING_SWEEP_KEY } })
     if (!row?.value) {
       return text('No run in progress. Call run_sweep first; finish_sweep needs a before state to compare against.')
