@@ -34,6 +34,10 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/approve/:token",
+      "destination": "/api/public/approval-preview?token=:token"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

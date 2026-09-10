@@ -72,6 +72,7 @@ const routes = [
   { method: 'delete', path: '/api/proofs',                 handler: '../api/proofs/index.js' },
   // Public storefront results lookup (gated behind PUBLIC_LOOKUP_ENABLED).
   { method: 'get',    path: '/api/public/results-lookup',  handler: '../api/public/results-lookup.js' },
+  { method: 'get',    path: '/api/public/approval-preview', handler: '../api/public/approval-preview.js' },
   // Marathon Monopoly proposal page (gated behind MONOPOLY_PAGE_ENABLED).
   { method: 'get',    path: '/api/public/monopoly',        handler: '../api/public/monopoly.js' },
   { method: 'get',    path: '/api/admin/monopoly-model',   handler: '../api/admin/monopoly-model.js' },
