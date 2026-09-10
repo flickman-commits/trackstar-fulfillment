@@ -6,7 +6,8 @@
  * across all RTRT races and live in RTRTScraper.
  * Event ID format: MCM-1775K-{year}
  *
- * 17.75K = 11.03 miles. Race is typically held in late March.
+ * 17.75K = 11.03 miles. Held in late March, but the day moves — do not derive
+ * a date from a "third Saturday" rule; every year needs a source.
  */
 export default {
   platform: 'rtrt',
@@ -15,11 +16,16 @@ export default {
   location: 'Arlington, VA',
   eventPrefix: 'MCM-1775K',
   raceDates: {
-    2022: '2022-03-26',
     2023: '2023-03-25',
     2024: '2024-03-23',
     2025: '2025-03-22',
     2026: '2026-03-21',
+  },
+  raceDateSources: {
+    2023: 'potomaclocal.com "7 a.m. Saturday, March 25, 2023" + FinisherPix event 6022',
+    2024: 'potomaclocal.com road-closure notice (Sat Mar 23) + marinemarathon.com',
+    2025: 'marines.mil 2025 17.75K coverage + marinemarathon.com event page',
+    2026: 'DVIDS 2026 17.75K image set + raceentry.com listing',
   },
   eventTypes: ['17.75K'],
   defaultEventType: '17.75K',

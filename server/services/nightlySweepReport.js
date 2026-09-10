@@ -29,6 +29,87 @@ const KIND_LABELS = {
 
 const label = kind => KIND_LABELS[kind] || kind
 
+/**
+ * Findings the agent has no tool for, whatever tier the check assigned them.
+ *
+ * The `action` field describes how hard a finding is to fix, not who can fix
+ * it, and the two came apart: an expired approval link is labelled tier0_auto
+ * because resending is trivial, but there is no resend endpoint the agent can
+ * reach, so it sat in "the robot will handle it" while a paying customer
+ * waited. Anything here needs a person regardless of tier.
+ */
+const NO_TOOL_KINDS = new Set([
+  'approval_link_expired',
+  'missing_weather',
+  'researched_over_customer_data',
+  'suggestions_presented_as_matches',
+  'photo_gate_bypassed',
+  'no_runner_data',
+  'race_run_but_not_researched',
+  'pace_inconsistent_with_time',
+])
+
+/**
+ * How long the agent gets before an item it owns becomes Matt's problem.
+ *
+ * A finding the agent can theoretically fix but has not fixed in a week is not
+ * pending, it is stuck — the tool is missing, the site is blocking us, or it
+ * keeps getting skipped for easier work. Leaving it in the agent's column
+ * forever is how a backlog item becomes permanent without anyone deciding it
+ * should be.
+ */
+const ESCALATE_AFTER_NIGHTS = 7
+
+/** Who has to act: 'matt' if only a person can move it, otherwise 'claude'. */
+export function owner(f) {
+  if (f.action === 'tier2_flag') return 'matt'
+  if (NO_TOOL_KINDS.has(f.kind)) return 'matt'
+  if ((f.nightsOpen || 0) >= ESCALATE_AFTER_NIGHTS) return 'matt'
+  return 'claude'
+}
+
+/**
+ * Kinds where a paid order is already waiting.
+ *
+ * Everything in NEEDS YOU is high severity, so severity cannot order it. What
+ * separates these is that someone has paid and is waiting: a print stalled on
+ * a dead approval link costs money today, while a product selling without a
+ * scraper degrades an experience that still completes. Ordering by group size
+ * put three stalled orders below a scraper gap nobody is blocked on.
+ */
+const ORDER_KINDS = new Set([
+  'approval_link_expired',
+  'researched_over_customer_data',
+  'race_run_but_not_researched',
+  'no_runner_data',
+  'photo_gate_bypassed',
+  'suggestions_presented_as_matches',
+  'pace_inconsistent_with_time',
+])
+
+/**
+ * Backlog that is SUPPOSED to sit — the nightly quota works through it.
+ *
+ * An untested race-year ageing for five nights is the queue behaving normally;
+ * flagging it as stalling would fire on a hundred rows and train the reader to
+ * skip the line that means something. Stalling is only interesting for work
+ * that was meant to be finished and was not.
+ */
+const EXPECTED_BACKLOG_KINDS = new Set(['no_probe', 'race_date_missing', 'no_year'])
+
+/** "new tonight" / "8 nights" — the age that turns a noun into a decision. */
+function age(f) {
+  const n = f.nightsOpen
+  if (n === undefined || n === null) return null
+  if (n <= 0) return 'new tonight'
+  return `${n} night${n === 1 ? '' : 's'}`
+}
+
+/** Oldest first: the thing that has been ignored longest is the real question. */
+function byAgeDesc(a, b) {
+  return (b.nightsOpen || 0) - (a.nightsOpen || 0)
+}
+
 /** Group findings by kind, biggest group first. */
 function group(findings) {
   const by = {}
@@ -223,8 +304,9 @@ export function formatSweepAsMarkdown(combined) {
  * writes a paragraph every morning to prove it ran is a section you stop
  * reading, and then the morning it matters goes past unnoticed.
  */
-export function formatSweepBrief(stored, { maxItems = 6 } = {}) {
+export function formatSweepBrief(stored, { maxItems = 3 } = {}) {
   const c = stored.counts || {}
+  const remaining = stored.remaining || []
   const out = []
 
   // A sweep that could not finish leads, because the alternative is a healthy
@@ -234,26 +316,70 @@ export function formatSweepBrief(stored, { maxItems = 6 } = {}) {
     out.push('')
   }
 
-  const parts = []
-  if (c.fixed) parts.push(`**${c.fixed}** fixed overnight`)
-  if (c.found) parts.push(`**${c.found}** new`)
-  parts.push(`**${c.remainingHigh || 0}** need attention`)
-  out.push(parts.join(' · '))
-
-  const high = (stored.remaining || []).filter(f => f.severity === 'high')
-  if (high.length) {
-    out.push('')
-    for (const [kind, items] of group(high).slice(0, 4)) {
+  /* ── 1. NEEDS YOU ───────────────────────────────────────────────────────
+     Only what a person has to decide. This block earns the whole report, and
+     it is meant to be empty most mornings — "nothing needs you" is the most
+     useful thing it can say, and it can only mean that if the block stays
+     honest about what the agent genuinely cannot do. */
+  const mine = remaining.filter(f => owner(f) === 'matt')
+  out.push(`**NEEDS YOU** ${mine.length ? `(${mine.length})` : '— nothing'}`)
+  if (mine.length) {
+    // Money first, then longest-ignored. Never by group size.
+    const groups = group(mine).sort((a, b) => {
+      const money = Number(ORDER_KINDS.has(b[0])) - Number(ORDER_KINDS.has(a[0]))
+      if (money) return money
+      return ([...b[1]].sort(byAgeDesc)[0].nightsOpen || 0)
+        - ([...a[1]].sort(byAgeDesc)[0].nightsOpen || 0)
+    })
+    for (const [kind, items] of groups.slice(0, 4)) {
+      const stamp = age([...items].sort(byAgeDesc)[0])
       const names = items.slice(0, maxItems).map(f => f.subject).join(', ')
-      const more = items.length > maxItems ? `, +${items.length - maxItems} more` : ''
-      out.push(`- **${label(kind)}** — ${names}${more}`)
+      const more = items.length > maxItems ? `, +${items.length - maxItems}` : ''
+      out.push(`- **${label(kind)}** (${items.length})${stamp ? ` · ${stamp}` : ''}`)
+      out.push(`  ${names}${more}`)
     }
+    const shown = groups.slice(0, 4).reduce((n, [, i]) => n + i.length, 0)
+    if (mine.length > shown) out.push(`- …and ${mine.length - shown} more`)
   }
 
-  // The agent's own narrative: what it shipped, what it deliberately left.
+  /* ── 2. SHIPPED ─────────────────────────────────────────────────────────
+     What actually changed, as the re-sweep measured it — never as the agent
+     described it. Race-date commits do not appear here: the sweep reads the
+     deployed config, so a date committed tonight only clears its finding on
+     tomorrow's run. They land in "cleared since last night" instead, which is
+     why that line is kept separate rather than added to this one. */
+  out.push('')
+  out.push('**SHIPPED**')
+  const cleared = (stored.delta?.resolved || []).length
+  out.push(`- ${c.fixed || 0} findings fixed and re-checked this run`)
+  if (cleared) out.push(`- ${cleared} cleared since last night (includes work that deployed after it)`)
+  if (c.introduced) out.push(`- ⚠️ ${c.introduced} new problem(s) appeared after the fixes ran`)
+
+  /* ── 3. IN PROGRESS ─────────────────────────────────────────────────────
+     The agent's own queue. No action implied — this exists so the backlog has
+     a visible direction, and so anything the agent is quietly failing at
+     surfaces before it ages into the NEEDS YOU block above. */
+  out.push('')
+  out.push('**IN PROGRESS**')
+  const theirs = remaining.filter(f => owner(f) === 'claude')
+  out.push(`- ${theirs.length} in the agent's queue · ${c.found || 0} new tonight`)
+
+  // Aging but not yet escalated: the early warning for a stuck item.
+  const stalling = theirs
+    .filter(f => !EXPECTED_BACKLOG_KINDS.has(f.kind))
+    .filter(f => (f.nightsOpen || 0) >= Math.floor(ESCALATE_AFTER_NIGHTS / 2))
+    .sort(byAgeDesc)
+    .slice(0, 2)
+  for (const f of stalling) {
+    out.push(`- Stalling: ${label(f.kind)} — ${f.subject} · ${age(f)}`)
+  }
+
+  // The agent's own words, marked as such. Kept last and kept labelled: this
+  // is the one part of the report nothing verifies, and a claim that reads
+  // like a measurement is how a bad night gets reported as a good one.
   if (stored.notes) {
     out.push('')
-    out.push(stored.notes)
+    out.push(`_Agent's note (unverified): ${stored.notes}_`)
   }
 
   return out.join('\n')

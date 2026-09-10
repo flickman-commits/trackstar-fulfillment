@@ -18,8 +18,9 @@ export default {
   location: 'Jackson, WY',
   masterEventId: 119816,
   raceDates: {
-    2022: '2022-09-24',
+    // 2023: enmotive.com event page + marathonguide, both naming Sat Sep 23.
     2023: '2023-09-23',
+    // 2024: marathonguide 2024 race detail + ahotu, both naming Sat Sep 28.
     2024: '2024-09-28',
     2025: '2025-09-27',
     2026: '2026-09-26',

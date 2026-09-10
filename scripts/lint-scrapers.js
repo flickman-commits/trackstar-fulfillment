@@ -144,6 +144,52 @@ for (const file of configFiles) {
       )
     }
 
+    // Every pinned date needs a source, and a rule is not a source.
+    //
+    // The weekday gate below cannot catch a date derived FROM a weekday rule,
+    // because such a date agrees with its siblings by construction. On
+    // 2026-09-10 a run pinned 25 dates off "third Sunday in October", "second
+    // Saturday of February" and similar, every one of them sailed through the
+    // gate, and the commit message recorded the rules as if they were
+    // citations. A guess that passes the check is worse than no check.
+    //
+    // So provenance is data, not prose: raceDateSources[year] names where the
+    // day came from. A config that has opted in must be complete — that makes
+    // the requirement ratchet forward file by file without a grandfather list,
+    // and makes a missing source a build failure rather than a warning nobody
+    // reads at 1am.
+    const RULE_SHAPED = /\b(first|second|third|fourth|fifth|last)\s+\w*\s*(sun|mon|tues?|wed(nes)?|thurs?|fri|satur)day\b|\btypically\b|\balways\b/i
+    const sources = cfg.raceDateSources
+    if (sources !== undefined) {
+      if (typeof sources !== 'object' || Array.isArray(sources)) {
+        errors.push(`${file}: raceDateSources must be an object of year -> source.`)
+      } else {
+        for (const [year] of Object.entries(cfg.raceDates || {})) {
+          const src = sources[year]
+          if (typeof src !== 'string' || src.trim().length < 8) {
+            errors.push(
+              `${file}: raceDates.${year} has no raceDateSources.${year}. Name where the ` +
+              `calendar day came from, e.g. 'marinemarathon.com results + DVIDS coverage'. ` +
+              `If you could not find one, leave the year out — a computed date shows as a ` +
+              `warning until somebody fixes it, a guessed one looks finished forever.`
+            )
+          } else if (RULE_SHAPED.test(src)) {
+            errors.push(
+              `${file}: raceDateSources.${year} = "${src}" is a rule, not a source. ` +
+              `"Third Sunday in October" tells you how to guess the day, not that anyone ` +
+              `checked which day this race actually ran. Cite something that names the date ` +
+              `for ${year} specifically, or drop the year.`
+            )
+          }
+        }
+      }
+    } else if (Object.keys(cfg.raceDates || {}).length) {
+      warnings.push(
+        `${file}: ${Object.keys(cfg.raceDates).length} pinned date(s) with no raceDateSources. ` +
+        `[grandfathered - backfill when possible]`
+      )
+    }
+
     // Race WEEKEND is not race DAY.
     //
     // Every wrong date this repo has shipped came from the same move: a source

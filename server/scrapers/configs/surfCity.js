@@ -15,11 +15,10 @@ export default {
   location: 'Huntington Beach, CA',
 
   raceDates: {
-    2022: '2022-02-06',
-    2023: '2023-02-05',
-    2024: '2024-02-04',
     2025: '2025-02-02',
-    2026: '2026-02-01',
+  },
+  raceDateSources: {
+    2025: 'runsurfcity.com results + findmymarathon race detail',
   },
   eventIds: {
     2024: 2531,

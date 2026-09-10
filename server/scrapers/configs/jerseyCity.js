@@ -9,7 +9,8 @@
  * distinguish between marathon and half via the `course` field on
  * each profile ("marathon" vs "halfmarathon").
  *
- * Race is typically held on a Sunday in mid-April.
+ * Held on a Sunday in mid-April, but the date moves — do not derive one from
+ * that pattern; every year needs a source naming the calendar day.
  * Confirmed: 2026-04-19
  */
 export default {

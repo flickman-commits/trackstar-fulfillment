@@ -520,7 +520,33 @@ async function withDelta(report, { persist = true } = {}) {
   }
 
   const now = new Set(report.findings.map(fingerprint))
-  const before = new Set(previous?.fingerprints || [])
+
+  // When each open finding was first seen, carried forward night to night.
+  //
+  // Age is the difference between "Tokyo 2025 drifted" and "Tokyo 2025 has
+  // been drifted for six weeks and two attempts have failed". The first reads
+  // the same on night 1 and night 40; the second tells you nobody is going to
+  // fix this without a decision. Without it the report cannot tell a fresh
+  // problem from a permanent one, and everything gets the same weight.
+  //
+  // Older snapshots stored a bare fingerprint array. Those get dated to the
+  // snapshot itself, so ages start accruing from the last run rather than
+  // resetting the whole board to "new tonight".
+  const previousFirstSeen = previous?.firstSeen
+    || Object.fromEntries((previous?.fingerprints || []).map(fp => [fp, previous?.finishedAt]))
+
+  const firstSeen = {}
+  for (const f of report.findings) {
+    const fp = fingerprint(f)
+    firstSeen[fp] = previousFirstSeen[fp] || report.finishedAt
+    f.firstSeenAt = firstSeen[fp]
+    f.nightsOpen = Math.max(
+      0,
+      Math.round((Date.parse(report.finishedAt) - Date.parse(firstSeen[fp])) / 86400000)
+    )
+  }
+
+  const before = new Set(Object.keys(previousFirstSeen))
 
   report.delta = {
     hasBaseline: Boolean(previous),
@@ -537,7 +563,7 @@ async function withDelta(report, { persist = true } = {}) {
   try {
     const snapshot = JSON.stringify({
       finishedAt: report.finishedAt,
-      fingerprints: [...now],
+      firstSeen,
     })
     await prisma.systemConfig.upsert({
       where: { key: LAST_REPORT_KEY },
@@ -594,8 +620,14 @@ export function combineSweepPasses(before, after) {
     fixed,
     introduced,
     // Still standing once the fixes were done. This is the "needs attention"
-    // list, and the hope is that it is short.
+    // list, and the hope is that it is short. Each finding carries nightsOpen,
+    // which is what lets the report separate a fresh problem from a permanent
+    // one instead of printing both at the same volume.
     remaining: after.findings,
+    // Night-over-night movement. Distinct from `fixed`, which is only what
+    // this run's own repairs cleared: date commits deploy after the run ends,
+    // so they show up here on the following night and nowhere else.
+    delta: after.delta,
     stats: after.stats,
     counts: {
       found: (before.delta?.new || []).length,

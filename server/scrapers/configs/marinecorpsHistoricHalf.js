@@ -16,6 +16,7 @@ export default {
   location: 'Fredericksburg, VA',
   eventPrefix: 'MCM-HHALF',
   raceDates: {
+    // 2022: marines.mil 2022 Historic Half coverage + DVIDS image set, both May 22.
     2022: '2022-05-22',
     2023: '2023-05-21',
     2024: '2024-05-19',

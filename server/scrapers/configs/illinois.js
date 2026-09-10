@@ -8,8 +8,8 @@
  *
  * Webtracker credentials extracted from track.rtrt.me payload (Apr 2026).
  *
- * Race is typically held the last Saturday of April.
- * Confirmed 2026: 2026-04-25
+ * Do not derive a date from "the last Saturday of April" or any similar rule.
+ * Every year needs a source naming the calendar day — see raceDates below.
  */
 export default {
   platform: 'rtrt',
@@ -18,9 +18,7 @@ export default {
   location: 'Champaign-Urbana, IL',
   eventPrefix: 'IL',
   raceDates: {
-    2022: '2022-04-30',
-    2023: '2023-04-29',
-    2024: '2024-04-27',
+    // 2025: illinoismarathon.com results archive + Christie Clinic race listing
     2025: '2025-04-26',
     2026: '2026-04-25',
   },

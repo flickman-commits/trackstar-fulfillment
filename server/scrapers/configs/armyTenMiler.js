@@ -25,7 +25,9 @@ export default {
   },
 
   raceDates: {
+    // 2022: armymwr.com "Sunday, Oct. 9" + armytenmiler.com 2022 race-day volunteer packet.
     2022: '2022-10-09',
+    // 2023: Wikipedia Army Ten-Miler (39th annual, Oct 8 2023) + AUSA coverage.
     2023: '2023-10-08',
     2024: '2024-10-13',
     2025: '2025-10-12',

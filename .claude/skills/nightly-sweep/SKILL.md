@@ -224,6 +224,25 @@ the race's own site or results archive, a road-closure notice, a timing
 platform's event listing, a running calendar. Two that agree is enough; one is
 not.
 
+**Every date you pin needs a `raceDateSources` entry naming where the day came
+from.** It sits beside `raceDates` in the same config:
+
+```js
+raceDates:       { 2024: '2024-03-23' },
+raceDateSources: { 2024: 'potomaclocal.com road-closure notice + marinemarathon.com' },
+```
+
+The build rejects a config that pins a date without one, and rejects a source
+that is phrased as a rule ("the third Sunday in October", "typically the second
+Saturday"). A rule tells you how to guess the day; it is not evidence that
+anyone checked which day this race actually ran. If you cannot name a source,
+leave the year out.
+
+Once a config has a `raceDateSources` block, every year in it must be sourced —
+so if you pin one year in a config that has none yet, either source the existing
+years too or leave the block off and keep the new date out. Do not invent a
+citation to satisfy the gate.
+
 If two sources disagree:
 - Search for a third independent source to break the tie
 - Favor the race's official website and official timing platform
@@ -246,6 +265,18 @@ sanity-checking a date you already found. On 2026-09-09 a run wrote
 `2025-05-17` for the Marine Corps Historic Half off a "May 17-18 weekend"
 phrase; the race was the Sunday, May 18, and the report called it verified.
 
+On 2026-09-10 a run did it at scale: 44 dates pinned, only 19 of them sourced,
+the other 25 derived from "third Sunday in October", "second Saturday of
+February", "first weekend in May". Four Austin years went in off a February
+pattern after the search explicitly returned no per-year dates. Every one
+passed the weekday gate — they were derived FROM the weekday rule, so of course
+they agreed with their siblings — and the commit message listed the rules as
+if they were citations. The report said "52 verified"; the count was wrong too.
+Note what did NOT save it: the build was green, the lint was green, and the
+agent believed its own summary. Search engines volunteer these rules unasked
+("the Columbus Marathon is held on the third Sunday in October"), and a rule
+arriving in a search result feels like a finding. It is not one.
+
 **A marathon and its race weekend are different things.** Most events spread
 distances across two days and the full is usually the Sunday, so a source
 saying "February 28 - March 1" is telling you the weekend, not the race. Pin
@@ -259,7 +290,10 @@ work.
 
 Be clear about what it is worth. It does not prove a date is right; it catches
 the one-day-off case, which is the mistake that has actually shipped, and is
-blind to a date wrong by a week. And it is a heuristic, not a law — **races do
+blind to a date wrong by a week. It is also **structurally blind to a date
+derived from a weekday rule** — that date agrees with its siblings by
+construction, so the gate waves it through every time. `raceDateSources` is the
+check that catches that class; this one cannot. And it is a heuristic, not a law — **races do
 move days.** So when it fires, the answer is never to shift the date until the
 build goes quiet. Go find a source naming the day that year actually ran. If
 the race moved, record it and say who told you:
@@ -322,8 +356,30 @@ a night with no report looks like a broken agent.
 **Matt's existing morning email reads that stored report**; you are not sending
 a separate notification. One more channel is how a report stops being read.
 
-`notes` is your own narrative, kept separate from the computed sections so a
-claim can never be mistaken for a verified fact.
+### What the report looks like
+
+Matt's card has three blocks, and the first two are computed — you do not write
+them and you cannot influence them:
+
+- **NEEDS YOU** — findings only a person can move: everything `tier2_flag`,
+  everything you have no endpoint for (approval links, weather, re-research),
+  and anything you own that has gone unfixed for a week. Paid-order problems
+  sort to the top. This block is meant to be empty.
+- **SHIPPED** — what the re-sweep verified, not what you say you did. Date
+  commits do not appear here on the night you make them: the sweep reads the
+  deployed config, so they clear on the following night's run instead.
+- **IN PROGRESS** — your queue, with anything you are quietly failing at named
+  as "stalling" before it ages into NEEDS YOU.
+
+Every item carries how many nights it has been open. A finding you skip does
+not disappear; it gets older in front of him, and after a week it lands in his
+column with your name implicitly on it.
+
+`notes` is your own narrative and is rendered **labelled as unverified**,
+underneath the computed blocks. That labelling is deliberate: it is the one
+part of the report nothing checks, and the 2026-09-10 run used it to report 52
+verified dates when 19 were sourced. Write it as commentary on facts the report
+has already established, never as the source of them.
 
 **Three sentences. Hard cap.** Matt reads this on his phone at 7am, wedged
 between the revenue numbers and the rest of his morning. A wall of text there is

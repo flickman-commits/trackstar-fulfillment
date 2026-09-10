@@ -10,10 +10,6 @@ export default {
   parseMode: 'columns',
   endpoint: 'searchResultGen.php',
   raceDates: {
-    2022: '2022-02-13',
-    2023: '2023-02-12',
-    2024: '2024-02-11',
-    2025: '2025-02-16',
     2026: '2026-02-15',
   },
   eventTypes: ['Marathon', 'Half Marathon', '5K'],

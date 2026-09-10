@@ -25,8 +25,8 @@ export default {
   raceSlug: 'missoula-marathon',
   location: 'Missoula, MT',
   raceDates: {
+    // 2022: runwildmissoula.org 2022 event page + raceraves 2022 review.
     2022: '2022-06-26',
-    2023: '2023-06-25',
     2024: '2024-06-30',
     2025: '2025-06-29',
     2026: '2026-06-28',

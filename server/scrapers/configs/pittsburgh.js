@@ -13,7 +13,8 @@
  *   225166 = UPMC Health Plan Pittsburgh Half Marathon
  *   225167 = KeyBank | UPMC Health Plan Pittsburgh BACK Half Marathon
  *
- * Race weekend is the first Sunday of May.
+ * Race weekend falls in early May, but do not derive a date from a "first
+ * Sunday of May" rule — every year needs a source naming the day.
  */
 export default {
   platform: 'raceroster',

@@ -26,12 +26,22 @@ export default {
   },
   distances: { marathon: 26.2, half: 13.1 },
   distanceMiles: 26.2,
+  // Sources are per-year because this race moves: 2023 ran in October, every
+  // other pinned year is November. Any "early November Saturday" rule is wrong
+  // for 2023 and there is no rule that covers both.
   raceDates: {
     2022: '2022-11-05',
     2023: '2023-10-28',
     2024: '2024-11-09',
     2025: '2025-11-08',
     2026: '2026-11-07',
+  },
+  raceDateSources: {
+    2022: 'marathonguide 2022 results header + Wikipedia (15th anniversary edition)',
+    2023: 'monumentalmarathon.com 2023 results page + wthr.com race-day coverage, both Sat Oct 28',
+    2024: 'findmymarathon race detail + monumentalmarathon.com results archive',
+    2025: 'beyondmonumental.org sellout release + World Athletics results 7215766',
+    2026: 'monumentalmarathon.com 2026 FAQ + athleticannex race-weekend guide',
   },
   aliases: [
     'Indianapolis Monumental Marathon',
