@@ -255,8 +255,17 @@ the wrong end of a weekend range, all off by exactly one day.
 `npm run build` now fails on this. If a race runs Sunday in most of its pinned
 years and you add a Saturday, the build stops and names the year. **Run it
 before you push** — it is the only check here that is not you grading your own
-work. It does not prove a date is right, it only catches the one-day-off case,
-which is the mistake that has actually shipped.
+work.
+
+Be clear about what it is worth. It does not prove a date is right; it catches
+the one-day-off case, which is the mistake that has actually shipped, and is
+blind to a date wrong by a week. And it is a heuristic, not a law — **races do
+move days.** So when it fires, the answer is never to shift the date until the
+build goes quiet. Go find a source naming the day that year actually ran. If
+the race moved, record it and say who told you:
+`raceDatesWeekdayExceptions: { 2026: 'moved to Saturday, per usafmarathon.com' }`.
+Silencing the check has to cost the same as fixing it, or the gate becomes a
+way to launder a guess.
 
 **Dates are verified and committed straight to `main`.** Once you have two
 independent sources naming the day, add or update the `raceDates` entry, commit
