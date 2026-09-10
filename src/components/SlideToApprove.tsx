@@ -72,7 +72,7 @@ export default function SlideToApprove({ label, onComplete, disabled, busy, acce
       className="relative w-full select-none overflow-hidden"
       style={{
         height: KNOB + PAD * 2,
-        borderRadius: 999,
+        borderRadius: 5,
         backgroundColor: done || busy ? accent : '#EDEBE6',
         border: `1px solid ${done || busy ? accent : '#DCD9D2'}`,
         opacity: disabled ? 0.4 : 1,
@@ -84,7 +84,7 @@ export default function SlideToApprove({ label, onComplete, disabled, busy, acce
       {x > 0 && (
         <div
           className="absolute inset-y-0 left-0"
-          style={{ width: x + KNOB + PAD * 2, backgroundColor: accent, borderRadius: 999, opacity: done || busy ? 1 : 0.9 }}
+          style={{ width: x + KNOB + PAD * 2, backgroundColor: accent, borderRadius: 5, opacity: done || busy ? 1 : 0.9 }}
         />
       )}
       <div
@@ -104,7 +104,7 @@ export default function SlideToApprove({ label, onComplete, disabled, busy, acce
           left: PAD,
           width: KNOB,
           height: KNOB,
-          borderRadius: 999,
+          borderRadius: 4,
           backgroundColor: '#FFFFFF',
           boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
           transform: `translateX(${x}px)`,

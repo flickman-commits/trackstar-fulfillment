@@ -1066,7 +1066,7 @@ export default function ApprovalPortal() {
                                     setFeedback('')
                                   }}
                                   disabled={submitting}
-                                  className="w-full px-4 py-2.5 text-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2 rounded-full md:rounded-none font-bold uppercase tracking-wide md:font-medium md:normal-case md:tracking-normal min-h-[58px] md:min-h-0"
+                                  className="w-full px-4 py-2.5 text-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2 rounded-[5px] md:rounded-none font-bold uppercase tracking-wide md:font-medium md:normal-case md:tracking-normal min-h-[58px] md:min-h-0"
                                   style={{
                                     backgroundColor: isRevising ? '#1A1A1A' : '#FFFFFF',
                                     color: isRevising ? '#FFFFFF' : '#1A1A1A',
