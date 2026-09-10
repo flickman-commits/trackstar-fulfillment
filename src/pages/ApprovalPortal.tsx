@@ -718,7 +718,7 @@ export default function ApprovalPortal() {
       <div className="max-w-3xl mx-auto px-4 pt-3 pb-1">
         <div
           className="flex items-center justify-between gap-3 pl-1.5 pr-1.5 py-1.5"
-          style={{ backgroundColor: T.bar, borderRadius: 999 }}
+          style={{ backgroundColor: T.bar, borderRadius: 24 }}
         >
           <span
             className="flex items-center justify-center shrink-0 overflow-hidden"
@@ -730,14 +730,12 @@ export default function ApprovalPortal() {
           </span>
           {/* The partner's name lives in the bar, beside the mark. It is still
               the page's h1 - it is the title, it just sits where a title sits
-              in the reference. Truncates rather than wraps, because a pill
-              that grows to two lines stops reading as a pill; the full name is
-              in the tab title and the link preview regardless. */}
+              in the reference. Wraps rather than truncates, per Matt: a
+              partner should see their whole name, so the bar grows to fit. */}
           {isPartner && (
             <h1
-              className="flex-1 min-w-0 truncate"
-              title={partnerName}
-              style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}
+              className="flex-1 min-w-0 py-1"
+              style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.3, margin: 0 }}
             >
               {partnerName}
             </h1>
