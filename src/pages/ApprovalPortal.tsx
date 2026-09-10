@@ -728,8 +728,20 @@ export default function ApprovalPortal() {
           >
             <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 w-auto" />
           </span>
-          {/* Partners get the logo alone. Their name is the page title rather
-              than a line in the corner, and there is no order number to track. */}
+          {/* The partner's name lives in the bar, beside the mark. It is still
+              the page's h1 - it is the title, it just sits where a title sits
+              in the reference. Truncates rather than wraps, because a pill
+              that grows to two lines stops reading as a pill; the full name is
+              in the tab title and the link preview regardless. */}
+          {isPartner && (
+            <h1
+              className="flex-1 min-w-0 truncate"
+              title={partnerName}
+              style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}
+            >
+              {partnerName}
+            </h1>
+          )}
           {!isPartner && (
             <span className="flex items-center gap-2 pr-2 min-w-0">
               {order?.customerName && (
@@ -751,17 +763,12 @@ export default function ApprovalPortal() {
           {/* The partner's own name is the headline - a touch larger and
               heavier than the customer greeting it replaces, because here it
               is the subject of the page rather than a salutation. */}
-          <h1 style={{
-            color: '#1A1A1A',
-            fontSize: isPartner ? '28px' : '24px',
-            fontWeight: isPartner ? 800 : 700,
-            marginBottom: '4px',
-            letterSpacing: '-0.01em',
-          }}>
-            {isPartner
-              ? partnerName
-              : order?.customerName ? `Hey ${order.customerName}.` : 'Your design is ready.'}
-          </h1>
+          {/* Partners' title moved up into the bar. Customers keep the greeting. */}
+          {!isPartner && (
+            <h1 style={{ color: '#1A1A1A', fontSize: '24px', fontWeight: 700, marginBottom: '4px', letterSpacing: '-0.01em' }}>
+              {order?.customerName ? `Hey ${order.customerName}.` : 'Your design is ready.'}
+            </h1>
+          )}
           {isPartner && (
             // A pill, all caps, purple on white, per Matt. It reads as a
             // credit line rather than a sentence, which is what it is.
