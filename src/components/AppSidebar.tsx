@@ -166,11 +166,13 @@ function ToolsTile({
  * The same tools, laid along the top for a phone.
  *
  * On a narrow screen a fixed side rail would eat a third of the width, so the
- * desktop rail hides below md and this takes its place: one dark bar pinned
- * to the top, the tiles in a row, scrolling sideways when they do not fit.
- * Same dark grey, same white card on the current tile, so the app reads as
- * one thing on both screens. The three small utilities lose their flyout and
- * sit in the row as ordinary tiles; a hover menu has no meaning on a thumb.
+ * desktop rail hides below md and this takes its place: the same floating
+ * dark card, inset from the edges with the same radius and shadow, turned on
+ * its side along the top. The tiles sit in a row and scroll sideways when
+ * they do not fit; the card itself stays put. Same white card on the current
+ * tile, so the app reads as one thing on both screens. The three small
+ * utilities lose their flyout and sit in the row as ordinary tiles; a hover
+ * menu has no meaning on a thumb.
  */
 export function MobileToolBar({
   isAdmin,
@@ -195,13 +197,15 @@ export function MobileToolBar({
   return (
     <nav
       aria-label="Tools"
-      className="md:hidden fixed top-0 inset-x-0 z-30 bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.18)]"
-      // Under the notch on phones that have one.
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      // Same inset (3), radius (22px) and shadow as the desktop rail, so it is
+      // recognisably the same object. Sits below the notch on phones with one.
+      className="md:hidden fixed left-3 right-3 z-30 rounded-[22px] bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.10)]"
+      style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
     >
-      {/* Horizontal scroll with the scrollbar hidden: the tiles themselves
-          show there is more, and a bar under a row of icons looks broken. */}
-      <div className="flex gap-1 px-2 py-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Horizontal scroll with the scrollbar hidden: the half-visible next
+          tile already says there is more, and a bar under a row of icons
+          looks broken. The rounded card clips the strip at its corners. */}
+      <div className="flex gap-0.5 px-1.5 py-1.5 overflow-x-auto rounded-[22px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map(item => (
           <div key={item.id} className="shrink-0 w-[72px]">
             <Tile item={item} active={activeId === item.id} />
