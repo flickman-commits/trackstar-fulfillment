@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "installCommand": "npm ci --include=dev",
+  "installCommand": "PUPPETEER_SKIP_DOWNLOAD=1 npm ci --include=dev",
   "crons": [
     {
       "path": "/api/orders/actions?action=monday-pipeline",
