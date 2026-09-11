@@ -18,16 +18,12 @@ export default {
   location: 'Champaign-Urbana, IL',
   eventPrefix: 'IL',
   raceDates: {
-    2022: '2022-04-23',
-    2023: '2023-04-23',
     2024: '2024-04-27',
     // 2025: illinoismarathon.com results archive + Christie Clinic race listing
     2025: '2025-04-26',
     2026: '2026-04-25',
   },
   raceDateSources: {
-    2022: 'illinoismarathon.com + raceroster.com "fourth weekend in April"',
-    2023: 'illinoismarathon.com + raceroster.com "fourth weekend in April"',
     2024: 'illinoismarathon.com + mybestruns.com',
     2025: 'illinoismarathon.com + raceroster.com',
     2026: 'illinoismarathon.com + raceroster.com',

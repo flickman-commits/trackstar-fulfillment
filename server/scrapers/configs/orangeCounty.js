@@ -24,17 +24,11 @@ export default {
   location: 'Costa Mesa, CA',
   masterEventId: 3234,
   raceDates: {
-    2022: '2022-04-30',
-    2023: '2023-05-07',
     2024: '2024-05-05',
-    2025: '2025-05-04',
     2026: '2026-05-03',
   },
   raceDateSources: {
-    2022: 'justserve.org + ocmarathon.com "first Sunday in May" pattern',
-    2023: 'justserve.org "OC Marathon-May 7, 2023" + ahotu.com',
     2024: 'findmymarathon.com results + ocmarathon.com',
-    2025: 'ocmarathon.com "first Sunday in May" + runguides.com',
     2026: 'ocmarathon.com + findarace.com',
   },
   eventTypes: ['Marathon', 'Half Marathon'],

@@ -18,7 +18,6 @@ export default {
   location: 'Jackson, WY',
   masterEventId: 119816,
   raceDates: {
-    2022: '2022-09-23',
     // 2023: enmotive.com event page + marathonguide, both naming Sat Sep 23.
     2023: '2023-09-23',
     // 2024: marathonguide 2024 race detail + ahotu, both naming Sat Sep 28.
@@ -27,7 +26,6 @@ export default {
     2026: '2026-09-26',
   },
   raceDateSources: {
-    2022: 'findmymarathon.com race results + mountainmodernmotel.com event listing',
     2023: 'enmotive.com event page + marathonguide',
     2024: 'marathonguide.com + ahotu.com',
     2025: 'jacksonholemarathon.com event page',

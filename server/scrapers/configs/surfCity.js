@@ -18,14 +18,12 @@ export default {
     2022: '2022-02-06',
     2023: '2023-02-05',
     2024: '2024-02-04',
-    2025: '2025-02-01',
     2026: '2026-02-01',
   },
   raceDateSources: {
     2022: 'findmymarathon.com race results + runsurfcity.com',
     2023: 'findmymarathon.com race results + runsurfcity.com',
     2024: 'findmymarathon.com race results + runsurfcity.com',
-    2025: 'findtherun.com + runsurfcity.com',
     2026: 'goandrace.com + findtherun.com',
   },
   eventIds: {
