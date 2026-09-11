@@ -115,7 +115,7 @@ async function buildPrompt({ company, contact, touchNumber, step, previousTouche
 /**
  * @returns {Promise<{ touchNumber, step, exhausted, variants: Array<{subject, body}>, contact, company, model }>}
  */
-export async function draftVariants({ companyId, contactId, useTemplate = false }) {
+export async function draftVariants({ companyId, contactId, useTemplate = false, force = false }) {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     include: { contacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] } },
@@ -125,6 +125,21 @@ export async function draftVariants({ companyId, contactId, useTemplate = false 
   if (!contact) throw new Error('This company has no contact to write to')
 
   const { touchNumber, step, exhausted } = await nextStepFor(company)
+
+  // The overnight routine may already have written this one. Use it unless the
+  // operator explicitly asked for a fresh draft (force), or it was written for
+  // a different touch than the org is now on.
+  const held = company.proposedDraft
+  if (!useTemplate && !force && held && held.touchNumber === touchNumber && Array.isArray(held.variants) && held.variants.length) {
+    const heldContact = company.contacts.find(c => c.id === held.contactId) || contact
+    return {
+      touchNumber, step, exhausted, contact: heldContact, company,
+      variants: held.variants,
+      model: held.source === 'routine' ? 'nightly routine' : held.source,
+      source: 'prepared',
+      preparedAt: held.preparedAt,
+    }
+  }
 
   // Either there is no model, or the operator asked for the template. Same
   // answer: the cadence's own copy is a real first draft. This is what keeps
@@ -231,10 +246,13 @@ export async function queueDraft({ companyId, contactId, subject, body, mockupId
     )
   }
 
+  // Drafts go into the mailbox of whoever is filing. Cron and internal
+  // callers have no user row and therefore no mailbox; the draft is still
+  // recorded, just not pushed to Gmail.
   let gmail = null
-  const status = await gmailStatus()
+  const status = await gmailStatus(actor?.id)
   if (status.connected) {
-    gmail = await createDraft({ to: contact.email, subject: subject.trim(), html: textToHtml(body), threadId, attachment })
+    gmail = await createDraft({ userId: actor.id, to: contact.email, subject: subject.trim(), html: textToHtml(body), threadId, attachment })
   }
 
   const now = new Date()
@@ -260,6 +278,9 @@ export async function queueDraft({ companyId, contactId, subject, body, mockupId
         touchCount: touchNumber,
         lastTouchAt: now,
         nextActionAt,
+        // Whatever was held for this touch has now been used.
+        proposedDraft: null,
+        proposedAt: null,
         nextAction: touchNumber >= cadenceFor(company.pipeline).length
           ? 'Sequence complete: decide next year vs. pass'
           : `Send touch ${touchNumber + 1}: ${cadenceFor(company.pipeline)[touchNumber].angle}`,

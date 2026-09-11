@@ -649,6 +649,7 @@ model User {
   comments     OrderComment[]
   editBatches  ProductEditBatch[]
   auditEvents  AuditEvent[]
+  ownedCompanies Company[]
 
   @@index([email])
 }
@@ -762,11 +763,19 @@ model Company {
   nextAction     String?
   notes          String?
   // Provenance
-  source         String    // "csv" | "clickup" | "notion" | "manual"
+  source         String    // "csv" | "clickup" | "notion" | "manual" | "agent"
   externalId     String?   // ClickUp task id / Notion page id
+  // Who works this deal. Null means unassigned. One column now so a second
+  // rep is a filter later, not a data migration.
+  ownerId        String?
+  // The email the nightly routine wrote, waiting for a person to send it:
+  // { touchNumber, angle, contactId, variants:[{subject,body}], source, preparedAt }
+  proposedDraft  Json?
+  proposedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  owner          User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   contacts       Contact[]
   touches        Touch[]
 
@@ -774,6 +783,7 @@ model Company {
   @@index([pipeline, stage])
   @@index([nextActionAt])
   @@index([domain])
+  @@index([ownerId])
 }
 
 model Contact {
@@ -785,7 +795,10 @@ model Contact {
   title        String?
   linkedinUrl  String?
   isPrimary    Boolean   @default(true)
-  // What we know about them, from Perplexity: { title, personInfo[], companyInfo[], sources[] }
+  // Where the address came from. "website" and "apollo" are verified-ish;
+  // "guessed" is a pattern like first.last@domain and should not be sent to.
+  emailSource  String?   // "import" | "website" | "apollo" | "manual" | "guessed"
+  // What we know about them: { title, personInfo[], companyInfo[], sources[] }
   research     Json?
   researchedAt DateTime?
   source       String

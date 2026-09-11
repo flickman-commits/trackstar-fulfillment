@@ -32,8 +32,22 @@ import { google } from 'googleapis'
 import prisma from '../../db.js'
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.compose']
-const KEY_REFRESH = 'gmail_refresh_token'
-const KEY_EMAIL = 'gmail_account_email'
+
+/**
+ * One connection per person. Keys are scoped by user id so a second rep can
+ * connect their own mailbox without touching Matt's. The unscoped keys are
+ * what the first version wrote; the first per-user read migrates them across
+ * and they are never written again.
+ */
+const LEGACY_REFRESH = 'gmail_refresh_token'
+const LEGACY_EMAIL = 'gmail_account_email'
+const keyRefresh = userId => `gmail_refresh_token:${userId}`
+const keyEmail = userId => `gmail_account_email:${userId}`
+
+function requireUser(userId) {
+  if (!userId) throw new Error('A user id is required for Gmail: connections are per person.')
+  return String(userId)
+}
 
 export function isGmailConfigured() {
   return Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET)
@@ -55,6 +69,20 @@ async function getConfig(key) {
 
 async function setConfig(key, value) {
   await prisma.systemConfig.upsert({ where: { key }, update: { value }, create: { key, value } })
+}
+
+/** The user's refresh token, adopting the legacy unscoped one on first read. */
+async function refreshTokenFor(userId) {
+  const own = await getConfig(keyRefresh(userId))
+  if (own) return own
+  const legacy = await getConfig(LEGACY_REFRESH)
+  if (!legacy) return null
+  const legacyEmail = await getConfig(LEGACY_EMAIL)
+  await setConfig(keyRefresh(userId), legacy)
+  if (legacyEmail) await setConfig(keyEmail(userId), legacyEmail)
+  await prisma.systemConfig.deleteMany({ where: { key: { in: [LEGACY_REFRESH, LEGACY_EMAIL] } } })
+  console.log(`[gmail] migrated the unscoped Gmail connection to user ${userId}`)
+  return legacy
 }
 
 /**
@@ -92,38 +120,41 @@ export function getAuthUrl(redirectUri) {
 }
 
 /** Exchange the code Google sent back, persist the refresh token, record which account it is. */
-export async function completeConnection(code, redirectUri) {
+export async function completeConnection(code, redirectUri, userId) {
+  const uid = requireUser(userId)
   const client = oauthClient(redirectUri)
   const { tokens } = await client.getToken(code)
   if (!tokens.refresh_token) {
     throw new Error('Google did not return a refresh token. Remove the app under Google Account > Security > Third-party access and connect again.')
   }
-  await setConfig(KEY_REFRESH, tokens.refresh_token)
+  await setConfig(keyRefresh(uid), tokens.refresh_token)
   client.setCredentials(tokens)
   const gmail = google.gmail({ version: 'v1', auth: client })
   const profile = await gmail.users.getProfile({ userId: 'me' })
   const email = profile.data.emailAddress || ''
-  await setConfig(KEY_EMAIL, email)
+  await setConfig(keyEmail(uid), email)
   return { email }
 }
 
-export async function disconnectGmail() {
-  await prisma.systemConfig.deleteMany({ where: { key: { in: [KEY_REFRESH, KEY_EMAIL] } } })
+export async function disconnectGmail(userId) {
+  const uid = requireUser(userId)
+  await prisma.systemConfig.deleteMany({ where: { key: { in: [keyRefresh(uid), keyEmail(uid)] } } })
 }
 
-export async function gmailStatus() {
+export async function gmailStatus(userId) {
   const configured = isGmailConfigured()
-  const refresh = configured ? await getConfig(KEY_REFRESH) : null
-  const email = refresh ? await getConfig(KEY_EMAIL) : null
+  if (!configured || !userId) return { configured, connected: false, email: null }
+  const refresh = await refreshTokenFor(String(userId))
+  const email = refresh ? await getConfig(keyEmail(String(userId))) : null
   return { configured, connected: Boolean(refresh), email }
 }
 
-async function gmailClient() {
-  const refresh = await getConfig(KEY_REFRESH)
+async function gmailClient(userId) {
+  const refresh = await refreshTokenFor(requireUser(userId))
   if (!refresh) throw new Error('Gmail is not connected. Open Sales and press Connect Gmail.')
   const client = oauthClient()
   client.setCredentials({ refresh_token: refresh })
-  return google.gmail({ version: 'v1', auth: client })
+  return { gmail: google.gmail({ version: 'v1', auth: client }), uid: String(userId) }
 }
 
 /**
@@ -139,9 +170,9 @@ function isRevokedToken(err) {
   return /invalid_grant|invalid_token|unauthorized_client/i.test(text)
 }
 
-async function handleGmailError(err) {
+async function handleGmailError(err, uid) {
   if (!isRevokedToken(err)) throw err
-  await prisma.systemConfig.deleteMany({ where: { key: KEY_REFRESH } })
+  await prisma.systemConfig.deleteMany({ where: { key: keyRefresh(uid) } })
   throw new Error(
     'Gmail disconnected: Google rejected the saved credential. Press Connect Gmail again. '
     + 'If this keeps happening weekly, the OAuth consent screen is still in Testing, which expires refresh tokens after 7 days - set it to Internal, or publish it.'
@@ -240,8 +271,8 @@ export function textToHtml(text) {
  * Create a draft. Returns Gmail's draft id, the message id, and the thread id
  * so a follow-up can land in the same thread later.
  */
-export async function createDraft({ to, subject, html, threadId, inReplyTo, attachment }) {
-  const gmail = await gmailClient()
+export async function createDraft({ userId, to, subject, html, threadId, inReplyTo, attachment }) {
+  const { gmail, uid } = await gmailClient(userId)
   const raw = base64url(buildMime({ to, subject, html, inReplyTo, attachment }))
   const message = { raw }
   if (threadId) message.threadId = threadId
@@ -249,7 +280,7 @@ export async function createDraft({ to, subject, html, threadId, inReplyTo, atta
   try {
     res = await gmail.users.drafts.create({ userId: 'me', requestBody: { message } })
   } catch (err) {
-    await handleGmailError(err)
+    await handleGmailError(err, uid)
   }
   return {
     draftId: res.data.id,

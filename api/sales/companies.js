@@ -17,6 +17,7 @@
 import prisma from '../_lib/prisma.js'
 import { setCors } from '../_lib/auth.js'
 import { requireAdminOnly, recordAudit } from '../_lib/users.js'
+import { syncCompanyOut } from '../../server/domain/sales/externalSync.js'
 
 const PIPELINES = new Set(['RACE', 'CHARITY'])
 const STAGES = new Set(['NOT_CONTACTED', 'QUEUED', 'SENT', 'FOLLOWED_UP', 'REPLIED', 'CALL_BOOKED', 'PROPOSAL_SENT', 'INTERESTED', 'SIGNED', 'INVOICED', 'PAID', 'NEXT_YEAR', 'PASSED', 'NOT_INTERESTED'])
@@ -84,7 +85,15 @@ async function listCompanies(query) {
   ])
 
   return {
-    companies: companies.map(c => ({ ...c, lastTouch: c.touches[0] || null, touches: undefined })),
+    companies: companies.map(c => ({
+      ...c,
+      lastTouch: c.touches[0] || null,
+      touches: undefined,
+      // The body stays server-side until the row is opened; the list only
+      // needs to know a draft is waiting.
+      proposedDraft: undefined,
+      hasProposedDraft: Boolean(c.proposedDraft),
+    })),
     counts: { due, new: fresh, total },
   }
 }
@@ -145,7 +154,8 @@ export default async function handler(req, res) {
           data: { stage, ...(closing ? { nextActionAt: null, nextAction: null } : {}) },
           include: { contacts: { select: CONTACT_SELECT } },
         })
-        return res.status(200).json({ company })
+        const sync = await syncCompanyOut(company)
+        return res.status(200).json({ company, sync })
       }
 
       if (action === 'note') {
@@ -183,7 +193,10 @@ export default async function handler(req, res) {
           prisma.company.update({ where: { id: company.id }, data: { stage, lastTouchAt: now }, include: { contacts: { select: CONTACT_SELECT } } }),
           ...(draft ? [prisma.touch.update({ where: { id: draft.id }, data: { kind: 'EMAIL_SENT', sentAt: now } })] : []),
         ])
-        return res.status(200).json({ company: updated })
+        // "After you send: log it in the tracker." Best effort; a mirror
+        // outage never blocks marking the email sent.
+        const sync = await syncCompanyOut(updated, { sent: { body: draft?.body, touchNumber: draft?.touchNumber, sentAt: now } })
+        return res.status(200).json({ company: updated, sync })
       }
 
       return res.status(400).json({ error: `Unknown action: ${action}` })

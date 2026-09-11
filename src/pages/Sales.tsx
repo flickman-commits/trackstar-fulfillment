@@ -122,7 +122,7 @@ export default function Sales() {
   const variants = useMemo(() => current?.variants || [], [current])
 
   /** Research (if needed) and draft for one company. Silent when prefetching. */
-  const prepare = useCallback(async (c: Company, opts: { silent: boolean; force?: boolean; contactId?: string | null }) => {
+  const prepare = useCallback(async (c: Company, opts: { silent: boolean; force?: boolean; contactId?: string | null; fresh?: boolean }) => {
     const target = (opts.contactId && c.contacts.find(x => x.id === opts.contactId)) || c.contacts[0]
     // No model is not a reason to skip: draftVariants falls back to the
     // cadence's own copy, which is still a real draft to edit and send.
@@ -137,7 +137,9 @@ export default function Sales() {
     if (!opts.force && cached && cached.template === !aiActive) return
     inFlight.current.add(key)
     try {
-      if (aiActive && !target.research && status?.research.configured) {
+      // The routine researches as it goes, so a prepared org usually has this
+      // already; only spend on research when nothing was prepared.
+      if (aiActive && !target.research && status?.research.configured && !c.hasProposedDraft) {
         if (!opts.silent) setResearching(true)
         try {
           const r = await salesApi.research(target.id)
@@ -148,7 +150,7 @@ export default function Sales() {
       }
       if (!opts.silent) setDrafting(true)
       try {
-        const draft = await salesApi.variants(c.id, target.id, !aiActive)
+        const draft = await salesApi.variants(c.id, target.id, !aiActive, Boolean(opts.fresh))
         setPrepared(prev => ({ ...prev, [c.id]: { draft, variants: draft.variants, template: !aiActive } }))
         if (!opts.silent) {
           setVariantIndex(0)
@@ -198,7 +200,7 @@ export default function Sales() {
 
   }
 
-  const regenerate = () => { if (company) prepare(company, { silent: false, force: true, contactId }) }
+  const regenerate = () => { if (company) prepare(company, { silent: false, force: true, contactId, fresh: true }) }
 
 
   const queue = useCallback(async () => {
@@ -254,10 +256,19 @@ export default function Sales() {
     setDetail(prev => prev && prev.id === updated.id ? { ...prev, ...updated, contacts: updated.contacts || prev.contacts } : prev)
   }
 
+  /** A mirror that did not update is worth a nudge, never a blocker. */
+  const noteSync = (sync?: { target: string | null; ok: boolean; skipped?: string; error?: string }) => {
+    if (!sync || sync.ok || !sync.target) return
+    const where = sync.target === 'notion' ? 'Notion' : 'ClickUp'
+    toast.warning(`${where} was not updated: ${sync.error || sync.skipped || 'unknown reason'}`)
+  }
+
   const setStage = async (stage: DealStage) => {
     if (!company) return
-    try { patchCompany((await salesApi.setStage(company.id, stage)).company); toast.success(`${company.name}: ${STAGE_LABEL[stage]}`) }
-    catch (e) { toast.error((e as Error).message) }
+    try {
+      const r = await salesApi.setStage(company.id, stage)
+      patchCompany(r.company); toast.success(`${company.name}: ${STAGE_LABEL[stage]}`); noteSync(r.sync)
+    } catch (e) { toast.error((e as Error).message) }
   }
   const saveNotes = async (notes: string) => {
     if (!company) return
@@ -265,7 +276,10 @@ export default function Sales() {
   }
   const markSent = async () => {
     if (!company) return
-    try { patchCompany((await salesApi.markSent(company.id)).company); toast.success('Marked sent') } catch (e) { toast.error((e as Error).message) }
+    try {
+      const r = await salesApi.markSent(company.id)
+      patchCompany(r.company); toast.success('Marked sent'); noteSync(r.sync)
+    } catch (e) { toast.error((e as Error).message) }
   }
   const addContact = async (c: { firstName: string; lastName: string; email: string; title: string }) => {
     if (!company) return
@@ -398,7 +412,7 @@ export default function Sales() {
               </div>
             ) : companies.map(c => {
               const primary = c.contacts[0]
-              const ready = Boolean(prepared[c.id])
+              const ready = Boolean(prepared[c.id]) || Boolean(c.hasProposedDraft)
               const active = c.id === selectedId
               return (
                 <button

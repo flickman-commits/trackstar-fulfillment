@@ -83,6 +83,9 @@ export interface Company {
   nextAction: string | null
   notes: string | null
   source: string
+  ownerId?: string | null
+  proposedAt?: string | null
+  hasProposedDraft?: boolean
   contacts: Contact[]
   lastTouch?: Touch | null
   touches?: Touch[]
@@ -98,8 +101,9 @@ export interface DraftResult {
   contactId: string
   companyId: string
   model: string
-  /** 'model' when a model wrote it, 'template' when the cadence copy did. */
-  source?: 'model' | 'template'
+  /** Who wrote it: a model now, the cadence template, or the overnight routine ('prepared'). */
+  source?: 'model' | 'template' | 'prepared'
+  preparedAt?: string
   /** Set when the model was meant to write it and could not. */
   warning?: string
 }

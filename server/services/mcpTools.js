@@ -29,6 +29,7 @@ import { buildCatalogCoverage, coveredYears } from '../lib/scraperHealth.js'
 import { getSupportedRaces, getVerifiedRaceDates, getRaceConfigSummaries } from '../scrapers/index.js'
 import { NIGHTLY_REPORT_KEY } from './nightlySweep.js'
 import { REPAIR_TOOLS, REPAIR_HANDLERS, REPAIR_TOOL_NAMES } from './mcpRepairTools.js'
+import { SALES_TOOLS, SALES_HANDLERS, SALES_TOOL_NAMES } from './mcpSalesTools.js'
 
 /** Tool definitions, in the shape MCP's tools/list expects. */
 export const TOOLS = [
@@ -230,7 +231,7 @@ const HANDLERS = {
 /** Run a tool by name. Throws on an unknown name so the caller can answer -32602. */
 export async function callTool(name, args = {}, context = {}) {
   if (name === 'connection_check') return connectionCheck(context)
-  const handler = HANDLERS[name] || REPAIR_HANDLERS[name]
+  const handler = HANDLERS[name] || REPAIR_HANDLERS[name] || SALES_HANDLERS[name]
   if (!handler) throw new Error(`Unknown tool: ${name}`)
   return await handler(args || {})
 }
@@ -248,10 +249,11 @@ export const OPEN_TOOLS = new Set(['connection_check'])
  */
 export function toolTier(name) {
   if (OPEN_TOOLS.has(name)) return 'open'
-  return REPAIR_TOOL_NAMES.has(name) ? 'repair' : 'read'
+  // Sales tools write production data too, so they share the write tier.
+  return REPAIR_TOOL_NAMES.has(name) || SALES_TOOL_NAMES.has(name) ? 'repair' : 'read'
 }
 
 /** The tool list a caller may see, given what they presented. */
 export function toolsFor(tier) {
-  return tier === 'repair' ? [...TOOLS, ...REPAIR_TOOLS] : TOOLS
+  return tier === 'repair' ? [...TOOLS, ...REPAIR_TOOLS, ...SALES_TOOLS] : TOOLS
 }

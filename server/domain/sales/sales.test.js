@@ -293,3 +293,43 @@ test('an attached mockup is embedded inline and survives the encoding', async ()
     assert.ok(line.length <= 76, `base64 line too long: ${line.length}`)
   }
 })
+
+// ── What the app refuses to hold, whoever wrote it ───────────────────────────
+
+test('draft guardrails catch the runbook violations', async () => {
+  const { draftProblems } = await import('./guardrails.js')
+  const ok = { subject: 'Team Fox - personalized marathon posters', body: 'Hey Sam,\n\nSaw your NYC team. Any interest?\n\nMatt' }
+  assert.deepEqual(draftProblems(ok, { pipeline: 'CHARITY', touchNumber: 1 }), [])
+
+  const dash = { ...ok, body: 'Hey Sam — quick one.' }
+  assert.match(draftProblems(dash, { pipeline: 'RACE', touchNumber: 1 }).join(' '), /dash/)
+
+  const money = { ...ok, body: 'Hey Sam,\n\nWe send a revenue share back to you.\n\nMatt' }
+  assert.match(draftProblems(money, { pipeline: 'CHARITY', touchNumber: 2 }).join(' '), /revenue share/)
+
+  const priced = { ...ok, body: 'Hey Sam,\n\nPosters are $64 each at 20% off, 50 unit minimum.\n\nMatt' }
+  const p = draftProblems(priced, { pipeline: 'CHARITY', touchNumber: 1 })
+  assert.ok(p.some(x => /price/.test(x)) && p.some(x => /percentage/.test(x)) && p.some(x => /minimum/.test(x)))
+  // The same numbers are fine on a race email, and fine on a later charity touch.
+  assert.deepEqual(draftProblems(priced, { pipeline: 'RACE', touchNumber: 1 }), [])
+
+  const prints = { subject: 'Quick question', body: 'Hey Sam,\n\nWe make marathon prints.\n\nMatt' }
+  assert.match(draftProblems(prints, { pipeline: 'CHARITY', touchNumber: 1 }).join(' '), /poster/)
+
+  assert.ok(draftProblems({ subject: '', body: '' }, { pipeline: 'RACE', touchNumber: 1 }).length >= 2)
+})
+
+test('generic inboxes are recognised', async () => {
+  const { isGenericInbox } = await import('./guardrails.js')
+  for (const e of ['info@race.org', 'events@charity.org', 'race@robinhood.org', 'no-reply@x.com']) assert.ok(isGenericInbox(e), e)
+  for (const e of ['kerri.powell@themmrf.org', 'jane@acme.org', 'm.hickman@trackstar.art']) assert.ok(!isGenericInbox(e), e)
+})
+
+test('Notion page ids are recovered from the stored URL', async () => {
+  const { notionPageId, openingLine } = await import('./externalSync.js')
+  assert.equal(notionPageId('https://app.notion.com/3c9977ac2a3e81f49403dbf8b6142445'), '3c9977ac-2a3e-81f4-9403-dbf8b6142445')
+  assert.equal(notionPageId('https://app.notion.com/p/Title-3c9977ac2a3e81f49403dbf8b6142445?pvs=4'), '3c9977ac-2a3e-81f4-9403-dbf8b6142445')
+  assert.equal(notionPageId('86e1ek0wk'), null, 'a ClickUp id is not a Notion page')
+  assert.equal(openingLine('Hey Sam,\n\nSaw your team at Chicago last year.\n\nMore text.'), 'Saw your team at Chicago last year.')
+  assert.equal(openingLine(''), '')
+})

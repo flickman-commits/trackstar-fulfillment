@@ -107,6 +107,11 @@ export default function Composer({
               Written from the cadence template, not a model. Edit it before you send.
             </span>
           )}
+          {draft.source === 'prepared' && (
+            <span className="block mt-1 text-off-black/60">
+              Written overnight by the routine{draft.preparedAt ? ` at ${new Date(draft.preparedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. Regenerate for a fresh take.
+            </span>
+          )}
         </p>
       )}
 

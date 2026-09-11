@@ -21,6 +21,9 @@ const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'PO
 
 export type ListView = 'due' | 'new' | 'all' | `stage:${DealStage}`
 
+/** Result of mirroring a change out to Notion or ClickUp. */
+export interface SyncResult { target: 'notion' | 'clickup' | null; ok: boolean; skipped?: string; error?: string }
+
 export const salesApi = {
   status: () => request<SalesStatus>('/api/sales/draft'),
 
@@ -39,7 +42,7 @@ export const salesApi = {
     post<{ company: Company }>('/api/sales/companies', { action: 'update', id, ...fields }),
 
   setStage: (id: string, stage: DealStage) =>
-    post<{ company: Company }>('/api/sales/companies', { action: 'stage', id, stage }),
+    post<{ company: Company; sync?: SyncResult }>('/api/sales/companies', { action: 'stage', id, stage }),
 
   addNote: (id: string, text: string, contactId?: string) =>
     post<{ touch: Touch }>('/api/sales/companies', { action: 'note', id, text, contactId }),
@@ -48,7 +51,7 @@ export const salesApi = {
     post<{ contact: Contact }>('/api/sales/companies', { action: 'contact', companyId, ...contact }),
 
   markSent: (id: string) =>
-    post<{ company: Company }>('/api/sales/companies', { action: 'mark-sent', id }),
+    post<{ company: Company; sync?: SyncResult }>('/api/sales/companies', { action: 'mark-sent', id }),
 
   remove: (id: string) => request<{ success: true }>('/api/sales/companies', { method: 'DELETE', body: JSON.stringify({ id }) }),
 
@@ -56,8 +59,8 @@ export const salesApi = {
     post<{ contact: Contact; research: Research; cached: boolean }>('/api/sales/research', { contactId, force }),
 
   /** `useTemplate` asks for the cadence copy even when a model is available. */
-  variants: (companyId: string, contactId?: string, useTemplate = false) =>
-    post<DraftResult>('/api/sales/draft', { action: 'variants', companyId, contactId, useTemplate }),
+  variants: (companyId: string, contactId?: string, useTemplate = false, force = false) =>
+    post<DraftResult>('/api/sales/draft', { action: 'variants', companyId, contactId, useTemplate, force }),
 
   queue: (body: { companyId: string; contactId: string; subject: string; body: string; mockupId?: string }) =>
     post<{ touch: Touch; gmailDraft: boolean; gmailConnected: boolean; mockup: { id: string; name: string } | null }>('/api/sales/draft', { action: 'queue', ...body }),

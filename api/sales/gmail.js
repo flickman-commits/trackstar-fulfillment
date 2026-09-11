@@ -15,14 +15,15 @@ import { getAuthUrl, disconnectGmail, gmailStatus, redirectUriFor, isGmailConfig
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
   // Admin-only: this connects a mailbox and can draft mail as its owner.
-  if (!await requireAdminOnly(req, res)) return
+  const actor = await requireAdminOnly(req, res)
+  if (!actor) return
 
   try {
     const action = req.method === 'GET'
       ? String(req.query?.action || 'status')
       : String((typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}).action || '')
 
-    if (action === 'status') return res.status(200).json(await gmailStatus())
+    if (action === 'status') return res.status(200).json(await gmailStatus(actor.id))
 
     if (action === 'connect') {
       if (!isGmailConfigured()) return res.status(400).json({ error: 'Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET first' })
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'disconnect' && req.method === 'POST') {
-      await disconnectGmail()
+      await disconnectGmail(actor.id)
       return res.status(200).json({ success: true })
     }
 

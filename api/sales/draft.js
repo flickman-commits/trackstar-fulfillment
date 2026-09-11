@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         llm: llmInfo(),
         research: { configured: researchProvider() !== null, provider: researchProvider() },
-        gmail: await gmailStatus(),
+        gmail: await gmailStatus(actor.id),
       })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -37,6 +37,7 @@ export default async function handler(req, res) {
         companyId: String(body.companyId),
         contactId: body.contactId ? String(body.contactId) : undefined,
         useTemplate: Boolean(body.useTemplate),
+        force: Boolean(body.force),
       })
       const { company, contact, ...rest } = out
       return res.status(200).json({ ...rest, contactId: contact.id, companyId: company.id })

@@ -16,7 +16,8 @@ import { completeConnection, redirectUriFor, originFor } from '../../server/doma
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!await requireAdminOnly(req, res)) return
+  const actor = await requireAdminOnly(req, res)
+  if (!actor) return
 
   const base = originFor(req)
   const back = (query) => {
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
   if (!code) return back('gmail=denied')
 
   try {
-    const { email } = await completeConnection(code, redirectUriFor(req))
+    const { email } = await completeConnection(code, redirectUriFor(req), actor.id)
     return back(`gmail=connected&account=${encodeURIComponent(email)}`)
   } catch (err) {
     console.error('[API /sales/gmail-callback] failed', err)
