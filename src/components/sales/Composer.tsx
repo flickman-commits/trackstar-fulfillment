@@ -1,35 +1,25 @@
-import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Check } from 'lucide-react'
-import { btnPrimary, btnSecondary, btnGhost, inputBase } from '@/lib/ui'
-import { Paperclip } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, ExternalLink, Paperclip, ChevronDown, ChevronRight } from 'lucide-react'
+import { btnPrimary, btnGhost, inputBase } from '@/lib/ui'
 import type { Company, Contact, DraftResult, Mockup, Variant } from '@/types/sales'
 
 /**
- * The middle column: the email you are about to file.
+ * The middle column: the email, and what to do with it.
  *
- * Five variants, one visible at a time. J and L flip between them, edits
- * stick to the variant you are on, and Cmd+Enter files whichever one is
- * showing. Everything in here is controlled by the page so the keyboard
- * handler up there can drive it.
+ * No explainer by default. The one point this email has to make is behind a
+ * "Why this email" toggle for the curious; a rep who has read the draft does
+ * not need it narrated. Variants only show their carousel when there is more
+ * than one. The primary action is Send; Skip and Not interested are one key
+ * each and live at the other end of the row so they cannot be hit by
+ * accident.
+ *
+ * A company with a reply waiting gets no composer at all: the answer is
+ * written in Gmail, so the pane says so and links straight to the thread.
  */
 export default function Composer({
-  company,
-  contact,
-  draft,
-  variants,
-  index,
-  drafting,
-  queueing,
-  gmailConnected,
-  mockups,
-  mockupId,
-  onMockupChange,
-  onManageMockups,
-  onChange,
-  onPrev,
-  onNext,
-  onRegenerate,
-  onQueue,
-  onMarkSent,
+  company, contact, draft, variants, index, drafting, gmailConnected, canSend, capReached,
+  mockups, mockupId, onMockupChange, onManageMockups,
+  onChange, onPrev, onNext, onRewrite, onSend, onSkip, onNotInterested,
 }: {
   company: Company | null
   contact: Contact | null
@@ -37,8 +27,9 @@ export default function Composer({
   variants: Variant[]
   index: number
   drafting: boolean
-  queueing: boolean
   gmailConnected: boolean
+  canSend: boolean
+  capReached: boolean
   mockups: Mockup[]
   mockupId: string | null
   onMockupChange: (id: string) => void
@@ -46,159 +37,148 @@ export default function Composer({
   onChange: (v: Variant) => void
   onPrev: () => void
   onNext: () => void
-  onRegenerate: () => void
-  onQueue: () => void
-  onMarkSent: () => void
+  onRewrite: () => void
+  onSend: () => void
+  onSkip: () => void
+  onNotInterested: () => void
 }) {
+  const [whyOpen, setWhyOpen] = useState(false)
+
   if (!company) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-off-black/40">
-        Pick someone on the left, or import a list.
+      <div className="flex-1 min-w-0 flex items-center justify-center text-sm text-off-black/40 rounded-lg border border-dashed border-border-gray bg-white/60 min-h-[320px]">
+        Pick someone on the left.
+      </div>
+    )
+  }
+
+  const kbd = 'inline-flex h-5 items-center gap-1 rounded border border-white/30 bg-white/10 px-1.5 font-mono text-[10px] font-medium'
+  const kbdDark = 'inline-flex h-5 items-center rounded border border-off-black/20 bg-off-black/5 px-1.5 font-mono text-[10px] font-medium text-off-black/60'
+  const who = contact ? `${contact.firstName} ${contact.lastName}`.trim() : 'No contact'
+
+  // A reply is answered in Gmail, not here.
+  if (company.replyPending) {
+    const threadId = company.touches?.find(t => t.gmailThreadId)?.gmailThreadId || company.lastTouch?.gmailThreadId
+    return (
+      <div className="flex-1 min-w-0 flex flex-col rounded-lg border border-border-gray bg-white">
+        <div className="px-4 py-3 border-b border-border-gray">
+          <div className="text-[15px] font-bold">{who} <span className="text-off-black/45 font-normal">· {company.name}</span></div>
+          <div className="text-xs text-success-green mt-0.5">Replied{company.lastReplyAt ? ` ${new Date(company.lastReplyAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : ''}. The sequence is paused.</div>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
+          <p className="text-sm text-off-black/65 max-w-[40ch]">Answer in Gmail. When your message is the latest in the thread, this clears on its own.</p>
+          <a
+            href={threadId ? `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(threadId)}` : 'https://mail.google.com/'}
+            target="_blank" rel="noopener noreferrer"
+            className={`${btnPrimary} px-4 py-2 text-sm`}
+          >
+            Open the thread in Gmail <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+          <p className="text-xs text-off-black/45">Set the stage on the right when you know where it stands.</p>
+        </div>
       </div>
     )
   }
 
   const current = variants[index]
-  const hasQueuedDraft = company.lastTouch?.kind === 'EMAIL_DRAFT' && !company.lastTouch.sentAt
-  // The charity runbook's hard rule: the first email points at an attached
-  // example, so filing one without an image sends a promise it does not keep.
   const mockupRequired = company.pipeline === 'CHARITY' && draft?.touchNumber === 1
   const chosen = mockups.find(m => m.id === mockupId) || null
   const missingRequired = mockupRequired && !chosen
-  const kbd = 'inline-flex h-5 items-center gap-1 rounded border border-white/30 bg-white/10 px-1.5 font-mono text-[10px] font-medium'
-  const kbdDark = 'inline-flex h-5 items-center rounded border border-off-black/20 bg-off-black/5 px-1.5 font-mono text-[10px] font-medium text-off-black/60'
+  const sendDisabled = !current || drafting || !contact?.email || missingRequired || !canSend
+  const sendTitle = !gmailConnected ? 'Connect Gmail in Settings to send'
+    : capReached ? 'Today\'s cap is reached. Raise it in Settings if you mean to.'
+    : missingRequired ? 'A charity first touch has to carry a mockup'
+    : contact?.emailSource === 'guessed' ? 'This address was guessed; confirm it first'
+    : 'Send through your Gmail'
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col">
-      {/* Who and which touch */}
-      <div className="flex items-start justify-between gap-4 mb-4">
+    <div className="flex-1 min-w-0 flex flex-col rounded-lg border border-border-gray bg-white">
+      {/* Who, and which touch */}
+      <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-border-gray">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-off-black truncate">
-            {contact ? `${contact.firstName} ${contact.lastName}`.trim() : 'No contact'}{' '}
-            <span className="text-off-black/45 font-normal">· {company.name}</span>
-          </h2>
-          <p className="text-xs text-off-black/55 mt-0.5">
-            {contact?.email || <span className="text-red-600">No email on file</span>}
+          <div className="text-[15px] font-bold truncate">{who} <span className="text-off-black/45 font-normal">· {company.name}</span></div>
+          <div className="text-xs text-off-black/55 mt-0.5 flex flex-wrap items-center gap-x-2">
+            <span>{contact?.email || <span className="text-red-600">No email on file</span>}</span>
             {draft && (
               <>
-                {' · '}Touch {draft.touchNumber} · <span className="font-medium">{draft.step.angle}</span>
-                {draft.exhausted && <span className="text-amber-700"> · sequence complete</span>}
+                <span className="px-1.5 py-0.5 rounded bg-subtle-gray border border-border-gray text-off-black/70">
+                  {draft.touchNumber === 1 ? 'First touch' : `Follow-up ${draft.touchNumber - 1}`}
+                </span>
+                {draft.exhausted && <span className="text-amber-700">sequence complete</span>}
+                {draft.source === 'prepared' && <span>written overnight</span>}
+                {draft.source === 'template' && <span className="text-amber-700">template, not written for them</span>}
               </>
             )}
-          </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {hasQueuedDraft && (
-            <button onClick={onMarkSent} className={btnSecondary} title="The draft went out from Gmail">
-              <Check className="w-3.5 h-3.5" /> Mark sent
-            </button>
-          )}
-          <button onClick={onRegenerate} disabled={drafting || !contact} className={btnGhost} title={draft?.source === 'template' ? 'Rebuild this draft from the template' : 'Write five new variants'}>
-            <RefreshCw className={`w-3.5 h-3.5 ${drafting ? 'animate-spin' : ''}`} /> Regenerate
-          </button>
-        </div>
+        <button onClick={() => setWhyOpen(o => !o)} className={`${btnGhost} shrink-0`} disabled={!draft}>
+          Why this email {whyOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        </button>
       </div>
-
-      {draft && (
-        <p className="text-xs text-off-black/55 bg-subtle-gray border border-border-gray rounded-md px-3 py-2 mb-3">
-          <span className="font-semibold text-off-black/70">This email's job:</span> {draft.step.purpose}
-          {draft.source === 'template' && (
-            <span className="block mt-1 text-amber-700">
-              Written from the cadence template, not a model. Edit it before you send.
-            </span>
-          )}
-          {draft.source === 'prepared' && (
-            <span className="block mt-1 text-off-black/60">
-              Written overnight by the routine{draft.preparedAt ? ` at ${new Date(draft.preparedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. Regenerate for a fresh take.
-            </span>
-          )}
-        </p>
+      {whyOpen && draft && (
+        <p className="text-xs text-off-black/60 bg-subtle-gray border-b border-border-gray px-4 py-2 leading-snug">{draft.step.purpose}</p>
       )}
 
       {/* The email */}
-      <div className="flex-1 min-h-0 flex flex-col rounded-lg border border-border-gray bg-white">
-        {drafting ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-off-black/50">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            {variants.length === 1 && draft?.source === 'template' ? 'Filling in the template…' : 'Writing five ways to say it…'}
-          </div>
-        ) : !current ? (
-          <div className="flex-1 flex items-center justify-center text-sm text-off-black/40 px-6 text-center">
-            {contact ? 'No draft yet. Press Regenerate.' : 'Add a contact with an email on the right before drafting.'}
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-2 px-4 pt-3">
-              <span className="text-xs font-semibold text-off-black/50 w-14">Subject</span>
-              <input
-                value={current.subject}
-                onChange={e => onChange({ ...current, subject: e.target.value })}
-                className={`${inputBase} flex-1`}
-              />
-            </div>
-            <div className="flex items-start gap-2 px-4 pt-2 pb-3 flex-1 min-h-0">
-              <span className="text-xs font-semibold text-off-black/50 w-14 pt-2">Body</span>
-              <textarea
-                value={current.body}
-                onChange={e => onChange({ ...current, body: e.target.value })}
-                className={`${inputBase} flex-1 h-full min-h-[260px] resize-none leading-relaxed`}
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* What goes out with it */}
-      <div className="flex items-center gap-2 mt-3 text-xs">
-        <Paperclip className={`w-3.5 h-3.5 shrink-0 ${missingRequired ? 'text-red-600' : 'text-off-black/40'}`} />
-        {mockups.length > 0 ? (
-          <>
-            <select
-              value={mockupId || ''}
-              onChange={e => onMockupChange(e.target.value)}
-              className={`bg-transparent max-w-[240px] truncate focus:outline-none ${missingRequired ? 'text-red-600' : 'text-off-black/70'}`}
-            >
-              <option value="">No attachment</option>
-              {mockups.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-            {chosen?.previewUrl && (
-              <img src={chosen.previewUrl} alt="" className="h-7 w-auto rounded border border-border-gray" />
-            )}
-          </>
-        ) : (
-          <span className={missingRequired ? 'text-red-600' : 'text-off-black/50'}>No mockups uploaded</span>
-        )}
-        <button onClick={onManageMockups} className={btnGhost}>Manage</button>
-        {missingRequired && (
-          <span className="text-red-600">A charity first touch has to carry one.</span>
-        )}
-      </div>
-
-      {/* Variant nav + file it */}
-      <div className="flex items-center justify-between mt-3">
-        <div className="flex items-center gap-2">
-          <button onClick={onPrev} disabled={index === 0 || drafting} className={btnGhost} title="Previous variant (J)">
-            <ArrowLeft className="w-4 h-4" /> <kbd className={kbdDark}>J</kbd>
-          </button>
-          <div className="flex items-center gap-1.5 px-1">
-            {variants.map((_, i) => (
-              <span key={i} className={`w-1.5 h-1.5 rounded-full ${i === index ? 'bg-dark-fill' : 'bg-off-black/20'}`} />
-            ))}
-            {variants.length > 0 && <span className="text-xs text-off-black/45 ml-1.5">{index + 1} of {variants.length}</span>}
-          </div>
-          <button onClick={onNext} disabled={index >= variants.length - 1 || drafting} className={btnGhost} title="Next variant (L)">
-            <kbd className={kbdDark}>L</kbd> <ArrowRight className="w-4 h-4" />
-          </button>
+      {drafting ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-off-black/50 min-h-[300px]">
+          <Loader2 className="w-5 h-5 animate-spin" /> Writing…
         </div>
-        <button
-          onClick={onQueue}
-          disabled={!current || queueing || drafting || !contact?.email || missingRequired}
-          className={`${btnPrimary} px-4 py-2 text-sm`}
-          title={gmailConnected ? 'Create the draft in Gmail' : 'Gmail is not connected; the draft is saved here only'}
-        >
-          {queueing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          {gmailConnected ? 'Draft to Gmail' : 'Save draft'}
-          <kbd className={kbd}><Command className="w-3 h-3" />↵</kbd>
+      ) : !current ? (
+        <div className="flex-1 flex items-center justify-center text-sm text-off-black/40 px-6 text-center min-h-[300px]">
+          {contact ? 'No draft yet. Press Rewrite.' : 'Add a contact with an email on the right first.'}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-[64px_1fr] items-center gap-2 px-4 py-2 border-b border-border-gray">
+            <span className="font-mono text-[10.5px] tracking-wider uppercase text-off-black/40">Subject</span>
+            <input value={current.subject} onChange={e => onChange({ ...current, subject: e.target.value })} className={`${inputBase} w-full border-transparent bg-transparent px-1 focus:bg-white focus:border-border-gray`} />
+          </div>
+          <div className="flex-1 min-h-0 grid grid-cols-[64px_1fr] gap-2 px-4 pt-3 pb-2">
+            <span className="font-mono text-[10.5px] tracking-wider uppercase text-off-black/40 pt-2">Body</span>
+            <textarea
+              value={current.body}
+              onChange={e => onChange({ ...current, body: e.target.value })}
+              className="w-full h-full min-h-[280px] resize-none text-[15px] leading-relaxed bg-transparent px-1 py-1 focus:outline-none focus:bg-subtle-gray/60 rounded"
+            />
+          </div>
+          <div className="flex items-center gap-2 px-4 pb-3 pl-[88px] text-xs">
+            <Paperclip className={`w-3.5 h-3.5 ${missingRequired ? 'text-red-600' : 'text-off-black/40'}`} />
+            {mockups.length > 0 ? (
+              <>
+                {chosen?.previewUrl && <img src={chosen.previewUrl} alt="" className="h-7 w-auto rounded border border-border-gray" />}
+                <select value={mockupId || ''} onChange={e => onMockupChange(e.target.value)} className={`bg-transparent max-w-[220px] truncate focus:outline-none ${missingRequired ? 'text-red-600' : 'text-off-black/70'}`}>
+                  <option value="">No attachment</option>
+                  {mockups.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </>
+            ) : (
+              <span className={missingRequired ? 'text-red-600' : 'text-off-black/45'}>{missingRequired ? 'A charity first touch needs a mockup' : 'No attachment'}</span>
+            )}
+            <button onClick={onManageMockups} className={btnGhost}>Manage</button>
+            <span className="ml-auto text-off-black/40">Your signature is added when it sends.</span>
+          </div>
+        </>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-t border-border-gray bg-subtle-gray rounded-b-lg">
+        <div className="flex items-center gap-1">
+          <button onClick={onSkip} className={btnGhost} title="Hide until tomorrow">Skip today <kbd className={kbdDark}>S</kbd></button>
+          <button onClick={onNotInterested} className={btnGhost} title="Close this one out">Not interested <kbd className={kbdDark}>X</kbd></button>
+          <button onClick={onRewrite} disabled={drafting || !contact} className={btnGhost} title="Write it again">
+            <RefreshCw className={`w-3.5 h-3.5 ${drafting ? 'animate-spin' : ''}`} /> Rewrite
+          </button>
+          {variants.length > 1 && (
+            <span className="flex items-center gap-1 ml-2 text-xs text-off-black/45">
+              <button onClick={onPrev} disabled={index === 0} className={btnGhost} title="Previous variant (J)"><ArrowLeft className="w-3.5 h-3.5" /></button>
+              {index + 1} of {variants.length}
+              <button onClick={onNext} disabled={index >= variants.length - 1} className={btnGhost} title="Next variant (L)"><ArrowRight className="w-3.5 h-3.5" /></button>
+            </span>
+          )}
+        </div>
+        <button onClick={onSend} disabled={sendDisabled} className={`${btnPrimary} px-4 py-2 text-sm`} title={sendTitle}>
+          <Send className="w-4 h-4" /> Send <kbd className={kbd}><Command className="w-3 h-3" />↵</kbd>
         </button>
       </div>
     </div>

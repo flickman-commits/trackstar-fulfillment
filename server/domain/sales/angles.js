@@ -191,42 +191,42 @@ function fill(text, { company, contact, socialProof, oneLiner }) {
 const RACE_TEMPLATES = {
   'first-touch': {
     subject: 'Custom race prints for [Race Name] finishers',
-    body: `Hey [First Name],\n\n[One-liner]\n\nI'm Matt, founder at Trackstar. We make custom race prints in partnership with iconic US marathons: the runner's name, time and your course map, on something they actually hang up.\n\nHappy to put together a mockup with your logo and course so you can see it.\n\nWorth a quick chat?\n\nMatt`,
+    body: `Hey [First Name],\n\n[One-liner]\n\nI'm Matt, founder at Trackstar. We make custom race prints in partnership with iconic US marathons: the runner's name, time and your course map, on something they actually hang up.\n\nHappy to put together a mockup with your logo and course so you can see it.\n\nWorth a quick chat?`,
   },
   'course-landmark': {
     subject: 'Re: [Race Name] prints',
-    body: `Hey [First Name],\n\n[Landmark] would make an incredible focal point for a [Race Name] print. That is the bit finishers photograph, and it is the bit that makes a poster worth wall space.\n\nI can show you what that looks like on paper.\n\nOpen to a quick call?\n\nMatt`,
+    body: `Hey [First Name],\n\n[Landmark] would make an incredible focal point for a [Race Name] print. That is the bit finishers photograph, and it is the bit that makes a poster worth wall space.\n\nI can show you what that looks like on paper.\n\nOpen to a quick call?`,
   },
   'do-you-have-this-covered': {
     subject: 'Quick question for [Race Name] [Season Year]',
-    body: `Hey [First Name],\n\nQuick one as your [Season Year] season ramps up: do you already have finisher prints handled?\n\nMatt`,
+    body: `Hey [First Name],\n\nQuick one as your [Season Year] season ramps up: do you already have finisher prints handled?`,
   },
   'social-proof': {
     subject: "What we're seeing this season",
-    body: `Hey [First Name],\n\n[Social Proof]\n\nI think [Race Name] runners would go for these too. Worth fifteen minutes?\n\nMatt`,
+    body: `Hey [First Name],\n\n[Social Proof]\n\nI think [Race Name] runners would go for these too. Worth fifteen minutes?`,
   },
   'marquee-feature': {
     subject: '[Race Name] on Trackstar',
-    body: `Hey [First Name],\n\nI'd like to feature [Race Name] as our next marquee race, with a print built around your logo and course map.\n\nCan we find time this week?\n\nMatt`,
+    body: `Hey [First Name],\n\nI'd like to feature [Race Name] as our next marquee race, with a print built around your logo and course map.\n\nCan we find time this week?`,
   },
   'better-person': {
     subject: 'Re: [Race Name] prints',
-    body: `Hey [First Name],\n\nIs there a better person on your team to talk to about a finisher print partnership?\n\nMatt`,
+    body: `Hey [First Name],\n\nIs there a better person on your team to talk to about a finisher print partnership?`,
   },
 }
 
 const CHARITY_TEMPLATES = {
   'first-touch': {
     subject: '[Org Name] - personalized marathon posters',
-    body: `Hey [First Name],\n\n[One-liner]\n\nI'm Matt, founder at Trackstar. I ran the NYC Marathon with New York Urban League two years ago and had a wonderful experience, which is actually what made me start this company. We make personalized marathon posters, and we work with 20 race partners now.\n\nWe just opened up a charity program this year and I'd love to have [Org Name] in it. It costs you nothing to get started, and there's a co-branded tier if you want your logo built into the design like the one attached.\n\nAny interest in being part of the pilot? Happy to hop on a quick call.\n\nMatt\n\nP.S. Attached a co-branded example so you can see what these look like with a charity logo built in.`,
+    body: `Hey [First Name],\n\n[One-liner]\n\nI'm Matt, founder at Trackstar. I ran the NYC Marathon with New York Urban League two years ago and had a wonderful experience, which is actually what made me start this company. We make personalized marathon posters, and we work with 20 race partners now.\n\nWe just opened up a charity program this year and I'd love to have [Org Name] in it. It costs you nothing to get started, and there's a co-branded tier if you want your logo built into the design like the one attached.\n\nAny interest in being part of the pilot? Happy to hop on a quick call.\n\nP.S. Attached a co-branded example so you can see what these look like with a charity logo built in.`,
   },
   'recognition': {
     subject: 'Re: [Org Name] posters',
-    body: `Hey [First Name],\n\nOne thing we keep hearing from charity teams: the runners who need something are the ones who already hit their minimum and have nothing left to chase.\n\nA few partners are using these as a reward for their top fundraisers for exactly that reason. Costs nothing on your end to set up.\n\nWorth a quick call?\n\nMatt`,
+    body: `Hey [First Name],\n\nOne thing we keep hearing from charity teams: the runners who need something are the ones who already hit their minimum and have nothing left to chase.\n\nA few partners are using these as a reward for their top fundraisers for exactly that reason. Costs nothing on your end to set up.\n\nWorth a quick call?`,
   },
   'better-person': {
     subject: 'Re: [Org Name] posters',
-    body: `Hey [First Name],\n\nLast one from me. Is there someone else on your team who handles runner rewards for [Org Name]?\n\nHappy to leave it here if the timing isn't right.\n\nMatt`,
+    body: `Hey [First Name],\n\nLast one from me. Is there someone else on your team who handles runner rewards for [Org Name]?\n\nHappy to leave it here if the timing isn't right.`,
   },
 }
 
@@ -243,7 +243,9 @@ export function templateFor({ pipeline, angle, company, contact, socialProof, on
 
 /** Rules every draft follows, regardless of touch. Read by the model verbatim. */
 export const HOUSE_STYLE = `
-- Write as Matt, founder of Trackstar. First person singular. Sign off with just "Matt".
+- Write as Matt, founder of Trackstar. First person singular.
+- Do NOT write a sign-off or a name at the end. The signature block ("Thanks, Matt Hickman...") is added automatically when the email is sent. End on the ask.
+- A P.S., if the template has one, is the last paragraph and starts with "P.S.".
 - Open with "Hey [First Name]," on its own line, then a blank line.
 - NEVER use an em dash or an en dash. Not once, anywhere. Use a comma, a full stop, or rewrite the sentence.
 - Under 120 words. Shorter is better on every follow-up.

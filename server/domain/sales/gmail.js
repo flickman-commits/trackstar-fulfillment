@@ -31,7 +31,15 @@ import crypto from 'crypto'
 import { google } from 'googleapis'
 import prisma from '../../db.js'
 
-const SCOPES = ['https://www.googleapis.com/auth/gmail.compose']
+/**
+ * compose: create drafts and send. metadata: read message headers (From, Date)
+ * on our own threads, which is all reply detection needs; never a body.
+ * Adding metadata after the first connection means Google asks for consent
+ * again, so the status reports whether the stored grant covers it.
+ */
+const SCOPE_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose'
+const SCOPE_METADATA = 'https://www.googleapis.com/auth/gmail.metadata'
+const SCOPES = [SCOPE_COMPOSE, SCOPE_METADATA]
 
 /**
  * One connection per person. Keys are scoped by user id so a second rep can
@@ -43,6 +51,7 @@ const LEGACY_REFRESH = 'gmail_refresh_token'
 const LEGACY_EMAIL = 'gmail_account_email'
 const keyRefresh = userId => `gmail_refresh_token:${userId}`
 const keyEmail = userId => `gmail_account_email:${userId}`
+const keyScopes = userId => `gmail_scopes:${userId}`
 
 function requireUser(userId) {
   if (!userId) throw new Error('A user id is required for Gmail: connections are per person.')
@@ -128,6 +137,7 @@ export async function completeConnection(code, redirectUri, userId) {
     throw new Error('Google did not return a refresh token. Remove the app under Google Account > Security > Third-party access and connect again.')
   }
   await setConfig(keyRefresh(uid), tokens.refresh_token)
+  await setConfig(keyScopes(uid), String(tokens.scope || SCOPES.join(' ')))
   client.setCredentials(tokens)
   const gmail = google.gmail({ version: 'v1', auth: client })
   const profile = await gmail.users.getProfile({ userId: 'me' })
@@ -138,15 +148,23 @@ export async function completeConnection(code, redirectUri, userId) {
 
 export async function disconnectGmail(userId) {
   const uid = requireUser(userId)
-  await prisma.systemConfig.deleteMany({ where: { key: { in: [keyRefresh(uid), keyEmail(uid)] } } })
+  await prisma.systemConfig.deleteMany({ where: { key: { in: [keyRefresh(uid), keyEmail(uid), keyScopes(uid)] } } })
 }
 
 export async function gmailStatus(userId) {
   const configured = isGmailConfigured()
-  if (!configured || !userId) return { configured, connected: false, email: null }
+  if (!configured || !userId) return { configured, connected: false, email: null, canReadReplies: false }
   const refresh = await refreshTokenFor(String(userId))
   const email = refresh ? await getConfig(keyEmail(String(userId))) : null
-  return { configured, connected: Boolean(refresh), email }
+  const scopes = refresh ? (await getConfig(keyScopes(String(userId))) || '') : ''
+  return {
+    configured,
+    connected: Boolean(refresh),
+    email,
+    // A connection made before the metadata scope existed can send but not
+    // see replies. Reconnecting fixes it; the UI says so.
+    canReadReplies: scopes.includes(SCOPE_METADATA),
+  }
 }
 
 async function gmailClient(userId) {
@@ -200,12 +218,15 @@ function base64Lines(buf) {
  * sitting at the bottom as a file the reader has to decide to open. Gmail
  * still shows it as an attachment too, so the copy's "attached" stays true.
  */
-export function buildMime({ to, subject, html, inReplyTo, attachment }) {
+export function buildMime({ to, subject, html, inReplyTo, attachment, messageId }) {
   const headers = [
     `To: ${headerValue(to)}`,
     `Subject: ${headerValue(subject)}`,
     'MIME-Version: 1.0',
   ]
+  // Gmail keeps a Message-ID we supply, which lets a follow-up carry
+  // In-Reply-To without a read scope to look the id up afterwards.
+  if (messageId) headers.push(`Message-ID: ${messageId}`)
   if (inReplyTo) {
     headers.push(`In-Reply-To: ${inReplyTo}`)
     headers.push(`References: ${inReplyTo}`)
@@ -271,6 +292,51 @@ export function textToHtml(text) {
  * Create a draft. Returns Gmail's draft id, the message id, and the thread id
  * so a follow-up can land in the same thread later.
  */
+/** A Message-ID of our own making, on our own domain. */
+export function newMessageId() {
+  return `<ts-${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}@trackstar.art>`
+}
+
+/**
+ * Send, as the connected account. This is the one place the app sends
+ * anything, and it is only ever reached by a person pressing Send on an
+ * email they have read. The undo window lives in the client; by the time
+ * this runs, the decision is made.
+ */
+export async function sendMessage({ userId, to, subject, html, threadId, inReplyTo, attachment }) {
+  const { gmail, uid } = await gmailClient(userId)
+  const messageId = newMessageId()
+  const raw = base64url(buildMime({ to, subject, html, inReplyTo, attachment, messageId }))
+  const requestBody = { raw }
+  if (threadId) requestBody.threadId = threadId
+  let res
+  try {
+    res = await gmail.users.messages.send({ userId: 'me', requestBody })
+  } catch (err) {
+    await handleGmailError(err, uid)
+  }
+  return { gmailMessageId: res.data.id, threadId: res.data.threadId || threadId || null, rfcMessageId: messageId }
+}
+
+/**
+ * Who said what, and when, on one of our threads. Headers only: the metadata
+ * scope never sees a body, and reply detection does not need one.
+ */
+export async function threadMessages({ userId, threadId }) {
+  const { gmail, uid } = await gmailClient(userId)
+  let res
+  try {
+    res = await gmail.users.threads.get({ userId: 'me', id: threadId, format: 'metadata', metadataHeaders: ['From', 'Date'] })
+  } catch (err) {
+    if (err?.code === 404) return []
+    await handleGmailError(err, uid)
+  }
+  return (res.data.messages || []).map(m => {
+    const h = Object.fromEntries((m.payload?.headers || []).map(x => [x.name.toLowerCase(), x.value]))
+    return { id: m.id, from: h.from || '', date: m.internalDate ? new Date(Number(m.internalDate)) : (h.date ? new Date(h.date) : null), labelIds: m.labelIds || [] }
+  })
+}
+
 export async function createDraft({ userId, to, subject, html, threadId, inReplyTo, attachment }) {
   const { gmail, uid } = await gmailClient(userId)
   const raw = base64url(buildMime({ to, subject, html, inReplyTo, attachment }))

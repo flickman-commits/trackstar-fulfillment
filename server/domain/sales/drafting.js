@@ -13,9 +13,10 @@
 import prisma from '../../db.js'
 import { complete, isLlmConfigured } from '../../lib/llm.js'
 import { cadenceFor, pickIdentityTag, RACE_ONE_LINERS, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateFor, greetingName } from './angles.js'
-import { createDraft, textToHtml, gmailStatus } from './gmail.js'
+import { createDraft, sendMessage, textToHtml, gmailStatus } from './gmail.js'
 import { pickMockup, readMockup, isMockupStorageConfigured } from './mockups.js'
 import { getSettings } from './settings.js'
+import { syncCompanyOut } from './externalSync.js'
 
 const VARIANT_COUNT = 5
 
@@ -27,6 +28,39 @@ function nextSeasonYear(raceDate) {
   const now = new Date()
   const y = raceDate ? new Date(raceDate).getFullYear() : now.getFullYear()
   return Math.max(y, now.getFullYear()) + (raceDate && new Date(raceDate) > now ? 0 : 1)
+}
+
+/**
+ * The HTML that actually goes out: body, then the signature, then any P.S.
+ *
+ * A draft ends on the ask; the signature is the sign-off. But a template's
+ * P.S. ("attached a co-branded example") belongs after the signature, the
+ * way a person writes one, so the body is split there. Drafts written before
+ * the signature existed end in a bare "Matt"; that line is dropped rather
+ * than sent twice.
+ */
+export function composeHtml(body, { signature = '', senderName = 'Matt' } = {}) {
+  const paragraphs = String(body || '').replace(/\r\n/g, '\n').split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
+  const psAt = paragraphs.findIndex(p => /^p\.?s\.?[\s:.-]/i.test(p))
+  const main = psAt >= 0 ? paragraphs.slice(0, psAt) : paragraphs
+  const ps = psAt >= 0 ? paragraphs.slice(psAt) : []
+  // A trailing sign-off that is just the sender's name, with or without a
+  // closing word before it, is the signature's job now.
+  while (main.length) {
+    const last = main[main.length - 1]
+    const bare = last.replace(/[,.!]/g, '').trim().toLowerCase()
+    const name = senderName.toLowerCase()
+    if (bare === name || bare === `thanks\n${name}` || bare === `thanks ${name}` || bare === `best ${name}` || bare === `cheers ${name}`) { main.pop(); continue }
+    break
+  }
+  const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const para = t => `<p>${esc(t).replace(/\n/g, '<br>')}</p>`
+  const parts = [
+    ...main.map(para),
+    signature ? `<div style="margin-top:14px">${signature}</div>` : '',
+    ...ps.map(p => `<p style="margin-top:14px">${esc(p).replace(/\n/g, '<br>')}</p>`),
+  ].filter(Boolean)
+  return `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;">\n${parts.join('\n')}\n</div>`
 }
 
 /** The model-free draft for a step, with the identity one-liner filled in. */
@@ -126,11 +160,11 @@ export async function draftVariants({ companyId, contactId, useTemplate = false,
 
   const { touchNumber, step, exhausted } = await nextStepFor(company)
 
-  // The overnight routine may already have written this one. Use it unless the
-  // operator explicitly asked for a fresh draft (force), or it was written for
-  // a different touch than the org is now on.
+  // The overnight routine may already have written this one. It costs nothing
+  // to use, so it wins whatever the AI switch says; only an explicit Rewrite
+  // (force) or a draft written for a different touch sets it aside.
   const held = company.proposedDraft
-  if (!useTemplate && !force && held && held.touchNumber === touchNumber && Array.isArray(held.variants) && held.variants.length) {
+  if (!force && held && held.touchNumber === touchNumber && Array.isArray(held.variants) && held.variants.length) {
     const heldContact = company.contacts.find(c => c.id === held.contactId) || contact
     return {
       touchNumber, step, exhausted, contact: heldContact, company,
@@ -296,5 +330,110 @@ export async function queueDraft({ companyId, contactId, subject, body, mockupId
     gmailDraft: Boolean(gmail),
     gmailConnected: status.connected,
     mockup: mockup ? { id: mockup.id, name: mockup.name } : null,
+  }
+}
+
+/**
+ * Send it. The one act in Sales that reaches another person.
+ *
+ * Same preparation as queueDraft, then Gmail sends as the connected account,
+ * the touch is recorded as EMAIL_SENT, the cadence advances, any held draft
+ * is consumed, and the change is mirrored to Notion or ClickUp. The undo
+ * window happens in the client before this is called; here the decision is
+ * final.
+ */
+export async function sendDraft({ companyId, contactId, subject, body, mockupId, actor }) {
+  const company = await prisma.company.findUnique({ where: { id: companyId } })
+  if (!company) throw new Error('Company not found')
+  const contact = await prisma.contact.findUnique({ where: { id: contactId } })
+  if (!contact) throw new Error('Contact not found')
+  if (!contact.email) throw new Error(`${contact.firstName} has no email address`)
+  if (contact.emailSource === 'guessed') throw new Error(`${contact.email} was guessed, not found. Confirm the address before sending.`)
+  if (!subject?.trim() || !body?.trim()) throw new Error('Subject and body are required')
+  if (!actor?.id) throw new Error('Sending needs a signed-in person with a connected Gmail')
+
+  const settings = await getSettings()
+  const status = await gmailStatus(actor.id)
+  if (!status.connected) throw new Error('Gmail is not connected. Open Settings and press Connect Gmail.')
+
+  const { touchNumber, step, exhausted } = await nextStepFor(company)
+  if (exhausted) throw new Error(`${company.name} has finished its sequence. Change its stage instead of sending another touch.`)
+
+  // Follow-ups reply in the thread of the first send when the step says so.
+  let threadId = null
+  let inReplyTo = null
+  if (touchNumber > 1 && /reply in thread/i.test(step.subject)) {
+    const first = await prisma.touch.findFirst({
+      where: { companyId, kind: 'EMAIL_SENT', gmailThreadId: { not: null } },
+      orderBy: { createdAt: 'asc' },
+    })
+    threadId = first?.gmailThreadId || null
+    inReplyTo = first?.rfcMessageId || null
+  }
+
+  let attachment = null
+  let mockup = null
+  if (isMockupStorageConfigured()) {
+    try {
+      mockup = await pickMockup(company, { preferId: mockupId })
+      if (mockup) attachment = await readMockup(mockup.id)
+    } catch (err) {
+      console.warn(`[sales.send] could not attach a mockup: ${err.message}`)
+    }
+  }
+  if (!attachment && requiresMockup(company.pipeline, touchNumber)) {
+    throw new Error('A charity first touch has to carry a co-branded example. Upload one under Mockups, then send again.')
+  }
+
+  const html = composeHtml(body, { signature: settings.signature, senderName: settings.sender?.name || 'Matt' })
+  const sent = await sendMessage({ userId: actor.id, to: contact.email, subject: subject.trim(), html, threadId, inReplyTo, attachment })
+
+  const now = new Date()
+  const cadence = cadenceFor(company.pipeline)
+  const nextActionAt = new Date(now.getTime() + step.nextActionDays * 24 * 60 * 60 * 1000)
+  const [touch, updated] = await prisma.$transaction([
+    prisma.touch.create({
+      data: {
+        companyId, contactId,
+        kind: 'EMAIL_SENT',
+        touchNumber,
+        angle: step.angle,
+        subject: subject.trim(),
+        body: body.trim(),
+        gmailMessageId: sent.gmailMessageId,
+        gmailThreadId: sent.threadId,
+        rfcMessageId: sent.rfcMessageId,
+        sentAt: now,
+        createdBy: actor.email || null,
+      },
+    }),
+    prisma.company.update({
+      where: { id: companyId },
+      data: {
+        touchCount: touchNumber,
+        lastTouchAt: now,
+        nextActionAt,
+        nextAction: touchNumber >= cadence.length
+          ? 'Sequence complete: decide next year vs. pass'
+          : `Send touch ${touchNumber + 1}: ${cadence[touchNumber].angle}`,
+        stage: ['NOT_CONTACTED', 'QUEUED'].includes(company.stage) ? 'SENT'
+          : company.stage === 'SENT' ? 'FOLLOWED_UP'
+          : company.stage,
+        proposedDraft: null,
+        proposedAt: null,
+        snoozedUntil: null,
+      },
+    }),
+  ])
+
+  // "After you send: log it in the tracker." Best effort; never blocks.
+  const sync = await syncCompanyOut(updated, { sent: { body: body.trim(), touchNumber, sentAt: now } })
+
+  return {
+    touch,
+    company: updated,
+    mockup: mockup ? { id: mockup.id, name: mockup.name } : null,
+    gmailThreadId: sent.threadId,
+    sync,
   }
 }

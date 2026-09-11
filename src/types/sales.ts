@@ -42,6 +42,8 @@ export interface Contact {
   title: string | null
   linkedinUrl: string | null
   isPrimary: boolean
+  /** Where the address came from. "guessed" is never sent to. */
+  emailSource?: 'import' | 'website' | 'apollo' | 'manual' | 'guessed' | null
   research: Research | null
   researchedAt: string | null
 }
@@ -56,6 +58,7 @@ export interface Touch {
   subject: string | null
   body?: string | null
   gmailDraftId?: string | null
+  gmailThreadId?: string | null
   sentAt: string | null
   createdAt: string
   createdBy?: string | null
@@ -86,9 +89,46 @@ export interface Company {
   ownerId?: string | null
   proposedAt?: string | null
   hasProposedDraft?: boolean
+  replyPending?: boolean
+  lastReplyAt?: string | null
+  snoozedUntil?: string | null
   contacts: Contact[]
   lastTouch?: Touch | null
   touches?: Touch[]
+}
+
+/** A company as it appears in the morning stack, with the reason it is there. */
+export interface StackItem extends Company {
+  reason: string
+  nextTouchNumber: number | null
+  nextAngle: string | null
+  lastEmailedAt: string | null
+  /** Only on sentToday rows. */
+  sentAt?: string
+}
+
+export interface OvernightRun {
+  finishedAt: string; prepared: number; followUps: number; fresh: number
+  leadsAdded: number; researched: number; skipped: string[]; notes: string
+}
+
+export interface TodayPayload {
+  cap: number
+  timezone: string
+  undoSeconds: number
+  sentTodayCount: number
+  replies: StackItem[]
+  stack: StackItem[]
+  sentToday: StackItem[]
+  counts: { dueLater: number; needsContact: number; total: number; week: { sent: number; replies: number; calls: number } }
+  overnight: OvernightRun | null
+}
+
+export interface Progress {
+  days: { day: string; sent: number }[]
+  totals: { sent: number; replies: number; replyRate: number; calls: number; signed: number }
+  funnel: { stage: string; count: number }[]
+  byStage: Record<string, number>
 }
 
 export interface Variant { subject: string; body: string }
@@ -119,8 +159,8 @@ export interface Mockup {
 export interface SalesStatus {
   llm: { configured: boolean; provider?: string; model?: string; baseUrl?: string; canSearch?: boolean }
   research: { configured: boolean; provider: 'anthropic' | 'perplexity' | null }
-  gmail: { configured: boolean; connected: boolean; email: string | null }
-  lastRun: { finishedAt: string; prepared: number; followUps: number; fresh: number; leadsAdded: number; researched: number; skipped: string[]; notes: string } | null
+  gmail: { configured: boolean; connected: boolean; email: string | null; canReadReplies?: boolean }
+  lastRun: OvernightRun | null
 }
 
 export interface ImportPreview {
@@ -147,4 +187,8 @@ export interface SalesSettings {
   sender: { name: string; role: string; story: string; partnerCount: number }
   socialProof: string
   priorityRaces: string[]
+  /** HTML appended to every sent email. */
+  signature: string
+  timezone: string
+  undoSeconds: number
 }

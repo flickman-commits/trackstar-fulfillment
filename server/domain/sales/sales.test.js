@@ -347,3 +347,31 @@ test('the recipient is never presented as an existing partner', async () => {
   const real = { subject: 'Re: posters', body: 'Hey Jane,\n\nA few of our partners use these. Marine Corps Marathon finishers ordered 1,000 this season.\n\nMatt' }
   assert.deepEqual(draftProblems(real, ctx), [])
 })
+
+// ── What actually leaves the building ────────────────────────────────────────
+
+test('composeHtml puts the signature after the body and before the P.S., and drops a bare sign-off', async () => {
+  const { composeHtml } = await import('./drafting.js')
+  const sig = '<p>Thanks,</p><p><b>Matt Hickman</b></p>'
+  const html = composeHtml('Hey Jane,\n\nQuick one.\n\nWorth a call?\n\nMatt\n\nP.S. Attached an example.', { signature: sig, senderName: 'Matt' })
+  const iBody = html.indexOf('Worth a call?')
+  const iSig = html.indexOf('Matt Hickman')
+  const iPs = html.indexOf('P.S. Attached')
+  assert.ok(iBody < iSig && iSig < iPs, 'order must be body, signature, P.S.')
+  assert.ok(!/<p>Matt<\/p>/.test(html), 'the bare "Matt" line must not be sent on top of the signature')
+  assert.ok(html.includes('Hey Jane,'))
+  // No signature configured: nothing is appended, nothing breaks.
+  const plain = composeHtml('Hey Jane,\n\nQuick one.', { signature: '' })
+  assert.ok(plain.includes('Quick one.') && !plain.includes('margin-top:14px'))
+  // Escapes user text but leaves the signature's HTML alone.
+  const esc = composeHtml('Hey,\n\n<b>not bold</b>', { signature: '<b>bold</b>' })
+  assert.ok(esc.includes('&lt;b&gt;not bold&lt;/b&gt;') && esc.includes('<b>bold</b>'))
+})
+
+test('startOfToday respects the business timezone', async () => {
+  const { startOfToday } = await import('./settings.js')
+  // 03:00 UTC on Sep 11 is still Sep 10 in New York, so "today" starts at Sep 10 04:00 UTC.
+  const at = new Date('2026-09-11T03:00:00Z')
+  assert.equal(startOfToday('America/New_York', at).toISOString(), '2026-09-10T04:00:00.000Z')
+  assert.equal(startOfToday('UTC', at).toISOString(), '2026-09-11T00:00:00.000Z')
+})

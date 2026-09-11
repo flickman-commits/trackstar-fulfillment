@@ -3,7 +3,7 @@
  * so the Sales screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { Company, Contact, DraftResult, ImportPreview, ImportResult, Mockup, Pipeline, Research, SalesSettings, SalesStatus, Touch, DealStage } from '@/types/sales'
+import type { Company, Contact, DraftResult, ImportPreview, ImportResult, Mockup, Pipeline, Progress, Research, SalesSettings, SalesStatus, TodayPayload, Touch, DealStage } from '@/types/sales'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -67,6 +67,18 @@ export const salesApi = {
 
   queue: (body: { companyId: string; contactId: string; subject: string; body: string; mockupId?: string }) =>
     post<{ touch: Touch; gmailDraft: boolean; gmailConnected: boolean; mockup: { id: string; name: string } | null }>('/api/sales/draft', { action: 'queue', ...body }),
+
+  /** The morning in one call. */
+  today: () => request<TodayPayload>('/api/sales/today'),
+  progress: () => request<Progress>('/api/sales/today?action=progress'),
+  checkReplies: (force = false) =>
+    request<{ checked: number; newReplies: string[]; cleared: string[]; skipped?: string }>(`/api/sales/today?action=check-replies${force ? '&force=1' : ''}`),
+  skip: (id: string) => post<{ success: true; until: string }>('/api/sales/today', { action: 'skip', id }),
+  unskip: (id: string) => post<{ success: true }>('/api/sales/today', { action: 'unskip', id }),
+
+  /** Sends through the connected Gmail. Final; the undo window is the caller's. */
+  send: (body: { companyId: string; contactId: string; subject: string; body: string; mockupId?: string }) =>
+    post<{ touch: Touch; company: Company; mockup: { id: string; name: string } | null; gmailThreadId: string | null; sync?: SyncResult }>('/api/sales/draft', { action: 'send', ...body }),
 
   mockups: (companyId?: string) =>
     request<{ configured: boolean; mockups: Mockup[]; selectedId: string | null }>(

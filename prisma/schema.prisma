@@ -772,6 +772,12 @@ model Company {
   // { touchNumber, angle, contactId, variants:[{subject,body}], source, preparedAt }
   proposedDraft  Json?
   proposedAt     DateTime?
+  // "Skip today": hidden from the stack until this passes. Null means not snoozed.
+  snoozedUntil   DateTime?
+  // The other side wrote back and nobody has answered yet. Set by the reply
+  // check from Gmail thread metadata; cleared when our message is the latest.
+  replyPending   Boolean   @default(false)
+  lastReplyAt    DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -823,6 +829,10 @@ model Touch {
   body          String?   // plain text as approved
   gmailDraftId  String?
   gmailThreadId String?
+  // Gmail's id for the sent message, and the RFC 5322 Message-ID we stamped
+  // on it, so a follow-up can carry In-Reply-To and land in the same thread.
+  gmailMessageId String?
+  rfcMessageId   String?
   sentAt        DateTime?
   createdBy     String?   // actor email
   createdAt     DateTime  @default(now())

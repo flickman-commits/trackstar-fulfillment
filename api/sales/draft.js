@@ -7,7 +7,7 @@
  */
 import { setCors } from '../_lib/auth.js'
 import { requireAdminOnly } from '../_lib/users.js'
-import { draftVariants, queueDraft } from '../../server/domain/sales/drafting.js'
+import { draftVariants, queueDraft, sendDraft } from '../../server/domain/sales/drafting.js'
 import { llmInfo } from '../../server/lib/llm.js'
 import { researchProvider } from '../../server/domain/sales/research.js'
 import { gmailStatus } from '../../server/domain/sales/gmail.js'
@@ -43,6 +43,19 @@ export default async function handler(req, res) {
       })
       const { company, contact, ...rest } = out
       return res.status(200).json({ ...rest, contactId: contact.id, companyId: company.id })
+    }
+
+    if (body.action === 'send') {
+      if (!body.contactId) return res.status(400).json({ error: 'contactId is required' })
+      const out = await sendDraft({
+        companyId: String(body.companyId),
+        contactId: String(body.contactId),
+        subject: String(body.subject || ''),
+        body: String(body.body || ''),
+        mockupId: body.mockupId ? String(body.mockupId) : undefined,
+        actor,
+      })
+      return res.status(200).json(out)
     }
 
     if (body.action === 'queue') {

@@ -41,6 +41,21 @@ export const DEFAULTS = {
   ],
   /** Follow-up gaps in days, per pipeline and touch. Overrides the cadence file. */
   followUpDays: { RACE: null, CHARITY: null },
+  /**
+   * Appended to every email the app sends, after the body and before any
+   * P.S. HTML, because it carries links. The drafts themselves carry no
+   * sign-off; this is the sign-off.
+   */
+  signature: [
+    '<p style="margin:0">Thanks,</p>',
+    '<p style="margin:0;font-family:Georgia,\'Times New Roman\',serif;font-size:16px;font-weight:700">Matt Hickman</p>',
+    '<p style="margin:0;font-family:Georgia,\'Times New Roman\',serif">Owner | <a href="https://www.flickmanmedia.com" style="color:#1a56db">Flickman Media</a>, <a href="https://www.trackstar.art" style="color:#1a56db">Trackstar</a></p>',
+    '<p style="margin:0;font-family:Georgia,\'Times New Roman\',serif;font-style:italic">NYC</p>',
+  ].join('\n'),
+  /** What "today" means for the daily count. The business runs on Eastern time. */
+  timezone: 'America/New_York',
+  /** Seconds between pressing Send and the message actually going. Long enough to catch a typo. */
+  undoSeconds: 10,
 }
 
 /** Deep-ish merge: one level of nesting is all these settings have. */
@@ -80,6 +95,19 @@ export async function setSettings(patch) {
     if (!Number.isInteger(n) || n < 1 || n > 50) throw new Error('dailyCap must be a whole number from 1 to 50')
     next.dailyCap = n
   }
+  if (next.undoSeconds !== undefined) {
+    const n = Number(next.undoSeconds)
+    if (!Number.isInteger(n) || n < 0 || n > 60) throw new Error('undoSeconds must be a whole number from 0 to 60')
+    next.undoSeconds = n
+  }
+  if (next.timezone !== undefined) {
+    try { new Intl.DateTimeFormat('en-US', { timeZone: String(next.timezone) }) }
+    catch { throw new Error(`Unknown timezone: ${next.timezone}`) }
+  }
+  if (next.signature !== undefined) {
+    next.signature = String(next.signature).slice(0, 4000)
+    if (/<script|javascript:/i.test(next.signature)) throw new Error('The signature cannot contain scripts')
+  }
   if (next.priorityRaces !== undefined) {
     if (!Array.isArray(next.priorityRaces)) throw new Error('priorityRaces must be a list')
     next.priorityRaces = next.priorityRaces.map(s => String(s).trim()).filter(Boolean).slice(0, 30)
@@ -91,4 +119,24 @@ export async function setSettings(patch) {
   })
   cache = { at: 0, value: null }
   return getSettings({ force: true })
+}
+
+/**
+ * Start of "today" in the business timezone, as a Date. What "sent today"
+ * means depends on this; a send at 11pm Eastern is today's, not tomorrow's.
+ */
+export function startOfToday(timezone, now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
+  const get = t => parts.find(x => x.type === t).value
+  // Midnight local expressed in UTC: find the offset at that instant.
+  const localMidnightGuess = new Date(`${get('year')}-${get('month')}-${get('day')}T00:00:00Z`)
+  const offsetMs = tzOffsetMs(timezone, localMidnightGuess)
+  return new Date(localMidnightGuess.getTime() - offsetMs)
+}
+
+function tzOffsetMs(timezone, at) {
+  const f = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const p = Object.fromEntries(f.formatToParts(at).map(x => [x.type, x.value]))
+  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second)
+  return asUtc - at.getTime()
 }

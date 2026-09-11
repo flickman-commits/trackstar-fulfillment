@@ -96,8 +96,10 @@ export async function salesQueue({ limit, pipeline, ownerId } = {}) {
   if (pipeline === 'RACE' || pipeline === 'CHARITY') scope.pipeline = pipeline
   if (ownerId) scope.ownerId = ownerId
 
+  // Snoozed orgs and orgs with a reply waiting are not tomorrow's cold work.
+  const workable = { ...scope, replyPending: false, OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }] }
   const due = await prisma.company.findMany({
-    where: { ...scope, stage: { in: OPEN_STAGES }, nextActionAt: { lte: now }, contacts: { some: { email: { not: null } } } },
+    where: { ...workable, stage: { in: OPEN_STAGES }, nextActionAt: { lte: now }, contacts: { some: { email: { not: null } } } },
     orderBy: { nextActionAt: 'asc' },
     take: limit,
     include: INCLUDE,
@@ -105,7 +107,7 @@ export async function salesQueue({ limit, pipeline, ownerId } = {}) {
   const remaining = Math.max(0, limit - due.length)
   const fresh = remaining
     ? await prisma.company.findMany({
-        where: { ...scope, stage: 'NOT_CONTACTED', contacts: { some: { email: { not: null } } } },
+        where: { ...workable, stage: 'NOT_CONTACTED', contacts: { some: { email: { not: null } } } },
         orderBy: [{ tier: 'asc' }, { createdAt: 'desc' }],
         take: remaining,
         include: INCLUDE,

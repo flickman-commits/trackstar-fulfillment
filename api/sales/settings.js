@@ -13,7 +13,7 @@ import { getSettings, setSettings, DEFAULTS } from '../../server/domain/sales/se
 import { checkMirrors } from '../../server/domain/sales/externalSync.js'
 import prisma from '../_lib/prisma.js'
 
-const EDITABLE = ['dailyCap', 'sender', 'socialProof', 'priorityRaces']
+const EDITABLE = ['dailyCap', 'sender', 'socialProof', 'priorityRaces', 'signature', 'timezone', 'undoSeconds']
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return

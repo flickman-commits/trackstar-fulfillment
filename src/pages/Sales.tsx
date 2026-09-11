@@ -1,38 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Upload, Search, Mail, Loader2, ChevronDown, SlidersHorizontal } from 'lucide-react'
-import { salesApi, type ListView } from '@/lib/salesApi'
-import { btnSecondary, btnGhost, inputBase, segment, segmentGroup } from '@/lib/ui'
-import { STAGE_LABEL, type Company, type Contact, type DraftResult, type Mockup, type Pipeline, type SalesStatus, type Variant, type DealStage } from '@/types/sales'
+import { Upload, Mail, SlidersHorizontal, BarChart3, Check } from 'lucide-react'
+import { salesApi } from '@/lib/salesApi'
+import { btnSecondary, btnGhost } from '@/lib/ui'
+import { STAGE_LABEL, type Company, type Contact, type DraftResult, type Mockup, type SalesStatus, type StackItem, type TodayPayload, type Variant, type DealStage } from '@/types/sales'
+import TodayStack, { type StackMode } from '@/components/sales/TodayStack'
 import Composer from '@/components/sales/Composer'
-import DetailPane from '@/components/sales/DetailPane'
+import WhoPane from '@/components/sales/WhoPane'
 import ImportModal from '@/components/sales/ImportModal'
 import MockupsModal from '@/components/sales/MockupsModal'
 import SettingsModal from '@/components/sales/SettingsModal'
+import ProgressModal from '@/components/sales/ProgressModal'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 
 /**
- * Sales: the daily outreach queue.
+ * Sales: the morning.
  *
- * Left: who to write to today. Middle: the email, five ways. Right: what we
- * know about them. The keyboard does the work - I/K move between people, J/L
- * between variants, Cmd+Enter files the draft into Gmail and moves on.
+ * One number at the top (sent today, of the cap), today's stack on the left
+ * with replies first, the email in the middle, the person on the right.
+ * Cmd+Enter sends through your Gmail after a short undo window and moves you
+ * to the next one. When the stack is empty the page says so and stops.
  *
- * Research and drafting run as soon as a person is selected, and the next
- * person in the list is prepared in the background, so by the time you get
- * there the email is already waiting.
+ * The cap, the signature, the undo window and what "today" means are all
+ * settings; nothing on this page hard-codes ten.
  */
 
-type Prepared = {
-  draft: DraftResult
-  variants: Variant[]
-  /** The mode this was produced under, so flipping the switch invalidates it. */
-  template: boolean
-}
-
-const PIPELINE_KEY = 'sales.pipeline'
-const VIEW_KEY = 'sales.view'
+type Prepared = { draft: DraftResult; variants: Variant[]; template: boolean }
 const AI_KEY = 'sales.ai'
 
 export default function Sales() {
@@ -40,44 +34,32 @@ export default function Sales() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const [pipeline, setPipeline] = useState<Pipeline | 'all'>(() => {
-    try { return (localStorage.getItem(PIPELINE_KEY) as Pipeline | 'all') || 'all' } catch { return 'all' }
-  })
-  const [view, setView] = useState<ListView>(() => {
-    try { return (localStorage.getItem(VIEW_KEY) as ListView) || 'due' } catch { return 'due' }
-  })
-  /**
-   * Whether the model does the work. Off means research is skipped and drafts
-   * come from the cadence templates - free, instant, and still sendable after
-   * an edit. Remembered per browser, because whether an email is worth paying
-   * for is a decision that changes with the day rather than with the deal.
-   */
-  const [aiOn, setAiOn] = useState<boolean>(() => {
-    try { return localStorage.getItem(AI_KEY) !== 'off' } catch { return true }
-  })
-  const [q, setQ] = useState('')
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [counts, setCounts] = useState({ due: 0, new: 0, total: 0 })
-  const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState<SalesStatus | null>(null)
+  const [today, setToday] = useState<TodayPayload | null>(null)
+  const [mode, setMode] = useState<StackMode>('today')
+  const [q, setQ] = useState('')
+  const [view, setView] = useState<'all' | `stage:${DealStage}`>('all')
+  const [all, setAll] = useState<Company[]>([])
+  const [allLoading, setAllLoading] = useState(false)
+
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [contactId, setContactId] = useState<string | null>(null)
   const [detail, setDetail] = useState<Company | null>(null)
   const [prepared, setPrepared] = useState<Record<string, Prepared>>({})
   const [variantIndex, setVariantIndex] = useState(0)
-  const [researching, setResearching] = useState(false)
   const [drafting, setDrafting] = useState(false)
-  const [queueing, setQueueing] = useState(false)
+  const [researching, setResearching] = useState(false)
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
+  const [mockups, setMockups] = useState<Mockup[]>([])
+  const [mockupId, setMockupId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [mockupsOpen, setMockupsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [mockups, setMockups] = useState<Mockup[]>([])
-  /** Which example goes out with this one. Auto-picked per org, overridable. */
-  const [mockupId, setMockupId] = useState<string | null>(null)
+  const [progressOpen, setProgressOpen] = useState(false)
+  const [aiOn, setAiOn] = useState<boolean>(() => { try { return localStorage.getItem(AI_KEY) !== 'off' } catch { return true } })
   const inFlight = useRef(new Set<string>())
+  const timers = useRef<Record<string, number>>({})
 
-  useEffect(() => { try { localStorage.setItem(PIPELINE_KEY, pipeline) } catch { /* ignore */ } }, [pipeline])
-  useEffect(() => { try { localStorage.setItem(VIEW_KEY, view) } catch { /* ignore */ } }, [view])
   useEffect(() => { try { localStorage.setItem(AI_KEY, aiOn ? 'on' : 'off') } catch { /* ignore */ } }, [aiOn])
 
   // Gmail's OAuth round trip lands back here with a flag in the query string.
@@ -92,60 +74,76 @@ export default function Sales() {
   }, [location.search, navigate])
 
   const loadStatus = useCallback(() => { salesApi.status().then(setStatus).catch(() => setStatus(null)) }, [])
-  useEffect(loadStatus, [loadStatus])
+  const loadToday = useCallback(async () => {
+    try { setToday(await salesApi.today()) } catch (e) { toast.error((e as Error).message) }
+  }, [])
+  const loadAll = useCallback(async () => {
+    setAllLoading(true)
+    try { setAll((await salesApi.list({ pipeline: 'all', view, q })).companies) } catch (e) { toast.error((e as Error).message) }
+    finally { setAllLoading(false) }
+  }, [view, q])
 
-  const loadList = useCallback(async () => {
-    setLoading(true)
-    try {
-      const r = await salesApi.list({ pipeline, view, q })
-      setCompanies(r.companies)
-      setCounts(r.counts)
-    } catch (e) { toast.error((e as Error).message) }
-    finally { setLoading(false) }
-  }, [pipeline, view, q])
-  useEffect(() => { loadList() }, [loadList])
-
-  // Keep a selection that exists in the list.
+  // First load: ask Gmail who has written back, then build the morning.
   useEffect(() => {
-    if (companies.length === 0) { setSelectedId(null); return }
-    if (!selectedId || !companies.some(c => c.id === selectedId)) setSelectedId(companies[0].id)
-  }, [companies, selectedId])
+    loadStatus()
+    salesApi.checkReplies()
+      .then(r => { if (r.newReplies.length) toast.success(`${r.newReplies.length} new ${r.newReplies.length === 1 ? 'reply' : 'replies'}: ${r.newReplies.join(', ')}`) })
+      .catch(() => {})
+      .finally(loadToday)
+  }, [loadStatus, loadToday])
+  useEffect(() => { if (mode === 'all') loadAll() }, [mode, loadAll])
 
-  const selected = useMemo(() => companies.find(c => c.id === selectedId) || null, [companies, selectedId])
-  const company = detail && detail.id === selectedId ? detail : selected
+  // The list I/K walks: replies, then the stack, then what already went out.
+  const items: (StackItem | Company)[] = useMemo(() => {
+    if (mode === 'all') return all
+    if (!today) return []
+    return [...today.replies, ...today.stack, ...today.sentToday]
+  }, [mode, all, today])
+
+  const sentIds = useMemo(() => new Set(today?.sentToday.map(c => c.id) || []), [today])
+
+  // Keep a selection that exists; default to the first thing to act on.
+  useEffect(() => {
+    if (items.length === 0) { setSelectedId(null); return }
+    if (!selectedId || !items.some(c => c.id === selectedId)) {
+      const first = items.find(c => !sentIds.has(c.id) && !pendingIds.has(c.id)) || items[0]
+      setSelectedId(first.id)
+    }
+  }, [items, selectedId, sentIds, pendingIds])
+
+  const selected = useMemo(() => items.find(c => c.id === selectedId) || null, [items, selectedId])
+  // The stack row plus its full detail (history, all contacts) once loaded.
+  const company: Company | null = useMemo(
+    () => (detail && detail.id === selectedId ? { ...selected, ...detail, contacts: detail.contacts } as Company : selected),
+    [detail, selected, selectedId],
+  )
   const contact: Contact | null = useMemo(() => {
     if (!company) return null
-    return company.contacts.find(c => c.id === contactId) || company.contacts[0] || null
+    return company.contacts.find(c => c.id === contactId) || company.contacts.find(c => c.email) || company.contacts[0] || null
   }, [company, contactId])
 
-  // A configured model that is switched off is not in use.
   const aiActive = aiOn && Boolean(status?.llm.configured)
   const current = selectedId ? prepared[selectedId] : undefined
   const variants = useMemo(() => current?.variants || [], [current])
+  const cap = today?.cap ?? 10
+  const sentCount = today?.sentTodayCount ?? 0
+  const capReached = sentCount + pendingIds.size >= cap
+  const gmailConnected = Boolean(status?.gmail.connected)
 
-  /** Research (if needed) and draft for one company. Silent when prefetching. */
+  /** Research (only when AI is on and nothing was prepared) and draft one org. */
   const prepare = useCallback(async (c: Company, opts: { silent: boolean; force?: boolean; contactId?: string | null; fresh?: boolean }) => {
-    const target = (opts.contactId && c.contacts.find(x => x.id === opts.contactId)) || c.contacts[0]
-    // No model is not a reason to skip: draftVariants falls back to the
-    // cadence's own copy, which is still a real draft to edit and send.
-    if (!target?.email) return
+    const target = (opts.contactId && c.contacts.find(x => x.id === opts.contactId)) || c.contacts.find(x => x.email) || c.contacts[0]
+    if (!target?.email || c.replyPending) return
     const key = `${c.id}:${target.id}`
     if (inFlight.current.has(key)) return
-    // A draft written by the model is stale the moment the switch says
-    // templates, and vice versa. Comparing the mode it was REQUESTED under -
-    // not the mode it came back as - matters, because a model failure returns
-    // a template and must not then look permanently stale and retry forever.
     const cached = prepared[c.id]
     if (!opts.force && cached && cached.template === !aiActive) return
     inFlight.current.add(key)
     try {
-      // The routine researches as it goes, so a prepared org usually has this
-      // already; only spend on research when nothing was prepared.
       if (aiActive && !target.research && status?.research.configured && !c.hasProposedDraft) {
         if (!opts.silent) setResearching(true)
         try {
           const r = await salesApi.research(target.id)
-          setCompanies(prev => prev.map(x => x.id === c.id ? { ...x, contacts: x.contacts.map(k => k.id === target.id ? r.contact : k) } : x))
           setDetail(prev => prev && prev.id === c.id ? { ...prev, contacts: prev.contacts.map(k => k.id === target.id ? r.contact : k) } : prev)
         } catch (e) { if (!opts.silent) toast.error(`Research failed: ${(e as Error).message}`) }
         finally { if (!opts.silent) setResearching(false) }
@@ -154,10 +152,7 @@ export default function Sales() {
       try {
         const draft = await salesApi.variants(c.id, target.id, !aiActive, Boolean(opts.fresh))
         setPrepared(prev => ({ ...prev, [c.id]: { draft, variants: draft.variants, template: !aiActive } }))
-        if (!opts.silent) {
-          setVariantIndex(0)
-          if (draft.warning) toast.warning(draft.warning)
-        }
+        if (!opts.silent) { setVariantIndex(0); if (draft.warning) toast.warning(draft.warning) }
       } catch (e) { if (!opts.silent) toast.error(`Drafting failed: ${(e as Error).message}`) }
       finally { if (!opts.silent) setDrafting(false) }
     } finally {
@@ -165,337 +160,262 @@ export default function Sales() {
     }
   }, [prepared, status, aiActive])
 
-  // On selection: load full detail (history), prepare this one, then the next one quietly.
+  // On selection: full detail (history), the draft, and the next one quietly.
   useEffect(() => {
     if (!selected) { setDetail(null); return }
     let cancelled = false
     setVariantIndex(0)
     setContactId(null)
     salesApi.company(selected.id).then(r => { if (!cancelled) setDetail(r.company) }).catch(() => {})
-    // Signed preview URLs are short-lived, so refresh them with the selection
-    // rather than holding one list for the whole session.
-    salesApi.mockups(selected.id)
-      .then(r => { if (!cancelled) { setMockups(r.mockups); setMockupId(r.selectedId) } })
-      .catch(() => {})
-    prepare(selected, { silent: false }).then(() => {
-      if (cancelled) return
-      const idx = companies.findIndex(c => c.id === selected.id)
-      const next = companies[idx + 1]
-      if (next) prepare(next, { silent: true })
-    })
+    salesApi.mockups(selected.id).then(r => { if (!cancelled) { setMockups(r.mockups); setMockupId(r.selectedId) } }).catch(() => {})
+    if (!sentIds.has(selected.id)) {
+      prepare(selected, { silent: false }).then(() => {
+        if (cancelled) return
+        const idx = items.findIndex(c => c.id === selected.id)
+        const next = items.slice(idx + 1).find(c => !sentIds.has(c.id) && !pendingIds.has(c.id))
+        if (next) prepare(next, { silent: true })
+      })
+    }
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id, status, aiActive])
 
-  const move = useCallback((delta: number) => {
-    if (!companies.length) return
-    const idx = Math.max(0, companies.findIndex(c => c.id === selectedId))
-    const next = companies[Math.min(companies.length - 1, Math.max(0, idx + delta))]
+  const moveTo = useCallback((delta: number) => {
+    if (!items.length) return
+    const idx = Math.max(0, items.findIndex(c => c.id === selectedId))
+    const next = items[Math.min(items.length - 1, Math.max(0, idx + delta))]
     if (next) setSelectedId(next.id)
-  }, [companies, selectedId])
+  }, [items, selectedId])
 
-  const updateVariant = (v: Variant) => {
-    if (!selectedId || !current) return
-    const next = current.variants.slice()
-    next[variantIndex] = v
-    setPrepared(prev => ({ ...prev, [selectedId]: { ...current, variants: next } }))
-
-  }
-
-  const regenerate = () => { if (company) prepare(company, { silent: false, force: true, contactId, fresh: true }) }
-
-
-  const queue = useCallback(async () => {
-    const v = variants[variantIndex]
-    if (!company || !contact?.email || !v || queueing) return
-    setQueueing(true)
-    try {
-      const r = await salesApi.queue({
-        companyId: company.id, contactId: contact.id,
-        subject: v.subject, body: v.body,
-        mockupId: mockupId || undefined,
-      })
-      toast.success(
-        r.gmailDraft
-          ? `Draft in Gmail for ${contact.firstName}${r.mockup ? ` with ${r.mockup.name}` : ''}`
-          : 'Saved. Connect Gmail to get drafts in your inbox.',
-      )
-      setPrepared(prev => { const n = { ...prev }; delete n[company.id]; return n })
-      // The person leaves Due/New once a draft exists; step forward first so the selection survives the refetch.
-      const idx = companies.findIndex(c => c.id === company.id)
-      const next = companies[idx + 1] || companies[idx - 1]
-      if (view === 'due' || view === 'new') {
-        setCompanies(prev => prev.filter(c => c.id !== company.id))
-        if (next) setSelectedId(next.id)
-        setCounts(c => ({ ...c, [view]: Math.max(0, c[view as 'due' | 'new'] - 1) }))
-      } else {
-        await loadList()
-      }
-    } catch (e) { toast.error((e as Error).message) }
-    finally { setQueueing(false) }
-  }, [variants, variantIndex, company, contact, queueing, companies, view, loadList, mockupId])
-
-  // Keyboard: I/K people, J/L variants, Cmd+Enter file.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); queue(); return }
-      const t = e.target as HTMLElement
-      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable) return
-      if (importOpen) return
-      switch (e.key.toLowerCase()) {
-        case 'j': e.preventDefault(); setVariantIndex(i => Math.max(0, i - 1)); break
-        case 'l': e.preventDefault(); setVariantIndex(i => Math.min(variants.length - 1, i + 1)); break
-        case 'i': e.preventDefault(); move(-1); break
-        case 'k': e.preventDefault(); move(1); break
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [queue, move, variants.length, importOpen])
+  /** After acting on the current one, land on the next thing to do. */
+  const advance = useCallback((fromId: string) => {
+    const idx = items.findIndex(c => c.id === fromId)
+    const next = items.slice(idx + 1).find(c => c.id !== fromId && !sentIds.has(c.id) && !pendingIds.has(c.id))
+      || items.find(c => c.id !== fromId && !sentIds.has(c.id) && !pendingIds.has(c.id))
+    setSelectedId(next ? next.id : null)
+  }, [items, sentIds, pendingIds])
 
   const patchCompany = (updated: Company) => {
-    setCompanies(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated, contacts: updated.contacts || c.contacts } : c))
     setDetail(prev => prev && prev.id === updated.id ? { ...prev, ...updated, contacts: updated.contacts || prev.contacts } : prev)
+    setAll(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated, contacts: updated.contacts || c.contacts } : c))
   }
-
-  /** A mirror that did not update is worth a nudge, never a blocker. */
   const noteSync = (sync?: { target: string | null; ok: boolean; skipped?: string; error?: string }) => {
     if (!sync || sync.ok || !sync.target) return
-    const where = sync.target === 'notion' ? 'Notion' : 'ClickUp'
-    toast.warning(`${where} was not updated: ${sync.error || sync.skipped || 'unknown reason'}`)
+    toast.warning(`${sync.target === 'notion' ? 'Notion' : 'ClickUp'} was not updated: ${sync.error || sync.skipped || 'unknown reason'}`)
   }
 
-  const setStage = async (stage: DealStage) => {
+  /** Send, after an undo window. Selection moves on immediately so the rhythm holds. */
+  const send = useCallback(() => {
+    const v = variants[variantIndex]
+    if (!company || !contact?.email || !v || pendingIds.has(company.id)) return
+    if (!gmailConnected) { toast.error('Connect Gmail in Settings to send.'); return }
+    if (capReached) { toast.error(`That is ${cap} for today. Raise the cap in Settings if you mean to.`); return }
+    if (contact.emailSource === 'guessed') { toast.error('This address was guessed. Confirm it before sending.'); return }
+    const payload = { companyId: company.id, contactId: contact.id, subject: v.subject, body: v.body, mockupId: mockupId || undefined }
+    const id = company.id
+    const first = contact.firstName
+    const undo = today?.undoSeconds ?? 10
+
+    setPendingIds(prev => new Set(prev).add(id))
+    advance(id)
+
+    const fire = async () => {
+      try {
+        const r = await salesApi.send(payload)
+        toast.success(`Sent to ${first}`)
+        noteSync(r.sync)
+        setPrepared(prev => { const n = { ...prev }; delete n[id]; return n })
+      } catch (e) {
+        toast.error(`Not sent to ${first}: ${(e as Error).message}`, { duration: 8000 })
+        setSelectedId(id)
+      } finally {
+        setPendingIds(prev => { const n = new Set(prev); n.delete(id); return n })
+        delete timers.current[id]
+        loadToday()
+      }
+    }
+
+    if (undo > 0) {
+      timers.current[id] = window.setTimeout(fire, undo * 1000)
+      toast(`Sending to ${first} in ${undo}s`, {
+        duration: undo * 1000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            window.clearTimeout(timers.current[id]); delete timers.current[id]
+            setPendingIds(prev => { const n = new Set(prev); n.delete(id); return n })
+            setSelectedId(id)
+            toast.message(`Held. ${first} is back in the stack.`)
+          },
+        },
+      })
+    } else {
+      fire()
+    }
+  }, [variants, variantIndex, company, contact, pendingIds, gmailConnected, capReached, cap, mockupId, today?.undoSeconds, advance, loadToday])
+
+  const skip = useCallback(async () => {
+    if (!company) return
+    try { await salesApi.skip(company.id); toast.message(`${company.name} moved to tomorrow`); advance(company.id); loadToday() }
+    catch (e) { toast.error((e as Error).message) }
+  }, [company, advance, loadToday])
+
+  const setStage = useCallback(async (stage: DealStage) => {
     if (!company) return
     try {
       const r = await salesApi.setStage(company.id, stage)
       patchCompany(r.company); toast.success(`${company.name}: ${STAGE_LABEL[stage]}`); noteSync(r.sync)
+      if (['NOT_INTERESTED', 'PASSED', 'NEXT_YEAR', 'SIGNED'].includes(stage)) { advance(company.id); loadToday() }
     } catch (e) { toast.error((e as Error).message) }
+  }, [company, advance, loadToday])
+
+  // Keyboard: I/K people, J/L variants, ⌘↵ send, S skip, X not interested.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(); return }
+      const t = e.target as HTMLElement
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable) return
+      if (importOpen || mockupsOpen || settingsOpen || progressOpen) return
+      switch (e.key.toLowerCase()) {
+        case 'i': e.preventDefault(); moveTo(-1); break
+        case 'k': e.preventDefault(); moveTo(1); break
+        case 'j': e.preventDefault(); setVariantIndex(i => Math.max(0, i - 1)); break
+        case 'l': e.preventDefault(); setVariantIndex(i => Math.min(variants.length - 1, i + 1)); break
+        case 's': e.preventDefault(); skip(); break
+        case 'x': e.preventDefault(); setStage('NOT_INTERESTED'); break
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [send, skip, setStage, moveTo, variants.length, importOpen, mockupsOpen, settingsOpen, progressOpen])
+
+  const updateVariant = (v: Variant) => {
+    if (!selectedId || !current) return
+    const next = current.variants.slice(); next[variantIndex] = v
+    setPrepared(prev => ({ ...prev, [selectedId]: { ...current, variants: next } }))
   }
-  const saveNotes = async (notes: string) => {
-    if (!company) return
-    try { patchCompany((await salesApi.update(company.id, { notes })).company) } catch (e) { toast.error((e as Error).message) }
-  }
-  const markSent = async () => {
-    if (!company) return
-    try {
-      const r = await salesApi.markSent(company.id)
-      patchCompany(r.company); toast.success('Marked sent'); noteSync(r.sync)
-    } catch (e) { toast.error((e as Error).message) }
-  }
+  const rewrite = () => { if (company) prepare(company, { silent: false, force: true, contactId, fresh: true }) }
+  const saveNotes = async (notes: string) => { if (!company) return; try { patchCompany((await salesApi.update(company.id, { notes })).company) } catch (e) { toast.error((e as Error).message) } }
   const addContact = async (c: { firstName: string; lastName: string; email: string; title: string }) => {
     if (!company) return
     try {
       const r = await salesApi.saveContact(company.id, c)
       const contacts = [...company.contacts, r.contact]
-      patchCompany({ ...company, contacts })
-      setContactId(r.contact.id)
+      patchCompany({ ...company, contacts }); setContactId(r.contact.id)
       setPrepared(prev => { const n = { ...prev }; delete n[company.id]; return n })
       prepare({ ...company, contacts }, { silent: false, force: true, contactId: r.contact.id })
+      loadToday()
     } catch (e) { toast.error((e as Error).message) }
   }
   const research = async (force: boolean) => {
     if (!contact || !company) return
-    if (!aiOn) { toast.error('Turn AI on to research a contact.'); return }
+    if (!aiActive) { toast.error('Turn AI on in Settings to research.'); return }
     setResearching(true)
     try {
       const r = await salesApi.research(contact.id, force)
       const contacts = company.contacts.map(k => k.id === contact.id ? r.contact : k)
       patchCompany({ ...company, contacts })
-      if (force) { setPrepared(prev => { const n = { ...prev }; delete n[company.id]; return n }); prepare({ ...company, contacts }, { silent: false, force: true, contactId: contact.id }) }
     } catch (e) { toast.error((e as Error).message) }
     finally { setResearching(false) }
   }
 
-  const fmtShort = (s: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '')
+  const isSent = Boolean(selectedId && sentIds.has(selectedId))
+  const doneForToday = mode === 'today' && today && today.stack.length === 0 && today.replies.length === 0 && pendingIds.size === 0
 
   return (
-    <div className="h-screen flex flex-col px-4 md:px-6 py-4 max-w-[1600px]">
-      {/* Top bar */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
-        <div className="flex items-center gap-3">
+    <div className="min-h-screen lg:h-screen flex flex-col px-4 md:px-6 py-4 max-w-[1600px]">
+      {/* The one number */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 mb-3">
+        <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-xl font-semibold text-off-black">Sales</h1>
-          <div className={segmentGroup}>
-            <button onClick={() => setPipeline('all')} className={segment(pipeline === 'all')}>Both</button>
-            <button onClick={() => setPipeline('RACE')} className={segment(pipeline === 'RACE')}>Races</button>
-            <button onClick={() => setPipeline('CHARITY')} className={segment(pipeline === 'CHARITY')}>Charities</button>
+          <div className="flex items-center gap-3">
+            <span className="text-xl font-semibold tabular-nums">{sentCount}<span className="text-[13px] font-medium text-off-black/55 ml-1.5">of {cap} sent today</span></span>
+            <span className="flex gap-[3px]" aria-label={`${sentCount} of ${cap} sent`}>
+              {Array.from({ length: cap }).map((_, i) => (
+                <span key={i} className={`block w-[14px] h-[7px] rounded-[3px] ${i < sentCount ? 'bg-dark-fill' : i < sentCount + pendingIds.size ? 'bg-amber-400' : 'bg-border-gray'}`} />
+              ))}
+            </span>
           </div>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          {status && (
-            <>
-              {/* The switch sits first because it changes what every other
-                  chip means: with AI off, the model and research chips are
-                  describing something that is configured but not running. */}
-              <button
-                onClick={() => setAiOn(v => !v)}
-                disabled={!status.llm.configured}
-                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${
-                  aiActive
-                    ? 'border-dark-fill bg-dark-fill text-white'
-                    : 'border-border-gray text-off-black/55 hover:text-off-black'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-                title={!status.llm.configured
-                  ? 'No model is configured, so drafts always come from the templates.'
-                  : aiActive
-                    ? 'AI is writing the drafts and researching contacts. Click to switch to the free templates.'
-                    : 'Drafts come from the cadence templates and research is skipped. Click to use the model.'}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${aiActive ? 'bg-white' : 'bg-off-black/30'}`} />
-                AI {aiActive ? 'on' : 'off'}
-              </button>
-              <span
-                className={`px-2 py-1 rounded-md border ${
-                  !status.llm.configured ? 'border-amber-300 text-amber-700'
-                  : aiActive ? 'border-border-gray text-off-black/60'
-                  : 'border-border-gray text-off-black/35 line-through'}`}
-                title={status.llm.model
-                  ? `${status.llm.provider}: ${status.llm.model}`
-                  : 'No model configured. Drafts come from the cadence templates; edit and send them as normal. Set ANTHROPIC_API_KEY, or LLM_PROVIDER=openai with LLM_BASE_URL and LLM_API_KEY.'}
-              >
-                {status.llm.configured ? `Model · ${status.llm.model}` : 'Templates only · no model'}
-              </span>
-              <span
-                className={`px-2 py-1 rounded-md border ${
-                  !status.research.configured ? 'border-amber-300 text-amber-700'
-                  : aiActive ? 'border-border-gray text-off-black/60'
-                  : 'border-border-gray text-off-black/35 line-through'}`}
-                title={status.research.configured
-                  ? `Contact research runs on ${status.research.provider}`
-                  : 'No backend can search the web. Set ANTHROPIC_API_KEY, or PERPLEXITY_API_KEY.'}
-              >
-                {status.research.configured ? `Research · ${status.research.provider}` : 'Research off'}
-              </span>
-              {status.gmail.connected ? (
-                <button onClick={async () => { await salesApi.gmailDisconnect(); loadStatus() }} className="px-2 py-1 rounded-md border border-border-gray text-off-black/60 hover:text-off-black" title="Disconnect">
-                  <Mail className="w-3 h-3 inline mr-1" />{status.gmail.email}
-                </button>
-              ) : (
-                <a href={salesApi.gmailConnectUrl} className={btnSecondary} title={status.gmail.configured ? 'Connect your Gmail so drafts land in your inbox' : 'Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET first'} aria-disabled={!status.gmail.configured}>
-                  <Mail className="w-3.5 h-3.5" /> Connect Gmail
-                </a>
-              )}
-            </>
-          )}
-          {status?.lastRun && (
-            <span
-              className="px-2 py-1 rounded-md border border-border-gray text-off-black/60"
-              title={`${status.lastRun.notes || 'No notes.'}${status.lastRun.skipped.length ? `\n\nSkipped: ${status.lastRun.skipped.join('; ')}` : ''}`}
-            >
-              Overnight · {status.lastRun.prepared} ready
-              <span className="text-off-black/40"> · {new Date(status.lastRun.finishedAt).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>
+          {today && (
+            <span className="text-[12.5px] text-off-black/55 flex gap-3">
+              <span>This week <b className="text-off-black tabular-nums">{today.counts.week.sent}</b> sent</span>
+              <span><b className="text-off-black tabular-nums">{today.counts.week.replies}</b> replies</span>
+              <span><b className="text-off-black tabular-nums">{today.counts.week.calls}</b> calls</span>
             </span>
           )}
-          <button onClick={() => setImportOpen(true)} className={btnSecondary}><Upload className="w-3.5 h-3.5" /> Import</button>
-          <button onClick={() => setSettingsOpen(true)} className={btnGhost} title="Sales settings: cap, sender, social proof, sourcing races"><SlidersHorizontal className="w-3.5 h-3.5" /></button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setProgressOpen(true)} className={btnGhost}><BarChart3 className="w-3.5 h-3.5" /> Progress</button>
+          <button onClick={() => setImportOpen(true)} className={btnGhost}><Upload className="w-3.5 h-3.5" /> Import</button>
+          <button onClick={() => setSettingsOpen(true)} className={btnGhost} title="Settings"><SlidersHorizontal className="w-3.5 h-3.5" /></button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex gap-4">
-        {/* Queue */}
-        <aside className="w-[240px] xl:w-[290px] shrink-0 flex flex-col min-h-0">
-          <div className={`${segmentGroup} w-full mb-2`}>
-            <button onClick={() => setView('due')} className={`${segment(view === 'due')} flex-1`}>Due <span className="opacity-60 tabular-nums">{counts.due}</span></button>
-            <button onClick={() => setView('new')} className={`${segment(view === 'new')} flex-1`}>New <span className="opacity-60 tabular-nums">{counts.new}</span></button>
-            <button onClick={() => setView('all')} className={`${segment(view === 'all')} flex-1`}>All <span className="opacity-60 tabular-nums">{counts.total}</span></button>
-          </div>
-          <div className="relative mb-2">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-off-black/40" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search" className={`${inputBase} w-full pl-8`} />
-          </div>
-          {view === 'all' && (
-            <div className="relative mb-2">
-              <select value={view} onChange={e => setView(e.target.value as ListView)} className={`${inputBase} w-full appearance-none pr-7`}>
-                <option value="all">Every stage</option>
-                {(Object.keys(STAGE_LABEL) as DealStage[]).map(s => <option key={s} value={`stage:${s}`}>{STAGE_LABEL[s]}</option>)}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-off-black/40 pointer-events-none" />
-            </div>
-          )}
-          {view.startsWith('stage:') && (
-            <button onClick={() => setView('all')} className={`${btnGhost} mb-2 -ml-2`}>← {STAGE_LABEL[view.slice(6) as DealStage]} only</button>
-          )}
-          <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-border-gray bg-white">
-            {loading && companies.length === 0 ? (
-              <div className="flex items-center justify-center h-32 text-off-black/40"><Loader2 className="w-4 h-4 animate-spin" /></div>
-            ) : companies.length === 0 ? (
-              <div className="p-4 text-xs text-off-black/50">
-                {view === 'due' ? 'Nothing due. Try New.' : view === 'new' ? 'Nobody new with an email. Import a list.' : 'Empty.'}
-              </div>
-            ) : companies.map(c => {
-              const primary = c.contacts[0]
-              const ready = Boolean(prepared[c.id]) || Boolean(c.hasProposedDraft)
-              const active = c.id === selectedId
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedId(c.id)}
-                  className={`w-full text-left px-3 py-2.5 border-b border-border-gray/70 last:border-b-0 transition-colors ${active ? 'bg-dark-fill text-white' : 'hover:bg-subtle-gray'}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium truncate">{c.name}</span>
-                    <span className={`text-[10px] uppercase tracking-wide shrink-0 ${active ? 'text-white/60' : 'text-off-black/45'}`}>{c.pipeline === 'RACE' ? 'race' : 'charity'}</span>
-                  </div>
-                  <div className={`flex items-center justify-between gap-2 text-xs mt-0.5 ${active ? 'text-white/70' : 'text-off-black/55'}`}>
-                    <span className="truncate">{primary ? `${primary.firstName} ${primary.lastName}`.trim() : 'No contact'}{primary && !primary.email ? ' · no email' : ''}</span>
-                    <span className="shrink-0 flex items-center gap-1.5">
-                      {ready && <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-white' : 'bg-success-green'}`} title="Draft ready" />}
-                      {view === 'due' ? fmtShort(c.nextActionAt) : STAGE_LABEL[c.stage]}
-                    </span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-          <p className="text-[11px] text-off-black/40 mt-2">I / K move · J / L variants · ⌘↵ file the draft</p>
-        </aside>
+      {status && !status.gmail.connected && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-3 text-[13px] text-amber-800">
+          <span><Mail className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />Connect your Gmail to send from here.</span>
+          <a href={salesApi.gmailConnectUrl} className={btnSecondary}>Connect Gmail</a>
+        </div>
+      )}
+      {status?.gmail.connected && status.gmail.canReadReplies === false && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border-gray bg-white px-3 py-2 mb-3 text-[12.5px] text-off-black/65">
+          <span>Reconnect Gmail once so the app can see who has replied. It only reads sender and date on your own threads.</span>
+          <a href={salesApi.gmailConnectUrl} className={btnSecondary}>Reconnect</a>
+        </div>
+      )}
 
-        <Composer
-          company={company}
-          contact={contact}
-          draft={current?.draft || null}
-          variants={variants}
-          index={Math.min(variantIndex, Math.max(0, variants.length - 1))}
-          drafting={drafting}
-          queueing={queueing}
-          gmailConnected={Boolean(status?.gmail.connected)}
-          mockups={mockups}
-          mockupId={mockupId}
-          onMockupChange={id => setMockupId(id || null)}
-          onManageMockups={() => setMockupsOpen(true)}
-          onChange={updateVariant}
-          onPrev={() => setVariantIndex(i => Math.max(0, i - 1))}
-          onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-          onRegenerate={regenerate}
-          onQueue={queue}
-          onMarkSent={markSent}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3">
+        <TodayStack
+          mode={mode} onMode={setMode}
+          replies={today?.replies || []} stack={today?.stack || []} sentToday={today?.sentToday || []}
+          pendingSendIds={pendingIds}
+          overnight={today?.overnight || null}
+          counts={today?.counts || null}
+          selectedId={selectedId} onSelect={setSelectedId}
+          allCompanies={all} allLoading={allLoading} q={q} onQ={setQ} view={view} onView={setView}
         />
 
-        <DetailPane
-          company={company}
-          contact={contact}
-          researching={researching}
-          researchConfigured={Boolean(status?.research.configured)}
-          onResearch={research}
-          onStage={setStage}
-          onSaveNotes={saveNotes}
-          onAddContact={addContact}
+        {doneForToday && !selected ? (
+          <div className="flex-1 min-w-0 flex items-center justify-center rounded-lg border border-border-gray bg-white min-h-[320px]">
+            <div className="text-center max-w-[44ch] px-6">
+              <Check className="w-8 h-8 mx-auto text-success-green mb-2" />
+              <div className="text-xl font-semibold">{sentCount ? `Done for today. ${sentCount} sent.` : 'Nothing to send today.'}</div>
+              <p className="text-sm text-off-black/60 mt-2">{sentCount >= cap ? 'That is the cap.' : 'The stack is empty.'} Tomorrow's batch arrives overnight. Replies show up here as they come in.</p>
+            </div>
+          </div>
+        ) : isSent && selected ? (
+          <div className="flex-1 min-w-0 flex items-center justify-center rounded-lg border border-border-gray bg-white min-h-[320px]">
+            <div className="text-center px-6">
+              <Check className="w-6 h-6 mx-auto text-success-green mb-2" />
+              <div className="text-base font-semibold">Sent{(selected as StackItem).sentAt ? ` at ${new Date((selected as StackItem).sentAt as string).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}</div>
+              <p className="text-sm text-off-black/60 mt-1">The next follow-up is on the clock. It will come back to the stack when it is due.</p>
+            </div>
+          </div>
+        ) : (
+          <Composer
+            company={company} contact={contact} draft={current?.draft || null}
+            variants={variants} index={Math.min(variantIndex, Math.max(0, variants.length - 1))}
+            drafting={drafting} gmailConnected={gmailConnected}
+            canSend={gmailConnected && !capReached && contact?.emailSource !== 'guessed'} capReached={capReached}
+            mockups={mockups} mockupId={mockupId}
+            onMockupChange={id => setMockupId(id || null)} onManageMockups={() => setMockupsOpen(true)}
+            onChange={updateVariant}
+            onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
+            onRewrite={rewrite} onSend={send} onSkip={skip} onNotInterested={() => setStage('NOT_INTERESTED')}
+          />
+        )}
+
+        <WhoPane
+          company={company} contact={contact} researching={researching} canResearch={aiActive && Boolean(status?.research.configured)}
+          onResearch={research} onStage={setStage} onSaveNotes={saveNotes} onAddContact={addContact}
           onSelectContact={id => { setContactId(id); if (company) { setPrepared(prev => { const n = { ...prev }; delete n[company.id]; return n }); prepare(company, { silent: false, force: true, contactId: id }) } }}
         />
       </div>
 
-      {importOpen && <ImportModal onClose={() => setImportOpen(false)} onImported={() => { loadList(); setImportOpen(false) }} />}
-      {settingsOpen && <SettingsModal onClose={() => { setSettingsOpen(false); loadStatus() }} />}
-      {mockupsOpen && (
-        <MockupsModal
-          onClose={() => setMockupsOpen(false)}
-          onChanged={next => {
-            setMockups(next)
-            // Keep a selection that still exists after a delete.
-            setMockupId(prev => (prev && next.some(m => m.id === prev) ? prev : next[0]?.id ?? null))
-          }}
-        />
-      )}
+      {importOpen && <ImportModal onClose={() => setImportOpen(false)} onImported={() => { loadToday(); if (mode === 'all') loadAll(); setImportOpen(false) }} />}
+      {mockupsOpen && <MockupsModal onClose={() => setMockupsOpen(false)} onChanged={next => { setMockups(next); setMockupId(prev => (prev && next.some(m => m.id === prev) ? prev : next[0]?.id ?? null)) }} />}
+      {settingsOpen && <SettingsModal status={status} aiOn={aiOn} onAiChange={setAiOn} onClose={() => { setSettingsOpen(false); loadStatus(); loadToday() }} />}
+      {progressOpen && <ProgressModal onClose={() => setProgressOpen(false)} />}
     </div>
   )
 }

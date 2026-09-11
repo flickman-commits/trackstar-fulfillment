@@ -77,12 +77,10 @@ We just opened up a charity program this year and I'd love to have Team Fox in i
 
 Any interest in being part of the pilot? Happy to hop on a quick call.
 
-Matt
-
 P.S. Attached a co-branded example so you can see what these look like with a charity logo built in.
 ```
 
-The first line is the only part that changed from the template, and it is the part that gets the reply.
+No sign-off: the app adds Matt's signature block when it sends. The first line is the only part that changed from the template, and it is the part that gets the reply.
 
 ## What you must not do
 
