@@ -21,6 +21,9 @@ const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'PO
 
 export type ListView = 'due' | 'new' | 'all' | `stage:${DealStage}`
 
+/** Whether a mirror is reachable, from a read-only probe. */
+export interface MirrorCheck { configured: boolean; ok: boolean; error?: string; sample?: string }
+
 /** Result of mirroring a change out to Notion or ClickUp. */
 export interface SyncResult { target: 'notion' | 'clickup' | null; ok: boolean; skipped?: string; error?: string }
 
@@ -81,6 +84,7 @@ export const salesApi = {
     post<ImportResult>('/api/sales/import', { csv, pipeline, overwrite }),
 
   settings: () => request<{ settings: SalesSettings; defaults: SalesSettings }>('/api/sales/settings'),
+  checkMirrors: () => request<{ notion: MirrorCheck; clickup: MirrorCheck }>('/api/sales/settings?action=check'),
   saveSettings: (patch: Partial<SalesSettings>) => post<{ settings: SalesSettings }>('/api/sales/settings', patch),
 
   gmailDisconnect: () => post<{ success: true }>('/api/sales/gmail', { action: 'disconnect' }),

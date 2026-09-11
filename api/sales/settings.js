@@ -10,6 +10,8 @@
 import { setCors } from '../_lib/auth.js'
 import { requireAdminOnly, recordAudit } from '../_lib/users.js'
 import { getSettings, setSettings, DEFAULTS } from '../../server/domain/sales/settings.js'
+import { checkMirrors } from '../../server/domain/sales/externalSync.js'
+import prisma from '../_lib/prisma.js'
 
 const EDITABLE = ['dailyCap', 'sender', 'socialProof', 'priorityRaces']
 
@@ -20,6 +22,10 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      if (req.query?.action === 'check') {
+        const sample = await prisma.company.findFirst({ where: { pipeline: 'CHARITY', externalId: { contains: 'notion' } }, select: { externalId: true } })
+        return res.status(200).json(await checkMirrors(sample?.externalId))
+      }
       return res.status(200).json({ settings: await getSettings({ force: true }), defaults: DEFAULTS })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })

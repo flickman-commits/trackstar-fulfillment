@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Plug } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnPrimary, btnSecondary, btnGhost, fieldLabel, inputBase } from '@/lib/ui'
 import { salesApi } from '@/lib/salesApi'
@@ -12,6 +12,15 @@ import type { SalesSettings } from '@/types/sales'
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [s, setS] = useState<SalesSettings | null>(null)
   const [saving, setSaving] = useState(false)
+  const [check, setCheck] = useState<{ notion: { configured: boolean; ok: boolean; error?: string; sample?: string }; clickup: { configured: boolean; ok: boolean; error?: string } } | null>(null)
+  const [checking, setChecking] = useState(false)
+
+  const runCheck = async () => {
+    setChecking(true)
+    try { setCheck(await salesApi.checkMirrors()) }
+    catch (e) { toast.error((e as Error).message) }
+    finally { setChecking(false) }
+  }
 
   useEffect(() => {
     salesApi.settings().then(r => setS(r.settings)).catch(e => toast.error((e as Error).message))
@@ -78,6 +87,26 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               <label className={fieldLabel}>Social proof line</label>
               <textarea rows={2} value={s.socialProof} onChange={e => setS({ ...s, socialProof: e.target.value })} className={`${inputBase} w-full resize-y`} />
               <p className="text-xs text-off-black/50 mt-1">Leads the fourth race touch. Update the numbers as the season moves.</p>
+            </div>
+
+            <div className="rounded-lg border border-border-gray bg-subtle-gray p-3">
+              <div className="flex items-center justify-between">
+                <span className={fieldLabel + ' mb-0'}>Mirrors</span>
+                <button onClick={runCheck} disabled={checking} className={btnSecondary}>
+                  {checking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plug className="w-3.5 h-3.5" />} Check connections
+                </button>
+              </div>
+              <p className="text-xs text-off-black/50 mt-1">When you mark an email sent, the Notion charity row and the ClickUp race task are updated. This reads one row from each to confirm the app can reach them.</p>
+              {check && (
+                <ul className="mt-2 space-y-1 text-xs">
+                  <li className={check.notion.ok ? 'text-success-green' : check.notion.configured ? 'text-red-600' : 'text-off-black/50'}>
+                    Notion: {check.notion.ok ? `connected (read "${check.notion.sample}")` : check.notion.configured ? check.notion.error : 'not configured'}
+                  </li>
+                  <li className={check.clickup.ok ? 'text-success-green' : check.clickup.configured ? 'text-red-600' : 'text-off-black/50'}>
+                    ClickUp: {check.clickup.ok ? 'connected' : check.clickup.configured ? check.clickup.error : 'not configured (set CLICKUP_API_TOKEN to mirror race stages)'}
+                  </li>
+                </ul>
+              )}
             </div>
 
             <div>

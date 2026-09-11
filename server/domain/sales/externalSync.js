@@ -138,3 +138,36 @@ export async function syncCompanyOut(company, { sent } = {}) {
 
   return { target: null, ok: true, skipped: 'unknown pipeline' }
 }
+
+/**
+ * Can the app actually reach the mirrors? Reads one known page; never writes.
+ * The Notion integration has to be shared with the Charity CRM database by a
+ * person in Notion, and nothing in code can do that, so this is how to tell
+ * whether it happened.
+ */
+export async function checkMirrors(sampleNotionExternalId) {
+  const out = { notion: { configured: isNotionConfigured(), ok: false }, clickup: { configured: isClickUpConfigured(), ok: false } }
+  if (out.notion.configured) {
+    const pageId = notionPageId(sampleNotionExternalId)
+    if (!pageId) out.notion.error = 'No charity row with a Notion page to test against'
+    else {
+      try {
+        const page = await notion().pages.retrieve({ page_id: pageId })
+        out.notion.ok = true
+        out.notion.sample = page?.properties?.Name?.title?.[0]?.plain_text || pageId
+      } catch (err) {
+        out.notion.error = /could not find|not found|404/i.test(err.message)
+          ? 'The integration cannot see the Charity CRM. In Notion, open the CRM, three dots, Connections, add the Trackstar integration.'
+          : err.message
+      }
+    }
+  }
+  if (out.clickup.configured) {
+    try {
+      const res = await fetchWithTimeout('https://api.clickup.com/api/v2/user', { headers: { Authorization: process.env.CLICKUP_API_TOKEN } }, 10_000)
+      out.clickup.ok = res.ok
+      if (!res.ok) out.clickup.error = `ClickUp answered ${res.status}`
+    } catch (err) { out.clickup.error = err.message }
+  }
+  return out
+}
