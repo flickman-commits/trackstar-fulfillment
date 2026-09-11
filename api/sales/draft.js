@@ -11,6 +11,7 @@ import { draftVariants, queueDraft } from '../../server/domain/sales/drafting.js
 import { llmInfo } from '../../server/lib/llm.js'
 import { researchProvider } from '../../server/domain/sales/research.js'
 import { gmailStatus } from '../../server/domain/sales/gmail.js'
+import { lastRun } from '../../server/domain/sales/nightly.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -25,6 +26,7 @@ export default async function handler(req, res) {
         llm: llmInfo(),
         research: { configured: researchProvider() !== null, provider: researchProvider() },
         gmail: await gmailStatus(actor.id),
+        lastRun: await lastRun(),
       })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })

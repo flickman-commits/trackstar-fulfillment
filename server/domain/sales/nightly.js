@@ -250,3 +250,35 @@ export async function addLead({ pipeline, company, contact, emailSource = 'websi
     contactId: row?.contacts.find(x => contact?.email && x.email === contact.email.toLowerCase().trim())?.id || null,
   }
 }
+
+export const LAST_RUN_KEY = 'sales_last_run'
+
+/**
+ * The routine's own account of the night, kept where the Sales page can show
+ * it. A run that stores nothing is a run that did not finish, which is the
+ * signal that matters most.
+ */
+export async function finishRun({ prepared = 0, followUps = 0, fresh = 0, leadsAdded = 0, researched = 0, skipped = [], notes = '' }) {
+  const summary = {
+    finishedAt: new Date().toISOString(),
+    prepared: Number(prepared) || 0,
+    followUps: Number(followUps) || 0,
+    fresh: Number(fresh) || 0,
+    leadsAdded: Number(leadsAdded) || 0,
+    researched: Number(researched) || 0,
+    skipped: (Array.isArray(skipped) ? skipped : []).map(String).slice(0, 20),
+    notes: String(notes || '').slice(0, 2000),
+  }
+  await prisma.systemConfig.upsert({
+    where: { key: LAST_RUN_KEY },
+    update: { value: JSON.stringify(summary) },
+    create: { key: LAST_RUN_KEY, value: JSON.stringify(summary) },
+  })
+  return summary
+}
+
+export async function lastRun() {
+  const row = await prisma.systemConfig.findUnique({ where: { key: LAST_RUN_KEY } })
+  if (!row?.value) return null
+  try { return JSON.parse(row.value) } catch { return null }
+}

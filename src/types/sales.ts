@@ -120,6 +120,7 @@ export interface SalesStatus {
   llm: { configured: boolean; provider?: string; model?: string; baseUrl?: string; canSearch?: boolean }
   research: { configured: boolean; provider: 'anthropic' | 'perplexity' | null }
   gmail: { configured: boolean; connected: boolean; email: string | null }
+  lastRun: { finishedAt: string; prepared: number; followUps: number; fresh: number; leadsAdded: number; researched: number; skipped: string[]; notes: string } | null
 }
 
 export interface ImportPreview {

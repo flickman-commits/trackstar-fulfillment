@@ -375,6 +375,15 @@ export default function Sales() {
               )}
             </>
           )}
+          {status?.lastRun && (
+            <span
+              className="px-2 py-1 rounded-md border border-border-gray text-off-black/60"
+              title={`${status.lastRun.notes || 'No notes.'}${status.lastRun.skipped.length ? `\n\nSkipped: ${status.lastRun.skipped.join('; ')}` : ''}`}
+            >
+              Overnight · {status.lastRun.prepared} ready
+              <span className="text-off-black/40"> · {new Date(status.lastRun.finishedAt).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>
+            </span>
+          )}
           <button onClick={() => setImportOpen(true)} className={btnSecondary}><Upload className="w-3.5 h-3.5" /> Import</button>
         </div>
       </div>

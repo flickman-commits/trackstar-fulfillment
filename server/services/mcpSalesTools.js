@@ -11,7 +11,7 @@
  * drafts and adding leads changes production data, and a connector is
  * reachable from every session that enables it.
  */
-import { salesQueue, salesRules, saveResearch, saveDraft, addLead } from '../domain/sales/nightly.js'
+import { salesQueue, salesRules, saveResearch, saveDraft, addLead, finishRun } from '../domain/sales/nightly.js'
 
 const text = value => ({
   content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }],
@@ -130,6 +130,24 @@ export const SALES_TOOLS = [
       required: ['pipeline', 'company'],
     },
   },
+  {
+    name: 'sales_finish',
+    description:
+      'Call this last, always, even after a failure. Records what the night produced so the ' +
+      'Sales page can show it. A run that never calls this reads as a run that did not finish.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prepared: { type: 'number', description: 'Drafts saved, total.' },
+        followUps: { type: 'number', description: 'Of those, follow-ups to people already contacted.' },
+        fresh: { type: 'number', description: 'Of those, first touches.' },
+        researched: { type: 'number', description: 'Contacts researched tonight.' },
+        leadsAdded: { type: 'number', description: 'New orgs or contacts added by sourcing.' },
+        skipped: { type: 'array', items: { type: 'string' }, description: 'Orgs you could not draft and why, one line each.' },
+        notes: { type: 'string', description: 'Anything Matt should know this morning, in two or three sentences.' },
+      },
+    },
+  },
 ]
 
 export const SALES_HANDLERS = {
@@ -144,6 +162,7 @@ export const SALES_HANDLERS = {
     source: 'routine',
     preparedBy: 'nightly-sales',
   })),
+  sales_finish: async (args) => text(await finishRun(args || {})),
   sales_add_lead: async (args) => text(await addLead({
     pipeline: args.pipeline,
     company: args.company,
