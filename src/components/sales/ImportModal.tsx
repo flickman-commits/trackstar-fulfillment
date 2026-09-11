@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnPrimary, btnSecondary, btnGhost, fieldLabel, inputBase, segment, segmentGroup } from '@/lib/ui'
+import { useEscape } from '@/lib/useEscape'
 import { salesApi } from '@/lib/salesApi'
 import type { ImportPreview, ImportResult, Pipeline } from '@/types/sales'
 
@@ -12,6 +13,7 @@ import type { ImportPreview, ImportResult, Pipeline } from '@/types/sales'
  * cheaper to catch here than in the queue.
  */
 export default function ImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  useEscape(onClose)
   const [pipeline, setPipeline] = useState<Pipeline>('RACE')
   const [csv, setCsv] = useState('')
   const [preview, setPreview] = useState<ImportPreview | null>(null)

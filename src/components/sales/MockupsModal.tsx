@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { X, Loader2, Upload, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnSecondary, btnGhost, btnDanger } from '@/lib/ui'
+import { useEscape } from '@/lib/useEscape'
 import { salesApi } from '@/lib/salesApi'
 import type { Mockup } from '@/types/sales'
 
@@ -13,6 +14,7 @@ import type { Mockup } from '@/types/sales'
  * image without anyone choosing it.
  */
 export default function MockupsModal({ onClose, onChanged }: { onClose: () => void; onChanged: (m: Mockup[]) => void }) {
+  useEscape(onClose)
   const [mockups, setMockups] = useState<Mockup[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)

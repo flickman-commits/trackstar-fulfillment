@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnGhost, fieldLabel } from '@/lib/ui'
+import { useEscape } from '@/lib/useEscape'
 import { salesApi } from '@/lib/salesApi'
 import type { Progress } from '@/types/sales'
 
 /** Sends per day, reply rate, and the funnel. Everything from touches and stages already in the database. */
 export default function ProgressModal({ onClose }: { onClose: () => void }) {
+  useEscape(onClose)
   const [p, setP] = useState<Progress | null>(null)
   useEffect(() => { salesApi.progress().then(setP).catch(e => toast.error((e as Error).message)) }, [])
 

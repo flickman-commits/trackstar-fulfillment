@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { X, Loader2, Plug, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnPrimary, btnSecondary, btnGhost, fieldLabel, inputBase, segment, segmentGroup } from '@/lib/ui'
+import { useEscape } from '@/lib/useEscape'
 import { salesApi } from '@/lib/salesApi'
 import type { SalesSettings, SalesStatus } from '@/types/sales'
 
@@ -18,6 +19,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   onAiChange: (on: boolean) => void
   onClose: () => void
 }) {
+  useEscape(onClose)
   const [tab, setTab] = useState<Tab>('sending')
   const [s, setS] = useState<SalesSettings | null>(null)
   const [saving, setSaving] = useState(false)
