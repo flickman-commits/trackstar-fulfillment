@@ -106,6 +106,7 @@ export const CHARITY_CADENCE = [
     purpose: [
       'Short. Lead with what we learned from other charity teams: the runners who need something are the ones who already hit their fundraising minimum and have nothing left to chase.',
       'Say a few partners use these as a reward for their top fundraisers, which costs the charity nothing to set up.',
+      'Say "a few partners", exactly that. NEVER name the recipient\'s own team or org as one of those partners: they are the prospect, not a partner, and "a few Team Fox partners use these" is a false claim to Team Fox.',
       'Recognition, not an incentive. Do not say "raise $X and get one".',
       'One ask: worth a quick call.',
     ].join('\n'),

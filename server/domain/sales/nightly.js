@@ -203,7 +203,7 @@ export async function saveDraft({ companyId, contactId, variants, touchNumber, s
   if (!list.length) throw new Error('No variants given')
   if (list.length > 5) throw new Error('At most five variants')
 
-  const rejected = list.map((v, i) => ({ i, problems: draftProblems(v, { pipeline: company.pipeline, touchNumber: expected }) })).filter(x => x.problems.length)
+  const rejected = list.map((v, i) => ({ i, problems: draftProblems(v, { pipeline: company.pipeline, touchNumber: expected, companyName: company.name }) })).filter(x => x.problems.length)
   if (rejected.length) {
     throw new Error('Draft rejected: ' + rejected.map(r => `variant ${r.i + 1}: ${r.problems.join('; ')}`).join(' | '))
   }

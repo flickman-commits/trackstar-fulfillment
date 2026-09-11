@@ -9,6 +9,15 @@
 
 const DASHES = /[—–]/
 const MONEY_WORDS = /revenue share|rev share|donation[- ]back|donate back|commission|share of every|percentage of (each|every)/i
+/**
+ * "A few Team Fox partners are using these" tells Team Fox that its own
+ * chapters already buy from us. The template says "a few partners"; a model
+ * personalising that line turns social proof into a false claim about the
+ * recipient. Anything between "a few" and "partners/teams" that is not the
+ * bare word "partners" is that mistake.
+ */
+const NAMED_AS_PARTNER = /\ba few (?!partners\b|of our partners\b)[^.\n]{2,50}?\b(partners|teams|chapters)\b[^.\n]{0,30}\b(use|using|used|run|running)\b/i
+
 const GENERIC_INBOX = /^(info|hello|hi|contact|admin|office|team|events|race|support|press|media|marketing|donate|volunteer|noreply|no-reply)@/i
 
 /**
@@ -16,7 +25,7 @@ const GENERIC_INBOX = /^(info|hello|hi|contact|admin|office|team|events|race|sup
  * @param {{ pipeline: 'RACE'|'CHARITY', touchNumber: number }} ctx
  * @returns {string[]} problems; empty means it passes
  */
-export function draftProblems(draft, { pipeline, touchNumber }) {
+export function draftProblems(draft, { pipeline, touchNumber, companyName }) {
   const problems = []
   const subject = String(draft?.subject || '')
   const body = String(draft?.body || '')
@@ -26,6 +35,11 @@ export function draftProblems(draft, { pipeline, touchNumber }) {
   if (!body.trim()) problems.push('Body is empty')
   if (DASHES.test(all)) problems.push('Contains an em or en dash. Use a comma or a full stop; never a dash in anything sent to a person.')
   if (body.length > 1600) problems.push('Body is over 1,600 characters. These emails are under 120 words.')
+
+  if (NAMED_AS_PARTNER.test(all)) problems.push('Presents the recipient\'s own team as an existing partner ("a few Team X partners use these"). They are not a partner yet. Say "a few partners", or name a real one.')
+  if (companyName && new RegExp(`\\b${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+(partners|teams|chapters)\\b`, 'i').test(all)) {
+    problems.push(`Refers to "${companyName} partners/teams" as if they already work with us. They do not yet.`)
+  }
 
   if (pipeline === 'CHARITY') {
     if (MONEY_WORDS.test(all)) problems.push('Implies money flows back to the charity. There is no revenue share, commission or donation-back; the program deliberately offers none.')

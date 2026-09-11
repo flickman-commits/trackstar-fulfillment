@@ -333,3 +333,17 @@ test('Notion page ids are recovered from the stored URL', async () => {
   assert.equal(openingLine('Hey Sam,\n\nSaw your team at Chicago last year.\n\nMore text.'), 'Saw your team at Chicago last year.')
   assert.equal(openingLine(''), '')
 })
+
+test('the recipient is never presented as an existing partner', async () => {
+  const { draftProblems } = await import('./guardrails.js')
+  const ctx = { pipeline: 'CHARITY', touchNumber: 2, companyName: 'Michael J. Fox Foundation - Team Fox' }
+  const ok = { subject: 'Re: posters', body: 'Hey Jane,\n\nA few partners are using these as a reward for their top fundraisers.\n\nMatt' }
+  assert.deepEqual(draftProblems(ok, ctx), [])
+  const named = { subject: 'Re: posters', body: 'Hey Jane,\n\nA few Team Fox partners are using these as a reward.\n\nMatt' }
+  assert.match(draftProblems(named, ctx).join(' '), /existing partner/)
+  const nowUse = { subject: 'Re: posters', body: 'Hey Kelly,\n\nA few Team In Training partners now use these.\n\nMatt' }
+  assert.match(draftProblems(nowUse, { ...ctx, companyName: 'Team In Training' }).join(' '), /partner/)
+  // Naming a genuine partner in the social proof is fine.
+  const real = { subject: 'Re: posters', body: 'Hey Jane,\n\nA few of our partners use these. Marine Corps Marathon finishers ordered 1,000 this season.\n\nMatt' }
+  assert.deepEqual(draftProblems(real, ctx), [])
+})
