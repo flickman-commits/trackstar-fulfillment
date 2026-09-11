@@ -205,15 +205,36 @@ export function MobileToolBar({
       {/* Horizontal scroll with the scrollbar hidden: the half-visible next
           tile already says there is more, and a bar under a row of icons
           looks broken. The rounded card clips the strip at its corners. */}
-      <div className="flex gap-0.5 px-1.5 py-1.5 overflow-x-auto rounded-[22px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-1 px-1.5 py-1.5 overflow-x-auto rounded-[22px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map(item => (
-          <div key={item.id} className="shrink-0 w-[72px]">
-            <Tile item={item} active={activeId === item.id} />
+          <div key={item.id} className="shrink-0">
+            <MobileTile item={item} active={activeId === item.id} />
           </div>
         ))}
       </div>
     </nav>
   )
+}
+
+/**
+ * A phone tile: icon and label inside one rounded square. On desktop the
+ * label hangs below the square, which reads well in a column; along the top
+ * of a phone that costs a whole extra line, so here the square holds both.
+ */
+function MobileTile({ item, active }: { item: Item; active?: boolean }) {
+  const Icon = item.icon
+  const cls = `flex flex-col items-center justify-center gap-1 w-[66px] h-[54px] rounded-xl transition-all focus:outline-none ${
+    active ? 'bg-white text-dark-fill shadow-[0_1px_3px_rgba(0,0,0,0.25)]' : 'text-white/55 active:bg-white/10'
+  }`
+  const inner = (
+    <>
+      <Icon className="w-[18px] h-[18px]" />
+      <span className={`text-[10px] leading-none text-center max-w-[60px] truncate ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
+    </>
+  )
+  if (item.to) return <Link to={item.to} className={cls} title={item.title}>{inner}</Link>
+  if (item.href) return <a href={item.href} target="_blank" rel="noopener noreferrer" className={cls} title={item.title}>{inner}</a>
+  return <button onClick={item.onClick} className={cls} title={item.title}>{inner}</button>
 }
 
 /** The places you go. Shared by the desktop rail and the mobile bar. */
