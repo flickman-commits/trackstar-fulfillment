@@ -15,12 +15,12 @@ import { complete, isLlmConfigured } from '../../lib/llm.js'
 import { cadenceFor, pickIdentityTag, RACE_ONE_LINERS, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateFor, greetingName } from './angles.js'
 import { createDraft, textToHtml, gmailStatus } from './gmail.js'
 import { pickMockup, readMockup, isMockupStorageConfigured } from './mockups.js'
+import { getSettings } from './settings.js'
 
 const VARIANT_COUNT = 5
 
 async function socialProofLine() {
-  const row = await prisma.systemConfig.findUnique({ where: { key: 'sales_social_proof' } })
-  return row?.value || DEFAULT_SOCIAL_PROOF
+  return (await getSettings()).socialProof || DEFAULT_SOCIAL_PROOF
 }
 
 function nextSeasonYear(raceDate) {

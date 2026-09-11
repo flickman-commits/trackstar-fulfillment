@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Upload, Search, Mail, Loader2, ChevronDown } from 'lucide-react'
+import { Upload, Search, Mail, Loader2, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { salesApi, type ListView } from '@/lib/salesApi'
 import { btnSecondary, btnGhost, inputBase, segment, segmentGroup } from '@/lib/ui'
 import { STAGE_LABEL, type Company, type Contact, type DraftResult, type Mockup, type Pipeline, type SalesStatus, type Variant, type DealStage } from '@/types/sales'
@@ -9,6 +9,7 @@ import Composer from '@/components/sales/Composer'
 import DetailPane from '@/components/sales/DetailPane'
 import ImportModal from '@/components/sales/ImportModal'
 import MockupsModal from '@/components/sales/MockupsModal'
+import SettingsModal from '@/components/sales/SettingsModal'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 
 /**
@@ -69,6 +70,7 @@ export default function Sales() {
   const [queueing, setQueueing] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [mockupsOpen, setMockupsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [mockups, setMockups] = useState<Mockup[]>([])
   /** Which example goes out with this one. Auto-picked per org, overridable. */
   const [mockupId, setMockupId] = useState<string | null>(null)
@@ -385,6 +387,7 @@ export default function Sales() {
             </span>
           )}
           <button onClick={() => setImportOpen(true)} className={btnSecondary}><Upload className="w-3.5 h-3.5" /> Import</button>
+          <button onClick={() => setSettingsOpen(true)} className={btnGhost} title="Sales settings: cap, sender, social proof, sourcing races"><SlidersHorizontal className="w-3.5 h-3.5" /></button>
         </div>
       </div>
 
@@ -482,6 +485,7 @@ export default function Sales() {
       </div>
 
       {importOpen && <ImportModal onClose={() => setImportOpen(false)} onImported={() => { loadList(); setImportOpen(false) }} />}
+      {settingsOpen && <SettingsModal onClose={() => { setSettingsOpen(false); loadStatus() }} />}
       {mockupsOpen && (
         <MockupsModal
           onClose={() => setMockupsOpen(false)}

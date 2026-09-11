@@ -20,7 +20,7 @@ You are preparing Matt's morning. He opens Sales, sees ten emails already writte
 
 ### 1. Read the rules
 
-Call `sales_rules` once. It returns the house style, the charity-specific rules, both cadences, and what the server will reject on save. Everything you write follows it. Two things to hold onto from it: no em or en dashes anywhere, and a charity first touch says "poster" and quotes no price, percentage or minimum.
+Call `sales_rules` once. It returns the house style, the charity-specific rules, both cadences, the sender identity and founder story, the daily cap, the priority races for sourcing, and what the server will reject on save. These are live settings, not constants: what it says tonight is what applies tonight. Everything you write follows it. Two things to hold onto from it: no em or en dashes anywhere, and a charity first touch says "poster" and quotes no price, percentage or minimum.
 
 ### 2. Get the queue
 
@@ -50,7 +50,7 @@ If the site gives a name but no email, do not guess an address. Add the contact 
 
 ### 5. Source new charity teams
 
-If you still have not reached the cap, find new orgs. Work the priority races in this order: St. Jude Memphis Marathon, Berlin Marathon, Marine Corps Marathon, California International Marathon, Houston Marathon, Tokyo Marathon, London Marathon.
+If you still have not reached the cap, find new orgs. Work the races in `sourcing.priorityRaces` from `sales_rules`, in that order. That list is a setting Matt can change in the app; never substitute your own.
 
 For a race: find its official charity partner page. Keep only orgs with a named team brand (Team In Training, Team Fox, Team Challenge, DetermiNation, Fred's Team and the like), or with a described partnership rather than just a logo. Skip small partners: a charity holding three entries has no staffer and no budget. For each org you keep, find the named contact on their own site as in step 4, then `sales_add_lead` with `pipeline: "CHARITY"`, the team brand as the name, the races they run in `notes`, and `emailSource: "website"`. Then research and draft them.
 

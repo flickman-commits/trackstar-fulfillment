@@ -18,9 +18,9 @@ import { cadenceFor, pickIdentityTag, RACE_ONE_LINERS, HOUSE_STYLE, CHARITY_RULE
 import { nextStepFor } from './drafting.js'
 import { draftProblems, researchProblems, isGenericInbox } from './guardrails.js'
 import { importRecords } from './importer.js'
+import { getSettings } from './settings.js'
 
 const OPEN_STAGES = ['QUEUED', 'SENT', 'FOLLOWED_UP']
-const DAILY_CAP = Number(process.env.SALES_DAILY_CAP) > 0 ? Number(process.env.SALES_DAILY_CAP) : 10
 
 function contactView(c) {
   if (!c) return null
@@ -87,7 +87,10 @@ const INCLUDE = {
  * costs more than a campaign earns. Already-drafted orgs are included with
  * hasProposedDraft=true so a re-run does not write them twice.
  */
-export async function salesQueue({ limit = DAILY_CAP, pipeline, ownerId } = {}) {
+export async function salesQueue({ limit, pipeline, ownerId } = {}) {
+  const settings = await getSettings()
+  const DAILY_CAP = settings.dailyCap
+  limit = Number(limit) > 0 ? Math.min(Number(limit), DAILY_CAP) : DAILY_CAP
   const now = new Date()
   const scope = {}
   if (pipeline === 'RACE' || pipeline === 'CHARITY') scope.pipeline = pipeline
@@ -128,14 +131,21 @@ export async function salesQueue({ limit = DAILY_CAP, pipeline, ownerId } = {}) 
   }
 }
 
-/** Everything the routine needs to write in the house voice. Static; read once per run. */
-export function salesRules() {
+/**
+ * Everything the routine needs to write in the house voice, merged with the
+ * live settings so a change made in the app reaches the next run without a
+ * deploy. Read once per run.
+ */
+export async function salesRules() {
+  const settings = await getSettings()
   return {
     houseStyle: HOUSE_STYLE,
     charityRules: CHARITY_RULES,
-    socialProof: DEFAULT_SOCIAL_PROOF,
+    sender: settings.sender,
+    socialProof: settings.socialProof,
     cadence: { RACE: cadenceFor('RACE'), CHARITY: cadenceFor('CHARITY') },
-    dailyCap: DAILY_CAP,
+    dailyCap: settings.dailyCap,
+    sourcing: { priorityRaces: settings.priorityRaces },
     guardrails: [
       'Drafts are checked on save: no em or en dashes; a charity first touch may not quote a price, a percentage or the unit minimum, and must say "poster" rather than "print"; nothing may imply money flows back to a charity.',
       'A lead with a generic inbox (info@, events@, race@) is refused. Find a person.',

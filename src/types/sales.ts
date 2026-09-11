@@ -141,3 +141,10 @@ export interface ImportResult {
   contactsUpdated: number
   skipped: Array<{ line?: number; company?: string; reason: string }>
 }
+
+export interface SalesSettings {
+  dailyCap: number
+  sender: { name: string; role: string; story: string; partnerCount: number }
+  socialProof: string
+  priorityRaces: string[]
+}

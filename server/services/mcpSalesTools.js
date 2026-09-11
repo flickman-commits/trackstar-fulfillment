@@ -21,8 +21,9 @@ export const SALES_TOOLS = [
   {
     name: 'sales_rules',
     description:
-      'The house style, the charity-specific rules, both cadences, and what the server will ' +
-      'reject on save. Read this once at the start of a run before writing any email.',
+      'The house style, the charity-specific rules, both cadences, the sender identity, the ' +
+      'daily cap, the priority races to source from, and what the server will reject on save. ' +
+      'These are live settings, not constants: read this once at the start of every run.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
@@ -151,7 +152,7 @@ export const SALES_TOOLS = [
 ]
 
 export const SALES_HANDLERS = {
-  sales_rules: async () => text(salesRules()),
+  sales_rules: async () => text(await salesRules()),
   sales_queue: async (args) => text(await salesQueue({ limit: args.limit, pipeline: args.pipeline })),
   sales_save_research: async (args) => text(await saveResearch({ contactId: String(args.contactId), research: args.research })),
   sales_save_draft: async (args) => text(await saveDraft({

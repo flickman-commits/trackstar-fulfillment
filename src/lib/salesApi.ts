@@ -3,7 +3,7 @@
  * so the Sales screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { Company, Contact, DraftResult, ImportPreview, ImportResult, Mockup, Pipeline, Research, SalesStatus, Touch, DealStage } from '@/types/sales'
+import type { Company, Contact, DraftResult, ImportPreview, ImportResult, Mockup, Pipeline, Research, SalesSettings, SalesStatus, Touch, DealStage } from '@/types/sales'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -79,6 +79,9 @@ export const salesApi = {
 
   importRun: (csv: string, pipeline: Pipeline, overwrite = false) =>
     post<ImportResult>('/api/sales/import', { csv, pipeline, overwrite }),
+
+  settings: () => request<{ settings: SalesSettings; defaults: SalesSettings }>('/api/sales/settings'),
+  saveSettings: (patch: Partial<SalesSettings>) => post<{ settings: SalesSettings }>('/api/sales/settings', patch),
 
   gmailDisconnect: () => post<{ success: true }>('/api/sales/gmail', { action: 'disconnect' }),
   gmailConnectUrl: `${API_BASE}/api/sales/gmail?action=connect`,
