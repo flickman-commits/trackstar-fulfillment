@@ -16,9 +16,17 @@ export default {
   endpoint: 'searchResultGen.php',
   raceDates: {
     2022: '2022-12-11',
+    2023: '2023-12-10',
     2024: '2024-12-15',
     2025: '2025-12-14',
     2026: '2026-12-13',
+  },
+  raceDateSources: {
+    2022: 'mychiptime.com results + wikipedia.org',
+    2023: 'raceroster.com + goandrace.com + dallasnews.com',
+    2024: 'mychiptime.com results + goandrace.com',
+    2025: 'mychiptime.com results',
+    2026: 'wikipedia.org + dallas marathon pattern',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],

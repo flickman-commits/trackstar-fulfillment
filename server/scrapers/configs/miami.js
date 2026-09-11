@@ -37,5 +37,19 @@ export default {
     2023: 1042170,
     2024: 1039374,
     2025: 1087859,
-  }
+  },
+  raceDates: {
+    2022: '2022-02-06',
+    2023: '2023-01-29',
+    2024: '2024-01-28',
+    2025: '2025-02-02',
+    2026: '2026-01-25',
+  },
+  raceDateSources: {
+    2022: 'themiamimarathon.com + news.lifetime.life',
+    2023: 'themiamimarathon.com + news.lifetime.life + findmymarathon.com results',
+    2024: 'themiamimarathon.com + news.lifetime.life + findmymarathon.com results',
+    2025: 'news.lifetime.life + prnewswire.com',
+    2026: 'ahotu.com + findarace.com + themiamimarathon.com',
+  },
 }

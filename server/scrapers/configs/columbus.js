@@ -15,7 +15,18 @@ export default {
   tag: 'Columbus',
   location: 'Columbus, OH',
   raceDates: {
+    2022: '2022-10-16',
+    2023: '2023-10-15',
+    2024: '2024-10-20',
+    2025: '2025-10-19',
     2026: '2026-10-18',
+  },
+  raceDateSources: {
+    2022: 'columbusmarathon.com "third Sunday in October" + findmymarathon.com',
+    2023: 'columbusmarathon.com "third Sunday in October" + runguides.com',
+    2024: 'columbusmarathon.com event listing + vdoto2.com',
+    2025: 'columbusmarathon.com event listing + vdoto2.com',
+    2026: 'columbusmarathon.com event listing + ahotu.com',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
