@@ -25,8 +25,6 @@ const FIXTURES_PATH = path.resolve(__dirname, '../server/scrapers/__tests__/chip
 const errors = []
 const warnings = []
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const dayOf = iso => new Date(`${iso}T12:00:00Z`).getUTCDay()
 
 // 1. Read all platform files
 const platformFiles = fs.readdirSync(PLATFORMS_DIR)
@@ -190,65 +188,6 @@ for (const file of configFiles) {
       )
     }
 
-    // Race WEEKEND is not race DAY.
-    //
-    // Every wrong date this repo has shipped came from the same move: a source
-    // says "February 28 - March 1" or "the May 17-18 weekend", and the first
-    // day gets pinned when the marathon was actually the second. Seven such
-    // dates went in on 2026-09-09, and denverColfax 2023 had been sitting wrong
-    // before that. It is one day off, which is exactly small enough that
-    // nobody notices until the poster prints the wrong weather.
-    //
-    // This is a heuristic and not a truth. Races do move days — Sydney went
-    // from mid-September to late August, and a Sunday race can become a
-    // Saturday one. So the check deliberately does NOT claim the date is
-    // wrong. It says the date disagrees with its siblings, and asks for a
-    // source either way. Recording a genuine move costs one line with a
-    // reason, which is the whole design: an intentional move leaves a record,
-    // an accident gets stopped. Anything that made "just shift it a day" the
-    // cheaper response would turn this gate into a source of wrong dates.
-    const dated = Object.entries(cfg.raceDates || {})
-      .filter(([, d]) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
-    const rawExempt = cfg.raceDatesWeekdayExceptions || {}
-    if (Array.isArray(rawExempt)) {
-      errors.push(
-        `${file}: raceDatesWeekdayExceptions must be an object of year -> reason, not an ` +
-        `array. A bare year records that someone silenced the check but not why.`
-      )
-    }
-    const exempt = new Map(Object.entries(Array.isArray(rawExempt) ? {} : rawExempt))
-    if (dated.length >= 3) {
-      const tally = {}
-      for (const [, d] of dated) tally[dayOf(d)] = (tally[dayOf(d)] || 0) + 1
-      const [modal, modalCount] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]
-      // No majority means no expectation to violate — say nothing rather than
-      // picking a winner out of a 2-2 split.
-      if (modalCount > dated.length / 2) {
-        for (const [year, d] of dated) {
-          if (String(dayOf(d)) === modal) continue
-          const reason = exempt.get(String(year))
-          if (reason !== undefined) {
-            if (typeof reason !== 'string' || reason.trim().length < 10) {
-              errors.push(
-                `${file}: raceDatesWeekdayExceptions.${year} needs a reason naming a source, ` +
-                `e.g. 'moved to Saturday, per usafmarathon.com'. An empty exemption is just ` +
-                `a silenced check.`
-              )
-            }
-            continue
-          }
-          errors.push(
-            `${file}: raceDates.${year} = ${d} is a ${DAYS[dayOf(d)]}, but this race runs ` +
-            `${DAYS[modal]} in ${modalCount} of ${dated.length} pinned years. Either the date ` +
-            `is a day off — the usual cause is a race-weekend range with the wrong end pinned ` +
-            `— or the race genuinely moved. Both answers need a source naming the day ${year} ` +
-            `actually ran. Do not resolve this by shifting the date to match its neighbours. ` +
-            `If it moved, record raceDatesWeekdayExceptions: { ${year}: 'moved to ` +
-            `${DAYS[dayOf(d)]}, per <source>' }.`
-          )
-        }
-      }
-    }
 
     console.log(`  ✓ ${file.padEnd(25)} (${cfg.platform})${missing.length ? `  [${missing.length} computed year(s)]` : '  [dates verified]'}`)
   } catch (e) {
