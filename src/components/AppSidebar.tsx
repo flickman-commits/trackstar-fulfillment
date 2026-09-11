@@ -162,6 +162,66 @@ function ToolsTile({
   )
 }
 
+/**
+ * The same tools, laid along the top for a phone.
+ *
+ * On a narrow screen a fixed side rail would eat a third of the width, so the
+ * desktop rail hides below md and this takes its place: one dark bar pinned
+ * to the top, the tiles in a row, scrolling sideways when they do not fit.
+ * Same dark grey, same white card on the current tile, so the app reads as
+ * one thing on both screens. The three small utilities lose their flyout and
+ * sit in the row as ordinary tiles; a hover menu has no meaning on a thumb.
+ */
+export function MobileToolBar({
+  isAdmin,
+  onOpenDiscounts,
+  onOpenPaceConverter,
+  onOpenSettings,
+  activeId,
+}: {
+  isAdmin: boolean
+  onOpenDiscounts: () => void
+  onOpenPaceConverter: () => void
+  onOpenSettings: () => void
+  activeId?: string
+}) {
+  const items: Item[] = [
+    ...railItems(isAdmin),
+    { id: 'discounts', label: 'Discounts', icon: Ticket, onClick: onOpenDiscounts, title: 'One-time discount code' },
+    { id: 'pace', label: 'Pace', icon: Calculator, onClick: onOpenPaceConverter, title: 'Finish time to pace' },
+    { id: 'weather', label: 'Weather', icon: CloudSun, href: 'https://weatherspark.com', title: 'Race-day weather on WeatherSpark' },
+    { id: 'settings', label: 'Settings', icon: Settings, onClick: onOpenSettings, title: 'Settings' },
+  ]
+  return (
+    <nav
+      aria-label="Tools"
+      className="md:hidden fixed top-0 inset-x-0 z-30 bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.18)]"
+      // Under the notch on phones that have one.
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      {/* Horizontal scroll with the scrollbar hidden: the tiles themselves
+          show there is more, and a bar under a row of icons looks broken. */}
+      <div className="flex gap-1 px-2 py-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {items.map(item => (
+          <div key={item.id} className="shrink-0 w-[72px]">
+            <Tile item={item} active={activeId === item.id} />
+          </div>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
+/** The places you go. Shared by the desktop rail and the mobile bar. */
+function railItems(isAdmin: boolean): Item[] {
+  return [
+    { id: 'fulfillment', label: 'Fulfillment', icon: Package, to: '/', title: 'Orders to personalize, custom designs and partners' },
+    // Creators and Sales are admin-only, same as the routes behind them.
+    ...(isAdmin ? [{ id: 'creators', label: 'Creators', icon: Users, to: '/creators', title: 'The creator programme' } as Item] : []),
+    ...(isAdmin ? [{ id: 'sales', label: 'Sales', icon: Send, to: '/sales', title: 'Outreach queue: races and charities' } as Item] : []),
+  ]
+}
+
 export default function AppSidebar({
   isAdmin,
   onOpenDiscounts,
@@ -176,12 +236,7 @@ export default function AppSidebar({
   /** Which tile reads as current. 'fulfillment' on the dashboard. */
   activeId?: string
 }) {
-  const items: Item[] = [
-    { id: 'fulfillment', label: 'Fulfillment', icon: Package, to: '/', title: 'Orders to personalize, custom designs and partners' },
-    // Creators is admin-only, same as the route behind it.
-    ...(isAdmin ? [{ id: 'creators', label: 'Creators', icon: Users, to: '/creators', title: 'The creator programme' } as Item] : []),
-    ...(isAdmin ? [{ id: 'sales', label: 'Sales', icon: Send, to: '/sales', title: 'Outreach queue: races and charities' } as Item] : []),
-  ]
+  const items = railItems(isAdmin)
 
   return (
     <aside className="hidden md:flex fixed left-3 top-3 bottom-3 w-[78px] z-30 flex-col rounded-[22px] bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.10)]">

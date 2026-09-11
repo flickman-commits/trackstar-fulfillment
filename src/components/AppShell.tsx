@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
-import AppSidebar from '@/components/AppSidebar'
+import AppSidebar, { MobileToolBar } from '@/components/AppSidebar'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
 
@@ -39,22 +39,33 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     : path.startsWith('/sales') ? 'sales'
     : 'fulfillment'
 
+  const openSettings = () => {
+    // Close whatever panel is open first. Without this the old tile keeps
+    // its white card while the settings modal is up, and its popup sits
+    // behind the modal where it cannot be closed.
+    setRailPanel(null)
+    // `replace` so Settings does not stack history entries you have to
+    // click back through.
+    navigate('/?settings=1', { replace: path === '/' })
+  }
+
   return (
-    <div className="md:pl-[92px]">
+    // Room for the rail on the left on desktop, and for the bar along the
+    // top on a phone, so neither covers the page's own header.
+    <div className="md:pl-[92px] pt-[88px] md:pt-0">
+      <MobileToolBar
+        isAdmin={isAdmin}
+        activeId={activeId}
+        onOpenDiscounts={() => setRailPanel(p => (p === 'discounts' ? null : 'discounts'))}
+        onOpenPaceConverter={() => setRailPanel(p => (p === 'pace' ? null : 'pace'))}
+        onOpenSettings={openSettings}
+      />
       <AppSidebar
         isAdmin={isAdmin}
         activeId={activeId}
         onOpenDiscounts={() => setRailPanel(p => (p === 'discounts' ? null : 'discounts'))}
         onOpenPaceConverter={() => setRailPanel(p => (p === 'pace' ? null : 'pace'))}
-        onOpenSettings={() => {
-          // Close whatever panel is open first. Without this the old tile keeps
-          // its white card while the settings modal is up, and its popup sits
-          // behind the modal where it cannot be closed.
-          setRailPanel(null)
-          // `replace` so Settings does not stack history entries you have to
-          // click back through.
-          navigate('/?settings=1', { replace: path === '/' })
-        }}
+        onOpenSettings={openSettings}
       />
       <CustomTools open={railPanel === 'pace'} onClose={() => setRailPanel(null)} />
       <StandardTools open={railPanel === 'discounts'} onClose={() => setRailPanel(null)} />
