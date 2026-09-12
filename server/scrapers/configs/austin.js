@@ -10,7 +10,17 @@ export default {
   parseMode: 'columns',
   endpoint: 'searchResultGen.php',
   raceDates: {
+    2022: '2022-02-20',
+    2023: '2023-02-19',
+    2024: '2024-02-18',
+    2025: '2025-02-16',
     2026: '2026-02-15',
+  },
+  raceDateSources: {
+    2022: 'KXAN Austin marathon coverage + MarathonGuide race results',
+    2023: 'AFTD race calendar + Austin Monthly Magazine event listing',
+    2024: 'Austin Monthly Magazine event listing + Findarace event listing',
+    2025: 'AFTD race calendar + RaceEntry event listing',
   },
   eventTypes: ['Marathon', 'Half Marathon', '5K'],
   eventSearchOrder: ['marathon', 'halfMarathon'],

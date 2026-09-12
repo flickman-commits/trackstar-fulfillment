@@ -22,14 +22,14 @@ export default {
   location: 'Mesa, AZ',
   raceDates: {
     2022: '2022-02-12',
-    // 2024: mesanow.org "12th Annual Mesa Marathon Returns Saturday, February 10, 2024"
+    2023: '2023-02-04',
     2024: '2024-02-10',
-    // 2025: mesamarathon.com results + runready 2025 course guide
     2025: '2025-02-08',
     2026: '2026-02-14',
   },
   raceDateSources: {
     2022: 'mesaaz.gov city calendar + findmymarathon.com',
+    2023: 'Mesa Marathon official results page + David Baker 2023 race recap',
     2024: 'mesanow.org + mesamarathon.com',
     2025: 'mesamarathon.com + runready.com',
     2026: 'mesamarathon.com',
