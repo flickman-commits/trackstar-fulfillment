@@ -25,6 +25,12 @@ export default {
     2025: '2025-04-13',
     2026: '2026-04-19',
   },
+  raceDateSources: {
+    2023: 'JerseyCityMarathon.com race info + FindMyMarathon.com event listing',
+    2024: 'JerseyCityMarathon.com race info + FindMyMarathon.com event listing',
+    2025: 'JerseyCityMarathon.com race info + FindMyMarathon.com event listing',
+    2026: 'JerseyCityMarathon.com race info + FindMyMarathon.com event listing',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: {

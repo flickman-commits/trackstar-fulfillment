@@ -21,6 +21,7 @@ export default {
     2023: 'AFTD race calendar + Austin Monthly Magazine event listing',
     2024: 'Austin Monthly Magazine event listing + Findarace event listing',
     2025: 'AFTD race calendar + RaceEntry event listing',
+    2026: 'AustinTexas.gov event calendar + Findarace event listing',
   },
   eventTypes: ['Marathon', 'Half Marathon', '5K'],
   eventSearchOrder: ['marathon', 'halfMarathon'],

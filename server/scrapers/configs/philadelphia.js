@@ -33,6 +33,11 @@ export default {
     2025: '2025-11-23',
     2026: '2026-11-22',
   },
+  raceDateSources: {
+    2024: 'PhiladelphiaMarathon.com race info + RunHive event listing',
+    2025: 'PhiladelphiaMarathon.com race info + RunHive event listing',
+    2026: 'PhiladelphiaMarathon.com race info + RunHive event listing',
+  },
   eventTypes: ['Marathon'],
   eventSearchOrder: ['marathon'],
   eventLabels: {
