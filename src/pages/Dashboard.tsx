@@ -2581,7 +2581,7 @@ Thank you!`
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
+    <div className="h-[calc(100dvh-92px)] md:h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
       <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 w-full flex flex-col h-full">
         {/* Header - Compact bar on mobile, full greeting on desktop */}
         <div className="pt-4 md:pt-8 lg:pt-10 pb-3 md:pb-6 flex items-center md:items-end justify-between gap-3 md:gap-6 flex-shrink-0">
@@ -2741,7 +2741,7 @@ Thank you!`
             </div>
 
             {/* Scrollable Container */}
-            <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
 
               {/* ===== MOBILE CARD LIST ===== */}
               <div className="md:hidden divide-y divide-border-gray">
