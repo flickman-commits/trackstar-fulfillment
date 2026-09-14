@@ -32,8 +32,14 @@ const ARTELO_API_KEY = process.env.ARTELO_API_KEY
 // Statuses that need design work
 const ACTIONABLE_STATUSES = ['PendingFulfillmentAction', 'AwaitingPayment']
 
-// Race name strings that indicate a custom order (customer provides their own data)
-const CUSTOM_ORDER_RACE_NAMES = ['Custom Trackstar Print (Any Race)']
+// Product titles that indicate a custom order (customer provides their own
+// data and the design goes through the custom flow, not research). Shopify
+// checks the product title; Etsy checks the name parseEtsyRaceName produces
+// from the listing title, which is normalized to the same strings.
+const CUSTOM_ORDER_RACE_NAMES = [
+  'Custom Trackstar Print (Any Race)',
+  'Custom Triathlon Print',
+]
 
 /**
  * Is a cart-property flag actually set? Blank means "not set" — the
@@ -358,7 +364,7 @@ async function fetchEtsyReceiptData(receiptId) {
  * @param {Object} transaction - Etsy transaction object
  * @returns {Object} - Extracted personalization data
  */
-function extractEtsyPersonalization(transaction) {
+export function extractEtsyPersonalization(transaction) {
   const result = {
     raceName: null,
     runnerName: null,
@@ -366,7 +372,10 @@ function extractEtsyPersonalization(transaction) {
     hadNoTime: false,
     customerTime: null,
     needsAttention: false,
-    rawPersonalization: null
+    rawPersonalization: null,
+    productTitle: null,
+    timeCustomer: null,
+    creativeDirection: null
   }
 
   if (!transaction) {
@@ -374,8 +383,11 @@ function extractEtsyPersonalization(transaction) {
     return result
   }
 
-  // Parse race name from listing title
+  // Parse race name from listing title. productTitle keeps the normalized
+  // listing name so custom detection works even when the customer's own
+  // race name replaces raceName below (mirrors the Shopify path).
   result.raceName = parseEtsyRaceName(transaction.title) || parseRaceNameFromTitle(transaction.title)
+  result.productTitle = result.raceName
 
   // Find personalization in variations
   const variations = transaction.variations || []
@@ -384,7 +396,48 @@ function extractEtsyPersonalization(transaction) {
          v.formatted_name?.toLowerCase() === 'personalization'
   )
 
-  if (personalization?.formatted_value) {
+  // Question-style listings (the custom triathlon print) ask for each field
+  // separately instead of one Personalization box. Read those first; when
+  // present they are the whole answer and the freeform parse never runs.
+  const q = (label) => {
+    const v = variations.find(x => String(x.formatted_name || '').trim().toLowerCase() === label)
+    const val = String(v?.formatted_value || '').trim()
+    return val || null
+  }
+  const qRunner = q('runner name')
+  const qRace = q('race name')
+  const qTotalTime = q('total time')
+  const qSplits = q('run, swim, bike time') || q('swim, bike, run time') || q('splits')
+
+  if (qRunner || qRace) {
+    if (qRunner) {
+      const cleaned = cleanRunnerName(qRunner)
+      result.runnerName = cleaned.cleaned
+      result.hadNoTime = cleaned.hadNoTime
+      result.customerTime = cleaned.customerTime
+    }
+    if (qRace) {
+      // Customers often add the date on a second line. Keep the first line as
+      // the race and pull a 4-digit year from anywhere in the answer.
+      const lines = qRace.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+      result.raceName = lines[0] || result.raceName
+      const yearMatch = qRace.match(/\b(20\d{2}|19\d{2})\b/)
+      if (yearMatch) result.raceYear = parseInt(yearMatch[1], 10)
+    }
+    if (qTotalTime && /\d/.test(qTotalTime)) {
+      result.timeCustomer = qTotalTime
+      result.customerTime = result.customerTime || qTotalTime
+    }
+    const direction = []
+    if (qTotalTime) direction.push(`Total time: ${qTotalTime}`)
+    if (qSplits) direction.push(`Swim / bike / run: ${qSplits}`)
+    result.creativeDirection = direction.join('\n') || null
+    result.rawPersonalization = variations
+      .filter(x => x.question_id)
+      .map(x => `${x.formatted_name}: ${x.formatted_value}`)
+      .join('\n') || null
+    result.needsAttention = !result.raceYear
+  } else if (personalization?.formatted_value) {
     result.rawPersonalization = personalization.formatted_value
     const parsed = parseEtsyPersonalization(personalization.formatted_value)
     result.raceYear = parsed.raceYear
@@ -766,8 +819,10 @@ export async function processOrders(options = {}) {
                   updateData.etsyOrderData = etsyReceipt
 
                   // Classify custom orders (e.g. "Any Race - Custom Trackstar Print")
-                  if (isCustomOrder(extracted.raceName)) {
+                  if (isCustomOrder(extracted.productTitle)) {
                     updateData.trackstarOrderType = 'custom'
+                    if (extracted.timeCustomer) updateData.timeCustomer = extracted.timeCustomer
+                    if (extracted.creativeDirection) updateData.creativeDirection = extracted.creativeDirection
 
                     // Backfill due date if missing: Etsy create_timestamp (seconds) + 14 days
                     const etsyCreatedAt = etsyReceipt.create_timestamp
@@ -776,7 +831,7 @@ export async function processOrders(options = {}) {
                     }
                   }
 
-                  if (extracted.needsAttention && existing.status === 'pending' && !isCustomOrder(extracted.raceName)) {
+                  if (extracted.needsAttention && existing.status === 'pending' && !isCustomOrder(extracted.productTitle)) {
                     updateData.status = 'missing_year'
                     results.needsAttention++
                   }
@@ -925,8 +980,10 @@ export async function processOrders(options = {}) {
                   lineItemEtsyData = etsyReceipt
 
                   // Classify custom orders (e.g. "Any Race - Custom Trackstar Print")
-                  if (isCustomOrder(extracted.raceName)) {
+                  if (isCustomOrder(extracted.productTitle)) {
                     trackstarOrderType = 'custom'
+                    timeCustomer = extracted.timeCustomer || timeCustomer
+                    creativeDirection = extracted.creativeDirection || creativeDirection
 
                     // Compute due date: Etsy create_timestamp (seconds) + 14 days
                     const etsyCreatedAt = etsyReceipt.create_timestamp

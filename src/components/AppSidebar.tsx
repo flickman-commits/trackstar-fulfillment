@@ -163,12 +163,12 @@ function ToolsTile({
 }
 
 /**
- * The same tools, laid along the top for a phone.
+ * The same tools, laid along the bottom for a phone.
  *
  * On a narrow screen a fixed side rail would eat a third of the width, so the
  * desktop rail hides below md and this takes its place: the same floating
  * dark card, inset from the edges with the same radius and shadow, turned on
- * its side along the top. The tiles sit in a row and scroll sideways when
+ * its side along the bottom where a thumb already rests. The tiles sit in a row and scroll sideways when
  * they do not fit; the card itself stays put. Same white card on the current
  * tile, so the app reads as one thing on both screens. The three small
  * utilities lose their flyout and sit in the row as ordinary tiles; a hover
@@ -198,9 +198,9 @@ export function MobileToolBar({
     <nav
       aria-label="Tools"
       // Same inset (3), radius (22px) and shadow as the desktop rail, so it is
-      // recognisably the same object. Sits below the notch on phones with one.
-      className="md:hidden fixed left-3 right-3 z-30 rounded-[22px] bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.10)]"
-      style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
+      // recognisably the same object. Sits above the home indicator.
+      className="md:hidden fixed left-3 right-3 z-30 rounded-[22px] bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.18)]"
+      style={{ bottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
     >
       {/* Horizontal scroll with the scrollbar hidden: the half-visible next
           tile already says there is more, and a bar under a row of icons
@@ -218,7 +218,7 @@ export function MobileToolBar({
 
 /**
  * A phone tile: icon and label inside one rounded square. On desktop the
- * label hangs below the square, which reads well in a column; along the top
+ * label hangs below the square, which reads well in a column; along the bottom
  * of a phone that costs a whole extra line, so here the square holds both.
  */
 function MobileTile({ item, active }: { item: Item; active?: boolean }) {

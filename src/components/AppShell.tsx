@@ -51,8 +51,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     // Room for the rail on the left on desktop, and for the bar along the
-    // top on a phone, so neither covers the page's own header.
-    <div className="md:pl-[92px] pt-[88px] md:pt-0">
+    // bottom on a phone, so neither covers the page's own content.
+    <div className="md:pl-[92px] pb-[92px] md:pb-0">
       <MobileToolBar
         isAdmin={isAdmin}
         activeId={activeId}

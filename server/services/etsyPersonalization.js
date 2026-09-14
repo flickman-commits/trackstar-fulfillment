@@ -22,7 +22,8 @@
  *   "Custom Twin Cities Marathon Poster | Personalized Marathon Race Map | ..."
  *   "Grandma&#39;s Marathon Poster | Personalized Race Map, Runner Gift"
  *   "CIM Marathon Poster | Personalized Race Map, Runner Gift"
- *   "Any Race - Custom Trackstar Print"  (custom order — special case)
+ *   "Any Race - Custom Trackstar Print"  (custom order, special case)
+ *   "Custom Triathlon Poster | IRONMAN Print | Triathlon Gift"  (custom order, special case)
  *
  * @param {string} listingTitle - Full Etsy listing title
  * @returns {string|null} - Cleaned race name, e.g. "Twin Cities Marathon"
@@ -38,9 +39,14 @@ export function parseEtsyRaceName(listingTitle) {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
 
-  // Special case: custom order product
+  // Special cases: custom order products. Normalized to the Shopify product
+  // titles so processOrders classifies both channels the same way.
   if (/any\s+race/i.test(name) && /custom\s+trackstar/i.test(name)) {
     return 'Custom Trackstar Print (Any Race)'
+  }
+  // "Custom Triathlon Poster | IRONMAN Print | Triathlon Gift"
+  if (/custom\s+triathlon/i.test(name)) {
+    return 'Custom Triathlon Print'
   }
 
   // Split on | or : and take the first part (the actual race info)
