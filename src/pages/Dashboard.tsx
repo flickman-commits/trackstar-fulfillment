@@ -955,6 +955,7 @@ export default function Dashboard() {
     }
   }
 
+
   const [photoConfirming, setPhotoConfirming] = useState(false)
 
   /** Toggle the "photo is on the artwork" confirmation for a photo order. */
@@ -981,6 +982,74 @@ export default function Dashboard() {
       setPhotoConfirming(false)
     }
   }
+
+  // Photo orders get an explicit sign-off. The photo is the one element a
+  // normal proof does not show, and a print that ships without it is a
+  // reprint and a refund. Shared by the standard and custom views.
+  const photoCard = selectedOrder?.photoPath ? (
+      <div
+        className={`rounded-md border p-3 ${
+          selectedOrder.photoPlacedAt
+            ? 'bg-green-50 border-green-300'
+            : 'bg-[#4600D6]/5 border-[#4600D6]/40'
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <p className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-[#4600D6]'}`}>
+              {selectedOrder.photoPlacedAt
+                ? 'Photo confirmed on artwork'
+                : 'This print includes a customer photo'}
+            </p>
+            <p className={`text-[11px] mt-0.5 ${selectedOrder.photoPlacedAt ? 'text-green-700' : 'text-[#4600D6]/80'}`}>
+              {selectedOrder.photoPlacedAt
+                ? `Confirmed ${new Date(selectedOrder.photoPlacedAt).toLocaleString()}`
+                : 'Place this photo on the print before completing this order.'}
+            </p>
+            <label className={`mt-2 inline-flex items-center gap-2 cursor-pointer select-none ${photoConfirming ? 'opacity-50' : ''}`}>
+              <input
+                type="checkbox"
+                checked={!!selectedOrder.photoPlacedAt}
+                disabled={photoConfirming}
+                onChange={() => setPhotoPlaced(selectedOrder.orderNumber, !selectedOrder.photoPlacedAt)}
+                className={`w-4 h-4 cursor-pointer ${selectedOrder.photoPlacedAt ? 'accent-green-600' : 'accent-[#4600D6]'}`}
+              />
+              <span className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-[#4600D6]'}`}>
+                {photoConfirming ? 'Saving...' : 'Photo placed on artwork'}
+              </span>
+            </label>
+          </div>
+
+          {/* Photo sits on the right with its download directly beneath. */}
+          <div className="flex-none w-20">
+            <button
+              type="button"
+              onClick={() => photoUrl && window.open(photoUrl, '_blank')}
+              disabled={!photoUrl}
+              title={photoUrl ? 'Open full size' : undefined}
+              className="w-20 h-20 rounded border border-black/10 bg-white overflow-hidden flex items-center justify-center disabled:cursor-default"
+            >
+              {photoLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin text-off-black/30" />
+              ) : photoUrl ? (
+                <img src={photoUrl} alt="Customer photo" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-[10px] text-off-black/40 px-2 text-center">No preview</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadPersonalizationPhoto(selectedOrder)}
+              disabled={!photoUrl}
+              className="mt-1.5 w-20 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded bg-dark-fill text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+            >
+              <Download className="w-3 h-3" />
+              Download
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null
 
   const [reviewCopied, setReviewCopied] = useState<string | null>(null)
   const [customersServedCount, setCustomersServedCount] = useState<number | null>(null)
@@ -4605,6 +4674,8 @@ Thank you!`
                         </div>
                       )}
 
+                      {photoCard}
+
                       {/* Delay-notice banner — shown when Dan has emailed the customer
                           warning them about a delay. The due date itself isn't changed
                           (we keep it as the original promise) - this is purely a flag. */}
@@ -5075,74 +5146,7 @@ Thank you!`
                     {photoError && (
                       <p className="text-[11px] text-red-600">Photo: {photoError}</p>
                     )}
-                    {/* Photo orders get an explicit sign-off. The photo is the
-                        one element a normal proof does not show, and a print
-                        that ships without it is a reprint and a refund. The
-                        order cannot be completed until the box is ticked. */}
-                    {selectedOrder.photoPath && (
-                      <div
-                        className={`rounded-md border p-3 ${
-                          selectedOrder.photoPlacedAt
-                            ? 'bg-green-50 border-green-300'
-                            : 'bg-[#4600D6]/5 border-[#4600D6]/40'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-[#4600D6]'}`}>
-                              {selectedOrder.photoPlacedAt
-                                ? 'Photo confirmed on artwork'
-                                : 'This print includes a customer photo'}
-                            </p>
-                            <p className={`text-[11px] mt-0.5 ${selectedOrder.photoPlacedAt ? 'text-green-700' : 'text-[#4600D6]/80'}`}>
-                              {selectedOrder.photoPlacedAt
-                                ? `Confirmed ${new Date(selectedOrder.photoPlacedAt).toLocaleString()}`
-                                : 'Place this photo on the print before completing this order.'}
-                            </p>
-                            <label className={`mt-2 inline-flex items-center gap-2 cursor-pointer select-none ${photoConfirming ? 'opacity-50' : ''}`}>
-                              <input
-                                type="checkbox"
-                                checked={!!selectedOrder.photoPlacedAt}
-                                disabled={photoConfirming}
-                                onChange={() => setPhotoPlaced(selectedOrder.orderNumber, !selectedOrder.photoPlacedAt)}
-                                className={`w-4 h-4 cursor-pointer ${selectedOrder.photoPlacedAt ? 'accent-green-600' : 'accent-[#4600D6]'}`}
-                              />
-                              <span className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-[#4600D6]'}`}>
-                                {photoConfirming ? 'Saving...' : 'Photo placed on artwork'}
-                              </span>
-                            </label>
-                          </div>
-
-                          {/* Photo sits on the right with its download directly beneath. */}
-                          <div className="flex-none w-20">
-                            <button
-                              type="button"
-                              onClick={() => photoUrl && window.open(photoUrl, '_blank')}
-                              disabled={!photoUrl}
-                              title={photoUrl ? 'Open full size' : undefined}
-                              className="w-20 h-20 rounded border border-black/10 bg-white overflow-hidden flex items-center justify-center disabled:cursor-default"
-                            >
-                              {photoLoading ? (
-                                <Loader2 className="w-5 h-5 animate-spin text-off-black/30" />
-                              ) : photoUrl ? (
-                                <img src={photoUrl} alt="Customer photo" className="h-full w-full object-cover" />
-                              ) : (
-                                <span className="text-[10px] text-off-black/40 px-2 text-center">No preview</span>
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => downloadPersonalizationPhoto(selectedOrder)}
-                              disabled={!photoUrl}
-                              className="mt-1.5 w-20 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded bg-dark-fill text-white hover:opacity-90 transition-opacity disabled:opacity-40"
-                            >
-                              <Download className="w-3 h-3" />
-                              Download
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    {photoCard}
                     {/* Customer's own numbers. Loud, because the whole point is
                         that nobody goes looking for a "better" answer: we
                         deliberately skip the scrape for these orders, so
