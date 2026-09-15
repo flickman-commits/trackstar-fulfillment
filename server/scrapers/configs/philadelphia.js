@@ -29,11 +29,15 @@ export default {
   parseMode: 'simple',
   endpoint: 'searchResultGen.php',
   raceDates: {
+    2022: '2022-11-20',
+    2023: '2023-11-19',
     2024: '2024-11-24',
     2025: '2025-11-23',
     2026: '2026-11-22',
   },
   raceDateSources: {
+    2022: 'Philadelphia Inquirer race report published 2022-11-20 (Zimmerman wins) + FOX 29 Philadelphia 2022 full-results report',
+    2023: 'Philadelphia Inquirer race report published 2023-11-19 (Koech/Kwambai win) + V.O2 (vdoto2.com) event listing dated 2023-11-19',
     2024: 'PhiladelphiaMarathon.com race info + RunHive event listing',
     2025: 'PhiladelphiaMarathon.com race info + RunHive event listing',
     2026: 'PhiladelphiaMarathon.com race info + RunHive event listing',
