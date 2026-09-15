@@ -16,7 +16,8 @@ import { cadenceFor, pickIdentityTag, RACE_ONE_LINERS, HOUSE_STYLE, CHARITY_RULE
 import { createDraft, sendMessage, textToHtml, gmailStatus } from './gmail.js'
 import { pickMockup, readMockup, isMockupStorageConfigured } from './mockups.js'
 import { getSettings } from './settings.js'
-import { syncCompanyOut } from './externalSync.js'
+import { recordSend } from './attio.js'
+import { draftProblems } from './guardrails.js'
 
 const VARIANT_COUNT = 5
 
@@ -359,6 +360,15 @@ export async function sendDraft({ companyId, contactId, subject, body, mockupId,
   const { touchNumber, step, exhausted } = await nextStepFor(company)
   if (exhausted) throw new Error(`${company.name} has finished its sequence. Change its stage instead of sending another touch.`)
 
+  // The same rules the overnight routine's drafts pass. Whoever wrote or
+  // edited this one, the server is what decides it can go.
+  const problems = draftProblems({ subject, body }, { pipeline: company.pipeline, touchNumber, companyName: company.name })
+  if (problems.length) {
+    const err = new Error(problems[0])
+    err.problems = problems
+    throw err
+  }
+
   // Follow-ups reply in the thread of the first send when the step says so.
   let threadId = null
   let inReplyTo = null
@@ -426,8 +436,9 @@ export async function sendDraft({ companyId, contactId, subject, body, mockupId,
     }),
   ])
 
-  // "After you send: log it in the tracker." Best effort; never blocks.
-  const sync = await syncCompanyOut(updated, { sent: { body: body.trim(), touchNumber, sentAt: now } })
+  // The email is gone. Tell the CRM; a failure here is shown, never retried
+  // into a second send.
+  const sync = await recordSend(updated, { sentAt: now, touchCount: updated.touchCount, nextActionAt: updated.nextActionAt, nextAction: updated.nextAction })
 
   return {
     touch,
@@ -436,4 +447,12 @@ export async function sendDraft({ companyId, contactId, subject, body, mockupId,
     gmailThreadId: sent.threadId,
     sync,
   }
+}
+
+/** What would stop this draft going, as plain reasons. Empty means it passes. */
+export async function checkDraft({ companyId, subject, body }) {
+  const company = await prisma.company.findUnique({ where: { id: companyId } })
+  if (!company) throw new Error('Company not found')
+  const { touchNumber } = await nextStepFor(company)
+  return { touchNumber, problems: draftProblems({ subject, body }, { pipeline: company.pipeline, touchNumber, companyName: company.name }) }
 }

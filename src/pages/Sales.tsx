@@ -57,6 +57,11 @@ export default function Sales() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [progressOpen, setProgressOpen] = useState(false)
   const [aiOn, setAiOn] = useState<boolean>(() => { try { return localStorage.getItem(AI_KEY) !== 'off' } catch { return true } })
+  // Whose queue: mine (plus unowned) by default, everyone's when covering.
+  const [scope, setScope] = useState<'mine' | 'all'>(() => { try { return localStorage.getItem('sales.scope') === 'all' ? 'all' : 'mine' } catch { return 'mine' } })
+  // The server's verdict on the draft as it stands. null until checked.
+  const [problems, setProblems] = useState<string[] | null>(null)
+  const [checking, setChecking] = useState(false)
   const inFlight = useRef(new Set<string>())
   const timers = useRef<Record<string, number>>({})
 
@@ -75,8 +80,9 @@ export default function Sales() {
 
   const loadStatus = useCallback(() => { salesApi.status().then(setStatus).catch(() => setStatus(null)) }, [])
   const loadToday = useCallback(async () => {
-    try { setToday(await salesApi.today()) } catch (e) { toast.error((e as Error).message) }
-  }, [])
+    try { setToday(await salesApi.today(scope)) } catch (e) { toast.error((e as Error).message) }
+  }, [scope])
+  useEffect(() => { try { localStorage.setItem('sales.scope', scope) } catch { /* ignore */ } }, [scope])
   const loadAll = useCallback(async () => {
     setAllLoading(true)
     try { setAll((await salesApi.list({ pipeline: 'all', view, q })).companies) } catch (e) { toast.error((e as Error).message) }
@@ -201,8 +207,22 @@ export default function Sales() {
   }
   const noteSync = (sync?: { target: string | null; ok: boolean; skipped?: string; error?: string }) => {
     if (!sync || sync.ok || !sync.target) return
-    toast.warning(`${sync.target === 'notion' ? 'Notion' : 'ClickUp'} was not updated: ${sync.error || sync.skipped || 'unknown reason'}`)
+    // The email went. Only the CRM is behind, and the overnight upkeep
+    // reconciles it; say so rather than inviting a second send.
+    toast.warning(`Sent, but Attio was not updated: ${sync.error || sync.skipped || 'unknown reason'}. The overnight upkeep will reconcile it.`, { duration: 10000 })
   }
+
+  /** Ask the server whether the draft as edited would be allowed to go. */
+  const checkDraft = useCallback(async () => {
+    const v = variants[variantIndex]
+    if (!company || !v) { setProblems(null); return }
+    setChecking(true)
+    try { setProblems((await salesApi.check({ companyId: company.id, subject: v.subject, body: v.body })).problems) }
+    catch { setProblems(null) }
+    finally { setChecking(false) }
+  }, [company, variants, variantIndex])
+  // A different org or variant is a different draft; forget the old verdict.
+  useEffect(() => { setProblems(null) }, [company?.id, variantIndex])
 
   /** Send, after an undo window. Selection moves on immediately so the rhythm holds. */
   const send = useCallback(() => {
@@ -211,6 +231,7 @@ export default function Sales() {
     if (!gmailConnected) { toast.error('Connect Gmail in Settings to send.'); return }
     if (capReached) { toast.error(`That is ${cap} for today. Raise the cap in Settings if you mean to.`); return }
     if (contact.emailSource === 'guessed') { toast.error('This address was guessed. Confirm it before sending.'); return }
+    if (problems && problems.length) { toast.error(problems[0]); return }
     const payload = { companyId: company.id, contactId: contact.id, subject: v.subject, body: v.body, mockupId: mockupId || undefined }
     const id = company.id
     const first = contact.firstName
@@ -252,11 +273,11 @@ export default function Sales() {
     } else {
       fire()
     }
-  }, [variants, variantIndex, company, contact, pendingIds, gmailConnected, capReached, cap, mockupId, today?.undoSeconds, advance, loadToday])
+  }, [variants, variantIndex, company, contact, pendingIds, gmailConnected, capReached, cap, mockupId, today?.undoSeconds, advance, loadToday, problems])
 
-  const skip = useCallback(async () => {
+  const skip = useCallback(async (reason?: string) => {
     if (!company) return
-    try { await salesApi.skip(company.id); toast.message(`${company.name} moved to tomorrow`); advance(company.id); loadToday() }
+    try { await salesApi.skip(company.id, reason); toast.message(`${company.name} moved to tomorrow`); advance(company.id); loadToday() }
     catch (e) { toast.error((e as Error).message) }
   }, [company, advance, loadToday])
 
@@ -365,7 +386,7 @@ export default function Sales() {
       )}
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3">
-        <TodayStack
+        <TodayStack scope={scope} onScope={setScope}
           mode={mode} onMode={setMode}
           replies={today?.replies || []} stack={today?.stack || []} sentToday={today?.sentToday || []}
           pendingSendIds={pendingIds}
@@ -379,8 +400,11 @@ export default function Sales() {
           <div className="flex-1 min-w-0 flex items-center justify-center rounded-lg border border-border-gray bg-white min-h-[320px]">
             <div className="text-center max-w-[44ch] px-6">
               <Check className="w-8 h-8 mx-auto text-success-green mb-2" />
-              <div className="text-xl font-semibold">{sentCount ? `Done for today. ${sentCount} sent.` : 'Nothing to send today.'}</div>
-              <p className="text-sm text-off-black/60 mt-2">{sentCount >= cap ? 'That is the cap.' : 'The stack is empty.'} Tomorrow's batch arrives overnight. Replies show up here as they come in.</p>
+              <div className="text-xl font-semibold">Queue's clear. {sentCount} sent today.</div>
+              <p className="text-sm text-off-black/60 mt-2">{sentCount >= cap ? 'That is the cap.' : 'Tomorrow\'s batch arrives overnight.'} Replies show up here as they come in.</p>
+              {today?.counts?.needsContact ? (
+                <p className="text-sm text-off-black/60 mt-2">{today.counts.needsContact} {today.counts.needsContact === 1 ? 'org is' : 'orgs are'} waiting on a contact with an email. They are blocked, not done.</p>
+              ) : null}
             </div>
           </div>
         ) : isSent && selected ? (
@@ -397,6 +421,7 @@ export default function Sales() {
             variants={variants} index={Math.min(variantIndex, Math.max(0, variants.length - 1))}
             drafting={drafting} gmailConnected={gmailConnected}
             canSend={gmailConnected && !capReached && contact?.emailSource !== 'guessed'} capReached={capReached}
+            problems={problems} checking={checking} onCheck={checkDraft}
             mockups={mockups} mockupId={mockupId}
             onMockupChange={id => setMockupId(id || null)} onManageMockups={() => setMockupsOpen(true)}
             onChange={updateVariant}

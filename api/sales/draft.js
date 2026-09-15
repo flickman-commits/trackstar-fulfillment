@@ -4,10 +4,11 @@
  *   GET  ?action=status                                    what is wired up: model, research, Gmail
  *   POST { action:'variants', companyId, contactId? }       five drafts for the next touch
  *   POST { action:'queue', companyId, contactId, subject, body }  file the chosen one
+ *   POST { action:'check', companyId, subject, body }             guardrail reasons, no side effects
  */
 import { setCors } from '../_lib/auth.js'
 import { requireAdminOnly } from '../_lib/users.js'
-import { draftVariants, queueDraft, sendDraft } from '../../server/domain/sales/drafting.js'
+import { draftVariants, queueDraft, sendDraft, checkDraft } from '../../server/domain/sales/drafting.js'
 import { llmInfo } from '../../server/lib/llm.js'
 import { researchProvider } from '../../server/domain/sales/research.js'
 import { gmailStatus } from '../../server/domain/sales/gmail.js'
@@ -45,6 +46,11 @@ export default async function handler(req, res) {
       return res.status(200).json({ ...rest, contactId: contact.id, companyId: company.id })
     }
 
+    if (body.action === 'check') {
+      const out = await checkDraft({ companyId: String(body.companyId), subject: String(body.subject || ''), body: String(body.body || '') })
+      return res.status(200).json(out)
+    }
+
     if (body.action === 'send') {
       if (!body.contactId) return res.status(400).json({ error: 'contactId is required' })
       const out = await sendDraft({
@@ -73,6 +79,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: `Unknown action: ${body.action}` })
   } catch (error) {
+    if (error.problems) return res.status(400).json({ error: error.message, problems: error.problems })
     console.error('[API /sales/draft]', error)
     return res.status(500).json({ error: error.message })
   }

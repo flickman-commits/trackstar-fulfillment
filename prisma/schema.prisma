@@ -765,6 +765,7 @@ model Company {
   // Provenance
   source         String    // "csv" | "clickup" | "notion" | "manual" | "agent"
   externalId     String?   // ClickUp task id / Notion page id
+  attioDealId    String?   // Attio deal record id; the CRM the app writes to after a send
   // Who works this deal. Null means unassigned. One column now so a second
   // rep is a filter later, not a data migration.
   ownerId        String?

@@ -22,10 +22,10 @@ const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'PO
 export type ListView = 'due' | 'new' | 'all' | `stage:${DealStage}`
 
 /** Whether a mirror is reachable, from a read-only probe. */
-export interface MirrorCheck { configured: boolean; ok: boolean; error?: string; sample?: string }
+export interface CrmCheck { configured: boolean; ok: boolean; error?: string; workspace?: string | null }
 
 /** Result of mirroring a change out to Notion or ClickUp. */
-export interface SyncResult { target: 'notion' | 'clickup' | null; ok: boolean; skipped?: string; error?: string }
+export interface SyncResult { target: 'attio' | null; ok: boolean; skipped?: string; error?: string; recordId?: string }
 
 export const salesApi = {
   status: () => request<SalesStatus>('/api/sales/draft'),
@@ -69,14 +69,16 @@ export const salesApi = {
     post<{ touch: Touch; gmailDraft: boolean; gmailConnected: boolean; mockup: { id: string; name: string } | null }>('/api/sales/draft', { action: 'queue', ...body }),
 
   /** The morning in one call. */
-  today: () => request<TodayPayload>('/api/sales/today'),
+  today: (scope: 'mine' | 'all' = 'mine') => request<TodayPayload>(`/api/sales/today?scope=${scope}`),
   progress: () => request<Progress>('/api/sales/today?action=progress'),
   checkReplies: (force = false) =>
     request<{ checked: number; newReplies: string[]; cleared: string[]; skipped?: string }>(`/api/sales/today?action=check-replies${force ? '&force=1' : ''}`),
-  skip: (id: string) => post<{ success: true; until: string }>('/api/sales/today', { action: 'skip', id }),
+  skip: (id: string, reason?: string) => post<{ success: true; until: string }>('/api/sales/today', { action: 'skip', id, reason }),
   unskip: (id: string) => post<{ success: true }>('/api/sales/today', { action: 'unskip', id }),
 
   /** Sends through the connected Gmail. Final; the undo window is the caller's. */
+  check: (body: { companyId: string; subject: string; body: string }) =>
+    post<{ touchNumber: number; problems: string[] }>('/api/sales/draft', { action: 'check', ...body }),
   send: (body: { companyId: string; contactId: string; subject: string; body: string; mockupId?: string }) =>
     post<{ touch: Touch; company: Company; mockup: { id: string; name: string } | null; gmailThreadId: string | null; sync?: SyncResult }>('/api/sales/draft', { action: 'send', ...body }),
 
@@ -96,7 +98,7 @@ export const salesApi = {
     post<ImportResult>('/api/sales/import', { csv, pipeline, overwrite }),
 
   settings: () => request<{ settings: SalesSettings; defaults: SalesSettings }>('/api/sales/settings'),
-  checkMirrors: () => request<{ notion: MirrorCheck; clickup: MirrorCheck }>('/api/sales/settings?action=check'),
+  checkMirrors: () => request<{ attio: CrmCheck }>('/api/sales/settings?action=check'),
   saveSettings: (patch: Partial<SalesSettings>) => post<{ settings: SalesSettings }>('/api/sales/settings', patch),
 
   gmailDisconnect: () => post<{ success: true }>('/api/sales/gmail', { action: 'disconnect' }),

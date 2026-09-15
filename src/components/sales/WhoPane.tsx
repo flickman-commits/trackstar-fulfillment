@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, Loader2, Search, Plus } from 'lucide-react'
+import { ExternalLink, Loader2, Search, Plus, ChevronDown, ChevronRight } from 'lucide-react'
 import { btnSecondary, btnGhost, fieldLabel, inputBase } from '@/lib/ui'
 import { STAGE_LABEL, type Company, type Contact, type DealStage } from '@/types/sales'
 
@@ -33,7 +33,8 @@ export default function WhoPane({
   const [notes, setNotes] = useState(company?.notes || '')
   const [adding, setAdding] = useState(false)
   const [nc, setNc] = useState({ firstName: '', lastName: '', email: '', title: '' })
-  useEffect(() => { setNotes(company?.notes || ''); setAdding(false) }, [company?.id, company?.notes])
+  const [allResearch, setAllResearch] = useState(false)
+  useEffect(() => { setNotes(company?.notes || ''); setAdding(false); setAllResearch(false) }, [company?.id, company?.notes])
 
   if (!company) return <aside className="hidden lg:block w-[300px] shrink-0" />
 
@@ -83,13 +84,59 @@ export default function WhoPane({
         )}
       </section>
 
-      {/* Use in the opener */}
+      {/* Why this person. Three hooks up front; the whole record, person and
+          org with its sources, one click away. Someone who has read that Jane
+          built the program for 14 years writes a better follow-up than
+          someone who has not been shown it. */}
       <section className="rounded-lg border border-border-gray bg-white px-3.5 py-3">
-        <span className={fieldLabel}>Use in the opener</span>
+        <div className="flex items-center justify-between">
+          <span className={fieldLabel}>Why this person</span>
+          {r && ((r.personInfo?.length || 0) + (r.companyInfo?.length || 0) > hooks.length || (r.sources?.length || 0) > 0) && (
+            <button onClick={() => setAllResearch(o => !o)} className="text-[11px] text-off-black/50 hover:text-off-black inline-flex items-center gap-0.5 -mt-1">
+              {allResearch ? 'Less' : 'Everything'} {allResearch ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            </button>
+          )}
+        </div>
         {hooks.length ? (
-          <ul className="space-y-1.5">
-            {hooks.map((h, i) => <li key={i} className="pl-3 relative text-[13px] text-off-black/80 leading-snug before:absolute before:left-0 before:top-[0.5em] before:w-1.5 before:h-1.5 before:rounded-full before:bg-dark-fill">{h}</li>)}
-          </ul>
+          allResearch ? (
+            <div className="space-y-2.5">
+              {(r?.personInfo?.length || 0) > 0 && (
+                <div>
+                  <div className="text-[10.5px] font-mono uppercase tracking-wider text-off-black/40 mb-1">{contact?.firstName || 'Person'}</div>
+                  <ul className="space-y-1.5">
+                    {r!.personInfo!.map((h, i) => <li key={i} className="pl-3 relative text-[13px] text-off-black/80 leading-snug before:absolute before:left-0 before:top-[0.5em] before:w-1.5 before:h-1.5 before:rounded-full before:bg-dark-fill">{h}</li>)}
+                  </ul>
+                </div>
+              )}
+              {(r?.companyInfo?.length || 0) > 0 && (
+                <div>
+                  <div className="text-[10.5px] font-mono uppercase tracking-wider text-off-black/40 mb-1">{company.name}</div>
+                  <ul className="space-y-1.5">
+                    {r!.companyInfo!.map((h, i) => <li key={i} className="pl-3 relative text-[13px] text-off-black/80 leading-snug before:absolute before:left-0 before:top-[0.5em] before:w-1.5 before:h-1.5 before:rounded-full before:bg-off-black/30">{h}</li>)}
+                  </ul>
+                </div>
+              )}
+              {(r?.sources?.length || 0) > 0 && (
+                <div>
+                  <div className="text-[10.5px] font-mono uppercase tracking-wider text-off-black/40 mb-1">Sources</div>
+                  <ul className="space-y-0.5">
+                    {r!.sources!.map((u, i) => (
+                      <li key={i} className="truncate">
+                        <a href={u} target="_blank" rel="noopener noreferrer" className="text-[11.5px] text-off-black/55 hover:text-off-black inline-flex items-center gap-1 max-w-full">
+                          <span className="truncate">{u.replace(/^https?:\/\/(www\.)?/, '')}</span><ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {r?.researchedAt && <p className="text-[10.5px] text-off-black/35">Researched {fmtDate(r.researchedAt)}</p>}
+            </div>
+          ) : (
+            <ul className="space-y-1.5">
+              {hooks.map((h, i) => <li key={i} className="pl-3 relative text-[13px] text-off-black/80 leading-snug before:absolute before:left-0 before:top-[0.5em] before:w-1.5 before:h-1.5 before:rounded-full before:bg-dark-fill">{h}</li>)}
+            </ul>
+          )
         ) : (
           <p className="text-xs text-off-black/45">{researching ? 'Looking…' : 'Nothing on file. The opener is the line that gets the reply, so give it something true.'}</p>
         )}
@@ -102,7 +149,7 @@ export default function WhoPane({
           <p className="text-xs text-off-black/65">
             <span className="tabular-nums text-off-black/40 mr-2">{fmtDate(company.lastTouchAt)}</span>
             Last emailed · {company.touchCount} {company.touchCount === 1 ? 'touch' : 'touches'} so far
-            <span className="text-off-black/40"> · from the {company.source === 'notion' ? 'Notion' : company.source === 'clickup' ? 'ClickUp' : 'imported'} record</span>
+            <span className="text-off-black/40"> · from the imported record</span>
           </p>
         )}
         {touches.length ? (

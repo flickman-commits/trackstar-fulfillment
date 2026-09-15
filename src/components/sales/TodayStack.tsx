@@ -21,12 +21,26 @@ function fmtTime(s?: string | null) {
   return s ? new Date(s).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
 }
 
+/**
+ * Days past due, as a chip. Over two weeks goes red: that is a follow-up the
+ * cadence promised and nobody sent, and it should feel uncomfortable.
+ */
+export function OverdueBadge({ days, active }: { days?: number; active?: boolean }) {
+  if (!days || days <= 0) return null
+  const late = days > 14
+  const cls = active
+    ? 'border-white/40 text-white'
+    : late ? 'bg-red-50 border-red-300 text-red-700' : 'bg-amber-50 border-amber-300 text-amber-700'
+  return <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border tabular-nums whitespace-nowrap ${cls}`} title={`${days} days past the next action date`}>{days}d late</span>
+}
+
 function Row({ c, active, sent, pendingSend, onClick, hint }: {
   c: StackItem | Company; active: boolean; sent?: boolean; pendingSend?: boolean; onClick: () => void; hint?: string
 }) {
   const primary = c.contacts.find(x => x.email) || c.contacts[0]
   const who = primary ? `${primary.firstName} ${primary.lastName}`.trim() : 'No contact'
   const reason = (c as StackItem).reason
+  const overdue = sent ? 0 : (c as StackItem).overdueDays
   return (
     <button
       onClick={onClick}
@@ -48,17 +62,22 @@ function Row({ c, active, sent, pendingSend, onClick, hint }: {
           {sent ? `Sent ${fmtTime((c as StackItem).sentAt)}` : pendingSend ? 'Sending…' : reason || STAGE_LABEL[c.stage]}
         </span>
       </span>
-      {hint && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${active ? 'border-white/30 text-white/70' : 'border-border-gray text-off-black/40'}`}>{hint}</span>}
+      <span className="flex items-center gap-1">
+        <OverdueBadge days={overdue} active={active} />
+        {hint && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${active ? 'border-white/30 text-white/70' : 'border-border-gray text-off-black/40'}`}>{hint}</span>}
+      </span>
     </button>
   )
 }
 
 export default function TodayStack({
+  scope, onScope,
   mode, onMode,
   replies, stack, sentToday, pendingSendIds, overnight, counts,
   selectedId, onSelect,
   allCompanies, allLoading, q, onQ, view, onView,
 }: {
+  scope: 'mine' | 'all'; onScope: (s: 'mine' | 'all') => void
   mode: StackMode; onMode: (m: StackMode) => void
   replies: StackItem[]; stack: StackItem[]; sentToday: StackItem[]; pendingSendIds: Set<string>
   overnight: OvernightRun | null
@@ -105,15 +124,27 @@ export default function TodayStack({
           )}
 
           <div className="rounded-lg border border-border-gray bg-white overflow-hidden">
-            <div className="px-3 py-1.5 font-mono text-[10.5px] tracking-wider uppercase text-off-black/45 border-b border-border-gray flex justify-between">
-              <span>Today</span><span>{left} left</span>
+            <div className="px-3 py-1.5 font-mono text-[10.5px] tracking-wider uppercase text-off-black/45 border-b border-border-gray flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <span>Today</span>
+                {/* Whose queue. Everyone's stays one click away so one person
+                    can cover when the other is out. */}
+                <button
+                  onClick={() => onScope(scope === 'mine' ? 'all' : 'mine')}
+                  className="normal-case tracking-normal font-sans text-[10.5px] px-1.5 py-0.5 rounded border border-border-gray text-off-black/55 hover:text-off-black hover:bg-subtle-gray"
+                  title={scope === 'mine' ? 'Showing your orgs and unowned ones. Click to see everyone\'s.' : 'Showing everyone\'s orgs. Click to see just yours.'}
+                >
+                  {scope === 'mine' ? 'Mine' : 'Everyone'}
+                </button>
+              </span>
+              <span>{left} left</span>
             </div>
             {sentToday.map(c => <Row key={c.id} c={c} sent active={c.id === selectedId} onClick={() => onSelect(c.id)} />)}
             {stack.map(c => (
               <Row key={c.id} c={c} active={c.id === selectedId} pendingSend={pendingSendIds.has(c.id)} onClick={() => onSelect(c.id)} hint={c.id === selectedId ? '⌘↵' : undefined} />
             ))}
             {stack.length === 0 && sentToday.length === 0 && (
-              <div className="px-3 py-4 text-xs text-off-black/50">Nothing in the stack. Import a list, or check All.</div>
+              <div className="px-3 py-4 text-xs text-off-black/50">Queue's clear.{counts?.needsContact ? ` ${counts.needsContact} still need a contact.` : ''}</div>
             )}
           </div>
 

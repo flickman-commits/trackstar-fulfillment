@@ -23,7 +23,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   const [tab, setTab] = useState<Tab>('sending')
   const [s, setS] = useState<SalesSettings | null>(null)
   const [saving, setSaving] = useState(false)
-  const [check, setCheck] = useState<{ notion: { configured: boolean; ok: boolean; error?: string; sample?: string }; clickup: { configured: boolean; ok: boolean; error?: string } } | null>(null)
+  const [check, setCheck] = useState<{ attio: { configured: boolean; ok: boolean; error?: string; workspace?: string | null } } | null>(null)
   const [checking, setChecking] = useState(false)
 
   useEffect(() => { salesApi.settings().then(r => setS(r.settings)).catch(e => toast.error((e as Error).message)) }, [])
@@ -135,14 +135,13 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 </div>
                 <div className="rounded-lg border border-border-gray p-3">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium">Mirrors</div>
+                    <div className="font-medium">CRM</div>
                     <button onClick={runCheck} disabled={checking} className={btnSecondary}>{checking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plug className="w-3.5 h-3.5" />} Check connections</button>
                   </div>
-                  <p className="text-xs text-off-black/50 mt-1">Every send updates the Notion charity row and the ClickUp race task. This reads one row from each to confirm the app can reach them.</p>
+                  <p className="text-xs text-off-black/50 mt-1">Every send updates the deal in Attio: last contacted, touch count, next action, and the stage moves to Reached Out. This confirms the app can reach the workspace.</p>
                   {check && (
                     <ul className="mt-2 space-y-1 text-xs">
-                      <li className={check.notion.ok ? 'text-success-green' : check.notion.configured ? 'text-red-600' : 'text-off-black/50'}>Notion: {check.notion.ok ? `connected (read "${check.notion.sample}")` : check.notion.configured ? check.notion.error : 'not configured'}</li>
-                      <li className={check.clickup.ok ? 'text-success-green' : check.clickup.configured ? 'text-red-600' : 'text-off-black/50'}>ClickUp: {check.clickup.ok ? 'connected' : check.clickup.configured ? check.clickup.error : 'not configured (set CLICKUP_API_TOKEN to mirror race stages)'}</li>
+                      <li className={check.attio.ok ? 'text-success-green' : check.attio.configured ? 'text-red-600' : 'text-off-black/50'}>Attio: {check.attio.ok ? `connected${check.attio.workspace ? ` (${check.attio.workspace})` : ''}` : check.attio.configured ? check.attio.error : 'not configured (set ATTIO_API_KEY)'}</li>
                     </ul>
                   )}
                 </div>

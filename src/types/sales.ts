@@ -100,6 +100,8 @@ export interface Company {
 /** A company as it appears in the morning stack, with the reason it is there. */
 export interface StackItem extends Company {
   reason: string
+  /** Days past nextActionAt. 0 when not overdue. */
+  overdueDays: number
   nextTouchNumber: number | null
   nextAngle: string | null
   lastEmailedAt: string | null
@@ -114,6 +116,7 @@ export interface OvernightRun {
 
 export interface TodayPayload {
   cap: number
+  scope: 'mine' | 'all'
   timezone: string
   undoSeconds: number
   sentTodayCount: number

@@ -173,6 +173,8 @@ export default function App() {
                 <Route path="/products" element={<RequireAdmin><ProductsBulkEdit /></RequireAdmin>} />
                 <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
                 <Route path="/sales" element={<RequireAdmin><Sales /></RequireAdmin>} />
+                {/* The daily send list is the Sales page. /send is the short name the brief uses. */}
+                <Route path="/send" element={<RequireAdmin><Sales /></RequireAdmin>} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>
               </AppShell>

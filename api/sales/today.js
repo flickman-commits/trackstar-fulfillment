@@ -1,10 +1,12 @@
 /**
  * /api/sales/today - the morning, as one payload.
  *
- *   GET                       replies waiting, today's stack, what went out today, the counts
+ *   GET ?scope=mine|all       replies waiting, today's stack, what went out today, the counts.
+ *                             mine (default) is your orgs plus unowned ones; all is everyone's,
+ *                             for covering when the other person is out.
  *   GET ?action=progress      sends per day, reply rate, funnel; the last 30 days
  *   GET ?action=check-replies ask Gmail who has written back (throttled; ?force=1 to insist)
- *   POST { action:'skip', id }             hide until tomorrow
+ *   POST { action:'skip', id, reason? }    hide until tomorrow; the reason lands in the history
  *   POST { action:'unskip', id }
  *
  * The stack is the daily cap, filled in this order: orgs the routine already
@@ -45,8 +47,14 @@ async function reason(c) {
 async function shape(c) {
   const r = await reason(c)
   const { proposedDraft, ...rest } = c
+  // Days past the next-action date. This is the number that should feel
+  // uncomfortable, so it is computed here and shown everywhere the org is.
+  const overdueDays = c.nextActionAt && new Date(c.nextActionAt) < new Date()
+    ? Math.floor((Date.now() - new Date(c.nextActionAt).getTime()) / 86400000)
+    : 0
   return {
     ...rest,
+    overdueDays,
     lastTouch: c.touches[0] || null,
     hasProposedDraft: Boolean(proposedDraft),
     reason: r.text,
@@ -56,13 +64,13 @@ async function shape(c) {
   }
 }
 
-async function today(actor) {
+async function today(actor, { scopeMode = 'mine' } = {}) {
   const settings = await getSettings()
   const cap = settings.dailyCap
   const now = new Date()
   const dayStart = startOfToday(settings.timezone, now)
   const weekStart = new Date(dayStart.getTime() - 6 * 86400000)
-  const scope = actor?.id ? { OR: [{ ownerId: actor.id }, { ownerId: null }] } : {}
+  const scope = scopeMode === 'all' || !actor?.id ? {} : { OR: [{ ownerId: actor.id }, { ownerId: null }] }
 
   const sentTodayTouches = await prisma.touch.findMany({
     where: { kind: 'EMAIL_SENT', sentAt: { gte: dayStart } },
@@ -120,6 +128,7 @@ async function today(actor) {
 
   return {
     cap,
+    scope: scopeMode === 'all' ? 'all' : 'mine',
     timezone: settings.timezone,
     undoSeconds: settings.undoSeconds,
     sentTodayCount: sentIds.length,
@@ -176,7 +185,7 @@ export default async function handler(req, res) {
       const action = String(req.query?.action || '')
       if (action === 'progress') return res.status(200).json(await progress())
       if (action === 'check-replies') return res.status(200).json(await checkReplies(actor.id, { force: req.query?.force === '1' }))
-      return res.status(200).json(await today(actor))
+      return res.status(200).json(await today(actor, { scopeMode: String(req.query?.scope || 'mine') }))
     }
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
@@ -184,7 +193,13 @@ export default async function handler(req, res) {
       if (body.action === 'skip') {
         const settings = await getSettings()
         const tomorrow = new Date(startOfToday(settings.timezone).getTime() + 86400000)
-        await prisma.company.update({ where: { id: String(body.id) }, data: { snoozedUntil: tomorrow } })
+        const reason = String(body.reason || '').trim()
+        // Skipping never counts as a touch. The reason, if any, goes in the
+        // history so tomorrow's person knows why it was passed over.
+        await prisma.$transaction([
+          prisma.company.update({ where: { id: String(body.id) }, data: { snoozedUntil: tomorrow } }),
+          ...(reason ? [prisma.touch.create({ data: { companyId: String(body.id), kind: 'NOTE', body: `Skipped: ${reason}`, createdBy: actor.email || null } })] : []),
+        ])
         return res.status(200).json({ success: true, until: tomorrow })
       }
       if (body.action === 'unskip') {

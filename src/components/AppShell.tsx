@@ -36,7 +36,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     : railPanel === 'discounts' ? 'discounts'
     : railPanel === 'pace' ? 'pace'
     : path.startsWith('/creators') ? 'creators'
-    : path.startsWith('/sales') ? 'sales'
+    : path.startsWith('/sales') || path.startsWith('/send') ? 'sales'
     : 'fulfillment'
 
   const openSettings = () => {

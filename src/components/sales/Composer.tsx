@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, ExternalLink, Paperclip, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, ExternalLink, Paperclip, ChevronDown, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react'
+import { OverdueBadge } from './TodayStack'
 import { btnPrimary, btnGhost, inputBase } from '@/lib/ui'
-import type { Company, Contact, DraftResult, Mockup, Variant } from '@/types/sales'
+import type { Company, Contact, DraftResult, Mockup, StackItem, Variant } from '@/types/sales'
 
 /**
  * The middle column: the email, and what to do with it.
@@ -18,9 +19,14 @@ import type { Company, Contact, DraftResult, Mockup, Variant } from '@/types/sal
  */
 export default function Composer({
   company, contact, draft, variants, index, drafting, gmailConnected, canSend, capReached,
+  problems, checking, onCheck,
   mockups, mockupId, onMockupChange, onManageMockups,
   onChange, onPrev, onNext, onRewrite, onSend, onSkip, onNotInterested,
 }: {
+  /** The server's guardrail verdict for the draft as it stands; null = not checked yet. */
+  problems: string[] | null
+  checking: boolean
+  onCheck: () => void
   company: Company | null
   contact: Contact | null
   draft: DraftResult | null
@@ -39,10 +45,12 @@ export default function Composer({
   onNext: () => void
   onRewrite: () => void
   onSend: () => void
-  onSkip: () => void
+  onSkip: (reason?: string) => void
   onNotInterested: () => void
 }) {
   const [whyOpen, setWhyOpen] = useState(false)
+  const [skipOpen, setSkipOpen] = useState(false)
+  const [skipReason, setSkipReason] = useState('')
 
   if (!company) {
     return (
@@ -84,8 +92,10 @@ export default function Composer({
   const mockupRequired = company.pipeline === 'CHARITY' && draft?.touchNumber === 1
   const chosen = mockups.find(m => m.id === mockupId) || null
   const missingRequired = mockupRequired && !chosen
-  const sendDisabled = !current || drafting || !contact?.email || missingRequired || !canSend
-  const sendTitle = !gmailConnected ? 'Connect Gmail in Settings to send'
+  const blocked = Boolean(problems && problems.length)
+  const sendDisabled = !current || drafting || !contact?.email || missingRequired || !canSend || blocked
+  const sendTitle = blocked ? (problems as string[])[0]
+    : !gmailConnected ? 'Connect Gmail in Settings to send'
     : capReached ? 'Today\'s cap is reached. Raise it in Settings if you mean to.'
     : missingRequired ? 'A charity first touch has to carry a mockup'
     : contact?.emailSource === 'guessed' ? 'This address was guessed; confirm it first'
@@ -96,7 +106,10 @@ export default function Composer({
       {/* Who, and which touch */}
       <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-border-gray">
         <div className="min-w-0">
-          <div className="text-[15px] font-bold truncate">{who} <span className="text-off-black/45 font-normal">· {company.name}</span></div>
+          <div className="text-[15px] font-bold truncate flex items-center gap-2">
+            <span className="truncate">{who} <span className="text-off-black/45 font-normal">· {company.name}</span></span>
+            <OverdueBadge days={(company as StackItem).overdueDays} />
+          </div>
           <div className="text-xs text-off-black/55 mt-0.5 flex flex-wrap items-center gap-x-2">
             <span>{contact?.email || <span className="text-red-600">No email on file</span>}</span>
             {draft && (
@@ -132,15 +145,31 @@ export default function Composer({
         <>
           <div className="grid grid-cols-[64px_1fr] items-center gap-2 px-4 py-2 border-b border-border-gray">
             <span className="font-mono text-[10.5px] tracking-wider uppercase text-off-black/40">Subject</span>
-            <input value={current.subject} onChange={e => onChange({ ...current, subject: e.target.value })} className={`${inputBase} w-full border-transparent bg-transparent px-1 focus:bg-white focus:border-border-gray`} />
+            <input value={current.subject} onChange={e => onChange({ ...current, subject: e.target.value })} onBlur={onCheck} className={`${inputBase} w-full border-transparent bg-transparent px-1 focus:bg-white focus:border-border-gray`} />
           </div>
           <div className="flex-1 min-h-0 grid grid-cols-[64px_1fr] gap-2 px-4 pt-3 pb-2">
             <span className="font-mono text-[10.5px] tracking-wider uppercase text-off-black/40 pt-2">Body</span>
             <textarea
               value={current.body}
               onChange={e => onChange({ ...current, body: e.target.value })}
+              onBlur={onCheck}
               className="w-full h-full min-h-[280px] resize-none text-[15px] leading-relaxed bg-transparent px-1 py-1 focus:outline-none focus:bg-subtle-gray/60 rounded"
             />
+          </div>
+          {/* The house rules, as the server sees this draft. Checked on
+              blur, so an em dash is caught before Send, not after. */}
+          <div className="px-4 pb-2 pl-[88px] text-xs">
+            {checking ? (
+              <span className="inline-flex items-center gap-1.5 text-off-black/45"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking the house rules…</span>
+            ) : problems === null ? (
+              <span className="text-off-black/40">Edits are checked against the house rules when you click away.</span>
+            ) : problems.length === 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-success-green"><CheckCircle2 className="w-3.5 h-3.5" /> Passes the house rules</span>
+            ) : (
+              <ul className="space-y-1">
+                {problems.map((p, i) => <li key={i} className="flex items-start gap-1.5 text-red-700"><AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" /><span>{p}</span></li>)}
+              </ul>
+            )}
           </div>
           <div className="flex items-center gap-2 px-4 pb-3 pl-[88px] text-xs">
             <Paperclip className={`w-3.5 h-3.5 ${missingRequired ? 'text-red-600' : 'text-off-black/40'}`} />
@@ -163,8 +192,21 @@ export default function Composer({
 
       {/* Actions */}
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-t border-border-gray bg-subtle-gray rounded-b-lg">
-        <div className="flex items-center gap-1">
-          <button onClick={onSkip} className={btnGhost} title="Hide until tomorrow">Skip today <kbd className={kbdDark}>S</kbd></button>
+        <div className="flex items-center gap-1 relative">
+          <button onClick={() => setSkipOpen(o => !o)} className={btnGhost} title="Hide until tomorrow">Skip today <kbd className={kbdDark}>S</kbd></button>
+          {skipOpen && (
+            <form
+              className="absolute bottom-full left-0 mb-2 w-72 rounded-lg border border-border-gray bg-white shadow-lg p-3 flex flex-col gap-2 z-10"
+              onSubmit={e => { e.preventDefault(); onSkip(skipReason.trim() || undefined); setSkipOpen(false); setSkipReason('') }}
+            >
+              <span className="text-xs text-off-black/60">Moves to tomorrow. Does not count as a touch.</span>
+              <input autoFocus value={skipReason} onChange={e => setSkipReason(e.target.value)} placeholder="Why? (optional, goes in the history)" className={`${inputBase} w-full`} onKeyDown={e => { if (e.key === 'Escape') { setSkipOpen(false); setSkipReason('') } }} />
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => { setSkipOpen(false); setSkipReason('') }} className={btnGhost}>Cancel</button>
+                <button type="submit" className={`${btnPrimary} px-3 py-1.5 text-xs`}>Skip</button>
+              </div>
+            </form>
+          )}
           <button onClick={onNotInterested} className={btnGhost} title="Close this one out">Not interested <kbd className={kbdDark}>X</kbd></button>
           <button onClick={onRewrite} disabled={drafting || !contact} className={btnGhost} title="Write it again">
             <RefreshCw className={`w-3.5 h-3.5 ${drafting ? 'animate-spin' : ''}`} /> Rewrite
