@@ -12,6 +12,7 @@ import { draftVariants, queueDraft, sendDraft, checkDraft } from '../../server/d
 import { llmInfo } from '../../server/lib/llm.js'
 import { researchProvider } from '../../server/domain/sales/research.js'
 import { gmailStatus } from '../../server/domain/sales/gmail.js'
+import { isAttioConfigured } from '../../server/domain/sales/attio.js'
 import { lastRun } from '../../server/domain/sales/nightly.js'
 
 export default async function handler(req, res) {
@@ -27,6 +28,7 @@ export default async function handler(req, res) {
         llm: llmInfo(),
         research: { configured: researchProvider() !== null, provider: researchProvider() },
         gmail: await gmailStatus(actor.id),
+        attio: { configured: isAttioConfigured() },
         lastRun: await lastRun(),
       })
     }

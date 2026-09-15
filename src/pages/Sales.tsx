@@ -378,6 +378,12 @@ export default function Sales() {
           <a href={salesApi.gmailConnectUrl} className={btnSecondary}>Connect Gmail</a>
         </div>
       )}
+      {status && status.attio && !status.attio.configured && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-3 text-[13px] text-amber-800">
+          <span>Attio is not connected. Sends still go out, but the deal will not update until <code className="font-mono text-[12px]">ATTIO_API_KEY</code> is set in Vercel.</span>
+          <button onClick={() => setSettingsOpen(true)} className={btnSecondary}>Settings</button>
+        </div>
+      )}
       {status?.gmail.connected && status.gmail.canReadReplies === false && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border-gray bg-white px-3 py-2 mb-3 text-[12.5px] text-off-black/65">
           <span>Reconnect Gmail once so the app can see who has replied. It only reads sender and date on your own threads.</span>
