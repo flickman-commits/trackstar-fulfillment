@@ -6,7 +6,8 @@ import { apiFetch } from '@/lib/api'
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
 // Desktop-only helper tile pinned to the bottom-left of the Standard view:
-// a quick one-time Shopify discount-code generator for customer support.
+// a quick Shopify discount-code generator for customer support, with optional
+// limits on uses and days.
 // Mirrors CustomTools (pace converter) on the Custom view.
 
 type ValueType = 'percentage' | 'fixed_amount'
@@ -14,13 +15,17 @@ type ValueType = 'percentage' | 'fixed_amount'
 interface CreatedDiscount {
   code: string
   label: string
-  endsAt: string
+  endsAt: string | null
+  usageLimit: number | null
+  oncePerCustomer: boolean
 }
 
 function DiscountForm({ onCreated }: { onCreated: (d: CreatedDiscount) => void }) {
   const [valueType, setValueType] = useState<ValueType>('percentage')
   const [amount, setAmount] = useState('')
   const [days, setDays] = useState('30')
+  const [uses, setUses] = useState('1')
+  const [oncePerCustomer, setOncePerCustomer] = useState(false)
   const [code, setCode] = useState('')
   const [creating, setCreating] = useState(false)
 
@@ -39,7 +44,10 @@ function DiscountForm({ onCreated }: { onCreated: (d: CreatedDiscount) => void }
           action: 'create-discount',
           valueType,
           value: amtNum,
-          expiresInDays: Number(days) || 30,
+          // Blank means no limit on either.
+          expiresInDays: days.trim() === '' ? null : Number(days),
+          usageLimit: uses.trim() === '' ? null : Number(uses),
+          oncePerCustomer,
           code: code.trim() || undefined,
         }),
       })
@@ -48,7 +56,7 @@ function DiscountForm({ onCreated }: { onCreated: (d: CreatedDiscount) => void }
         toast.error(data.error || 'Failed to create discount')
         return
       }
-      onCreated({ code: data.code, label: data.label, endsAt: data.endsAt })
+      onCreated({ code: data.code, label: data.label, endsAt: data.endsAt, usageLimit: data.usageLimit, oncePerCustomer: data.oncePerCustomer })
     } catch {
       toast.error('Failed to create discount')
     } finally {
@@ -100,8 +108,19 @@ function DiscountForm({ onCreated }: { onCreated: (d: CreatedDiscount) => void }
         </div>
       </div>
 
-      {/* Expiry + custom code */}
+      {/* Limits. Blank on either means no limit. */}
       <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Max uses</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={uses}
+            onChange={e => setUses(e.target.value.replace(/[^0-9]/g, ''))}
+            placeholder="Unlimited"
+            className="w-full px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
+          />
+        </div>
         <div>
           <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Expires (days)</label>
           <input
@@ -109,10 +128,18 @@ function DiscountForm({ onCreated }: { onCreated: (d: CreatedDiscount) => void }
             inputMode="numeric"
             value={days}
             onChange={e => setDays(e.target.value.replace(/[^0-9]/g, ''))}
-            placeholder="30"
+            placeholder="Never"
             className="w-full px-3 py-2 border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
           />
         </div>
+      </div>
+      <label className="flex items-center gap-2 text-xs text-off-black/70 select-none">
+        <input type="checkbox" checked={oncePerCustomer} onChange={e => setOncePerCustomer(e.target.checked)} className="w-3.5 h-3.5 accent-dark-fill" />
+        One use per customer
+      </label>
+
+      {/* Custom code */}
+      <div className="grid grid-cols-1 gap-2">
         <div>
           <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Code (optional)</label>
           <input
@@ -130,7 +157,7 @@ function DiscountForm({ onCreated }: { onCreated: (d: CreatedDiscount) => void }
         disabled={!valid || creating}
         className="w-full px-3 py-2.5 text-sm font-medium text-white bg-dark-fill hover:opacity-90 rounded-md transition-opacity disabled:opacity-40 flex items-center justify-center gap-1.5"
       >
-        {creating ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : 'Create one-time code'}
+        {creating ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : 'Create code'}
       </button>
     </div>
   )
@@ -146,16 +173,17 @@ function CreatedView({ created, onReset }: { created: CreatedDiscount; onReset: 
     }
     setCopied(true); toast.success('Code copied'); setTimeout(() => setCopied(false), 1500)
   }
-  const expires = new Date(created.endsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const expires = created.endsAt ? new Date(created.endsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null
+  const usesLabel = created.usageLimit === 1 ? 'one-time' : created.usageLimit ? `${created.usageLimit} uses` : 'unlimited uses'
   return (
     <div className="space-y-3 text-center">
       <div>
-        <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">{created.label} · one-time</p>
+        <p className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">{created.label} · {usesLabel}{created.oncePerCustomer ? ' · once per customer' : ''}</p>
         <button onClick={copy} className="mt-1 inline-flex items-center gap-2 group">
           <span className="text-xl font-bold font-mono text-off-black tracking-wide">{created.code}</span>
           {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-off-black/40 group-hover:text-off-black" />}
         </button>
-        <p className="text-[11px] text-off-black/40 mt-1">Expires {expires}</p>
+        <p className="text-[11px] text-off-black/40 mt-1">{expires ? `Expires ${expires}` : 'Never expires'}</p>
       </div>
       <button
         onClick={onReset}

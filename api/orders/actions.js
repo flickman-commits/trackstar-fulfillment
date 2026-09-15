@@ -13,7 +13,7 @@
  *   - reopen: Un-complete an order — brings it back into the active queue
  *   - design-status: Update design status of a custom order
  *   - message-customer: Designer asks the customer a question (email + portal Q&A)
- *   - create-discount: Create a one-time Shopify discount code ($ or % off)
+ *   - create-discount: Create a Shopify discount code ($ or % off) with optional use and day limits
  *   - calculate-weather: Compute race-day weather (avg 7am–1pm) via Open-Meteo
  *   - customers-served-info: Get current customers served count
  *   - customers-served-sync: Force sync count to Shopify
@@ -833,8 +833,9 @@ async function handleMessageCustomer({ orderId, body }, res) {
 }
 
 // --- create-discount ---
-// Creates a one-time ($ off or % off) Shopify discount code so customer support
-// can quickly comp a customer. Uses the GraphQL discountCodeBasicCreate mutation
+// Creates a ($ off or % off) Shopify discount code so customer support can
+// quickly comp a customer. One use and 30 days by default; either can be
+// widened or removed. Uses the GraphQL discountCodeBasicCreate mutation
 // (needs the write_discounts scope). Not logged locally — the record lives in
 // Shopify (Discounts admin).
 function generateDiscountCode() {
@@ -846,7 +847,7 @@ function generateDiscountCode() {
   return `TS-${suffix}`
 }
 
-async function handleCreateDiscount({ valueType, value, code, expiresInDays }, res) {
+async function handleCreateDiscount({ valueType, value, code, expiresInDays, usageLimit, oncePerCustomer }, res) {
   if (!['percentage', 'fixed_amount'].includes(valueType)) {
     return res.status(400).json({ error: "valueType must be 'percentage' or 'fixed_amount'" })
   }
@@ -858,9 +859,21 @@ async function handleCreateDiscount({ valueType, value, code, expiresInDays }, r
     return res.status(400).json({ error: 'Percentage cannot exceed 100' })
   }
 
-  const days = Number.isFinite(Number(expiresInDays)) && Number(expiresInDays) > 0
-    ? Math.min(Number(expiresInDays), 365)
-    : 30
+  // Expiry: a positive day count, or null for a code that never expires.
+  // Undefined keeps the old 30-day default so existing callers behave.
+  const days = expiresInDays === null || expiresInDays === ''
+    ? null
+    : Number.isFinite(Number(expiresInDays)) && Number(expiresInDays) > 0
+      ? Math.min(Number(expiresInDays), 365)
+      : 30
+
+  // Uses: a positive whole number, or null for unlimited. Undefined keeps
+  // the one-time default.
+  const uses = usageLimit === null || usageLimit === ''
+    ? null
+    : Number.isFinite(Number(usageLimit)) && Number(usageLimit) >= 1
+      ? Math.min(Math.floor(Number(usageLimit)), 100000)
+      : 1
 
   // Custom code (uppercased, sanitized) or an auto-generated one.
   const finalCode = (typeof code === 'string' && code.trim())
@@ -869,7 +882,7 @@ async function handleCreateDiscount({ valueType, value, code, expiresInDays }, r
   if (!finalCode) return res.status(400).json({ error: 'Invalid code' })
 
   const startsAt = new Date().toISOString()
-  const endsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+  const endsAt = days ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString() : null
 
   // customerGets.value differs by type: percentage is a 0–1 decimal;
   // fixed_amount is a money amount off the order total.
@@ -890,7 +903,8 @@ async function handleCreateDiscount({ valueType, value, code, expiresInDays }, r
     code: finalCode,
     startsAt,
     endsAt,
-    usageLimit: 1, // one-time use
+    usageLimit: uses,
+    appliesOncePerCustomer: Boolean(oncePerCustomer),
     customerSelection: { all: true },
     customerGets: {
       value: valueField,
@@ -908,7 +922,7 @@ async function handleCreateDiscount({ valueType, value, code, expiresInDays }, r
     }
 
     const label = valueType === 'percentage' ? `${amount}% off` : `$${amount.toFixed(2)} off`
-    console.log(`[actions/create-discount] Created ${finalCode} (${label}, expires ${endsAt})`)
+    console.log(`[actions/create-discount] Created ${finalCode} (${label}, ${uses ? `${uses} use${uses === 1 ? '' : 's'}` : 'unlimited uses'}, ${endsAt ? `expires ${endsAt}` : 'no expiry'})`)
     return res.status(200).json({
       success: true,
       code: finalCode,
@@ -916,6 +930,8 @@ async function handleCreateDiscount({ valueType, value, code, expiresInDays }, r
       value: amount,
       label,
       endsAt,
+      usageLimit: uses,
+      oncePerCustomer: Boolean(oncePerCustomer),
     })
   } catch (err) {
     console.error('[actions/create-discount] Failed:', err.message)
