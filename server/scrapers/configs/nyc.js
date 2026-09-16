@@ -36,5 +36,15 @@ export default {
     2024: '2024-11-03',
     2025: '2025-11-02',
     2026: '2026-11-01',
-  }
+  },
+  raceDateSources: {
+    2006: 'Wikipedia 2006 New York City Marathon edition article + Fox News race report on the Gomes dos Santos win',
+    2015: 'Wikipedia 2015 New York City Marathon edition article + CNN race-day gallery dated 2015/11/01',
+    2019: 'NYRR event listing startDateTime + Wikipedia 2019 New York City Marathon edition article',
+    2022: 'NYRR event listing startDateTime + Wikipedia 2022 New York City Marathon edition article',
+    2023: 'Washington Post race-day live coverage dated 2023/11/05 + Wikipedia 2023 New York City Marathon edition article',
+    2024: 'NYRR event listing startDateTime + Wikipedia 2024 New York City Marathon edition article',
+    2025: 'NYRR press release 2025_1103_marathonmonday + Wikipedia 2025 New York City Marathon edition article',
+    2026: 'NYRR tcsnycmarathon official race page + ABC7NY report on the 2026 professional field announcement',
+  },
 }

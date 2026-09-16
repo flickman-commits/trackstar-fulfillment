@@ -37,5 +37,14 @@ export default {
     2024: '2024-04-15',
     2025: '2025-04-21',
     2026: '2026-04-20',
-  }
+  },
+  raceDateSources: {
+    2010: 'Wikipedia 2010 Boston Marathon edition article + MarathonGuide 2010 Boston results archive',
+    2018: 'Wikipedia 2018 Boston Marathon edition article + ESPN race report on Kawauchi win',
+    2022: 'Boston Globe race-day report dated 2022/04/18 + CNN race-day report dated 2022/04/18',
+    2023: 'Washington Post race-day live coverage dated 2023/04/17 + UPI race-day report dated 2023/04/17',
+    2024: 'Washington Post race-day live coverage dated 2024/04/15 + CNN race-day report dated 2024/04/15',
+    2025: 'Wikipedia 2025 Boston Marathon edition article + BAA 129th Boston Marathon media resources page',
+    2026: 'Boston Globe race-day report dated 2026/04/20 + NBC Boston 2026 results page',
+  },
 }

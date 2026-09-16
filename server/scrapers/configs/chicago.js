@@ -34,5 +34,14 @@ export default {
     2024: '2024-10-13',
     2025: '2025-10-12',
     2026: '2026-10-11',
-  }
+  },
+  raceDateSources: {
+    2011: 'Wikipedia 2011 Chicago Marathon edition article + RunBlogRun race-day report dated 2011/10',
+    2021: 'chicagomarathon.com event-dates listing + Wikipedia 2021 Chicago Marathon edition article',
+    2022: 'chicagomarathon.com event-dates listing + Wikipedia 2022 Chicago Marathon edition article',
+    2023: 'chicagomarathon.com event-dates listing + Wikipedia 2023 Chicago Marathon edition article',
+    2024: 'chicagomarathon.com event-dates listing + Wikipedia 2024 Chicago Marathon edition article',
+    2025: 'chicagomarathon.com event-dates listing + MarathonGuide 2025 Chicago race details page',
+    2026: 'chicagomarathon.com naming Sunday October 11 2026 + FindTheRun 2026 Chicago event listing',
+  },
 }
