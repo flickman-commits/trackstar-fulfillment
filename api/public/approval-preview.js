@@ -63,13 +63,20 @@ function escapeHtml(value) {
  * "... x Release Foundation x Trackstar", so a name that already says Trackstar
  * is left exactly as it is.
  */
+/**
+ * Partners: "<partner> x Trackstar". Everyone else: the person's name, since
+ * the link is going to them and it reads as theirs in a message thread.
+ * "Matt Flickman Design Proof | Trackstar".
+ */
 export function previewTitle(order) {
-  const name = (order?.raceName || '').trim()
-  if (order?.trackstarOrderType !== 'race_partner' || !name) {
-    return name ? `${name} design proof` : DEFAULT_TITLE
+  const race = (order?.raceName || '').trim()
+  if (order?.trackstarOrderType === 'race_partner' && race) {
+    if (/trackstar/i.test(race)) return race
+    return `${race} x Trackstar`
   }
-  if (/trackstar/i.test(name)) return name
-  return `${name} x Trackstar`
+  const person = (order?.runnerName || order?.customerName || '').trim()
+  const who = person || race
+  return who ? `${who} Design Proof | Trackstar` : DEFAULT_TITLE
 }
 
 export function buildMeta(order) {
@@ -139,6 +146,8 @@ export default async function handler(req, res) {
           order: {
             select: {
               raceName: true,
+              runnerName: true,
+              customerName: true,
               trackstarOrderType: true,
               proofs: {
                 where: { status: 'pending' },
