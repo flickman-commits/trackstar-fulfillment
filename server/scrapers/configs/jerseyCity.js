@@ -12,6 +12,14 @@
  * Held on a Sunday in mid-April, but the date moves — do not derive one from
  * that pattern; every year needs a source naming the calendar day.
  * Confirmed: 2026-04-19
+ *
+ * There is no 2022 entry because there was no 2022 race. The inaugural running
+ * was 2023-04-23 (TAPinto, "Inaugural Jersey City Marathon Set for April 23,
+ * 2023" + Jersey City Upfront's 2022 piece on the race being planned for 2023).
+ * The lint's COVERED_YEARS is a blanket range, so it will keep reporting 2022 as
+ * an unpinned year and the sweep will keep listing it as an untested race-year.
+ * Both are artifacts of that blanket assumption. Do not pin a 2022 date to make
+ * them quiet — there is no day to find.
  */
 export default {
   platform: 'rtrt',
