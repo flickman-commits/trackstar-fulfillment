@@ -28,6 +28,13 @@ export default {
     2025: '2025-09-21',
     2026: '2026-09-27',
   },
+  raceDateSources: {
+    2022: 'Wikipedia 2022 Berlin Marathon edition article naming Sunday 25 September 2022 + FloTrack Berlin past-winners list',
+    2023: 'Wikipedia 2023 Berlin Marathon edition article naming Sunday 24 September 2023 + Olympics.com Berlin results report',
+    2024: 'Wikipedia 2024 Berlin Marathon edition article + RunABC BMW Berlin Marathon 2024 race-day report',
+    2025: 'Wikipedia 2025 Berlin Marathon edition article naming Sunday 21 September 2025 + berlin.de official event listing',
+    2026: 'bmw-berlin-marathon.com official site naming 27 September 2026 + Spoferan 52nd BMW Berlin-Marathon 2026 listing',
+  },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
