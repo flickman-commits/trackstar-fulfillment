@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Loader2, AlertTriangle, X, Maximize2, ChevronDow
 const PdfViewer = lazy(() => import('@/components/PdfViewer'))
 
 import ProofFullscreen from '@/components/ProofFullscreen'
+import DesignGallery from '@/components/DesignGallery'
 import SlideToApprove from '@/components/SlideToApprove'
 
 /**
@@ -490,77 +491,55 @@ export default function ApprovalPortal() {
             </a>
           </div>
 
-          {/* Earlier batches */}
-          {sortedBatches.length > 0 && (
-            <div>
-              <button
-                onClick={() => setShowEarlierVersions(!showEarlierVersions)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm transition-colors"
-                style={{ color: '#999999' }}
-              >
-                {showEarlierVersions ? (
-                  <><ChevronUp className="w-4 h-4" /> Hide earlier batches</>
-                ) : (
-                  <><ChevronDown className="w-4 h-4" /> View {sortedBatches.length} earlier batch{sortedBatches.length !== 1 ? 'es' : ''}</>
+          {/* The other options from the final round, then earlier rounds.
+              Approved, but still browseable full screen: a partner will want
+              to show colleagues what else was on the table. */}
+          {(() => {
+            const finalBatch = approvedProof?.batch ?? Math.max(0, ...proofs.map(p => p.batch || 1))
+            const finalOthers = proofs.filter(p => (p.batch || 1) === finalBatch && p.status !== 'approved' && p.status !== 'pending')
+            const earlier = sortedBatches.filter(([b]) => b !== finalBatch)
+            if (finalOthers.length === 0 && earlier.length === 0) return null
+            return (
+              <div className="space-y-6">
+                {finalOthers.length > 0 && (
+                  <DesignGallery proofs={finalOthers} title={`Also in this round - ${finalOthers.length} other option${finalOthers.length !== 1 ? 's' : ''}`} muted />
                 )}
-              </button>
-              {showEarlierVersions && (
-                <div className="space-y-6 mt-2">
-                  {sortedBatches.map(([batchNum, batchProofs]) => {
-                    const feedback = batchProofs.find(p => p.status === 'revision_requested' && p.customerFeedback)?.customerFeedback || null
-                    return (
-                      <div key={batchNum}>
-                        <p className="text-xs font-medium mb-2" style={{ color: '#999999', letterSpacing: '0.03em' }}>
-                          Batch {batchNum} - {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {batchProofs.map(proof => {
-                            const badgeStyle = proof.status === 'rejected'
-                              ? { backgroundColor: 'rgba(220, 38, 38, 0.1)', color: '#DC2626' }
-                              : { backgroundColor: 'rgba(0,0,0,0.05)', color: '#666666' }
-                            const badgeLabel = proof.status === 'rejected' ? 'Rejected' : 'Revision'
-                            return (
-                              <div key={proof.id} className="relative opacity-60">
-                                {isPdf(proof.imageUrl) ? (
-                                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-md" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E0E0E0' }}>
-                                    <span className="text-lg">📄</span>
-                                    <span style={{ fontSize: '10px', color: '#666666' }}>{proof.fileName || `v${proof.version}`}</span>
-                                  </div>
-                                ) : (
-                                  <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
-                                    <img
-                                      src={proof.thumbnailUrl || proof.imageUrl}
-                                      alt={`Option ${proof.version}`}
-                                      className="h-16 w-16 object-cover rounded-md hover:opacity-90 transition-opacity"
-                                      style={{ border: '1px solid #E0E0E0' }}
-                                      draggable={false}
-                                      onContextMenu={e => e.preventDefault()}
-                                    />
-                                  </button>
-                                )}
-                                <span
-                                  className="absolute -top-1.5 -right-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium"
-                                  style={badgeStyle}
-                                >
-                                  {badgeLabel}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                        {feedback && (
-                          <div className="mt-2 px-4 py-3" style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0' }}>
-                            <p className="text-xs font-medium mb-1" style={{ color: '#4600D6' }}>Your feedback:</p>
-                            <p className="text-sm" style={{ color: '#666666' }}>{feedback}</p>
-                          </div>
-                        )}
+                {earlier.length > 0 && (
+                  <div>
+                    <button
+                      onClick={() => setShowEarlierVersions(!showEarlierVersions)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 text-sm transition-colors"
+                      style={{ color: '#999999' }}
+                    >
+                      {showEarlierVersions ? (
+                        <><ChevronUp className="w-4 h-4" /> Hide earlier rounds</>
+                      ) : (
+                        <><ChevronDown className="w-4 h-4" /> View {earlier.length} earlier round{earlier.length !== 1 ? 's' : ''}</>
+                      )}
+                    </button>
+                    {showEarlierVersions && (
+                      <div className="space-y-6 mt-2">
+                        {earlier.map(([batchNum, batchProofs]) => {
+                          const feedback = batchProofs.find(p => p.status === 'revision_requested' && p.customerFeedback)?.customerFeedback || null
+                          return (
+                            <div key={batchNum}>
+                              <DesignGallery proofs={batchProofs} title={`Round ${batchNum} - ${batchProofs.length} option${batchProofs.length !== 1 ? 's' : ''}`} muted />
+                              {feedback && (
+                                <div className="mt-2 px-4 py-3" style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0' }}>
+                                  <p className="text-xs font-medium mb-1" style={{ color: '#4600D6' }}>Your feedback:</p>
+                                  <p className="text-sm" style={{ color: '#666666' }}>{feedback}</p>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Footer */}
           <div className="mt-12 pt-6 text-center" style={{ borderTop: '1px solid #E0E0E0' }}>
@@ -810,11 +789,19 @@ export default function ApprovalPortal() {
               }
             </p>
           ) : (
-            <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>
-              {isPartner
-                ? "We're working on those revisions now. We'll be in touch shortly."
-                : "We're working on your revisions. Check back soon."}
-            </p>
+            <div>
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md mb-3"
+                style={{ backgroundColor: 'rgba(217, 119, 6, 0.12)', color: '#B45309', fontSize: '12px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}
+              >
+                In revision
+              </span>
+              <p style={{ color: '#666666', fontSize: '15px', lineHeight: 1.6 }}>
+                {isPartner
+                  ? "We're working on those revisions now. We'll be in touch shortly. The designs from this round are below if you want to look through them in the meantime."
+                  : "We're working on your revisions. Check back soon. You can still look through the designs below."}
+              </p>
+            </div>
           )}
           {/* "Don't email us" callout — light purple, sits right under the
               subheader so customers see it before they even scroll to the
@@ -1174,29 +1161,46 @@ export default function ApprovalPortal() {
                 return revProof?.customerFeedback || null
               }
 
+              // In revision: the round just sent back is the one they want
+              // to look at, so it gets the full gallery up top; older rounds
+              // fold away as before.
+              const latestBatch: [number, Proof[]] | null = hasPendingProofs ? null : (sortedBatches[0] ?? null)
+              const foldable: [number, Proof[]][] = hasPendingProofs ? sortedBatches : sortedBatches.slice(1)
+
               return (
                 <div className={hasPendingProofs ? 'mt-4' : ''}>
-                  {hasPendingProofs && (
+                  {!hasPendingProofs && latestBatch && (
+                    <div className="mb-6">
+                      <DesignGallery proofs={latestBatch[1]} title={`This round - ${latestBatch[1].length} option${latestBatch[1].length !== 1 ? 's' : ''}`} />
+                      {getFeedback(latestBatch[1]) && (
+                        <div className="mt-2 px-4 py-3" style={{ backgroundColor: '#FAFAFA', border: '1px solid #E0E0E0', borderRadius: 12 }}>
+                          <p className="text-xs font-medium mb-1" style={{ color: '#4600D6' }}>Your feedback:</p>
+                          <p className="text-sm" style={{ color: '#666666' }}>{getFeedback(latestBatch[1])}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {foldable.length > 0 && (
                     <button
                       onClick={() => setShowEarlierVersions(!showEarlierVersions)}
                       className="w-full flex items-center justify-center gap-2 py-2.5 text-sm transition-colors"
                       style={{ color: '#999999' }}
                     >
                       {showEarlierVersions ? (
-                        <><ChevronUp className="w-4 h-4" /> Hide earlier batches</>
+                        <><ChevronUp className="w-4 h-4" /> Hide earlier rounds</>
                       ) : (
-                        <><ChevronDown className="w-4 h-4" /> View {sortedBatches.length} earlier batch{sortedBatches.length !== 1 ? 'es' : ''}</>
+                        <><ChevronDown className="w-4 h-4" /> View {foldable.length} earlier round{foldable.length !== 1 ? 's' : ''}</>
                       )}
                     </button>
                   )}
-                  {(showEarlierVersions || !hasPendingProofs) && (
+                  {showEarlierVersions && foldable.length > 0 && (
                     <div className="space-y-6 mt-2">
-                      {sortedBatches.map(([batchNum, batchProofs]) => {
+                      {foldable.map(([batchNum, batchProofs]) => {
                         const feedback = getFeedback(batchProofs)
                         return (
                           <div key={batchNum}>
                             <p className="text-xs font-medium mb-2" style={{ color: '#999999', letterSpacing: '0.03em' }}>
-                              Batch {batchNum} - {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
+                              Round {batchNum} - {batchProofs.length} option{batchProofs.length !== 1 ? 's' : ''}
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {batchProofs.map(proof => {
