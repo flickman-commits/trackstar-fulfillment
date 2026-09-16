@@ -19,6 +19,9 @@ interface PostApprovalChecklistProps {
   displayOrderNumber: string
   designStatus: string
   onDesignStatusChange: (newStatus: string) => void
+  /** Partner orders: no Drive link, and the files are a production file plus a photo. */
+  isPartner?: boolean
+  partnerName?: string | null
 }
 
 export default function PostApprovalChecklist({
@@ -26,6 +29,8 @@ export default function PostApprovalChecklist({
   displayOrderNumber,
   designStatus,
   onDesignStatusChange,
+  isPartner = false,
+  partnerName,
 }: PostApprovalChecklistProps) {
   const [isSending, setIsSending] = useState(false)
   const [uploaded, setUploaded] = useState(false)
@@ -90,7 +95,7 @@ export default function PostApprovalChecklist({
       })
       // Update design status
       onDesignStatusChange('sent_to_production')
-      toast.success('Eli has been notified - sent to production!')
+      toast.success(isPartner ? `Eli has been notified: production file + photo uploaded for ${partnerName || 'this partner'}` : 'Eli has been notified - sent to production!')
     } catch {
       toast.error('Failed to notify Eli')
     } finally {
@@ -157,16 +162,18 @@ export default function PostApprovalChecklist({
 
   return (
     <div className="space-y-2">
-      {/* Step 1: Open Google Drive to upload */}
-      <a
-        href={GOOGLE_DRIVE_FOLDER}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-md transition-colors"
-      >
-        <ExternalLink className="w-4 h-4" />
-        Open Google Drive to Upload PDF
-      </a>
+      {/* Step 1: Open Google Drive to upload. Partner files live elsewhere. */}
+      {!isPartner && (
+        <a
+          href={GOOGLE_DRIVE_FOLDER}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-md transition-colors"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Open Google Drive to Upload PDF
+        </a>
+      )}
 
       {/* Step 2: Checkbox — I've uploaded */}
       <button
@@ -182,7 +189,7 @@ export default function PostApprovalChecklist({
         ) : (
           <Square className="w-4 h-4 shrink-0 text-off-black/30" />
         )}
-        PDF exported and uploaded to Google Drive
+        {isPartner ? 'Production File + Photo Uploaded' : 'PDF exported and uploaded to Google Drive'}
       </button>
 
       {/* Step 3: Notify Eli */}

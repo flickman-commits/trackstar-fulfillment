@@ -592,11 +592,14 @@ export default async function handler(req, res) {
       const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
         ? String(shopifyData.name) : `#${order.parentOrderNumber}`
 
-      // Send Slack notification to Eli
+      // Send Slack notification to Eli. Partner orders carry a production
+      // file and a photo, and are named by the partner, not an order number.
+      const isPartner = order.trackstarOrderType === 'race_partner'
+      const text = isPartner
+        ? `📋 <@U09UVEP1N3Y> Production file + photo uploaded for *${order.raceName || displayNum}* - ready for production.`
+        : `📋 <@U09UVEP1N3Y> Final PDF uploaded for order *${displayNum}* - ready for production.`
       if (process.env.SLACK_PROOF_WEBHOOK_URL) {
-        const slackMsg = {
-          text: `📋 <@U09UVEP1N3Y> Final PDF uploaded for order *${displayNum}* - ready for production.`
-        }
+        const slackMsg = { text }
         fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

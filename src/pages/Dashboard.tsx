@@ -198,6 +198,12 @@ const DESIGN_STATUS_CONFIG: Record<DesignStatus, { icon: string; label: string; 
   sent_to_production: { icon: '🟢', label: 'Sent to Production', color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
 }
 
+/** Partner orders are approved by the partner, not a customer. Same status, different word. */
+function designLabel(status: string | null | undefined, orderType?: string | null) {
+  const cfg = DESIGN_STATUS_CONFIG[(status || 'not_started') as DesignStatus] || DESIGN_STATUS_CONFIG.not_started
+  return orderType === 'race_partner' ? cfg.label.replace('Customer', 'Partner') : cfg.label
+}
+
 // Source indicator — shopify/etsy icon for marketplace orders, or a distinct
 // green "Creator" chip for creator-program sample orders so Elí can tell at
 // a glance these are free fulfillments (not paying customers).
@@ -2852,7 +2858,7 @@ Thank you!`
                             <div className="flex items-center gap-2 min-w-0">
                               <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${designConfig.bgColor} ${designConfig.color}`}>
                                 <span>{designConfig.icon}</span>
-                                {designConfig.label}
+                                {designLabel(order.designStatus, order.trackstarOrderType)}
                               </span>
                               {!isPartner && (
                                 <>
@@ -2921,7 +2927,7 @@ Thank you!`
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${designConfig.bgColor} ${designConfig.color}`}>
                                     <span>{designConfig.icon}</span>
-                                    {designConfig.label}
+                                    {designLabel(order.designStatus, order.trackstarOrderType)}
                                   </span>
                                   <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                   {itemCount > 1 && (
@@ -3098,7 +3104,7 @@ Thank you!`
                             <td className="pl-6 pr-3 py-4">
                               <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
                                 <span>{designConfig.icon}</span>
-                                {designConfig.label}
+                                {designLabel(order.designStatus, order.trackstarOrderType)}
                               </span>
                             </td>
                             <td className="px-3 py-4">
@@ -3169,7 +3175,7 @@ Thank you!`
                             <td className="px-3 py-4">
                               <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
                                 <span>{designConfig.icon}</span>
-                                {designConfig.label}
+                                {designLabel(order.designStatus, order.trackstarOrderType)}
                               </span>
                             </td>
                             <td className="px-3 py-4">
@@ -3227,7 +3233,7 @@ Thank you!`
                                 <td className="px-3 py-4">
                                   <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
                                     <span>{designConfig.icon}</span>
-                                    {designConfig.label}
+                                    {designLabel(order.designStatus, order.trackstarOrderType)}
                                   </span>
                                 </td>
                                 <td className="px-3 py-4">
@@ -4335,7 +4341,7 @@ Thank you!`
                           >
                             {(Object.entries(DESIGN_STATUS_CONFIG) as [DesignStatus, typeof DESIGN_STATUS_CONFIG[DesignStatus]][]).map(([status, config]) => (
                               <option key={status} value={status}>
-                                {config.icon} {config.label}
+                                {config.icon} {designLabel(status, selectedOrder.trackstarOrderType)}
                               </option>
                             ))}
                           </select>
@@ -4493,6 +4499,8 @@ Thank you!`
                             displayOrderNumber={selectedOrder.displayOrderNumber}
                             designStatus={selectedOrder.designStatus}
                             onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
+                            isPartner={selectedOrder.trackstarOrderType === 'race_partner'}
+                            partnerName={selectedOrder.raceName}
                           />
                         )}
 
@@ -4651,7 +4659,7 @@ Thank you!`
                           >
                             {(Object.entries(DESIGN_STATUS_CONFIG) as [DesignStatus, typeof DESIGN_STATUS_CONFIG[DesignStatus]][]).map(([status, config]) => (
                               <option key={status} value={status}>
-                                {config.icon} {config.label}
+                                {config.icon} {designLabel(status, selectedOrder.trackstarOrderType)}
                               </option>
                             ))}
                           </select>
@@ -4703,6 +4711,8 @@ Thank you!`
                           displayOrderNumber={selectedOrder.displayOrderNumber}
                           designStatus={ds}
                           onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
+                          isPartner={selectedOrder.trackstarOrderType === 'race_partner'}
+                          partnerName={selectedOrder.raceName}
                         />
                       )}
 
@@ -4763,6 +4773,8 @@ Thank you!`
                           displayOrderNumber={selectedOrder.displayOrderNumber}
                           designStatus={ds}
                           onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
+                          isPartner={selectedOrder.trackstarOrderType === 'race_partner'}
+                          partnerName={selectedOrder.raceName}
                         />
                       )}
 
