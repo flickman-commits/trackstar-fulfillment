@@ -15,6 +15,17 @@ export default {
     2025: '2025-10-05',
     2026: '2026-10-04',
   },
+  // 2023 is a real date with no finishers behind it: the marathon was called
+  // off about two hours before the start over record heat. The date below is
+  // the day it was due to run and was cancelled, so a 2023 lookup correctly
+  // finds nobody — that is not a broken scraper and should not be "fixed".
+  raceDateSources: {
+    2022: 'Wikipedia Twin Cities Marathon per-edition table + usamarathonlist.com race details naming 2 October 2022',
+    2023: 'CNN report published 2023-10-01 on the cancellation + MPR News 2023-10-01 ("canceled amid forecast for record-setting heat")',
+    2024: 'Running USA race report naming 6 October 2024 (Kimining/Bookmyer titles) + MTEC Results event page for the 2024 Medtronic Twin Cities Marathon',
+    2025: 'V.O2 (vdoto2.com) event page dated 2025-10-05 + tcmevents.org pro-fields release giving the marathon as Sunday October 5',
+    2026: 'tcmevents.org event page giving the marathon as Sunday October 4 2026 at 8:00 CT + ahotu listing "03-04 Oct, 2026 (Sat - Sun)"',
+  },
   eventTypes: ['Marathon', '10 Mile'],
   eventSearchOrder: ['marathon', 'tenMile'],
   eventLabels: {

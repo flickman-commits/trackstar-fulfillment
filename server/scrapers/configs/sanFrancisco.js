@@ -32,6 +32,16 @@ export default {
     2025: '2025-07-27',
     2026: '2026-07-26',
   },
+  // thesfmarathon.com headlines the weekend ("July 25 - 26, 2026"); the
+  // marathon itself is the Sunday. MarathonGuide's MIDD encodes the race day
+  // (521 + YYMMDD), which is why it is cited as a date source for 2022.
+  raceDateSources: {
+    2022: 'MarathonGuide results MIDD=521220724 + Bleacher Report "San Francisco Marathon Results 2022" naming 24 July 2022',
+    2023: 'SF Chronicle race report on the 2023 marathon + Runner\'s Gazette write-up (Zimmermann/Daubord) naming 23 July 2023',
+    2024: 'thesfmarathon.com race-results index for the 2024 edition + V.O2 (vdoto2.com) San Francisco Marathon listing dated 2024-07-28',
+    2025: 'thesfmarathon.com race-results index for the 2025 edition + V.O2 (vdoto2.com) listing dated 2025-07-27',
+    2026: 'thesfmarathon.com giving race weekend July 25-26 2026 with the marathon on the Sunday + marathonscout.com 2026 San Francisco Marathon results',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   eventLabels: { marathon: 'Marathon', half: 'Half Marathon' },

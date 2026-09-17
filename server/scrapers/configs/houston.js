@@ -59,6 +59,15 @@ export default {
     2025: '2025-01-19',
     2026: '2026-01-11',
   },
+  // The marathon is the Sunday of a Sat/Sun weekend, so listings that give a
+  // range (e.g. "January 18 - 19, 2025") are naming the weekend, not race day.
+  raceDateSources: {
+    2022: 'Athletics Illustrated report on the 2022 Chevron Houston Marathon (Ngandu/D\'Amato, 16 January 2022) + chevronhoustonmarathon.com 50th-anniversary release',
+    2023: 'runblogrun race report published 2023-01-15 + LetsRun.com 2023 Houston Marathon results coverage dated 2023-01-15',
+    2024: 'chevronhoustonmarathon.com FAQ giving Saturday January 13 - Sunday January 14 2024 + AIMS race information page for the 2024 edition',
+    2025: 'chevronhoustonmarathon.com FAQ giving Saturday January 18 - Sunday January 19 2025 + AIMS race information page for the 2025 edition',
+    2026: 'chevronhoustonmarathon.com "When is the race?" FAQ naming Sunday January 11 2026 + AIMS race information page',
+  },
   eventIds: {
     2019: 711053,
     2020: 881836,

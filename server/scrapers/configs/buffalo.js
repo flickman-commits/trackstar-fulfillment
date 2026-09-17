@@ -3,7 +3,12 @@
  * Results: https://scorethis-results.com/Results.php?raceid={YYYYMMDD}BFLM
  * Data: https://scorethis-results.com/ResultFiles/{YYYYMMDD}BFLM.txt
  *
- * Race held on the last Sunday in May (day before Memorial Day).
+ * The date is not cosmetic here: it IS the lookup key ({YYYYMMDD} + BFLM), so a
+ * day out means no results at all rather than wrong weather. Score This's own
+ * archive encodes the race day in the raceid, which makes the timing platform
+ * the primary source for every year below — do not derive a day from the
+ * Memorial Day weekend pattern, and note the marathon is the Sunday while the
+ * 5K is the Saturday, so weekend ranges in listings are not the race day.
  * Confirmed years: 2017, 2022, 2023, 2024, 2025, 2026
  * 2026 URL: https://scorethis-results.com/ResultFiles/20260524BFLM.txt
  *
@@ -45,6 +50,13 @@ export default {
     2024: '2024-05-26',
     2025: '2025-05-25',
     2026: '2026-05-24',
+  },
+  raceDateSources: {
+    2022: 'Score This!!! results archive raceid 20220529BFLM + RunSignup race-results listing for the 2022 edition',
+    2023: 'Score This!!! results archive raceid 20230528BFLM + WGRZ report "Buffalo Marathon Sunday May 28" (2023)',
+    2024: 'Score This!!! results archive raceid 20240526BFLM + V.O2 (vdoto2.com) event listing dated 2024-05-26',
+    2025: 'Score This!!! results archive raceid 20250525BFLM + WGRZ 2025 race-winners report dated May 25 2025',
+    2026: 'Score This!!! result file 20260524BFLM + findtherun.com listing giving the marathon start as Sunday 24 May 2026',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   defaultEventType: 'Marathon',

@@ -77,5 +77,16 @@ export default {
     2024: '2024-09-15',
     2025: '2025-08-31',
     2026: '2026-08-30',
+  },
+  // This is the config that motivated the sourcing requirement: Sydney moved
+  // from mid-September to late August in 2025, so any rule fitted to 2022-2024
+  // returns a date three weeks wrong for 2025 and 2026. Every year is sourced
+  // individually for that reason.
+  raceDateSources: {
+    2022: 'Athletics Illustrated 2022 Sydney Marathon results report naming Sunday 18 September 2022 + MultiSport Australia "Blackmores Sydney Running Festival (2022)" results',
+    2023: 'MultiSport Australia "Sydney Marathon (2023)" results + MarathonGuide 2023 Sydney Marathon results page',
+    2024: 'World Athletics report on the 2024 TCS Sydney Marathon (Edesa/Misoi course records) + MarathonGuide 2024 results',
+    2025: 'Wikipedia 2025 Sydney Marathon per-edition article (Hassan/Kiros course records) + marathonscout.com Sydney results',
+    2026: 'MultiSport Australia "TCS Sydney Marathon presented by ASICS (2026)" results + marathonscout.com 2026 results (Gobena/Jepchirchir)',
   }
 }

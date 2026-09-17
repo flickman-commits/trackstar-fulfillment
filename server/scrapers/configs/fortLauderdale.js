@@ -43,6 +43,18 @@ export default {
     2025: '2025-02-16',
     2026: '2026-02-15',
   },
+  // Sourced per year, not derived. The set looks like a fixed February Sunday
+  // and is not one: 2027 runs Feb 13-14, a week earlier in the month than 2026,
+  // so a date extrapolated from the pattern would be wrong. MarathonGuide's MIDD
+  // encodes the race day (2368 + YYMMDD), which makes it a date source rather
+  // than a listing.
+  raceDateSources: {
+    2022: 'MarathonGuide results MIDD=2368220220 + Trifind results listing "February 20, 2022" + splitsecondtiming.com 2022 a1afull results',
+    2023: 'MarathonGuide results MIDD=2368230219 + splitsecondtiming.com 2023 A1A results',
+    2024: 'MarathonGuide results MIDD=2368240218 + Athlinks event 1073139 full-marathon results (Logan Howard 2:30:22)',
+    2025: 'MarathonGuide results MIDD=2368250216 + goandrace.com event page "Publix Fort Lauderdale A1A Marathon 2025, February 16"',
+    2026: 'local10.com race-day report published 2026-02-15 + Publix/Colavita press release giving the 21st running as Sunday February 15th 2026',
+  },
   eventIds: {
     2022: 1007295,
     2023: 1042727,
