@@ -28,6 +28,13 @@ export default {
     2025: '2025-05-04',
     2026: '2026-05-03',
   },
+  raceDateSources: {
+    2022: 'findmymarathon.com per-year race archive (2,606 finishers) + marathonguide.com Pittsburgh Marathon results',
+    2023: 'findmymarathon.com per-year race archive (3,004 finishers) + marathonguide.com Pittsburgh Marathon results',
+    2024: 'marathonguide.com 2024 Pittsburgh Marathon results page + findmymarathon.com archive (3,587 finishers)',
+    2025: 'findmymarathon.com per-year race archive (3,784 finishers) + marathonscout.com Pittsburgh results',
+    2026: 'cbsnews.com/pittsburgh race-day results report naming Sun May 3 + results.raceroster.com official 2026 Pittsburgh Marathon Weekend results',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
   eventLabels: {
