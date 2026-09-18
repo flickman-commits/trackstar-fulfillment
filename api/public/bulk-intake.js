@@ -50,7 +50,7 @@ export default async function handler(req, res) {
         previewImageUrl = bulk.previewImageUrl || null
         if (!previewImageUrl && bulk.partnerOrderId) {
           const proof = await prisma.proof.findFirst({ where: { orderId: bulk.partnerOrderId, status: 'approved' }, select: { thumbnailUrl: true, imageUrl: true } })
-          previewImageUrl = proof?.thumbnailUrl || proof?.imageUrl || null
+          previewImageUrl = proof?.imageUrl || proof?.thumbnailUrl || null
         }
       }
       return res.status(200).json({

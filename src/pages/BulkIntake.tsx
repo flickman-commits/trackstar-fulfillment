@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Trash2, Loader2, CheckCircle2, Upload, Download, Copy, Link2, ChevronDown, ChevronUp } from 'lucide-react'
+import ProofFullscreen from '@/components/ProofFullscreen'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -62,6 +63,7 @@ export default function BulkIntake() {
   const [mode, setMode] = useState<'paste' | 'link'>('paste')
   const [copied, setCopied] = useState(false)
   const [receivedOpen, setReceivedOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ added: number; duplicates: number; rejected: { name?: string; reason: string }[] } | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -135,6 +137,9 @@ export default function BulkIntake() {
 
   return shell(
     <>
+      {previewOpen && info.previewImageUrl && (
+        <ProofFullscreen proofs={[{ id: 'preview', imageUrl: info.previewImageUrl }]} index={0} onIndexChange={() => {}} onClose={() => setPreviewOpen(false)} counterLabel="Your co-branded print" />
+      )}
       <div className="rounded-2xl p-6 mb-4" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
         <div className="flex gap-5">
           <div className="flex-1 min-w-0">
@@ -143,9 +148,9 @@ export default function BulkIntake() {
             <p className="text-sm mt-1" style={{ color: '#666' }}>For each runner we need their first and last name and shipping address to be able to create and send their Trackstar print.</p>
           </div>
           {info.previewImageUrl && (
-            <div className="shrink-0 w-24 h-32 rounded-xl overflow-hidden" style={{ backgroundColor: '#E9EBEE', border: `1px solid ${T.line}` }} title="Your co-branded print">
+            <button type="button" onClick={() => setPreviewOpen(true)} className="shrink-0 w-28 h-28 rounded-xl overflow-hidden" style={{ backgroundColor: '#E9EBEE', border: `1px solid ${T.line}` }} title="See your co-branded print full screen">
               <img src={info.previewImageUrl} alt="Your co-branded print" className="w-full h-full object-cover" draggable={false} onContextMenu={e => e.preventDefault()} />
-            </div>
+            </button>
           )}
         </div>
         {/* Progress toward the invoiced count */}
