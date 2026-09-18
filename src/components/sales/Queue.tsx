@@ -84,7 +84,7 @@ export default function Queue({
   scope: 'mine' | 'all'; onScope: (s: 'mine' | 'all') => void
   today: {
     sentToday: Deal[]; newOutreach: Deal[]; newWaiting: number; followUps: Deal[]; later: Deal[]; exhausted: Deal[]
-    needsContact: Deal[]; skipped: Deal[]; overnight: OvernightRun | null; cap: number; member: { id: string; email: string } | null
+    needsContact: Deal[]; skipped: Deal[]; overnight: OvernightRun | null; cap: number; member: { id: string; email: string; name: string } | null
   } | null
   pendingSendIds: Set<string>
   selectedId: string | null; onSelect: (id: string) => void
@@ -128,7 +128,7 @@ export default function Queue({
                 className="normal-case tracking-normal font-sans text-[10.5px] px-1.5 py-0.5 rounded border border-border-gray text-off-black/55 hover:text-off-black hover:bg-subtle-gray"
                 title={scope === 'mine' ? 'Deals you own in Attio, plus unowned ones. Click for everyone\'s.' : 'Everyone\'s deals. Click for just yours.'}
               >
-                {scope === 'mine' ? 'Mine' : 'Everyone'}
+                {scope === 'mine' ? (today?.member?.name || 'Mine') : 'Everyone'}
               </button>
             </span>
             <span>{mode === 'new' ? `${newLeft} left` : `${dueLeft} due`}</span>

@@ -169,7 +169,7 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
     cap,
     room,
     scope: scopeMode === 'all' ? 'all' : 'mine',
-    member: owner.member ? { id: owner.member.id, email: owner.member.email } : null,
+    member: owner.member ? { id: owner.member.id, email: owner.member.email, name: `${owner.member.firstName} ${owner.member.lastName}`.trim() } : null,
     timezone: settings.timezone,
     undoSeconds: settings.undoSeconds,
     sentTodayCount: today.length,

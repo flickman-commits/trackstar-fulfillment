@@ -107,7 +107,7 @@ export interface TodayPayload {
   cap: number
   room: number
   scope: 'mine' | 'all'
-  member: { id: string; email: string } | null
+  member: { id: string; email: string; name: string } | null
   timezone: string
   undoSeconds: number
   sentTodayCount: number
@@ -162,7 +162,7 @@ export interface Asset {
 export interface SalesStatus {
   llm: { configured: boolean; provider?: string; model?: string; baseUrl?: string; canSearch?: boolean }
   gmail: { configured: boolean; connected: boolean; email: string | null; canReadReplies?: boolean }
-  attio: { configured: boolean; member: { id: string; email: string } | null }
+  attio: { configured: boolean; member: { id: string; email: string; name: string } | null }
   library: { configured: boolean }
   me: { id: string; email: string; firstName: string | null; role: string }
   lastRun: OvernightRun | null

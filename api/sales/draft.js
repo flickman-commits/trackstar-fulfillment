@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         llm: llmInfo(),
         gmail: await gmailStatus(actor.id),
-        attio: { configured: isAttioConfigured(), member: member ? { id: member.id, email: member.email } : null },
+        attio: { configured: isAttioConfigured(), member: member ? { id: member.id, email: member.email, name: `${member.firstName} ${member.lastName}`.trim() } : null },
         library: { configured: isAssetStorageConfigured() },
         me: { id: actor.id, email: actor.email, firstName: actor.firstName || null, role: actor.role },
         lastRun: await lastRun(),

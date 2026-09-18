@@ -154,10 +154,15 @@ export async function readAsset(id) {
 export async function pickAssetFor(deal) {
   const images = (await listAssets()).filter(f => f.kind === 'image')
   if (!images.length) return null
-  const haystack = `${deal.name || ''} ${deal.company?.name || ''} ${deal.notes || ''}`.toLowerCase()
+  // The deal's races are the strongest signal: "New York City Marathon" on
+  // the deal should find NYC_SIR_Mockup.png. Common short forms are added so
+  // a filename's abbreviation still matches.
+  const alias = { 'new york city marathon': 'nyc new york', 'marine corps marathon': 'mcm marine corps', 'california international marathon': 'cim sacramento' }
+  const races = (deal.races || []).map(r => `${r} ${alias[r.toLowerCase()] || ''}`).join(' ')
+  const haystack = `${deal.name || ''} ${deal.company?.name || ''} ${races} ${deal.notes || ''}`.toLowerCase()
   const scored = images
     .map(f => {
-      const words = f.filename.toLowerCase().replace(/\.[a-z0-9]+$/, '').split(/[_\-\s]+/).filter(w => w.length > 3 && !['mockup', 'print', 'poster', 'example'].includes(w))
+      const words = f.filename.toLowerCase().replace(/\.[a-z0-9]+$/, '').split(/[_\-\s]+/).filter(w => w.length > 2 && !['mockup', 'print', 'poster', 'example', 'marathon', 'the', 'and'].includes(w))
       return { file: f, hits: words.filter(w => haystack.includes(w)).length }
     })
     .filter(x => x.hits > 0)

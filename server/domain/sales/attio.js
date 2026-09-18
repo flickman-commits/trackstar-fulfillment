@@ -40,7 +40,7 @@ export const MOTIONS = ['Race', 'Charity', 'Corporate']
 
 /** Deal attributes the tool reads or writes. The settings check reports any that are missing. */
 export const DEAL_ATTRIBUTES = {
-  reads: ['name', 'stage', 'motion', 'owner', 'associated_company', 'associated_people', 'touch_count', 'next_action', 'next_action_date', 'race_date', 'runners', 'tier', 'size_tier', 'priority', 'deal_notes', 'value', 'units'],
+  reads: ['name', 'stage', 'motion', 'owner', 'associated_company', 'associated_people', 'touch_count', 'next_action', 'next_action_date', 'race_date', 'runners', 'tier', 'size_tier', 'priority', 'races', 'deal_notes', 'value', 'units'],
   writes: ['stage', 'touch_count', 'next_action', 'next_action_date'],
 }
 
@@ -186,7 +186,10 @@ export function dealView(record) {
     runners: val(record, 'runners'),
     tier: val(record, 'tier'),
     sizeTier: val(record, 'size_tier'),
-    priority: val(record, 'priority'),
+    // Titled "🔥 High" in the workspace; the emoji is decoration.
+    priority: (val(record, 'priority') || '').replace(/[^\p{L}\s]/gu, '').trim() || null,
+    // Charity deals: which marathons the team fields. Drives the mockup pick.
+    races: multi(record, 'races'),
     notes: val(record, 'deal_notes'),
     value: val(record, 'value'),
     units: val(record, 'units'),
