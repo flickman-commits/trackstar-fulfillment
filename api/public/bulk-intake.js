@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     const token = String((req.method === 'GET' ? req.query?.token : body.token) || '')
     if (!token || token.length > 80) return res.status(404).json({ error: 'not_found' })
     const bulk = await prisma.bulkOrder.findUnique({ where: { intakeToken: token } })
-    if (!bulk || ['submitted', 'done'].includes(bulk.status)) return res.status(404).json({ error: 'not_found' })
+    if (!bulk || bulk.status === 'submitted') return res.status(404).json({ error: 'not_found' })
 
     if (req.method === 'GET') {
       const count = await prisma.order.count({ where: { bulkOrderId: bulk.id } })

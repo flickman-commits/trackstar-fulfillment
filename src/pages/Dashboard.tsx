@@ -1075,6 +1075,7 @@ export default function Dashboard() {
   const [newRaceValues, setNewRaceValues] = useState({ raceName: '', year: new Date().getFullYear().toString(), raceDate: '', location: '' })
   // Tab switcher: standard vs custom order view
   const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner' | 'bulk'>('standard')
+  const [bulkCount, setBulkCount] = useState<number | null>(null)
   // "New Partner" modal state
   const [showNewRacePartner, setShowNewRacePartner] = useState(false)
   const [newPartnerValues, setNewPartnerValues] = useState({ partnerName: '', raceYear: String(new Date().getFullYear()), contactName: '', contactEmail: '' })
@@ -2654,7 +2655,7 @@ Thank you!`
                 <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
               </h2>
               <span className="hidden md:inline px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
-                {ordersToFulfill.length}
+                {activeView === 'bulk' ? (bulkCount ?? '') : ordersToFulfill.length}
               </span>
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
             </div>
@@ -2703,6 +2704,7 @@ Thank you!`
             <BulkView
               onOpenRunner={(orderNumber) => { const o = orders.find(x => x.orderNumber === orderNumber); if (o) setSelectedOrder(o); else fetchOrders().then(() => { const oo = orders.find(x => x.orderNumber === orderNumber); if (oo) setSelectedOrder(oo) }) }}
               refreshRunners={() => { fetchOrders() }}
+              onCount={setBulkCount}
             />
           ) : (
           <div className="bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">

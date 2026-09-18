@@ -144,6 +144,7 @@ export default async function handler(req, res) {
         if (k === 'raceDate' || k === 'dueDate') v = v ? new Date(v) : null
         if (k === 'frameType' && !FRAME_OPTIONS.includes(v)) continue
         if (k === 'productSize' && !SIZE_OPTIONS.includes(v)) continue
+        if (k === 'status' && !['collecting', 'fulfillment', 'submitted'].includes(v)) continue
         if (typeof v === 'string') v = v.trim() || null
         if (k === 'partnerName' && !v) continue
         if (k === 'raceName' && v) v = getCanonicalRaceName(v) || v
@@ -204,7 +205,7 @@ export default async function handler(req, res) {
       // Small batches: each runner is a live scrape, and the request has to
       // finish well inside the function's time limit.
       const out = await researchPending(bulk, { limit: Math.min(5, Math.max(1, parseInt(body.limit, 10) || 3)) })
-      if (bulk.status === 'collecting') await prisma.bulkOrder.update({ where: { id: bulk.id }, data: { status: 'researching' } })
+      if (bulk.status === 'collecting') await prisma.bulkOrder.update({ where: { id: bulk.id }, data: { status: 'fulfillment' } })
       return res.status(200).json({ ...out, bulkOrder: await loadOne(bulk.id) })
     }
 

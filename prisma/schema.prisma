@@ -212,7 +212,7 @@ model BulkOrder {
   previewImageUrl   String?   // What the finished print should look like
   raceDate          DateTime?
   dueDate           DateTime? // raceDate + 3 days unless set by hand
-  status            String    @default("collecting") // collecting | researching | printing | submitted | done
+  status            String    @default("collecting") // collecting | fulfillment | submitted
   submittedAt       DateTime?
   intakeToken       String    @unique @default(cuid()) // /intake/<token> for the partner
   intakeNote        String?   // Shown to the partner on the intake page
