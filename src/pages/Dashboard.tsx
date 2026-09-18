@@ -4,6 +4,7 @@ import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
+import BulkView from '@/components/bulk/BulkView'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import StatsPanel from '@/components/StatsPanel'
@@ -118,7 +119,7 @@ interface Order {
   effectiveRunnerName?: string
   hasOverrides?: boolean
   // Trackstar order type and custom order fields
-  trackstarOrderType?: 'standard' | 'custom' | 'race_partner'
+  trackstarOrderType?: 'standard' | 'custom' | 'race_partner' | 'bulk'
   // Partner fields (only populated when trackstarOrderType === 'race_partner').
   // The stored value keeps its 'race_partner' name; only the labels changed,
   // when charities and other co-branded partners joined the same view.
@@ -297,7 +298,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     effectiveRunnerName: order.effectiveRunnerName as string | undefined,
     hasOverrides: order.hasOverrides as boolean | undefined,
     // Custom order fields
-    trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | undefined,
+    trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | 'bulk' | undefined,
     designStatus: order.designStatus as DesignStatus | undefined,
     dueDate: order.dueDate as string | undefined,
     customerEmail: order.customerEmail as string | undefined,
@@ -1073,7 +1074,7 @@ export default function Dashboard() {
   const [showAddRace, setShowAddRace] = useState(false)
   const [newRaceValues, setNewRaceValues] = useState({ raceName: '', year: new Date().getFullYear().toString(), raceDate: '', location: '' })
   // Tab switcher: standard vs custom order view
-  const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner'>('standard')
+  const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner' | 'bulk'>('standard')
   // "New Partner" modal state
   const [showNewRacePartner, setShowNewRacePartner] = useState(false)
   const [newPartnerValues, setNewPartnerValues] = useState({ partnerName: '', raceYear: String(new Date().getFullYear()), contactName: '', contactEmail: '' })
@@ -2649,8 +2650,8 @@ Thank you!`
           <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
             <div className="flex items-center gap-3">
               <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
-                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : 'Partners'}</span>
-                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : 'Partners'}</span>
+                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
+                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
               </h2>
               <span className="hidden md:inline px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
                 {ordersToFulfill.length}
@@ -2661,12 +2662,13 @@ Thank you!`
             <div className="relative md:hidden">
               <select
                 value={activeView}
-                onChange={(e) => { setActiveView(e.target.value as 'standard' | 'custom' | 'race_partner'); setSearchQuery('') }}
+                onChange={(e) => { setActiveView(e.target.value as 'standard' | 'custom' | 'race_partner' | 'bulk'); setSearchQuery('') }}
                 className="appearance-none pl-3 pr-7 py-1.5 text-xs font-medium rounded-full border border-border-gray bg-white text-off-black focus:outline-none focus:ring-2 focus:ring-off-black/20"
               >
                 <option value="standard">Standard</option>
                 <option value="custom">Custom</option>
                 <option value="race_partner">Partners</option>
+                <option value="bulk">Bulk</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
                 <ChevronDownIcon className="w-3.5 h-3.5 text-off-black/40" />
@@ -2682,6 +2684,7 @@ Thank you!`
                 ['standard', 'Standard'],
                 ['custom', 'Custom'],
                 ['race_partner', 'Partners'],
+                ['bulk', 'Bulk'],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
@@ -2694,7 +2697,14 @@ Thank you!`
             </div>
           </div>
 
-          {/* Content Card */}
+          {/* Bulk is its own screen: a table of runs, not a list of orders. The
+              runner rows are still orders, so the modal below opens them. */}
+          {activeView === 'bulk' ? (
+            <BulkView
+              onOpenRunner={(orderNumber) => { const o = orders.find(x => x.orderNumber === orderNumber); if (o) setSelectedOrder(o); else fetchOrders().then(() => { const oo = orders.find(x => x.orderNumber === orderNumber); if (oo) setSelectedOrder(oo) }) }}
+              refreshRunners={() => { fetchOrders() }}
+            />
+          ) : (
           <div className="bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
             {/* Search + Race filter inside card. On mobile they stack;
                 on md+ they sit side-by-side with the race select fixed width. */}
@@ -3278,6 +3288,7 @@ Thank you!`
               )}
             </div>
           </div>
+          )}
         </section>
         )}
 

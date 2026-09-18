@@ -164,12 +164,13 @@ export default async function handler(req, res) {
 
     // Support filtering by order type: ?type=standard | custom | race_partner
     const whereClause = {}
-    if (type === 'standard' || type === 'custom' || type === 'race_partner') {
+    if (type === 'standard' || type === 'custom' || type === 'race_partner' || type === 'bulk') {
       whereClause.trackstarOrderType = type
     } else {
-      // No type specified: exclude race_partner rows from the default "all" query
-      // so they never leak into customer-order analytics or list views.
-      whereClause.trackstarOrderType = { not: 'race_partner' }
+      // No type specified: exclude partner design rows and bulk runners from
+      // the default "all" query so they never leak into customer-order
+      // analytics or list views.
+      whereClause.trackstarOrderType = { notIn: ['race_partner', 'bulk'] }
     }
 
     // Fetch orders with their research data and race info
@@ -313,9 +314,11 @@ export default async function handler(req, res) {
         delayNoticeSentAt: order.delayNoticeSentAt,
         delayNoticeDaysLate: order.delayNoticeDaysLate,
         // Shopify display order number (e.g. "2855") and order date for sorting
+        // Bulk runners are BULK-0001-17: the parent alone would name a hundred
+        // files the same, so the line number stays in.
         displayOrderNumber: order.shopifyOrderData?.name
           ? String(order.shopifyOrderData.name).replace('#', '')
-          : order.parentOrderNumber,
+          : order.trackstarOrderType === 'bulk' ? order.orderNumber : order.parentOrderNumber,
         // Shipping info — expose for expedited badge + callout in dashboard
         shippingMethod: getShippingMethod(order.shopifyOrderData),
         isExpedited: isExpeditedShipping(order.shopifyOrderData),

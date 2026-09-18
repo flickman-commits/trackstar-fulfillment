@@ -73,6 +73,13 @@ const routes = [
   // Public storefront results lookup (gated behind PUBLIC_LOOKUP_ENABLED).
   { method: 'get',    path: '/api/public/results-lookup',  handler: '../api/public/results-lookup.js' },
   { method: 'get',    path: '/api/public/approval-preview', handler: '../api/public/approval-preview.js' },
+  // Bulk partner orders
+  { method: 'get',    path: '/api/bulk',                   handler: '../api/bulk/index.js' },
+  { method: 'post',   path: '/api/bulk',                   handler: '../api/bulk/index.js' },
+  { method: 'post',   path: '/api/bulk/files',             handler: '../api/bulk/files.js' },
+  { method: 'get',    path: '/api/bulk/sheet',             handler: '../api/bulk/sheet.js' },
+  { method: 'get',    path: '/api/public/bulk-intake',     handler: '../api/public/bulk-intake.js' },
+  { method: 'post',   path: '/api/public/bulk-intake',     handler: '../api/public/bulk-intake.js' },
   // Marathon Monopoly proposal page (gated behind MONOPOLY_PAGE_ENABLED).
   { method: 'get',    path: '/api/public/monopoly',        handler: '../api/public/monopoly.js' },
   { method: 'get',    path: '/api/admin/monopoly-model',   handler: '../api/admin/monopoly-model.js' },

@@ -5,6 +5,7 @@ import { useEffect, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import Dashboard from '@/pages/Dashboard'
 import ApprovalPortal from '@/pages/ApprovalPortal'
+import BulkIntake from '@/pages/BulkIntake'
 import CreatorsHome from '@/pages/CreatorsHome'
 import BriefsAdmin from '@/pages/BriefsAdmin'
 import CreatorPortal from '@/pages/CreatorPortal'
@@ -153,6 +154,8 @@ export default function App() {
         <Routes>
           {/* Public routes — no password gate */}
           <Route path="/approve/:token" element={<ApprovalPortal />} />
+          {/* A partner's runner list for a bulk order. The link is the credential. */}
+          <Route path="/intake/:token" element={<BulkIntake />} />
           <Route path="/creator/:token" element={<CreatorPortal />} />
           <Route path="/apply" element={<CreatorApply />} />
           {/* The page lives on monopoly.trackstar.art now. */}

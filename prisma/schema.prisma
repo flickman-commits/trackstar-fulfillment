@@ -32,7 +32,7 @@ model Order {
   createdAt          DateTime  @default(now())
 
   // Trackstar order classification
-  trackstarOrderType String    @default("standard") // "standard" | "custom" | "race_partner"
+  trackstarOrderType String    @default("standard") // "standard" | "custom" | "race_partner" | "bulk"
   // Note: race_partner rows reuse raceName as the partner name and
   // customerName/customerEmail as the partner contact — no schema change needed.
 
@@ -109,6 +109,12 @@ model Order {
   proofs           Proof[]
   messages         OrderMessage[]
   creatorSample    Creator?  @relation("CreatorSample") // Set iff this is a creator-program sample order
+  // Bulk partner orders: one runner per row, grouped under a BulkOrder. The
+  // address is the runner's own; every print ships separately.
+  bulkOrderId      String?
+  bulkOrder        BulkOrder? @relation(fields: [bulkOrderId], references: [id], onDelete: Cascade)
+  shippingAddress  Json?      // { line1, line2, city, state, zip, country }
+  productionFileUrl String?   // Public URL of the finished print file, for the Artelo sheet
 
   @@unique([parentOrderNumber, lineItemIndex]) // Each line item is unique within an order
   @@index([orderNumber])
@@ -185,6 +191,40 @@ model RunnerResearch {
   @@index([orderId])
   @@index([raceId])
   @@index([researchStatus])
+}
+
+// A partner's prepaid run of prints for one race: the invoice, the runner list,
+// the co-branded production file, and the Artelo sheet that ships it. Runners
+// are real Order rows (trackstarOrderType "bulk") so research, weather, the
+// filename convention and the order modal all work on them unchanged.
+model BulkOrder {
+  id                String    @id @default(cuid())
+  number            String    @unique   // "BULK-0001", the parentOrderNumber on its runners
+  partnerName       String
+  raceName          String
+  raceYear          Int
+  quantity          Int       @default(0) // What was invoiced; the runner count may differ
+  frameType         String    @default("Natural Premium Oak") // Artelo framing value
+  productSize       String    @default("12x18")
+  stripeInvoiceUrl  String?
+  paidAt            DateTime?
+  productionFileUrl String?   // Google Drive link to the co-branded Illustrator file
+  previewImageUrl   String?   // What the finished print should look like
+  raceDate          DateTime?
+  dueDate           DateTime? // raceDate + 3 days unless set by hand
+  status            String    @default("collecting") // collecting | researching | printing | submitted | done
+  submittedAt       DateTime?
+  intakeToken       String    @unique @default(cuid()) // /intake/<token> for the partner
+  intakeNote        String?   // Shown to the partner on the intake page
+  notes             String?
+  partnerOrderId    String?   // The race_partner design order this belongs to, if any
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  runners           Order[]
+
+  @@index([dueDate])
+  @@index([status])
 }
 
 model OrderComment {
