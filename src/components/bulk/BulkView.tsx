@@ -72,7 +72,7 @@ export interface BulkOrder {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  collecting: 'Collecting runner info',
+  collecting: 'Collecting Info',
   fulfillment: 'Fulfillment',
   submitted: 'Sent to Artelo',
 }
@@ -83,7 +83,7 @@ const STATUS_STYLE: Record<string, { icon: string; color: string; bg: string; bo
   submitted: { icon: '🟢', color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
 }
 const STAGES: { key: string; label: string }[] = [
-  { key: 'collecting', label: 'Collect runners' },
+  { key: 'collecting', label: 'Collecting Info' },
   { key: 'fulfillment', label: 'Fulfillment' },
   { key: 'submitted', label: 'Sent to Artelo' },
 ]
@@ -192,7 +192,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount }: {
                       ) : <span className="text-off-black/40">No race date</span>}
                     </td>
                     <td className="px-3 py-3">{b.paidAt ? <Chip tone="green">Paid</Chip> : <Chip tone="amber">Unpaid</Chip>}</td>
-                    <td className="px-3 py-3"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-medium ${st.bg} ${st.color} ${st.border}`}>{st.icon} {STATUS_LABEL[b.status] || b.status}</span></td>
+                    <td className="px-3 py-3"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap ${st.bg} ${st.color} ${st.border}`}>{st.icon} {STATUS_LABEL[b.status] || b.status}</span></td>
                   </tr>
                 )
               })}

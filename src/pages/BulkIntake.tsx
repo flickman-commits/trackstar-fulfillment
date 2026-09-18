@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Trash2, Loader2, CheckCircle2 } from 'lucide-react'
+import { Plus, Trash2, Loader2, CheckCircle2, Upload } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -21,10 +21,13 @@ const input = 'w-full px-3 py-2 text-sm rounded-md focus:outline-none focus:ring
 const inputStyle = { border: `1px solid ${T.line}`, backgroundColor: '#FFFFFF' }
 
 function parsePaste(text: string): Row[] {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  let lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).map(l => l.trim()).filter(Boolean)
   if (!lines.length) return []
-  const sep = lines[0].includes('\t') ? '\t' : ','
-  const split = (l: string) => sep === '\t' ? l.split('\t') : l.match(/("([^"]|"")*"|[^,]*)(,|$)/g)!.map(c => c.replace(/,$/, '').replace(/^"|"$/g, '').replace(/""/g, '"')).filter((_, i, arr) => i < arr.length - 1 || _ !== '')
+  // A Markdown table: strip the outer pipes and the |---| divider, then treat as pipe-separated.
+  const isMd = lines[0].startsWith('|')
+  if (isMd) lines = lines.filter(l => !/^\|?\s*:?-{2,}/.test(l)).map(l => l.replace(/^\|/, '').replace(/\|$/, ''))
+  const sep = isMd ? '|' : lines[0].includes('\t') ? '\t' : ','
+  const split = (l: string) => sep !== ',' ? l.split(sep) : l.match(/("([^"]|"")*"|[^,]*)(,|$)/g)!.map(c => c.replace(/,$/, '').replace(/^"|"$/g, '').replace(/""/g, '"')).filter((_, i, arr) => i < arr.length - 1 || _ !== '')
   const head = split(lines[0]).map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''))
   const idx = (...names: string[]) => head.findIndex(h => names.includes(h))
   const iF = idx('firstname', 'first'), iL = idx('lastname', 'last', 'surname'), iN = idx('name', 'fullname', 'runner', 'runnername')
@@ -149,7 +152,18 @@ export default function BulkIntake() {
 
       {mode === 'paste' ? (
         <div className="rounded-2xl p-4 mb-4 space-y-2" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
-          <p className="text-xs" style={{ color: '#666' }}>Copy the rows from Excel or Google Sheets and paste here. A header row with First Name, Last Name, Address, City, State, Zip works best.</p>
+          <p className="text-xs" style={{ color: '#666' }}>Copy the rows from Excel or Google Sheets and paste here, or upload a CSV or Markdown file. A header row with First Name, Last Name, Address, City, State, Zip works best.</p>
+          <label className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-md cursor-pointer" style={{ backgroundColor: '#fff', color: '#1A1A1A', border: `1px solid ${T.line}` }}>
+            <Upload className="w-4 h-4" /> Upload a file
+            <input type="file" accept=".csv,.txt,.md,.markdown,text/csv,text/markdown,text/plain" className="hidden" onChange={async e => {
+              const f = e.target.files?.[0]; e.target.value = ''
+              if (!f) return
+              const text = await f.text()
+              const parsed = parsePaste(text)
+              if (!parsed.length) { setErr('Could not read any rows from that file.'); return }
+              setRows(parsed); setMode('form'); setErr(null)
+            }} />
+          </label>
           <textarea value={paste} onChange={e => setPaste(e.target.value)} rows={8} className={`${input} font-mono text-xs`} style={inputStyle} placeholder={'First Name\tLast Name\tAddress\tCity\tState\tZip'} />
           <button onClick={() => { const parsed = parsePaste(paste); if (!parsed.length) { setErr('Could not read any rows.'); return } setRows(parsed); setMode('form'); setErr(null) }} className="px-4 py-2 text-sm font-semibold rounded-md" style={{ backgroundColor: T.bar, color: '#fff' }}>Read {paste.trim() ? 'rows' : ''}</button>
         </div>
@@ -160,8 +174,7 @@ export default function BulkIntake() {
               <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
                 <input value={r.firstName} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, firstName: e.target.value } : x))} placeholder="First name" className={input} style={inputStyle} />
                 <input value={r.lastName} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, lastName: e.target.value } : x))} placeholder="Last name" className={input} style={inputStyle} />
-                <input value={r.email} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, email: e.target.value } : x))} placeholder="Email (optional)" className={`${input} col-span-2`} style={inputStyle} />
-                <input value={r.line1} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, line1: e.target.value } : x))} placeholder="Street address" className={`${input} col-span-2`} style={inputStyle} />
+                <input value={r.line1} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, line1: e.target.value } : x))} placeholder="Street address" className={`${input} col-span-2 md:col-span-4`} style={inputStyle} />
                 <input value={r.line2} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, line2: e.target.value } : x))} placeholder="Apt / unit" className={input} style={inputStyle} />
                 <input value={r.city} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, city: e.target.value } : x))} placeholder="City" className={input} style={inputStyle} />
                 <input value={r.state} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, state: e.target.value } : x))} placeholder="State" className={input} style={inputStyle} />
