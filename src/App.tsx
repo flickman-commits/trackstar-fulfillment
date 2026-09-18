@@ -6,6 +6,7 @@ import type { ErrorInfo, ReactNode } from 'react'
 import Dashboard from '@/pages/Dashboard'
 import ApprovalPortal from '@/pages/ApprovalPortal'
 import BulkIntake from '@/pages/BulkIntake'
+import RunnerClaim from '@/pages/RunnerClaim'
 import CreatorsHome from '@/pages/CreatorsHome'
 import BriefsAdmin from '@/pages/BriefsAdmin'
 import CreatorPortal from '@/pages/CreatorPortal'
@@ -156,6 +157,8 @@ export default function App() {
           <Route path="/approve/:token" element={<ApprovalPortal />} />
           {/* A partner's runner list for a bulk order. The link is the credential. */}
           <Route path="/intake/:token" element={<BulkIntake />} />
+          {/* One runner entering their own address for a bulk order. */}
+          <Route path="/runner/:token" element={<RunnerClaim />} />
           <Route path="/creator/:token" element={<CreatorPortal />} />
           <Route path="/apply" element={<CreatorApply />} />
           {/* The page lives on monopoly.trackstar.art now. */}

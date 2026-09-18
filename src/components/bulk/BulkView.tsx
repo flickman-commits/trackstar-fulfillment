@@ -56,6 +56,7 @@ export interface BulkOrder {
   status: string
   submittedAt: string | null
   intakeToken: string
+  runnerToken: string
   intakeNote: string | null
   notes: string | null
   partnerOrderId: string | null
@@ -373,6 +374,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
   }
 
   const intakeLink = useMemo(() => (b ? `${window.location.origin}/intake/${b.intakeToken}` : ''), [b])
+  const runnerLink = useMemo(() => (b ? `${window.location.origin}/runner/${b.runnerToken}` : ''), [b])
   const previewUrl = b?.previewImageUrl || b?.readiness?.design.approvedImageUrl || null
 
   if (!b) return <div className="flex items-center justify-center py-16 text-off-black/40"><Loader2 className="w-5 h-5 animate-spin" /></div>
@@ -410,7 +412,12 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
           <button onClick={() => { if (confirm('Rotate the link? The old one stops working.')) act({ action: 'new-intake-link' }, 'New link made') }} className={btnGhost} title="Make a new link"><RefreshCw className="w-3.5 h-3.5" /></button>
         </div>
       </div>
-      <input value={b.intakeNote || ''} onChange={e => setB({ ...b, intakeNote: e.target.value })} onBlur={e => update({ intakeNote: e.target.value })} placeholder="Note shown to the partner on that page (optional)" className={`${inputBase} w-full mt-3 text-xs`} />
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-off-black/60">
+        <span>Runner self-serve link, for the partner to forward to their team:</span>
+        <code className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-subtle-gray truncate max-w-[360px]">{runnerLink}</code>
+        <button onClick={() => copyText(runnerLink, 'Runner link copied')} className={btnGhost}><Copy className="w-3.5 h-3.5" /> Copy</button>
+      </div>
+      <input value={b.intakeNote || ''} onChange={e => setB({ ...b, intakeNote: e.target.value })} onBlur={e => update({ intakeNote: e.target.value })} placeholder="Note shown to the partner and runners on those pages (optional)" className={`${inputBase} w-full mt-3 text-xs`} />
       </div>}
     </div>
   )

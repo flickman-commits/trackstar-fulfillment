@@ -33,24 +33,28 @@ export default async function handler(req, res) {
     const body = req.method === 'POST' ? (typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})) : {}
     const token = String((req.method === 'GET' ? req.query?.token : body.token) || '')
     if (!token || token.length > 80) return res.status(404).json({ error: 'not_found' })
-    const bulk = await prisma.bulkOrder.findUnique({ where: { intakeToken: token } })
+    // Two links: the partner's (whole list) and the runner's (one person,
+    // their own address). The runner link never reveals the count.
+    const kind = String((req.method === 'GET' ? req.query?.kind : body.kind) || 'partner') === 'runner' ? 'runner' : 'partner'
+    const bulk = await prisma.bulkOrder.findUnique({ where: kind === 'runner' ? { runnerToken: token } : { intakeToken: token } })
     if (!bulk || bulk.status === 'submitted') return res.status(404).json({ error: 'not_found' })
 
     if (req.method === 'GET') {
-      const count = await prisma.order.count({ where: { bulkOrderId: bulk.id } })
+      const count = kind === 'runner' ? null : await prisma.order.count({ where: { bulkOrderId: bulk.id } })
       return res.status(200).json({
         partnerName: bulk.partnerName,
         raceName: bulk.raceName,
         raceYear: bulk.raceYear,
-        quantity: bulk.quantity,
+        quantity: kind === 'runner' ? null : bulk.quantity,
         entered: count,
         note: bulk.intakeNote || null,
         product: `${bulk.productSize} ${bulk.frameType === 'Unframed' ? 'unframed' : `framed in ${bulk.frameType.toLowerCase()}`}`,
+        runnerLink: kind === 'partner' ? `/runner/${bulk.runnerToken}` : null,
       })
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' })
-    const list = Array.isArray(body.runners) ? body.runners.slice(0, MAX_PER_SUBMIT) : []
+    const list = Array.isArray(body.runners) ? body.runners.slice(0, kind === 'runner' ? 1 : MAX_PER_SUBMIT) : []
     const rows = []
     const rejected = []
     for (const r of list) {
@@ -71,7 +75,7 @@ export default async function handler(req, res) {
       rows.push({ runnerName: `${first} ${last}`, email, address })
     }
     const created = await addRunners(bulk, rows)
-    const count = await prisma.order.count({ where: { bulkOrderId: bulk.id } })
+    const count = kind === 'runner' ? null : await prisma.order.count({ where: { bulkOrderId: bulk.id } })
     return res.status(200).json({ added: created.length, duplicates: rows.length - created.length, rejected, entered: count })
   } catch (error) {
     console.error('[API /public/bulk-intake]', error)

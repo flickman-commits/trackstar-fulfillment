@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Trash2, Loader2, CheckCircle2, Upload } from 'lucide-react'
+import { Plus, Trash2, Loader2, CheckCircle2, Upload, Download, Copy, Link2 } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -58,11 +58,12 @@ function parsePaste(text: string): Row[] {
 
 export default function BulkIntake() {
   const { token } = useParams<{ token: string }>()
-  const [info, setInfo] = useState<{ partnerName: string; raceName: string; raceYear: number; quantity: number; entered: number; note: string | null; product: string } | null>(null)
+  const [info, setInfo] = useState<{ partnerName: string; raceName: string; raceYear: number; quantity: number; entered: number; note: string | null; product: string; runnerLink: string | null } | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'gone' | 'sent'>('loading')
   const [rows, setRows] = useState<Row[]>([blank()])
   const [paste, setPaste] = useState('')
-  const [mode, setMode] = useState<'form' | 'paste'>('form')
+  const [mode, setMode] = useState<'form' | 'paste'>('paste')
+  const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ added: number; duplicates: number; rejected: { name?: string; reason: string }[] } | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -143,29 +144,45 @@ export default function BulkIntake() {
       </div>
 
       <div className="flex gap-1 mb-3">
-        {(['form', 'paste'] as const).map(m => (
+        {(['paste', 'form'] as const).map(m => (
           <button key={m} onClick={() => setMode(m)} className="px-3 py-1.5 text-xs font-semibold rounded-md" style={mode === m ? { backgroundColor: T.bar, color: '#fff' } : { backgroundColor: '#fff', color: '#666', border: `1px solid ${T.line}` }}>
-            {m === 'form' ? 'Type them in' : 'Paste a spreadsheet'}
+            {m === 'paste' ? 'Upload a spreadsheet' : 'Type them in'}
           </button>
         ))}
       </div>
 
       {mode === 'paste' ? (
-        <div className="rounded-2xl p-4 mb-4 space-y-2" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
-          <p className="text-xs" style={{ color: '#666' }}>Copy the rows from Excel or Google Sheets and paste here, or upload a CSV or Markdown file. A header row with First Name, Last Name, Address, City, State, Zip works best.</p>
-          <label className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-md cursor-pointer" style={{ backgroundColor: '#fff', color: '#1A1A1A', border: `1px solid ${T.line}` }}>
-            <Upload className="w-4 h-4" /> Upload a file
-            <input type="file" accept=".csv,.txt,.md,.markdown,text/csv,text/markdown,text/plain" className="hidden" onChange={async e => {
+        <div className="rounded-2xl p-4 mb-4 space-y-3" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
+          <div className="flex flex-wrap items-center gap-2">
+            <a href="/trackstar-runner-list.xlsx" download className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-md" style={{ backgroundColor: '#fff', color: '#1A1A1A', border: `1px solid ${T.line}` }}>
+              <Download className="w-4 h-4" /> Download the template
+            </a>
+            <span className="text-xs" style={{ color: '#666' }}>Fill it in, then upload it here. Excel, CSV or Markdown all work.</span>
+          </div>
+          <label className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold uppercase tracking-wide rounded-md cursor-pointer" style={{ backgroundColor: T.accent, color: '#fff' }}>
+            <Upload className="w-4 h-4" /> Upload your list
+            <input type="file" accept=".xlsx,.xls,.csv,.txt,.md,.markdown,text/csv,text/markdown,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={async e => {
               const f = e.target.files?.[0]; e.target.value = ''
               if (!f) return
-              const text = await f.text()
+              let text = ''
+              if (/\.xlsx?$/i.test(f.name)) {
+                // Excel: read the first sheet to CSV, then the same parser.
+                const XLSX = await import('xlsx')
+                const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' })
+                text = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]])
+              } else {
+                text = await f.text()
+              }
               const parsed = parsePaste(text)
               if (!parsed.length) { setErr('Could not read any rows from that file.'); return }
               setRows(parsed); setMode('form'); setErr(null)
             }} />
           </label>
-          <textarea value={paste} onChange={e => setPaste(e.target.value)} rows={8} className={`${input} font-mono text-xs`} style={inputStyle} placeholder={'First Name\tLast Name\tAddress\tCity\tState\tZip'} />
-          <button onClick={() => { const parsed = parsePaste(paste); if (!parsed.length) { setErr('Could not read any rows.'); return } setRows(parsed); setMode('form'); setErr(null) }} className="px-4 py-2 text-sm font-semibold rounded-md" style={{ backgroundColor: T.bar, color: '#fff' }}>Read {paste.trim() ? 'rows' : ''}</button>
+          <details>
+            <summary className="text-xs cursor-pointer" style={{ color: '#666' }}>Or paste the rows straight from Excel or Google Sheets</summary>
+            <textarea value={paste} onChange={e => setPaste(e.target.value)} rows={6} className={`${input} font-mono text-xs mt-2`} style={inputStyle} placeholder={'First Name\tLast Name\tAddress\tCity\tState\tZip'} />
+            <button onClick={() => { const parsed = parsePaste(paste); if (!parsed.length) { setErr('Could not read any rows.'); return } setRows(parsed); setMode('form'); setErr(null) }} className="mt-2 px-4 py-2 text-sm font-semibold rounded-md" style={{ backgroundColor: T.bar, color: '#fff' }}>Read rows</button>
+          </details>
         </div>
       ) : (
         <div className="space-y-2 mb-4">
@@ -185,6 +202,24 @@ export default function BulkIntake() {
             </div>
           ))}
           <button onClick={() => setRows(rs => [...rs, blank()])} className="w-full py-2.5 text-sm font-semibold rounded-2xl inline-flex items-center justify-center gap-1.5" style={{ backgroundColor: '#fff', color: '#1A1A1A', border: `1px dashed ${T.line}` }}><Plus className="w-4 h-4" /> Another runner</button>
+        </div>
+      )}
+
+      {info.runnerLink && (
+        <div className="rounded-2xl p-4 mb-4" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
+          <div className="flex items-start gap-3">
+            <Link2 className="w-5 h-5 mt-0.5 shrink-0" style={{ color: T.accent }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: '#1A1A1A' }}>Don't have everyone's address? Send your runners this link.</p>
+              <p className="text-xs mt-0.5" style={{ color: '#666' }}>Each person enters their own name and shipping address and lands on your list here. No spreadsheet needed.</p>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <code className="text-[12px] px-2 py-1 rounded-md truncate max-w-full" style={{ backgroundColor: T.page, color: '#666' }}>{window.location.origin}{info.runnerLink}</code>
+                <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}${info.runnerLink}`).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }).catch(() => {}) }} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md" style={{ backgroundColor: T.bar, color: '#fff' }}>
+                  {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy link'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
