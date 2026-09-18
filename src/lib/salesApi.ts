@@ -3,9 +3,15 @@
  * so the Sales screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { Company, Contact, DraftResult, ImportPreview, ImportResult, Mockup, Pipeline, Progress, Research, SalesSettings, SalesStatus, TodayPayload, Touch, DealStage } from '@/types/sales'
+import type { Asset, AttioCheck, Deal, DraftResult, Motion, Progress, SalesSettings, SalesStatus, Sender, Stage, TodayPayload } from '@/types/sales'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
+
+export class SalesApiError extends Error {
+  code?: string
+  problems?: string[]
+  constructor(message: string, code?: string, problems?: string[]) { super(message); this.code = code; this.problems = problems }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await apiFetch(`${API_BASE}${path}`, {
@@ -13,93 +19,77 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
+  if (!res.ok) {
+    const d = data as { error?: string; code?: string; problems?: string[] }
+    throw new SalesApiError(d.error || `Request failed (${res.status})`, d.code, d.problems)
+  }
   return data as T
 }
 
 const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 
-export type ListView = 'due' | 'new' | 'all' | `stage:${DealStage}`
-
-/** Whether a mirror is reachable, from a read-only probe. */
-export interface CrmCheck { configured: boolean; ok: boolean; error?: string; workspace?: string | null }
-
-/** Result of mirroring a change out to Notion or ClickUp. */
-export interface SyncResult { target: 'attio' | null; ok: boolean; skipped?: string; error?: string; recordId?: string }
+/** After a send: whether Attio now agrees. */
+export interface SyncResult { ok: boolean; skipped?: string; error?: string }
 
 export const salesApi = {
   status: () => request<SalesStatus>('/api/sales/draft'),
 
-  list: (opts: { pipeline: Pipeline | 'all'; view: ListView; q?: string }) => {
-    const params = new URLSearchParams({ pipeline: opts.pipeline, view: opts.view })
-    if (opts.q) params.set('q', opts.q)
-    return request<{ companies: Company[]; counts: { due: number; new: number; total: number } }>(`/api/sales/companies?${params}`)
-  },
-
-  company: (id: string) => request<{ company: Company }>(`/api/sales/companies?id=${encodeURIComponent(id)}`),
-
-  create: (body: { pipeline: Pipeline; name: string; contact?: Partial<Contact> } & Partial<Company>) =>
-    post<{ company: Company }>('/api/sales/companies', { action: 'create', ...body }),
-
-  update: (id: string, fields: Partial<Company>) =>
-    post<{ company: Company }>('/api/sales/companies', { action: 'update', id, ...fields }),
-
-  setStage: (id: string, stage: DealStage) =>
-    post<{ company: Company; sync?: SyncResult }>('/api/sales/companies', { action: 'stage', id, stage }),
-
-  addNote: (id: string, text: string, contactId?: string) =>
-    post<{ touch: Touch }>('/api/sales/companies', { action: 'note', id, text, contactId }),
-
-  saveContact: (companyId: string, contact: Partial<Contact> & { id?: string }) =>
-    post<{ contact: Contact }>('/api/sales/companies', { action: 'contact', companyId, ...contact }),
-
-  markSent: (id: string) =>
-    post<{ company: Company; sync?: SyncResult }>('/api/sales/companies', { action: 'mark-sent', id }),
-
-  remove: (id: string) => request<{ success: true }>('/api/sales/companies', { method: 'DELETE', body: JSON.stringify({ id }) }),
-
-  research: (contactId: string, force = false) =>
-    post<{ contact: Contact; research: Research; cached: boolean }>('/api/sales/research', { contactId, force }),
-
-  /** `useTemplate` asks for the cadence copy even when a model is available. */
-  variants: (companyId: string, contactId?: string, useTemplate = false, force = false) =>
-    post<DraftResult>('/api/sales/draft', { action: 'variants', companyId, contactId, useTemplate, force }),
-
-  queue: (body: { companyId: string; contactId: string; subject: string; body: string; mockupId?: string }) =>
-    post<{ touch: Touch; gmailDraft: boolean; gmailConnected: boolean; mockup: { id: string; name: string } | null }>('/api/sales/draft', { action: 'queue', ...body }),
-
   /** The morning in one call. */
-  today: (scope: 'mine' | 'all' = 'mine') => request<TodayPayload>(`/api/sales/today?scope=${scope}`),
-  progress: () => request<Progress>('/api/sales/today?action=progress'),
-  checkReplies: (force = false) =>
-    request<{ checked: number; newReplies: string[]; cleared: string[]; skipped?: string }>(`/api/sales/today?action=check-replies${force ? '&force=1' : ''}`),
+  today: (opts: { scope?: 'mine' | 'all'; motion?: Motion | null; refresh?: boolean } = {}) => {
+    const params = new URLSearchParams({ scope: opts.scope || 'mine' })
+    if (opts.motion) params.set('motion', opts.motion)
+    if (opts.refresh) params.set('refresh', '1')
+    return request<TodayPayload>(`/api/sales/today?${params}`)
+  },
+  deal: (id: string, refresh = false) => request<{ deal: Deal }>(`/api/sales/today?action=deal&id=${encodeURIComponent(id)}${refresh ? '&refresh=1' : ''}`),
+  progress: (scope: 'mine' | 'all' = 'mine') => request<Progress>(`/api/sales/today?action=progress&scope=${scope}`),
   skip: (id: string, reason?: string) => post<{ success: true; until: string }>('/api/sales/today', { action: 'skip', id, reason }),
   unskip: (id: string) => post<{ success: true }>('/api/sales/today', { action: 'unskip', id }),
+  setStage: (id: string, stage: Stage) => post<{ deal: Deal; stage: string }>('/api/sales/today', { action: 'stage', id, stage }),
+  addNote: (id: string, text: string) => post<{ success: true }>('/api/sales/today', { action: 'note', id, text }),
 
-  /** Sends through the connected Gmail. Final; the undo window is the caller's. */
-  check: (body: { companyId: string; subject: string; body: string }) =>
+  /** `useTemplate` asks for the cadence copy even when a model is available. */
+  variants: (dealId: string, personId?: string | null, useTemplate = false, force = false) =>
+    post<DraftResult>('/api/sales/draft', { action: 'variants', dealId, personId: personId || undefined, useTemplate, force }),
+  check: (body: { dealId: string; subject: string; body: string }) =>
     post<{ touchNumber: number; problems: string[] }>('/api/sales/draft', { action: 'check', ...body }),
-  send: (body: { companyId: string; contactId: string; subject: string; body: string; mockupId?: string }) =>
-    post<{ touch: Touch; company: Company; mockup: { id: string; name: string } | null; gmailThreadId: string | null; sync?: SyncResult }>('/api/sales/draft', { action: 'send', ...body }),
+  revise: (body: { dealId: string; subject: string; body: string; instruction: string }) =>
+    post<{ subject: string; body: string; model: string }>('/api/sales/draft', { action: 'revise', ...body }),
+  /** Sends through the connected Gmail. Final; the undo window is the caller's. */
+  send: (body: { dealId: string; personId: string; subject: string; body: string; assetIds: string[] }) =>
+    post<{ send: { id: string; touchNumber: number; sentAt: string; gmailThreadId: string | null }; attached: string[]; sync: SyncResult }>('/api/sales/draft', { action: 'send', ...body }),
 
-  mockups: (companyId?: string) =>
-    request<{ configured: boolean; mockups: Mockup[]; selectedId: string | null }>(
-      `/api/sales/mockups${companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''}`),
+  assets: (dealId?: string, refresh = false) => {
+    const params = new URLSearchParams()
+    if (dealId) params.set('dealId', dealId)
+    if (refresh) params.set('refresh', '1')
+    return request<{ configured: boolean; assets: Asset[]; suggestedId: string | null }>(`/api/sales/assets${params.size ? `?${params}` : ''}`)
+  },
+  /**
+   * Upload straight to storage: ask for a signed URL, then PUT the bytes
+   * there. The server never sees the file, so decks can be as big as
+   * storage allows.
+   */
+  uploadAsset: async (file: File, onProgress?: (fraction: number) => void) => {
+    const { url, id, maxBytes } = await post<{ id: string; filename: string; url: string; token: string; maxBytes: number }>('/api/sales/assets', { action: 'upload-url', filename: file.name, contentType: file.type })
+    if (file.size > maxBytes) throw new Error(`${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is ${Math.round(maxBytes / 1024 / 1024)} MB.`)
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('PUT', url)
+      xhr.setRequestHeader('Content-Type', file.type)
+      xhr.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total) }
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)))
+      xhr.onerror = () => reject(new Error('Upload failed'))
+      xhr.send(file)
+    })
+    return id
+  },
+  deleteAsset: (id: string) => post<{ success: true }>('/api/sales/assets', { action: 'delete', id }),
 
-  uploadMockup: (file: { filename: string; contentType: string; data: string }) =>
-    post<{ mockup: Mockup }>('/api/sales/mockups', { action: 'upload', ...file }),
-
-  deleteMockup: (id: string) => post<{ success: true }>('/api/sales/mockups', { action: 'delete', id }),
-
-  importPreview: (csv: string, pipeline: Pipeline) =>
-    post<ImportPreview>('/api/sales/import', { csv, pipeline, dryRun: true }),
-
-  importRun: (csv: string, pipeline: Pipeline, overwrite = false) =>
-    post<ImportResult>('/api/sales/import', { csv, pipeline, overwrite }),
-
-  settings: () => request<{ settings: SalesSettings; defaults: SalesSettings }>('/api/sales/settings'),
-  checkMirrors: () => request<{ attio: CrmCheck }>('/api/sales/settings?action=check'),
+  settings: () => request<{ settings: SalesSettings; defaults: SalesSettings; sender: Sender }>('/api/sales/settings'),
+  checkAttio: () => request<{ attio: AttioCheck }>('/api/sales/settings?action=check'),
   saveSettings: (patch: Partial<SalesSettings>) => post<{ settings: SalesSettings }>('/api/sales/settings', patch),
+  saveSender: (patch: Partial<Sender>) => post<{ sender: Sender }>('/api/sales/settings', { action: 'sender', ...patch }),
 
   gmailDisconnect: () => post<{ success: true }>('/api/sales/gmail', { action: 'disconnect' }),
   gmailConnectUrl: `${API_BASE}/api/sales/gmail?action=connect`,

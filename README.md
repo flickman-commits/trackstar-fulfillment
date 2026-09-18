@@ -10,6 +10,7 @@ Internal operations app for [Trackstar](https://trackstar.art), personalized rac
 - **Creator program.** Invites, briefs, sample orders, and a creator portal.
 - **Products and pricing.** Bulk Shopify product edits with undo, pricing calculators, Artelo cost sync.
 - **Marathon Monopoly.** A partner-facing proposal page and an internal economics model.
+- **Sales.** A UI over Attio for sending outreach. Reads each rep's queue live from Attio (new outreach up to a daily cap, follow-ups when due), drafts from the cadence templates or a model using Attio's enrichment, sends through the rep's own Gmail with decks and mockups from a shared library, and writes the touch back to the Attio deal. Attio is the source of truth; Postgres keeps only the send log, overnight drafts and skips.
 - **Ops.** Nightly scraper health sweep, weekly ads debrief, Slack reports, an MCP server so Claude can read operational data.
 
 ## Stack
@@ -47,5 +48,5 @@ Push to `main`. Vercel builds and deploys. Cron schedules live in `vercel.json`.
 ## Where to look
 
 - `docs/` has the Monopoly briefs and the brand guidelines.
-- `.claude/skills/` has the operational runbooks: adding a race scraper, running the nightly sweep.
+- `.claude/skills/` has the operational runbooks: adding a race scraper, running the nightly sweep, and the outreach phase of the nightly CRM upkeep.
 - `CLAUDE.md` has the conventions an AI assistant should follow in this repo.

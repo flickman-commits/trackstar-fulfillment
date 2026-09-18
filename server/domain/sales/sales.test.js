@@ -1,64 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseCsv } from '../../lib/csv.js'
 import { extractJson } from '../../lib/llm.js'
-import { csvToRecords, normalizeStage, domainFromEmail, domainFromUrl, splitName } from './columns.js'
 import { cadenceFor, pickIdentityTag } from './angles.js'
-
-test('normalizeStage maps what other systems actually say', () => {
-  assert.equal(normalizeStage('in conversation'), 'REPLIED')
-  assert.equal(normalizeStage('Not Started'), 'NOT_CONTACTED')
-  assert.equal(normalizeStage('hit up next year'), 'NEXT_YEAR')
-  assert.equal(normalizeStage('Proposal Sent'), 'PROPOSAL_SENT')
-  assert.equal(normalizeStage('Followed Up'), 'FOLLOWED_UP')
-  assert.equal(normalizeStage('signed'), 'SIGNED')
-  assert.equal(normalizeStage(''), null)
-  assert.equal(normalizeStage('something nobody uses'), null)
-})
-
-test('company domains come from a website or a work email, never a freemail one', () => {
-  assert.equal(domainFromUrl('https://www.chicagomarathon.com/results'), 'chicagomarathon.com')
-  assert.equal(domainFromUrl('chicagomarathon.com'), 'chicagomarathon.com')
-  assert.equal(domainFromEmail('jane@chicagomarathon.com'), 'chicagomarathon.com')
-  assert.equal(domainFromEmail('jane@gmail.com'), null)
-  assert.equal(domainFromEmail('not-an-email'), null)
-})
-
-test('splitName keeps multi-word surnames together', () => {
-  assert.deepEqual(splitName('Jane van der Berg'), { firstName: 'Jane', lastName: 'van der Berg' })
-  assert.deepEqual(splitName('Cher'), { firstName: 'Cher', lastName: '' })
-  assert.deepEqual(splitName('  '), { firstName: '', lastName: '' })
-})
-
-test('csvToRecords reads a typical export', () => {
-  const csv = 'Race,Contact Name,Email,Title,Runners,Website,Race Date\n'
-    + '"Acme Marathon, Inc.",Jane Doe,JANE@acmemarathon.org,Race Director,"18,000",https://www.acmemarathon.org,2027-05-02\n'
-  const { records, skipped } = csvToRecords(parseCsv(csv))
-  assert.equal(skipped.length, 0)
-  assert.equal(records.length, 1)
-  const [r] = records
-  assert.equal(r.company.name, 'Acme Marathon, Inc.')
-  assert.equal(r.company.runnerCount, 18000)
-  assert.equal(r.company.domain, 'acmemarathon.org')
-  assert.equal(r.contact.email, 'jane@acmemarathon.org')
-  assert.equal(r.contact.firstName, 'Jane')
-  assert.equal(r.contact.lastName, 'Doe')
-})
-
-test('a row with no organisation is reported rather than dropped silently', () => {
-  // A personal address gives no company domain, so there is nothing to file
-  // the row under. (An all-blank line is dropped earlier, by the CSV parser.)
-  const { records, skipped } = csvToRecords(parseCsv('Race,Email\n,jane@gmail.com\nReal Race,a@real.org\n'))
-  assert.equal(records.length, 1)
-  assert.equal(skipped.length, 1)
-  assert.equal(skipped[0].line, 2)
-})
-
-test('an exact header beats one that merely contains the word', () => {
-  // "Company Name for Emails" contains "company"; "Race" is the real column.
-  const { records } = csvToRecords(parseCsv('Race,Company Name for Emails,Email\nBig Sur,Big Sur Intl,a@b.org\n'))
-  assert.equal(records[0].company.name, 'Big Sur')
-})
 
 test('identity tags pick the strongest angle available', () => {
   assert.equal(pickIdentityTag(['Community/Local', 'Premium/Prestige']), 'Premium/Prestige')
@@ -87,39 +30,6 @@ test('extractJson survives the ways models wrap JSON', () => {
   assert.deepEqual(extractJson('[{"a":1}]'), [{ a: 1 }])
   assert.throws(() => extractJson(''), /empty/)
   assert.throws(() => extractJson('no json at all'), /no JSON/)
-})
-
-test('research picks a backend that can actually search the web', async () => {
-  const { researchProvider } = await import('./research.js')
-  const saved = { ...process.env }
-  const set = (vars) => {
-    for (const k of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'PERPLEXITY_API_KEY', 'RESEARCH_PROVIDER', 'LLM_PROVIDER', 'LLM_API_KEY', 'OPENAI_API_KEY']) delete process.env[k]
-    Object.assign(process.env, vars)
-  }
-  try {
-    set({ ANTHROPIC_API_KEY: 'x' })
-    assert.equal(researchProvider(), 'anthropic', 'Anthropic alone is enough - it searches server-side')
-
-    set({ ANTHROPIC_API_KEY: 'x', PERPLEXITY_API_KEY: 'y' })
-    assert.equal(researchProvider(), 'anthropic', 'with both, prefer the one already drafting')
-
-    set({ ANTHROPIC_API_KEY: 'x', PERPLEXITY_API_KEY: 'y', RESEARCH_PROVIDER: 'perplexity' })
-    assert.equal(researchProvider(), 'perplexity', 'the override wins')
-
-    set({ PERPLEXITY_API_KEY: 'y' })
-    assert.equal(researchProvider(), 'perplexity', 'falls back when Anthropic is absent')
-
-    // A local model can draft but cannot browse, so research must report off
-    // rather than answer from training data.
-    set({ LLM_PROVIDER: 'openai', LLM_API_KEY: 'local' })
-    assert.equal(researchProvider(), null, 'a local model cannot search')
-
-    set({})
-    assert.equal(researchProvider(), null, 'nothing configured')
-  } finally {
-    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
-    Object.assign(process.env, saved)
-  }
 })
 
 test('the web search tool version matches what the model can do', async () => {
@@ -325,15 +235,6 @@ test('generic inboxes are recognised', async () => {
   for (const e of ['kerri.powell@themmrf.org', 'jane@acme.org', 'm.hickman@trackstar.art']) assert.ok(!isGenericInbox(e), e)
 })
 
-test('Notion page ids are recovered from the stored URL', async () => {
-  const { notionPageId, openingLine } = await import('./externalSync.js')
-  assert.equal(notionPageId('https://app.notion.com/3c9977ac2a3e81f49403dbf8b6142445'), '3c9977ac-2a3e-81f4-9403-dbf8b6142445')
-  assert.equal(notionPageId('https://app.notion.com/p/Title-3c9977ac2a3e81f49403dbf8b6142445?pvs=4'), '3c9977ac-2a3e-81f4-9403-dbf8b6142445')
-  assert.equal(notionPageId('86e1ek0wk'), null, 'a ClickUp id is not a Notion page')
-  assert.equal(openingLine('Hey Sam,\n\nSaw your team at Chicago last year.\n\nMore text.'), 'Saw your team at Chicago last year.')
-  assert.equal(openingLine(''), '')
-})
-
 test('the recipient is never presented as an existing partner', async () => {
   const { draftProblems } = await import('./guardrails.js')
   const ctx = { pipeline: 'CHARITY', touchNumber: 2, companyName: 'Michael J. Fox Foundation - Team Fox' }
@@ -374,4 +275,124 @@ test('startOfToday respects the business timezone', async () => {
   const at = new Date('2026-09-11T03:00:00Z')
   assert.equal(startOfToday('America/New_York', at).toISOString(), '2026-09-10T04:00:00.000Z')
   assert.equal(startOfToday('UTC', at).toISOString(), '2026-09-11T00:00:00.000Z')
+})
+
+// ── Attio: reading records and deciding what to write ────────────────────────
+
+test('Attio record values are read whatever their type', async () => {
+  const { dealView, personView, companyView } = await import('./attio.js')
+  const deal = dealView({
+    id: { record_id: 'd1' }, web_url: 'https://app.attio.com/x/deals/d1',
+    values: {
+      name: [{ value: 'Chicago Marathon' }],
+      stage: [{ status: { title: 'Reached Out' } }],
+      motion: [{ option: { title: 'Race' } }],
+      owner: [{ referenced_actor_type: 'workspace-member', referenced_actor_id: 'm1' }],
+      associated_company: [{ target_object: 'companies', target_record_id: 'c1' }],
+      associated_people: [{ target_object: 'people', target_record_id: 'p1' }, { target_object: 'people', target_record_id: 'p2' }],
+      touch_count: [{ value: 2 }],
+      next_action_date: [{ value: '2026-09-20' }],
+      value: [{ currency_value: 5000, currency_code: 'USD' }],
+    },
+  })
+  assert.equal(deal.stage, 'Reached Out')
+  assert.equal(deal.motion, 'Race')
+  assert.equal(deal.ownerId, 'm1')
+  assert.equal(deal.companyId, 'c1')
+  assert.deepEqual(deal.personIds, ['p1', 'p2'])
+  assert.equal(deal.touchCount, 2)
+  assert.equal(deal.value, 5000)
+  assert.equal(deal.webUrl, 'https://app.attio.com/x/deals/d1')
+
+  const person = personView({
+    id: { record_id: 'p1' },
+    values: {
+      name: [{ first_name: 'Sam', last_name: 'Lee', full_name: 'Sam Lee' }],
+      email_addresses: [{ email_address: 'sam@race.org' }, { email_address: 'sam@gmail.com' }],
+      job_title: [{ value: 'Race Director' }],
+      description: [{ value: 'Runs the marathon since 2019.' }],
+      primary_location: [{ locality: 'Chicago', region: 'IL', country_code: 'US' }],
+    },
+  })
+  assert.equal(person.email, 'sam@race.org')
+  assert.equal(person.title, 'Race Director')
+  assert.equal(person.location, 'Chicago, IL')
+
+  const company = companyView({
+    id: { record_id: 'c1' },
+    values: {
+      name: [{ value: 'Chicago Event Management' }],
+      domains: [{ domain: 'www.chicagomarathon.com', root_domain: 'chicagomarathon.com' }],
+      categories: [{ option: { title: 'Sports' } }, { option: { title: 'Events' } }],
+      last_email_interaction: [{ interaction_type: 'email', interacted_at: '2026-09-10T12:00:00Z' }],
+    },
+  })
+  assert.equal(company.domain, 'chicagomarathon.com')
+  assert.deepEqual(company.categories, ['Sports', 'Events'])
+  assert.equal(company.lastEmailAt, '2026-09-10T12:00:00Z')
+})
+
+test('the next touch comes from Attio\'s touch count and the motion picks the cadence', async () => {
+  const { nextStepFor, pipelineOf } = await import('./queue.js')
+  assert.equal(pipelineOf({ motion: 'Charity' }), 'CHARITY')
+  assert.equal(pipelineOf({ motion: 'Race' }), 'RACE')
+  assert.equal(pipelineOf({ motion: 'Corporate' }), 'RACE', 'corporate follows the race cadence until it has its own')
+  const t1 = nextStepFor({ motion: 'Charity', touchCount: 0, people: [] })
+  assert.equal(t1.touchNumber, 1)
+  assert.equal(t1.step.angle, 'first-touch')
+  const t3 = nextStepFor({ motion: 'Charity', touchCount: 2, people: [] })
+  assert.equal(t3.touchNumber, 3)
+  assert.equal(t3.exhausted, false)
+  const done = nextStepFor({ motion: 'Charity', touchCount: 3, people: [] })
+  assert.equal(done.exhausted, true, 'three charity touches is the whole sequence')
+  const race = nextStepFor({ motion: 'Race', touchCount: 5, people: [] })
+  assert.equal(race.touchNumber, 6)
+  assert.equal(race.exhausted, false)
+})
+
+test('a template fills in from the Attio deal and reads in the sender\'s voice', async () => {
+  const { buildTemplate } = await import('./drafting.js')
+  const { CHARITY_CADENCE, RACE_CADENCE } = await import('./angles.js')
+  const deal = { motion: 'Charity', name: 'Team Fox', raceDate: '2026-11-01', company: { name: 'Michael J. Fox Foundation', location: 'New York, NY' }, people: [] }
+  const person = { firstName: 'Sam', lastName: 'Lee', email: 'sam@teamfox.org' }
+  const t = buildTemplate(deal, person, CHARITY_CADENCE[0], { sender: { name: 'Jimmy', role: 'from Trackstar', story: '' } })
+  assert.match(t.body, /^Hey Sam,/)
+  assert.ok(t.body.includes("I'm Jimmy, from Trackstar."), 'the who-I-am line carries the rep\'s name')
+  assert.ok(!t.body.includes('I ran the NYC Marathon'), 'Matt\'s founder story is not put in another rep\'s mouth')
+  assert.ok(t.body.includes('We make personalized marathon posters'), 'the product line stays')
+  assert.ok(t.body.includes('Team Fox'))
+  assert.ok(t.subject.includes('Team Fox'))
+  const r = buildTemplate({ motion: 'Race', name: 'Big Sur Marathon', raceDate: '2027-04-25', people: [] }, person, RACE_CADENCE[2], {})
+  assert.ok(r.subject.includes('2027'), 'season year comes from the race date')
+})
+
+test('a deck attaches as a file while an image stays inline', async () => {
+  const { buildMime } = await import('./gmail.js')
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
+  const pdf = Buffer.from('%PDF-1.4 fake', 'latin1')
+  const mime = buildMime({
+    to: 'a@b.org', subject: 'deck', html: '<div><p>see attached</p>\n</div>',
+    attachments: [
+      { filename: 'Berlin_Mockup.png', contentType: 'image/png', bytes: png },
+      { filename: 'Trackstar_Deck.pdf', contentType: 'application/pdf', bytes: pdf, inline: false },
+    ],
+  })
+  assert.match(mime, /^To: a@b\.org\r\n/)
+  assert.match(mime, /Content-Type: multipart\/mixed; boundary="/, 'a file attachment wraps everything in mixed')
+  assert.match(mime, /Content-Type: multipart\/related; boundary="/, 'the image still rides inline with the html')
+  assert.match(mime, /Content-Disposition: attachment; filename="Trackstar_Deck\.pdf"/)
+  assert.match(mime, /Content-Disposition: inline; filename="Berlin_Mockup\.png"/)
+  const cid = mime.match(/Content-ID: <([^>]+)>/)[1]
+  const htmlB64 = mime.split('Content-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n')[1].split('\r\n--')[0]
+  assert.ok(Buffer.from(htmlB64.replace(/\r\n/g, ''), 'base64').toString('utf8').includes(`cid:${cid}`), 'the html references the inline image')
+  const pdfB64 = mime.split('Content-Disposition: attachment; filename="Trackstar_Deck.pdf"\r\n\r\n')[1].split('\r\n--')[0]
+  assert.deepEqual(Buffer.from(pdfB64.replace(/\r\n/g, ''), 'base64'), pdf)
+})
+
+test('the library reads the file kind from the type', async () => {
+  const { KINDS } = await import('./assets.js')
+  assert.equal(KINDS['image/png'], 'image')
+  assert.equal(KINDS['application/pdf'], 'deck')
+  assert.equal(KINDS['application/vnd.openxmlformats-officedocument.presentationml.presentation'], 'deck')
+  assert.equal(KINDS['text/csv'], undefined, 'a spreadsheet is not a sales asset')
 })

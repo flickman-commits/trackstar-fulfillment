@@ -1,161 +1,379 @@
 /**
- * Attio is the CRM. Postgres is the machinery.
+ * Attio is the CRM. This is the only file that talks to it.
  *
- * After a send, the deal in Attio has to say so: last contacted, touch count,
- * next action and date, and the stage moves to Reached Out if it was Not
- * Contacted. Nothing here ever advances a deal further than that; a reply is
- * what moves it to In Conversation, and the overnight upkeep handles those.
+ * Workspace `trackstar-usa`, object `deals`. A deal is the unit of work: it
+ * carries the stage, the motion (Race or Charity), the owner, the touch count
+ * and the next action. The company and the people hang off it as record
+ * references, and Attio's own enrichment (a description of the org, the
+ * person's title and LinkedIn) lives on those records. The Sales tool reads
+ * all of that live and never copies it anywhere.
  *
- * Every call is best effort and returns { target: 'attio', ok, error }. The
- * email has already gone by the time this runs. A failed write is logged and
- * shown; it is never a reason to retry the send.
+ * Reads: every open deal in one paged query, then the companies and people
+ * those deals reference in a handful of batched queries. Cached for a short
+ * while per process so a page load is not sixty round trips.
  *
- * Linking: a Company row does not carry an Attio id until the first time it
- * is needed. Deals were created with the same name as the Postgres company,
- * so the first link is an exact name match within the same motion, cached on
- * the row. A company with no deal, or two deals with the same name, is left
- * unlinked and reported rather than guessed.
+ * Writes: exactly what a send changes. touch_count, next_action (only when
+ * the field is empty or already carries the `[auto]` prefix, because a human
+ * who typed a next action owns it), next_action_date, the stage from Not
+ * Contacted to Reached Out and never further, and a note on the deal with the
+ * email that went. A person changing the stage by hand from the tool is a
+ * human decision and is written as given.
  *
- * API notes worth keeping: PATCH replaces single-value attributes (all the
- * ones written here); it appends on multiselects, so never use it for those.
- * Clear a value with [] and never null. Status and select values are written
- * by option title.
+ * API notes worth keeping: PATCH replaces single-value attributes and appends
+ * to multiselects, so never PATCH a multiselect from here. Clear a value with
+ * [] and never null. Status and select values are written by option title.
+ * Filtering on select and status attributes has its own syntax and a wrong
+ * guess silently returns nothing, which is why stage and motion are filtered
+ * in JavaScript after a plain paged fetch.
  */
-import prisma from '../../../api/_lib/prisma.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
-const BASE = 'https://api.attio.com/v2'
+const BASE = process.env.ATTIO_BASE_URL || 'https://api.attio.com/v2'
+const PAGE = 500
+const CACHE_MS = 45_000
+
+export const WORKSPACE_SLUG = 'trackstar-usa'
+
+/** Stage titles, in pipeline order. From the CRM upkeep skill; the workspace is the authority. */
+export const STAGES = ['Needs Enrichment', 'Not Contacted', 'Reached Out', 'In Conversation', 'Call Booked', 'Deck Sent', 'Won', 'Revisit Next Year', 'Lost']
+export const MOTIONS = ['Race', 'Charity', 'Corporate']
+
+/** Deal attributes the tool reads or writes. The settings check reports any that are missing. */
+export const DEAL_ATTRIBUTES = {
+  reads: ['name', 'stage', 'motion', 'owner', 'associated_company', 'associated_people', 'touch_count', 'next_action', 'next_action_date', 'race_date', 'runners', 'tier', 'size_tier', 'priority', 'deal_notes', 'value', 'units'],
+  writes: ['stage', 'touch_count', 'next_action', 'next_action_date'],
+}
 
 export function isAttioConfigured() { return Boolean(process.env.ATTIO_API_KEY) }
 
 async function attio(path, { method = 'GET', body } = {}) {
+  if (!isAttioConfigured()) throw new Error('Attio is not connected: ATTIO_API_KEY is not set')
   const res = await fetchWithTimeout(`${BASE}${path}`, {
     method,
     headers: { Authorization: `Bearer ${process.env.ATTIO_API_KEY}`, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
-  }, 15000)
+  }, 20000)
   const text = await res.text()
   let json = null
   try { json = text ? JSON.parse(text) : null } catch { json = null }
-  if (!res.ok) throw new Error(`Attio ${method} ${path} -> ${res.status}: ${json?.message || text.slice(0, 200)}`)
+  if (!res.ok) {
+    const err = new Error(`Attio ${method} ${path} -> ${res.status}: ${json?.message || text.slice(0, 200)}`)
+    err.status = res.status
+    throw err
+  }
   return json
 }
 
-/** Our stages, as Attio's deal stage titles. */
-export const ATTIO_STAGE = {
-  NOT_CONTACTED: 'Not Contacted',
-  QUEUED: 'Not Contacted',
-  SENT: 'Reached Out',
-  FOLLOWED_UP: 'Reached Out',
-  REPLIED: 'In Conversation',
-  CALL_BOOKED: 'Call Booked',
-  PROPOSAL_SENT: 'Proposal Sent',
-  INTERESTED: 'Proposal Sent',
-  SIGNED: 'Won',
-  INVOICED: 'Won',
-  PAID: 'Won',
-  NEXT_YEAR: 'Revisit Next Year',
-  PASSED: 'Lost',
-  NOT_INTERESTED: 'Lost',
+// ── Reading values off records ───────────────────────────────────────────────
+
+/** The first entry of an attribute, whatever its type, or null. */
+function first(record, slug) {
+  const v = record?.values?.[slug]
+  return Array.isArray(v) && v.length ? v[0] : null
 }
 
-const MOTION = { CHARITY: 'Charity', RACE: 'Race' }
+/** A scalar: text, number, date, select title, status title. */
+export function val(record, slug) {
+  const f = first(record, slug)
+  if (!f) return null
+  if (f.status?.title) return f.status.title
+  if (f.option?.title) return f.option.title
+  if ('currency_value' in f) return f.currency_value
+  if ('value' in f) return f.value
+  return null
+}
+
+function refs(record, slug) {
+  const v = record?.values?.[slug]
+  return Array.isArray(v) ? v.map(x => x.target_record_id).filter(Boolean) : []
+}
+
+function actorId(record, slug) {
+  const f = first(record, slug)
+  return f?.referenced_actor_id || null
+}
+
+function personName(record) {
+  const n = first(record, 'name')
+  return { firstName: n?.first_name || '', lastName: n?.last_name || '', fullName: n?.full_name || '' }
+}
+
+function emails(record) {
+  const v = record?.values?.email_addresses
+  return Array.isArray(v) ? v.map(x => x.email_address).filter(Boolean) : []
+}
+
+function domain(record) {
+  const f = first(record, 'domains')
+  return f?.root_domain || f?.domain || null
+}
+
+function location(record) {
+  const f = first(record, 'primary_location')
+  if (!f) return null
+  const parts = [f.locality, f.region].filter(Boolean)
+  return parts.length ? parts.join(', ') : (f.country_code || null)
+}
+
+function interaction(record, slug) {
+  const f = first(record, slug)
+  return f?.interacted_at || null
+}
+
+function multi(record, slug) {
+  const v = record?.values?.[slug]
+  return Array.isArray(v) ? v.map(x => x.option?.title).filter(Boolean) : []
+}
+
+function recordId(record) { return record?.id?.record_id || null }
+
+// ── Views: the shapes the rest of the app sees ───────────────────────────────
+
+export function companyView(record) {
+  if (!record) return null
+  return {
+    id: recordId(record),
+    name: val(record, 'name'),
+    domain: domain(record),
+    description: val(record, 'description'),
+    location: location(record),
+    employeeRange: val(record, 'employee_range'),
+    categories: multi(record, 'categories'),
+    linkedin: val(record, 'linkedin'),
+    twitter: val(record, 'twitter'),
+    lastInteractionAt: interaction(record, 'last_interaction'),
+    lastEmailAt: interaction(record, 'last_email_interaction'),
+    nextCalendarAt: interaction(record, 'next_calendar_interaction'),
+    webUrl: record.web_url || null,
+  }
+}
+
+export function personView(record) {
+  if (!record) return null
+  const name = personName(record)
+  const all = emails(record)
+  return {
+    id: recordId(record),
+    firstName: name.firstName,
+    lastName: name.lastName,
+    fullName: name.fullName || `${name.firstName} ${name.lastName}`.trim(),
+    email: all[0] || null,
+    emails: all,
+    title: val(record, 'job_title'),
+    description: val(record, 'description'),
+    linkedin: val(record, 'linkedin'),
+    location: location(record),
+    lastInteractionAt: interaction(record, 'last_interaction'),
+    lastEmailAt: interaction(record, 'last_email_interaction'),
+    webUrl: record.web_url || null,
+  }
+}
+
+export function dealView(record) {
+  if (!record) return null
+  return {
+    id: recordId(record),
+    name: val(record, 'name'),
+    stage: val(record, 'stage'),
+    motion: val(record, 'motion'),
+    ownerId: actorId(record, 'owner'),
+    companyId: refs(record, 'associated_company')[0] || null,
+    personIds: refs(record, 'associated_people'),
+    touchCount: Number(val(record, 'touch_count') || 0),
+    nextAction: val(record, 'next_action'),
+    nextActionDate: val(record, 'next_action_date'),
+    raceDate: val(record, 'race_date'),
+    runners: val(record, 'runners'),
+    tier: val(record, 'tier'),
+    sizeTier: val(record, 'size_tier'),
+    priority: val(record, 'priority'),
+    notes: val(record, 'deal_notes'),
+    value: val(record, 'value'),
+    units: val(record, 'units'),
+    // Optional: only present if someone adds these to the workspace.
+    courseLandmark: val(record, 'course_landmark'),
+    identity: val(record, 'identity'),
+    createdAt: record.created_at || null,
+    webUrl: record.web_url || null,
+  }
+}
+
+// ── Queries ──────────────────────────────────────────────────────────────────
+
+async function queryAll(object, body = {}) {
+  const out = []
+  for (let offset = 0; ; offset += PAGE) {
+    const res = await attio(`/objects/${object}/records/query`, { method: 'POST', body: { ...body, limit: PAGE, offset } })
+    const data = res?.data || []
+    out.push(...data)
+    if (data.length < PAGE) break
+  }
+  return out
+}
+
+/** Records of an object by id, in batches. Missing ids are simply absent. */
+async function byIds(object, ids) {
+  const unique = [...new Set(ids.filter(Boolean))]
+  const out = []
+  for (let i = 0; i < unique.length; i += 50) {
+    const chunk = unique.slice(i, i + 50)
+    const res = await attio(`/objects/${object}/records/query`, {
+      method: 'POST',
+      body: { filter: { $or: chunk.map(id => ({ record_id: { $eq: id } })) }, limit: PAGE },
+    })
+    out.push(...(res?.data || []))
+  }
+  return out
+}
+
+const cache = new Map()
+function cached(key, ms, fn) {
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < ms) return hit.value
+  const value = fn().catch(err => { cache.delete(key); throw err })
+  cache.set(key, { at: Date.now(), value })
+  return value
+}
+export function forgetAttioCache() { cache.clear() }
+
+/**
+ * Every deal in the workspace, as views, with the companies and people they
+ * point at. One paged fetch plus batched lookups; cached briefly.
+ */
+export async function loadDeals({ fresh = false } = {}) {
+  if (fresh) { cache.delete('deals'); cache.delete('members') }
+  return cached('deals', CACHE_MS, async () => {
+    const records = await queryAll('deals')
+    const deals = records.map(dealView).filter(d => d.id)
+    const [companies, people] = await Promise.all([
+      byIds('companies', deals.map(d => d.companyId)),
+      byIds('people', deals.flatMap(d => d.personIds)),
+    ])
+    const companyById = Object.fromEntries(companies.map(c => [recordId(c), companyView(c)]))
+    const personById = Object.fromEntries(people.map(p => [recordId(p), personView(p)]))
+    return deals.map(d => ({
+      ...d,
+      company: companyById[d.companyId] || null,
+      people: d.personIds.map(id => personById[id]).filter(Boolean),
+    }))
+  })
+}
+
+export async function getDeal(id, { fresh = false } = {}) {
+  const deals = await loadDeals({ fresh })
+  return deals.find(d => d.id === id) || null
+}
+
+/** People who can own a deal: id, name, email. Cached longer; the roster rarely changes. */
+export async function workspaceMembers() {
+  return cached('members', 10 * 60_000, async () => {
+    const res = await attio('/workspace_members')
+    return (res?.data || []).map(m => ({
+      id: m.id?.workspace_member_id || null,
+      email: (m.email_address || '').toLowerCase(),
+      firstName: m.first_name || '',
+      lastName: m.last_name || '',
+      access: m.access_level || null,
+    })).filter(m => m.id)
+  })
+}
+
+/** The workspace member whose email matches the signed-in person, or null. */
+export async function memberForEmail(email) {
+  if (!email) return null
+  const want = String(email).toLowerCase()
+  return (await workspaceMembers()).find(m => m.email === want) || null
+}
+
+// ── Writes ───────────────────────────────────────────────────────────────────
 
 function day(d) { return new Date(d).toISOString().slice(0, 10) }
 
-/** Read one value off a record the way Attio returns it: an array of entries. */
-function val(record, slug) {
-  const v = record?.values?.[slug]
-  if (!Array.isArray(v) || !v.length) return null
-  const first = v[0]
-  if (first.status?.title) return first.status.title
-  if (first.option?.title) return first.option.title
-  if ('value' in first) return first.value
-  return null
-}
-
-/** Find the deal for a company by exact name within its motion. */
-export async function findDeal(company) {
-  const out = await attio('/objects/deals/records/query', { method: 'POST', body: { filter: { name: { $eq: company.name } }, limit: 10 } })
-  const motion = MOTION[company.pipeline]
-  // Motion is matched here rather than in the filter: a select filter has its
-  // own syntax and a wrong guess silently returns nothing.
-  const data = (out?.data || []).filter(d => !motion || !val(d, 'motion') || val(d, 'motion') === motion)
-  if (data.length === 1) return data[0]
-  if (data.length > 1) throw new Error(`${data.length} Attio deals are named "${company.name}"`)
-  return null
-}
-
-/** The deal id for a company, linking and caching it on first use. */
-export async function ensureDealId(company) {
-  if (company.attioDealId) return company.attioDealId
-  const deal = await findDeal(company)
-  if (!deal) return null
-  const id = deal.id?.record_id
-  if (!id) return null
-  await prisma.company.update({ where: { id: company.id }, data: { attioDealId: id } })
-  return id
-}
-
-export async function getDeal(recordId) {
-  const out = await attio(`/objects/deals/records/${recordId}`)
+async function patchDeal(id, values) {
+  const out = await attio(`/objects/deals/records/${id}`, { method: 'PATCH', body: { data: { values } } })
+  cache.delete('deals')
   return out?.data || null
 }
 
-async function patchDeal(recordId, values) {
-  return attio(`/objects/deals/records/${recordId}`, { method: 'PATCH', body: { data: { values } } })
+/** A note on a deal. Plain text; the title is what shows in the timeline. */
+export async function addDealNote(id, { title, content }) {
+  return attio('/notes', {
+    method: 'POST',
+    body: { data: { parent_object: 'deals', parent_record_id: id, title, format: 'plaintext', content } },
+  })
 }
 
 /**
- * After a send. Touch count and dates are written as the app now knows them;
- * the stage only moves off Not Contacted and never past Reached Out.
+ * After a send. The email is gone by the time this runs, so nothing here
+ * throws: the result says whether Attio now agrees, and the caller shows it.
  */
-export async function recordSend(company, { sentAt, touchCount, nextActionAt, nextAction }) {
-  if (!isAttioConfigured()) return { target: 'attio', ok: false, skipped: 'ATTIO_API_KEY not set' }
+export async function recordSend(deal, { sentAt, touchNumber, nextAction, nextActionDate, subject, body, toEmail, sentBy }) {
+  if (!isAttioConfigured()) return { ok: false, skipped: 'ATTIO_API_KEY not set' }
   try {
-    const recordId = await ensureDealId(company)
-    if (!recordId) return { target: 'attio', ok: false, skipped: `no Attio deal named "${company.name}"` }
-    const deal = await getDeal(recordId)
-    const values = {
-      last_contacted: day(sentAt || new Date()),
-      touch_count: touchCount,
+    const values = { touch_count: touchNumber }
+    if (nextActionDate) values.next_action_date = day(nextActionDate)
+    // A next action a person typed is theirs. Only the tool's own are replaced.
+    if (nextAction && (!deal.nextAction || /^\[auto\]/i.test(deal.nextAction))) values.next_action = `[auto] ${nextAction}`
+    if (deal.stage === 'Not Contacted' || deal.stage === 'Needs Enrichment') values.stage = 'Reached Out'
+    await patchDeal(deal.id, values)
+    try {
+      await addDealNote(deal.id, {
+        title: `${day(sentAt)} Email ${touchNumber} sent: ${subject}`,
+        content: `Sent from the Sales tool by ${sentBy || 'a rep'} to ${toEmail}.\nAlready counted in touch_count.\n\nSubject: ${subject}\n\n${body}`,
+      })
+    } catch (err) {
+      console.warn(`[sales.attio] note failed for ${deal.name}: ${err.message}`)
     }
-    if (nextActionAt) values.next_action_date = day(nextActionAt)
-    if (nextAction) values.next_action = nextAction
-    if (val(deal, 'stage') === 'Not Contacted') values.stage = 'Reached Out'
-    await patchDeal(recordId, values)
-    return { target: 'attio', ok: true, recordId }
+    return { ok: true }
   } catch (err) {
-    console.error(`[sales.attio] send write failed for ${company.name}: ${err.message}`)
-    return { target: 'attio', ok: false, error: err.message }
+    console.error(`[sales.attio] send write failed for ${deal.name}: ${err.message}`)
+    return { ok: false, error: err.message }
   }
 }
 
-/** A person changed the stage by hand. Mirror it exactly. */
-export async function recordStage(company) {
-  if (!isAttioConfigured()) return { target: 'attio', ok: false, skipped: 'ATTIO_API_KEY not set' }
-  const title = ATTIO_STAGE[company.stage]
-  if (!title) return { target: 'attio', ok: false, skipped: `no Attio stage for ${company.stage}` }
-  try {
-    const recordId = await ensureDealId(company)
-    if (!recordId) return { target: 'attio', ok: false, skipped: `no Attio deal named "${company.name}"` }
-    const values = { stage: title }
-    if (company.nextActionAt) values.next_action_date = day(company.nextActionAt)
-    if (company.nextAction) values.next_action = company.nextAction
-    await patchDeal(recordId, values)
-    return { target: 'attio', ok: true, recordId }
-  } catch (err) {
-    console.error(`[sales.attio] stage write failed for ${company.name}: ${err.message}`)
-    return { target: 'attio', ok: false, error: err.message }
-  }
+/** A person changed the stage from the tool. Written exactly. */
+export async function setStage(dealId, stage) {
+  if (!STAGES.includes(stage)) throw new Error(`Unknown stage: ${stage}`)
+  await patchDeal(dealId, { stage })
+  return getDeal(dealId, { fresh: true })
 }
 
-/** Settings check: can we reach the workspace at all. */
+/** A rep's note on the deal, from the tool. */
+export async function noteOnDeal(dealId, text, byEmail) {
+  await addDealNote(dealId, { title: `${day(new Date())} Note from ${byEmail || 'the Sales tool'}`, content: text })
+}
+
+// ── Health ───────────────────────────────────────────────────────────────────
+
+/**
+ * Can we reach the workspace, and does the deals object have the attributes
+ * the tool expects. Missing ones are reported by slug so they can be added
+ * in Attio settings; the tool keeps working without the optional ones.
+ */
 export async function checkAttio() {
   if (!isAttioConfigured()) return { configured: false, ok: false }
   try {
-    const out = await attio('/self')
-    return { configured: true, ok: true, workspace: out?.data?.workspace_name || null }
+    const self = await attio('/self')
+    const attrs = await attio('/objects/deals/attributes')
+    const slugs = new Set((attrs?.data || []).map(a => a.api_slug))
+    const missing = [...DEAL_ATTRIBUTES.reads, ...DEAL_ATTRIBUTES.writes].filter(s => !slugs.has(s))
+    const stageAttr = (attrs?.data || []).find(a => a.api_slug === 'stage')
+    let stages = null
+    if (stageAttr) {
+      try {
+        const st = await attio(`/objects/deals/attributes/${stageAttr.id?.attribute_id || 'stage'}/statuses`)
+        stages = (st?.data || []).map(s => s.title)
+      } catch { stages = null }
+    }
+    const unknownStages = stages ? STAGES.filter(s => !stages.includes(s)) : []
+    return {
+      configured: true,
+      ok: missing.length === 0 && unknownStages.length === 0,
+      workspace: self?.data?.workspace_name || null,
+      missing: [...new Set(missing)],
+      stages,
+      unknownStages,
+    }
   } catch (err) {
     return { configured: true, ok: false, error: err.message }
   }

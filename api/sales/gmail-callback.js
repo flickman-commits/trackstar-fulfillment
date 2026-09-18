@@ -11,12 +11,12 @@
  * turns into a toast.
  */
 import { setCors } from '../_lib/auth.js'
-import { requireAdminOnly } from '../_lib/users.js'
+import { requireSalesRep } from '../_lib/users.js'
 import { completeConnection, redirectUriFor, originFor } from '../../server/domain/sales/gmail.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  const actor = await requireAdminOnly(req, res)
+  const actor = await requireSalesRep(req, res)
   if (!actor) return
 
   const base = originFor(req)

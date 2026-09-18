@@ -142,18 +142,16 @@ export function cadenceFor(pipeline) {
 /**
  * What to write after "Hey".
  *
- * Where a source system had an email but no name, the importer falls back to
- * the address's local part so the row has something to show. That is fine in a
- * list and awful in an email - "Hey usaf.marathon," is worse than not writing
- * at all - so anything that reads like a mailbox rather than a person becomes
- * "there".
+ * Names come from Attio's person record. When someone saved a mailbox as a
+ * name ("usaf.marathon", "info") the greeting is worse than none, so anything
+ * that reads like an address rather than a person becomes "there". A first
+ * name that happens to match the local part ("sam@teamfox.org") is fine.
  */
 export function greetingName(contact) {
   const raw = (contact?.firstName || '').trim()
   if (!raw) return 'there'
-  const local = (contact?.email || '').split('@')[0].toLowerCase()
-  const looksLikeMailbox = raw.toLowerCase() === local
-    || /[.@_\d]/.test(raw)
+  const looksLikeMailbox = /[.@_\d]/.test(raw)
+    || /^(info|hello|contact|events|race|team|admin|office|marketing|press)$/i.test(raw)
     || raw.length < 2
     || raw.length > 20
   return looksLikeMailbox ? 'there' : raw
@@ -178,7 +176,7 @@ function fill(text, { company, contact, socialProof, oneLiner }) {
     .replaceAll('[First Name]', greetingName(contact))
     .replaceAll('[Race Name]', company.name)
     .replaceAll('[Org Name]', company.name)
-    .replaceAll('[Landmark]', company.courseLandmark || 'your finish line')
+    .replaceAll('[Landmark]', company.courseLandmark || 'Your finish line')
     .replaceAll('[Season Year]', String(seasonYear))
     .replaceAll('[Social Proof]', socialProof || DEFAULT_SOCIAL_PROOF)
     // "Never send a generic first line" is a hard rule, and a template cannot

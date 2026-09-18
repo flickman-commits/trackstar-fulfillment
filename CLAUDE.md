@@ -19,6 +19,7 @@ Conventions for working in this repo. Read `README.md` first for what the app is
 - Keep `api/orders/actions.js` from growing. New features go in their own handler file (the Hobby-plan function cap that created it no longer applies).
 - No new template-style UI kits. Reuse `src/lib/ui.ts` and existing components.
 - Public endpoints (`api/public/*`) must use `checkRateLimitDurable` and never return `error.message`.
+- Sales: Attio is the CRM and the only source of truth for deals, people and stages. `server/domain/sales/attio.js` is the one file that talks to it. Never add a Postgres column that duplicates an Attio field; the `SalesSend`, `SalesPrep` and `SalesSkip` tables hold machinery only. The tool moves a deal from Not Contacted to Reached Out on a send and never further; every other stage move is a person's. A `next_action` that does not start with `[auto]` was written by a human and is never overwritten.
 - The nightly-sweep routine commits straight to `main` and pushes. This is standing authorization from the repo owner — no branch, no PR, no asking first — and it holds only for that routine and only for changes whose gates passed. If a run is handed a `claude/*` branch name anyway, merge to `main` and push `main` before finishing. Work parked on an unmerged branch never reaches production while the report claims it shipped, which is the failure this replaces.
 
 ## Verify before you say it works

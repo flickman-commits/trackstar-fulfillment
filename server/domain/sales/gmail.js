@@ -211,14 +211,19 @@ function base64Lines(buf) {
 /**
  * Build the message.
  *
- * With no attachment this is a plain text/html part. With one it becomes
- * multipart/related carrying the image with a Content-ID, and the HTML
- * references it as <img src="cid:...">. related rather than mixed on purpose:
- * the image then renders inside the body, where it does its job, instead of
- * sitting at the bottom as a file the reader has to decide to open. Gmail
- * still shows it as an attachment too, so the copy's "attached" stays true.
+ * No attachments: a plain text/html part. Images: multipart/related, each
+ * image carried with a Content-ID and referenced from the HTML as
+ * <img src="cid:..."> above the sign-off, so it renders in the body where it
+ * does its job instead of sitting at the bottom as a file to open. Gmail still
+ * lists it as an attachment, so the copy's "attached" stays true. Files that
+ * are not images (a deck, a PDF) wrap the whole thing in multipart/mixed and
+ * hang off the end as ordinary attachments.
+ *
+ * `attachment` (singular) is still accepted for the old callers and tests.
  */
-export function buildMime({ to, subject, html, inReplyTo, attachment, messageId }) {
+export function buildMime({ to, subject, html, inReplyTo, attachment, attachments, messageId }) {
+  const list = [...(attachments || []), ...(attachment ? [attachment] : [])]
+    .map(a => ({ ...a, inline: a.inline ?? /^image\//.test(a.contentType || '') }))
   const headers = [
     `To: ${headerValue(to)}`,
     `Subject: ${headerValue(subject)}`,
@@ -232,37 +237,72 @@ export function buildMime({ to, subject, html, inReplyTo, attachment, messageId 
     headers.push(`References: ${inReplyTo}`)
   }
 
-  if (!attachment) {
+  if (!list.length) {
     headers.push('Content-Type: text/html; charset=utf-8', 'Content-Transfer-Encoding: base64')
     return `${headers.join('\r\n')}\r\n\r\n${base64Lines(Buffer.from(html, 'utf8'))}`
   }
 
-  const boundary = `ts_${crypto.randomBytes(16).toString('hex')}`
-  const cid = `mockup_${crypto.randomBytes(8).toString('hex')}`
-  const filename = attachment.filename || 'mockup.png'
-  // The image goes above the sign-off, where the copy points at it.
-  const withImage = html.replace(
-    '</div>',
-    `<p><img src="cid:${cid}" alt="Trackstar co-branded print example" width="600" style="max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0;" /></p>\n</div>`,
-  )
+  const inline = list.filter(a => a.inline)
+  const files = list.filter(a => !a.inline)
 
-  headers.push(`Content-Type: multipart/related; boundary="${boundary}"; type="text/html"`)
-  return [
-    headers.join('\r\n'),
-    '',
-    `--${boundary}`,
+  // The images go above the sign-off, where the copy points at them.
+  const cids = inline.map(() => `img_${crypto.randomBytes(8).toString('hex')}`)
+  const imgTags = cids.map(cid => `<p><img src="cid:${cid}" alt="Trackstar example" width="600" style="max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0;" /></p>`).join('\n')
+  const body = inline.length ? html.replace('</div>', `${imgTags}\n</div>`) : html
+
+  const htmlPart = [
     'Content-Type: text/html; charset=utf-8',
     'Content-Transfer-Encoding: base64',
     '',
-    base64Lines(Buffer.from(withImage, 'utf8')),
-    `--${boundary}`,
-    `Content-Type: ${attachment.contentType || 'image/png'}; name="${filename}"`,
-    'Content-Transfer-Encoding: base64',
-    `Content-ID: <${cid}>`,
-    `Content-Disposition: inline; filename="${filename}"`,
+    base64Lines(Buffer.from(body, 'utf8')),
+  ].join('\r\n')
+
+  let inner = htmlPart
+  let innerType = 'text/html; charset=utf-8'
+  if (inline.length) {
+    const rel = `ts_${crypto.randomBytes(16).toString('hex')}`
+    const parts = [htmlPart, ...inline.map((a, i) => {
+      const filename = a.filename || `image_${i + 1}.png`
+      return [
+        `Content-Type: ${a.contentType || 'image/png'}; name="${filename}"`,
+        'Content-Transfer-Encoding: base64',
+        `Content-ID: <${cids[i]}>`,
+        `Content-Disposition: inline; filename="${filename}"`,
+        '',
+        base64Lines(a.bytes),
+      ].join('\r\n')
+    })]
+    inner = [...parts.map(p => `--${rel}\r\n${p}`), `--${rel}--`].join('\r\n')
+    innerType = `multipart/related; boundary="${rel}"; type="text/html"`
+  }
+
+  if (!files.length) {
+    if (inline.length) {
+      headers.push(`Content-Type: ${innerType}`)
+      return `${headers.join('\r\n')}\r\n\r\n${inner}\r\n`
+    }
+  }
+
+  const mixed = `ts_${crypto.randomBytes(16).toString('hex')}`
+  headers.push(`Content-Type: multipart/mixed; boundary="${mixed}"`)
+  const innerWrapped = inline.length ? `Content-Type: ${innerType}\r\n\r\n${inner}` : inner
+  const fileParts = files.map((a, i) => {
+    const filename = a.filename || `attachment_${i + 1}`
+    return [
+      `Content-Type: ${a.contentType || 'application/octet-stream'}; name="${filename}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${filename}"`,
+      '',
+      base64Lines(a.bytes),
+    ].join('\r\n')
+  })
+  return [
+    headers.join('\r\n'),
     '',
-    base64Lines(attachment.bytes),
-    `--${boundary}--`,
+    `--${mixed}`,
+    innerWrapped,
+    ...fileParts.flatMap(p => [`--${mixed}`, p]),
+    `--${mixed}--`,
     '',
   ].join('\r\n')
 }
@@ -303,10 +343,10 @@ export function newMessageId() {
  * email they have read. The undo window lives in the client; by the time
  * this runs, the decision is made.
  */
-export async function sendMessage({ userId, to, subject, html, threadId, inReplyTo, attachment }) {
+export async function sendMessage({ userId, to, subject, html, threadId, inReplyTo, attachment, attachments }) {
   const { gmail, uid } = await gmailClient(userId)
   const messageId = newMessageId()
-  const raw = base64url(buildMime({ to, subject, html, inReplyTo, attachment, messageId }))
+  const raw = base64url(buildMime({ to, subject, html, inReplyTo, attachment, attachments, messageId }))
   const requestBody = { raw }
   if (threadId) requestBody.threadId = threadId
   let res
@@ -337,9 +377,9 @@ export async function threadMessages({ userId, threadId }) {
   })
 }
 
-export async function createDraft({ userId, to, subject, html, threadId, inReplyTo, attachment }) {
+export async function createDraft({ userId, to, subject, html, threadId, inReplyTo, attachment, attachments }) {
   const { gmail, uid } = await gmailClient(userId)
-  const raw = base64url(buildMime({ to, subject, html, inReplyTo, attachment }))
+  const raw = base64url(buildMime({ to, subject, html, inReplyTo, attachment, attachments }))
   const message = { raw }
   if (threadId) message.threadId = threadId
   let res

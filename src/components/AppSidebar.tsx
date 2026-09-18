@@ -241,9 +241,10 @@ function MobileTile({ item, active }: { item: Item; active?: boolean }) {
 function railItems(isAdmin: boolean): Item[] {
   return [
     { id: 'fulfillment', label: 'Fulfillment', icon: Package, to: '/', title: 'Orders to personalize, custom designs and partners' },
-    // Creators and Sales are admin-only, same as the routes behind them.
+    // Creators is admin-only, same as the route behind it. Sales is for anyone
+    // on the Attio workspace; the API says no to everyone else.
     ...(isAdmin ? [{ id: 'creators', label: 'Creators', icon: Users, to: '/creators', title: 'The creator programme' } as Item] : []),
-    ...(isAdmin ? [{ id: 'sales', label: 'Sales', icon: Send, to: '/sales', title: 'Outreach queue: races and charities' } as Item] : []),
+    { id: 'sales', label: 'Sales', icon: Send, to: '/sales', title: 'Outreach: the emails to send today, read from Attio' },
   ]
 }
 

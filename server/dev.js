@@ -83,18 +83,13 @@ const routes = [
   // Marathon Monopoly proposal page (gated behind MONOPOLY_PAGE_ENABLED).
   { method: 'get',    path: '/api/public/monopoly',        handler: '../api/public/monopoly.js' },
   { method: 'get',    path: '/api/admin/monopoly-model',   handler: '../api/admin/monopoly-model.js' },
-  // Sales: the pipeline, imports, research, drafting, and the Gmail connection.
-  { method: 'get',    path: '/api/sales/companies',        handler: '../api/sales/companies.js' },
-  { method: 'post',   path: '/api/sales/companies',        handler: '../api/sales/companies.js' },
-  { method: 'delete', path: '/api/sales/companies',        handler: '../api/sales/companies.js' },
-  { method: 'post',   path: '/api/sales/import',           handler: '../api/sales/import.js' },
-  { method: 'post',   path: '/api/sales/research',         handler: '../api/sales/research.js' },
+  // Sales: a UI over Attio. The queue, drafting and sending, the library, settings, Gmail.
   { method: 'get',    path: '/api/sales/draft',            handler: '../api/sales/draft.js' },
   { method: 'post',   path: '/api/sales/draft',            handler: '../api/sales/draft.js' },
   { method: 'get',    path: '/api/sales/gmail',            handler: '../api/sales/gmail.js' },
   { method: 'get',    path: '/api/sales/gmail-callback',   handler: '../api/sales/gmail-callback.js' },
-  { method: 'get',    path: '/api/sales/mockups',          handler: '../api/sales/mockups.js' },
-  { method: 'post',   path: '/api/sales/mockups',          handler: '../api/sales/mockups.js' },
+  { method: 'get',    path: '/api/sales/assets',           handler: '../api/sales/assets.js' },
+  { method: 'post',   path: '/api/sales/assets',           handler: '../api/sales/assets.js' },
   { method: 'get',    path: '/api/sales/settings',         handler: '../api/sales/settings.js' },
   { method: 'post',   path: '/api/sales/settings',         handler: '../api/sales/settings.js' },
   { method: 'get',    path: '/api/sales/today',            handler: '../api/sales/today.js' },

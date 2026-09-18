@@ -33,6 +33,15 @@
         "/Users/flickman/Software/trackstar-art/_preview"
       ],
       "port": 8776
+    },
+    {
+      "name": "dev-alt",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "VITE_PORT=3100 API_PORT=3101 npm run dev"
+      ],
+      "port": 3100
     }
   ]
 }

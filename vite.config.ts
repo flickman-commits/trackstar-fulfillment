@@ -32,10 +32,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: Number(process.env.VITE_PORT) || 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        // The API's port, so a second dev pair can run beside the first.
+        target: `http://localhost:${process.env.API_PORT || 3001}`,
         changeOrigin: true,
       },
     },

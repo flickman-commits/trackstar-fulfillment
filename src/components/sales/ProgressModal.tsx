@@ -6,11 +6,11 @@ import { useEscape } from '@/lib/useEscape'
 import { salesApi } from '@/lib/salesApi'
 import type { Progress } from '@/types/sales'
 
-/** Sends per day, reply rate, and the funnel. Everything from touches and stages already in the database. */
-export default function ProgressModal({ onClose }: { onClose: () => void }) {
+/** Sends per day from the log, and where the deals stand in Attio. */
+export default function ProgressModal({ scope, onClose }: { scope: 'mine' | 'all'; onClose: () => void }) {
   useEscape(onClose)
   const [p, setP] = useState<Progress | null>(null)
-  useEffect(() => { salesApi.progress().then(setP).catch(e => toast.error((e as Error).message)) }, [])
+  useEffect(() => { salesApi.progress(scope).then(setP).catch(e => toast.error((e as Error).message)) }, [scope])
 
   const max = p ? Math.max(1, ...p.days.map(d => d.sent)) : 1
   const top = p?.funnel[0]?.count || 1
@@ -21,7 +21,7 @@ export default function ProgressModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-gray">
           <div>
             <h2 className="text-base font-semibold text-off-black">Progress</h2>
-            <p className="text-xs text-off-black/55 mt-0.5">Last 30 days.</p>
+            <p className="text-xs text-off-black/55 mt-0.5">Sends over the last 30 days. Stages as Attio has them now{scope === 'mine' ? ', for your deals' : ', for everyone'}.</p>
           </div>
           <button onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button>
         </div>
@@ -38,12 +38,11 @@ export default function ProgressModal({ onClose }: { onClose: () => void }) {
               </div>
               <div className="flex justify-between font-mono text-[10px] text-off-black/40 mt-1"><span>{p.days[0]?.day}</span><span>{p.days[p.days.length - 1]?.day}</span></div>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
-                { n: p.totals.sent, l: 'sent' },
-                { n: p.totals.replies, l: `replies · ${p.totals.replyRate}%` },
-                { n: p.totals.calls, l: 'calls booked' },
-                { n: p.totals.signed, l: 'signed' },
+                { n: p.totals.sent, l: 'sent, 30 days' },
+                { n: p.totals.inConversation, l: 'in conversation or further' },
+                { n: p.totals.won, l: 'won' },
               ].map(k => (
                 <div key={k.l} className="rounded-lg border border-border-gray px-3 py-2">
                   <div className="text-lg font-semibold tabular-nums">{k.n}</div>
@@ -52,16 +51,24 @@ export default function ProgressModal({ onClose }: { onClose: () => void }) {
               ))}
             </div>
             <div>
-              <span className={fieldLabel}>Funnel · all time</span>
+              <span className={fieldLabel}>Funnel · open and won deals</span>
               <ul className="space-y-1.5">
                 {p.funnel.map(f => (
-                  <li key={f.stage} className="grid grid-cols-[100px_1fr_40px] items-center gap-2 text-xs">
+                  <li key={f.stage} className="grid grid-cols-[110px_1fr_40px] items-center gap-2 text-xs">
                     <span className="text-off-black/65">{f.stage}</span>
                     <span className="h-2.5 rounded bg-dark-fill" style={{ width: `${Math.max(1, (f.count / top) * 100)}%` }} />
                     <span className="text-right tabular-nums text-off-black/60">{f.count}</span>
                   </li>
                 ))}
               </ul>
+            </div>
+            <div>
+              <span className={fieldLabel}>By stage</span>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(p.byStage).map(([stage, n]) => (
+                  <span key={stage} className="text-[11px] px-2 py-0.5 rounded-full border border-border-gray text-off-black/65">{stage} <b className="tabular-nums">{n}</b></span>
+                ))}
+              </div>
             </div>
           </div>
         )}

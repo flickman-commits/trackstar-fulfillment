@@ -1,17 +1,16 @@
 /**
  * The Sales tools Trackstar exposes over MCP.
  *
- * These exist so the overnight routine - a Claude session on Matt's plan, not
- * a metered API call - can do the outreach work. The session does the
- * thinking: it reads the queue, researches each person with its own web
- * search, writes the email, and hands the result back here. The app does no
- * thinking at all in that loop; it holds the data and enforces the rules.
+ * These exist so the overnight CRM upkeep, a Claude session on Matt's plan,
+ * can leave tomorrow's emails ready. Attio is read and written through the
+ * session's own Attio connector; the app is only asked for what Attio does
+ * not know: which touch comes next for each deal, the template and rules for
+ * it, and a place to hold the draft until a person sends it. The app does no
+ * thinking in that loop; it holds the drafts and enforces the rules.
  *
- * Gated behind MCP_WRITE_TOKEN, the same tier as the repair tools: saving
- * drafts and adding leads changes production data, and a connector is
- * reachable from every session that enables it.
+ * Gated behind MCP_WRITE_TOKEN, the same tier as the repair tools.
  */
-import { salesQueue, salesRules, saveResearch, saveDraft, addLead, finishRun } from '../domain/sales/nightly.js'
+import { salesQueue, salesRules, saveDraft, finishRun } from '../domain/sales/nightly.js'
 
 const text = value => ({
   content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }],
@@ -22,63 +21,40 @@ export const SALES_TOOLS = [
     name: 'sales_rules',
     description:
       'The house style, the charity-specific rules, both cadences, the sender identity, the ' +
-      'daily cap, the priority races to source from, and what the server will reject on save. ' +
-      'These are live settings, not constants: read this once at the start of every run.',
+      'daily cap, and what the server will reject on save. Live settings, not constants: read ' +
+      'this once at the start of every run.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'sales_queue',
     description:
-      'Tomorrow\'s outreach, in the order it should be worked: `due` follow-ups whose clock has ' +
-      'run out, then `new` orgs nobody has written to that have a contact with an email. Each ' +
-      'item carries the contact, any stored research, the next cadence step and its purpose, ' +
-      'previous emails in the thread, and a template draft as the baseline to beat. ' +
-      '`needsContact` lists orgs we want to reach that have no email yet; find a named person ' +
-      'on their site before sourcing brand-new orgs. Items with hasProposedDraft=true are ' +
-      'already written; skip them.',
+      'Tomorrow\'s outreach, per Attio owner, read live from Attio. For each owner: `followUps` ' +
+      '(deals at Reached Out whose next touch is due) and `newOutreach` (deals at Not Contacted ' +
+      'with a person to write to, up to the daily cap, in priority order). Each item carries the ' +
+      'deal id, the person (name, email, title, Attio\'s description), the company\'s Attio ' +
+      'enrichment, the deal notes, the next cadence step and its purpose, the last email sent ' +
+      'from the tool, and a template draft as the baseline to beat. Items with hasPrep=true ' +
+      'are already written tonight; skip them. `needsContact` lists deals with nobody to email: ' +
+      'find a named person and add them to the deal in Attio. `exhausted` lists sequences that ' +
+      'have run out and need a human decision; report them, never draft.',
     inputSchema: {
       type: 'object',
       properties: {
-        limit: { type: 'number', description: 'How many to return in total. Defaults to the daily cap.' },
-        pipeline: { type: 'string', enum: ['RACE', 'CHARITY'], description: 'Optional: one pipeline only.' },
+        motion: { type: 'string', enum: ['Race', 'Charity', 'Corporate'], description: 'Optional: one motion only.' },
       },
-    },
-  },
-  {
-    name: 'sales_save_research',
-    description:
-      'Store what you found about a contact so it is never looked up twice. Facts must be ' +
-      'specific and true; leave arrays empty rather than invent. The LinkedIn URL must be the ' +
-      'exact profile of this person at this org, or omit it.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        contactId: { type: 'string' },
-        research: {
-          type: 'object',
-          properties: {
-            title: { type: 'string' },
-            linkedinUrl: { type: 'string' },
-            personInfo: { type: 'array', items: { type: 'string' } },
-            companyInfo: { type: 'array', items: { type: 'string' } },
-            sources: { type: 'array', items: { type: 'string' } },
-          },
-        },
-      },
-      required: ['contactId', 'research'],
     },
   },
   {
     name: 'sales_save_draft',
     description:
-      'Hold a draft for the morning. The server checks it against the rules and refuses it ' +
-      'with the reasons if it fails; fix and try again. One to three variants is plenty. ' +
-      'The touch number must match the org\'s next cadence step (see sales_queue).',
+      'Hold a draft for the morning, under its Attio deal. The server checks it against the ' +
+      'rules and refuses it with the reasons if it fails; fix and try again. One to three ' +
+      'variants is plenty. The touch number must match the deal\'s next step (see sales_queue).',
     inputSchema: {
       type: 'object',
       properties: {
-        companyId: { type: 'string' },
-        contactId: { type: 'string', description: 'Who it is addressed to. Defaults to the primary contact with an email.' },
+        dealId: { type: 'string', description: 'The Attio deal record id from sales_queue.' },
+        personId: { type: 'string', description: 'The Attio person record id it is addressed to. Defaults to the first person with an email.' },
         touchNumber: { type: 'number' },
         variants: {
           type: 'array',
@@ -86,49 +62,7 @@ export const SALES_TOOLS = [
           minItems: 1, maxItems: 5,
         },
       },
-      required: ['companyId', 'variants'],
-    },
-  },
-  {
-    name: 'sales_add_lead',
-    description:
-      'Add an org and a named person you sourced. Deduped against what exists by name and ' +
-      'domain, and existing values are never overwritten. Generic inboxes (info@, events@) are ' +
-      'refused. Say where the email came from: "website" (found on their own site), "apollo", ' +
-      'or "guessed" (a pattern you inferred; stored but never sent to).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        pipeline: { type: 'string', enum: ['RACE', 'CHARITY'] },
-        company: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'For a charity, the team brand if it has one, e.g. "Team In Training".' },
-            website: { type: 'string' },
-            city: { type: 'string' },
-            state: { type: 'string' },
-            tier: { type: 'string', description: 'Charity: "A - National", "B - Multi-race" or "C - Single race".' },
-            runnerCount: { type: 'number' },
-            raceDate: { type: 'string', description: 'ISO date, races only.' },
-            identityTags: { type: 'array', items: { type: 'string' } },
-            courseLandmark: { type: 'string' },
-            notes: { type: 'string', description: 'Races the team runs, why they are a fit, anything the email writer should know.' },
-          },
-          required: ['name'],
-        },
-        contact: {
-          type: 'object',
-          properties: {
-            firstName: { type: 'string' },
-            lastName: { type: 'string' },
-            email: { type: 'string' },
-            title: { type: 'string' },
-            linkedinUrl: { type: 'string' },
-          },
-        },
-        emailSource: { type: 'string', enum: ['website', 'apollo', 'guessed'] },
-      },
-      required: ['pipeline', 'company'],
+      required: ['dealId', 'variants'],
     },
   },
   {
@@ -142,10 +76,8 @@ export const SALES_TOOLS = [
         prepared: { type: 'number', description: 'Drafts saved, total.' },
         followUps: { type: 'number', description: 'Of those, follow-ups to people already contacted.' },
         fresh: { type: 'number', description: 'Of those, first touches.' },
-        researched: { type: 'number', description: 'Contacts researched tonight.' },
-        leadsAdded: { type: 'number', description: 'New orgs or contacts added by sourcing.' },
-        skipped: { type: 'array', items: { type: 'string' }, description: 'Orgs you could not draft and why, one line each.' },
-        notes: { type: 'string', description: 'Anything Matt should know this morning, in two or three sentences.' },
+        skipped: { type: 'array', items: { type: 'string' }, description: 'Deals you could not draft and why, one line each.' },
+        notes: { type: 'string', description: 'Anything the reps should know this morning, in two or three sentences.' },
       },
     },
   },
@@ -153,23 +85,15 @@ export const SALES_TOOLS = [
 
 export const SALES_HANDLERS = {
   sales_rules: async () => text(await salesRules()),
-  sales_queue: async (args) => text(await salesQueue({ limit: args.limit, pipeline: args.pipeline })),
-  sales_save_research: async (args) => text(await saveResearch({ contactId: String(args.contactId), research: args.research })),
+  sales_queue: async (args) => text(await salesQueue({ motion: args?.motion })),
   sales_save_draft: async (args) => text(await saveDraft({
-    companyId: String(args.companyId),
-    contactId: args.contactId ? String(args.contactId) : undefined,
+    dealId: String(args.dealId),
+    personId: args.personId ? String(args.personId) : undefined,
     touchNumber: args.touchNumber ? Number(args.touchNumber) : undefined,
     variants: args.variants,
     source: 'routine',
-    preparedBy: 'nightly-sales',
   })),
   sales_finish: async (args) => text(await finishRun(args || {})),
-  sales_add_lead: async (args) => text(await addLead({
-    pipeline: args.pipeline,
-    company: args.company,
-    contact: args.contact,
-    emailSource: args.emailSource || 'website',
-  })),
 }
 
 export const SALES_TOOL_NAMES = new Set(SALES_TOOLS.map(t => t.name))

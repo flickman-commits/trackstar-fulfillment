@@ -122,6 +122,32 @@ export async function requireAdminOnly(req, res) {
   return await requireAdminRole(req, res, actor)
 }
 
+/**
+ * Gate for the Sales tool: signed in, active, and either an admin or a
+ * member of the Attio workspace by email. Reps are added by adding them to
+ * Attio, which is where their deals are anyway; the app keeps no second
+ * list. Responds and returns null on failure. When Attio is not configured
+ * only admins get in, so the page can say what is missing.
+ */
+export async function requireSalesRep(req, res) {
+  const actor = requireAdmin(req, res)
+  if (!actor) return null
+  const user = await loadActiveUser(actor)
+  if (!user) {
+    res.status(401).json({ error: 'Your account is no longer active. Sign in again.' })
+    return null
+  }
+  if (user.role === 'admin' || user.isSystem) return user
+  try {
+    const { memberForEmail, isAttioConfigured } = await import('../../server/domain/sales/attio.js')
+    if (isAttioConfigured() && await memberForEmail(user.email)) return user
+  } catch (err) {
+    console.warn(`[sales] could not check Attio membership for ${user.email}: ${err.message}`)
+  }
+  res.status(403).json({ error: 'Sales is for the people on the Attio workspace. Ask Matt to add you in Attio with this email.', code: 'not_a_rep' })
+  return null
+}
+
 /** Append-only record of who did something consequential. */
 export async function recordAudit({ action, summary, detail = null, actor }) {
   try {

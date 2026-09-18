@@ -4,14 +4,17 @@ import { toast } from 'sonner'
 import { btnPrimary, btnSecondary, btnGhost, fieldLabel, inputBase, segment, segmentGroup } from '@/lib/ui'
 import { useEscape } from '@/lib/useEscape'
 import { salesApi } from '@/lib/salesApi'
-import type { SalesSettings, SalesStatus } from '@/types/sales'
+import type { AttioCheck, SalesSettings, SalesStatus, Sender } from '@/types/sales'
 
 /**
- * Everything that is not today's work: the cap, who the emails are from and
- * how they are signed, Gmail, the mirrors, and the automation status that
- * used to crowd the page header.
+ * Everything that is not today's work.
+ *
+ * Me: your name and signature, which every email you send carries. Sending:
+ * the workspace's cap, undo window and business day (admins). Connections:
+ * your Gmail, and whether Attio has the fields the tool reads. Automation:
+ * the AI switch and the last overnight run.
  */
-type Tab = 'sending' | 'voice' | 'connections' | 'automation'
+type Tab = 'me' | 'sending' | 'connections' | 'automation'
 
 export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   status: SalesStatus | null
@@ -20,29 +23,34 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   onClose: () => void
 }) {
   useEscape(onClose)
-  const [tab, setTab] = useState<Tab>('sending')
+  const isAdmin = status?.me.role === 'admin'
+  const [tab, setTab] = useState<Tab>('me')
   const [s, setS] = useState<SalesSettings | null>(null)
+  const [me, setMe] = useState<Sender | null>(null)
   const [saving, setSaving] = useState(false)
-  const [check, setCheck] = useState<{ attio: { configured: boolean; ok: boolean; error?: string; workspace?: string | null } } | null>(null)
+  const [check, setCheck] = useState<AttioCheck | null>(null)
   const [checking, setChecking] = useState(false)
 
-  useEffect(() => { salesApi.settings().then(r => setS(r.settings)).catch(e => toast.error((e as Error).message)) }, [])
+  useEffect(() => { salesApi.settings().then(r => { setS(r.settings); setMe(r.sender) }).catch(e => toast.error((e as Error).message)) }, [])
 
   const save = async () => {
-    if (!s) return
+    if (!s || !me) return
     setSaving(true)
     try {
-      const r = await salesApi.saveSettings({ dailyCap: s.dailyCap, sender: s.sender, socialProof: s.socialProof, priorityRaces: s.priorityRaces, signature: s.signature, timezone: s.timezone, undoSeconds: s.undoSeconds })
-      setS(r.settings); toast.success('Saved'); onClose()
+      await salesApi.saveSender({ name: me.name, role: me.role, story: me.story, signature: me.signature })
+      if (isAdmin) await salesApi.saveSettings({ dailyCap: s.dailyCap, socialProof: s.socialProof, timezone: s.timezone, undoSeconds: s.undoSeconds })
+      toast.success('Saved'); onClose()
     } catch (e) { toast.error((e as Error).message) }
     finally { setSaving(false) }
   }
   const runCheck = async () => {
     setChecking(true)
-    try { setCheck(await salesApi.checkMirrors()) } catch (e) { toast.error((e as Error).message) } finally { setChecking(false) }
+    try { setCheck((await salesApi.checkAttio()).attio) } catch (e) { toast.error((e as Error).message) } finally { setChecking(false) }
   }
 
   const TZ = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'UTC']
+  const tabs: Tab[] = isAdmin ? ['me', 'sending', 'connections', 'automation'] : ['me', 'connections', 'automation']
+  const label: Record<Tab, string> = { me: 'Me', sending: 'Sending', connections: 'Connections', automation: 'Automation' }
 
   return (
     <div className="fixed inset-0 z-50 bg-off-black/40 flex items-center justify-center p-4" onClick={onClose}>
@@ -53,21 +61,41 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
         </div>
         <div className="px-5 pt-3">
           <div className={segmentGroup}>
-            {(['sending', 'voice', 'connections', 'automation'] as Tab[]).map(t => (
-              <button key={t} onClick={() => setTab(t)} className={segment(tab === t)}>{t[0].toUpperCase() + t.slice(1)}</button>
-            ))}
+            {tabs.map(t => <button key={t} onClick={() => setTab(t)} className={segment(tab === t)}>{label[t]}</button>)}
           </div>
         </div>
 
-        {!s ? (
+        {!s || !me ? (
           <div className="flex items-center justify-center h-40 text-off-black/40"><Loader2 className="w-4 h-4 animate-spin" /></div>
         ) : (
           <div className="px-5 py-4 overflow-y-auto space-y-4 text-sm">
-            {tab === 'sending' && (
+            {tab === 'me' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={fieldLabel}>First name, as the emails say it</label><input value={me.name} onChange={e => setMe({ ...me, name: e.target.value })} className={`${inputBase} w-full`} /></div>
+                  <div><label className={fieldLabel}>Role</label><input value={me.role} onChange={e => setMe({ ...me, role: e.target.value })} placeholder="founder at Trackstar" className={`${inputBase} w-full`} /></div>
+                </div>
+                <div>
+                  <label className={fieldLabel}>Your one-line story (optional, first person)</label>
+                  <textarea rows={2} value={me.story} onChange={e => setMe({ ...me, story: e.target.value })} placeholder="Why you are the one writing. Goes in the who-I-am line of a first touch." className={`${inputBase} w-full resize-y`} />
+                </div>
+                <div>
+                  <label className={fieldLabel}>Signature</label>
+                  <textarea rows={6} value={me.signature} onChange={e => setMe({ ...me, signature: e.target.value })} className={`${inputBase} w-full resize-y font-mono text-[11.5px]`} spellCheck={false} />
+                  <p className="text-xs text-off-black/50 mt-1">HTML. Added after the body of every email you send, before any P.S. Drafts themselves carry no sign-off.{me.isDefault ? ' This is the workspace default until you save your own.' : ''}</p>
+                  <div className="mt-2 rounded-lg border border-border-gray bg-subtle-gray px-4 py-3">
+                    <div className="font-mono text-[10px] tracking-wider uppercase text-off-black/40 mb-1">Preview</div>
+                    <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 14, color: '#333', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: me.signature }} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {tab === 'sending' && isAdmin && (
               <>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className={fieldLabel}>Emails per day</label>
+                    <label className={fieldLabel}>Emails per day, per rep</label>
                     <input type="number" min={1} max={50} value={s.dailyCap} onChange={e => setS({ ...s, dailyCap: Number(e.target.value) })} className={`${inputBase} w-full`} />
                   </div>
                   <div>
@@ -81,36 +109,11 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                     </select>
                   </div>
                 </div>
-                <p className="text-xs text-off-black/50">The cap is what the overnight routine prepares and what the page counts toward. These go from the same domain as order confirmations, so a spike costs more than a campaign earns.</p>
-                <div>
-                  <label className={fieldLabel}>Signature</label>
-                  <textarea rows={6} value={s.signature} onChange={e => setS({ ...s, signature: e.target.value })} className={`${inputBase} w-full resize-y font-mono text-[11.5px]`} spellCheck={false} />
-                  <p className="text-xs text-off-black/50 mt-1">HTML. Added after the body of every email you send, before any P.S. Drafts themselves carry no sign-off.</p>
-                  <div className="mt-2 rounded-lg border border-border-gray bg-subtle-gray px-4 py-3">
-                    <div className="font-mono text-[10px] tracking-wider uppercase text-off-black/40 mb-1">Preview</div>
-                    <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 14, color: '#333', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: s.signature }} />
-                  </div>
-                </div>
-              </>
-            )}
-
-            {tab === 'voice' && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className={fieldLabel}>Sender name</label><input value={s.sender.name} onChange={e => setS({ ...s, sender: { ...s.sender, name: e.target.value } })} className={`${inputBase} w-full`} /></div>
-                  <div><label className={fieldLabel}>Role</label><input value={s.sender.role} onChange={e => setS({ ...s, sender: { ...s.sender, role: e.target.value } })} className={`${inputBase} w-full`} /></div>
-                </div>
-                <div><label className={fieldLabel}>Founder story (one sentence, first person)</label><textarea rows={2} value={s.sender.story} onChange={e => setS({ ...s, sender: { ...s.sender, story: e.target.value } })} className={`${inputBase} w-full resize-y`} /></div>
-                <div><label className={fieldLabel}>Race partners to cite</label><input type="number" min={0} value={s.sender.partnerCount} onChange={e => setS({ ...s, sender: { ...s.sender, partnerCount: Number(e.target.value) } })} className={`${inputBase} w-24`} /></div>
+                <p className="text-xs text-off-black/50">The cap is how much new outreach the overnight run prepares per rep and what the page counts toward. Follow-ups are never capped; they are owed.</p>
                 <div>
                   <label className={fieldLabel}>Social proof line</label>
                   <textarea rows={2} value={s.socialProof} onChange={e => setS({ ...s, socialProof: e.target.value })} className={`${inputBase} w-full resize-y`} />
                   <p className="text-xs text-off-black/50 mt-1">Leads the fourth race touch. Update the numbers as the season moves.</p>
-                </div>
-                <div>
-                  <label className={fieldLabel}>Races to source charity teams from, in priority order</label>
-                  <textarea rows={6} value={s.priorityRaces.join('\n')} onChange={e => setS({ ...s, priorityRaces: e.target.value.split('\n') })} className={`${inputBase} w-full resize-y font-mono text-xs`} />
-                  <p className="text-xs text-off-black/50 mt-1">One per line. The overnight routine works down this list only when the stack has room.</p>
                 </div>
               </>
             )}
@@ -123,7 +126,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                       <div className="font-medium flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Gmail</div>
                       <div className="text-xs text-off-black/55 mt-0.5">
                         {!status?.gmail.configured ? 'Not configured on the server (GOOGLE_OAUTH_CLIENT_ID / SECRET).'
-                          : status.gmail.connected ? `Sending as ${status.gmail.email}.${status.gmail.canReadReplies ? ' Reply detection on.' : ' Reconnect once to allow reply detection.'}`
+                          : status.gmail.connected ? `Sending as ${status.gmail.email}.`
                           : 'Not connected. Emails cannot be sent until it is.'}
                       </div>
                     </div>
@@ -135,13 +138,20 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 </div>
                 <div className="rounded-lg border border-border-gray p-3">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium">CRM</div>
-                    <button onClick={runCheck} disabled={checking} className={btnSecondary}>{checking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plug className="w-3.5 h-3.5" />} Check connections</button>
+                    <div className="font-medium">Attio</div>
+                    <button onClick={runCheck} disabled={checking} className={btnSecondary}>{checking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plug className="w-3.5 h-3.5" />} Check</button>
                   </div>
-                  <p className="text-xs text-off-black/50 mt-1">Every send updates the deal in Attio: last contacted, touch count, next action, and the stage moves to Reached Out. This confirms the app can reach the workspace.</p>
+                  <p className="text-xs text-off-black/50 mt-1">
+                    Attio is the source of truth: the queue is read from it and every send writes back touch count, next action, Reached Out and a note with the email.
+                    {status?.attio.member ? ` You are ${status.attio.member.email} on the workspace.` : ' Your email is not on the workspace, so Mine shows unowned deals only.'}
+                  </p>
                   {check && (
                     <ul className="mt-2 space-y-1 text-xs">
-                      <li className={check.attio.ok ? 'text-success-green' : check.attio.configured ? 'text-red-600' : 'text-off-black/50'}>Attio: {check.attio.ok ? `connected${check.attio.workspace ? ` (${check.attio.workspace})` : ''}` : check.attio.configured ? check.attio.error : 'not configured (set ATTIO_API_KEY)'}</li>
+                      <li className={check.ok ? 'text-success-green' : check.configured ? 'text-red-600' : 'text-off-black/50'}>
+                        {!check.configured ? 'Not configured: set ATTIO_API_KEY in Vercel.' : check.error ? check.error : check.ok ? `Connected${check.workspace ? ` to ${check.workspace}` : ''}, every field the tool needs is there.` : `Connected${check.workspace ? ` to ${check.workspace}` : ''}, with gaps:`}
+                      </li>
+                      {check.missing && check.missing.length > 0 && <li className="text-amber-700">Missing deal attributes: {check.missing.join(', ')}. Add them in Attio settings with these exact API slugs.</li>}
+                      {check.unknownStages && check.unknownStages.length > 0 && <li className="text-amber-700">Stages the tool expects but the workspace lacks: {check.unknownStages.join(', ')}.</li>}
                     </ul>
                   )}
                 </div>
@@ -153,7 +163,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 <div className="rounded-lg border border-border-gray p-3 flex items-center justify-between gap-3">
                   <div>
                     <div className="font-medium">Use AI on this page</div>
-                    <div className="text-xs text-off-black/55 mt-0.5">Rewrite and Research call the model. Off means Rewrite uses the cadence template and Research is disabled. The overnight routine is unaffected.</div>
+                    <div className="text-xs text-off-black/55 mt-0.5">Rewrite and Change it call the model. Off means Rewrite resets to the cadence template. The overnight run is unaffected.</div>
                   </div>
                   <button onClick={() => onAiChange(!aiOn)} disabled={!status?.llm.configured} className={`${aiOn && status?.llm.configured ? btnPrimary : btnSecondary} shrink-0`}>
                     {status?.llm.configured ? (aiOn ? 'On' : 'Off') : 'No model'}
@@ -161,16 +171,16 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 </div>
                 <dl className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1.5 text-xs">
                   <dt className="text-off-black/50">Model</dt><dd>{status?.llm.configured ? `${status.llm.provider} · ${status.llm.model}` : 'not configured'}</dd>
-                  <dt className="text-off-black/50">Research</dt><dd>{status?.research.configured ? status.research.provider : 'off'}</dd>
+                  <dt className="text-off-black/50">Enrichment</dt><dd>Attio's, on the company and the person. Nothing is researched here.</dd>
                   <dt className="text-off-black/50">Overnight run</dt>
                   <dd>
                     {status?.lastRun ? (
                       <>
-                        {new Date(status.lastRun.finishedAt).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })} · {status.lastRun.prepared} prepared, {status.lastRun.researched} researched, {status.lastRun.leadsAdded} leads
+                        {new Date(status.lastRun.finishedAt).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })} · {status.lastRun.prepared} written ({status.lastRun.followUps} follow-ups, {status.lastRun.fresh} first touches)
                         {status.lastRun.notes && <p className="text-off-black/60 mt-1 leading-snug">{status.lastRun.notes}</p>}
-                        {status.lastRun.skipped.length > 0 && <p className="text-amber-700 mt-1">Skipped: {status.lastRun.skipped.join('; ')}</p>}
+                        {status.lastRun.skipped?.length > 0 && <p className="text-amber-700 mt-1">Skipped: {status.lastRun.skipped.join('; ')}</p>}
                       </>
-                    ) : 'has not run yet'}
+                    ) : 'has not run yet. It is the last phase of the nightly CRM upkeep.'}
                   </dd>
                 </dl>
               </>
@@ -180,7 +190,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
 
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border-gray">
           <button onClick={onClose} className={btnSecondary}>Cancel</button>
-          <button onClick={save} disabled={!s || saving} className={btnPrimary}>{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save</button>
+          <button onClick={save} disabled={!s || !me || saving} className={btnPrimary}>{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save</button>
         </div>
       </div>
     </div>

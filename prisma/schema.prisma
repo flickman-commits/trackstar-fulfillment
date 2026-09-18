@@ -742,10 +742,11 @@ model ToplineWaitlist {
 //
 // Company is the organisation the deal is with (a race or a charity), and
 // the deal's stage and cadence live on it. Contact is a person there.
-// Touch is one thing that happened between us: a draft, a send, a reply, a
-// call, a note. Enums rather than free strings, on purpose: the order tables
-// documented their statuses in comments and the code drifted from them.
-// Money is integer cents. There is no float price column anywhere in here.
+// LEGACY. Attio is the CRM (workspace trackstar-usa, object deals). Nothing
+// reads or writes Company, Contact or Touch any more; they are the tables the
+// Sales tool used before the CRM moved. Drop them when convenient:
+//   delete the three models and the three enums below, remove
+//   User.ownedCompanies, then `npx prisma db push --accept-data-loss`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum Pipeline {
@@ -882,4 +883,57 @@ model Touch {
   contact       Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   @@index([companyId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sales machinery. Attio holds the deal, the company, the person, the stage
+// and the touch count. Postgres holds only what Attio cannot: the Gmail ids a
+// follow-up needs to land in the same thread, the send log that says how many
+// went out today, the draft the overnight routine wrote, and a skip. Every
+// row points at an Attio record id and nothing here is a fact about a deal.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SalesSend {
+  id             String   @id @default(cuid())
+  attioDealId    String
+  attioPersonId  String?
+  toEmail        String
+  touchNumber    Int
+  angle          String?
+  subject        String
+  body           String
+  attachments    String[] @default([])
+  gmailMessageId String?
+  gmailThreadId  String?
+  // The RFC 5322 Message-ID we stamped on it, for In-Reply-To on the next touch.
+  rfcMessageId   String?
+  sentAt         DateTime @default(now())
+  sentById       String?
+  sentByEmail    String?
+  // The write to Attio after the send: ok, or why not. Shown, never retried into a second send.
+  attioOk        Boolean  @default(false)
+  attioError     String?
+
+  @@index([attioDealId, sentAt])
+  @@index([sentAt])
+}
+
+// The email the overnight routine wrote for a deal, waiting for a person.
+model SalesPrep {
+  attioDealId   String   @id
+  attioPersonId String?
+  touchNumber   Int
+  angle         String?
+  variants      Json     // [{subject, body}]
+  source        String   @default("routine")
+  preparedAt    DateTime @default(now())
+}
+
+// "Skip today": hidden from the queue until `until`. The reason is for tomorrow's person.
+model SalesSkip {
+  attioDealId String   @id
+  until       DateTime
+  reason      String?
+  byEmail     String?
+  createdAt   DateTime @default(now())
 }

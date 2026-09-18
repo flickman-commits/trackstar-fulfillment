@@ -1,5 +1,5 @@
 /**
- * /api/sales/gmail - connect Matt's Gmail so the tool can write drafts into it.
+ * /api/sales/gmail - connect a rep's own Gmail so the tool can send as them.
  *
  *   GET  ?action=status     { configured, connected, email }
  *   GET  ?action=connect    redirects to Google's consent screen
@@ -9,13 +9,13 @@
  * file because Google rejects a redirect URI containing a query string.
  */
 import { setCors } from '../_lib/auth.js'
-import { requireAdminOnly } from '../_lib/users.js'
+import { requireSalesRep } from '../_lib/users.js'
 import { getAuthUrl, disconnectGmail, gmailStatus, redirectUriFor, isGmailConfigured } from '../../server/domain/sales/gmail.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  // Admin-only: this connects a mailbox and can draft mail as its owner.
-  const actor = await requireAdminOnly(req, res)
+  // Any rep: this connects their own mailbox, and sends go as that account.
+  const actor = await requireSalesRep(req, res)
   if (!actor) return
 
   try {

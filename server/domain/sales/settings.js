@@ -29,18 +29,6 @@ export const DEFAULTS = {
   },
   /** The social-proof line the fourth race touch leads with. */
   socialProof: DEFAULT_SOCIAL_PROOF,
-  /** Where the routine looks for new charity teams, in priority order. From the runbook. */
-  priorityRaces: [
-    'St. Jude Memphis Marathon',
-    'Berlin Marathon',
-    'Marine Corps Marathon',
-    'California International Marathon',
-    'Houston Marathon',
-    'Tokyo Marathon',
-    'London Marathon',
-  ],
-  /** Follow-up gaps in days, per pipeline and touch. Overrides the cadence file. */
-  followUpDays: { RACE: null, CHARITY: null },
   /**
    * Appended to every email the app sends, after the body and before any
    * P.S. HTML, because it carries links. The drafts themselves carry no
@@ -108,10 +96,6 @@ export async function setSettings(patch) {
     next.signature = String(next.signature).slice(0, 4000)
     if (/<script|javascript:/i.test(next.signature)) throw new Error('The signature cannot contain scripts')
   }
-  if (next.priorityRaces !== undefined) {
-    if (!Array.isArray(next.priorityRaces)) throw new Error('priorityRaces must be a list')
-    next.priorityRaces = next.priorityRaces.map(s => String(s).trim()).filter(Boolean).slice(0, 30)
-  }
   await prisma.systemConfig.upsert({
     where: { key: SETTINGS_KEY },
     update: { value: JSON.stringify(next) },
@@ -120,6 +104,60 @@ export async function setSettings(patch) {
   cache = { at: 0, value: null }
   return getSettings({ force: true })
 }
+
+/**
+ * Who this email is from.
+ *
+ * Every rep sends from their own Gmail, so the name on the drafts and the
+ * signature under them are theirs, not the workspace's. Stored per user;
+ * the workspace defaults (Matt's) fill in anything a rep has not set, so a
+ * new rep's first send still looks finished.
+ */
+export function senderKey(userId) { return `sales_sender:${userId}` }
+
+export async function getSenderFor(userId, user = null) {
+  const base = await getSettings()
+  const row = userId ? await prisma.systemConfig.findUnique({ where: { key: senderKey(userId) } }) : null
+  let over = {}
+  try { over = row?.value ? JSON.parse(row.value) : {} } catch { over = {} }
+  const firstName = user?.firstName || base.sender.name
+  // Matt's role and founder story are his. Another rep starts plain.
+  const isDefaultSender = firstName === base.sender.name
+  const fallback = {
+    name: firstName,
+    role: isDefaultSender ? base.sender.role : 'from Trackstar',
+    story: isDefaultSender ? base.sender.story : '',
+    // A rep without a saved signature gets a plain one in their own name
+    // rather than Matt's, so nothing goes out signed by the wrong person.
+    signature: user && user.firstName && user.firstName !== base.sender.name
+      ? `<p style="margin:0">Thanks,</p><p style="margin:0;font-weight:700">${escapeHtml(`${user.firstName} ${user.lastName || ''}`.trim())}</p><p style="margin:0">Trackstar</p>`
+      : base.signature,
+  }
+  return { ...fallback, ...over, isDefault: !row }
+}
+
+export async function setSenderFor(userId, patch) {
+  if (!userId) throw new Error('No user')
+  const row = await prisma.systemConfig.findUnique({ where: { key: senderKey(userId) } })
+  let current = {}
+  try { current = row?.value ? JSON.parse(row.value) : {} } catch { current = {} }
+  const next = { ...current }
+  if (patch.name !== undefined) next.name = String(patch.name).trim().slice(0, 60)
+  if (patch.role !== undefined) next.role = String(patch.role).trim().slice(0, 120)
+  if (patch.story !== undefined) next.story = String(patch.story).trim().slice(0, 600)
+  if (patch.signature !== undefined) {
+    next.signature = String(patch.signature).slice(0, 4000)
+    if (/<script|javascript:/i.test(next.signature)) throw new Error('The signature cannot contain scripts')
+  }
+  await prisma.systemConfig.upsert({
+    where: { key: senderKey(userId) },
+    update: { value: JSON.stringify(next) },
+    create: { key: senderKey(userId), value: JSON.stringify(next) },
+  })
+  return getSenderFor(userId)
+}
+
+function escapeHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 
 /**
  * Start of "today" in the business timezone, as a Date. What "sent today"

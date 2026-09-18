@@ -1,135 +1,131 @@
 /**
- * Shapes returned by /api/sales/*. Mirrors prisma/schema.prisma; keep in step.
+ * Shapes returned by /api/sales/*. Attio is the source of truth; these are
+ * its records as the server reads them, plus what the send log adds.
  */
 
 export type Pipeline = 'RACE' | 'CHARITY'
+export type Motion = 'Race' | 'Charity' | 'Corporate'
 
-export type DealStage =
-  | 'NOT_CONTACTED' | 'QUEUED' | 'SENT' | 'FOLLOWED_UP' | 'REPLIED' | 'CALL_BOOKED'
-  | 'PROPOSAL_SENT' | 'INTERESTED' | 'SIGNED' | 'INVOICED' | 'PAID' | 'NEXT_YEAR'
-  | 'PASSED' | 'NOT_INTERESTED'
+/** Attio deal stages, in pipeline order. */
+export const STAGES = ['Needs Enrichment', 'Not Contacted', 'Reached Out', 'In Conversation', 'Call Booked', 'Deck Sent', 'Won', 'Revisit Next Year', 'Lost'] as const
+export type Stage = typeof STAGES[number]
 
-export const STAGE_LABEL: Record<DealStage, string> = {
-  NOT_CONTACTED: 'Not contacted',
-  QUEUED: 'Draft ready',
-  SENT: 'Sent',
-  FOLLOWED_UP: 'Followed up',
-  REPLIED: 'Replied',
-  CALL_BOOKED: 'Call booked',
-  PROPOSAL_SENT: 'Proposal sent',
-  INTERESTED: 'Interested',
-  SIGNED: 'Signed',
-  INVOICED: 'Invoiced',
-  PAID: 'Paid',
-  NEXT_YEAR: 'Next year',
-  PASSED: 'Passed',
-  NOT_INTERESTED: 'Not interested',
-}
-
-export interface Research {
-  title?: string
-  personInfo?: string[]
-  companyInfo?: string[]
-  sources?: string[]
-  researchedAt?: string
-}
-
-export interface Contact {
+export interface Person {
   id: string
   firstName: string
   lastName: string
+  fullName: string
   email: string | null
+  emails: string[]
   title: string | null
-  linkedinUrl: string | null
-  isPrimary: boolean
-  /** Where the address came from. "guessed" is never sent to. */
-  emailSource?: 'import' | 'website' | 'apollo' | 'manual' | 'guessed' | null
-  research: Research | null
-  researchedAt: string | null
+  /** Attio's enrichment on the person. */
+  description: string | null
+  linkedin: string | null
+  location: string | null
+  lastInteractionAt: string | null
+  lastEmailAt: string | null
+  webUrl: string | null
 }
 
-export type TouchKind = 'EMAIL_DRAFT' | 'EMAIL_SENT' | 'REPLY' | 'CALL' | 'NOTE'
-
-export interface Touch {
+export interface CompanyRecord {
   id: string
-  kind: TouchKind
-  touchNumber: number | null
-  angle?: string | null
-  subject: string | null
-  body?: string | null
-  gmailDraftId?: string | null
-  gmailThreadId?: string | null
-  sentAt: string | null
-  createdAt: string
-  createdBy?: string | null
-}
-
-export interface Company {
-  id: string
-  pipeline: Pipeline
-  name: string
+  name: string | null
   domain: string | null
-  website: string | null
-  city: string | null
-  state: string | null
-  runnerCount: number | null
-  raceDate: string | null
-  identityTags: string[]
-  courseLandmark: string | null
-  tier: string | null
-  dealValueCents: number | null
-  units: number | null
-  stage: DealStage
-  touchCount: number
-  lastTouchAt: string | null
-  nextActionAt: string | null
-  nextAction: string | null
-  notes: string | null
-  source: string
-  ownerId?: string | null
-  proposedAt?: string | null
-  hasProposedDraft?: boolean
-  replyPending?: boolean
-  lastReplyAt?: string | null
-  snoozedUntil?: string | null
-  contacts: Contact[]
-  lastTouch?: Touch | null
-  touches?: Touch[]
+  /** Attio's enrichment on the company. */
+  description: string | null
+  location: string | null
+  employeeRange: string | null
+  categories: string[]
+  linkedin: string | null
+  twitter: string | null
+  lastInteractionAt: string | null
+  lastEmailAt: string | null
+  nextCalendarAt: string | null
+  webUrl: string | null
 }
 
-/** A company as it appears in the morning stack, with the reason it is there. */
-export interface StackItem extends Company {
-  reason: string
-  /** Days past nextActionAt. 0 when not overdue. */
-  overdueDays: number
+export interface Send {
+  id: string
+  touchNumber: number
+  subject: string
+  body?: string
+  sentAt: string
+  sentByEmail: string | null
+  gmailThreadId: string | null
+  attachments: string[]
+  attioOk: boolean
+}
+
+/** A deal as the queue shows it. */
+export interface Deal {
+  id: string
+  name: string | null
+  stage: Stage | string | null
+  motion: Motion | string | null
+  pipeline: Pipeline
+  ownerId: string | null
+  company: CompanyRecord | null
+  people: Person[]
+  person: Person | null
+  hasEmail: boolean
+  touchCount: number
+  nextAction: string | null
+  nextActionDate: string | null
+  raceDate: string | null
+  runners: number | null
+  tier: string | null
+  sizeTier: string | null
+  priority: string | null
+  notes: string | null
+  value: number | null
+  units: number | null
+  createdAt: string | null
+  webUrl: string | null
   nextTouchNumber: number | null
   nextAngle: string | null
-  lastEmailedAt: string | null
+  exhausted: boolean
+  lastSentAt: string | null
+  lastSubject: string | null
+  hasPrep: boolean
+  preparedAt: string | null
+  skippedUntil: string | null
+  overdueDays: number
+  reason: string
   /** Only on sentToday rows. */
   sentAt?: string
+  sentSubject?: string
+  /** Only on the full detail. */
+  sends?: Send[]
 }
 
 export interface OvernightRun {
   finishedAt: string; prepared: number; followUps: number; fresh: number
-  leadsAdded: number; researched: number; skipped: string[]; notes: string
+  skipped: string[]; notes: string
 }
 
 export interface TodayPayload {
   cap: number
+  room: number
   scope: 'mine' | 'all'
+  member: { id: string; email: string } | null
   timezone: string
   undoSeconds: number
   sentTodayCount: number
-  replies: StackItem[]
-  stack: StackItem[]
-  sentToday: StackItem[]
-  counts: { dueLater: number; needsContact: number; total: number; week: { sent: number; replies: number; calls: number } }
+  sentToday: Deal[]
+  newOutreach: Deal[]
+  newWaiting: number
+  followUps: Deal[]
+  later: Deal[]
+  exhausted: Deal[]
+  needsContact: Deal[]
+  skipped: Deal[]
+  counts: { deals: number; inScope: number; byStage: Record<string, number>; week: { sent: number } }
   overnight: OvernightRun | null
 }
 
 export interface Progress {
   days: { day: string; sent: number }[]
-  totals: { sent: number; replies: number; replyRate: number; calls: number; signed: number }
+  totals: { sent: number; won: number; inConversation: number }
   funnel: { stage: string; count: number }[]
   byStage: Record<string, number>
 }
@@ -141,58 +137,61 @@ export interface DraftResult {
   step: { angle: string; purpose: string; subject: string; nextActionDays: number }
   exhausted: boolean
   variants: Variant[]
-  contactId: string
-  companyId: string
+  personId: string
+  dealId: string
   model: string
   /** Who wrote it: a model now, the cadence template, or the overnight routine ('prepared'). */
   source?: 'model' | 'template' | 'prepared'
   preparedAt?: string
-  /** Set when the model was meant to write it and could not. */
   warning?: string
 }
 
-export interface Mockup {
+export type AssetKind = 'image' | 'deck' | 'file'
+
+export interface Asset {
   id: string
   name: string
+  filename: string
   size: number | null
   contentType: string
+  kind: AssetKind
+  updatedAt: string | null
   previewUrl: string | null
 }
 
 export interface SalesStatus {
   llm: { configured: boolean; provider?: string; model?: string; baseUrl?: string; canSearch?: boolean }
-  research: { configured: boolean; provider: 'anthropic' | 'perplexity' | null }
   gmail: { configured: boolean; connected: boolean; email: string | null; canReadReplies?: boolean }
-  attio?: { configured: boolean }
+  attio: { configured: boolean; member: { id: string; email: string } | null }
+  library: { configured: boolean }
+  me: { id: string; email: string; firstName: string | null; role: string }
   lastRun: OvernightRun | null
-}
-
-export interface ImportPreview {
-  headers: string[]
-  mapped: Record<string, string>
-  unmapped: string[]
-  total: number
-  withContact: number
-  withEmail: number
-  sample: Array<{ line: number; company: { name: string }; contact: { firstName: string; lastName: string; email: string | null } | null }>
-  skipped: Array<{ line?: number; reason: string }>
-}
-
-export interface ImportResult {
-  companiesCreated: number
-  companiesUpdated: number
-  contactsCreated: number
-  contactsUpdated: number
-  skipped: Array<{ line?: number; company?: string; reason: string }>
 }
 
 export interface SalesSettings {
   dailyCap: number
   sender: { name: string; role: string; story: string; partnerCount: number }
   socialProof: string
-  priorityRaces: string[]
-  /** HTML appended to every sent email. */
+  /** HTML appended to every sent email. The workspace default; reps override under Me. */
   signature: string
   timezone: string
   undoSeconds: number
+}
+
+export interface Sender {
+  name: string
+  role: string
+  story: string
+  signature: string
+  isDefault: boolean
+}
+
+export interface AttioCheck {
+  configured: boolean
+  ok: boolean
+  error?: string
+  workspace?: string | null
+  missing?: string[]
+  stages?: string[] | null
+  unknownStages?: string[]
 }

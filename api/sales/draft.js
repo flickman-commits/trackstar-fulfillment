@@ -1,84 +1,72 @@
 /**
  * /api/sales/draft
  *
- *   GET  ?action=status                                    what is wired up: model, research, Gmail
- *   POST { action:'variants', companyId, contactId? }       five drafts for the next touch
- *   POST { action:'queue', companyId, contactId, subject, body }  file the chosen one
- *   POST { action:'check', companyId, subject, body }             guardrail reasons, no side effects
+ *   GET                                                  what is wired up: model, Gmail, Attio, the last overnight run
+ *   POST { action:'variants', dealId, personId?, useTemplate?, force? }   drafts for the next touch
+ *   POST { action:'check', dealId, subject, body }         guardrail reasons, no side effects
+ *   POST { action:'revise', dealId, subject, body, instruction }   the model rewrites to an instruction
+ *   POST { action:'send', dealId, personId, subject, body, assetIds? }   sends through your Gmail. Final.
  */
 import { setCors } from '../_lib/auth.js'
-import { requireAdminOnly } from '../_lib/users.js'
-import { draftVariants, queueDraft, sendDraft, checkDraft } from '../../server/domain/sales/drafting.js'
+import { requireSalesRep } from '../_lib/users.js'
+import { draftVariants, sendDraft, checkDraft, reviseDraft } from '../../server/domain/sales/drafting.js'
 import { llmInfo } from '../../server/lib/llm.js'
-import { researchProvider } from '../../server/domain/sales/research.js'
 import { gmailStatus } from '../../server/domain/sales/gmail.js'
-import { isAttioConfigured } from '../../server/domain/sales/attio.js'
-import { lastRun } from '../../server/domain/sales/nightly.js'
+import { isAttioConfigured, memberForEmail } from '../../server/domain/sales/attio.js'
+import { isAssetStorageConfigured } from '../../server/domain/sales/assets.js'
+import { lastRun } from '../../server/domain/sales/queue.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  // Admin-only, and every model call costs money, so the role is checked
-  // against the database rather than trusted from the session token.
-  const actor = await requireAdminOnly(req, res)
+  const actor = await requireSalesRep(req, res)
   if (!actor) return
 
   try {
     if (req.method === 'GET') {
+      let member = null
+      if (isAttioConfigured()) { try { member = await memberForEmail(actor.email) } catch { member = null } }
       return res.status(200).json({
         llm: llmInfo(),
-        research: { configured: researchProvider() !== null, provider: researchProvider() },
         gmail: await gmailStatus(actor.id),
-        attio: { configured: isAttioConfigured() },
+        attio: { configured: isAttioConfigured(), member: member ? { id: member.id, email: member.email } : null },
+        library: { configured: isAssetStorageConfigured() },
+        me: { id: actor.id, email: actor.email, firstName: actor.firstName || null, role: actor.role },
         lastRun: await lastRun(),
       })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
-    if (!body.companyId) return res.status(400).json({ error: 'companyId is required' })
+    const dealId = String(body.dealId || '')
+    if (!dealId) return res.status(400).json({ error: 'dealId is required' })
 
     if (body.action === 'variants') {
-      const out = await draftVariants({
-        companyId: String(body.companyId),
-        contactId: body.contactId ? String(body.contactId) : undefined,
+      return res.status(200).json(await draftVariants({
+        dealId,
+        personId: body.personId ? String(body.personId) : undefined,
         useTemplate: Boolean(body.useTemplate),
         force: Boolean(body.force),
-      })
-      const { company, contact, ...rest } = out
-      return res.status(200).json({ ...rest, contactId: contact.id, companyId: company.id })
+        actor,
+      }))
     }
-
     if (body.action === 'check') {
-      const out = await checkDraft({ companyId: String(body.companyId), subject: String(body.subject || ''), body: String(body.body || '') })
-      return res.status(200).json(out)
+      return res.status(200).json(await checkDraft({ dealId, subject: String(body.subject || ''), body: String(body.body || '') }))
     }
-
+    if (body.action === 'revise') {
+      const instruction = String(body.instruction || '').trim()
+      if (!instruction) return res.status(400).json({ error: 'Say what to change' })
+      return res.status(200).json(await reviseDraft({ dealId, subject: String(body.subject || ''), body: String(body.body || ''), instruction, actor }))
+    }
     if (body.action === 'send') {
-      if (!body.contactId) return res.status(400).json({ error: 'contactId is required' })
-      const out = await sendDraft({
-        companyId: String(body.companyId),
-        contactId: String(body.contactId),
+      return res.status(200).json(await sendDraft({
+        dealId,
+        personId: body.personId ? String(body.personId) : undefined,
         subject: String(body.subject || ''),
         body: String(body.body || ''),
-        mockupId: body.mockupId ? String(body.mockupId) : undefined,
+        assetIds: Array.isArray(body.assetIds) ? body.assetIds.map(String) : [],
         actor,
-      })
-      return res.status(200).json(out)
+      }))
     }
-
-    if (body.action === 'queue') {
-      if (!body.contactId) return res.status(400).json({ error: 'contactId is required' })
-      const out = await queueDraft({
-        companyId: String(body.companyId),
-        contactId: String(body.contactId),
-        subject: String(body.subject || ''),
-        body: String(body.body || ''),
-        mockupId: body.mockupId ? String(body.mockupId) : undefined,
-        actor,
-      })
-      return res.status(200).json(out)
-    }
-
     return res.status(400).json({ error: `Unknown action: ${body.action}` })
   } catch (error) {
     if (error.problems) return res.status(400).json({ error: error.message, problems: error.problems })

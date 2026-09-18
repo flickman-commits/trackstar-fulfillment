@@ -175,9 +175,11 @@ export default function App() {
                 <Route path="/creators" element={<RequireAdmin><CreatorsHome /></RequireAdmin>} />
                 <Route path="/products" element={<RequireAdmin><ProductsBulkEdit /></RequireAdmin>} />
                 <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
-                <Route path="/sales" element={<RequireAdmin><Sales /></RequireAdmin>} />
+                {/* Sales is for reps: anyone signed in whose email is on the Attio
+                    workspace, or an admin. The API decides; the page shows why not. */}
+                <Route path="/sales" element={<Sales />} />
                 {/* The daily send list is the Sales page. /send is the short name the brief uses. */}
-                <Route path="/send" element={<RequireAdmin><Sales /></RequireAdmin>} />
+                <Route path="/send" element={<Sales />} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>
               </AppShell>
