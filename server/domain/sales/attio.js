@@ -214,19 +214,55 @@ async function queryAll(object, body = {}) {
   return out
 }
 
-/** Records of an object by id, in batches. Missing ids are simply absent. */
-async function byIds(object, ids) {
-  const unique = [...new Set(ids.filter(Boolean))]
-  const out = []
-  for (let i = 0; i < unique.length; i += 50) {
-    const chunk = unique.slice(i, i + 50)
-    const res = await attio(`/objects/${object}/records/query`, {
-      method: 'POST',
-      body: { filter: { $or: chunk.map(id => ({ record_id: { $eq: id } })) }, limit: PAGE },
-    })
-    out.push(...(res?.data || []))
+/**
+ * One record by id. A plain read: Attio's query complexity limit does not
+ * apply, unlike a filter with fifty $or clauses, which it refuses outright.
+ */
+async function getRecord(object, id) {
+  try {
+    const out = await attio(`/objects/${object}/records/${id}`)
+    return out?.data || null
+  } catch (err) {
+    if (err.status === 404) return null
+    throw err
   }
+}
+
+/** Run `fn` over `items` with at most `n` in flight; a 429 waits and retries once. */
+async function mapLimit(items, n, fn) {
+  const out = new Array(items.length)
+  let i = 0
+  async function worker() {
+    while (i < items.length) {
+      const idx = i++
+      try {
+        out[idx] = await fn(items[idx])
+      } catch (err) {
+        if (err.status !== 429) throw err
+        await new Promise(r => setTimeout(r, 1500))
+        out[idx] = await fn(items[idx])
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker))
   return out
+}
+
+/**
+ * People by id. The people object holds thousands of records from the inbox
+ * sync, so it is never read whole; the ones a deal points at are fetched one
+ * by one and remembered for a while.
+ */
+const peopleCache = new Map()
+const PEOPLE_MS = 10 * 60_000
+async function peopleByIds(ids) {
+  const unique = [...new Set(ids.filter(Boolean))]
+  const missing = unique.filter(id => !(peopleCache.get(id) && Date.now() - peopleCache.get(id).at < PEOPLE_MS))
+  await mapLimit(missing, 8, async id => {
+    const rec = await getRecord('people', id)
+    peopleCache.set(id, { at: Date.now(), value: rec ? personView(rec) : null })
+  })
+  return Object.fromEntries(unique.map(id => [id, peopleCache.get(id)?.value || null]))
 }
 
 const cache = new Map()
@@ -243,28 +279,39 @@ export function forgetAttioCache() { cache.clear() }
  * Every deal in the workspace, as views, with the companies and people they
  * point at. One paged fetch plus batched lookups; cached briefly.
  */
+/** The stages the queue works. People are loaded up front only for these. */
+const WORKED_STAGES = ['Needs Enrichment', 'Not Contacted', 'Reached Out']
+
+/**
+ * Every deal in the workspace, as views, with the companies they point at
+ * and the people on the ones the queue works. Companies are read whole (a
+ * few hundred, plain paged reads); people only by reference. Cached briefly.
+ */
 export async function loadDeals({ fresh = false } = {}) {
   if (fresh) { cache.delete('deals'); cache.delete('members') }
   return cached('deals', CACHE_MS, async () => {
-    const records = await queryAll('deals')
-    const deals = records.map(dealView).filter(d => d.id)
-    const [companies, people] = await Promise.all([
-      byIds('companies', deals.map(d => d.companyId)),
-      byIds('people', deals.flatMap(d => d.personIds)),
-    ])
-    const companyById = Object.fromEntries(companies.map(c => [recordId(c), companyView(c)]))
-    const personById = Object.fromEntries(people.map(p => [recordId(p), personView(p)]))
+    const [dealRecords, companyRecords] = await Promise.all([queryAll('deals'), queryAll('companies')])
+    const deals = dealRecords.map(dealView).filter(d => d.id)
+    const companyById = Object.fromEntries(companyRecords.map(c => [recordId(c), companyView(c)]))
+    const worked = deals.filter(d => WORKED_STAGES.includes(d.stage))
+    const personById = await peopleByIds(worked.flatMap(d => d.personIds))
     return deals.map(d => ({
       ...d,
       company: companyById[d.companyId] || null,
       people: d.personIds.map(id => personById[id]).filter(Boolean),
+      peopleLoaded: WORKED_STAGES.includes(d.stage),
     }))
   })
 }
 
 export async function getDeal(id, { fresh = false } = {}) {
   const deals = await loadDeals({ fresh })
-  return deals.find(d => d.id === id) || null
+  const deal = deals.find(d => d.id === id)
+  if (!deal) return null
+  if (deal.peopleLoaded) return deal
+  // A deal outside the worked stages: its people were not read up front.
+  const personById = await peopleByIds(deal.personIds)
+  return { ...deal, people: deal.personIds.map(pid => personById[pid]).filter(Boolean), peopleLoaded: true }
 }
 
 /** People who can own a deal: id, name, email. Cached longer; the roster rarely changes. */

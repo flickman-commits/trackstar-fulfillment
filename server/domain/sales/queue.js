@@ -19,7 +19,7 @@
  * so nothing falls between two reps.
  */
 import prisma from '../../db.js'
-import { loadDeals, memberForEmail } from './attio.js'
+import { loadDeals, getDeal, memberForEmail } from './attio.js'
 import { cadenceFor } from './angles.js'
 import { getSettings, startOfToday } from './settings.js'
 
@@ -46,12 +46,25 @@ export function primaryPerson(deal) {
 
 function daysBetween(a, b) { return Math.floor((b.getTime() - a.getTime()) / 86400000) }
 
+/**
+ * When we last wrote to them: the tool's own log first, else Attio's synced
+ * last email interaction on the company or the person, which covers emails
+ * sent straight from Gmail before the tool existed.
+ */
+function lastContactAt(deal, lastSend) {
+  if (lastSend?.sentAt) return new Date(lastSend.sentAt)
+  const person = deal.person || primaryPerson(deal)
+  const at = deal.company?.lastEmailAt || person?.lastEmailAt || null
+  return at ? new Date(at) : null
+}
+
 function isDue(deal, lastSend, dayStart) {
   if (deal.nextActionDate) return new Date(`${deal.nextActionDate}T00:00:00`) <= new Date(dayStart.getTime() + 86400000 - 1)
-  if (!lastSend) return true
+  const last = lastContactAt(deal, lastSend)
+  if (!last) return true
   const { step } = nextStepFor(deal)
   const gap = step?.days ?? 4
-  return daysBetween(new Date(lastSend.sentAt), new Date()) >= gap
+  return daysBetween(last, new Date()) >= gap
 }
 
 function overdueDays(deal, dayStart) {
@@ -64,7 +77,8 @@ function reasonFor(deal, lastSend, prep) {
   const { touchNumber, step, exhausted } = nextStepFor(deal)
   if (exhausted) return 'Sequence complete · decide next year vs. lost'
   if (touchNumber === 1) return `First touch${deal.priority ? ` · ${deal.priority} priority` : ''}${prep ? ' · written overnight' : ''}`
-  const ago = lastSend ? daysBetween(new Date(lastSend.sentAt), new Date()) : null
+  const last = lastContactAt(deal, lastSend)
+  const ago = last ? daysBetween(last, new Date()) : null
   return `Touch ${touchNumber} · ${step.angle}${ago != null ? ` · last emailed ${ago}d ago, no reply` : ''}${prep ? ' · written overnight' : ''}`
 }
 
@@ -80,7 +94,7 @@ function shape(deal, { lastSend, prep, skip, dayStart }) {
     nextTouchNumber: exhausted ? null : touchNumber,
     nextAngle: exhausted ? null : step.angle,
     exhausted,
-    lastSentAt: lastSend?.sentAt || null,
+    lastSentAt: lastContactAt(deal, lastSend)?.toISOString() || null,
     lastSubject: lastSend?.subject || null,
     hasPrep: Boolean(prep),
     preparedAt: prep?.preparedAt || null,
@@ -203,8 +217,7 @@ export async function lastRun() {
 export async function dealForWork(dealId, { fresh = false } = {}) {
   const settings = await getSettings()
   const dayStart = startOfToday(settings.timezone, new Date())
-  const deals = await loadDeals({ fresh })
-  const deal = deals.find(d => d.id === dealId)
+  const deal = await getDeal(dealId, { fresh })
   if (!deal) throw new Error('That deal is not in Attio any more')
   const [sends, prep, skip] = await Promise.all([
     prisma.salesSend.findMany({ where: { attioDealId: dealId }, orderBy: { sentAt: 'asc' } }),
