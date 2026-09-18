@@ -41,7 +41,21 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       const count = kind === 'runner' ? null : await prisma.order.count({ where: { bulkOrderId: bulk.id } })
+      // The partner sees who is on the list, names only; nobody's address
+      // is echoed back over a link.
+      const received = kind === 'runner' ? null : (await prisma.order.findMany({ where: { bulkOrderId: bulk.id }, orderBy: { lineItemIndex: 'asc' }, select: { runnerName: true, shippingAddress: true, createdAt: true } }))
+        .map(r => ({ name: r.runnerName, city: r.shippingAddress?.city || null, at: r.createdAt }))
+      let previewImageUrl = null
+      if (kind === 'partner') {
+        previewImageUrl = bulk.previewImageUrl || null
+        if (!previewImageUrl && bulk.partnerOrderId) {
+          const proof = await prisma.proof.findFirst({ where: { orderId: bulk.partnerOrderId, status: 'approved' }, select: { thumbnailUrl: true, imageUrl: true } })
+          previewImageUrl = proof?.thumbnailUrl || proof?.imageUrl || null
+        }
+      }
       return res.status(200).json({
+        received,
+        previewImageUrl,
         partnerName: bulk.partnerName,
         raceName: bulk.raceName,
         raceYear: bulk.raceYear,

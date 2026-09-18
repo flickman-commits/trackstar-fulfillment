@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Trash2, Loader2, CheckCircle2, Upload, Download, Copy, Link2 } from 'lucide-react'
+import { Trash2, Loader2, CheckCircle2, Upload, Download, Copy, Link2, ChevronDown, ChevronUp } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -17,8 +17,6 @@ type Row = { firstName: string; lastName: string; email: string; line1: string; 
 const blank = (): Row => ({ firstName: '', lastName: '', email: '', line1: '', line2: '', city: '', state: '', zip: '', country: 'United States' })
 
 const T = { page: '#F6F5F2', card: '#FFFFFF', line: '#E7E4DD', accent: '#4600D6', bar: '#242424', font: "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" }
-const input = 'w-full px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-[#4600D6]/30'
-const inputStyle = { border: `1px solid ${T.line}`, backgroundColor: '#FFFFFF' }
 
 function parsePaste(text: string): Row[] {
   let lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).map(l => l.trim()).filter(Boolean)
@@ -58,12 +56,12 @@ function parsePaste(text: string): Row[] {
 
 export default function BulkIntake() {
   const { token } = useParams<{ token: string }>()
-  const [info, setInfo] = useState<{ partnerName: string; raceName: string; raceYear: number; quantity: number; entered: number; note: string | null; product: string; runnerLink: string | null } | null>(null)
+  const [info, setInfo] = useState<{ partnerName: string; raceName: string; raceYear: number; quantity: number; entered: number; note: string | null; product: string; runnerLink: string | null; previewImageUrl: string | null; received: { name: string; city: string | null; at: string }[] | null } | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'gone' | 'sent'>('loading')
   const [rows, setRows] = useState<Row[]>([blank()])
-  const [paste, setPaste] = useState('')
   const [mode, setMode] = useState<'paste' | 'link'>('paste')
   const [copied, setCopied] = useState(false)
+  const [receivedOpen, setReceivedOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ added: number; duplicates: number; rejected: { name?: string; reason: string }[] } | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -92,7 +90,9 @@ export default function BulkIntake() {
     } catch { setErr('Something went wrong sending the list. Please try again, or email us the spreadsheet.') } finally { setBusy(false) }
   }
 
-  const Shell = ({ children }: { children: React.ReactNode }) => (
+  // A plain function, not a component: a component defined inside render is
+  // a new type every keystroke, which remounts everything below and drops focus.
+  const shell = (children: React.ReactNode) => (
     <div className="min-h-screen" style={{ backgroundColor: T.page, fontFamily: T.font }}>
       <div className="max-w-3xl mx-auto px-4 py-6">
         <div className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 mb-6" style={{ backgroundColor: T.bar, borderRadius: 24 }}>
@@ -107,11 +107,11 @@ export default function BulkIntake() {
     </div>
   )
 
-  if (state === 'loading') return <Shell><div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" style={{ color: '#999' }} /></div></Shell>
-  if (state === 'gone' || !info) return <Shell><div className="rounded-2xl p-8 text-center" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}><h1 className="text-lg font-bold mb-2">This link is no longer active</h1><p className="text-sm" style={{ color: '#666' }}>Ask your Trackstar contact for a fresh one.</p></div></Shell>
+  if (state === 'loading') return shell(<div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" style={{ color: '#999' }} /></div>)
+  if (state === 'gone' || !info) return shell(<div className="rounded-2xl p-8 text-center" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}><h1 className="text-lg font-bold mb-2">This link is no longer active</h1><p className="text-sm" style={{ color: '#666' }}>Ask your Trackstar contact for a fresh one.</p></div>)
 
-  if (state === 'sent' && result) return (
-    <Shell>
+  if (state === 'sent' && result) return shell(
+    <>
       <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
         <CheckCircle2 className="w-8 h-8 mx-auto mb-3" style={{ color: T.accent }} />
         <h1 className="text-xl font-bold mb-2">Got it. {result.added} runner{result.added === 1 ? '' : 's'} added.</h1>
@@ -125,20 +125,29 @@ export default function BulkIntake() {
             <ul className="space-y-0.5">{result.rejected.map((x, i) => <li key={i}>{x.name || `Row ${i + 1}`}: {x.reason === 'address' ? 'address is incomplete' : 'name is missing'}</li>)}</ul>
           </div>
         )}
-        <button onClick={() => { setRows([blank()]); setPaste(''); setResult(null); setState('ready'); setMode('paste') }} className="mt-6 px-4 py-2.5 text-sm font-semibold rounded-md" style={{ backgroundColor: T.accent, color: '#fff' }}>Add more</button>
+        <button onClick={() => { setRows([blank()]); setResult(null); setState('ready'); setMode('paste') }} className="mt-6 px-4 py-2.5 text-sm font-semibold rounded-md" style={{ backgroundColor: T.accent, color: '#fff' }}>Add more</button>
       </div>
-    </Shell>
+    </>
   )
 
   const pct = info.quantity ? Math.min(100, Math.round((info.entered / info.quantity) * 100)) : 0
   const tag = (t: string) => <span className="inline-flex items-center px-2.5 py-1 rounded-md" style={{ backgroundColor: T.accent, color: '#fff', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{t}</span>
 
-  return (
-    <Shell>
+  return shell(
+    <>
       <div className="rounded-2xl p-6 mb-4" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
-        <div className="flex flex-wrap gap-1.5 mb-3">{tag(info.raceName)}{tag(String(info.raceYear))}</div>
-        <h1 className="text-xl font-bold" style={{ color: '#1A1A1A' }}>Upload your list of runners</h1>
-        <p className="text-sm mt-1" style={{ color: '#666' }}>For each runner we need their first and last name and shipping address to be able to create and send their Trackstar print.</p>
+        <div className="flex gap-5">
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap gap-1.5 mb-3">{tag(info.raceName)}{tag(String(info.raceYear))}</div>
+            <h1 className="text-xl font-bold" style={{ color: '#1A1A1A' }}>Upload your list of runners</h1>
+            <p className="text-sm mt-1" style={{ color: '#666' }}>For each runner we need their first and last name and shipping address to be able to create and send their Trackstar print.</p>
+          </div>
+          {info.previewImageUrl && (
+            <div className="shrink-0 w-24 h-32 rounded-xl overflow-hidden" style={{ backgroundColor: '#E9EBEE', border: `1px solid ${T.line}` }} title="Your co-branded print">
+              <img src={info.previewImageUrl} alt="Your co-branded print" className="w-full h-full object-cover" draggable={false} onContextMenu={e => e.preventDefault()} />
+            </div>
+          )}
+        </div>
         {/* Progress toward the invoiced count */}
         <div className="mt-4">
           <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: '#666' }}>
@@ -176,46 +185,72 @@ export default function BulkIntake() {
               </div>
             </div>
           </div>
+          {/* Who has come in so far, so the partner knows who to chase. */}
+          <div className="mt-4 pt-3" style={{ borderTop: `1px solid ${T.line}` }}>
+            <button onClick={() => setReceivedOpen(o => !o)} className="w-full flex items-center justify-between text-sm font-semibold" style={{ color: '#1A1A1A' }}>
+              <span>Received so far ({info.received?.length || 0})</span>
+              {receivedOpen ? <ChevronUp className="w-4 h-4" style={{ color: '#999' }} /> : <ChevronDown className="w-4 h-4" style={{ color: '#999' }} />}
+            </button>
+            {receivedOpen && (
+              (info.received?.length || 0) === 0 ? (
+                <p className="text-xs mt-2" style={{ color: '#999' }}>Nobody yet. They appear here as they submit.</p>
+              ) : (
+                <ul className="mt-2 max-h-64 overflow-y-auto text-sm" style={{ color: '#1A1A1A' }}>
+                  {info.received!.map((r, i) => (
+                    <li key={i} className="flex items-center justify-between py-1.5" style={{ borderTop: i ? `1px solid ${T.line}` : undefined }}>
+                      <span className="font-medium">{r.name}</span>
+                      <span className="text-xs" style={{ color: '#999' }}>{r.city || ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              )
+            )}
+          </div>
         </div>
       ) : (
         <>
-          <div className="rounded-2xl p-4 mb-4 space-y-3" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
-            <div className="flex flex-wrap items-center gap-2">
-              <a href="/trackstar-runner-list.xlsx" download className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-md" style={{ backgroundColor: '#fff', color: '#1A1A1A', border: `1px solid ${T.line}` }}>
-                <Download className="w-4 h-4" /> Download the template
-              </a>
-              <span className="text-xs" style={{ color: '#666' }}>Fill it in, then upload it here. Excel, CSV or Markdown all work.</span>
-            </div>
-            <label className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold uppercase tracking-wide rounded-md cursor-pointer" style={{ backgroundColor: T.accent, color: '#fff' }}>
-              <Upload className="w-4 h-4" /> Upload your list
-              <input type="file" accept=".xlsx,.xls,.csv,.txt,.md,.markdown,text/csv,text/markdown,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={async e => {
-                const f = e.target.files?.[0]; e.target.value = ''
-                if (!f) return
-                let text = ''
-                if (/\.xlsx?$/i.test(f.name)) {
-                  const XLSX = await import('xlsx')
-                  const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' })
-                  text = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]])
-                } else {
-                  text = await f.text()
-                }
-                const parsed = parsePaste(text)
-                if (!parsed.length) { setErr('Could not read any rows from that file.'); return }
-                setRows(parsed); setErr(null)
-              }} />
-            </label>
-            <details>
-              <summary className="text-xs cursor-pointer" style={{ color: '#666' }}>Or paste the rows straight from Excel or Google Sheets</summary>
-              <textarea value={paste} onChange={e => setPaste(e.target.value)} rows={6} className={`${input} font-mono text-xs mt-2`} style={inputStyle} placeholder={'First Name\tLast Name\tAddress\tCity\tState\tZip'} />
-              <button onClick={() => { const parsed = parsePaste(paste); if (!parsed.length) { setErr('Could not read any rows.'); return } setRows(parsed); setErr(null) }} className="mt-2 px-4 py-2 text-sm font-semibold rounded-md" style={{ backgroundColor: T.bar, color: '#fff' }}>Read rows</button>
-            </details>
+          <div className="rounded-2xl p-5 mb-4" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
+            <ol className="space-y-4">
+              <li className="flex items-center gap-4">
+                <span className="text-xs font-bold w-14 shrink-0" style={{ color: '#999', letterSpacing: '0.06em' }}>STEP 1</span>
+                <a href="/trackstar-runner-list.xlsx" download className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold uppercase tracking-wide rounded-md" style={{ backgroundColor: '#fff', color: '#1A1A1A', border: `1px solid ${T.line}` }}>
+                  <Download className="w-4 h-4" /> Download template
+                </a>
+              </li>
+              <li className="flex items-center gap-4">
+                <span className="text-xs font-bold w-14 shrink-0" style={{ color: '#999', letterSpacing: '0.06em' }}>STEP 2</span>
+                <span className="text-sm" style={{ color: '#1A1A1A' }}>Fill it out with each runner's name and shipping address</span>
+              </li>
+              <li className="flex items-center gap-4">
+                <span className="text-xs font-bold w-14 shrink-0" style={{ color: '#999', letterSpacing: '0.06em' }}>STEP 3</span>
+                <label className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold uppercase tracking-wide rounded-md cursor-pointer" style={{ backgroundColor: T.accent, color: '#fff' }}>
+                  <Upload className="w-4 h-4" /> Upload your list
+                  <input type="file" accept=".xlsx,.xls,.csv,.txt,.md,.markdown,text/csv,text/markdown,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={async e => {
+                    const f = e.target.files?.[0]; e.target.value = ''
+                    if (!f) return
+                    let text = ''
+                    if (/\.xlsx?$/i.test(f.name)) {
+                      const XLSX = await import('xlsx')
+                      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' })
+                      text = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]])
+                    } else {
+                      text = await f.text()
+                    }
+                    const parsed = parsePaste(text)
+                    if (!parsed.length) { setErr('Could not read any rows from that file.'); return }
+                    setRows(parsed); setErr(null)
+                  }} />
+                </label>
+                <span className="text-xs" style={{ color: '#999' }}>Excel, CSV or Markdown</span>
+              </li>
+            </ol>
           </div>
 
           {/* What was read, before it goes. */}
           {usable.length > 0 && (
             <div className="rounded-2xl mb-4 overflow-hidden" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
               <div className="px-4 py-2.5 text-xs font-semibold flex items-center justify-between" style={{ borderBottom: `1px solid ${T.line}`, color: '#1A1A1A' }}>
-                <span>{usable.length} runner{usable.length === 1 ? '' : 's'} read</span>
+                <span>Upload List: {usable.length} runner{usable.length === 1 ? '' : 's'} read</span>
                 <button onClick={() => { setRows([blank()]); setErr(null) }} className="text-xs font-medium" style={{ color: '#999' }}>Clear</button>
               </div>
               <div className="max-h-72 overflow-y-auto">
@@ -241,10 +276,10 @@ export default function BulkIntake() {
           {err && <p className="text-sm mb-3" style={{ color: '#DC2626' }}>{err}</p>}
           {incomplete > 0 && <p className="text-xs mb-3" style={{ color: '#92400E' }}>{incomplete} runner{incomplete === 1 ? ' has' : 's have'} an incomplete address and will be held back.</p>}
           <button onClick={submit} disabled={busy || usable.length === 0} className="w-full py-3 text-sm font-bold uppercase tracking-wide rounded-md disabled:opacity-40" style={{ backgroundColor: T.accent, color: '#fff' }}>
-            {busy ? <Loader2 className="w-4 h-4 animate-spin inline" /> : `Send ${usable.length} runner${usable.length === 1 ? '' : 's'}`}
+            {busy ? <Loader2 className="w-4 h-4 animate-spin inline" /> : `Send ${usable.length} runner${usable.length === 1 ? '' : 's'} to Trackstar`}
           </button>
         </>
       )}
-    </Shell>
+    </>
   )
 }

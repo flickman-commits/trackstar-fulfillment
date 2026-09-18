@@ -47,7 +47,9 @@ export default function RunnerClaim() {
     } catch { setErr('Something went wrong. Please try again in a moment.') } finally { setBusy(false) }
   }
 
-  const Shell = ({ children }: { children: React.ReactNode }) => (
+  // A plain function, not a component: a component defined inside render is
+  // a new type every keystroke, which remounts the form and drops focus.
+  const shell = (children: React.ReactNode) => (
     <div className="min-h-screen" style={{ backgroundColor: T.page, fontFamily: T.font }}>
       <div className="max-w-md mx-auto px-4 py-6">
         <div className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 mb-6" style={{ backgroundColor: T.bar, borderRadius: 24 }}>
@@ -62,30 +64,27 @@ export default function RunnerClaim() {
     </div>
   )
 
-  if (state === 'loading') return <Shell><div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" style={{ color: '#999' }} /></div></Shell>
-  if (state === 'gone' || !info) return <Shell><div className="rounded-2xl p-8 text-center" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}><h1 className="text-lg font-bold mb-2">This link is no longer active</h1><p className="text-sm" style={{ color: '#666' }}>Check with your team for a fresh one.</p></div></Shell>
+  if (state === 'loading') return shell(<div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" style={{ color: '#999' }} /></div>)
+  if (state === 'gone' || !info) return shell(<div className="rounded-2xl p-8 text-center" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}><h1 className="text-lg font-bold mb-2">This link is no longer active</h1><p className="text-sm" style={{ color: '#666' }}>Check with your team for a fresh one.</p></div>)
 
-  if (state === 'sent' || state === 'duplicate') return (
-    <Shell>
-      <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
-        <CheckCircle2 className="w-8 h-8 mx-auto mb-3" style={{ color: T.accent }} />
-        <h1 className="text-xl font-bold mb-2">{state === 'duplicate' ? "You're already on the list." : "You're on the list."}</h1>
-        <p className="text-sm" style={{ color: '#666' }}>
-          Your {info.raceName} print ships to the address you gave us after the race. We find your finish time ourselves, so there's nothing else to do.
-        </p>
-      </div>
-    </Shell>
+  if (state === 'sent' || state === 'duplicate') return shell(
+    <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
+      <CheckCircle2 className="w-8 h-8 mx-auto mb-3" style={{ color: T.accent }} />
+      <h1 className="text-xl font-bold mb-2">{state === 'duplicate' ? "You're already on the list." : 'Got it, thank you.'}</h1>
+      <p className="text-sm" style={{ color: '#666' }}>
+        Keep an eye on your mailbox after the race. There's nothing else you need to do.
+      </p>
+    </div>
   )
 
-  return (
-    <Shell>
+  return shell(
+    <>
       <div className="rounded-2xl p-6 mb-4" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
-        <span className="inline-flex items-center px-2.5 py-1 rounded-md mb-3" style={{ backgroundColor: T.accent, color: '#fff', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Your print</span>
+        <span className="inline-flex items-center px-2.5 py-1 rounded-md mb-3" style={{ backgroundColor: T.accent, color: '#fff', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>A gift for you</span>
         <h1 className="text-xl font-bold" style={{ color: '#1A1A1A' }}>{info.raceName} {info.raceYear}</h1>
         <p className="text-sm mt-1" style={{ color: '#666' }}>
-          {info.partnerName} is sending you a Trackstar print of your race. Tell us your name as it appears in the results and where to ship it. We find your finish time ourselves.
+          {info.partnerName} is sending you a personalized gift after your marathon and needs your address. Please enter it below.
         </p>
-        <p className="text-xs mt-1" style={{ color: '#999' }}>{info.product}.</p>
         {info.note && <p className="text-sm mt-3 rounded-xl p-3" style={{ backgroundColor: 'rgba(70,0,214,0.05)', border: '1px solid rgba(70,0,214,0.15)', color: '#1A1A1A' }}>{info.note}</p>}
       </div>
 
@@ -107,6 +106,6 @@ export default function RunnerClaim() {
           {busy ? <Loader2 className="w-4 h-4 animate-spin inline" /> : 'Send my details'}
         </button>
       </form>
-    </Shell>
+    </>
   )
 }
