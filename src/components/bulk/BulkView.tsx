@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Plus, Loader2, Check, X, Upload, Download, Link2, Copy, ExternalLink, RefreshCw, FlaskConical,
-  CheckCircle2, AlertTriangle, ChevronLeft, ChevronDown, ChevronUp, Trash2, FileText,
+  CheckCircle2, ChevronLeft, ChevronDown, ChevronUp, Trash2, FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
@@ -210,7 +210,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount }: {
 function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (b: BulkOrder) => void }) {
   const [opts, setOpts] = useState<{ frames: string[]; sizes: string[] } | null>(null)
   const [partners, setPartners] = useState<{ id: string; raceName: string; customerName: string | null }[]>([])
-  const [f, setF] = useState({ partnerName: '', raceName: '', raceYear: String(new Date().getFullYear()), quantity: '', frameType: 'Natural Premium Oak', productSize: '12x18', stripeInvoiceUrl: '', partnerOrderId: '' })
+  const [f, setF] = useState({ partnerName: '', raceName: '', raceYear: String(new Date().getFullYear()), quantity: '', frameType: 'Natural Premium Oak', productSize: '12x18', partnerOrderId: '' })
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     apiFetch(`${API_BASE}/api/bulk?options=1`).then(r => r.json()).then(setOpts).catch(() => setOpts({ frames: ['Unframed', 'Natural Premium Oak', 'Black Premium Oak'], sizes: ['8x10', '12x18', '16x24'] }))
@@ -242,8 +242,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           <div className="col-span-2"><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Partner</label><input required value={f.partnerName} onChange={set('partnerName')} placeholder="Release Recovery Foundation" className={`${inputBase} w-full`} /></div>
           <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Race</label><input required value={f.raceName} onChange={set('raceName')} placeholder="NYC Marathon" className={`${inputBase} w-full`} /></div>
           <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Year</label><input required inputMode="numeric" value={f.raceYear} onChange={set('raceYear')} className={`${inputBase} w-full`} /></div>
-          <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Units invoiced</label><input inputMode="numeric" value={f.quantity} onChange={set('quantity')} placeholder="100" className={`${inputBase} w-full`} /></div>
-          <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Stripe invoice</label><input value={f.stripeInvoiceUrl} onChange={set('stripeInvoiceUrl')} placeholder="https://invoice.stripe.com/…" className={`${inputBase} w-full`} /></div>
+          <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Units</label><input inputMode="numeric" value={f.quantity} onChange={set('quantity')} placeholder="100" className={`${inputBase} w-full`} /></div>
           <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Frame</label>
             <select value={f.frameType} onChange={e => setF(v => ({ ...v, frameType: e.target.value, productSize: e.target.value === 'Unframed' ? '8x10' : '12x18' }))} className={`${inputBase} w-full`}>{(opts?.frames || []).map(o => <option key={o}>{o}</option>)}</select></div>
           <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Size</label>
@@ -270,6 +269,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
   const [preview, setPreview] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [intakeLinkOpen, setIntakeLinkOpen] = useState(false)
   const [opts, setOpts] = useState<{ frames: string[]; sizes: string[] }>({ frames: ['Unframed', 'Natural Premium Oak', 'Black Premium Oak'], sizes: ['8x10', '12x18', '16x24'] })
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -391,6 +391,13 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
   // ── Cards, so the status decides the order rather than the markup ──
   const intakeCard = (
     <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4">
+      {!collecting && (
+        <button onClick={() => setIntakeLinkOpen(o => !o)} className="w-full flex items-center justify-between text-left -my-1">
+          <span className="text-xs font-semibold uppercase tracking-tight text-off-black/60">Partner intake link</span>
+          {intakeLinkOpen ? <ChevronUp className="w-4 h-4 text-off-black/40" /> : <ChevronDown className="w-4 h-4 text-off-black/40" />}
+        </button>
+      )}
+      {(collecting || intakeLinkOpen) && <div className={collecting ? '' : 'mt-3'}>
       <div className="flex flex-col md:flex-row md:items-center gap-3">
         <div className="flex-1 min-w-0">
           <div className="text-[11px] font-semibold text-[#4600D6] uppercase tracking-wider">Partner intake link</div>
@@ -404,6 +411,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
         </div>
       </div>
       <input value={b.intakeNote || ''} onChange={e => setB({ ...b, intakeNote: e.target.value })} onBlur={e => update({ intakeNote: e.target.value })} placeholder="Note shown to the partner on that page (optional)" className={`${inputBase} w-full mt-3 text-xs`} />
+      </div>}
     </div>
   )
 
@@ -554,10 +562,10 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
   )
 
   const detailsCard = (
-    <div className="bg-white border border-border-gray rounded-lg shadow-sm">
-      <button onClick={() => setDetailsOpen(o => !o)} className="w-full flex items-center justify-between px-4 py-3 text-left">
-        <span className="text-sm font-semibold uppercase tracking-tight text-off-black/60">Update bulk order details</span>
-        {detailsOpen ? <ChevronUp className="w-4 h-4 text-off-black/40" /> : <ChevronDown className="w-4 h-4 text-off-black/40" />}
+    <div className={detailsOpen ? 'bg-white border border-border-gray rounded-lg shadow-sm' : ''}>
+      <button onClick={() => setDetailsOpen(o => !o)} className={`flex items-center gap-1.5 text-xs text-off-black/45 hover:text-off-black ${detailsOpen ? 'w-full justify-between px-4 py-3' : 'px-1 py-1'}`}>
+        <span>Update bulk order details</span>
+        {detailsOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
       </button>
       {detailsOpen && (
         <div className="px-4 pb-4 grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-border-gray pt-3">
@@ -586,12 +594,8 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
             <select value={b.productSize} onChange={e => update({ productSize: e.target.value })} className={`${inputBase} w-full`}>{opts.sizes.map(o => <option key={o}>{o}</option>)}</select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Units invoiced</label>
+            <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Units</label>
             <input inputMode="numeric" value={b.quantity || ''} onChange={e => setB({ ...b, quantity: Number(e.target.value) || 0 })} onBlur={e => update({ quantity: Number(e.target.value) || 0 })} className={`${inputBase} w-full`} />
-          </div>
-          <div className="col-span-2 md:col-span-3">
-            <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Stripe invoice</label>
-            <input value={b.stripeInvoiceUrl || ''} onChange={e => setB({ ...b, stripeInvoiceUrl: e.target.value })} onBlur={e => update({ stripeInvoiceUrl: e.target.value })} placeholder="https://invoice.stripe.com/…" className={`${inputBase} w-full`} />
           </div>
           <div className="col-span-2 md:col-span-4">
             <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Notes</label>
@@ -644,21 +648,35 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
           ))}
         </div>
 
-        <div className="relative">
-          <select value={b.status} onChange={e => update({ status: e.target.value })} className={`w-full appearance-none px-4 py-3 pr-8 rounded-md text-sm font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-off-black/20 ${st.bg} ${st.color} ${st.border}`}>
-            {STAGES.map(stg => <option key={stg.key} value={stg.key}>{STATUS_STYLE[stg.key].icon} {STATUS_LABEL[stg.key]}</option>)}
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-            <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        {/* Production and payment side by side, each a tinted select. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-off-black/60 mb-1">Production</label>
+            <div className="relative">
+              <select value={b.status} onChange={e => update({ status: e.target.value })} className={`w-full appearance-none px-4 py-3 pr-8 rounded-md text-sm font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-off-black/20 ${st.bg} ${st.color} ${st.border}`}>
+                {STAGES.map(stg => <option key={stg.key} value={stg.key}>{STATUS_STYLE[stg.key].icon} {STATUS_LABEL[stg.key]}</option>)}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-off-black/60 mb-1">Payment</label>
+            <div className="relative">
+              <select value={r.paid ? 'paid' : 'unpaid'} onChange={e => act({ action: 'paid', paid: e.target.value === 'paid' }, e.target.value === 'paid' ? 'Marked paid' : 'Marked unpaid')} className={`w-full appearance-none px-4 py-3 pr-8 rounded-md text-sm font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-off-black/20 ${r.paid ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                <option value="unpaid">Not paid</option>
+                <option value="paid">Paid{b.paidAt ? ` ${fmtDate(b.paidAt)}` : ''}</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* The facts. Payment is a chip you can flip; the rest read only. */}
+        {/* The facts, read only. */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <Chip tone={r.paid ? 'green' : 'amber'} onClick={() => act({ action: 'paid', paid: !b.paidAt }, b.paidAt ? 'Marked unpaid' : 'Marked paid')} title={r.paid ? `Paid ${fmtDate(b.paidAt)}. Click to undo.` : 'Click when the Stripe invoice is paid'}>
-            {r.paid ? <><Check className="w-3.5 h-3.5" /> Paid</> : <><AlertTriangle className="w-3.5 h-3.5" /> Unpaid</>}
-          </Chip>
-          {b.stripeInvoiceUrl && <a href={b.stripeInvoiceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-off-black/50 hover:text-off-black inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Invoice</a>}
           <Chip tone={r.scraper.ok ? 'green' : 'red'} title={r.scraper.health ? `Probed ${fmtDate(r.scraper.health.checkedAt)}${r.scraper.health.detail ? `: ${r.scraper.health.detail}` : ''}` : undefined}>
             {!r.scraper.configured ? 'No scraper for this race' : !r.scraper.yearConfigured ? `Scraper: ${b.raceYear} not configured` : r.scraper.health?.status === 'not_run_yet' ? 'Scraper ready · race not run yet' : r.scraper.health ? `Scraper ${r.scraper.health.status}` : 'Scraper ready'}
           </Chip>
