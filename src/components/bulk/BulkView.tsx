@@ -621,7 +621,6 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
             <div className="flex items-center gap-2.5">
               <span className="text-2xl leading-none">{st.icon}</span>
               <h2 className="text-xl font-bold text-off-black">{b.partnerName}</h2>
-              <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs font-medium">bulk</span>
             </div>
             <div className="text-sm text-off-black/60 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="font-mono text-[12px]">{b.number}</span>
