@@ -419,7 +419,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
     <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4">
       <div className="flex gap-4">
         <button type="button" onClick={() => previewUrl && setPreview(true)} disabled={!previewUrl} className="shrink-0 w-24 h-24 rounded-md border border-border-gray bg-subtle-gray overflow-hidden flex items-center justify-center disabled:cursor-default" title={previewUrl ? 'Full screen' : undefined}>
-          {previewUrl ? <img src={previewUrl} alt="Co-branded design" className="w-full h-full object-contain p-1.5" /> : <span className="text-[10px] text-off-black/40 px-2 text-center">No preview</span>}
+          {previewUrl ? <img src={previewUrl} alt="Co-branded design" className="w-full h-full object-cover" /> : <span className="text-[10px] text-off-black/40 px-2 text-center">No preview</span>}
         </button>
         <div className="flex-1 min-w-0">
           <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">Co-branded production file</div>
