@@ -666,7 +666,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
             <div className="relative">
               <select value={r.paid ? 'paid' : 'unpaid'} onChange={e => act({ action: 'paid', paid: e.target.value === 'paid' }, e.target.value === 'paid' ? 'Marked paid' : 'Marked unpaid')} className={`w-full appearance-none px-4 py-3 pr-8 rounded-md text-sm font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-off-black/20 ${r.paid ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                 <option value="unpaid">Not paid</option>
-                <option value="paid">Paid{b.paidAt ? ` ${fmtDate(b.paidAt)}` : ''}</option>
+                <option value="paid">Paid</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                 <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
