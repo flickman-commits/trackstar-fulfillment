@@ -57,7 +57,7 @@ function parsePaste(text: string): Row[] {
 
 export default function BulkIntake() {
   const { token } = useParams<{ token: string }>()
-  const [info, setInfo] = useState<{ partnerName: string; raceName: string; raceYear: number; quantity: number; entered: number; note: string | null; product: string; runnerLink: string | null; previewImageUrl: string | null; received: { name: string; city: string | null; at: string }[] | null } | null>(null)
+  const [info, setInfo] = useState<{ partnerName: string; raceName: string; raceYear: number; quantity: number; entered: number; note: string | null; product: string; runnerLink: string | null; previewImageUrl: string | null; received: { id: string; name: string; city: string | null; at: string }[] | null } | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'gone' | 'sent'>('loading')
   const [rows, setRows] = useState<Row[]>([blank()])
   const [mode, setMode] = useState<'paste' | 'link'>('paste')
@@ -202,9 +202,23 @@ export default function BulkIntake() {
               ) : (
                 <ul className="mt-2 max-h-64 overflow-y-auto text-sm" style={{ color: '#1A1A1A' }}>
                   {info.received!.map((r, i) => (
-                    <li key={i} className="flex items-center justify-between py-1.5" style={{ borderTop: i ? `1px solid ${T.line}` : undefined }}>
+                    <li key={r.id} className="flex items-center justify-between gap-3 py-1.5" style={{ borderTop: i ? `1px solid ${T.line}` : undefined }}>
                       <span className="font-medium">{r.name}</span>
-                      <span className="text-xs" style={{ color: '#999' }}>{r.city || ''}</span>
+                      <span className="flex items-center gap-3">
+                        <span className="text-xs" style={{ color: '#999' }}>{r.city || ''}</span>
+                        <button
+                          type="button"
+                          title="Remove from the list"
+                          onClick={async () => {
+                            if (!confirm(`Remove ${r.name} from the list?`)) return
+                            const res = await fetch(`${API_BASE}/api/public/bulk-intake`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, action: 'remove', id: r.id }) })
+                            if (!res.ok) { setErr(res.status === 409 ? `${r.name} already has a print in production, so we can't remove them here. Email us.` : 'Could not remove them just now.'); return }
+                            const data = await res.json()
+                            setInfo(v => v ? { ...v, entered: data.entered, received: (v.received || []).filter(x => x.id !== r.id) } : v)
+                          }}
+                          style={{ color: '#999' }}
+                        ><Trash2 className="w-4 h-4" /></button>
+                      </span>
                     </li>
                   ))}
                 </ul>

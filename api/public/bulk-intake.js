@@ -43,8 +43,8 @@ export default async function handler(req, res) {
       const count = kind === 'runner' ? null : await prisma.order.count({ where: { bulkOrderId: bulk.id } })
       // The partner sees who is on the list, names only; nobody's address
       // is echoed back over a link.
-      const received = kind === 'runner' ? null : (await prisma.order.findMany({ where: { bulkOrderId: bulk.id }, orderBy: { lineItemIndex: 'asc' }, select: { runnerName: true, shippingAddress: true, createdAt: true } }))
-        .map(r => ({ name: r.runnerName, city: r.shippingAddress?.city || null, at: r.createdAt }))
+      const received = kind === 'runner' ? null : (await prisma.order.findMany({ where: { bulkOrderId: bulk.id }, orderBy: { lineItemIndex: 'asc' }, select: { orderNumber: true, runnerName: true, shippingAddress: true, createdAt: true } }))
+        .map(r => ({ id: r.orderNumber, name: r.runnerName, city: r.shippingAddress?.city || null, at: r.createdAt }))
       let previewImageUrl = null
       if (kind === 'partner') {
         previewImageUrl = bulk.previewImageUrl || null
@@ -68,6 +68,20 @@ export default async function handler(req, res) {
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' })
+
+    // The partner can take someone off their own list. Partner link only,
+    // and only a runner that belongs to this order and has no print yet.
+    if (body.action === 'remove') {
+      if (kind !== 'partner') return res.status(404).json({ error: 'not_found' })
+      const runner = await prisma.order.findFirst({ where: { bulkOrderId: bulk.id, orderNumber: String(body.id || '') }, select: { id: true, productionFileUrl: true, status: true } })
+      if (!runner) return res.status(404).json({ error: 'not_found' })
+      if (runner.productionFileUrl || runner.status === 'completed') return res.status(409).json({ error: 'in_production' })
+      await prisma.runnerResearch.deleteMany({ where: { orderId: runner.id } })
+      await prisma.order.delete({ where: { id: runner.id } })
+      const count = await prisma.order.count({ where: { bulkOrderId: bulk.id } })
+      return res.status(200).json({ removed: true, entered: count })
+    }
+
     const list = Array.isArray(body.runners) ? body.runners.slice(0, kind === 'runner' ? 1 : MAX_PER_SUBMIT) : []
     const rows = []
     const rejected = []
