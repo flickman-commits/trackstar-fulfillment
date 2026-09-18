@@ -78,6 +78,21 @@ const STATUS_LABEL: Record<string, string> = {
   submitted: 'Sent to Artelo',
   done: 'Done',
 }
+/** Same treatment as the order modal's design status: an icon, a tint, and the stages above it. */
+const STATUS_STYLE: Record<string, { icon: string; color: string; bg: string; border: string }> = {
+  collecting: { icon: '⚪', color: 'text-off-black/70', bg: 'bg-subtle-gray', border: 'border-border-gray' },
+  researching: { icon: '🔵', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+  printing: { icon: '🟠', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+  submitted: { icon: '🟣', color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' },
+  done: { icon: '🟢', color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+}
+const STAGES: { key: string; label: string }[] = [
+  { key: 'collecting', label: 'Collect' },
+  { key: 'researching', label: 'Research' },
+  { key: 'printing', label: 'Print' },
+  { key: 'submitted', label: 'Artelo' },
+  { key: 'done', label: 'Done' },
+]
 
 function fmtDate(s?: string | null) {
   return s ? new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
@@ -210,7 +225,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [f, setF] = useState({ partnerName: '', raceName: '', raceYear: String(new Date().getFullYear()), quantity: '', frameType: 'Natural Premium Oak', productSize: '12x18', stripeInvoiceUrl: '', partnerOrderId: '' })
   const [busy, setBusy] = useState(false)
   useEffect(() => {
-    apiFetch(`${API_BASE}/api/bulk?options=1`).then(r => r.json()).then(setOpts).catch(() => setOpts({ frames: ['Unframed', 'Natural Premium Oak'], sizes: ['8x10', '12x18'] }))
+    apiFetch(`${API_BASE}/api/bulk?options=1`).then(r => r.json()).then(setOpts).catch(() => setOpts({ frames: ['Unframed', 'Natural Premium Oak', 'Black Premium Oak'], sizes: ['8x10', '12x18', '16x24'] }))
     apiFetch(`${API_BASE}/api/orders?type=race_partner`).then(r => r.json()).then(d => setPartners((d.orders || []).map((o: { id: string; raceName: string; customerName: string | null }) => ({ id: o.id, raceName: o.raceName, customerName: o.customerName })))).catch(() => {})
   }, [])
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF(v => ({ ...v, [k]: e.target.value }))
@@ -266,7 +281,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
   const [reach, setReach] = useState<Record<string, boolean>>({})
   const [preview, setPreview] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
-  const [opts, setOpts] = useState<{ frames: string[]; sizes: string[] }>({ frames: ['Unframed', 'Natural Premium Oak'], sizes: ['8x10', '12x18'] })
+  const [opts, setOpts] = useState<{ frames: string[]; sizes: string[] }>({ frames: ['Unframed', 'Natural Premium Oak', 'Black Premium Oak'], sizes: ['8x10', '12x18', '16x24'] })
   const fileInput = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -303,7 +318,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
       let remaining = 1
       let total = 0
       while (remaining > 0) {
-        const out = await api<{ done: { status: string }[]; remaining: number; bulkOrder: BulkOrder }>({ id, action: 'research', limit: 10 })
+        const out = await api<{ done: { status: string }[]; remaining: number; bulkOrder: BulkOrder }>({ id, action: 'research', limit: 3 })
         total += out.done.length
         remaining = out.remaining
         setB(out.bulkOrder)
@@ -386,22 +401,60 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
         <ProofFullscreen proofs={[{ id: 'preview', imageUrl: previewUrl }]} index={0} onIndexChange={() => {}} onClose={() => setPreview(false)} counterLabel="Co-branded design" />
       )}
 
-      {/* Header */}
-      <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <button onClick={onBack} className={`${btnGhost} -ml-2 mb-1`}><ChevronLeft className="w-4 h-4" /> All bulk orders</button>
-          <h2 className="text-xl font-bold text-off-black">{b.partnerName}</h2>
-          <div className="text-sm text-off-black/60 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="font-mono text-[12px]">{b.number}</span>
-            <span>{b.raceName} {b.raceYear}</span>
-            <span>{b.productSize} · {b.frameType}</span>
-            <span className="px-2 py-0.5 rounded bg-subtle-gray border border-border-gray text-xs">{STATUS_LABEL[b.status] || b.status}</span>
+      {/* Header: the same shape as the order modal. Name, the stages, and a
+          tinted status you can change in place. */}
+      <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <button onClick={onBack} className={`${btnGhost} -ml-2 mb-1`}><ChevronLeft className="w-4 h-4" /> All bulk orders</button>
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl leading-none">{(STATUS_STYLE[b.status] || STATUS_STYLE.collecting).icon}</span>
+              <h2 className="text-xl font-bold text-off-black">{b.partnerName}</h2>
+              <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs font-medium">bulk</span>
+            </div>
+            <div className="text-sm text-off-black/60 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-mono text-[12px]">{b.number}</span>
+              <span>{b.raceName} {b.raceYear}</span>
+              <span>{b.productSize} · {b.frameType}</span>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[11px] font-semibold text-off-black/45 uppercase tracking-wider">Due</div>
+            <div className={`text-lg font-bold ${d !== null && d < 0 ? 'text-red-600' : d !== null && d <= 3 ? 'text-amber-700' : 'text-off-black'}`}>{b.dueDate ? fmtDate(b.dueDate) : 'No race date'}</div>
+            {b.raceDate && <div className="text-[11px] text-off-black/45">Race {fmtDate(b.raceDate)} + 3 days</div>}
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-[11px] font-semibold text-off-black/45 uppercase tracking-wider">Due</div>
-          <div className={`text-lg font-bold ${d !== null && d < 0 ? 'text-red-600' : d !== null && d <= 3 ? 'text-amber-700' : 'text-off-black'}`}>{b.dueDate ? fmtDate(b.dueDate) : 'No race date'}</div>
-          {b.raceDate && <div className="text-[11px] text-off-black/45">Race {fmtDate(b.raceDate)} + 3 days</div>}
+
+        {/* Stages */}
+        {(() => {
+          const at = Math.max(0, STAGES.findIndex(x => x.key === b.status))
+          return (
+            <div className="flex items-center">
+              {STAGES.map((st, i) => (
+                <div key={st.key} className="flex items-center flex-1 last:flex-none">
+                  <button onClick={() => update({ status: st.key })} className={`flex items-center gap-1.5 text-xs ${i <= at ? 'text-off-black font-medium' : 'text-off-black/40'}`} title={`Set to ${STATUS_LABEL[st.key]}`}>
+                    <span className={`w-2.5 h-2.5 rounded-full ${i <= at ? 'bg-off-black' : 'bg-off-black/20'}`} />
+                    {st.label}
+                  </button>
+                  {i < STAGES.length - 1 && <div className={`flex-1 h-px mx-2 ${i < at ? 'bg-off-black/40' : 'bg-border-gray'}`} />}
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+
+        {/* Status select, tinted like the order modal */}
+        <div className="relative">
+          <select
+            value={b.status}
+            onChange={e => update({ status: e.target.value })}
+            className={`w-full appearance-none px-4 py-3 pr-8 rounded-md text-sm font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-off-black/20 ${(STATUS_STYLE[b.status] || STATUS_STYLE.collecting).bg} ${(STATUS_STYLE[b.status] || STATUS_STYLE.collecting).color} ${(STATUS_STYLE[b.status] || STATUS_STYLE.collecting).border}`}
+          >
+            {STAGES.map(st => <option key={st.key} value={st.key}>{STATUS_STYLE[st.key].icon} {STATUS_LABEL[st.key]}</option>)}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+            <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </div>
         </div>
       </div>
 

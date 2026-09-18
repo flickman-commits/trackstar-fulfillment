@@ -19,12 +19,8 @@ import { ResearchService } from '../../services/ResearchService.js'
 export const TURNAROUND_DAYS = 3
 
 /** The Artelo catalog values we ship. Everything else on the sheet is fixed. */
-export const FRAME_OPTIONS = [
-  'Unframed',
-  'Natural Premium Oak', 'Black Premium Oak', 'White Premium Oak', 'Walnut Premium Oak',
-  'Natural Oak', 'Black Oak', 'White Oak', 'Walnut Oak',
-]
-export const SIZE_OPTIONS = ['8x10', '12x18', '16x24', '18x24', '24x36']
+export const FRAME_OPTIONS = ['Unframed', 'Natural Premium Oak', 'Black Premium Oak']
+export const SIZE_OPTIONS = ['8x10', '12x18', '16x24']
 
 export function nextNumber(last) {
   const n = last ? parseInt(String(last).replace(/\D/g, ''), 10) || 0 : 0

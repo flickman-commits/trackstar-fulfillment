@@ -92,13 +92,15 @@ export default async function handler(req, res) {
         if (!one) return res.status(404).json({ error: 'Bulk order not found' })
         return res.status(200).json({ bulkOrder: one })
       }
+      // One round trip for the list and one for every runner, then group in
+      // memory. A query per order is what exhausts the pool on a busy morning.
       const list = await prisma.bulkOrder.findMany({ orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }] })
-      const out = []
-      for (const b of list) {
-        const runners = await prisma.order.findMany({ where: { bulkOrderId: b.id }, select: { shippingAddress: true, researchedAt: true, productionFileUrl: true, status: true, runnerResearch: { select: { researchStatus: true }, take: 1, orderBy: { createdAt: 'desc' } } } })
-        out.push({ ...b, progress: progressOf(runners) })
-      }
-      return res.status(200).json({ bulkOrders: out })
+      const all = list.length
+        ? await prisma.order.findMany({ where: { bulkOrderId: { in: list.map(b => b.id) } }, select: { bulkOrderId: true, shippingAddress: true, researchedAt: true, productionFileUrl: true, status: true, runnerResearch: { select: { researchStatus: true }, take: 1, orderBy: { createdAt: 'desc' } } } })
+        : []
+      const byBulk = new Map()
+      for (const r of all) { if (!byBulk.has(r.bulkOrderId)) byBulk.set(r.bulkOrderId, []); byBulk.get(r.bulkOrderId).push(r) }
+      return res.status(200).json({ bulkOrders: list.map(b => ({ ...b, progress: progressOf(byBulk.get(b.id) || []) })) })
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -199,7 +201,9 @@ export default async function handler(req, res) {
 
     if (action === 'research') {
       if (!bulk.paidAt) return res.status(400).json({ error: 'Mark the invoice paid before researching. Nothing ships until it is.' })
-      const out = await researchPending(bulk, { limit: Math.min(25, Math.max(1, parseInt(body.limit, 10) || 10)) })
+      // Small batches: each runner is a live scrape, and the request has to
+      // finish well inside the function's time limit.
+      const out = await researchPending(bulk, { limit: Math.min(5, Math.max(1, parseInt(body.limit, 10) || 3)) })
       if (bulk.status === 'collecting') await prisma.bulkOrder.update({ where: { id: bulk.id }, data: { status: 'researching' } })
       return res.status(200).json({ ...out, bulkOrder: await loadOne(bulk.id) })
     }
