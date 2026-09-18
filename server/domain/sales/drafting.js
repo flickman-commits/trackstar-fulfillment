@@ -18,6 +18,7 @@ import { cadenceFor, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateF
 import { sendMessage, gmailStatus } from './gmail.js'
 import { pickAssetFor, readAsset, isAssetStorageConfigured } from './assets.js'
 import { getSettings, getSenderFor } from './settings.js'
+import { getTemplates } from './templates.js'
 import { recordSend } from './attio.js'
 import { dealForWork, nextStepFor, pipelineOf } from './queue.js'
 import { draftProblems } from './guardrails.js'
@@ -71,11 +72,11 @@ function templateCompany(deal) {
  * rep's first touch keeps the structure and swaps the who-I-am sentence for
  * theirs: their name, their role, their story if they saved one.
  */
-export function buildTemplate(deal, person, step, { socialProof, sender } = {}) {
+export function buildTemplate(deal, person, step, { socialProof, sender, templates } = {}) {
   const pipeline = pipelineOf(deal)
   const identity = pipeline === 'RACE' && deal.identity && RACE_ONE_LINERS[deal.identity]
   const oneLiner = step.touch === 1 && identity ? RACE_ONE_LINERS[deal.identity](templateCompany(deal)) : null
-  const t = templateFor({ pipeline, angle: step.angle, company: templateCompany(deal), contact: person, oneLiner, socialProof })
+  const t = templateFor({ pipeline, angle: step.angle, company: templateCompany(deal), contact: person, oneLiner, socialProof, templates })
   if (sender?.name && sender.name !== 'Matt') {
     const intro = `I'm ${sender.name}, ${sender.role || 'from Trackstar'}.${sender.story ? ` ${sender.story}` : ''}`
     t.body = t.body
@@ -168,6 +169,7 @@ export async function draftVariants({ dealId, personId, useTemplate = false, for
   const settings = await getSettings()
   const sender = await getSenderFor(actor?.id, actor)
   const socialProof = settings.socialProof || DEFAULT_SOCIAL_PROOF
+  const templates = await getTemplates()
   const base = { touchNumber, step, exhausted, personId: person.id, dealId: deal.id }
 
   // The overnight routine may already have written this one. It costs nothing
@@ -179,7 +181,7 @@ export async function draftVariants({ dealId, personId, useTemplate = false, for
   }
 
   if (useTemplate || !isLlmConfigured()) {
-    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender })], model: 'template', source: 'template' }
+    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender, templates })], model: 'template', source: 'template' }
   }
 
   const previous = deal.sends.map(s => ({ touchNumber: s.touchNumber, subject: s.subject, body: s.body }))
@@ -195,7 +197,7 @@ export async function draftVariants({ dealId, personId, useTemplate = false, for
     }))
   } catch (err) {
     console.warn(`[sales.draft] model failed (${err.message}); falling back to the template`)
-    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender })], model: 'template', source: 'template', warning: `Wrote this from the template: ${err.message}` }
+    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender, templates })], model: 'template', source: 'template', warning: `Wrote this from the template: ${err.message}` }
   }
 
   const raw = Array.isArray(json?.variants) ? json.variants : Array.isArray(json) ? json : []

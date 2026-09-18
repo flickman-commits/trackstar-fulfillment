@@ -197,3 +197,6 @@ export interface AttioCheck {
   stages?: string[] | null
   unknownStages?: string[]
 }
+
+export type TemplateTable = Record<Pipeline, Record<string, { subject: string; body: string; edited?: boolean }>>
+export interface TemplateStep { touch: number; angle: string; purpose: string }

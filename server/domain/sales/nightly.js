@@ -19,10 +19,11 @@ import { morningQueue, dealForWork, nextStepFor, pipelineOf, LAST_RUN_KEY, lastR
 import { buildTemplate } from './drafting.js'
 import { draftProblems } from './guardrails.js'
 import { getSettings } from './settings.js'
+import { getTemplates } from './templates.js'
 
 export { lastRun }
 
-function queueItem(d, settings) {
+function queueItem(d, settings, templates) {
   const step = d.nextTouchNumber ? cadenceFor(d.pipeline)[d.nextTouchNumber - 1] : null
   return {
     dealId: d.id,
@@ -53,7 +54,7 @@ function queueItem(d, settings) {
     } : null,
     dealNotes: d.notes,
     identityOneLiner: d.pipeline === 'RACE' && d.identity && RACE_ONE_LINERS[d.identity] ? RACE_ONE_LINERS[d.identity]({ name: d.name, courseLandmark: d.courseLandmark, city: d.company?.location }) : null,
-    template: step ? buildTemplate(d, d.person, step, { socialProof: settings.socialProof }) : null,
+    template: step ? buildTemplate(d, d.person, step, { socialProof: settings.socialProof, templates }) : null,
   }
 }
 
@@ -63,6 +64,7 @@ function queueItem(d, settings) {
  */
 export async function salesQueue({ motion } = {}) {
   const settings = await getSettings()
+  const templates = await getTemplates()
   const q = await morningQueue(null, { scopeMode: 'all', motion: motion || null, fresh: true, uncapped: true })
   const members = await workspaceMembers()
   const byOwner = {}
@@ -73,8 +75,8 @@ export async function salesQueue({ motion } = {}) {
     const mine = d => (d.ownerId || 'unowned') === key
     byOwner[key] = {
       owner: m ? { id: m.id, name: `${m.firstName} ${m.lastName}`.trim(), email: m.email } : null,
-      followUps: q.followUps.filter(mine).map(d => queueItem(d, settings)),
-      newOutreach: q.newOutreach.filter(mine).slice(0, settings.dailyCap).map(d => queueItem(d, settings)),
+      followUps: q.followUps.filter(mine).map(d => queueItem(d, settings, templates)),
+      newOutreach: q.newOutreach.filter(mine).slice(0, settings.dailyCap).map(d => queueItem(d, settings, templates)),
     }
   }
   return {
@@ -88,7 +90,9 @@ export async function salesQueue({ motion } = {}) {
 
 export async function salesRules() {
   const settings = await getSettings()
+  const templates = await getTemplates()
   return {
+    templates,
     houseStyle: HOUSE_STYLE,
     charityRules: CHARITY_RULES,
     sender: settings.sender,

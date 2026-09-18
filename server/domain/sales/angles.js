@@ -186,7 +186,7 @@ function fill(text, { company, contact, socialProof, oneLiner }) {
     .replaceAll('[One-liner]', oneLiner || NEEDS_OPENER)
 }
 
-const RACE_TEMPLATES = {
+export const RACE_TEMPLATES = {
   'first-touch': {
     subject: 'Custom race prints for [Race Name] finishers',
     body: `Hey [First Name],\n\n[One-liner]\n\nI'm Matt, founder at Trackstar. We make custom race prints in partnership with iconic US marathons: the runner's name, time and your course map, on something they actually hang up.\n\nHappy to put together a mockup with your logo and course so you can see it.\n\nWorth a quick chat?`,
@@ -213,7 +213,7 @@ const RACE_TEMPLATES = {
   },
 }
 
-const CHARITY_TEMPLATES = {
+export const CHARITY_TEMPLATES = {
   'first-touch': {
     subject: '[Org Name] - personalized marathon posters',
     body: `Hey [First Name],\n\n[One-liner]\n\nI'm Matt, founder at Trackstar. I ran the NYC Marathon with New York Urban League two years ago and had a wonderful experience, which is actually what made me start this company. We make personalized marathon posters, and we work with 20 race partners now.\n\nWe just opened up a charity program this year and I'd love to have [Org Name] in it. It costs you nothing to get started, and there's a co-branded tier if you want your logo built into the design like the one attached.\n\nAny interest in being part of the pilot? Happy to hop on a quick call.\n\nP.S. Attached a co-branded example so you can see what these look like with a charity logo built in.`,
@@ -232,8 +232,23 @@ const CHARITY_TEMPLATES = {
  * A ready-to-edit draft for one step, with no model involved.
  * Returns { subject, body } always, so the composer is never empty.
  */
-export function templateFor({ pipeline, angle, company, contact, socialProof, oneLiner }) {
-  const table = pipeline === 'CHARITY' ? CHARITY_TEMPLATES : RACE_TEMPLATES
+/** The placeholders a template may use, for the editor's legend. */
+export const TEMPLATE_PLACEHOLDERS = [
+  ['[First Name]', 'the person\'s first name from Attio, or "there"'],
+  ['[Race Name]', 'the deal name (races)'],
+  ['[Org Name]', 'the deal name (charities)'],
+  ['[Landmark]', 'the course landmark if the deal has one, else "Your finish line"'],
+  ['[Season Year]', 'the year of the next edition, from the race date'],
+  ['[Social Proof]', 'the social proof line from Settings'],
+  ['[One-liner]', 'the opening line: a race identity line if there is one, else a visible blank to fill in'],
+]
+
+/**
+ * `templates` is the live table (defaults with any edits made in Settings);
+ * without it the code defaults apply.
+ */
+export function templateFor({ pipeline, angle, company, contact, socialProof, oneLiner, templates }) {
+  const table = (templates && templates[pipeline]) || (pipeline === 'CHARITY' ? CHARITY_TEMPLATES : RACE_TEMPLATES)
   const t = table[angle] || table['first-touch']
   const ctx = { company, contact, socialProof, oneLiner }
   return { subject: fill(t.subject, ctx), body: fill(t.body, ctx) }

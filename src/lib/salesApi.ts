@@ -3,7 +3,7 @@
  * so the Sales screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { Asset, AttioCheck, Deal, DraftResult, Motion, Progress, SalesSettings, SalesStatus, Sender, Stage, TodayPayload } from '@/types/sales'
+import type { Asset, AttioCheck, Deal, DraftResult, Motion, Pipeline, Progress, SalesSettings, SalesStatus, Sender, Stage, TemplateStep, TemplateTable, TodayPayload } from '@/types/sales'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -86,7 +86,8 @@ export const salesApi = {
   },
   deleteAsset: (id: string) => post<{ success: true }>('/api/sales/assets', { action: 'delete', id }),
 
-  settings: () => request<{ settings: SalesSettings; defaults: SalesSettings; sender: Sender }>('/api/sales/settings'),
+  settings: () => request<{ settings: SalesSettings; defaults: SalesSettings; sender: Sender; templates: TemplateTable; templateDefaults: TemplateTable; templateSteps: Record<Pipeline, TemplateStep[]>; placeholders: [string, string][] }>('/api/sales/settings'),
+  saveTemplate: (body: { pipeline: Pipeline; angle: string; subject?: string; body?: string }) => post<{ templates: TemplateTable }>('/api/sales/settings', { action: 'template', ...body }),
   checkAttio: () => request<{ attio: AttioCheck }>('/api/sales/settings?action=check'),
   saveSettings: (patch: Partial<SalesSettings>) => post<{ settings: SalesSettings }>('/api/sales/settings', patch),
   saveSender: (patch: Partial<Sender>) => post<{ sender: Sender }>('/api/sales/settings', { action: 'sender', ...patch }),

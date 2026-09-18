@@ -7,7 +7,8 @@
  * Each returns a plain-English reason so the author can fix it.
  */
 
-const DASHES = /[—–]/
+export const NO_DASHES = /[—–]/
+const DASHES = NO_DASHES
 const MONEY_WORDS = /revenue share|rev share|donation[- ]back|donate back|commission|share of every|percentage of (each|every)/i
 /**
  * "A few Team Fox partners are using these" tells Team Fox that its own

@@ -4,17 +4,18 @@ import { toast } from 'sonner'
 import { btnPrimary, btnSecondary, btnGhost, fieldLabel, inputBase, segment, segmentGroup } from '@/lib/ui'
 import { useEscape } from '@/lib/useEscape'
 import { salesApi } from '@/lib/salesApi'
-import type { AttioCheck, SalesSettings, SalesStatus, Sender } from '@/types/sales'
+import type { AttioCheck, Pipeline, SalesSettings, SalesStatus, Sender, TemplateStep, TemplateTable } from '@/types/sales'
 
 /**
  * Everything that is not today's work.
  *
- * Me: your name and signature, which every email you send carries. Sending:
+ * Me: your name and signature, which every email you send carries.
+ * Templates: the copy for each touch, editable in place. Sending:
  * the workspace's cap, undo window and business day (admins). Connections:
  * your Gmail, and whether Attio has the fields the tool reads. Automation:
  * the AI switch and the last overnight run.
  */
-type Tab = 'me' | 'sending' | 'connections' | 'automation'
+type Tab = 'me' | 'templates' | 'sending' | 'connections' | 'automation'
 
 export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   status: SalesStatus | null
@@ -29,9 +30,28 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   const [me, setMe] = useState<Sender | null>(null)
   const [saving, setSaving] = useState(false)
   const [check, setCheck] = useState<AttioCheck | null>(null)
+  const [templates, setTemplates] = useState<TemplateTable | null>(null)
+  const [templateDefaults, setTemplateDefaults] = useState<TemplateTable | null>(null)
+  const [steps, setSteps] = useState<Record<Pipeline, TemplateStep[]> | null>(null)
+  const [placeholders, setPlaceholders] = useState<[string, string][]>([])
+  const [tPipeline, setTPipeline] = useState<Pipeline>('CHARITY')
+  const [tAngle, setTAngle] = useState<string>('first-touch')
+  const [tDraft, setTDraft] = useState<{ subject: string; body: string } | null>(null)
+  const [tSaving, setTSaving] = useState(false)
   const [checking, setChecking] = useState(false)
 
-  useEffect(() => { salesApi.settings().then(r => { setS(r.settings); setMe(r.sender) }).catch(e => toast.error((e as Error).message)) }, [])
+  useEffect(() => { salesApi.settings().then(r => { setS(r.settings); setMe(r.sender); setTemplates(r.templates); setTemplateDefaults(r.templateDefaults); setSteps(r.templateSteps); setPlaceholders(r.placeholders) }).catch(e => toast.error((e as Error).message)) }, [])
+  // The editor shows one touch at a time; switching touches loads its copy.
+  useEffect(() => { const t = templates?.[tPipeline]?.[tAngle]; setTDraft(t ? { subject: t.subject, body: t.body } : null) }, [templates, tPipeline, tAngle])
+  const saveTemplate = async (reset = false) => {
+    if (!tDraft) return
+    setTSaving(true)
+    try {
+      const r = await salesApi.saveTemplate(reset ? { pipeline: tPipeline, angle: tAngle, subject: '', body: '' } : { pipeline: tPipeline, angle: tAngle, subject: tDraft.subject, body: tDraft.body })
+      setTemplates(r.templates); toast.success(reset ? 'Back to the default' : 'Template saved')
+    } catch (e) { toast.error((e as Error).message) }
+    finally { setTSaving(false) }
+  }
 
   const save = async () => {
     if (!s || !me) return
@@ -49,8 +69,8 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   }
 
   const TZ = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'UTC']
-  const tabs: Tab[] = isAdmin ? ['me', 'sending', 'connections', 'automation'] : ['me', 'connections', 'automation']
-  const label: Record<Tab, string> = { me: 'Me', sending: 'Sending', connections: 'Connections', automation: 'Automation' }
+  const tabs: Tab[] = isAdmin ? ['me', 'templates', 'sending', 'connections', 'automation'] : ['me', 'templates', 'connections', 'automation']
+  const label: Record<Tab, string> = { me: 'Me', templates: 'Templates', sending: 'Sending', connections: 'Connections', automation: 'Automation' }
 
   return (
     <div className="fixed inset-0 z-50 bg-off-black/40 flex items-center justify-center p-4" onClick={onClose}>
@@ -88,6 +108,40 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                     <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 14, color: '#333', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: me.signature }} />
                   </div>
                 </div>
+              </>
+            )}
+
+            {tab === 'templates' && templates && steps && (
+              <>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className={segmentGroup}>
+                    {(['CHARITY', 'RACE'] as Pipeline[]).map(p => <button key={p} onClick={() => { setTPipeline(p); setTAngle(steps[p][0].angle) }} className={segment(tPipeline === p)}>{p === 'CHARITY' ? 'Charity' : 'Race'}</button>)}
+                  </div>
+                  <select value={tAngle} onChange={e => setTAngle(e.target.value)} className={`${inputBase} text-xs`}>
+                    {steps[tPipeline].map(st => <option key={st.angle} value={st.angle}>Touch {st.touch} · {st.angle}{templates[tPipeline][st.angle]?.edited ? ' · edited' : ''}</option>)}
+                  </select>
+                </div>
+                <p className="text-xs text-off-black/55">{steps[tPipeline].find(st => st.angle === tAngle)?.purpose}</p>
+                {tDraft && (
+                  <>
+                    <div><label className={fieldLabel}>Subject</label><input value={tDraft.subject} onChange={e => setTDraft({ ...tDraft, subject: e.target.value })} disabled={!isAdmin} className={`${inputBase} w-full`} /></div>
+                    <div><label className={fieldLabel}>Body</label><textarea rows={12} value={tDraft.body} onChange={e => setTDraft({ ...tDraft, body: e.target.value })} disabled={!isAdmin} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
+                    <details className="text-xs text-off-black/55">
+                      <summary className="cursor-pointer">Placeholders the template can use</summary>
+                      <dl className="mt-1 grid grid-cols-[130px_1fr] gap-x-2 gap-y-0.5">
+                        {placeholders.map(([k, v]) => [<dt key={`${k}k`} className="font-mono text-[11px]">{k}</dt>, <dd key={`${k}v`}>{v}</dd>])}
+                      </dl>
+                      <p className="mt-1">No em or en dashes; the server refuses them. The signature is added on send, so end on the ask. A P.S. goes last and starts with "P.S.".</p>
+                    </details>
+                    {isAdmin && (
+                      <div className="flex items-center justify-between gap-2">
+                        <button onClick={() => saveTemplate(true)} disabled={tSaving || !templates[tPipeline][tAngle]?.edited} className={btnGhost}>Reset to default</button>
+                        <button onClick={() => saveTemplate(false)} disabled={tSaving || (templateDefaults != null && tDraft.subject === templates[tPipeline][tAngle].subject && tDraft.body === templates[tPipeline][tAngle].body)} className={btnSecondary}>{tSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save this touch</button>
+                      </div>
+                    )}
+                    {!isAdmin && <p className="text-xs text-off-black/45">Templates are edited by an admin. You can still change any draft before it goes.</p>}
+                  </>
+                )}
               </>
             )}
 
