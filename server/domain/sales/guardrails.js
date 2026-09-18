@@ -18,7 +18,7 @@ const MONEY_WORDS = /revenue share|rev share|donation[- ]back|donate back|commis
  */
 const NAMED_AS_PARTNER = /\ba few (?!partners\b|of our partners\b)[^.\n]{2,50}?\b(partners|teams|chapters)\b[^.\n]{0,30}\b(use|using|used|run|running)\b/i
 
-const GENERIC_INBOX = /^(info|hello|hi|contact|admin|office|team|events|race|support|press|media|marketing|donate|volunteer|noreply|no-reply)@/i
+const GENERIC_INBOX = /^(info|hello|hi|contact|admin|office|team|events|race|support|press|media|marketing|donate|volunteer|noreply|no-reply|sponsorship|sponsorships|sponsors|partnerships|partners|development|sales|general|mail|disneysports|registration)@/i
 
 /**
  * @param {{ subject: string, body: string }} draft

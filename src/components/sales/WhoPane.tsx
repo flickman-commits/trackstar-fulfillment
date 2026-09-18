@@ -90,7 +90,7 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className={`${fieldLabel} mb-0`}>Stage</span>
           <select value={String(deal.stage || '')} onChange={e => onStage(e.target.value as Stage)} disabled={busy} className={`${inputBase} text-xs py-1 max-w-[170px]`}>
-            {[...new Set([String(deal.stage || ''), ...STAGES])].filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}
+            {[...STAGES, ...(deal.stage && !STAGES.includes(deal.stage as Stage) ? [String(deal.stage)] : [])].map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         {facts.length > 0 && (

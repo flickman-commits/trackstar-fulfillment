@@ -22,6 +22,7 @@ import prisma from '../../db.js'
 import { loadDeals, getDeal, memberForEmail } from './attio.js'
 import { cadenceFor } from './angles.js'
 import { getSettings, startOfToday } from './settings.js'
+import { isGenericInbox } from './guardrails.js'
 
 const OPEN_FOR_OUTREACH = ['Not Contacted']
 const OPEN_FOR_FOLLOW_UP = ['Reached Out']
@@ -32,16 +33,35 @@ export function pipelineOf(deal) {
   return deal.motion === 'Charity' ? 'CHARITY' : 'RACE'
 }
 
+/**
+ * Touches so far. Attio's count, except that a deal at Reached Out has been
+ * written to at least once whatever the counter says; many were moved there
+ * by hand before anything counted.
+ */
+export function touchesSoFar(deal) {
+  const n = Number(deal.touchCount || 0)
+  return deal.stage === 'Reached Out' ? Math.max(n, 1) : n
+}
+
 /** Which touch comes next, from Attio's count. */
 export function nextStepFor(deal) {
   const cadence = cadenceFor(pipelineOf(deal))
-  const touchNumber = Math.min(deal.touchCount + 1, cadence.length)
-  return { touchNumber, step: cadence[touchNumber - 1], cadenceLength: cadence.length, exhausted: deal.touchCount >= cadence.length }
+  const done = touchesSoFar(deal)
+  const touchNumber = Math.min(done + 1, cadence.length)
+  return { touchNumber, step: cadence[touchNumber - 1], cadenceLength: cadence.length, exhausted: done >= cadence.length }
 }
 
-/** The person to write to: first with an email. */
+/**
+ * The person to write to: first with a real address. A generic inbox
+ * (info@, sponsorship@, office@) has gone unanswered every time and the
+ * house rules say never; a person who only has one counts as having none.
+ */
 export function primaryPerson(deal) {
-  return deal.people.find(p => p.email) || deal.people[0] || null
+  const usable = p => p.emails?.find(e => !isGenericInbox(e)) || (p.email && !isGenericInbox(p.email) ? p.email : null)
+  const real = deal.people.find(p => usable(p))
+  if (real) return { ...real, email: usable(real) }
+  const any = deal.people[0]
+  return any ? { ...any, email: null, genericEmail: any.email || null } : null
 }
 
 function daysBetween(a, b) { return Math.floor((b.getTime() - a.getTime()) / 86400000) }
@@ -91,6 +111,7 @@ function shape(deal, { lastSend, prep, skip, dayStart }) {
     pipeline: pipelineOf(deal),
     person,
     hasEmail: Boolean(person?.email),
+    genericOnly: Boolean(person && !person.email && person.genericEmail),
     nextTouchNumber: exhausted ? null : touchNumber,
     nextAngle: exhausted ? null : step.angle,
     exhausted,

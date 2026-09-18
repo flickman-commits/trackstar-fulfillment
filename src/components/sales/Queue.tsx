@@ -161,7 +161,7 @@ export default function Queue({
               </div>
             )}
             <Fold title="Need a person with an email" count={today.needsContact.length}>
-              {today.needsContact.map(d => <Row key={d.id} d={d} muted active={d.id === selectedId} onClick={() => onSelect(d.id)} />)}
+              {today.needsContact.map(d => <Row key={d.id} d={{ ...d, reason: d.genericOnly ? 'Only a generic inbox · find a person in Attio' : 'No person with an email in Attio' }} muted active={d.id === selectedId} onClick={() => onSelect(d.id)} />)}
             </Fold>
           </>
         )}
@@ -185,7 +185,7 @@ export default function Queue({
         )}
       </div>
 
-      <p className="text-[11px] text-off-black/40 px-0.5">I / K move · ⌘↵ send · S skip today · X lost</p>
+      <p className="text-[11px] text-off-black/40 px-0.5">I / K move · ⌘↵ send · S skip today</p>
     </aside>
   )
 }

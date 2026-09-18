@@ -273,7 +273,7 @@ export default function Sales() {
     finally { setBusy(false) }
   }, [deal])
 
-  // Keyboard: I/K deals, J/L variants, ⌘↵ send, S skip, X lost.
+  // Keyboard: I/K deals, J/L variants, ⌘↵ send, S skip.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(); return }
@@ -286,7 +286,6 @@ export default function Sales() {
         case 'j': e.preventDefault(); setVariantIndex(i => Math.max(0, i - 1)); break
         case 'l': e.preventDefault(); setVariantIndex(i => Math.min(variants.length - 1, i + 1)); break
         case 's': e.preventDefault(); skip(); break
-        case 'x': e.preventDefault(); setStage('Lost'); break
       }
     }
     window.addEventListener('keydown', onKey)
@@ -397,7 +396,7 @@ export default function Sales() {
             attachments={attachedAssets} onAttach={attach} onDetach={detach} suggested={suggested}
             onChange={updateVariant}
             onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-            onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} onLost={() => setStage('Lost')}
+            onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip}
           />
         )}
 

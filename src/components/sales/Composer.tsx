@@ -15,14 +15,14 @@ export const ASSET_DRAG_TYPE = 'application/x-trackstar-asset'
  * card from the library on the right, or click one. A "change it" line asks
  * the model to rewrite to an instruction ("shorter", "mention their Boston
  * team") without losing the rest. Send goes through your Gmail after the
- * undo window; Skip and Lost are one key each and live at the other end of
- * the row so they cannot be hit by accident.
+ * undo window; Skip is one key and lives at the other end of the row so it
+ * cannot be hit by accident. Closing a deal out is done in Attio.
  */
 export default function Composer({
   deal, person, draft, variants, index, drafting, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach, suggested,
-  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, onLost,
+  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip,
 }: {
   deal: Deal | null
   person: Person | null
@@ -48,7 +48,6 @@ export default function Composer({
   onRevise: (instruction: string) => Promise<void>
   onSend: () => void
   onSkip: (reason?: string) => void
-  onLost: () => void
 }) {
   const [whyOpen, setWhyOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
@@ -126,7 +125,7 @@ export default function Composer({
             <OverdueBadge days={deal.overdueDays} />
           </div>
           <div className="text-xs text-off-black/55 mt-0.5 flex flex-wrap items-center gap-x-2">
-            <span>{person?.email || <span className="text-red-600">No email in Attio</span>}</span>
+            <span>{person?.email || <span className="text-red-600">{deal.genericOnly ? 'Only a generic inbox in Attio. Find a person.' : 'No email in Attio'}</span>}</span>
             {draft && (
               <>
                 <span className="px-1.5 py-0.5 rounded bg-subtle-gray border border-border-gray text-off-black/70">
@@ -237,7 +236,6 @@ export default function Composer({
               </div>
             </form>
           )}
-          <button onClick={onLost} className={btnGhost} title="Mark Lost in Attio">Lost <kbd className={kbdDark}>X</kbd></button>
           <button onClick={onRewrite} disabled={drafting || !person} className={btnGhost} title={aiActive ? 'Write it again' : 'Reset to the template'}>
             <RefreshCw className={`w-3.5 h-3.5 ${drafting ? 'animate-spin' : ''}`} /> {aiActive ? 'Rewrite' : 'Template'}
           </button>

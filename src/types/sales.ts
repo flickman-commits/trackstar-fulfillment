@@ -68,6 +68,8 @@ export interface Deal {
   people: Person[]
   person: Person | null
   hasEmail: boolean
+  /** The only address on the deal is a generic inbox, which is never written to. */
+  genericOnly?: boolean
   touchCount: number
   nextAction: string | null
   nextActionDate: string | null
