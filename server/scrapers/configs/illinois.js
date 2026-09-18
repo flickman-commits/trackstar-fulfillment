@@ -18,16 +18,18 @@ export default {
   location: 'Champaign-Urbana, IL',
   eventPrefix: 'IL',
   raceDates: {
-    2022: '2022-04-23',
-    2023: '2023-04-23',
+    // No full marathon was held 2021-2023; these are the race-weekend
+    // Saturday, the day the half/10K/relay actually ran.
+    2022: '2022-04-30',
+    2023: '2023-04-29',
     2024: '2024-04-27',
     // 2025: illinoismarathon.com results archive + Christie Clinic race listing
     2025: '2025-04-26',
     2026: '2026-04-25',
   },
   raceDateSources: {
-    2022: 'illinoismarathon.com + raceroster.com',
-    2023: 'illinoismarathon.com + raceroster.com',
+    2022: 'enjoyillinois.com 2022 race listing (weekend Apr 28-30) + smilepolitely.com/wandtv.com reporting the half, 10K and relay ran Sat Apr 30 with no full marathon',
+    2023: 'raceroster.com Christie Clinic Illinois Race Weekend 2023 event page + marathonguide.com race detail, both giving Sat Apr 29 (weekend Apr 27-29)',
     2024: 'illinoismarathon.com + mybestruns.com',
     2025: 'illinoismarathon.com + raceroster.com',
     2026: 'illinoismarathon.com + raceroster.com',
