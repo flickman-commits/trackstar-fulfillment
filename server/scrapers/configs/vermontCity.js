@@ -32,6 +32,13 @@ export default {
     2025: '2025-05-25',
     2026: '2026-05-24',
   },
+  raceDateSources: {
+    2022: 'WCAX "Vermont City Marathon results for Sunday, May 29th" published 2022-05-30 (Reyes 2:19:50) + V.O2 listing dated 2022-05-29',
+    2023: 'Granite State Race Services "Vermont City Marathon & Relay 2023" results (node 4700) + Wikipedia Vermont City Marathon article recording Krifchin\'s 2:33:40 course record on Sunday May 28 2023',
+    2024: 'WCAX race-day report published 2024-05-26 on the 35th VCM + Granite State Race Services 2024 results (node 5084)',
+    2025: 'Granite State Race Services "Vermont City Marathon & Relay 2025" results (node 5747) + runvermont.org "RunVermont Announces Official Results" for the May 25 2025 race',
+    2026: 'ahotu.com event listing "Vermont City Marathon, 24 May, 2026 (Sun)" + runvermont.org Race Date, Time & Location page (Waterfront Park, 7:15am, May 24 2026)',
+  },
   eventTypes: [
     'Marathon',
     'Marathon - 2 Person Relay',
