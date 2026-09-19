@@ -23,6 +23,13 @@ export default {
     2025: '2025-05-18',
     2026: '2026-05-17',
   },
+  raceDateSources: {
+    2022: 'fredericksburgchamber.org event listing "Marine Corps Historic Half - May 22, 2022" + potomaclocal.com race report published 2022-05-23 on the 15th annual running',
+    2023: 'fredericksburgva.gov newsflash "Marine Corps Historic Half This Sunday - Road Closures and Parking Restrictions" for Sunday May 21 2023 + fredericksburg.com "Traffic closures set for city Sunday with Historic Half Marathon events"',
+    2024: 'fredericksburgva.gov city calendar entry for Sunday May 19 2024 + goandrace.com "Marine Corps Historic Half 2024, May 19" (DVIDS 2024 highlight reel same day)',
+    2025: 'fredericksburg.com race report "Daniels, Yakulis Jr. repeat as Historic Half winners" covering the Sunday May 18 2025 running + runners.quest Historic Half 2025 results page',
+    2026: 'ahotu.com event listing "Marine Corps Historic Half, 17 May, 2026 (Sun)" + Fredericksburg Free Press results article published 2026-05-18, the Monday after the race',
+  },
   eventTypes: ['Half Marathon'],
   defaultEventType: 'Half Marathon',
   distanceMiles: 13.1,
