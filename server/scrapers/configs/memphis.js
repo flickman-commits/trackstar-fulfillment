@@ -56,5 +56,13 @@ export default {
     2024: '2024-12-07',
     2025: '2025-12-06',
     2026: '2026-12-05',
-  }
+  },
+  raceDateSources: {
+    2021: 'goandrace.com "St. Jude Memphis Marathon Weekend 2021, December 4" + trifind.com results page headed "December 04, 2021"',
+    2022: 'MarathonGuide results MIDD=556221203 + goandrace.com "St. Jude Memphis Marathon Weekend 2022, December 3"',
+    2023: 'MarathonGuide results MIDD=556231202 + Action News 5 race-day report published 2023/12/02 on the 22nd annual event',
+    2024: 'V.O2 (vdoto2.com) listing dated 2024-12-07 + stjude.org post-event news release for the 2024 weekend (Businesswire 20241207)',
+    2025: 'stjude.org announcement "Join us on Saturday, December 6, 2025" + Action News 5 race-day report published 2025/12/07',
+    2026: 'stjude.org 25th-annual Hero Registration release naming Saturday, Dec. 5, 2026 + ahotu.com listing "05 Dec, 2026 (Sat)"',
+  },
 }
