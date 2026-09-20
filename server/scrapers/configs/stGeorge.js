@@ -22,6 +22,13 @@ export default {
     2025: '2025-10-04',
     2026: '2026-10-03',
   },
+  raceDateSources: {
+    2022: 'stgeorgemarathon.com 2022 runners guide PDF (Saturday, October 1, 2022 start times; expo Friday Sept 30) + hungryrunnergirl.com race recap posted 2022-10',
+    2023: 'stgeorgeutah.com live race-day coverage archived under 2023/10/07 (Santana/Bedford win) + 890kdxu.com "47th Annual St. George Marathon Results"',
+    2024: 'goandrace.com "St. George Marathon and Half Marathon 2024, October 5" + stgeorgeutah.com 48th-race preview naming Saturday Oct. 5 with the Friday Oct. 4 expo',
+    2025: 'stgeorgeutah.com "Runners scorch course records ... 49th St. George Marathon" on Saturday + marathonguide.com 2025 St. George Marathon results',
+    2026: 'marathonguide.com 2026 details page (Saturday, October 3, 2026) + kylepeasefoundation.org 2026 St. George Marathon event page',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
   events: { marathon: 'Marathon', half: 'Half Marathon' },

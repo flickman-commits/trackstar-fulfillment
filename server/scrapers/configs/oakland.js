@@ -22,6 +22,13 @@ export default {
     2025: '2025-03-23',
     2026: '2026-03-22',
   },
+  raceDateSources: {
+    2022: 'results.svetiming.com "Oakland Running Festival - Sunday, March 20, 2022" + marathonguide.com MIDD=3364220320',
+    2023: 'results.svetiming.com "Oakland Running Festival - Sunday, March 19, 2023" + runsignup.com 2023 Oakland Running Festival results',
+    2024: 'letsdothis.com Oakland Marathon 2024 event page (Sunday March 17 2024) + finisherpix.com event 7379 Oakland Running Festival 2024',
+    2025: 'results.svetiming.com "Oakland Running Festival - Sunday, March 23, 2025" + oaklandmarathon.com "Crist, Bagnell & Chamberlain Win Oakland Marathon"',
+    2026: 'oaklandmarathon.com 2026 race-weekend post (marathon 7:00 am Sunday March 22; festival March 20-22) + worldsmarathons.com "Oakland Marathon, 22 Mar 2026"',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
   eventLabels: {

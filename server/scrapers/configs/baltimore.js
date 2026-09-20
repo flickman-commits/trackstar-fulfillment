@@ -54,5 +54,13 @@ export default {
     2024: '2024-10-19',
     2025: '2025-10-18',
     2026: '2026-10-17',
-  }
+  },
+  raceDateSources: {
+    2021: 'results.svetiming.com "Race Results for October 9, 2021 Baltimore Running Festival" + thebaltimoremarathon.com 2021/10 news archive',
+    2022: 'results.svetiming.com "Race Results for October 15, 2022 Baltimore Running Festival" + marathonview.net 2022 (38th running, Creese/Roman-Duval)',
+    2023: 'baltimoresun.com race report dated 2023-10-14 (22nd annual) + results.svetiming.com "Race Results for October 14, 2023"',
+    2024: 'baltimoresun.com race report dated 2024-10-19 (Fink/Kenefick) + results.svetiming.com "Race Results for October 19, 2024"',
+    2025: 'baltimoresun.com race report dated 2025-10-18 (Mance/Cluett, 25th annual) + results.svetiming.com "Race Results for October 18, 2025"',
+    2026: 'marathonguide.com 2026 details page (26th annual, October 17 2026) + findarace.com "Baltimore Running Festival 2026 | Sat 17 Oct"',
+  },
 }

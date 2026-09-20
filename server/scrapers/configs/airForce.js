@@ -19,6 +19,13 @@ export default {
     2025: '2025-09-20',
     2026: '2026-09-19',
   },
+  raceDateSources: {
+    2022: 'wpafb.af.mil 2022 schedule-of-events article (marathon Saturday Sept. 17) + ohd3ares.org event log "Air Force Marathon 17 Sept 2022"',
+    2023: 'findmymarathon.com "held September 16th, 2023" + wpafb.af.mil top-finishers article (races Sept. 15-16; the full is the Saturday)',
+    2024: 'letsdothis.com 2024 event page "September 21st, 2024" + results.raceroster.com 2024 Air Force Marathon results',
+    2025: 'mybestruns.com "Air Force Marathon Race Results - Dayton, OH - 9/20/2025" + wpafb.af.mil article 4310764 (competitors Sept. 19-20; the full is the Saturday)',
+    2026: 'usafmarathon.com marathon page "Saturday, September 19th, 2026 at 6:30 a.m." + raceroster.com 2026 event 111482',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon'],
   eventLabels: {

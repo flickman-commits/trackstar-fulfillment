@@ -23,6 +23,13 @@ export default {
     2025: '2025-02-23',
     2026: '2026-03-01',
   },
+  raceDateSources: {
+    2022: 'fortworthreport.org race-day report dated 2022-02-27 (44th annual) + nbcdfw.com 2022 schedule (half, full and ultra ran Sunday Feb. 27)',
+    2023: 'runningusa.org "45th running took place February 25-26, 2023" with the marathon records set on the Sunday + results.raceroster.com 2023 Cowtown Race Weekend',
+    2024: 'raceroster.com 2024 Cowtown Race Weekend schedule (Half, Full and Ultra on Sunday Feb. 25) + Star-Telegram/Yahoo results story for the 46th annual',
+    2025: 'cowtownmarathon.org full-marathon training schedule PDF "Sunday - February 23rd, 2025" + runningusa.org 2025 recap (10K/5K Saturday, marathon Sunday, weekend Feb 22-23)',
+    2026: 'raceroster.com 2026 Cowtown Race Weekend schedule (Half, Full and Ultra on Sunday March 1) + nbcdfw.com 48th Annual Cowtown registration article',
+  },
   eventTypes: ['Marathon', 'Half Marathon', 'Ultra Marathon'],
   eventSearchOrder: ['marathon', 'halfMarathon', 'ultra'],
   eventLabels: {

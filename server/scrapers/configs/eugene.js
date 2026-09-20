@@ -40,6 +40,13 @@ export default {
     2025: '2025-04-27',
     2026: '2026-04-26',
   },
+  raceDateSources: {
+    2022: 'eugenemarathon.com news post "Eugene Marathon and Half Marathon on May 1, 2022" + findmymarathon.com race detail',
+    2023: 'vdoto2.com race page dated 2023-04-30 + marathonguide.com 2023 Eugene Marathon results',
+    2024: 'trisignup.com 2024 Eugene Marathon individual results + mile2marathon.com 2024 recap (weekend Apr 27-28; the marathon is the Sunday)',
+    2025: 'lookouteugene-springfield.com race-day story dated 2025-04-27 + gotracktownusa.com "first-time winners in 2025 edition" dated 2025-04-27',
+    2026: 'eugenemarathon.com registration announcement "marathon and half marathon on Sunday, April 26, 2026" + runningusa.org 2026 registration notice',
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['Marathon', 'Half Marathon'],
   eventLabels: {

@@ -66,5 +66,12 @@ export default {
     2024: '2024-10-20',
     2025: '2025-10-19',
     2026: '2026-10-18',
-  }
+  },
+  raceDateSources: {
+    2022: 'detroitnews.com race report dated 2022-10-16 (Ryan Corby repeats) + marathonview.net 2022 race page',
+    2023: 'detroitnews.com race report dated 2023-10-15 (Mitch Klingler wins) + enmotive.com 2023 results hub',
+    2024: 'wxyz.com "2024 Detroit Free Press Marathon set for October 20th" + marathonview.net/race/137370',
+    2025: 'cbsnews.com/detroit 2025 winners story + Oakland Press/AOL naming the 48th annual on Sunday, Oct. 19, 2025',
+    2026: 'marathonguide.com 2026 details page, marathon Sunday October 18 2026 7 a.m. + freepmarathon.com (weekend Oct 16-18; the full is the Sunday)',
+  },
 }

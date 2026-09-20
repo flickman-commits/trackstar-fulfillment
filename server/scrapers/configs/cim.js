@@ -46,15 +46,26 @@ export default {
    * listings for the recent years.
    */
   raceDates: {
+    // 2017: marathonguide.com MIDD=687171203 + chronotrack event-31790 live results
     2017: '2017-12-03',
+    // 2018: runningusa.org "7,831 marathon runners crossed the finish line on December 2" + flotrack 2018 CIM results
     2018: '2018-12-02',
+    // 2019: NOT SOURCED. Three searches found only the weekday rule, never a
+    //       page naming the day, and the blocking sites are unreachable from CI.
+    //       This one year is why cim.js still has no raceDateSources block.
     2019: '2019-12-08',
     // 2020 was cancelled (COVID). No date, because there was no race.
+    // 2021: world-track.org 2021 recap "Sunday, December 5 at 7:00 a.m. PST" + letsrun.com 2021 CIM results
     2021: '2021-12-05',
+    // 2022: watchathletics.com "took place on Sunday, December 4" + pausatf.org CIM recap
     2022: '2022-12-04',
+    // 2023: carmichaeltimes.com "On Sunday, December 3, 11,000 runners" + marathonguide.com MIDD=687231203
     2023: '2023-12-03',
+    // 2024: my.raceresult.com/319471 "California International Marathon, 12/08/2024" + pausatf.org 2024 overall results
     2024: '2024-12-08',
+    // 2025: my.raceresult.com/374113 "California International Marathon, 12/07/2025" + abc10.com 2025 winners story
     2025: '2025-12-07',
+    // 2026: raceroster.com 2026 event 112918 + marathonscout.com "Sunday, December 6, 2026"
     2026: '2026-12-06',
   },
 }

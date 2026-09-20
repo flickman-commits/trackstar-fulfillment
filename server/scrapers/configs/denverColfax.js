@@ -34,6 +34,20 @@ export default {
     2025: '2025-05-18',
     2026: '2026-05-17',
   },
+
+  raceDateSources: {
+
+    2022: '9news.com 2022 guide "16th annual ... May 13-15, 2022, with the main race day on May 15" + kdvr.com 16th-annual race-day report',
+
+    2023: 'coloradorunnermag.com "17th Annual Denver Colfax Marathon" (weekend May 19-21 2023; the marathon is the Sunday) + raceroster.com 2023 event 62692',
+
+    2024: '9news.com 2024 Denver Colfax Marathon results + allmarathon.fr "Denver Colfax Marathon Sunday May 19 2024"',
+
+    2025: 'denvergazette.com race report dated 2025-05-18 (Goldy/Queen win) + runcolfax.org 2025 relay results pages',
+
+    2026: 'thescoutguide.com "returns May 16 and 17 ... Sunday is the main event: a full marathon" + halsports.net Colfax Marathon event dated 2026-05-17',
+
+  },
   eventTypes: ['Marathon', 'Half Marathon', '10 Miler'],
   defaultEventType: 'Marathon',
   eventSearchOrder: ['marathon', 'half', 'tenMiler'],

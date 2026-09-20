@@ -55,6 +55,20 @@ export default {
     2025: '2025-03-16',
     2026: '2026-03-08',
   },
+
+  raceDateSources: {
+
+    2022: 'nbclosangeles.com "Winners of 2022 LA Marathon Cross Finish Line" + torunsports results post "2022 Los Angeles Marathon, March 20, 2022"',
+
+    2023: 'foxla.com "Yimer, Ndiwa win 2023 LA Marathon" + ktla.com 2023 Los Angeles Marathon broadcast page',
+
+    2024: 'runningusa.org "Stacy Ndiwa, Dominic Ngeno Win the 2024 Los Angeles Marathon" + nbclosangeles.com race-day report (Sunday, second-largest field in history)',
+
+    2025: 'cbsnews.com/losangeles 2025 winner story (Matt Richtman) + thecorsaironline.com "Celebrating the 40th L.A. Marathon" on Sunday March 16',
+
+    2026: 'marathonguide.com press release "ASICS Los Angeles Marathon Moves to Sunday, March 8, 2026" (moved to avoid an Academy Awards conflict) + nbclosangeles.com 2026 race details',
+
+  },
   eventTypes: ['Marathon', 'Half Marathon'],
   defaultEventType: 'Marathon',
   eventSearchOrder: ['marathon', 'half'],

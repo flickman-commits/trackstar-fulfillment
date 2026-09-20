@@ -33,6 +33,20 @@ export default {
     2025: '2025-10-12',
     2026: '2026-10-11',
   },
+
+  raceDateSources: {
+
+    2022: 'armymwr.com "Sunday, Oct. 9" + armytenmiler.com 2022 race-day volunteer packet',
+
+    2023: 'usar.army.mil "held October 8, 2023" + army.mil article 271615 "MDW hosts 39th Annual Army Ten-Miler"',
+
+    2024: 'stripes.com race-day report dated 2024-10-13 (40th annual) + armymwr.com Army Ten Miler page',
+
+    2025: 'MDW news release (via wjla.com) "Sunday, Oct. 12, 2025 at 8 a.m." + stripes.com race-day report dated 2025-10-12',
+
+    2026: 'active.com "Army Ten-Miler 2026 - Washington, DC October 11, 2026" + armymwr.com 42nd Annual listing',
+
+  },
   eventTypes: ['10 Miler'],
   defaultEventType: '10 Miler',
   eventSearchOrder: ['tenMiler'],
