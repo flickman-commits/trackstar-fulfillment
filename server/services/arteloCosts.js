@@ -20,7 +20,7 @@
 
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
 
-const ARTELO_COSTS_URL = 'https://www.artelo.io/api/open/catalog/get-costs'
+const ARTELO_COSTS_URL = 'https://www.artelo.com/api/open/catalog/get-costs'
 const CATALOG_PRODUCT_ID = 'IndividualArtPrint'
 const PAPER_TYPE = 'ArchivalMatteFineArt'
 

@@ -1314,7 +1314,7 @@ async function handleTestConnections(res) {
   await runStep('artelo', 'GET /api/open/orders/get', async () => {
     if (!process.env.ARTELO_API_KEY) return { status: 'error', message: 'Skipped (no key)' }
     const params = new URLSearchParams({ limit: '5', allOrders: 'true' })
-    const resp = await fetch(`https://www.artelo.io/api/open/orders/get?${params}`, {
+    const resp = await fetch(`https://www.artelo.com/api/open/orders/get?${params}`, {
       headers: { 'Authorization': `Bearer ${process.env.ARTELO_API_KEY}`, 'Content-Type': 'application/json' }
     })
     if (!resp.ok) {

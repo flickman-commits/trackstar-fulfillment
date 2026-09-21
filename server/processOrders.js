@@ -26,7 +26,9 @@ import { fetchWithTimeout } from './lib/fetchWithTimeout.js'
 import { buildShopifyMatchMap, buildEtsyMatchMap } from './lib/lineItemMatching.js'
 
 // Artelo API configuration
-const ARTELO_API_URL = 'https://www.artelo.io/api/open/orders/get'
+// artelo.com, not artelo.io: the old host now redirects across domains and
+// the Authorization header is dropped on the hop, so every call came back 401.
+const ARTELO_API_URL = 'https://www.artelo.com/api/open/orders/get'
 const ARTELO_API_KEY = process.env.ARTELO_API_KEY
 
 // Statuses that need design work

@@ -15,7 +15,7 @@ const prisma = new PrismaClient()
 import dotenv from 'dotenv'
 dotenv.config()
 
-const ARTELO_API_URL = 'https://www.artelo.io/api/open/orders/get'
+const ARTELO_API_URL = 'https://www.artelo.com/api/open/orders/get'
 const ARTELO_API_KEY = process.env.ARTELO_API_KEY
 
 /**
