@@ -266,7 +266,7 @@ function SignInForm({ onDone }: { onDone: (u: CurrentUser) => void }) {
     <div className={shell}>
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-12" />
+          <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-12" />
         </div>
         <form onSubmit={handleSubmit} className={card}>
           <label className="block text-body-sm font-medium text-off-black mb-2">Email</label>
@@ -347,7 +347,7 @@ function AcceptInvite({ token, onDone }: { token: string; onDone: (u: CurrentUse
       <div className={shell}>
         <div className="w-full max-w-sm text-center">
           <div className="flex justify-center mb-8">
-            <img src="/trackstar-logo.png" alt="Trackstar" className="h-12" />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-12" />
           </div>
           <div className={card}>
             <p className="text-body-sm text-off-black">{loadError}</p>
@@ -362,7 +362,7 @@ function AcceptInvite({ token, onDone }: { token: string; onDone: (u: CurrentUse
     <div className={shell}>
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-12" />
+          <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-12" />
         </div>
         <form onSubmit={handleSubmit} className={card}>
           <h1 className="text-body font-semibold text-off-black">

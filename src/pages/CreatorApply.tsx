@@ -38,7 +38,7 @@ export default function CreatorApply() {
       {/* Header */}
       <header className="sticky top-0 z-10 bg-[#F0F0F0]/90 backdrop-blur border-b border-border-gray/60">
         <div className="max-w-5xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-7 md:h-8" />
+          <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8" />
           <button
             onClick={handleApply}
             disabled={isStarting}
@@ -162,7 +162,7 @@ export default function CreatorApply() {
       <footer className="border-t border-border-gray/60 py-6">
         <div className="max-w-5xl mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between gap-2 text-xs text-off-black/50">
           <div className="flex items-center gap-2">
-            <img src="/trackstar-logo.png" alt="Trackstar" className="h-5" />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-5" />
             <span>© Trackstar</span>
           </div>
           <div>

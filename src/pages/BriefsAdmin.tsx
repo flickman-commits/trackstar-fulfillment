@@ -67,7 +67,7 @@ export default function BriefsAdmin() {
         {/* Header */}
         <div className="flex items-end justify-between mb-8">
           <div className="flex items-center gap-3">
-            <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 md:h-10" />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 md:h-10" />
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-off-black">Briefs</h1>
               <p className="text-sm text-off-black/50">Content direction Matt assigns to creators</p>

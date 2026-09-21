@@ -259,7 +259,7 @@ export default function CreatorsHome() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
-            <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 md:h-10" />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 md:h-10" />
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-off-black">Creator Program</h1>
               <p className="text-sm text-off-black/50">Overview of creators, content, and performance</p>

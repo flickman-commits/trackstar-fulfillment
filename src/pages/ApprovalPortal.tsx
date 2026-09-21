@@ -360,7 +360,7 @@ export default function ApprovalPortal() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: T.page, fontFamily: T.font }}>
         <div className="text-center max-w-sm">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
+          <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
           <XCircle className="w-12 h-12 mx-auto mb-4" style={{ color: '#4600D6' }} />
           <h1 style={{ color: '#1A1A1A', fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Something went wrong</h1>
           <p style={{ color: '#666666', fontSize: '14px' }}>{errorMessage}</p>
@@ -374,7 +374,7 @@ export default function ApprovalPortal() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: T.page, fontFamily: T.font }}>
         <div className="text-center max-w-sm">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
+          <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
           <AlertTriangle className="w-12 h-12 mx-auto mb-4" style={{ color: '#4600D6' }} />
           <h1 style={{ color: '#1A1A1A', fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Link expired</h1>
           <p style={{ color: '#666666', fontSize: '14px' }}>This approval link has expired. Reach out to us and we'll send a fresh one.</p>
@@ -421,7 +421,7 @@ export default function ApprovalPortal() {
 
         <div className="max-w-md mx-auto px-4 py-8">
           {/* Logo */}
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-6 mx-auto mb-8" />
+          <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-6 mx-auto mb-8" />
 
           {/* Approved design — hero image */}
           {approvedProof && !isPdf(approvedProof.imageUrl) && (
@@ -557,7 +557,7 @@ export default function ApprovalPortal() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: T.page, fontFamily: T.font }}>
         <div className="text-center max-w-sm">
-          <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
+          <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 mx-auto mb-8" />
           <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(200, 85, 61, 0.1)' }}>
             <CheckCircle2 className="w-10 h-10" style={{ color: '#C8553D' }} />
           </div>
@@ -708,7 +708,7 @@ export default function ApprovalPortal() {
             // asset, so the chip and the artwork meet with no visible seam.
             style={{ backgroundColor: '#F3F3F3', borderRadius: 999, padding: '2px 10px' }}
           >
-            <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 w-auto" />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 w-auto" />
           </span>
           {/* The partner's name lives in the bar, beside the mark. It is still
               the page's h1 - it is the title, it just sits where a title sits

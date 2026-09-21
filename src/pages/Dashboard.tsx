@@ -2597,7 +2597,7 @@ Thank you!`
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
               <img
-                src="/trackstar-logo.png"
+                src="/trackstar-stars-transparent.png"
                 alt="Trackstar"
                 className="h-8 md:h-11"
               />
