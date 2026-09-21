@@ -54,7 +54,7 @@ export default function RunnerClaim() {
       <div className="max-w-md mx-auto px-4 py-6">
         <div className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 mb-6" style={{ backgroundColor: T.bar, borderRadius: 24 }}>
           <span className="flex items-center justify-center shrink-0 overflow-hidden" style={{ backgroundColor: '#F3F3F3', borderRadius: 999, padding: '2px 10px' }}>
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 w-auto" />
+            <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 w-auto" />
           </span>
           {info && <span style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: 600 }}>{info.partnerName}</span>}
         </div>

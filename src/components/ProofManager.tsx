@@ -272,18 +272,35 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
 
     try {
       for (const file of selectedFiles) {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('orderId', orderId)
-        if (groupLabel.trim()) formData.append('groupLabel', groupLabel.trim())
+        // The file goes to storage directly: our API sits behind a 4.5 MB
+        // request cap that a PNG preview blows through. Ask for a signed
+        // slot, put the bytes there, then create the record from its URL.
+        const slotRes = await apiFetch(`${API_BASE}/api/proofs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'upload-url', orderId, filename: file.name, contentType: file.type }),
+        })
+        if (!slotRes.ok) {
+          const data = await slotRes.json().catch(() => ({ error: 'Could not start the upload' }))
+          toast.error(`Failed to upload ${file.name}: ${data.error}`)
+          continue
+        }
+        const slot = await slotRes.json()
+        const put = await fetch(slot.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }, body: file })
+        if (!put.ok) {
+          const text = await put.text().catch(() => '')
+          toast.error(`Failed to upload ${file.name}: storage said ${put.status}${text ? ` ${text.slice(0, 80)}` : ''}`)
+          continue
+        }
 
         const res = await apiFetch(`${API_BASE}/api/proofs`, {
           method: 'POST',
-          body: formData
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId, imageUrl: slot.publicUrl, imageName: file.name, groupLabel: groupLabel.trim() || undefined }),
         })
 
         if (!res.ok) {
-          const data = await res.json().catch(() => ({ error: 'Upload failed' }))
+          const data = await res.json().catch(() => ({ error: `server returned ${res.status}` }))
           toast.error(`Failed to upload ${file.name}: ${data.error}`)
           continue
         }

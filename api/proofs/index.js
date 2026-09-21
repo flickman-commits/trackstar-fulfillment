@@ -653,6 +653,30 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, proof })
     }
 
+    // A signed URL so the browser can put the file in storage itself. Vercel
+    // caps a request body at 4.5 MB, which a PNG preview clears easily, and
+    // the failure is a plain-text 413 the client cannot even read. The file
+    // goes straight to the bucket; the record is created in a second call
+    // with the resulting URL.
+    if (req.method === 'POST' && body.action === 'upload-url') {
+      const { orderId, filename, contentType } = body
+      if (!orderId) return res.status(400).json({ error: 'orderId is required' })
+      const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } })
+      if (!order) return res.status(404).json({ error: 'Order not found' })
+      const ext = String(filename || 'proof.png').split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'
+      const path = `${orderId}/raw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+      const { data, error } = await supabase.storage.from('order-proofs').createSignedUploadUrl(path)
+      if (error) return res.status(500).json({ error: `Could not start the upload: ${error.message}` })
+      return res.status(200).json({
+        path,
+        uploadUrl: data.signedUrl,
+        token: data.token,
+        contentType: contentType || null,
+        publicUrl: supabase.storage.from('order-proofs').getPublicUrl(path).data.publicUrl,
+      })
+    }
+
     if (req.method === 'POST') {
       const { orderId, imageData, imageUrl, imageName, groupLabel } = body
 
@@ -686,7 +710,40 @@ export default async function handler(req, res) {
       let publicUrl = imageUrl || null
       let thumbnailUrl = null
 
-      // File upload via FormData (preferred — no size limit issues)
+      // A file the browser already put in our bucket via upload-url. Pull it
+      // back, make the web-size copy and the thumbnail the same way a direct
+      // upload would, and drop the raw original.
+      const rawMatch = imageUrl && !uploadedFile && !imageData
+        ? String(imageUrl).match(/\/storage\/v1\/object\/public\/order-proofs\/(.+\/raw-[^/]+)$/)
+        : null
+      if (rawMatch) {
+        const rawPath = decodeURIComponent(rawMatch[1])
+        const ext = rawPath.split('.').pop()?.toLowerCase() || 'png'
+        const timestamp = Date.now()
+        const { data: blob, error: dlErr } = await supabaseClient.storage.from('order-proofs').download(rawPath)
+        if (dlErr || !blob) return res.status(400).json({ error: `The uploaded file could not be read back: ${dlErr?.message || 'empty'}` })
+        const buffer = Buffer.from(await blob.arrayBuffer())
+        const { compressed, thumbnail } = await processImage(buffer, ext)
+        if (compressed) {
+          const filePath = `${orderId}/v${version}-${timestamp}.jpg`
+          const { error: upErr } = await supabaseClient.storage.from('order-proofs').upload(filePath, compressed, { contentType: 'image/jpeg', upsert: false })
+          if (upErr) return res.status(500).json({ error: `Image upload failed: ${upErr.message}` })
+          publicUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(filePath).data.publicUrl
+          await supabaseClient.storage.from('order-proofs').remove([rawPath]).catch(() => {})
+        } else {
+          // PDFs and anything sharp cannot read stay as uploaded, under a proper name.
+          const filePath = `${orderId}/v${version}-${timestamp}.${ext}`
+          const { error: mvErr } = await supabaseClient.storage.from('order-proofs').move(rawPath, filePath)
+          publicUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(mvErr ? rawPath : filePath).data.publicUrl
+        }
+        if (thumbnail) {
+          const thumbPath = `${orderId}/v${version}-${timestamp}-thumb.jpg`
+          const { error: thumbErr } = await supabaseClient.storage.from('order-proofs').upload(thumbPath, thumbnail, { contentType: 'image/jpeg', upsert: false })
+          if (!thumbErr) thumbnailUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(thumbPath).data.publicUrl
+        }
+      }
+
+      // File upload via FormData (small files; large ones use upload-url)
       if (uploadedFile) {
         const ext = (uploadedFile.originalFilename || 'proof.png').split('.').pop()?.toLowerCase() || 'png'
         const timestamp = Date.now()

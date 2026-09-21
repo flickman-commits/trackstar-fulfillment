@@ -708,7 +708,7 @@ export default function ApprovalPortal() {
             // asset, so the chip and the artwork meet with no visible seam.
             style={{ backgroundColor: '#F3F3F3', borderRadius: 999, padding: '2px 10px' }}
           >
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 w-auto" />
+            <img src="/trackstar-logo.png" alt="Trackstar" className="h-8 w-auto" />
           </span>
           {/* The partner's name lives in the bar, beside the mark. It is still
               the page's h1 - it is the title, it just sits where a title sits
