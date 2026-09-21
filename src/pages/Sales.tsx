@@ -438,7 +438,7 @@ export default function Sales() {
 
         <aside className="w-full lg:w-[320px] shrink-0 overflow-y-auto flex flex-col gap-2 min-h-0">
           <WhoPane
-            deal={deal} person={person} busy={busy}
+            deal={deal} person={person} busy={busy} stages={status?.attio.stages}
             onStage={setStage} onNote={addNote}
             onSelectPerson={id => { setPersonId(id); if (deal) { setPrepared(prev => { const n = { ...prev }; delete n[deal.id]; return n }); prepare(deal, { silent: false, force: true, personId: id }) } }}
           />

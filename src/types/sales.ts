@@ -7,8 +7,9 @@ export type Pipeline = 'RACE' | 'CHARITY'
 export type Motion = 'Race' | 'Charity' | 'Corporate'
 
 /** Attio deal stages, in pipeline order. */
-export const STAGES = ['Needs Enrichment', 'Not Contacted', 'Reached Out', 'In Conversation', 'Call Booked', 'Deck Sent', 'Won', 'Revisit Next Year', 'Lost'] as const
-export type Stage = typeof STAGES[number]
+/** Fallback only; the live list comes from Attio via SalesStatus.attio.stages. */
+export const STAGES = ['Needs Enrichment', 'Not Contacted', 'Reached Out', 'In Conversation', 'Call Booked', 'Deck Sent', 'Awaiting Payment', 'Won', 'Revisit Next Year', 'Lost'] as const
+export type Stage = string
 
 export interface Person {
   id: string
@@ -166,7 +167,7 @@ export interface Asset {
 export interface SalesStatus {
   llm: { configured: boolean; provider?: string; model?: string; baseUrl?: string; canSearch?: boolean }
   gmail: { configured: boolean; connected: boolean; email: string | null; canReadReplies?: boolean }
-  attio: { configured: boolean; member: { id: string; email: string; name: string } | null }
+  attio: { configured: boolean; member: { id: string; email: string; name: string } | null; stages?: string[] | null }
   library: { configured: boolean }
   me: { id: string; email: string; firstName: string | null; role: string }
   lastRun: OvernightRun | null

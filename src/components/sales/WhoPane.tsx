@@ -18,7 +18,9 @@ function fmtDate(s?: string | null) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })
 }
 
-export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote, busy }: {
+export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote, busy, stages }: {
+  /** Attio's stage list, in order. Falls back to the known list. */
+  stages?: string[] | null
   deal: Deal | null
   person: Person | null
   onStage: (stage: Stage) => void
@@ -92,7 +94,7 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className={`${fieldLabel} mb-0`}>Stage</span>
           <select value={String(deal.stage || '')} onChange={e => onStage(e.target.value as Stage)} disabled={busy} className={`${inputBase} text-xs py-1 max-w-[170px]`}>
-            {[...STAGES, ...(deal.stage && !STAGES.includes(deal.stage as Stage) ? [String(deal.stage)] : [])].map(s => <option key={s} value={s}>{s}</option>)}
+            {[...(stages && stages.length ? stages : STAGES), ...(deal.stage && !(stages && stages.length ? stages : [...STAGES]).includes(String(deal.stage)) ? [String(deal.stage)] : [])].map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         {facts.length > 0 && (

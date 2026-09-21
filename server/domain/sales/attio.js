@@ -34,8 +34,8 @@ const CACHE_MS = 45_000
 
 export const WORKSPACE_SLUG = 'trackstar-usa'
 
-/** Stage titles, in pipeline order. From the CRM upkeep skill; the workspace is the authority. */
-export const STAGES = ['Needs Enrichment', 'Not Contacted', 'Reached Out', 'In Conversation', 'Call Booked', 'Deck Sent', 'Won', 'Revisit Next Year', 'Lost']
+/** Stage titles the tool relies on. The full ordered list is read live; see stageTitles(). */
+export const STAGES = ['Needs Enrichment', 'Not Contacted', 'Reached Out', 'In Conversation', 'Call Booked', 'Deck Sent', 'Awaiting Payment', 'Won', 'Revisit Next Year', 'Lost']
 export const MOTIONS = ['Race', 'Charity', 'Corporate']
 
 /** Deal attributes the tool reads or writes. The settings check reports any that are missing. */
@@ -328,6 +328,19 @@ export async function workspaceMembers() {
   })
 }
 
+/** The deal stages as the workspace defines them, in pipeline order. Cached; falls back to the known list. */
+export async function stageTitles() {
+  return cached('stages', 10 * 60_000, async () => {
+    try {
+      const attrs = await attio('/objects/deals/attributes')
+      const stageAttr = (attrs?.data || []).find(a => a.api_slug === 'stage')
+      const st = await attio(`/objects/deals/attributes/${stageAttr?.id?.attribute_id || 'stage'}/statuses`)
+      const titles = (st?.data || []).filter(x => !x.is_archived).map(x => x.title)
+      return titles.length ? titles : STAGES
+    } catch { return STAGES }
+  })
+}
+
 /** The workspace member whose email matches the signed-in person, or null. */
 export async function memberForEmail(email) {
   if (!email) return null
@@ -383,7 +396,7 @@ export async function recordSend(deal, { sentAt, touchNumber, nextAction, nextAc
 
 /** A person changed the stage from the tool. Written exactly. */
 export async function setStage(dealId, stage) {
-  if (!STAGES.includes(stage)) throw new Error(`Unknown stage: ${stage}`)
+  if (!(await stageTitles()).includes(stage)) throw new Error(`Unknown stage: ${stage}`)
   await patchDeal(dealId, { stage })
   return getDeal(dealId, { fresh: true })
 }

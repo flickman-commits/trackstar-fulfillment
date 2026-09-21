@@ -13,7 +13,7 @@ import { requireSalesRep } from '../_lib/users.js'
 import { draftVariants, sendDraft, sendFree, checkDraft, reviseDraft } from '../../server/domain/sales/drafting.js'
 import { llmInfo } from '../../server/lib/llm.js'
 import { gmailStatus } from '../../server/domain/sales/gmail.js'
-import { isAttioConfigured, memberForEmail } from '../../server/domain/sales/attio.js'
+import { isAttioConfigured, memberForEmail, stageTitles } from '../../server/domain/sales/attio.js'
 import { isAssetStorageConfigured } from '../../server/domain/sales/assets.js'
 import { lastRun } from '../../server/domain/sales/queue.js'
 
@@ -25,11 +25,12 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       let member = null
-      if (isAttioConfigured()) { try { member = await memberForEmail(actor.email) } catch { member = null } }
+      let stages = null
+      if (isAttioConfigured()) { try { member = await memberForEmail(actor.email); stages = await stageTitles() } catch { member = null } }
       return res.status(200).json({
         llm: llmInfo(),
         gmail: await gmailStatus(actor.id),
-        attio: { configured: isAttioConfigured(), member: member ? { id: member.id, email: member.email, name: `${member.firstName} ${member.lastName}`.trim() } : null },
+        attio: { configured: isAttioConfigured(), member: member ? { id: member.id, email: member.email, name: `${member.firstName} ${member.lastName}`.trim() } : null, stages },
         library: { configured: isAssetStorageConfigured() },
         me: { id: actor.id, email: actor.email, firstName: actor.firstName || null, role: actor.role },
         lastRun: await lastRun(),
