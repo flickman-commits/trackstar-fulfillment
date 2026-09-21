@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnGhost, segment, segmentGroup, inputBase, fieldLabel } from '@/lib/ui'
@@ -122,7 +122,11 @@ export default function PricingCalculator() {
   const [error, setError] = useState<string | null>(null)
 
   const [channel, setChannel] = useState<Channel>('retail')
-  const [quantity, setQuantity] = useState(25)
+  // Kept as text so the field can be emptied while retyping. The grid only
+  // refetches once typing pauses, and a slow older response never overwrites
+  // a newer one.
+  const [unitsText, setUnitsText] = useState('25')
+  const requestSeq = useRef(0)
   const [includePhoto, setIncludePhoto] = useState(false)
   // Discount comes from the published tier for this quantity. The override is
   // for modeling a deal we have not published — empty means "use the tier".
@@ -139,24 +143,32 @@ export default function PricingCalculator() {
   const [singleRows, setSingleRows] = useState<Record<string, number> | null>(null)
 
   // Retail always ships one at a time; bulk channels ship as one consignment.
-  const effectiveQty = channel === 'retail' ? 1 : Math.max(1, Number(quantity) || 1)
+  const typedQty = parseInt(unitsText, 10)
+  const effectiveQty = channel === 'retail' ? 1 : Math.max(1, Number.isFinite(typedQty) ? typedQty : 1)
 
   const load = useCallback(async (qty: number) => {
+    const seq = ++requestSeq.current
     setLoading(true)
     setError(null)
     try {
       const res = await apiFetch(`${API_BASE}/api/products/pricing?quantity=${qty}`)
       const json = await res.json()
+      if (seq !== requestSeq.current) return
       if (!res.ok) throw new Error(json.error || 'Failed to load pricing')
       setData(json)
     } catch (e) {
+      if (seq !== requestSeq.current) return
       setError(e instanceof Error ? e.message : 'Failed to load pricing')
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
   }, [])
 
-  useEffect(() => { load(effectiveQty) }, [load, effectiveQty])
+  useEffect(() => {
+    const t = window.setTimeout(() => load(effectiveQty), data ? 450 : 0)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, effectiveQty])
 
   // Single-unit shipping per size, for the per-runner mode. Fetched once.
   useEffect(() => {
@@ -289,96 +301,76 @@ export default function PricingCalculator() {
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh live Artelo/Shopify data
         </button>
       </div>
-      <p className="text-[11px] text-off-black/40 mb-3">
-        {CHANNELS.find(c => c.id === channel)?.blurb}
-        {channel === 'wholesale' && tiers.length > 0 && (
-          <span className="ml-1">
-            Published tiers: {tiers.map(t => `${t.label} ${(t.discount * 100).toFixed(0)}% off`).join(' · ')}.
-          </span>
-        )}
-      </p>
+      {channel === 'wholesale' && tiers.length > 0 && (
+        <p className="text-[11px] text-off-black/40 mb-3">
+          Tiers: {tiers.map(t => `${t.label} ${(t.discount * 100).toFixed(0)}%`).join(' · ')}
+        </p>
+      )}
 
       {/* Controls */}
-      <div className={`mb-4 flex flex-wrap items-end gap-4 ${
-        channel === 'retail' ? '' : 'bg-subtle-gray border border-border-gray rounded-lg p-3'
-      }`}>
-        {channel !== 'retail' && (
-          <>
-            <div>
-              <label className={fieldLabel}>Units in shipment</label>
-              <input
-                value={quantity}
-                onChange={e => setQuantity(Number(e.target.value.replace(/[^0-9]/g, '')) || 1)}
-                inputMode="numeric"
-                className={`${inputBase} w-24`}
-              />
-            </div>
-            <div>
-              <label className={fieldLabel}>
-                Tier discount
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="px-2.5 py-1.5 rounded-md bg-white border border-border-gray text-sm tabular-nums min-w-[4.5rem] text-center">
-                  {activeTier ? `${(activeTier.discount * 100).toFixed(0)}%` : '-'}
-                </div>
-                <span className="text-[11px] text-off-black/45">
-                  {activeTier ? activeTier.label : `under ${tiers[0]?.min ?? 10} units - retail`}
-                </span>
-              </div>
-            </div>
-            <div>
-              <label className={fieldLabel}>
-                Override
-              </label>
-              <div className="relative w-24">
-                <input
-                  value={discountOverride}
-                  onChange={e => setDiscountOverride(e.target.value.replace(/[^0-9.]/g, ''))}
-                  inputMode="decimal"
-                  placeholder="tier"
-                  className={`${inputBase} w-full pr-6`}
-                />
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-off-black/40 text-xs">%</span>
-              </div>
-            </div>
-          </>
-        )}
-        <label className="inline-flex items-center gap-1.5 text-[11px] text-off-black/55 pb-2 cursor-pointer">
-          <input type="checkbox" checked={includePhoto} onChange={e => setIncludePhoto(e.target.checked)} className="w-3.5 h-3.5" />
-          Photo add-on {data ? `+${money(data.assumptions.photoAddOnPrice)}` : ''}
-        </label>
-        {channel === 'wholesale' && (
-          <div className="basis-full flex flex-wrap items-end gap-4 pt-3 mt-1 border-t border-border-gray/70">
-            <div>
-              <label className={fieldLabel}>Ships</label>
-              <div className={segmentGroup}>
-                <button onClick={() => setShipMode('consignment')} className={segment(shipMode === 'consignment')}>One shipment to partner</button>
-                <button onClick={() => setShipMode('individual')} className={segment(shipMode === 'individual')}>To each runner</button>
-              </div>
-            </div>
-            {shipMode === 'consignment' ? (
-              <div>
-                <label className={fieldLabel}>Bulk shipping (whole run)</label>
-                <div className="flex items-center gap-2">
-                  <div className="relative w-28">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/40 text-xs">$</span>
-                    <input
-                      value={bulkShippingOverride}
-                      onChange={e => setBulkShippingOverride(e.target.value.replace(/[^0-9.]/g, ''))}
-                      inputMode="decimal"
-                      placeholder={selected ? selected.orderShipping.toFixed(2) : 'Artelo'}
-                      className={`${inputBase} w-full pl-6`}
-                    />
-                  </div>
-                  <span className="text-[11px] text-off-black/45">{bulkShippingOverride.trim() ? 'your quote' : `Artelo's rate for ${effectiveQty}`}</span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-[11px] text-off-black/55 pb-2">Each print ships on its own to the runner at Artelo's single-unit rate{singleRows === null ? ' (loading)' : ''}.</p>
-            )}
+      {channel === 'wholesale' ? (
+        <div className="mb-4 bg-subtle-gray border border-border-gray rounded-lg p-3 flex flex-wrap items-end gap-x-5 gap-y-3">
+          <div>
+            <label className={fieldLabel}>Units</label>
+            <input
+              value={unitsText}
+              onChange={e => setUnitsText(e.target.value.replace(/[^0-9]/g, ''))}
+              onBlur={() => { if (!unitsText.trim() || parseInt(unitsText, 10) < 1) setUnitsText('1') }}
+              inputMode="numeric"
+              className={`${inputBase} w-20`}
+            />
           </div>
-        )}
-      </div>
+          <div>
+            <label className={fieldLabel}>Discount</label>
+            <div className="relative w-24">
+              <input
+                value={discountOverride}
+                onChange={e => setDiscountOverride(e.target.value.replace(/[^0-9.]/g, ''))}
+                inputMode="decimal"
+                placeholder={activeTier ? (activeTier.discount * 100).toFixed(0) : '0'}
+                className={`${inputBase} w-full pr-6`}
+                title={activeTier ? `${activeTier.label}: ${(activeTier.discount * 100).toFixed(0)}% by tier. Type a number to override.` : 'Under the first tier: retail price. Type a number to override.'}
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-off-black/40 text-xs">%</span>
+            </div>
+          </div>
+          <div>
+            <label className={fieldLabel}>Ships</label>
+            <div className={segmentGroup}>
+              <button onClick={() => setShipMode('consignment')} className={segment(shipMode === 'consignment')}>To partner</button>
+              <button onClick={() => setShipMode('individual')} className={segment(shipMode === 'individual')}>To each runner</button>
+            </div>
+          </div>
+          {shipMode === 'consignment' && (
+            <div>
+              <label className={fieldLabel}>Shipping, whole run</label>
+              <div className="relative w-28">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/40 text-xs">$</span>
+                <input
+                  value={bulkShippingOverride}
+                  onChange={e => setBulkShippingOverride(e.target.value.replace(/[^0-9.]/g, ''))}
+                  inputMode="decimal"
+                  placeholder={selected ? selected.orderShipping.toFixed(2) : ''}
+                  className={`${inputBase} w-full pl-6`}
+                  title="Artelo's rate by default. Type a quote to use it instead."
+                />
+              </div>
+            </div>
+          )}
+          <label className="inline-flex items-center gap-1.5 text-[11px] text-off-black/55 pb-2 cursor-pointer">
+            <input type="checkbox" checked={includePhoto} onChange={e => setIncludePhoto(e.target.checked)} className="w-3.5 h-3.5" />
+            Photo add-on {data ? `+${money(data.assumptions.photoAddOnPrice)}` : ''}
+          </label>
+          {loading && data && <Loader2 className="w-4 h-4 animate-spin text-off-black/30 mb-2" />}
+        </div>
+      ) : (
+        <div className="mb-4">
+          <label className="inline-flex items-center gap-1.5 text-[11px] text-off-black/55 cursor-pointer">
+            <input type="checkbox" checked={includePhoto} onChange={e => setIncludePhoto(e.target.checked)} className="w-3.5 h-3.5" />
+            Photo add-on {data ? `+${money(data.assumptions.photoAddOnPrice)}` : ''}
+          </label>
+        </div>
+      )}
 
       {loading && !data && (
         <div className="flex items-center justify-center gap-2 py-10 text-sm text-off-black/50">
