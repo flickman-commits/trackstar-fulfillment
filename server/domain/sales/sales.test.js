@@ -56,6 +56,13 @@ test('the web search tool version matches what the model can do', async () => {
 })
 
 test('a mailbox is never used as a first name in a greeting', async () => {
+  {
+    const { greetingName } = await import('./angles.js')
+    assert.equal(greetingName({ firstName: 'lmcelrath', lastName: '', email: 'lmcelrath@akronmarathon.org' }), 'there', 'the local part imported as a name')
+    assert.equal(greetingName({ firstName: 'Sam', lastName: 'Lee', email: 'sam@teamfox.org' }), 'Sam', 'a real first name that happens to match the address')
+    assert.equal(greetingName({ firstName: 'ellen', lastName: '', email: 'ellen@inmotionevents.com' }), 'there', 'lower case, no surname, same as the address: not trusted')
+    assert.equal(greetingName({ firstName: 'Carolyn', lastName: 'Draayer', email: 'cdraayer@brooks.com' }), 'Carolyn')
+  }
   const { greetingName } = await import('./angles.js')
   // Real names pass through.
   assert.equal(greetingName({ firstName: 'Kerri', email: 'kerri.powell@themmrf.org' }), 'Kerri')

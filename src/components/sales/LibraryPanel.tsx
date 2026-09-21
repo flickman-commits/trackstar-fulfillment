@@ -103,17 +103,17 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
               draggable
               onDragStart={e => { e.dataTransfer.setData(ASSET_DRAG_TYPE, JSON.stringify(a)); e.dataTransfer.effectAllowed = 'copy' }}
               onDoubleClick={() => onAttach(a)}
-              className={`group relative rounded-md border overflow-hidden cursor-grab active:cursor-grabbing ${attached ? 'border-dark-fill' : 'border-border-gray hover:border-off-black/40'}`}
+              className={`group relative rounded-md border cursor-grab active:cursor-grabbing ${attached ? 'border-dark-fill' : 'border-border-gray hover:border-off-black/40'}`}
               title={`${a.name}${a.size ? ` · ${fmtSize(a.size)}` : ''}. Drag onto the email, or double-click.`}
             >
-              <div className="aspect-[4/3] bg-subtle-gray grid place-items-center overflow-hidden">
+              <div className="h-[104px] rounded-t-md bg-subtle-gray grid place-items-center overflow-hidden">
                 {a.kind === 'image' && a.previewUrl ? (
                   <img src={a.previewUrl} alt="" className="w-full h-full object-cover" draggable={false} />
                 ) : a.kind === 'image' ? <ImageIcon className="w-6 h-6 text-off-black/30" /> : (
-                  <div className="text-center"><FileText className="w-6 h-6 text-off-black/40 mx-auto" /><div className="font-mono text-[9px] uppercase text-off-black/40 mt-1">{a.filename.split('.').pop()}</div></div>
+                  <div className="text-center"><FileText className="w-7 h-7 text-off-black/40 mx-auto" /><div className="font-mono text-[9px] uppercase text-off-black/40 mt-1">{a.filename.split('.').pop()}{a.size ? ` · ${fmtSize(a.size)}` : ''}</div></div>
                 )}
               </div>
-              <div className="px-1.5 py-1 text-[11px] leading-tight truncate">{a.name}</div>
+              <div className="px-1.5 py-1 text-[11px] leading-tight line-clamp-2 min-h-[34px]" title={a.name}>{a.name}</div>
               <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => onAttach(a)} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-subtle-gray" title={attached ? 'Attached' : 'Attach to this email'}>
                   {attached ? <Check className="w-3.5 h-3.5 text-success-green" /> : <Plus className="w-3.5 h-3.5" />}

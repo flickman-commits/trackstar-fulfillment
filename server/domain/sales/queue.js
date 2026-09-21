@@ -20,7 +20,7 @@
  */
 import prisma from '../../db.js'
 import { loadDeals, getDeal, memberForEmail } from './attio.js'
-import { cadenceFor } from './angles.js'
+import { cadenceFor, looksLikeMailbox } from './angles.js'
 import { getSettings, startOfToday } from './settings.js'
 import { isGenericInbox } from './guardrails.js'
 
@@ -59,9 +59,19 @@ export function nextStepFor(deal) {
 export function primaryPerson(deal) {
   const usable = p => p.emails?.find(e => !isGenericInbox(e)) || (p.email && !isGenericInbox(p.email) ? p.email : null)
   const real = deal.people.find(p => usable(p))
-  if (real) return { ...real, email: usable(real) }
+  if (real) return withDisplay({ ...real, email: usable(real) })
   const any = deal.people[0]
-  return any ? { ...any, email: null, genericEmail: any.email || null } : null
+  return any ? withDisplay({ ...any, email: null, genericEmail: any.email || null }) : null
+}
+
+/**
+ * A person whose Attio name is really their mailbox is shown by address, so
+ * nobody reads "lmcelrath" as a first name. The email itself still greets
+ * them as "there". Fixing the name in Attio fixes both.
+ */
+function withDisplay(p) {
+  if (!looksLikeMailbox(p)) return p
+  return { ...p, nameIsMailbox: true, fullName: p.email || p.genericEmail || p.fullName || 'Unknown name', firstName: '', lastName: '' }
 }
 
 function daysBetween(a, b) { return Math.floor((b.getTime() - a.getTime()) / 86400000) }
@@ -129,7 +139,7 @@ function shape(deal, { lastSend, prep, skip, dayStart }) {
 async function sendIndex(dayStart) {
   const sends = await prisma.salesSend.findMany({ orderBy: { sentAt: 'desc' }, select: { attioDealId: true, sentAt: true, subject: true, touchNumber: true, gmailThreadId: true, rfcMessageId: true } })
   const lastByDeal = {}
-  for (const s of sends) if (!lastByDeal[s.attioDealId]) lastByDeal[s.attioDealId] = s
+  for (const s of sends) if (s.attioDealId && !lastByDeal[s.attioDealId]) lastByDeal[s.attioDealId] = s
   const today = sends.filter(s => s.sentAt >= dayStart)
   return { lastByDeal, today }
 }
@@ -164,21 +174,26 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
   ])
   const prepByDeal = Object.fromEntries(preps.map(p => [p.attioDealId, p]))
   const skipByDeal = Object.fromEntries(skips.map(s => [s.attioDealId, s]))
-  const sentTodayIds = new Set(today.map(s => s.attioDealId))
+  const sentTodayIds = new Set(today.map(s => s.attioDealId).filter(Boolean))
 
   const inScope = deals.filter(d => owner.matches(d) && (!motion || d.motion === motion))
   const ctx = d => ({ lastSend: lastByDeal[d.id], prep: prepByDeal[d.id], skip: skipByDeal[d.id], dayStart })
 
   // What went out today, in order, whoever's it is.
   const sentToday = today
-    .map(s => { const d = deals.find(x => x.id === s.attioDealId); return d ? { ...shape(d, ctx(d)), sentAt: s.sentAt, sentSubject: s.subject } : null })
+    .map(s => { const d = s.attioDealId && deals.find(x => x.id === s.attioDealId); return d ? { ...shape(d, ctx(d)), sentAt: s.sentAt, sentSubject: s.subject } : null })
     .filter(Boolean)
     .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt))
 
   // New outreach: not yet contacted, someone to write to, not skipped.
-  const fresh_ = inScope
+  // "Not Contacted" is only believed when Attio's inbox sync agrees: a deal
+  // whose company or person already has an email interaction was written
+  // to before the stage was kept, and is not a first touch.
+  const notContacted = inScope
     .filter(d => OPEN_FOR_OUTREACH.includes(d.stage) && !sentTodayIds.has(d.id) && !skipByDeal[d.id])
     .map(d => shape(d, ctx(d)))
+  const contactedBefore = notContacted.filter(d => d.lastSentAt)
+  const fresh_ = notContacted.filter(d => !d.lastSentAt)
   const newReady = fresh_.filter(d => d.hasEmail).sort((a, b) =>
     Number(b.hasPrep) - Number(a.hasPrep)
     || (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9)
@@ -215,6 +230,7 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
     later,
     exhausted,
     needsContact,
+    contactedBefore: contactedBefore.sort((a, b) => String(b.lastSentAt).localeCompare(String(a.lastSentAt))),
     skipped: skippedToday,
     counts: {
       deals: deals.length,
@@ -278,4 +294,20 @@ export async function progress(actor, { scopeMode = 'mine' } = {}) {
     { stage: 'Won', count: at('Won') },
   ]
   return { days, totals: { sent: sent.length, won: at('Won'), inConversation: at('In Conversation', 'Call Booked', 'Deck Sent') }, funnel, byStage }
+}
+
+/**
+ * Find a deal to write to outside the queue: any stage, matched on the deal
+ * name, the company, or a person's name or address. For "New email".
+ */
+export async function searchDeals(q, { limit = 12 } = {}) {
+  const needle = String(q || '').trim().toLowerCase()
+  if (needle.length < 2) return []
+  const deals = await loadDeals()
+  const hit = d => [d.name, d.company?.name, ...d.people.flatMap(p => [p.fullName, ...(p.emails || [])])]
+    .some(v => v && String(v).toLowerCase().includes(needle))
+  return deals.filter(hit).slice(0, limit).map(d => {
+    const person = primaryPerson(d)
+    return { id: d.id, name: d.name, stage: d.stage, motion: d.motion, ownerId: d.ownerId, webUrl: d.webUrl, person: person ? { fullName: person.fullName, email: person.email } : null, peopleLoaded: d.peopleLoaded }
+  })
 }

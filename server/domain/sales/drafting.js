@@ -21,7 +21,7 @@ import { getSettings, getSenderFor } from './settings.js'
 import { getTemplates } from './templates.js'
 import { recordSend } from './attio.js'
 import { dealForWork, nextStepFor, pipelineOf } from './queue.js'
-import { draftProblems } from './guardrails.js'
+import { draftProblems, NO_DASHES } from './guardrails.js'
 
 const VARIANT_COUNT = 5
 
@@ -256,22 +256,30 @@ export function requiresImage(pipeline, touchNumber) {
  * then Attio. The undo window happens in the client; here the decision is
  * final.
  */
-export async function sendDraft({ dealId, personId, subject, body, assetIds = [], actor }) {
+/**
+ * `adhoc` is a rep writing to a deal outside the queue: any stage, any
+ * point in the sequence. It still logs, still tells Attio, still moves Not
+ * Contacted to Reached Out; it just does not stamp a next action, because
+ * a person chose to write and knows what comes next.
+ */
+export async function sendDraft({ dealId, personId, subject, body, assetIds = [], actor, adhoc = false }) {
   if (!actor?.id) throw new Error('Sending needs a signed-in person with a connected Gmail')
   if (!subject?.trim() || !body?.trim()) throw new Error('Subject and body are required')
   const deal = await dealForWork(dealId, { fresh: true })
   const person = (personId && deal.people.find(p => p.id === personId)) || deal.person
   if (!person) throw new Error('This deal has nobody to write to')
   if (!person.email) throw new Error(`${person.fullName || 'This person'} has no email address in Attio`)
-  if (!['Not Contacted', 'Needs Enrichment', 'Reached Out'].includes(deal.stage)) {
-    throw new Error(`${deal.name} is at ${deal.stage}. The sequence only runs up to Reached Out; write to them from Gmail.`)
+  if (!adhoc && !['Not Contacted', 'Needs Enrichment', 'Reached Out'].includes(deal.stage)) {
+    throw new Error(`${deal.name} is at ${deal.stage}. The sequence only runs up to Reached Out; use New email to write to them.`)
   }
 
   const status = await gmailStatus(actor.id)
   if (!status.connected) throw new Error('Gmail is not connected. Open Settings and press Connect Gmail.')
 
-  const { touchNumber, step, exhausted } = nextStepFor(deal)
-  if (exhausted) throw new Error(`${deal.name} has finished its sequence. Change its stage in Attio instead of sending another touch.`)
+  const { touchNumber: nextTouch, step, exhausted } = nextStepFor(deal)
+  if (exhausted && !adhoc) throw new Error(`${deal.name} has finished its sequence. Change its stage in Attio instead of sending another touch.`)
+  // Past the cadence, an ad hoc email still counts as one more touch.
+  const touchNumber = exhausted ? deal.touchCount + 1 : nextTouch
   const pipeline = pipelineOf(deal)
 
   const problems = draftProblems({ subject, body }, { pipeline, touchNumber, companyName: deal.name })
@@ -318,8 +326,8 @@ export async function sendDraft({ dealId, personId, subject, body, assetIds = []
 
   const now = new Date()
   const cadence = cadenceFor(pipeline)
-  const nextActionDate = new Date(now.getTime() + step.nextActionDays * 86400000)
-  const nextAction = touchNumber >= cadence.length
+  const nextActionDate = adhoc ? null : new Date(now.getTime() + step.nextActionDays * 86400000)
+  const nextAction = adhoc ? null : touchNumber >= cadence.length
     ? 'Sequence complete: decide next year vs. lost'
     : `Send touch ${touchNumber + 1}: ${cadence[touchNumber].angle}`
 
@@ -334,7 +342,7 @@ export async function sendDraft({ dealId, personId, subject, body, assetIds = []
       attioPersonId: person.id,
       toEmail: person.email,
       touchNumber,
-      angle: step.angle,
+      angle: adhoc ? 'adhoc' : step.angle,
       subject: subject.trim(),
       body: body.trim(),
       attachments: attached,
@@ -353,6 +361,45 @@ export async function sendDraft({ dealId, personId, subject, body, assetIds = []
   await prisma.salesSkip.deleteMany({ where: { attioDealId: deal.id } })
 
   return { send: { id: send.id, touchNumber, sentAt: now, gmailThreadId: sent.threadId }, attached, sync }
+}
+
+/**
+ * A one-off email to an address with no deal behind it. Same mailbox, same
+ * signature, same attachments and undo; logged so "sent today" is right;
+ * nothing written to Attio because there is nothing to write it to. The
+ * house rule on dashes still holds; the pipeline rules do not, since this
+ * is not a cadence email.
+ */
+export async function sendFree({ to, subject, body, assetIds = [], actor }) {
+  if (!actor?.id) throw new Error('Sending needs a signed-in person with a connected Gmail')
+  const address = String(to || '').trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new Error('That is not an email address')
+  if (!subject?.trim() || !body?.trim()) throw new Error('Subject and body are required')
+  if (NO_DASHES.test(subject) || NO_DASHES.test(body)) throw new Error('No em or en dashes. Use a comma or a full stop.')
+  const status = await gmailStatus(actor.id)
+  if (!status.connected) throw new Error('Gmail is not connected. Open Settings and press Connect Gmail.')
+
+  const attachments = []
+  const attached = []
+  for (const id of [...new Set((assetIds || []).map(String).filter(Boolean))]) {
+    if (!isAssetStorageConfigured()) break
+    attachments.push(await readAsset(id)); attached.push(id)
+  }
+  if (attachments.reduce((n, a) => n + a.bytes.length, 0) > 18 * 1024 * 1024) throw new Error('Attachments add up to more than 18 MB, which Gmail will bounce. Drop one.')
+
+  const sender = await getSenderFor(actor.id, actor)
+  const html = composeHtml(body, { signature: sender.signature, senderName: sender.name })
+  const sent = await sendMessage({ userId: actor.id, to: address, subject: subject.trim(), html, attachments })
+  const now = new Date()
+  const send = await prisma.salesSend.create({
+    data: {
+      attioDealId: null, attioPersonId: null, toEmail: address, touchNumber: 0, angle: 'free',
+      subject: subject.trim(), body: body.trim(), attachments: attached,
+      gmailMessageId: sent.gmailMessageId, gmailThreadId: sent.threadId, rfcMessageId: sent.rfcMessageId,
+      sentAt: now, sentById: actor.id, sentByEmail: actor.email || null, attioOk: true,
+    },
+  })
+  return { send: { id: send.id, touchNumber: 0, sentAt: now, gmailThreadId: sent.threadId }, attached, sync: { ok: true } }
 }
 
 /** What would stop this draft going, as plain reasons. Empty means it passes. */

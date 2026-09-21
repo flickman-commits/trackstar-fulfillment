@@ -120,6 +120,8 @@ export interface TodayPayload {
   later: Deal[]
   exhausted: Deal[]
   needsContact: Deal[]
+  /** Stage says Not Contacted, but Attio's inbox sync shows email history. Fix the stage in Attio. */
+  contactedBefore: Deal[]
   skipped: Deal[]
   counts: { deals: number; inScope: number; byStage: Record<string, number>; week: { sent: number } }
   overnight: OvernightRun | null

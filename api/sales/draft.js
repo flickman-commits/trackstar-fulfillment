@@ -5,11 +5,12 @@
  *   POST { action:'variants', dealId, personId?, useTemplate?, force? }   drafts for the next touch
  *   POST { action:'check', dealId, subject, body }         guardrail reasons, no side effects
  *   POST { action:'revise', dealId, subject, body, instruction }   the model rewrites to an instruction
- *   POST { action:'send', dealId, personId, subject, body, assetIds? }   sends through your Gmail. Final.
+ *   POST { action:'send', dealId, personId, subject, body, assetIds?, adhoc? }   sends through your Gmail. Final.
+ *   POST { action:'send-to', to, subject, body, assetIds? }        a one-off to any address, no deal
  */
 import { setCors } from '../_lib/auth.js'
 import { requireSalesRep } from '../_lib/users.js'
-import { draftVariants, sendDraft, checkDraft, reviseDraft } from '../../server/domain/sales/drafting.js'
+import { draftVariants, sendDraft, sendFree, checkDraft, reviseDraft } from '../../server/domain/sales/drafting.js'
 import { llmInfo } from '../../server/lib/llm.js'
 import { gmailStatus } from '../../server/domain/sales/gmail.js'
 import { isAttioConfigured, memberForEmail } from '../../server/domain/sales/attio.js'
@@ -37,6 +38,9 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
+    if (body.action === 'send-to') {
+      return res.status(200).json(await sendFree({ to: String(body.to || ''), subject: String(body.subject || ''), body: String(body.body || ''), assetIds: Array.isArray(body.assetIds) ? body.assetIds.map(String) : [], actor }))
+    }
     const dealId = String(body.dealId || '')
     if (!dealId) return res.status(400).json({ error: 'dealId is required' })
 
@@ -65,6 +69,7 @@ export default async function handler(req, res) {
         body: String(body.body || ''),
         assetIds: Array.isArray(body.assetIds) ? body.assetIds.map(String) : [],
         actor,
+        adhoc: Boolean(body.adhoc),
       }))
     }
     return res.status(400).json({ error: `Unknown action: ${body.action}` })

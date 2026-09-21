@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, ExternalLink } from 'lucide-react'
-import { salesApi, SalesApiError } from '@/lib/salesApi'
+import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, ExternalLink, PenLine } from 'lucide-react'
+import { salesApi, SalesApiError, type DealHit } from '@/lib/salesApi'
 import { btnSecondary, btnGhost } from '@/lib/ui'
 import type { Asset, Deal, DraftResult, Motion, Person, SalesStatus, Stage, TodayPayload, Variant } from '@/types/sales'
 import Queue, { type QueueMode } from '@/components/sales/Queue'
@@ -11,6 +11,7 @@ import WhoPane from '@/components/sales/WhoPane'
 import LibraryPanel from '@/components/sales/LibraryPanel'
 import SettingsModal from '@/components/sales/SettingsModal'
 import ProgressModal from '@/components/sales/ProgressModal'
+import NewEmail from '@/components/sales/NewEmail'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 
 /**
@@ -55,6 +56,9 @@ export default function Sales() {
   const [attached, setAttached] = useState<Record<string, string[]>>({})
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [progressOpen, setProgressOpen] = useState(false)
+  const [newOpen, setNewOpen] = useState(false)
+  // Written from New email: a deal at any stage, or a bare address as a synthetic deal.
+  const [adhoc, setAdhoc] = useState<Deal | null>(null)
   const [busy, setBusy] = useState(false)
   const [aiOn, setAiOn] = useState<boolean>(() => { try { return localStorage.getItem(AI_KEY) !== 'off' } catch { return true } })
   const [problems, setProblems] = useState<string[] | null>(null)
@@ -89,13 +93,13 @@ export default function Sales() {
     catch { /* the library is optional */ }
   }, [])
 
-  useEffect(() => { loadStatus() }, [loadStatus])
+  useEffect(() => { loadStatus(); loadAssets() }, [loadStatus, loadAssets])
   useEffect(() => { loadToday() }, [loadToday])
 
   // The list I/K walks: the active pill's rows, with sent-today first on New.
   const items: Deal[] = useMemo(() => {
     if (!today) return []
-    if (mode === 'new') return [...today.sentToday, ...today.newOutreach, ...today.needsContact]
+    if (mode === 'new') return [...today.sentToday, ...today.newOutreach, ...today.contactedBefore, ...today.needsContact]
     return [...today.followUps, ...today.later, ...today.exhausted]
   }, [mode, today])
   const sentIds = useMemo(() => new Set(today?.sentToday.map(d => d.id) || []), [today])
@@ -109,35 +113,40 @@ export default function Sales() {
   }, [items, selectedId, sentIds, pendingIds])
 
   const selected = useMemo(() => items.find(d => d.id === selectedId) || null, [items, selectedId])
-  const deal: Deal | null = useMemo(() => (detail && detail.id === selectedId ? { ...selected, ...detail } : selected), [detail, selected, selectedId])
+  const deal: Deal | null = useMemo(() => adhoc || (detail && detail.id === selectedId ? { ...selected, ...detail } : selected), [adhoc, detail, selected, selectedId])
   const person: Person | null = useMemo(() => {
     if (!deal) return null
     return deal.people.find(p => p.id === personId) || deal.person || deal.people[0] || null
   }, [deal, personId])
 
   const aiActive = aiOn && Boolean(status?.llm.configured)
-  const current = selectedId ? prepared[selectedId] : undefined
+  const current = deal ? prepared[deal.id] : undefined
   const variants = useMemo(() => current?.variants || [], [current])
   const cap = today?.cap ?? 10
   const sentCount = today?.sentTodayCount ?? 0
   const capReached = sentCount + pendingIds.size >= cap
   const gmailConnected = Boolean(status?.gmail.connected)
-  const attachedAssets = useMemo(() => (selectedId ? (attached[selectedId] || []) : []).map(id => assets.find(a => a.id === id)).filter((a): a is Asset => Boolean(a)), [attached, selectedId, assets])
+  const attachedAssets = useMemo(() => (deal ? (attached[deal.id] || []) : []).map(id => assets.find(a => a.id === id)).filter((a): a is Asset => Boolean(a)), [attached, deal, assets])
   const suggested = useMemo(() => assets.find(a => a.id === suggestedId) || null, [assets, suggestedId])
 
-  /** Draft one deal: the overnight draft if there is one, else template or model. */
+  /**
+   * Draft one deal. A click shows the overnight draft if there is one, else
+   * the template, at once and with no model call; the model only writes
+   * when a rep presses Rewrite (`force`).
+   */
   const prepare = useCallback(async (d: Deal, opts: { silent: boolean; force?: boolean; personId?: string | null }) => {
     const target = (opts.personId && d.people.find(p => p.id === opts.personId)) || d.person
     if (!target?.email || d.exhausted) return
     const key = `${d.id}:${target.id}`
     if (inFlight.current.has(key)) return
     const cached = prepared[d.id]
-    if (!opts.force && cached && (cached.template === !aiActive || cached.draft.source === 'prepared')) return
+    if (!opts.force && cached) return
+    const useModel = Boolean(opts.force) && aiActive
     inFlight.current.add(key)
     if (!opts.silent) setDrafting(true)
     try {
-      const draft = await salesApi.variants(d.id, target.id, !aiActive, Boolean(opts.force))
-      setPrepared(prev => ({ ...prev, [d.id]: { draft, variants: draft.variants, template: !aiActive } }))
+      const draft = await salesApi.variants(d.id, target.id, !useModel, Boolean(opts.force))
+      setPrepared(prev => ({ ...prev, [d.id]: { draft, variants: draft.variants, template: !useModel } }))
       if (!opts.silent) { setVariantIndex(0); if (draft.warning) toast.warning(draft.warning) }
     } catch (e) {
       if (!opts.silent) toast.error(`Drafting failed: ${(e as Error).message}`)
@@ -149,6 +158,7 @@ export default function Sales() {
 
   // On selection: the full deal (history), the draft, the library's pick, and the next one quietly.
   useEffect(() => {
+    if (adhoc) return
     if (!selected) { setDetail(null); return }
     let cancelled = false
     setVariantIndex(0)
@@ -165,7 +175,27 @@ export default function Sales() {
     }
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id, status, aiActive])
+  }, [selected?.id, status, aiActive, adhoc])
+
+  /** New email: a deal from the search, at any stage. */
+  const pickDeal = useCallback(async (hit: DealHit) => {
+    setNewOpen(false)
+    try {
+      const r = await salesApi.deal(hit.id)
+      setAdhoc(r.deal); setPersonId(null); setVariantIndex(0); setProblems(null)
+      loadAssets(r.deal.id)
+      if (r.deal.person?.email) prepare({ ...r.deal, exhausted: false }, { silent: false })
+    } catch (e) { toast.error((e as Error).message) }
+  }, [prepare, loadAssets])
+  /** New email: a bare address. A synthetic deal so the composer has something to hold. */
+  const pickAddress = useCallback((email: string) => {
+    setNewOpen(false)
+    const id = `adhoc:${email.toLowerCase()}`
+    const person: Person = { id, firstName: '', lastName: '', fullName: email, email, emails: [email], title: null, description: null, linkedin: null, location: null, lastInteractionAt: null, lastEmailAt: null, webUrl: null }
+    const synthetic: Deal = { id, name: email, stage: 'Not Contacted', motion: null, pipeline: 'RACE', ownerId: null, company: null, people: [person], person, hasEmail: true, touchCount: 0, nextAction: null, nextActionDate: null, raceDate: null, runners: null, tier: null, sizeTier: null, priority: null, notes: null, value: null, units: null, createdAt: null, webUrl: null, nextTouchNumber: null, nextAngle: null, exhausted: false, lastSentAt: null, lastSubject: null, hasPrep: false, preparedAt: null, skippedUntil: null, overdueDays: 0, reason: 'One-off' }
+    setAdhoc(synthetic); setPersonId(null); setVariantIndex(0); setProblems(null); setSuggestedId(null)
+    setPrepared(prev => ({ ...prev, [id]: { draft: { touchNumber: 0, step: { angle: 'free', purpose: 'Whatever you want to say. Your signature is added on send.', subject: '', nextActionDays: 0 }, exhausted: false, variants: [], personId: id, dealId: id, model: 'you' }, variants: [{ subject: '', body: 'Hey there,\n\n' }], template: true } }))
+  }, [])
 
   const moveTo = useCallback((delta: number) => {
     if (!items.length) return
@@ -183,7 +213,7 @@ export default function Sales() {
 
   const checkDraft = useCallback(async () => {
     const v = variants[variantIndex]
-    if (!deal || !v) { setProblems(null); return }
+    if (!deal || !v || deal.id.startsWith('adhoc:')) { setProblems(null); return }
     setChecking(true)
     try { setProblems((await salesApi.check({ dealId: deal.id, subject: v.subject, body: v.body })).problems) }
     catch { setProblems(null) }
@@ -204,24 +234,26 @@ export default function Sales() {
     if (capReached) { toast.error(`That is ${cap} for today. Raise the cap in Settings if you mean to.`); return }
     if (problems && problems.length) { toast.error(problems[0]); return }
     const assetIds = attachedAssets.map(a => a.id)
-    const payload = { dealId: deal.id, personId: person.id, subject: v.subject, body: v.body, assetIds }
+    const isAdhoc = Boolean(adhoc)
+    const free = deal.id.startsWith('adhoc:')
+    const payload = { dealId: deal.id, personId: person.id, subject: v.subject, body: v.body, assetIds, adhoc: isAdhoc }
     const id = deal.id
     const first = person.firstName || person.fullName
     const undo = today?.undoSeconds ?? 10
 
     setPendingIds(prev => new Set(prev).add(id))
-    advance(id)
+    if (isAdhoc) setAdhoc(null); else advance(id)
 
     const fire = async () => {
       try {
-        const r = await salesApi.send(payload)
+        const r = free ? await salesApi.sendTo({ to: person.email as string, subject: v.subject, body: v.body, assetIds }) : await salesApi.send(payload)
         toast.success(`Sent to ${first}`)
         noteSync(r.sync)
         setPrepared(prev => { const n = { ...prev }; delete n[id]; return n })
         setAttached(prev => { const n = { ...prev }; delete n[id]; return n })
       } catch (e) {
         toast.error(`Not sent to ${first}: ${(e as Error).message}`, { duration: 8000 })
-        setSelectedId(id)
+        if (isAdhoc) setAdhoc(deal); else setSelectedId(id)
       } finally {
         setPendingIds(prev => { const n = new Set(prev); n.delete(id); return n })
         delete timers.current[id]
@@ -246,13 +278,14 @@ export default function Sales() {
     } else {
       fire()
     }
-  }, [variants, variantIndex, deal, person, pendingIds, gmailConnected, capReached, cap, attachedAssets, today?.undoSeconds, advance, loadToday, problems])
+  }, [variants, variantIndex, deal, person, pendingIds, gmailConnected, capReached, cap, attachedAssets, today?.undoSeconds, advance, loadToday, problems, adhoc])
 
   const skip = useCallback(async (reason?: string) => {
     if (!deal) return
+    if (adhoc) { setAdhoc(null); return }
     try { await salesApi.skip(deal.id, reason); toast.message(`${deal.name} moved to tomorrow`); advance(deal.id); loadToday() }
     catch (e) { toast.error((e as Error).message) }
-  }, [deal, advance, loadToday])
+  }, [deal, advance, loadToday, adhoc])
 
   const setStage = useCallback(async (stage: Stage) => {
     if (!deal) return
@@ -279,7 +312,7 @@ export default function Sales() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(); return }
       const t = e.target as HTMLElement
       if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable) return
-      if (settingsOpen || progressOpen) return
+      if (settingsOpen || progressOpen || newOpen) return
       switch (e.key.toLowerCase()) {
         case 'i': e.preventDefault(); moveTo(-1); break
         case 'k': e.preventDefault(); moveTo(1); break
@@ -290,14 +323,14 @@ export default function Sales() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [send, skip, setStage, moveTo, variants.length, settingsOpen, progressOpen])
+  }, [send, skip, setStage, moveTo, variants.length, settingsOpen, progressOpen, newOpen])
 
   const updateVariant = (v: Variant) => {
-    if (!selectedId || !current) return
+    if (!deal || !current) return
     const next = current.variants.slice(); next[variantIndex] = v
-    setPrepared(prev => ({ ...prev, [selectedId]: { ...current, variants: next } }))
+    setPrepared(prev => ({ ...prev, [deal.id]: { ...current, variants: next } }))
   }
-  const rewrite = () => { if (deal) prepare(deal, { silent: false, force: true, personId }) }
+  const rewrite = () => { if (deal && !deal.id.startsWith('adhoc:')) prepare({ ...deal, exhausted: adhoc ? false : deal.exhausted }, { silent: false, force: true, personId }) }
   const revise = async (instruction: string) => {
     const v = variants[variantIndex]
     if (!deal || !v) return
@@ -308,16 +341,18 @@ export default function Sales() {
     } catch (e) { toast.error((e as Error).message) }
   }
   const attach = (a: Asset) => {
-    if (!selectedId) return
-    setAttached(prev => ({ ...prev, [selectedId]: [...new Set([...(prev[selectedId] || []), a.id])] }))
+    if (!deal) return
+    const k = deal.id
+    setAttached(prev => ({ ...prev, [k]: [...new Set([...(prev[k] || []), a.id])] }))
   }
   const detach = (id: string) => {
-    if (!selectedId) return
-    setAttached(prev => ({ ...prev, [selectedId]: (prev[selectedId] || []).filter(x => x !== id) }))
+    if (!deal) return
+    const k = deal.id
+    setAttached(prev => ({ ...prev, [k]: (prev[k] || []).filter(x => x !== id) }))
   }
 
-  const isSent = Boolean(selectedId && sentIds.has(selectedId))
-  const queueClear = today && (mode === 'new' ? today.newOutreach.length === 0 : today.followUps.length === 0) && pendingIds.size === 0
+  const isSent = Boolean(!adhoc && selectedId && sentIds.has(selectedId))
+  const queueClear = !adhoc && today && (mode === 'new' ? today.newOutreach.length === 0 : today.followUps.length === 0) && pendingIds.size === 0
 
   return (
     <div className="min-h-screen lg:h-screen flex flex-col px-4 md:px-6 py-4 max-w-[1700px]">
@@ -343,6 +378,7 @@ export default function Sales() {
           <select value={motion || ''} onChange={e => setMotion((e.target.value || null) as Motion | null)} className="text-xs bg-transparent text-off-black/60 focus:outline-none" title="One motion only">
             <option value="">All motions</option><option value="Race">Race</option><option value="Charity">Charity</option><option value="Corporate">Corporate</option>
           </select>
+          <button onClick={() => setNewOpen(true)} className={btnSecondary} title="Write to any deal, or any address"><PenLine className="w-3.5 h-3.5" /> New email</button>
           <button onClick={() => loadToday(true)} className={btnGhost} title="Re-read Attio"><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /></button>
           <button onClick={() => setProgressOpen(true)} className={btnGhost}><BarChart3 className="w-3.5 h-3.5" /> Progress</button>
           <button onClick={() => setSettingsOpen(true)} className={btnGhost} title="Settings"><SlidersHorizontal className="w-3.5 h-3.5" /></button>
@@ -365,7 +401,7 @@ export default function Sales() {
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3">
         <Queue mode={mode} onMode={setMode} scope={scope} onScope={setScope} today={today} pendingSendIds={pendingIds} selectedId={selectedId} onSelect={setSelectedId} loading={loading} />
 
-        {queueClear && !selected ? (
+        {queueClear && !selected && !adhoc ? (
           <div className="flex-1 min-w-0 flex items-center justify-center rounded-lg border border-border-gray bg-white min-h-[320px]">
             <div className="text-center max-w-[44ch] px-6">
               <Check className="w-8 h-8 mx-auto text-success-green mb-2" />
@@ -396,7 +432,7 @@ export default function Sales() {
             attachments={attachedAssets} onAttach={attach} onDetach={detach} suggested={suggested}
             onChange={updateVariant}
             onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-            onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip}
+            onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} adhoc={Boolean(adhoc)}
           />
         )}
 
@@ -412,6 +448,7 @@ export default function Sales() {
 
       {settingsOpen && <SettingsModal status={status} aiOn={aiOn} onAiChange={setAiOn} onClose={() => { setSettingsOpen(false); loadStatus(); loadToday() }} />}
       {progressOpen && <ProgressModal scope={scope} onClose={() => setProgressOpen(false)} />}
+      {newOpen && <NewEmail onPickDeal={pickDeal} onPickAddress={pickAddress} onClose={() => setNewOpen(false)} />}
     </div>
   )
 }

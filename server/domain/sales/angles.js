@@ -148,13 +148,27 @@ export function cadenceFor(pipeline) {
  * name that happens to match the local part ("sam@teamfox.org") is fine.
  */
 export function greetingName(contact) {
+  return looksLikeMailbox(contact) ? 'there' : (contact?.firstName || '').trim()
+}
+
+/**
+ * Whether the "name" on a person is really their mailbox. Two tells: it is
+ * the local part of their own address ("lmcelrath" for lmcelrath@akron...)
+ * with no surname or no capital letter, or it is a role inbox word. "Sam"
+ * at sam@teamfox.org, capitalised with a surname, is a person.
+ */
+export function looksLikeMailbox(contact) {
   const raw = (contact?.firstName || '').trim()
-  if (!raw) return 'there'
-  const looksLikeMailbox = /[.@_\d]/.test(raw)
-    || /^(info|hello|contact|events|race|team|admin|office|marketing|press)$/i.test(raw)
+  if (!raw) return true
+  const local = (contact?.email || '').split('@')[0].toLowerCase()
+  const sameAsLocal = local && raw.toLowerCase() === local
+  const hasSurname = Boolean((contact?.lastName || '').trim())
+  const capitalised = /^[A-Z]/.test(raw)
+  return /[.@_\d]/.test(raw)
+    || /^(info|hello|contact|events|race|team|admin|office|marketing|press|sponsorship|development)$/i.test(raw)
+    || (sameAsLocal && (!hasSurname || !capitalised))
     || raw.length < 2
     || raw.length > 20
-  return looksLikeMailbox ? 'there' : raw
 }
 
 /**

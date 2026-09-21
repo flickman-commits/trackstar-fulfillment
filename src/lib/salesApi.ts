@@ -28,6 +28,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 
+/** A deal found for New email: any stage. */
+export interface DealHit { id: string; name: string | null; stage: string | null; motion: string | null; ownerId: string | null; webUrl: string | null; person: { fullName: string; email: string | null } | null }
+
 /** After a send: whether Attio now agrees. */
 export interface SyncResult { ok: boolean; skipped?: string; error?: string }
 
@@ -42,6 +45,7 @@ export const salesApi = {
     return request<TodayPayload>(`/api/sales/today?${params}`)
   },
   deal: (id: string, refresh = false) => request<{ deal: Deal }>(`/api/sales/today?action=deal&id=${encodeURIComponent(id)}${refresh ? '&refresh=1' : ''}`),
+  search: (q: string) => request<{ deals: DealHit[] }>(`/api/sales/today?action=search&q=${encodeURIComponent(q)}`),
   progress: (scope: 'mine' | 'all' = 'mine') => request<Progress>(`/api/sales/today?action=progress&scope=${scope}`),
   skip: (id: string, reason?: string) => post<{ success: true; until: string }>('/api/sales/today', { action: 'skip', id, reason }),
   unskip: (id: string) => post<{ success: true }>('/api/sales/today', { action: 'unskip', id }),
@@ -56,8 +60,11 @@ export const salesApi = {
   revise: (body: { dealId: string; subject: string; body: string; instruction: string }) =>
     post<{ subject: string; body: string; model: string }>('/api/sales/draft', { action: 'revise', ...body }),
   /** Sends through the connected Gmail. Final; the undo window is the caller's. */
-  send: (body: { dealId: string; personId: string; subject: string; body: string; assetIds: string[] }) =>
+  send: (body: { dealId: string; personId: string; subject: string; body: string; assetIds: string[]; adhoc?: boolean }) =>
     post<{ send: { id: string; touchNumber: number; sentAt: string; gmailThreadId: string | null }; attached: string[]; sync: SyncResult }>('/api/sales/draft', { action: 'send', ...body }),
+  /** A one-off to any address. No deal, nothing written to Attio. */
+  sendTo: (body: { to: string; subject: string; body: string; assetIds: string[] }) =>
+    post<{ send: { id: string; touchNumber: number; sentAt: string; gmailThreadId: string | null }; attached: string[]; sync: SyncResult }>('/api/sales/draft', { action: 'send-to', ...body }),
 
   assets: (dealId?: string, refresh = false) => {
     const params = new URLSearchParams()

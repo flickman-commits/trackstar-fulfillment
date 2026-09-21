@@ -22,7 +22,7 @@ export default function Composer({
   deal, person, draft, variants, index, drafting, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach, suggested,
-  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip,
+  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc,
 }: {
   deal: Deal | null
   person: Person | null
@@ -48,6 +48,8 @@ export default function Composer({
   onRevise: (instruction: string) => Promise<void>
   onSend: () => void
   onSkip: (reason?: string) => void
+  /** Written from New email, outside the queue: any stage is fine, Skip means close. */
+  adhoc?: boolean
 }) {
   const [whyOpen, setWhyOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
@@ -69,7 +71,7 @@ export default function Composer({
   const who = person ? person.fullName || `${person.firstName} ${person.lastName}`.trim() : 'Nobody to email'
 
   // Past Reached Out, a person is talking. That happens in Gmail and Attio.
-  if (!['Not Contacted', 'Needs Enrichment', 'Reached Out'].includes(String(deal.stage))) {
+  if (!adhoc && !['Not Contacted', 'Needs Enrichment', 'Reached Out'].includes(String(deal.stage))) {
     return (
       <div className="flex-1 min-w-0 flex flex-col rounded-lg border border-border-gray bg-white">
         <div className="px-4 py-3 border-b border-border-gray">
@@ -89,9 +91,9 @@ export default function Composer({
   const hasImage = attachments.some(a => a.kind === 'image')
   const missingRequired = imageRequired && !hasImage && !suggested
   const blocked = Boolean(problems && problems.length)
-  const sendDisabled = !current || drafting || !person?.email || missingRequired || !canSend || blocked || deal.exhausted
+  const sendDisabled = !current || drafting || !person?.email || missingRequired || !canSend || blocked || (deal.exhausted && !adhoc)
   const sendTitle = blocked ? (problems as string[])[0]
-    : deal.exhausted ? 'The sequence has run out. Decide the stage on the right.'
+    : deal.exhausted && !adhoc ? 'The sequence has run out. Decide the stage on the right.'
     : !gmailConnected ? 'Connect Gmail in Settings to send'
     : capReached ? 'Today\'s cap is reached. Raise it in Settings if you mean to.'
     : missingRequired ? 'A charity first touch has to carry a co-branded example'
@@ -126,11 +128,12 @@ export default function Composer({
           </div>
           <div className="text-xs text-off-black/55 mt-0.5 flex flex-wrap items-center gap-x-2">
             <span>{person?.email || <span className="text-red-600">{deal.genericOnly ? 'Only a generic inbox in Attio. Find a person.' : 'No email in Attio'}</span>}</span>
+            {adhoc && <span className="px-1.5 py-0.5 rounded bg-subtle-gray border border-border-gray text-off-black/70">{deal.id.startsWith('adhoc:') ? 'One-off, no deal' : `Outside the queue · ${deal.stage}`}</span>}
             {draft && (
               <>
-                <span className="px-1.5 py-0.5 rounded bg-subtle-gray border border-border-gray text-off-black/70">
+                {!adhoc && <span className="px-1.5 py-0.5 rounded bg-subtle-gray border border-border-gray text-off-black/70">
                   {draft.touchNumber === 1 ? 'First touch' : `Follow-up ${draft.touchNumber - 1}`}
-                </span>
+                </span>}
                 {draft.source === 'prepared' && <span>written overnight</span>}
                 {draft.source === 'template' && <span className="text-amber-700">template, fill in the opener</span>}
                 {draft.source === 'model' && <span>written just now</span>}
@@ -222,8 +225,8 @@ export default function Composer({
 
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-t border-border-gray bg-subtle-gray rounded-b-lg">
         <div className="flex items-center gap-1 relative">
-          <button onClick={() => setSkipOpen(o => !o)} className={btnGhost} title="Hide until tomorrow">Skip today <kbd className={kbdDark}>S</kbd></button>
-          {skipOpen && (
+          {adhoc ? <button onClick={() => onSkip()} className={btnGhost} title="Back to the queue">Close <kbd className={kbdDark}>S</kbd></button> : <button onClick={() => setSkipOpen(o => !o)} className={btnGhost} title="Hide until tomorrow">Skip today <kbd className={kbdDark}>S</kbd></button>}
+          {skipOpen && !adhoc && (
             <form
               className="absolute bottom-full left-0 mb-2 w-72 rounded-lg border border-border-gray bg-white shadow-lg p-3 flex flex-col gap-2 z-10"
               onSubmit={e => { e.preventDefault(); onSkip(skipReason.trim() || undefined); setSkipOpen(false); setSkipReason('') }}

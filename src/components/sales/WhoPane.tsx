@@ -32,6 +32,8 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
   useEffect(() => { setNote(''); setHistoryOpen(false); setNoteOpen(false) }, [deal?.id])
 
   if (!deal) return null
+  // A one-off to a bare address: nothing in Attio to show or move.
+  const free = deal.id.startsWith('adhoc:')
 
   const sends = deal.sends || []
   const facts: Array<[string, string]> = []
@@ -86,7 +88,7 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
         </section>
       )}
 
-      <section className="rounded-lg border border-border-gray bg-white px-3.5 py-3">
+      {!free && <section className="rounded-lg border border-border-gray bg-white px-3.5 py-3">
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className={`${fieldLabel} mb-0`}>Stage</span>
           <select value={String(deal.stage || '')} onChange={e => onStage(e.target.value as Stage)} disabled={busy} className={`${inputBase} text-xs py-1 max-w-[170px]`}>
@@ -102,7 +104,7 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
           </dl>
         )}
         {deal.nextAction && <p className="text-[11.5px] text-off-black/55 mt-1.5 leading-snug">{deal.nextAction}</p>}
-      </section>
+      </section>}
 
       {sends.length > 0 && (
         <section className="rounded-lg border border-border-gray bg-white px-3.5 py-2">
@@ -124,7 +126,7 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
         </section>
       )}
 
-      <section className="rounded-lg border border-border-gray bg-white px-3.5 py-2">
+      {!free && <section className="rounded-lg border border-border-gray bg-white px-3.5 py-2">
         <button onClick={() => setNoteOpen(o => !o)} className="w-full flex items-center justify-between text-xs font-semibold text-off-black/70">
           <span>Add a note to the deal</span>{noteOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
@@ -134,7 +136,7 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
             <div className="flex justify-end"><button type="submit" disabled={busy || !note.trim()} className={btnGhost}>{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save to Attio'}</button></div>
           </form>
         )}
-      </section>
+      </section>}
     </div>
   )
 }

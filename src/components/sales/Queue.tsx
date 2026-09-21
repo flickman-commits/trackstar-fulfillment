@@ -84,7 +84,7 @@ export default function Queue({
   scope: 'mine' | 'all'; onScope: (s: 'mine' | 'all') => void
   today: {
     sentToday: Deal[]; newOutreach: Deal[]; newWaiting: number; followUps: Deal[]; later: Deal[]; exhausted: Deal[]
-    needsContact: Deal[]; skipped: Deal[]; overnight: OvernightRun | null; cap: number; member: { id: string; email: string; name: string } | null
+    needsContact: Deal[]; contactedBefore: Deal[]; skipped: Deal[]; overnight: OvernightRun | null; cap: number; member: { id: string; email: string; name: string } | null
   } | null
   pendingSendIds: Set<string>
   selectedId: string | null; onSelect: (id: string) => void
@@ -160,6 +160,9 @@ export default function Queue({
                 {today.newWaiting} more ready after today's {today.cap}. Raise the cap in Settings to see them.
               </div>
             )}
+            <Fold title="Emailed before · stage says Not Contacted" count={today.contactedBefore.length}>
+              {today.contactedBefore.map(d => <Row key={d.id} d={{ ...d, reason: `Last email ${fmtDay(String(d.lastSentAt).slice(0, 10))} in Attio · fix the stage` }} muted active={d.id === selectedId} onClick={() => onSelect(d.id)} />)}
+            </Fold>
             <Fold title="Need a person with an email" count={today.needsContact.length}>
               {today.needsContact.map(d => <Row key={d.id} d={{ ...d, reason: d.genericOnly ? 'Only a generic inbox · find a person in Attio' : 'No person with an email in Attio' }} muted active={d.id === selectedId} onClick={() => onSelect(d.id)} />)}
             </Fold>

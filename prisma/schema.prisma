@@ -752,7 +752,8 @@ model ToplineWaitlist {
 
 model SalesSend {
   id             String   @id @default(cuid())
-  attioDealId    String
+  // Null for a one-off email to an address with no deal behind it.
+  attioDealId    String?
   attioPersonId  String?
   toEmail        String
   touchNumber    Int

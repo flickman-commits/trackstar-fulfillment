@@ -4,6 +4,7 @@
  *   GET ?scope=mine|all&motion=Race|Charity   new outreach, follow-ups due, what went out, counts
  *   GET ?action=deal&id=                       one deal with its people, enrichment and send history
  *   GET ?action=progress                       sends per day and the stage spread, last 30 days
+ *   GET ?action=search&q=                      deals at any stage, for writing outside the queue
  *   GET ?refresh=1                             skip the short Attio cache
  *   POST { action:'skip', id, reason? }        hide until tomorrow
  *   POST { action:'unskip', id }
@@ -17,7 +18,7 @@ import prisma from '../_lib/prisma.js'
 import { setCors } from '../_lib/auth.js'
 import { requireSalesRep } from '../_lib/users.js'
 import { getSettings, startOfToday } from '../../server/domain/sales/settings.js'
-import { morningQueue, dealForWork, progress } from '../../server/domain/sales/queue.js'
+import { morningQueue, dealForWork, progress, searchDeals } from '../../server/domain/sales/queue.js'
 import { setStage, noteOnDeal, isAttioConfigured } from '../../server/domain/sales/attio.js'
 
 export default async function handler(req, res) {
@@ -33,6 +34,7 @@ export default async function handler(req, res) {
       const action = String(req.query?.action || '')
       const scopeMode = String(req.query?.scope || 'mine')
       if (action === 'progress') return res.status(200).json(await progress(actor, { scopeMode }))
+      if (action === 'search') return res.status(200).json({ deals: await searchDeals(String(req.query?.q || '')) })
       if (action === 'deal') {
         if (!req.query?.id) return res.status(400).json({ error: 'id is required' })
         return res.status(200).json({ deal: await dealForWork(String(req.query.id), { fresh: req.query?.refresh === '1' }) })
