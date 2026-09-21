@@ -130,6 +130,13 @@ export default function PricingCalculator() {
   // Bulk orders are single-variant — we do not sell mixed consignments — so
   // the roll-up is for one chosen row rather than a blended basket.
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  // How a bulk run ships. One consignment to the partner, or a parcel to
+  // each runner (the bulk-order flow). Individual shipping is Artelo's real
+  // single-unit rate; consignment shipping can be typed in when we have a
+  // quote, otherwise it is Artelo's rate for the run.
+  const [shipMode, setShipMode] = useState<'consignment' | 'individual'>('consignment')
+  const [bulkShippingOverride, setBulkShippingOverride] = useState('')
+  const [singleRows, setSingleRows] = useState<Record<string, number> | null>(null)
 
   // Retail always ships one at a time; bulk channels ship as one consignment.
   const effectiveQty = channel === 'retail' ? 1 : Math.max(1, Number(quantity) || 1)
@@ -150,6 +157,16 @@ export default function PricingCalculator() {
   }, [])
 
   useEffect(() => { load(effectiveQty) }, [load, effectiveQty])
+
+  // Single-unit shipping per size, for the per-runner mode. Fetched once.
+  useEffect(() => {
+    if (channel !== 'wholesale' || singleRows !== null) return
+    apiFetch(`${API_BASE}/api/products/pricing?quantity=1`).then(r => r.json()).then((json: PricingData) => {
+      const map: Record<string, number> = {}
+      for (const r of json.rows || []) if (!r.error) map[r.key] = r.orderShipping
+      setSingleRows(map)
+    }).catch(() => setSingleRows({}))
+  }, [channel, singleRows])
 
   const tiers = data?.assumptions.wholesaleTiers ?? []
   const activeTier = channel === 'wholesale'
@@ -183,7 +200,10 @@ export default function PricingCalculator() {
         ? base
         : roundHalfUp(base * (1 - (Number.isFinite(discountPct) ? discountPct : 0) / 100))
 
-      const unitShipping = r.orderShipping / qty
+      const overrideTotal = bulkShippingOverride.trim() === '' ? null : Number(bulkShippingOverride)
+      const unitShipping = channel === 'retail' ? r.orderShipping / qty
+        : shipMode === 'individual' ? (singleRows?.[r.key] ?? r.orderShipping / qty)
+        : (overrideTotal !== null && Number.isFinite(overrideTotal) ? overrideTotal : r.orderShipping) / qty
       // Package branding (insert + sticker) is a DTC touch. Bulk consignments
       // to charities and race partners go out plain, so it is not a cost there
       // at all — not merely amortized to something small.
@@ -208,7 +228,7 @@ export default function PricingCalculator() {
         gpPct: unitPrice > 0 ? (gp / unitPrice) * 100 : null,
       }
     })
-  }, [data, channel, discountPct, includePhoto])
+  }, [data, channel, discountPct, includePhoto, shipMode, bulkShippingOverride, singleRows])
 
   const selectable = useMemo(
     () => computed.filter(r => !r.offSheet),
@@ -327,6 +347,37 @@ export default function PricingCalculator() {
           <input type="checkbox" checked={includePhoto} onChange={e => setIncludePhoto(e.target.checked)} className="w-3.5 h-3.5" />
           Photo add-on {data ? `+${money(data.assumptions.photoAddOnPrice)}` : ''}
         </label>
+        {channel === 'wholesale' && (
+          <div className="basis-full flex flex-wrap items-end gap-4 pt-3 mt-1 border-t border-border-gray/70">
+            <div>
+              <label className={fieldLabel}>Ships</label>
+              <div className={segmentGroup}>
+                <button onClick={() => setShipMode('consignment')} className={segment(shipMode === 'consignment')}>One shipment to partner</button>
+                <button onClick={() => setShipMode('individual')} className={segment(shipMode === 'individual')}>To each runner</button>
+              </div>
+            </div>
+            {shipMode === 'consignment' ? (
+              <div>
+                <label className={fieldLabel}>Bulk shipping (whole run)</label>
+                <div className="flex items-center gap-2">
+                  <div className="relative w-28">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/40 text-xs">$</span>
+                    <input
+                      value={bulkShippingOverride}
+                      onChange={e => setBulkShippingOverride(e.target.value.replace(/[^0-9.]/g, ''))}
+                      inputMode="decimal"
+                      placeholder={selected ? selected.orderShipping.toFixed(2) : 'Artelo'}
+                      className={`${inputBase} w-full pl-6`}
+                    />
+                  </div>
+                  <span className="text-[11px] text-off-black/45">{bulkShippingOverride.trim() ? 'your quote' : `Artelo's rate for ${effectiveQty}`}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] text-off-black/55 pb-2">Each print ships on its own to the runner at Artelo's single-unit rate{singleRows === null ? ' (loading)' : ''}.</p>
+            )}
+          </div>
+        )}
       </div>
 
       {loading && !data && (
@@ -440,7 +491,9 @@ export default function PricingCalculator() {
             <p>
               {channel === 'retail'
                 ? 'Retail ships one print per order, so that unit carries the full shipping, the $0.80 package branding and the flat 30c of the payment fee.'
-                : `Bulk ships as one consignment of ${data.quantity}, so shipping and the flat 30c processing fee divide across the run, and package branding is not applied at all. Production cost does not fall with volume - Artelo gives no quantity discount.`}
+                : shipMode === 'individual'
+                  ? `Each of the ${data.quantity} prints ships separately to its runner at Artelo's single-unit rate, so shipping does not fall with volume. The flat 30c processing fee still divides across the run, and package branding is not applied. Production cost does not fall with volume - Artelo gives no quantity discount.`
+                  : `Bulk ships as one consignment of ${data.quantity}${bulkShippingOverride.trim() ? ` at your quoted ${money(Number(bulkShippingOverride))}` : ''}, so shipping and the flat 30c processing fee divide across the run, and package branding is not applied at all. Production cost does not fall with volume - Artelo gives no quantity discount.`}
             </p>
             <p>
               {channel === 'retail'
