@@ -784,17 +784,21 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                 <X className="w-3 h-3" strokeWidth={2.5} />
               )}
             </button>
-            {/* Relabel on hover only, so a batch of seven does not show seven text boxes. */}
+            {/* The label sits under the thumbnail, always visible, so what
+                each option is for can be read at a glance and changed in place. */}
             {allowGroups && proof.status === 'pending' && (
-              <div className="absolute inset-x-0 -bottom-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <div className="mt-1 w-14">
                 <LabelPicker
                   value={proof.groupLabel || ''}
                   options={labelOptions}
                   disabled={relabelingId === proof.id}
                   onChange={label => setProofGroup(proof.id, label)}
-                  className="w-full !px-1 !py-0 !text-[9px]"
+                  className="w-full !px-1 !py-0.5 !text-[9px]"
                 />
               </div>
+            )}
+            {allowGroups && proof.status !== 'pending' && proof.groupLabel && (
+              <p className="mt-1 w-14 text-[9px] text-center text-off-black/40 truncate" title={proof.groupLabel}>{proof.groupLabel}</p>
             )}
           </div>
         )
