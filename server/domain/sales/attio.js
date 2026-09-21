@@ -339,7 +339,7 @@ export async function memberForEmail(email) {
 
 function day(d) { return new Date(d).toISOString().slice(0, 10) }
 
-async function patchDeal(id, values) {
+export async function patchDeal(id, values) {
   const out = await attio(`/objects/deals/records/${id}`, { method: 'PATCH', body: { data: { values } } })
   cache.delete('deals')
   return out?.data || null
