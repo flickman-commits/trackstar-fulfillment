@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Upload, Copy, Loader2, Trash2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw, MessageSquare, ExternalLink, ChevronDown } from 'lucide-react'
+import { Upload, Copy, Loader2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw, MessageSquare, ExternalLink, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 
@@ -769,16 +769,19 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
             <div className="absolute -top-1 -right-1">
               {statusBadge(proof)}
             </div>
+            {/* Always visible: a double upload has to be undoable without
+                hunting for a hover target, and the label picker below used
+                to cover the old one on partner orders. */}
             <button
-              onClick={() => deleteProof(proof.id)}
+              onClick={() => { if (confirm('Delete this proof?')) deleteProof(proof.id) }}
               disabled={deletingId === proof.id}
-              className="absolute -bottom-1 -right-1 bg-white border border-border-gray rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
-              title="Delete"
+              className="absolute -top-1.5 -left-1.5 z-10 bg-white border border-border-gray shadow-sm rounded-full w-5 h-5 flex items-center justify-center text-off-black/50 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors disabled:opacity-50"
+              title="Delete this proof"
             >
               {deletingId === proof.id ? (
-                <Loader2 className="w-2.5 h-2.5 animate-spin text-off-black/30" />
+                <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
-                <Trash2 className="w-2.5 h-2.5 text-red-400" />
+                <X className="w-3 h-3" strokeWidth={2.5} />
               )}
             </button>
             {/* Relabel on hover only, so a batch of seven does not show seven text boxes. */}
