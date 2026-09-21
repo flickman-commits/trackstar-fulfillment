@@ -276,6 +276,9 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
   const draftFrom = (x: BulkOrder | null): Draft | null => x ? ({ productionFileUrl: x.productionFileUrl || '', previewImageUrl: x.previewImageUrl || '', raceDate: toInputDate(x.raceDate), dueDate: toInputDate(x.dueDate), frameType: x.frameType, productSize: x.productSize, quantity: x.quantity ? String(x.quantity) : '', notes: x.notes || '' }) : null
   const [draft, setDraft] = useState<Draft | null>(null)
   const [saving, setSaving] = useState(false)
+  // Small dialog for pasting the Drive link from the production card.
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkDraft, setLinkDraft] = useState('')
   const [intakeLinkOpen, setIntakeLinkOpen] = useState(false)
   const [opts, setOpts] = useState<{ frames: string[]; sizes: string[] }>({ frames: ['Unframed', 'Natural Premium Oak', 'Black Premium Oak'], sizes: ['8x10', '12x18', '16x24'] })
   const fileInput = useRef<HTMLInputElement>(null)
@@ -444,7 +447,10 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
             {b.productionFileUrl ? (
               <a href={b.productionFileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#4600D6] hover:underline ml-1"><ExternalLink className="w-3 h-3" /> Open production file</a>
             ) : (
-              <button onClick={() => { setDraft(draftFrom(b)); setDetailsOpen(true) }} className="text-xs text-amber-700 hover:underline ml-1">No production file linked yet</button>
+              <span className="inline-flex items-center gap-1.5 ml-1 text-xs">
+                <span className="text-amber-700">No production file linked yet.</span>
+                <button onClick={() => { setLinkDraft(''); setLinkOpen(true) }} className="text-[#4600D6] font-semibold hover:underline">Add link</button>
+              </span>
             )}
           </div>
         </div>
@@ -650,6 +656,20 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
     <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pb-6">
       {preview && previewUrl && (
         <ProofFullscreen proofs={[{ id: 'preview', imageUrl: previewUrl }]} index={0} onIndexChange={() => {}} onClose={() => setPreview(false)} counterLabel="Co-branded design" />
+      )}
+      {linkOpen && (
+        <div className="fixed inset-0 z-50 bg-off-black/60 flex items-center justify-center p-4" onClick={() => setLinkOpen(false)}>
+          <form
+            onClick={e => e.stopPropagation()}
+            onSubmit={async e => { e.preventDefault(); const out = await update({ productionFileUrl: linkDraft.trim() || null }); if (out) { toast.success('Production file linked'); setLinkOpen(false) } }}
+            className="bg-white rounded-lg shadow-xl w-full max-w-md p-5 space-y-3"
+          >
+            <div className="flex items-center justify-between"><h3 className="text-base font-semibold">Link the production file</h3><button type="button" onClick={() => setLinkOpen(false)} className={btnGhost}><X className="w-4 h-4" /></button></div>
+            <p className="text-xs text-off-black/60">Paste the Google Drive link to the co-branded Illustrator file for {b.partnerName}. Eli opens this before personalizing every print in the run.</p>
+            <input autoFocus value={linkDraft} onChange={e => setLinkDraft(e.target.value)} placeholder="https://drive.google.com/file/d/…" className={`${inputBase} w-full`} />
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setLinkOpen(false)} className={btnGhost}>Cancel</button><button type="submit" disabled={!linkDraft.trim()} className={btnPrimary}>Save link</button></div>
+          </form>
+        </div>
       )}
 
       {/* Header: the same shape as the order modal. Name, the stages, the
