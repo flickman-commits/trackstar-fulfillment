@@ -31,6 +31,8 @@ import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 const BASE = process.env.ATTIO_BASE_URL || 'https://api.attio.com/v2'
 const PAGE = 500
 const CACHE_MS = 45_000
+/** People change far less often than deals, and re-reading them is the expensive part. */
+const PEOPLE_MS = 10 * 60_000
 
 export const WORKSPACE_SLUG = 'trackstar-usa'
 
@@ -249,20 +251,19 @@ async function mapLimit(items, n, fn) {
 }
 
 /**
- * People by id. The people object holds thousands of records from the inbox
- * sync, so it is never read whole; the ones a deal points at are fetched one
- * by one and remembered for a while.
+ * Everyone in the workspace, indexed by record id.
+ *
+ * The people object holds a few thousand records from the inbox sync. Reading
+ * them 500 at a time is a handful of requests; reading the ones a deal points
+ * at one by one was four hundred, which is where the page load went. Filtering
+ * by a list of ids instead is what Attio refuses as a complex query.
  */
-const peopleCache = new Map()
-const PEOPLE_MS = 10 * 60_000
-async function peopleByIds(ids) {
-  const unique = [...new Set(ids.filter(Boolean))]
-  const missing = unique.filter(id => !(peopleCache.get(id) && Date.now() - peopleCache.get(id).at < PEOPLE_MS))
-  await mapLimit(missing, 8, async id => {
-    const rec = await getRecord('people', id)
-    peopleCache.set(id, { at: Date.now(), value: rec ? personView(rec) : null })
+async function peopleById({ fresh = false } = {}) {
+  if (fresh) cache.delete('people')
+  return cached('people', PEOPLE_MS, async () => {
+    const records = await queryAll('people')
+    return Object.fromEntries(records.map(r => [recordId(r), personView(r)]))
   })
-  return Object.fromEntries(unique.map(id => [id, peopleCache.get(id)?.value || null]))
 }
 
 const cache = new Map()
@@ -279,53 +280,48 @@ export function forgetAttioCache() { cache.clear() }
  * Every deal in the workspace, as views, with the companies and people they
  * point at. One paged fetch plus batched lookups; cached briefly.
  */
-/** The stages the queue works. People are loaded up front only for these. */
-const WORKED_STAGES = ['Needs Enrichment', 'Not Contacted', 'Reached Out']
-
 /**
- * Every deal in the workspace, as views, with the companies they point at
- * and the people on the ones the queue works. Companies are read whole (a
- * few hundred, plain paged reads); people only by reference. Cached briefly.
+ * Every deal in the workspace, as views, with its company and people. Three
+ * paged reads, cached briefly, rather than one request per person.
  */
 export async function loadDeals({ fresh = false } = {}) {
   if (fresh) { cache.delete('deals'); cache.delete('members') }
   return cached('deals', CACHE_MS, async () => {
-    const [dealRecords, companyRecords] = await Promise.all([queryAll('deals'), queryAll('companies')])
-    const deals = dealRecords.map(dealView).filter(d => d.id)
+    const [dealRecords, companyRecords, personById] = await Promise.all([
+      queryAll('deals'),
+      queryAll('companies'),
+      peopleById({ fresh }),
+    ])
     const companyById = Object.fromEntries(companyRecords.map(c => [recordId(c), companyView(c)]))
-    const worked = deals.filter(d => WORKED_STAGES.includes(d.stage))
-    const personById = await peopleByIds(worked.flatMap(d => d.personIds))
-    return deals.map(d => ({
+    return dealRecords.map(dealView).filter(d => d.id).map(d => ({
       ...d,
       company: companyById[d.companyId] || null,
       people: d.personIds.map(id => personById[id]).filter(Boolean),
-      peopleLoaded: WORKED_STAGES.includes(d.stage),
     }))
   })
 }
 
-export async function getDeal(id, { fresh = false } = {}) {
-  const deals = await loadDeals({ fresh })
-  const deal = deals.find(d => d.id === id)
-  if (!deal) return null
-  if (deal.peopleLoaded) return deal
-  // A deal outside the worked stages: its people were not read up front.
-  const personById = await peopleByIds(deal.personIds)
-  return { ...deal, people: deal.personIds.map(pid => personById[pid]).filter(Boolean), peopleLoaded: true }
+/**
+ * One deal, read from Attio now, with its company and people: a handful of
+ * requests rather than the whole workspace. This is what the send path uses
+ * to check the deal has not moved under it, so a list that is a minute old
+ * can never send against a stale stage or a stale touch count.
+ */
+export async function getDealNow(id) {
+  const record = await getRecord('deals', id)
+  if (!record) return null
+  const deal = dealView(record)
+  const [company, people] = await Promise.all([
+    deal.companyId ? getRecord('companies', deal.companyId).then(companyView) : null,
+    mapLimit(deal.personIds, 5, async pid => personView(await getRecord('people', pid))),
+  ])
+  return { ...deal, company, people: people.filter(Boolean) }
 }
 
-/** People who can own a deal: id, name, email. Cached longer; the roster rarely changes. */
-export async function workspaceMembers() {
-  return cached('members', 10 * 60_000, async () => {
-    const res = await attio('/workspace_members')
-    return (res?.data || []).map(m => ({
-      id: m.id?.workspace_member_id || null,
-      email: (m.email_address || '').toLowerCase(),
-      firstName: m.first_name || '',
-      lastName: m.last_name || '',
-      access: m.access_level || null,
-    })).filter(m => m.id)
-  })
+export async function getDeal(id, { fresh = false } = {}) {
+  if (fresh) return getDealNow(id)
+  const deals = await loadDeals()
+  return deals.find(d => d.id === id) || null
 }
 
 /** The deal stages as the workspace defines them, in pipeline order. Cached; falls back to the known list. */
@@ -354,7 +350,16 @@ function day(d) { return new Date(d).toISOString().slice(0, 10) }
 
 export async function patchDeal(id, values) {
   const out = await attio(`/objects/deals/records/${id}`, { method: 'PATCH', body: { data: { values } } })
-  cache.delete('deals')
+  // We know exactly which deal changed, so update it in place rather than
+  // dropping a list that costs seconds to rebuild.
+  try {
+    const cachedDeals = cache.get('deals')
+    if (cachedDeals) {
+      const list = await cachedDeals.value
+      const i = list.findIndex(d => d.id === id)
+      if (i >= 0) list[i] = { ...list[i], ...dealView(out?.data), company: list[i].company, people: list[i].people }
+    }
+  } catch { cache.delete('deals') }
   return out?.data || null
 }
 

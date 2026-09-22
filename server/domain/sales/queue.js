@@ -308,6 +308,6 @@ export async function searchDeals(q, { limit = 12 } = {}) {
     .some(v => v && String(v).toLowerCase().includes(needle))
   return deals.filter(hit).slice(0, limit).map(d => {
     const person = primaryPerson(d)
-    return { id: d.id, name: d.name, stage: d.stage, motion: d.motion, ownerId: d.ownerId, webUrl: d.webUrl, person: person ? { fullName: person.fullName, email: person.email } : null, peopleLoaded: d.peopleLoaded }
+    return { id: d.id, name: d.name, stage: d.stage, motion: d.motion, ownerId: d.ownerId, webUrl: d.webUrl, person: person ? { fullName: person.fullName, email: person.email } : null }
   })
 }
