@@ -64,6 +64,8 @@ export default function Sales() {
   const [problems, setProblems] = useState<string[] | null>(null)
   const [checking, setChecking] = useState(false)
   const inFlight = useRef(new Set<string>())
+  /** Deals whose required example has already been put in, so removing it sticks. */
+  const seeded = useRef(new Set<string>())
   const timers = useRef<Record<string, number>>({})
 
   useEffect(() => { try { localStorage.setItem(AI_KEY, aiOn ? 'on' : 'off') } catch { /* ignore */ } }, [aiOn])
@@ -334,9 +336,11 @@ export default function Sales() {
   // in as a normal attachment the moment the draft says it is touch 1. It is
   // a chip like any other: removable, and nothing is added behind your back.
   useEffect(() => {
-    if (!deal || !current?.draft) return
+    if (!deal || !current?.draft || seeded.current.has(deal.id)) return
     const needsImage = deal.pipeline === 'CHARITY' && current.draft.touchNumber === 1
     if (!needsImage || !suggested) return
+    // Once per deal, so taking the chip off keeps it off.
+    seeded.current.add(deal.id)
     setAttached(prev => (prev[deal.id]?.length ? prev : { ...prev, [deal.id]: [suggested.id] }))
   }, [deal, current?.draft, suggested])
 
