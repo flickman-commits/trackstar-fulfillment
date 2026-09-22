@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ExternalLink, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
 import { btnGhost, fieldLabel, inputBase } from '@/lib/ui'
-import { STAGES, type Deal, type Person, type Stage } from '@/types/sales'
+import { type Deal, type Person } from '@/types/sales'
 
 /**
  * The person and the deal, straight from Attio.
@@ -12,18 +12,31 @@ import { STAGES, type Deal, type Person, type Stage } from '@/types/sales'
  * from here because a rep is a person and may; the tool itself only ever
  * moves Not Contacted to Reached Out on a send.
  */
+const STAGE_STYLE: Record<string, string> = {
+  'Needs Enrichment': 'bg-slate-100 text-slate-700 border-slate-200',
+  'Not Contacted': 'bg-amber-100 text-amber-800 border-amber-200',
+  'Reached Out': 'bg-rose-100 text-rose-800 border-rose-200',
+  'In Conversation': 'bg-orange-100 text-orange-800 border-orange-200',
+  'Call Booked': 'bg-purple-100 text-purple-800 border-purple-200',
+  'Deck Sent': 'bg-lime-100 text-lime-800 border-lime-200',
+  'Awaiting Payment': 'bg-teal-100 text-teal-800 border-teal-200',
+  Won: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  'Revisit Next Year': 'bg-blue-100 text-blue-800 border-blue-200',
+  Lost: 'bg-red-100 text-red-800 border-red-200',
+}
+
+const pill = 'text-[10.5px] font-medium px-1.5 py-0.5 rounded-full border whitespace-nowrap'
+const neutral = 'bg-subtle-gray text-off-black/60 border-border-gray'
+
 function fmtDate(s?: string | null) {
   if (!s) return ''
   const d = s.length === 10 ? new Date(`${s}T00:00:00`) : new Date(s)
   return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })
 }
 
-export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote, busy, stages }: {
-  /** Attio's stage list, in order. Falls back to the known list. */
-  stages?: string[] | null
+export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: {
   deal: Deal | null
   person: Person | null
-  onStage: (stage: Stage) => void
   onSelectPerson: (id: string) => void
   onNote: (text: string) => Promise<void>
   busy: boolean
@@ -38,15 +51,6 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
   const free = deal.id.startsWith('adhoc:')
 
   const sends = deal.sends || []
-  const facts: Array<[string, string]> = []
-  if (deal.priority) facts.push(['Priority', deal.priority])
-  if (deal.sizeTier) facts.push(['Size', deal.sizeTier])
-  if (deal.tier) facts.push(['Tier', deal.tier])
-  if (deal.raceDate) facts.push(['Race', fmtDate(deal.raceDate)])
-  if (deal.runners) facts.push(['Runners', Number(deal.runners).toLocaleString()])
-  if (deal.touchCount) facts.push(['Touches', String(deal.touchCount)])
-  if (deal.nextActionDate) facts.push(['Next', fmtDate(deal.nextActionDate)])
-  if (deal.company?.lastEmailAt) facts.push(['Last email', fmtDate(deal.company.lastEmailAt)])
 
   return (
     <div className="flex flex-col gap-2 text-sm">
@@ -71,6 +75,12 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
             ))}
           </div>
         )}
+        {/* Where the deal stands, read-only. Stage moves happen in Attio. */}
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          {deal.stage && <span className={`${pill} ${STAGE_STYLE[String(deal.stage)] || neutral}`}>{deal.stage}</span>}
+          {deal.priority && <span className={`${pill} ${deal.priority === 'High' ? 'bg-orange-100 text-orange-800 border-orange-200' : neutral}`}>{deal.priority}</span>}
+          <span className={`${pill} ${neutral}`}>{deal.touchCount} {deal.touchCount === 1 ? 'touch' : 'touches'}</span>
+        </div>
         {person?.description && <p className="mt-2 text-[12.5px] text-off-black/70 leading-snug">{person.description}</p>}
       </section>
 
@@ -89,24 +99,6 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
           )}
         </section>
       )}
-
-      {!free && <section className="rounded-lg border border-border-gray bg-white px-3.5 py-3">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className={`${fieldLabel} mb-0`}>Stage</span>
-          <select value={String(deal.stage || '')} onChange={e => onStage(e.target.value as Stage)} disabled={busy} className={`${inputBase} text-xs py-1 max-w-[170px]`}>
-            {[...(stages && stages.length ? stages : STAGES), ...(deal.stage && !(stages && stages.length ? stages : [...STAGES]).includes(String(deal.stage)) ? [String(deal.stage)] : [])].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        {facts.length > 0 && (
-          <dl className="grid grid-cols-[72px_1fr] gap-x-2 gap-y-1 text-xs">
-            {facts.map(([k, v]) => [
-              <dt key={`${k}-k`} className="text-off-black/45">{k}</dt>,
-              <dd key={`${k}-v`} className="text-off-black/80 tabular-nums truncate">{v}</dd>,
-            ])}
-          </dl>
-        )}
-        {deal.nextAction && <p className="text-[11.5px] text-off-black/55 mt-1.5 leading-snug">{deal.nextAction}</p>}
-      </section>}
 
       {/* What has already gone to this person, so a follow-up can pick up where
           the last one left off. Emails sent from the tool carry their text;

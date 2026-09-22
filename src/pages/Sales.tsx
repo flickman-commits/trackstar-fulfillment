@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, ExternalLink, PenLine } from 'lucide-react'
 import { salesApi, SalesApiError, type DealHit } from '@/lib/salesApi'
 import { btnSecondary, btnGhost } from '@/lib/ui'
-import type { Asset, Deal, DraftResult, Motion, Person, SalesStatus, Stage, TodayPayload, Variant } from '@/types/sales'
+import type { Asset, Deal, DraftResult, Motion, Person, SalesStatus, TodayPayload, Variant } from '@/types/sales'
 import Queue, { type QueueMode } from '@/components/sales/Queue'
 import Composer from '@/components/sales/Composer'
 import WhoPane from '@/components/sales/WhoPane'
@@ -289,17 +289,6 @@ export default function Sales() {
     catch (e) { toast.error((e as Error).message) }
   }, [deal, advance, loadToday, adhoc])
 
-  const setStage = useCallback(async (stage: Stage) => {
-    if (!deal) return
-    setBusy(true)
-    try {
-      const r = await salesApi.setStage(deal.id, stage)
-      setDetail(r.deal); toast.success(`${deal.name}: ${stage} in Attio`)
-      if (!['Not Contacted', 'Needs Enrichment', 'Reached Out'].includes(stage)) { advance(deal.id); loadToday(true) }
-    } catch (e) { toast.error((e as Error).message) }
-    finally { setBusy(false) }
-  }, [deal, advance, loadToday])
-
   const addNote = useCallback(async (text: string) => {
     if (!deal) return
     setBusy(true)
@@ -325,7 +314,7 @@ export default function Sales() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [send, skip, setStage, moveTo, variants.length, settingsOpen, progressOpen, newOpen])
+  }, [send, skip, moveTo, variants.length, settingsOpen, progressOpen, newOpen])
 
   const updateVariant = (v: Variant) => {
     if (!deal || !current) return
@@ -452,8 +441,7 @@ export default function Sales() {
 
         <aside className="w-full lg:w-[320px] shrink-0 overflow-y-auto flex flex-col gap-2 min-h-0">
           <WhoPane
-            deal={deal} person={person} busy={busy} stages={status?.attio.stages}
-            onStage={setStage} onNote={addNote}
+            deal={deal} person={person} busy={busy} onNote={addNote}
             onSelectPerson={id => { setPersonId(id); if (deal) { setPrepared(prev => { const n = { ...prev }; delete n[deal.id]; return n }); prepare(deal, { silent: false, force: true, personId: id }) } }}
           />
           <LibraryPanel assets={assets} configured={libraryConfigured} attachedIds={new Set(attachedAssets.map(a => a.id))} onAttach={attach} onChanged={() => loadAssets(selectedId)} />
