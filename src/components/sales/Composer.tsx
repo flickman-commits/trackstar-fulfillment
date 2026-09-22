@@ -21,7 +21,7 @@ export const ASSET_DRAG_TYPE = 'application/x-trackstar-asset'
 export default function Composer({
   deal, person, draft, variants, index, drafting, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
-  attachments, onAttach, onDetach, suggested,
+  attachments, onAttach, onDetach,
   onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc,
 }: {
   deal: Deal | null
@@ -40,7 +40,6 @@ export default function Composer({
   attachments: Asset[]
   onAttach: (asset: Asset) => void
   onDetach: (id: string) => void
-  suggested: Asset | null
   onChange: (v: Variant) => void
   onPrev: () => void
   onNext: () => void
@@ -89,7 +88,7 @@ export default function Composer({
   const current = variants[index]
   const imageRequired = deal.pipeline === 'CHARITY' && draft?.touchNumber === 1
   const hasImage = attachments.some(a => a.kind === 'image')
-  const missingRequired = imageRequired && !hasImage && !suggested
+  const missingRequired = imageRequired && !hasImage
   const blocked = Boolean(problems && problems.length)
   const sendDisabled = !current || drafting || !person?.email || missingRequired || !canSend || blocked || (deal.exhausted && !adhoc)
   const sendTitle = blocked ? (problems as string[])[0]
@@ -208,14 +207,7 @@ export default function Composer({
                 <button onClick={() => onDetach(a.id)} className="text-off-black/40 hover:text-off-black" title="Remove"><X className="w-3 h-3" /></button>
               </span>
             ))}
-            {attachments.length === 0 && suggested && (
-              <button onClick={() => onAttach(suggested)} className="inline-flex items-center gap-1.5 pl-1 pr-1.5 py-0.5 rounded-md border border-dashed border-border-gray text-off-black/60 hover:text-off-black hover:bg-white" title="Auto-picked for this deal; click to attach">
-                {suggested.previewUrl ? <img src={suggested.previewUrl} alt="" className="h-5 w-auto rounded opacity-70" /> : <ImageIcon className="w-3.5 h-3.5" />}
-                <span className="max-w-[160px] truncate">{suggested.name}</span>
-                <span className="text-off-black/40">· will attach</span>
-              </button>
-            )}
-            {attachments.length === 0 && !suggested && (
+            {attachments.length === 0 && (
               <span className={missingRequired ? 'text-red-600' : 'text-off-black/45'}>{missingRequired ? 'A charity first touch needs a co-branded example. Drag one in from the library.' : 'Drag a deck or image here from the library.'}</span>
             )}
             <span className="ml-auto text-off-black/40">Your signature is added when it sends.</span>

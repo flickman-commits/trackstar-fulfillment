@@ -108,22 +108,42 @@ export default function WhoPane({ deal, person, onStage, onSelectPerson, onNote,
         {deal.nextAction && <p className="text-[11.5px] text-off-black/55 mt-1.5 leading-snug">{deal.nextAction}</p>}
       </section>}
 
-      {sends.length > 0 && (
+      {/* What has already gone to this person, so a follow-up can pick up where
+          the last one left off. Emails sent from the tool carry their text;
+          anything older than the tool lives in Gmail, one click away. */}
+      {(sends.length > 0 || person?.email) && (
         <section className="rounded-lg border border-border-gray bg-white px-3.5 py-2">
           <button onClick={() => setHistoryOpen(o => !o)} className="w-full flex items-center justify-between text-xs font-semibold text-off-black/70">
-            <span>Sent from here · {sends.length}</span>{historyOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            <span>Past emails{sends.length ? ` · ${sends.length}` : ''}</span>{historyOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </button>
           {historyOpen && (
-            <ul className="mt-2 space-y-2">
+            <div className="mt-2 space-y-2">
               {sends.slice().reverse().map(s => (
-                <li key={s.id} className="text-xs">
-                  <div className="flex justify-between gap-2 text-off-black/50"><span>Touch {s.touchNumber}{s.sentByEmail ? ` · ${s.sentByEmail.split('@')[0]}` : ''}</span><span>{fmtDate(s.sentAt)}</span></div>
-                  <div className="font-medium truncate">{s.subject}</div>
-                  {!s.attioOk && <div className="text-amber-700">Attio was not updated for this one.</div>}
-                  {s.gmailThreadId && <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(s.gmailThreadId)}`} target="_blank" rel="noopener noreferrer" className="text-off-black/50 hover:text-off-black inline-flex items-center gap-0.5">Thread <ExternalLink className="w-3 h-3" /></a>}
-                </li>
+                <details key={s.id} className="text-xs rounded border border-border-gray bg-subtle-gray/50 px-2 py-1.5">
+                  <summary className="cursor-pointer list-none">
+                    <span className="flex justify-between gap-2 text-off-black/50"><span>Touch {s.touchNumber}{s.sentByEmail ? ` · ${s.sentByEmail.split('@')[0]}` : ''}</span><span>{fmtDate(s.sentAt)}</span></span>
+                    <span className="block font-medium truncate">{s.subject}</span>
+                  </summary>
+                  {s.body && <p className="mt-1.5 whitespace-pre-wrap leading-snug text-off-black/70 border-t border-border-gray pt-1.5">{s.body}</p>}
+                  {!s.attioOk && <p className="text-amber-700 mt-1">Attio was not updated for this one.</p>}
+                  {s.gmailThreadId && (
+                    <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(s.gmailThreadId)}`} target="_blank" rel="noopener noreferrer" className="mt-1 text-off-black/50 hover:text-off-black inline-flex items-center gap-0.5">Open the thread <ExternalLink className="w-3 h-3" /></a>
+                  )}
+                </details>
               ))}
-            </ul>
+              {person?.email && (
+                <a
+                  href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(person.email)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 w-full rounded border border-border-gray px-2 py-1.5 text-xs text-off-black/60 hover:text-off-black hover:bg-subtle-gray"
+                >
+                  Read the whole chain in Gmail <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+              {sends.length === 0 && (
+                <p className="text-[11px] text-off-black/45 leading-snug">Nothing was sent from this tool yet. Earlier emails, including anyone who has left, are in Gmail.</p>
+              )}
+            </div>
           )}
         </section>
       )}

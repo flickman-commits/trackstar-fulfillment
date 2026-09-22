@@ -330,6 +330,16 @@ export default function Sales() {
     const next = current.variants.slice(); next[variantIndex] = v
     setPrepared(prev => ({ ...prev, [deal.id]: { ...current, variants: next } }))
   }
+  // A charity first touch has to carry an example, so put the library's pick
+  // in as a normal attachment the moment the draft says it is touch 1. It is
+  // a chip like any other: removable, and nothing is added behind your back.
+  useEffect(() => {
+    if (!deal || !current?.draft) return
+    const needsImage = deal.pipeline === 'CHARITY' && current.draft.touchNumber === 1
+    if (!needsImage || !suggested) return
+    setAttached(prev => (prev[deal.id]?.length ? prev : { ...prev, [deal.id]: [suggested.id] }))
+  }, [deal, current?.draft, suggested])
+
   const rewrite = () => { if (deal && !deal.id.startsWith('adhoc:')) prepare({ ...deal, exhausted: adhoc ? false : deal.exhausted }, { silent: false, force: true, personId }) }
   const revise = async (instruction: string) => {
     const v = variants[variantIndex]
@@ -429,7 +439,7 @@ export default function Sales() {
             drafting={drafting} gmailConnected={gmailConnected} aiActive={aiActive}
             canSend={gmailConnected && !capReached} capReached={capReached}
             problems={problems} checking={checking} onCheck={checkDraft}
-            attachments={attachedAssets} onAttach={attach} onDetach={detach} suggested={suggested}
+            attachments={attachedAssets} onAttach={attach} onDetach={detach}
             onChange={updateVariant}
             onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
             onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} adhoc={Boolean(adhoc)}

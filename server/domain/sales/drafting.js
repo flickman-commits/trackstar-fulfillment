@@ -16,7 +16,7 @@ import prisma from '../../db.js'
 import { complete, isLlmConfigured } from '../../lib/llm.js'
 import { cadenceFor, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateFor, greetingName, RACE_ONE_LINERS } from './angles.js'
 import { sendMessage, gmailStatus } from './gmail.js'
-import { pickAssetFor, readAsset, isAssetStorageConfigured } from './assets.js'
+import { readAsset, isAssetStorageConfigured } from './assets.js'
 import { getSettings, getSenderFor } from './settings.js'
 import { getTemplates } from './templates.js'
 import { recordSend } from './attio.js'
@@ -298,16 +298,13 @@ export async function sendDraft({ dealId, personId, subject, body, assetIds = []
     inReplyTo = (await prisma.salesSend.findFirst({ where: { attioDealId: deal.id, rfcMessageId: { not: null } }, orderBy: { sentAt: 'asc' } }))?.rfcMessageId || null
   }
 
-  // Attachments: what the rep chose, or the auto-picked example when the
-  // touch needs one and nothing was chosen.
+  // Attachments: exactly what the rep chose, nothing else. A touch whose copy
+  // points at an example is blocked below rather than quietly given one, so
+  // removing an attachment in the composer actually removes it.
   const attachments = []
   const attached = []
   if (isAssetStorageConfigured()) {
-    let ids = [...new Set((assetIds || []).map(String).filter(Boolean))]
-    if (!ids.length && requiresImage(pipeline, touchNumber)) {
-      const pick = await pickAssetFor(deal)
-      if (pick) ids = [pick.id]
-    }
+    const ids = [...new Set((assetIds || []).map(String).filter(Boolean))]
     for (const id of ids) {
       const a = await readAsset(id)
       attachments.push(a)

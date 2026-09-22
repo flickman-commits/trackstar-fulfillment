@@ -27,6 +27,8 @@ import { isGenericInbox } from './guardrails.js'
 const OPEN_FOR_OUTREACH = ['Not Contacted']
 const OPEN_FOR_FOLLOW_UP = ['Reached Out']
 const PRIORITY_RANK = { High: 0, Medium: 1, Low: 2 }
+/** Highest priority first, then whatever the list's own tiebreaker is. Deals with no priority set come last. */
+const byPriority = (a, b) => (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9)
 
 /** Race or Charity, as the cadence file spells it. Corporate follows the race cadence for now. */
 export function pipelineOf(deal) {
@@ -195,8 +197,8 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
   const contactedBefore = notContacted.filter(d => d.lastSentAt)
   const fresh_ = notContacted.filter(d => !d.lastSentAt)
   const newReady = fresh_.filter(d => d.hasEmail).sort((a, b) =>
-    Number(b.hasPrep) - Number(a.hasPrep)
-    || (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9)
+    byPriority(a, b)
+    || Number(b.hasPrep) - Number(a.hasPrep)
     || String(a.raceDate || '9999').localeCompare(String(b.raceDate || '9999'))
     || String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
   const needsContact = fresh_.filter(d => !d.hasEmail)
@@ -207,9 +209,9 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
     .filter(d => OPEN_FOR_FOLLOW_UP.includes(d.stage) && !sentTodayIds.has(d.id) && !skipByDeal[d.id])
     .map(d => shape(d, ctx(d)))
   const due = reached.filter(d => d.hasEmail && !d.exhausted && isDue(d, lastByDeal[d.id], dayStart))
-    .sort((a, b) => b.overdueDays - a.overdueDays || Number(b.hasPrep) - Number(a.hasPrep))
+    .sort((a, b) => byPriority(a, b) || b.overdueDays - a.overdueDays || Number(b.hasPrep) - Number(a.hasPrep))
   const later = reached.filter(d => d.hasEmail && !d.exhausted && !isDue(d, lastByDeal[d.id], dayStart))
-    .sort((a, b) => String(a.nextActionDate || '9999').localeCompare(String(b.nextActionDate || '9999')))
+    .sort((a, b) => byPriority(a, b) || String(a.nextActionDate || '9999').localeCompare(String(b.nextActionDate || '9999')))
   const exhausted = reached.filter(d => d.exhausted)
 
   const weekSent = await prisma.salesSend.count({ where: { sentAt: { gte: weekStart } } })
