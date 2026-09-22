@@ -324,6 +324,20 @@ export async function getDeal(id, { fresh = false } = {}) {
   return deals.find(d => d.id === id) || null
 }
 
+/** People who can own a deal: id, name, email. Cached longer; the roster rarely changes. */
+export async function workspaceMembers() {
+  return cached('members', 10 * 60_000, async () => {
+    const res = await attio('/workspace_members')
+    return (res?.data || []).map(m => ({
+      id: m.id?.workspace_member_id || null,
+      email: (m.email_address || '').toLowerCase(),
+      firstName: m.first_name || '',
+      lastName: m.last_name || '',
+      access: m.access_level || null,
+    })).filter(m => m.id)
+  })
+}
+
 /** The deal stages as the workspace defines them, in pipeline order. Cached; falls back to the known list. */
 export async function stageTitles() {
   return cached('stages', 10 * 60_000, async () => {
