@@ -1,6 +1,6 @@
 import { useState, type DragEvent } from 'react'
 import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink } from 'lucide-react'
-import { OverdueBadge } from './Queue'
+import { MotionTag } from './Queue'
 import { btnPrimary, btnGhost, inputBase } from '@/lib/ui'
 import type { Asset, Deal, DraftResult, Person, Variant } from '@/types/sales'
 
@@ -123,7 +123,7 @@ export default function Composer({
         <div className="min-w-0">
           <div className="text-[15px] font-bold truncate flex items-center gap-2">
             <span className="truncate">{who} <span className="text-off-black/45 font-normal">· {deal.name}</span></span>
-            <OverdueBadge days={deal.overdueDays} />
+            <MotionTag motion={deal.motion} />
           </div>
           <div className="text-xs text-off-black/55 mt-0.5 flex flex-wrap items-center gap-x-2">
             <span>{person?.email || <span className="text-red-600">{deal.genericOnly ? 'Only a generic inbox in Attio. Find a person.' : 'No email in Attio'}</span>}</span>

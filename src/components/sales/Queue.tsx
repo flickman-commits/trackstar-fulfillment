@@ -20,19 +20,23 @@ function fmtDay(s?: string | null) {
   return s ? new Date(`${s}T00:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''
 }
 
-/** Days past due, as a chip. Over two weeks goes red: that is a follow-up the cadence promised and nobody sent. */
-export function OverdueBadge({ days, active }: { days?: number; active?: boolean }) {
-  if (!days || days <= 0) return null
-  const late = days > 14
-  const cls = active ? 'border-white/40 text-white' : late ? 'bg-red-50 border-red-300 text-red-700' : 'bg-amber-50 border-amber-300 text-amber-700'
-  return <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border tabular-nums whitespace-nowrap ${cls}`} title={`${days} days past the next action date`}>{days}d late</span>
+/** The motion, coloured as Attio colours it, so the two read as the same thing. */
+const MOTION_STYLE: Record<string, string> = {
+  Race: 'bg-orange-100 text-orange-800 border-orange-200',
+  Charity: 'bg-pink-100 text-pink-800 border-pink-200',
+  Corporate: 'bg-sky-100 text-sky-800 border-sky-200',
+}
+
+export function MotionTag({ motion }: { motion?: string | null }) {
+  if (!motion) return null
+  const cls = MOTION_STYLE[motion] || 'bg-subtle-gray text-off-black/60 border-border-gray'
+  return <span className={`text-[10.5px] font-medium px-1.5 py-0.5 rounded-full border whitespace-nowrap ${cls}`}>{motion}</span>
 }
 
 function Row({ d, active, sent, pendingSend, onClick, hint, muted }: {
   d: Deal; active: boolean; sent?: boolean; pendingSend?: boolean; onClick: () => void; hint?: string; muted?: boolean
 }) {
   const who = d.person ? d.person.fullName || `${d.person.firstName} ${d.person.lastName}`.trim() : 'Nobody to email'
-  const overdue = sent ? 0 : d.overdueDays
   return (
     <button
       onClick={onClick}
@@ -55,8 +59,7 @@ function Row({ d, active, sent, pendingSend, onClick, hint, muted }: {
         </span>
       </span>
       <span className="flex items-center gap-1">
-        {d.motion && <span className={`font-mono text-[9.5px] px-1 py-0.5 rounded border uppercase tracking-wider ${active ? 'border-white/30 text-white/70' : 'border-border-gray text-off-black/40'}`}>{d.motion.slice(0, 3)}</span>}
-        <OverdueBadge days={overdue} active={active} />
+        <MotionTag motion={d.motion} />
         {hint && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${active ? 'border-white/30 text-white/70' : 'border-border-gray text-off-black/40'}`}>{hint}</span>}
       </span>
     </button>
@@ -67,7 +70,7 @@ function Fold({ title, count, children, defaultOpen = false }: { title: string; 
   const [open, setOpen] = useState(defaultOpen)
   if (!count) return null
   return (
-    <div className="rounded-lg border border-border-gray bg-white overflow-hidden">
+    <div className="shrink-0 rounded-lg border border-border-gray bg-white overflow-hidden">
       <button onClick={() => setOpen(o => !o)} className="w-full px-3 py-1.5 font-mono text-[10.5px] tracking-wider uppercase text-off-black/45 flex items-center justify-between hover:bg-subtle-gray">
         <span>{title}</span>
         <span className="flex items-center gap-1.5 tabular-nums">{count} {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}</span>
@@ -109,7 +112,7 @@ export default function Queue({
 
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
         {overnight && (
-          <div className="rounded-lg border border-border-gray bg-white px-3 py-2 text-[12.5px] text-off-black/65">
+          <div className="shrink-0 rounded-lg border border-border-gray bg-white px-3 py-2 text-[12.5px] text-off-black/65">
             <button onClick={() => setNoteOpen(o => !o)} className="w-full flex items-center justify-between font-semibold text-off-black">
               <span>Overnight · {overnight.prepared} written</span>
               {rest ? (noteOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />) : null}
@@ -119,7 +122,7 @@ export default function Queue({
           </div>
         )}
 
-        <div className="rounded-lg border border-border-gray bg-white overflow-hidden">
+        <div className="shrink-0 rounded-lg border border-border-gray bg-white overflow-hidden">
           <div className="px-3 py-1.5 font-mono text-[10.5px] tracking-wider uppercase text-off-black/45 border-b border-border-gray flex items-center justify-between gap-2">
             <span className="flex items-center gap-1.5">
               <span>{mode === 'new' ? 'Today' : 'Due now'}</span>
@@ -156,7 +159,7 @@ export default function Queue({
         {mode === 'new' && today && (
           <>
             {today.newWaiting > 0 && (
-              <div className="rounded-lg border border-border-gray bg-white px-3 py-2 text-[12px] text-off-black/55">
+              <div className="shrink-0 rounded-lg border border-border-gray bg-white px-3 py-2 text-[12px] text-off-black/55">
                 {today.newWaiting} more ready after today's {today.cap}. Raise the cap in Settings to see them.
               </div>
             )}
