@@ -205,6 +205,21 @@ function designLabel(status: string | null | undefined, orderType?: string | nul
   return orderType === 'race_partner' ? cfg.label.replace('Customer', 'Partner') : cfg.label
 }
 
+/**
+ * The statuses a person may pick by hand.
+ *
+ * A partner order's design work ends at Approved by Partner. What follows,
+ * Dan's production file and the handoff to Eli, is the checklist's job and
+ * sets the last two itself, so offering them here only invites a status
+ * nobody acted on. An order already past that keeps its own value listed.
+ */
+function selectableDesignStatuses(orderType?: string | null, current?: string | null): DesignStatus[] {
+  const all = Object.keys(DESIGN_STATUS_CONFIG) as DesignStatus[]
+  if (orderType !== 'race_partner') return all
+  const upToApproval = all.slice(0, all.indexOf('approved_by_customer') + 1)
+  return upToApproval.includes(current as DesignStatus) || !current ? upToApproval : [...upToApproval, current as DesignStatus]
+}
+
 // Source indicator — shopify/etsy icon for marketplace orders, or a distinct
 // green "Creator" chip for creator-program sample orders so Elí can tell at
 // a glance these are free fulfillments (not paying customers).
@@ -4352,9 +4367,9 @@ Thank you!`
                               (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).color
                             } border-border-gray focus:outline-none focus:ring-2 focus:ring-off-black/20`}
                           >
-                            {(Object.entries(DESIGN_STATUS_CONFIG) as [DesignStatus, typeof DESIGN_STATUS_CONFIG[DesignStatus]][]).map(([status, config]) => (
+                            {selectableDesignStatuses(selectedOrder.trackstarOrderType, selectedOrder.designStatus).map(status => (
                               <option key={status} value={status}>
-                                {config.icon} {designLabel(status, selectedOrder.trackstarOrderType)}
+                                {DESIGN_STATUS_CONFIG[status].icon} {designLabel(status, selectedOrder.trackstarOrderType)}
                               </option>
                             ))}
                           </select>
@@ -4670,9 +4685,9 @@ Thank you!`
                               (DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).color
                             } border-border-gray focus:outline-none focus:ring-2 focus:ring-off-black/20`}
                           >
-                            {(Object.entries(DESIGN_STATUS_CONFIG) as [DesignStatus, typeof DESIGN_STATUS_CONFIG[DesignStatus]][]).map(([status, config]) => (
+                            {selectableDesignStatuses(selectedOrder.trackstarOrderType, selectedOrder.designStatus).map(status => (
                               <option key={status} value={status}>
-                                {config.icon} {designLabel(status, selectedOrder.trackstarOrderType)}
+                                {DESIGN_STATUS_CONFIG[status].icon} {designLabel(status, selectedOrder.trackstarOrderType)}
                               </option>
                             ))}
                           </select>

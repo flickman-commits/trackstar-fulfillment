@@ -5,6 +5,8 @@ import { apiFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 const GOOGLE_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/1hvHh3F9Wdo8cpLPziSbIC1SUHe6Tq1OI'
+/** Partner production files live in their own folder, not with the customer PDFs. */
+const PARTNER_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/1ZIWN9sXwqE1nGU6Em_FDFggpa6kIh9Od'
 
 interface ChosenProof {
   imageUrl: string
@@ -19,7 +21,7 @@ interface PostApprovalChecklistProps {
   displayOrderNumber: string
   designStatus: string
   onDesignStatusChange: (newStatus: string) => void
-  /** Partner orders: no Drive link, and the files are a production file plus a photo. */
+  /** Partner orders: their own Drive folder, and the files are a production file plus a photo. */
   isPartner?: boolean
   partnerName?: string | null
 }
@@ -162,18 +164,16 @@ export default function PostApprovalChecklist({
 
   return (
     <div className="space-y-2">
-      {/* Step 1: Open Google Drive to upload. Partner files live elsewhere. */}
-      {!isPartner && (
-        <a
-          href={GOOGLE_DRIVE_FOLDER}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-md transition-colors"
-        >
-          <ExternalLink className="w-4 h-4" />
-          Open Google Drive to Upload PDF
-        </a>
-      )}
+      {/* Step 1: Open the Drive folder these files belong in. Partner production files have their own. */}
+      <a
+        href={isPartner ? PARTNER_DRIVE_FOLDER : GOOGLE_DRIVE_FOLDER}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-md transition-colors"
+      >
+        <ExternalLink className="w-4 h-4" />
+        {isPartner ? 'Open Drive to Upload the Production File' : 'Open Google Drive to Upload PDF'}
+      </a>
 
       {/* Step 2: Checkbox — I've uploaded */}
       <button
