@@ -5112,6 +5112,37 @@ Thank you!`
                       everything else lives here and nowhere else. */}
                   <OrderTags order={selectedOrder} size="md" className="mb-3" exclude={['photo']} />
 
+                  {/* A comment on a standard order is somebody flagging
+                      something about this print, usually a spelling the
+                      results site got wrong. It used to sit under the fold
+                      past the filename, which is too late to read. */}
+                  {orderComments.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-300 rounded-md p-3 mb-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <MessageSquareText className="w-3.5 h-3.5 text-amber-700" />
+                        <span className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider">
+                          {orderComments.length === 1 ? 'Note on this order' : `${orderComments.length} notes on this order`}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {orderComments.map(comment => (
+                          <div key={comment.id}>
+                            {comment.imageUrl && (
+                              <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
+                                <img src={comment.imageUrl} alt="Attachment" className="max-h-32 rounded-md mb-1.5 border border-amber-200 hover:opacity-90" />
+                              </a>
+                            )}
+                            {comment.text && <p className="text-body-sm text-amber-900 whitespace-pre-wrap">{comment.text}</p>}
+                            <span className="text-[11px] text-amber-700/70">
+                              {comment.authorName ? `${comment.authorName} · ` : ''}
+                              {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Expedited shipping steps. The tag says it is expedited,
                       this block exists only for the instructions and the exact
                       message Eli sends to Artelo. */}
