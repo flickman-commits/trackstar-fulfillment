@@ -146,8 +146,12 @@ export async function setSenderFor(userId, patch) {
   if (patch.role !== undefined) next.role = String(patch.role).trim().slice(0, 120)
   if (patch.story !== undefined) next.story = String(patch.story).trim().slice(0, 600)
   if (patch.signature !== undefined) {
-    next.signature = String(patch.signature).slice(0, 4000)
-    if (/<script|javascript:/i.test(next.signature)) throw new Error('The signature cannot contain scripts')
+    const sig = String(patch.signature)
+    // Refuse an oversized signature rather than silently cutting it in half,
+    // which is what happened to anyone pasting one with an inlined image.
+    if (sig.length > 20000) throw new Error(`That signature is ${sig.length} characters. Keep it under 20,000, and host images at a URL rather than pasting them in.`)
+    if (/<script|javascript:/i.test(sig)) throw new Error('The signature cannot contain scripts')
+    next.signature = sig
   }
   await prisma.systemConfig.upsert({
     where: { key: senderKey(userId) },

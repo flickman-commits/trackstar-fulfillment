@@ -102,7 +102,9 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 <div>
                   <label className={fieldLabel}>Signature</label>
                   <textarea rows={6} value={me.signature} onChange={e => setMe({ ...me, signature: e.target.value })} className={`${inputBase} w-full resize-y font-mono text-[11.5px]`} spellCheck={false} />
-                  <p className="text-xs text-off-black/50 mt-1">HTML. Added after the body of every email you send, before any P.S. Drafts themselves carry no sign-off.{me.isDefault ? ' This is the workspace default until you save your own.' : ''}</p>
+                  <p className="text-xs text-off-black/50 mt-1">
+                    HTML, not rich text: pasting from Mail or Gmail drops the formatting, so paste the HTML itself. An image has to live at a public URL, not be pasted in. Added after the body of every email you send, before any P.S.{me.isDefault ? ' This is the workspace default until you save your own.' : ''}
+                  </p>
                   <div className="mt-2 rounded-lg border border-border-gray bg-subtle-gray px-4 py-3">
                     <div className="font-mono text-[10px] tracking-wider uppercase text-off-black/40 mb-1">Preview</div>
                     <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 14, color: '#333', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: me.signature }} />
