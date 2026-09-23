@@ -207,7 +207,6 @@ export default async function handler(req, res) {
       'clear-research',
       'merge-race',
       'delete-creator',
-      'create-discount',
       'message-customer',
       'notify-custom-delay',
       'customers-served-set',
@@ -221,6 +220,17 @@ export default async function handler(req, res) {
         summary: describeAction(action, body),
         detail: body,
         actor: admin,
+      })
+    }
+
+    // Anyone on the team can comp a customer, but a discount code is money,
+    // so the log still names who made it.
+    if (action === 'create-discount') {
+      await recordAudit({
+        action: 'order.create-discount',
+        summary: describeAction(action, body),
+        detail: body,
+        actor,
       })
     }
 
