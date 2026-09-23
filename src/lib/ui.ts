@@ -61,3 +61,27 @@ export const panelToolbar = 'flex flex-wrap items-center gap-2 mb-4'
 
 /** Small uppercase label used above fields and stats. */
 export const fieldLabel = 'block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1'
+
+/**
+ * A chip: one fact about a record, as the fulfilment tool draws them.
+ * Square-ish corners, a border, small bold text. Pair with a tone.
+ */
+export const chip = 'inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-semibold'
+
+/** Tones for `chip`. Attio's own hues where a field comes from Attio. */
+export const chipTone = {
+  neutral: 'bg-white border-border-gray text-off-black',
+  quiet: 'bg-white border-border-gray text-off-black/60',
+  race: 'bg-orange-100 text-orange-800 border-orange-300',
+  charity: 'bg-pink-100 text-pink-800 border-pink-300',
+  corporate: 'bg-sky-100 text-sky-800 border-sky-300',
+  slate: 'bg-slate-100 text-slate-700 border-slate-300',
+  amber: 'bg-amber-100 text-amber-800 border-amber-300',
+  rose: 'bg-rose-100 text-rose-800 border-rose-300',
+  purple: 'bg-purple-100 text-purple-800 border-purple-300',
+  lime: 'bg-lime-100 text-lime-800 border-lime-300',
+  teal: 'bg-teal-100 text-teal-800 border-teal-300',
+  emerald: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  blue: 'bg-blue-100 text-blue-800 border-blue-300',
+  red: 'bg-red-100 text-red-800 border-red-300',
+} as const

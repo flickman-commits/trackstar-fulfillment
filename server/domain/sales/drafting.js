@@ -52,7 +52,7 @@ export function composeHtml(body, { signature = '', senderName = 'Matt' } = {}) 
     signature ? `<div style="margin-top:14px">${signature}</div>` : '',
     ...ps.map(p => `<p style="margin-top:14px">${esc(p).replace(/\n/g, '<br>')}</p>`),
   ].filter(Boolean)
-  return `<div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; color: #1a1a1a; line-height: 1.5;">\n${parts.join('\n')}\n</div>`
+  return `<div style="font-family: Helvetica, Arial, sans-serif; font-size: 16px; color: #1a1a1a; line-height: 1.5;">\n${parts.join('\n')}\n</div>`
 }
 
 /** The deal as the template filler expects it (it predates Attio and reads company-ish fields). */

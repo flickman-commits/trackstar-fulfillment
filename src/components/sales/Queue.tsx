@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
+import { chip, chipTone } from '@/lib/ui'
 import type { Deal, OvernightRun } from '@/types/sales'
 
 /**
@@ -20,17 +21,16 @@ function fmtDay(s?: string | null) {
   return s ? new Date(`${s}T00:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''
 }
 
-/** The motion, coloured as Attio colours it, so the two read as the same thing. */
-const MOTION_STYLE: Record<string, string> = {
-  Race: 'bg-orange-100 text-orange-800 border-orange-200',
-  Charity: 'bg-pink-100 text-pink-800 border-pink-200',
-  Corporate: 'bg-sky-100 text-sky-800 border-sky-200',
+/** The motion, in Attio's colours and the fulfilment tool's chip shape. */
+const MOTION_TONE: Record<string, string> = {
+  Race: chipTone.race,
+  Charity: chipTone.charity,
+  Corporate: chipTone.corporate,
 }
 
 export function MotionTag({ motion }: { motion?: string | null }) {
   if (!motion) return null
-  const cls = MOTION_STYLE[motion] || 'bg-subtle-gray text-off-black/60 border-border-gray'
-  return <span className={`text-[10.5px] font-medium px-1.5 py-0.5 rounded-full border whitespace-nowrap ${cls}`}>{motion}</span>
+  return <span className={`${chip} ${MOTION_TONE[motion] || chipTone.quiet}`}>{motion}</span>
 }
 
 function Row({ d, active, sent, pendingSend, onClick, hint, muted }: {

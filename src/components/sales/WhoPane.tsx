@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ExternalLink, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
-import { btnGhost, fieldLabel, inputBase } from '@/lib/ui'
+import { btnGhost, chip, chipTone, fieldLabel, inputBase } from '@/lib/ui'
 import { type Deal, type Person } from '@/types/sales'
 
 /**
@@ -12,21 +12,18 @@ import { type Deal, type Person } from '@/types/sales'
  * from here because a rep is a person and may; the tool itself only ever
  * moves Not Contacted to Reached Out on a send.
  */
-const STAGE_STYLE: Record<string, string> = {
-  'Needs Enrichment': 'bg-slate-100 text-slate-700 border-slate-200',
-  'Not Contacted': 'bg-amber-100 text-amber-800 border-amber-200',
-  'Reached Out': 'bg-rose-100 text-rose-800 border-rose-200',
-  'In Conversation': 'bg-orange-100 text-orange-800 border-orange-200',
-  'Call Booked': 'bg-purple-100 text-purple-800 border-purple-200',
-  'Deck Sent': 'bg-lime-100 text-lime-800 border-lime-200',
-  'Awaiting Payment': 'bg-teal-100 text-teal-800 border-teal-200',
-  Won: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  'Revisit Next Year': 'bg-blue-100 text-blue-800 border-blue-200',
-  Lost: 'bg-red-100 text-red-800 border-red-200',
+const STAGE_TONE: Record<string, string> = {
+  'Needs Enrichment': chipTone.slate,
+  'Not Contacted': chipTone.amber,
+  'Reached Out': chipTone.rose,
+  'In Conversation': chipTone.race,
+  'Call Booked': chipTone.purple,
+  'Deck Sent': chipTone.lime,
+  'Awaiting Payment': chipTone.teal,
+  Won: chipTone.emerald,
+  'Revisit Next Year': chipTone.blue,
+  Lost: chipTone.red,
 }
-
-const pill = 'text-[10.5px] font-medium px-1.5 py-0.5 rounded-full border whitespace-nowrap'
-const neutral = 'bg-subtle-gray text-off-black/60 border-border-gray'
 
 function fmtDate(s?: string | null) {
   if (!s) return ''
@@ -77,9 +74,9 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
         )}
         {/* Where the deal stands, read-only. Stage moves happen in Attio. */}
         <div className="mt-2 flex flex-wrap items-center gap-1">
-          {deal.stage && <span className={`${pill} ${STAGE_STYLE[String(deal.stage)] || neutral}`}>{deal.stage}</span>}
-          {deal.priority && <span className={`${pill} ${deal.priority === 'High' ? 'bg-orange-100 text-orange-800 border-orange-200' : neutral}`}>{deal.priority}</span>}
-          <span className={`${pill} ${neutral}`}>{deal.touchCount} {deal.touchCount === 1 ? 'touch' : 'touches'}</span>
+          {deal.stage && <span className={`${chip} ${STAGE_TONE[String(deal.stage)] || chipTone.quiet}`}>{deal.stage}</span>}
+          {deal.priority && <span className={`${chip} ${deal.priority === 'High' ? chipTone.amber : chipTone.neutral}`}>{deal.priority}</span>}
+          <span className={`${chip} ${chipTone.quiet}`}>{deal.touchCount} {deal.touchCount === 1 ? 'touch' : 'touches'}</span>
         </div>
         {person?.description && <p className="mt-2 text-[12.5px] text-off-black/70 leading-snug">{person.description}</p>}
       </section>

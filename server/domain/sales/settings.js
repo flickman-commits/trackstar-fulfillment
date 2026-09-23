@@ -35,9 +35,9 @@ export const DEFAULTS = {
    * sign-off; this is the sign-off.
    */
   signature: [
-    '<p style="margin:0;font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:21px;font-weight:700;color:#111">Matt Hickman</p>',
-    '<p style="margin:0;font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#444">Owner | <a href="https://www.trackstar.art" style="color:#1a56db">Trackstar</a>, <a href="https://www.flickmanmedia.com" style="color:#1a56db">Flickman Media</a></p>',
-    '<p style="margin:0;font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#8a8a8a">New York, NY</p>',
+    '<p style="margin:0;font-family:Inter,\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:21px;font-weight:700;color:#111">Matt Hickman</p>',
+    '<p style="margin:0;font-family:Inter,\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#444">Owner | <a href="https://www.trackstar.art" style="color:#1a56db">Trackstar</a>, <a href="https://www.flickmanmedia.com" style="color:#1a56db">Flickman Media</a></p>',
+    '<p style="margin:0;font-family:Inter,\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#8a8a8a">New York, NY</p>',
   ].join('\n'),
   /** What "today" means for the daily count. The business runs on Eastern time. */
   timezone: 'America/New_York',
