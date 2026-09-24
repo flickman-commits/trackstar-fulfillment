@@ -5133,10 +5133,13 @@ Thank you!`
                               </a>
                             )}
                             {comment.text && <p className="text-body-sm text-amber-900 whitespace-pre-wrap">{comment.text}</p>}
-                            <span className="text-[11px] text-amber-700/70">
-                              {comment.authorName ? `${comment.authorName} · ` : ''}
-                              {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                            </span>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] text-amber-700/70">
+                                {comment.authorName ? `${comment.authorName} · ` : ''}
+                                {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                              <button onClick={() => deleteComment(comment.id)} className="text-[11px] text-amber-700/60 hover:text-red-600">Delete</button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -6087,30 +6090,12 @@ Thank you!`
                     {isLoadingComments ? (
                       <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
                     ) : orderComments.length === 0 ? null : (
-                      <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {orderComments.map(comment => (
-                          <div key={comment.id} className="bg-white border border-border-gray rounded-md p-3 group">
-                            {comment.imageUrl && (
-                              <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
-                                <img src={comment.imageUrl} alt="Attachment" className="max-h-48 rounded-md mb-2 border border-border-gray hover:opacity-90 cursor-pointer" />
-                              </a>
-                            )}
-                            {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="text-xs text-off-black/40">
-                                {comment.authorName ? `${comment.authorName} · ` : ''}
-                                {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                              </span>
-                              <button
-                                onClick={() => deleteComment(comment.id)}
-                                className="text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      // The comments themselves are in the amber callout at the
+                      // top, where they get read. Repeating them here was just
+                      // the same paragraph twice.
+                      <p className="text-xs text-off-black/40">
+                        {orderComments.length === 1 ? 'The note is' : `All ${orderComments.length} notes are`} at the top of this order.
+                      </p>
                     )}
                   </div>
 
