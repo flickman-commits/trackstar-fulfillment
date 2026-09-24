@@ -24,7 +24,7 @@ export const ASSET_DRAG_TYPE = 'application/x-trackstar-asset'
  * cannot be hit by accident. Closing a deal out is done in Attio.
  */
 export default function Composer({
-  deal, person, draft, variants, index, drafting, gmailConnected, canSend, capReached, aiActive,
+  deal, person, draft, variants, index, drafting, writing, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach,
   onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature, library,
@@ -35,6 +35,8 @@ export default function Composer({
   variants: Variant[]
   index: number
   drafting: boolean
+  /** The model is writing (Rewrite), as opposed to a template being filled in. */
+  writing?: boolean
   gmailConnected: boolean
   canSend: boolean
   capReached: boolean
@@ -158,7 +160,7 @@ export default function Composer({
 
       {drafting ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-off-black/50 min-h-[300px]">
-          <Loader2 className="w-5 h-5 animate-spin" /> Writing…
+          <Loader2 className="w-5 h-5 animate-spin" /> {writing ? 'Writing…' : 'Loading the draft…'}
         </div>
       ) : !current ? (
         <div className="flex-1 flex items-center justify-center text-sm text-off-black/40 px-6 text-center min-h-[300px]">

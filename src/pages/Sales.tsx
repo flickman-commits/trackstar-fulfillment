@@ -57,6 +57,8 @@ export default function Sales() {
   const [prepared, setPrepared] = useState<Record<string, Prepared>>({})
   const [variantIndex, setVariantIndex] = useState(0)
   const [drafting, setDrafting] = useState(false)
+  // Only a Rewrite with AI on is the model writing; a click just fills in the template.
+  const [writing, setWriting] = useState(false)
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
   const [assets, setAssets] = useState<Asset[]>([])
   const [libraryConfigured, setLibraryConfigured] = useState(true)
@@ -153,7 +155,7 @@ export default function Sales() {
     if (!opts.force && cached) return
     const useModel = Boolean(opts.force) && aiActive
     inFlight.current.add(key)
-    if (!opts.silent) setDrafting(true)
+    if (!opts.silent) { setDrafting(true); setWriting(useModel) }
     try {
       const draft = await salesApi.variants(d.id, target.id, !useModel, Boolean(opts.force))
       setPrepared(prev => ({ ...prev, [d.id]: { draft, variants: draft.variants, template: !useModel } }))
@@ -463,7 +465,7 @@ export default function Sales() {
                 <Composer
                   deal={deal} person={person} draft={current?.draft || null}
                   variants={variants} index={Math.min(variantIndex, Math.max(0, variants.length - 1))}
-                  drafting={drafting} gmailConnected={gmailConnected} aiActive={aiActive}
+                  drafting={drafting} writing={writing} gmailConnected={gmailConnected} aiActive={aiActive}
                   canSend={gmailConnected && !capReached} capReached={capReached}
                   problems={problems} checking={checking} onCheck={checkDraft}
                   attachments={attachedAssets} onAttach={attach} onDetach={detach}

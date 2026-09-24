@@ -162,20 +162,23 @@ export function buildPrompt({ deal, person, touchNumber, step, previous, socialP
  * @returns {Promise<{ touchNumber, step, exhausted, variants, personId, dealId, model, source, warning? }>}
  */
 export async function draftVariants({ dealId, personId, useTemplate = false, force = false, actor }) {
-  const deal = await dealForWork(dealId)
+  // Everything a draft needs, read at once rather than one after another.
+  const [deal, settings, sender, templates, held] = await Promise.all([
+    dealForWork(dealId),
+    getSettings(),
+    getSenderFor(actor?.id, actor),
+    getTemplates(),
+    prisma.salesPrep.findUnique({ where: { attioDealId: dealId } }),
+  ])
   const person = (personId && deal.people.find(p => p.id === personId)) || deal.person
   if (!person) throw new Error('This deal has nobody to write to. Add a person to it in Attio.')
   const { touchNumber, step, exhausted } = nextStepFor(deal)
-  const settings = await getSettings()
-  const sender = await getSenderFor(actor?.id, actor)
   const socialProof = settings.socialProof || DEFAULT_SOCIAL_PROOF
-  const templates = await getTemplates()
   const base = { touchNumber, step, exhausted, personId: person.id, dealId: deal.id }
 
   // The overnight routine may already have written this one. It costs nothing
   // to use, so it wins whatever the AI switch says; only an explicit Rewrite
   // (force) or a draft written for a different touch sets it aside.
-  const held = await prisma.salesPrep.findUnique({ where: { attioDealId: deal.id } })
   if (!force && held && held.touchNumber === touchNumber && Array.isArray(held.variants) && held.variants.length) {
     return { ...base, personId: held.attioPersonId && deal.people.some(p => p.id === held.attioPersonId) ? held.attioPersonId : person.id, variants: held.variants, model: held.source, source: 'prepared', preparedAt: held.preparedAt }
   }
