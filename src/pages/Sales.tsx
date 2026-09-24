@@ -207,13 +207,6 @@ export default function Sales() {
     setPrepared(prev => ({ ...prev, [id]: { draft: { touchNumber: 0, step: { angle: 'free', purpose: 'Whatever you want to say. Your signature is added on send.', subject: '', nextActionDays: 0 }, exhausted: false, variants: [], personId: id, dealId: id, model: 'you' }, variants: [{ subject: '', body: 'Hey there,\n\n' }], template: true } }))
   }, [])
 
-  const moveTo = useCallback((delta: number) => {
-    if (!items.length) return
-    const idx = Math.max(0, items.findIndex(d => d.id === selectedId))
-    const next = items[Math.min(items.length - 1, Math.max(0, idx + delta))]
-    if (next) setSelectedId(next.id)
-  }, [items, selectedId])
-
   const advance = useCallback((fromId: string) => {
     const idx = items.findIndex(d => d.id === fromId)
     const ok = (d: Deal) => d.id !== fromId && !sentIds.has(d.id) && !pendingIds.has(d.id) && d.hasEmail
@@ -305,7 +298,7 @@ export default function Sales() {
     finally { setBusy(false) }
   }, [deal])
 
-  // Keyboard: I/K deals, J/L variants, ⌘↵ send, S skip.
+  // Keyboard: ⌘↵ sends, S skips.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(); return }
@@ -313,16 +306,12 @@ export default function Sales() {
       if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable) return
       if (settingsOpen || progressOpen || newOpen) return
       switch (e.key.toLowerCase()) {
-        case 'i': e.preventDefault(); moveTo(-1); break
-        case 'k': e.preventDefault(); moveTo(1); break
-        case 'j': e.preventDefault(); setVariantIndex(i => Math.max(0, i - 1)); break
-        case 'l': e.preventDefault(); setVariantIndex(i => Math.min(variants.length - 1, i + 1)); break
         case 's': e.preventDefault(); skip(); break
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [send, skip, moveTo, variants.length, settingsOpen, progressOpen, newOpen])
+  }, [send, skip, settingsOpen, progressOpen, newOpen])
 
   const updateVariant = (v: Variant) => {
     if (!deal || !current) return
@@ -497,7 +486,7 @@ export default function Sales() {
           {/* Bottom row: the shortcuts, and the page's own actions. */}
           <div className="flex items-center justify-between gap-3 mt-3 flex-shrink-0">
             <p className="hidden lg:block text-xs text-off-black/40">
-              I and K move between people · J and L switch versions · ⌘↵ sends · S skips
+              ⌘↵ sends · S skips
             </p>
             <div className="flex items-center gap-2 ml-auto">
               <button onClick={() => setSettingsOpen(true)} className={btnHeroSecondary} title="Settings"><SlidersHorizontal className="w-4 h-4" /><span className="hidden md:inline">Settings</span></button>

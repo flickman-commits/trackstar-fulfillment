@@ -48,13 +48,26 @@ export const DEAL_ATTRIBUTES = {
 
 export function isAttioConfigured() { return Boolean(process.env.ATTIO_API_KEY) }
 
+/**
+ * One Attio request. A 429 (rate or query-complexity limit) waits and tries
+ * again, up to three times, honouring Retry-After when Attio sends one, so a
+ * burst of clicks slows down instead of failing in front of the rep.
+ */
 async function attio(path, { method = 'GET', body } = {}) {
   if (!isAttioConfigured()) throw new Error('Attio is not connected: ATTIO_API_KEY is not set')
-  const res = await fetchWithTimeout(`${BASE}${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${process.env.ATTIO_API_KEY}`, 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  }, 20000)
+  let res
+  for (let attempt = 0; ; attempt++) {
+    res = await fetchWithTimeout(`${BASE}${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${process.env.ATTIO_API_KEY}`, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    }, 20000)
+    if (res.status !== 429 || attempt >= 3) break
+    const after = Number(res.headers.get('retry-after'))
+    const waitMs = Number.isFinite(after) && after > 0 ? Math.min(after * 1000, 10_000) : 800 * 2 ** attempt
+    await res.text().catch(() => {})
+    await new Promise(r => setTimeout(r, waitMs))
+  }
   const text = await res.text()
   let json = null
   try { json = text ? JSON.parse(text) : null } catch { json = null }
@@ -318,10 +331,28 @@ export async function getDealNow(id) {
   return { ...deal, company, people: people.filter(Boolean) }
 }
 
+/**
+ * One deal. If this server already holds the whole list (the queue just
+ * loaded it), that copy is used. Otherwise it is read on its own: a few plain
+ * record reads, never the workspace-wide query. Drafting, the library and
+ * notes each run on their own serverless instance, so reading every deal,
+ * company and person there to find one deal is what tripped Attio's
+ * query-complexity limit when a rep clicked a row.
+ */
 export async function getDeal(id, { fresh = false } = {}) {
-  if (fresh) return getDealNow(id)
-  const deals = await loadDeals()
-  return deals.find(d => d.id === id) || null
+  if (fresh) {
+    cache.delete(`deal:${id}`)
+    const deal = await getDealNow(id)
+    if (deal) cache.set(`deal:${id}`, { at: Date.now(), value: Promise.resolve(deal) })
+    return deal
+  }
+  const all = cache.get('deals')
+  if (all && Date.now() - all.at < CACHE_MS) {
+    const deals = await all.value.catch(() => null)
+    const hit = deals?.find(d => d.id === id)
+    if (hit) return hit
+  }
+  return cached(`deal:${id}`, CACHE_MS, () => getDealNow(id))
 }
 
 /** People who can own a deal: id, name, email. Cached longer; the roster rarely changes. */
@@ -374,6 +405,8 @@ export async function patchDeal(id, values) {
       if (i >= 0) list[i] = { ...list[i], ...dealView(out?.data), company: list[i].company, people: list[i].people }
     }
   } catch { cache.delete('deals') }
+  // The single-deal copy is cheap to re-read; drop it so the next look is current.
+  cache.delete(`deal:${id}`)
   return out?.data || null
 }
 

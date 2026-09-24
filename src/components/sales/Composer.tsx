@@ -241,9 +241,9 @@ export default function Composer({
           )}
           {variants.length > 1 && (
             <span className="flex items-center gap-1 ml-2 text-xs text-off-black/45">
-              <button onClick={onPrev} disabled={index === 0} className={btnGhost} title="Previous variant (J)"><ArrowLeft className="w-3.5 h-3.5" /></button>
+              <button onClick={onPrev} disabled={index === 0} className={btnGhost} title="Previous version"><ArrowLeft className="w-3.5 h-3.5" /></button>
               {index + 1} of {variants.length}
-              <button onClick={onNext} disabled={index >= variants.length - 1} className={btnGhost} title="Next variant (L)"><ArrowRight className="w-3.5 h-3.5" /></button>
+              <button onClick={onNext} disabled={index >= variants.length - 1} className={btnGhost} title="Next version"><ArrowRight className="w-3.5 h-3.5" /></button>
             </span>
           )}
         </div>
