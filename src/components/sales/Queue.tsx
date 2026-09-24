@@ -116,7 +116,7 @@ export default function Queue({
   const main = mode === 'new' ? [...f(today?.sentToday), ...f(today?.newOutreach)] : f(today?.followUps)
 
   return (
-    <aside className="w-full lg:w-[340px] shrink-0 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-border-gray">
+    <aside className="w-full lg:w-[290px] xl:w-[310px] shrink-0 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-border-gray">
       <div className={`flex items-center justify-between px-5 py-3 ${listHead} flex-shrink-0`}>
         <span>{mode === 'new' ? 'Today' : 'Due now'}</span>
         <span className="tabular-nums">{mode === 'new' ? `${newLeft} left` : `${dueLeft} due`}</span>
@@ -144,7 +144,6 @@ export default function Queue({
                 <Row
                   key={`${sent ? 'sent-' : ''}${d.id}`} d={d} index={i} sent={sent}
                   active={d.id === selectedId} pendingSend={pendingSendIds.has(d.id)} onClick={() => onSelect(d.id)}
-                  hint={!sent && d.id === selectedId ? '⌘↵' : undefined}
                 />
               )
             })}

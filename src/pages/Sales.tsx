@@ -4,8 +4,8 @@ import { toast } from 'sonner'
 import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, ExternalLink, PenLine, Search, ChevronDown, Loader2 } from 'lucide-react'
 import { salesApi, SalesApiError, type DealHit } from '@/lib/salesApi'
 import {
-  btnSecondary, btnHero, btnHeroSecondary, pageShell, pageColumn, pageHeader, pageTitle, pageLogo,
-  sectionTitle, sectionCount, segment, segmentGroup, listCard, listToolbar, toolbarInput, toolbarSelect, textLink,
+  btnSecondary, btnHero, btnHeroSecondary, pageShell,
+  segment, segmentGroup, listCard, listToolbar, toolbarInput, toolbarSelect, textLink,
 } from '@/lib/ui'
 import type { Asset, Deal, DraftResult, Motion, Person, SalesStatus, TodayPayload, Variant } from '@/types/sales'
 import Queue, { type QueueMode } from '@/components/sales/Queue'
@@ -362,35 +362,30 @@ export default function Sales() {
   const queueClear = !adhoc && today && (mode === 'new' ? today.newOutreach.length === 0 : today.followUps.length === 0) && pendingIds.size === 0
 
   const ownerName = today?.member?.name || status?.attio.member?.name || status?.me.firstName || 'Mine'
-  const sectionCountValue = mode === 'new' ? (today?.newOutreach.length ?? 0) : (today?.followUps.length ?? 0)
+  const newCount = today?.newOutreach.length ?? null
+  const dueCount = today?.followUps.length ?? null
 
   return (
     <div className={pageShell}>
-      <div className={`${pageColumn} max-w-7xl`}>
-        {/* Header: the fulfilment page's stars and big title, the day's count under it. */}
-        <div className={pageHeader}>
-          <div className="flex flex-col gap-3 min-w-0">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className={pageLogo} />
-            <div>
-              <h1 className={pageTitle}>Sales</h1>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-off-black/60">
-                <span className="flex items-center gap-2">
-                  <span><b className="text-off-black tabular-nums">{sentCount}</b> of {cap} sent today</span>
-                  <span className="hidden sm:flex gap-[3px]" aria-label={`${sentCount} of ${cap} sent`}>
-                    {Array.from({ length: cap }).map((_, i) => (
-                      <span key={i} className={`block w-[12px] h-[6px] rounded-[3px] ${i < sentCount ? 'bg-dark-fill' : i < sentCount + pendingIds.size ? 'bg-amber-400' : 'bg-off-black/10'}`} />
-                    ))}
-                  </span>
-                </span>
-                {today && <span><b className="text-off-black tabular-nums">{today.counts.week.sent}</b> this week</span>}
-                {today && <span><b className="text-off-black tabular-nums">{today.followUps.length}</b> follow-ups due</span>}
-              </div>
-            </div>
+      <div className="px-3 md:px-5 w-full flex flex-col h-full">
+        {/* Header: stars and title on one line, the day's count on the right. */}
+        <div className="pt-4 md:pt-5 pb-3 md:pb-4 flex items-center justify-between gap-4 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-fit" />
+            <h1 className="text-2xl md:text-[28px] font-bold text-off-black leading-none">Sales</h1>
+            {loading && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => setSettingsOpen(true)} className={btnHeroSecondary} title="Settings"><SlidersHorizontal className="w-4 h-4" /><span className="hidden lg:inline">Settings</span></button>
-            <button onClick={() => setProgressOpen(true)} className={btnHeroSecondary}><BarChart3 className="w-4 h-4" /><span className="hidden md:inline">Progress</span></button>
-            <button onClick={() => setNewOpen(true)} className={btnHero} title="Write to any deal, or any address"><PenLine className="w-4 h-4" /> New email</button>
+          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-off-black/60">
+            <span className="flex items-center gap-2">
+              <span><b className="text-off-black tabular-nums">{sentCount}</b> of {cap} sent today</span>
+              <span className="hidden sm:flex gap-[3px]" aria-label={`${sentCount} of ${cap} sent`}>
+                {Array.from({ length: cap }).map((_, i) => (
+                  <span key={i} className={`block w-[12px] h-[6px] rounded-[3px] ${i < sentCount ? 'bg-dark-fill' : i < sentCount + pendingIds.size ? 'bg-amber-400' : 'bg-off-black/10'}`} />
+                ))}
+              </span>
+            </span>
+            {today && <span className="hidden md:inline"><b className="text-off-black tabular-nums">{today.counts.week.sent}</b> this week</span>}
+            {today && <span className="hidden md:inline"><b className="text-off-black tabular-nums">{today.followUps.length}</b> follow-ups due</span>}
           </div>
         </div>
 
@@ -407,36 +402,31 @@ export default function Sales() {
           </div>
         )}
 
-        <section className="flex-1 flex flex-col min-h-0 pb-4">
-          {/* Section header: which list, how many, and the switch between the two. */}
-          <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <h2 className={sectionTitle}>{mode === 'new' ? 'New Outreach' : 'Follow Ups'}</h2>
-              {today && <span className={sectionCount}>{sectionCountValue}</span>}
-              {loading && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
-            </div>
-            <div className={segmentGroup}>
-              <button onClick={() => setMode('new')} className={segment(mode === 'new', 'md')}>New Outreach</button>
-              <button onClick={() => setMode('followups')} className={segment(mode === 'followups', 'md')}>Follow Ups</button>
-            </div>
-          </div>
-
+        <section className="flex-1 flex flex-col min-h-0 pb-3">
           <div className={listCard}>
             {/* Search and filters, inside the card like the order list's. */}
             <div className={listToolbar}>
               <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+                <div className={`${segmentGroup} self-start md:self-stretch shrink-0`}>
+                  <button onClick={() => setMode('new')} className={`${segment(mode === 'new', 'md')} h-full`}>
+                    New Outreach{newCount !== null && <span className="ml-1.5 tabular-nums opacity-60">{newCount}</span>}
+                  </button>
+                  <button onClick={() => setMode('followups')} className={`${segment(mode === 'followups', 'md')} h-full`}>
+                    Follow Ups{dueCount !== null && <span className="ml-1.5 tabular-nums opacity-60">{dueCount}</span>}
+                  </button>
+                </div>
                 <div className="relative flex-1">
                   <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
                   <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search people and deals..." className={toolbarInput} />
                 </div>
-                <div className="relative md:w-48">
+                <div className="relative md:w-44">
                   <select value={scope} onChange={e => setScope(e.target.value as 'mine' | 'all')} className={toolbarSelect(scope === 'all')} title="Deals you own in Attio plus unowned ones, or everyone's">
                     <option value="mine" className="bg-white text-off-black">{ownerName}</option>
                     <option value="all" className="bg-white text-off-black">Everyone</option>
                   </select>
                   <ChevronDown className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${scope === 'all' ? 'text-white' : 'text-off-black/40'}`} />
                 </div>
-                <div className="relative md:w-48">
+                <div className="relative md:w-40">
                   <select value={motion || ''} onChange={e => setMotion((e.target.value || null) as Motion | null)} className={toolbarSelect(Boolean(motion))}>
                     <option value="" className="bg-white text-off-black">All motions</option>
                     <option value="Race" className="bg-white text-off-black">Race</option>
@@ -446,7 +436,7 @@ export default function Sales() {
                   <ChevronDown className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${motion ? 'text-white' : 'text-off-black/40'}`} />
                 </div>
                 <button onClick={() => loadToday(true)} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm text-off-black/70 hover:bg-off-black/5 transition-colors" title="Re-read Attio">
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /><span className="md:hidden lg:inline">Refresh</span>
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /><span className="md:hidden">Refresh</span>
                 </button>
               </div>
             </div>
@@ -490,7 +480,7 @@ export default function Sales() {
                 />
               )}
 
-              <aside className="w-full lg:w-[340px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray p-5 space-y-6 min-h-0">
+              <aside className="w-full lg:w-[320px] xl:w-[340px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray p-5 space-y-6 min-h-0">
                 <WhoPane
                   deal={deal} person={person} busy={busy} onNote={addNote}
                   onSelectPerson={id => { setPersonId(id); if (deal) { setPrepared(prev => { const n = { ...prev }; delete n[deal.id]; return n }); prepare(deal, { silent: false, force: true, personId: id }) } }}
@@ -500,9 +490,17 @@ export default function Sales() {
             </div>
           </div>
 
-          <p className="hidden lg:block text-center text-xs text-off-black/40 mt-3 flex-shrink-0">
-            I and K move between people · J and L switch versions · ⌘↵ sends · S skips
-          </p>
+          {/* Bottom row: the shortcuts, and the page's own actions. */}
+          <div className="flex items-center justify-between gap-3 mt-3 flex-shrink-0">
+            <p className="hidden lg:block text-xs text-off-black/40">
+              I and K move between people · J and L switch versions · ⌘↵ sends · S skips
+            </p>
+            <div className="flex items-center gap-2 ml-auto">
+              <button onClick={() => setSettingsOpen(true)} className={btnHeroSecondary} title="Settings"><SlidersHorizontal className="w-4 h-4" /><span className="hidden md:inline">Settings</span></button>
+              <button onClick={() => setProgressOpen(true)} className={btnHeroSecondary}><BarChart3 className="w-4 h-4" /><span className="hidden md:inline">Progress</span></button>
+              <button onClick={() => setNewOpen(true)} className={btnHero} title="Write to any deal, or any address"><PenLine className="w-4 h-4" /> New email</button>
+            </div>
+          </div>
         </section>
 
       {settingsOpen && <SettingsModal status={status} aiOn={aiOn} onAiChange={setAiOn} onClose={() => { setSettingsOpen(false); loadStatus(); loadToday() }} />}
