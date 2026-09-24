@@ -1,13 +1,25 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate } from 'lucide-react'
 import { MotionTag } from './Queue'
 import type { LibraryTemplate, OutreachTemplate, TemplateFill } from '@/lib/salesApi'
 import { menuFor } from '@/lib/salesTemplates'
 
 /** The saved templates and their fill values, loaded once by the page. */
 export interface TemplateLibrary { templates: LibraryTemplate[]; fill: TemplateFill }
-import { btnPrimary, btnSecondary, btnGhost, inputBase, cardLabel, textLink } from '@/lib/ui'
+import { btnPrimary, btnSecondary, btnGhost, inputBase, cardLabel } from '@/lib/ui'
 import type { Asset, Deal, DraftResult, Person, Variant } from '@/types/sales'
+
+/** "today", "yesterday", "3 days ago", "2 weeks ago", "4 months ago". */
+function sinceLabel(iso: string) {
+  const then = new Date(iso); then.setHours(0, 0, 0, 0)
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const days = Math.max(0, Math.round((today.getTime() - then.getTime()) / 864e5))
+  if (days === 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 14) return `${days} days ago`
+  if (days < 60) return `${Math.round(days / 7)} weeks ago`
+  return `${Math.round(days / 30.4)} months ago`
+}
 
 /** What a library card carries when dragged. */
 export const ASSET_DRAG_TYPE = 'application/x-trackstar-asset'
@@ -61,7 +73,6 @@ export default function Composer({
   /** The saved templates, for the Templates menu. Null until loaded. */
   library: TemplateLibrary | null
 }) {
-  const [whyOpen, setWhyOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
   const [instruction, setInstruction] = useState('')
@@ -143,19 +154,16 @@ export default function Composer({
                 {!adhoc && <span className="px-2 py-0.5 rounded bg-off-black/10 text-off-black/60 font-medium">
                   {draft.touchNumber === 1 ? 'First touch' : `Follow-up ${draft.touchNumber - 1}`}
                 </span>}
-                {draft.source === 'template' && <span className="text-amber-700">template, fill in the opener</span>}
-                {draft.source === 'model' && <span>written just now</span>}
               </>
+            )}
+            {!adhoc && deal.lastSentAt && (
+              <span className="px-2 py-0.5 rounded bg-off-black/10 text-off-black/60 font-medium" title={new Date(deal.lastSentAt).toLocaleString()}>
+                Last emailed {sinceLabel(deal.lastSentAt)}
+              </span>
             )}
           </div>
         </div>
-        <button onClick={() => setWhyOpen(o => !o)} className={`${textLink} shrink-0 mt-1.5 disabled:opacity-40`} disabled={!draft}>
-          Why this email {whyOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        </button>
       </div>
-      {whyOpen && draft && (
-        <p className="text-xs text-off-black/60 bg-subtle-gray border-b border-border-gray px-6 py-2.5 leading-snug">{draft.step.purpose}</p>
-      )}
 
       {drafting ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-off-black/50 min-h-[300px]">
