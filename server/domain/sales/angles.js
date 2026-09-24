@@ -306,3 +306,6 @@ export const CHARITY_RULES = `
 
 /** Default social-proof line, editable in Settings later. */
 export const DEFAULT_SOCIAL_PROOF = 'Marine Corps Marathon finishers have ordered 1,000+ prints this season. CIM saw 300 orders in one week.'
+
+/** fill(), for templates that come from elsewhere (the Notion page). */
+export { fill as fillTemplate }

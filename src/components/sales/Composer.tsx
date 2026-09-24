@@ -1,6 +1,7 @@
-import { useState, type DragEvent } from 'react'
-import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink } from 'lucide-react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate } from 'lucide-react'
 import { MotionTag } from './Queue'
+import { salesApi, type OutreachTemplates } from '@/lib/salesApi'
 import { btnPrimary, btnSecondary, btnGhost, inputBase, cardLabel, textLink } from '@/lib/ui'
 import type { Asset, Deal, DraftResult, Person, Variant } from '@/types/sales'
 
@@ -230,9 +231,13 @@ export default function Composer({
               </div>
             </form>
           )}
-          <button onClick={onRewrite} disabled={drafting || !person} className={btnSecondary} title={aiActive ? 'Write it again' : 'Reset to the template'}>
-            <RefreshCw className={`w-3.5 h-3.5 ${drafting ? 'animate-spin' : ''}`} /> {aiActive ? 'Rewrite' : 'Template'}
-          </button>
+          <TemplateMenu deal={deal} person={person} disabled={drafting || !current} onRewrite={onRewrite} aiActive={aiActive}
+            onPick={t => current && onChange({ ...current, subject: t.subject ?? current.subject, body: t.body })} />
+          {aiActive && (
+            <button onClick={onRewrite} disabled={drafting || !person} className={btnSecondary} title="Write it again">
+              <RefreshCw className={`w-3.5 h-3.5 ${drafting ? 'animate-spin' : ''}`} /> Rewrite
+            </button>
+          )}
           {variants.length > 1 && (
             <span className="flex items-center gap-1 ml-2 text-xs text-off-black/45">
               <button onClick={onPrev} disabled={index === 0} className={btnGhost} title="Previous variant (J)"><ArrowLeft className="w-3.5 h-3.5" /></button>
@@ -245,6 +250,91 @@ export default function Composer({
           <Send className="w-4 h-4" /> Send <kbd className={kbd}><Command className="w-3 h-3" />↵</kbd>
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The Templates button: the team's templates from the Notion page, filled in
+ * for this person, plus the sequence's own copy for this touch. Picking one
+ * replaces the body; a template marked "stay on the thread" keeps the subject.
+ */
+function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive }: {
+  deal: Deal
+  person: Person | null
+  disabled: boolean
+  onPick: (t: { subject: string | null; body: string }) => void
+  onRewrite: () => void
+  aiActive: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<OutreachTemplates | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const key = `${deal.id}:${person?.id || ''}`
+  const loadedFor = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('mousedown', onDown); window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
+  }, [open])
+
+  useEffect(() => {
+    if (!open || loadedFor.current === key) return
+    loadedFor.current = key
+    setLoading(true); setError(null)
+    const adhoc = deal.id.startsWith('adhoc:')
+    salesApi.templates(adhoc
+      ? { firstName: person?.firstName, email: person?.email || undefined, org: deal.company?.name || '' }
+      : { dealId: deal.id, personId: person?.id })
+      .then(setData)
+      .catch(e => { setError((e as Error).message); loadedFor.current = null })
+      .finally(() => setLoading(false))
+  }, [open, key, deal, person])
+
+  const groups = (data?.items || []).reduce<Record<string, OutreachTemplates['items']>>((acc, t) => {
+    (acc[t.group] = acc[t.group] || []).push(t); return acc
+  }, {})
+
+  return (
+    <div ref={box} className="relative">
+      <button onClick={() => setOpen(o => !o)} disabled={disabled} className={btnSecondary} title="Choose a template">
+        <LayoutTemplate className="w-3.5 h-3.5" /> Templates <ChevronDown className="w-3 h-3 opacity-60" />
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 mb-2 w-[380px] max-h-[60vh] overflow-y-auto rounded-lg border border-border-gray bg-white shadow-lg z-20">
+          {!aiActive && (
+            <button onClick={() => { onRewrite(); setOpen(false) }} className="w-full text-left px-4 py-3 border-b border-border-gray hover:bg-subtle-gray">
+              <span className="block text-sm font-medium text-off-black">This touch in the sequence</span>
+              <span className="block text-xs text-off-black/50 mt-0.5">The tool's own copy for where this deal is. Edit it in Settings.</span>
+            </button>
+          )}
+          {loading && <div className="px-4 py-4 text-xs text-off-black/50 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading the templates…</div>}
+          {error && <div className="px-4 py-3 text-xs text-red-700">{error}</div>}
+          {Object.entries(groups).map(([group, items]) => (
+            <div key={group}>
+              <div className="px-4 py-2 bg-subtle-gray border-b border-border-gray text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">{group}</div>
+              {items.map(t => (
+                <button key={t.id} onClick={() => { onPick(t); setOpen(false) }} className="w-full text-left px-4 py-3 border-b border-border-gray last:border-b-0 hover:bg-subtle-gray">
+                  <span className="block text-sm font-medium text-off-black">{t.title}</span>
+                  {t.useFor && <span className="block text-xs text-off-black/55 mt-0.5 leading-snug">{t.useFor}</span>}
+                  <span className="block text-[11px] text-off-black/40 mt-1 truncate">{t.subject ? `Subject: ${t.subject}` : 'Replies on the thread, keeps the subject'}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+          {data && (
+            <div className="px-4 py-2.5 border-t border-border-gray flex items-center justify-between text-[11px] text-off-black/45">
+              <span>{data.source === 'notion' ? 'Live from Notion' : 'Copy of the Notion page from Sep 24'}</span>
+              <a href={data.url} target="_blank" rel="noopener noreferrer" className={textLink}>Edit in Notion <ExternalLink className="w-3 h-3" /></a>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -31,6 +31,10 @@ const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'PO
 /** A deal found for New email: any stage. */
 export interface DealHit { id: string; name: string | null; stage: string | null; motion: string | null; ownerId: string | null; webUrl: string | null; person: { fullName: string; email: string | null } | null }
 
+/** One of the team's templates from Notion, filled in for the person. A null subject means reply on the thread. */
+export interface OutreachTemplate { id: string; group: string; title: string; useFor: string | null; subject: string | null; body: string }
+export interface OutreachTemplates { source: 'notion' | 'snapshot'; url: string; items: OutreachTemplate[] }
+
 /** After a send: whether Attio now agrees. */
 export interface SyncResult { ok: boolean; skipped?: string; error?: string }
 
@@ -45,6 +49,12 @@ export const salesApi = {
     return request<TodayPayload>(`/api/sales/today?${params}`)
   },
   deal: (id: string, refresh = false) => request<{ deal: Deal }>(`/api/sales/today?action=deal&id=${encodeURIComponent(id)}${refresh ? '&refresh=1' : ''}`),
+  /** The Templates menu: the Notion page's templates, filled in for this person. */
+  templates: (opts: { dealId?: string; personId?: string | null; firstName?: string; email?: string; org?: string }) => {
+    const params = new URLSearchParams()
+    for (const [k, v] of Object.entries(opts)) if (v) params.set(k, v)
+    return request<OutreachTemplates>(`/api/sales/templates?${params}`)
+  },
   search: (q: string) => request<{ deals: DealHit[] }>(`/api/sales/today?action=search&q=${encodeURIComponent(q)}`),
   progress: (scope: 'mine' | 'all' = 'mine') => request<Progress>(`/api/sales/today?action=progress&scope=${scope}`),
   skip: (id: string, reason?: string) => post<{ success: true; until: string }>('/api/sales/today', { action: 'skip', id, reason }),

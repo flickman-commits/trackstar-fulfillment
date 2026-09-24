@@ -93,6 +93,7 @@ const routes = [
   { method: 'get',    path: '/api/sales/settings',         handler: '../api/sales/settings.js' },
   { method: 'post',   path: '/api/sales/settings',         handler: '../api/sales/settings.js' },
   { method: 'get',    path: '/api/sales/today',            handler: '../api/sales/today.js' },
+  { method: 'get',    path: '/api/sales/templates',        handler: '../api/sales/templates.js' },
   { method: 'post',   path: '/api/sales/today',            handler: '../api/sales/today.js' },
   { method: 'post',   path: '/api/sales/gmail',            handler: '../api/sales/gmail.js' },
 ]
