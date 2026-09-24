@@ -380,7 +380,7 @@ export default function Sales() {
               </span>
             </span>
             {today && <span className="hidden md:inline"><b className="text-off-black tabular-nums">{today.counts.week.sent}</b> this week</span>}
-            {today && <span className="hidden md:inline"><b className="text-off-black tabular-nums">{today.followUps.length}</b> follow-ups due</span>}
+            {today && <span className="hidden md:inline"><b className="text-off-black tabular-nums">{today.followUps.length}</b> due for a touch</span>}
           </div>
         </div>
 
@@ -444,10 +444,10 @@ export default function Sales() {
                 <div className="flex-1 min-w-0 flex items-center justify-center min-h-[320px]">
                   <div className="text-center max-w-[44ch] px-6">
                     <Check className="w-8 h-8 mx-auto text-success-green mb-2" />
-                    <div className="text-xl font-bold text-off-black">{mode === 'new' ? `New outreach is done. ${sentCount} sent today.` : 'No follow-ups due.'}</div>
+                    <div className="text-xl font-bold text-off-black">{mode === 'new' ? `New outreach is done. ${sentCount} sent today.` : 'Nothing due.'}</div>
                     <p className="text-sm text-off-black/60 mt-2">
                       {mode === 'new'
-                        ? (sentCount >= cap ? 'That is the cap. ' : '') + (today?.followUps.length ? `${today.followUps.length} follow-ups are waiting under Follow Ups.` : 'Tomorrow\'s batch comes from Attio in the morning.')
+                        ? (sentCount >= cap ? 'That is the cap. ' : '') + (today?.followUps.length ? `${today.followUps.length} are due under Follow Ups.` : 'Tomorrow\'s batch comes from Attio in the morning.')
                         : today?.later.length ? `${today.later.length} coming up this week.` : 'Nothing on the clock.'}
                     </p>
                   </div>

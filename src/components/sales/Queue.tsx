@@ -135,7 +135,7 @@ export default function Queue({
               <div className="px-5 py-8 text-sm text-off-black/50 text-center">
                 {query ? 'Nothing matches that search.'
                   : mode === 'new' ? `Nobody new to write to.${today.needsContact.length ? ` ${today.needsContact.length} deals need a person with an email in Attio.` : ''}`
-                  : `No follow-ups due.${today.later.length ? ` ${today.later.length} coming up.` : ''}`}
+                  : `Nothing due.${today.later.length ? ` ${today.later.length} coming up.` : ''}`}
               </div>
             )}
           </>

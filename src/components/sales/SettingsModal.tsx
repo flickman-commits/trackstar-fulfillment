@@ -253,7 +253,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                     </select>
                   </div>
                 </div>
-                <p className="text-xs text-off-black/50">The cap is how many first touches each rep gets a day, and what the page counts toward. Follow-ups are never capped; they are owed.</p>
+                <p className="text-xs text-off-black/50">The cap is how many first touches each rep gets a day, and what the page counts toward. Later touches are never capped; they are owed.</p>
                 <div>
                   <label className={fieldLabel}>Social proof line</label>
                   <textarea rows={2} value={s.socialProof} onChange={e => setS({ ...s, socialProof: e.target.value })} className={`${inputBase} w-full resize-y`} />

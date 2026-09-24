@@ -79,15 +79,29 @@ function withDisplay(p) {
 function daysBetween(a, b) { return Math.floor((b.getTime() - a.getTime()) / 86400000) }
 
 /**
- * When we last wrote to them: the tool's own log first, else Attio's synced
- * last email interaction on the company or the person, which covers emails
- * sent straight from Gmail before the tool existed.
+ * When the last email with them was, from Attio: its synced last email
+ * interaction on the person or the company, whichever is newer. That sees
+ * every mailbox Attio syncs, so emails sent straight from Gmail count the
+ * same as ones sent here. The tool's own log only fills the minutes before
+ * Attio's sync catches up with a send made here.
  */
 function lastContactAt(deal, lastSend) {
-  if (lastSend?.sentAt) return new Date(lastSend.sentAt)
   const person = deal.person || primaryPerson(deal)
-  const at = deal.company?.lastEmailAt || person?.lastEmailAt || null
-  return at ? new Date(at) : null
+  const times = [person?.lastEmailAt, deal.company?.lastEmailAt, lastSend?.sentAt]
+    .filter(Boolean).map(t => new Date(t)).filter(d => !Number.isNaN(d.getTime()))
+  return times.length ? new Date(Math.max(...times.map(d => d.getTime()))) : null
+}
+
+/** "today", "yesterday", "3 days ago", "2 weeks ago", "4 months ago". Same wording as the composer. */
+function sinceLabel(date) {
+  const then = new Date(date); then.setHours(0, 0, 0, 0)
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const days = Math.max(0, Math.round((today.getTime() - then.getTime()) / 864e5))
+  if (days === 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 14) return `${days} days ago`
+  if (days < 60) return `${Math.round(days / 7)} weeks ago`
+  return `${Math.round(days / 30.4)} months ago`
 }
 
 function isDue(deal, lastSend, dayStart) {
@@ -106,12 +120,10 @@ function overdueDays(deal, dayStart) {
 }
 
 function reasonFor(deal, lastSend) {
-  const { touchNumber, step, exhausted } = nextStepFor(deal)
+  const { touchNumber, exhausted } = nextStepFor(deal)
   if (exhausted) return 'Sequence complete · decide next year vs. lost'
-  if (touchNumber === 1) return `First touch${deal.priority ? ` · ${deal.priority} priority` : ''}`
   const last = lastContactAt(deal, lastSend)
-  const ago = last ? daysBetween(last, new Date()) : null
-  return `Touch ${touchNumber} · ${step.angle}${ago != null ? ` · last emailed ${ago}d ago, no reply` : ''}`
+  return `Touch ${touchNumber}${last ? ` · Last emailed ${sinceLabel(last)}` : ''}`
 }
 
 /** A deal as the page shows it: the Attio view plus what the send log and skips add. */

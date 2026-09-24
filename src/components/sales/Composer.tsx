@@ -152,7 +152,7 @@ export default function Composer({
             {draft && (
               <>
                 {!adhoc && <span className="px-2 py-0.5 rounded bg-off-black/10 text-off-black/60 font-medium">
-                  {draft.touchNumber === 1 ? 'First touch' : `Follow-up ${draft.touchNumber - 1}`}
+                  Touch {draft.touchNumber}
                 </span>}
               </>
             )}
