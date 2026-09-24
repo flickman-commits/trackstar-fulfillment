@@ -15,6 +15,7 @@ import LibraryPanel from '@/components/sales/LibraryPanel'
 import SettingsModal from '@/components/sales/SettingsModal'
 import ProgressModal from '@/components/sales/ProgressModal'
 import NewEmail from '@/components/sales/NewEmail'
+import LoadingStars from '@/components/sales/LoadingStars'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 
 /**
@@ -436,7 +437,9 @@ export default function Sales() {
               </div>
             </div>
 
-            {/* Three panes in the one card: who is next, the email, who they are. */}
+            {/* The first read of the queue can take a while; show the stars running laps. */}
+            {!today && !todayError ? <LoadingStars /> : (
+            /* Three panes in the one card: who is next, the email, who they are. */
             <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
               <Queue mode={mode} scope={scope} today={today} pendingSendIds={pendingIds} selectedId={selectedId} onSelect={setSelectedId} loading={loading} query={query} />
 
@@ -484,6 +487,7 @@ export default function Sales() {
                   onRenamed={(from, to) => setAttached(prev => Object.fromEntries(Object.entries(prev).map(([k, ids]) => [k, ids.map(x => (x === from ? to : x))])))} />
               </aside>
             </div>
+            )}
           </div>
 
           {/* Bottom row: the shortcuts, and the page's own actions. */}
