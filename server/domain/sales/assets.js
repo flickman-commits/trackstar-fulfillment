@@ -133,6 +133,26 @@ export async function deleteAsset(id) {
   cache = { at: 0, files: [] }
 }
 
+/**
+ * Give a file a new name. The name is the file's name in storage, so this
+ * moves it: the id changes, the extension stays, and the new name is what
+ * auto-pick matches and what the recipient sees on the attachment.
+ */
+export async function renameAsset(id, newName) {
+  const { bucket, name } = parseId(id)
+  const ext = (name.match(/\.[a-z0-9]+$/i) || [''])[0]
+  const base = String(newName || '').replace(/\.[a-z0-9]+$/i, '').trim()
+    .replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 120)
+  if (!base) throw new Error('Give it a name')
+  const target = `${base}${ext}`
+  if (target === name) return { id, filename: name }
+  const supabase = client()
+  const { error } = await supabase.storage.from(bucket).move(name, target)
+  if (error) throw new Error(/exists/i.test(error.message) ? `There is already a file called ${target}` : `Rename failed: ${error.message}`)
+  cache = { at: 0, files: [] }
+  return { id: idFor(bucket, target), filename: target }
+}
+
 /** The bytes, for attaching. */
 export async function readAsset(id) {
   const { bucket, name } = parseId(id)

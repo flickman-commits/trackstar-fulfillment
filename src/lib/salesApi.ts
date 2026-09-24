@@ -103,6 +103,7 @@ export const salesApi = {
     })
     return id
   },
+  renameAsset: (id: string, name: string) => post<{ id: string; filename: string }>('/api/sales/assets', { action: 'rename', id, name }),
   deleteAsset: (id: string) => post<{ success: true }>('/api/sales/assets', { action: 'delete', id }),
 
   settings: () => request<{ settings: SalesSettings; defaults: SalesSettings; sender: Sender; templates: TemplateTable; templateDefaults: TemplateTable; templateSteps: Record<Pipeline, TemplateStep[]>; placeholders: [string, string][] }>('/api/sales/settings'),

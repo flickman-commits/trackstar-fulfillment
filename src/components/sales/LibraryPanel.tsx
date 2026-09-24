@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent } from 'react'
-import { FileText, Image as ImageIcon, Loader2, Plus, Trash2, Upload, Check } from 'lucide-react'
+import { FileText, Image as ImageIcon, Loader2, Plus, Trash2, Upload, Check, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { sectionLabel, textLink } from '@/lib/ui'
 import { salesApi } from '@/lib/salesApi'
@@ -20,18 +20,23 @@ function fmtSize(n: number | null) {
   return n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`
 }
 
-export default function LibraryPanel({ assets, configured, attachedIds, onAttach, onChanged, compact }: {
+export default function LibraryPanel({ assets, configured, attachedIds, onAttach, onChanged, onRenamed, compact }: {
   assets: Asset[]
   configured: boolean
   attachedIds: Set<string>
   onAttach: (a: Asset) => void
   onChanged: () => void
+  /** A rename changes the file's id; the page moves any attachment across. */
+  onRenamed?: (oldId: string, newId: string) => void
   compact?: boolean
 }) {
   const [over, setOver] = useState(false)
   const [uploading, setUploading] = useState<Record<string, number>>({})
   const [filter, setFilter] = useState<'all' | 'image' | 'deck'>('all')
   const fileInput = useRef<HTMLInputElement>(null)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [draftName, setDraftName] = useState('')
+  const [renaming, setRenaming] = useState(false)
 
   const upload = async (files: FileList | File[]) => {
     const list = Array.from(files)
@@ -53,6 +58,20 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
     if (!window.confirm(`Remove ${a.name} from the library? Emails already sent keep their copy.`)) return
     try { await salesApi.deleteAsset(a.id); toast.message(`Removed ${a.name}`); onChanged() }
     catch (e) { toast.error((e as Error).message) }
+  }
+  const startRename = (a: Asset) => { setEditing(a.id); setDraftName(a.name) }
+  const rename = async (a: Asset) => {
+    const name = draftName.trim()
+    if (!name || name === a.name) { setEditing(null); return }
+    setRenaming(true)
+    try {
+      const out = await salesApi.renameAsset(a.id, name)
+      onRenamed?.(a.id, out.id)
+      toast.success(`Renamed to ${out.filename}`)
+      setEditing(null)
+      onChanged()
+    } catch (e) { toast.error((e as Error).message) }
+    finally { setRenaming(false) }
   }
   const onDrop = (e: DragEvent) => {
     e.preventDefault(); setOver(false)
@@ -114,11 +133,25 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
                   <div className="text-center"><FileText className="w-7 h-7 text-off-black/40 mx-auto" /><div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mt-1">{a.filename.split('.').pop()}{a.size ? ` · ${fmtSize(a.size)}` : ''}</div></div>
                 )}
               </div>
-              <div className="px-2 py-1.5 text-xs font-medium text-off-black leading-tight line-clamp-2 min-h-[38px]" title={a.name}>{a.name}</div>
+              {editing === a.id ? (
+                <form className="px-1.5 py-1.5" onSubmit={e => { e.preventDefault(); rename(a) }}>
+                  <input
+                    autoFocus value={draftName} disabled={renaming}
+                    onChange={e => setDraftName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Escape') setEditing(null) }}
+                    onBlur={() => rename(a)}
+                    onClick={e => e.stopPropagation()}
+                    className="w-full px-1.5 py-1 text-xs font-medium text-off-black border border-border-gray rounded focus:outline-none focus:ring-2 focus:ring-off-black/15"
+                  />
+                </form>
+              ) : (
+                <div className="px-2 py-1.5 text-xs font-medium text-off-black leading-tight line-clamp-2 min-h-[38px] cursor-text" title={`${a.name}. Double-click the name to rename.`} onDoubleClick={e => { e.stopPropagation(); startRename(a) }}>{a.name}</div>
+              )}
               <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => onAttach(a)} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-subtle-gray" title={attached ? 'Attached' : 'Attach to this email'}>
                   {attached ? <Check className="w-3.5 h-3.5 text-success-green" /> : <Plus className="w-3.5 h-3.5" />}
                 </button>
+                <button onClick={() => startRename(a)} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-subtle-gray" title="Rename"><Pencil className="w-3 h-3" /></button>
                 <button onClick={() => remove(a)} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-red-50 hover:text-red-700" title="Remove from the library"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
               {attached && <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-dark-fill text-white grid place-items-center"><Check className="w-2.5 h-2.5" strokeWidth={3} /></div>}

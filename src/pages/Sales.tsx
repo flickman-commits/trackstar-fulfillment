@@ -480,7 +480,8 @@ export default function Sales() {
                   deal={deal} person={person} busy={busy} onNote={addNote}
                   onSelectPerson={id => { setPersonId(id); if (deal) { setPrepared(prev => { const n = { ...prev }; delete n[deal.id]; return n }); prepare(deal, { silent: false, force: true, personId: id }) } }}
                 />
-                <LibraryPanel assets={assets} configured={libraryConfigured} attachedIds={new Set(attachedAssets.map(a => a.id))} onAttach={attach} onChanged={() => loadAssets(selectedId)} />
+                <LibraryPanel assets={assets} configured={libraryConfigured} attachedIds={new Set(attachedAssets.map(a => a.id))} onAttach={attach} onChanged={() => loadAssets(selectedId)}
+                  onRenamed={(from, to) => setAttached(prev => Object.fromEntries(Object.entries(prev).map(([k, ids]) => [k, ids.map(x => (x === from ? to : x))])))} />
               </aside>
             </div>
           </div>

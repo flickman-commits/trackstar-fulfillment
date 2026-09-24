@@ -4,6 +4,7 @@
  *   GET                                  every asset, each with a signed preview URL
  *   GET ?dealId=                         ...plus which image would be auto-attached for that deal
  *   POST { action:'upload-url', filename, contentType }   where the browser PUTs the bytes
+ *   POST { action:'rename', id, name }                 new name, same extension; the id changes
  *   POST { action:'delete', id }
  *
  * Bytes never pass through here: the browser uploads straight to storage on
@@ -11,7 +12,7 @@
  */
 import { setCors } from '../_lib/auth.js'
 import { requireSalesRep, recordAudit } from '../_lib/users.js'
-import { listAssets, assetPreviewUrl, assetUploadUrl, deleteAsset, pickAssetFor, isAssetStorageConfigured } from '../../server/domain/sales/assets.js'
+import { listAssets, assetPreviewUrl, assetUploadUrl, deleteAsset, renameAsset, pickAssetFor, isAssetStorageConfigured } from '../../server/domain/sales/assets.js'
 import { getDeal } from '../../server/domain/sales/attio.js'
 
 async function withPreviews(files) {
@@ -45,6 +46,16 @@ export default async function handler(req, res) {
         const out = await assetUploadUrl({ filename: String(body.filename || ''), contentType: String(body.contentType || '') })
         await recordAudit({ actor, action: 'sales.asset.upload', summary: `Added ${out.filename} to the sales library`, detail: { id: out.id } })
         return res.status(200).json(out)
+      }
+      if (body.action === 'rename') {
+        if (!body.id) return res.status(400).json({ error: 'id is required' })
+        try {
+          const out = await renameAsset(String(body.id), String(body.name || ''))
+          await recordAudit({ actor, action: 'sales.asset.rename', summary: `Renamed ${body.id} to ${out.filename} in the sales library`, detail: { from: body.id, to: out.id } })
+          return res.status(200).json(out)
+        } catch (e) {
+          return res.status(400).json({ error: e.message })
+        }
       }
       if (body.action === 'delete') {
         if (!body.id) return res.status(400).json({ error: 'id is required' })

@@ -26,7 +26,8 @@ import { draftProblems, NO_DASHES } from './guardrails.js'
 const VARIANT_COUNT = 5
 
 /**
- * The HTML that actually goes out: body, then the signature, then any P.S.
+ * The HTML that actually goes out: body, then the signature, then any P.S.,
+ * in the reader's default font.
  *
  * A draft ends on the ask; the signature is the sign-off. But a template's
  * P.S. ("attached a co-branded example") belongs after the signature, the
@@ -45,14 +46,19 @@ export function composeHtml(body, { signature = '', senderName = 'Matt' } = {}) 
     if (bare === name || bare === `thanks\n${name}` || bare === `thanks ${name}` || bare === `best ${name}` || bare === `cheers ${name}`) { main.pop(); continue }
     break
   }
+  // Written the way Apple Mail and Gmail write a message: a <div> per line
+  // and an empty line between paragraphs, with no font set. The reader's own
+  // mail app then shows it in its default font and size, like any email a
+  // person typed. Only the signature carries styling, its own.
   const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const para = t => `<p>${esc(t).replace(/\n/g, '<br>')}</p>`
-  const parts = [
+  const para = t => t.split('\n').map(line => `<div>${esc(line) || '<br>'}</div>`).join('\n')
+  const blank = '<div><br></div>'
+  const blocks = [
     ...main.map(para),
-    signature ? `<div style="margin-top:14px">${signature}</div>` : '',
-    ...ps.map(p => `<p style="margin-top:14px">${esc(p).replace(/\n/g, '<br>')}</p>`),
+    signature ? `<div>${signature}</div>` : '',
+    ...ps.map(para),
   ].filter(Boolean)
-  return `<div style="font-family: Helvetica, Arial, sans-serif; font-size: 16px; color: #1a1a1a; line-height: 1.5;">\n${parts.join('\n')}\n</div>`
+  return `<div>\n${blocks.join(`\n${blank}\n`)}\n</div>`
 }
 
 /** The deal as the template filler expects it (it predates Attio and reads company-ish fields). */

@@ -328,9 +328,10 @@ function base64url(s) {
  */
 export function textToHtml(text) {
   const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  // Same shape as composeHtml: no font set, so the reader's default applies.
   const paragraphs = String(text || '').replace(/\r\n/g, '\n').split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
-  const inner = paragraphs.map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('\n')
-  return `<div style="font-family: Helvetica, Arial, sans-serif; font-size: 16px; color: #1a1a1a; line-height: 1.5;">\n${inner}\n</div>`
+  const inner = paragraphs.map(p => p.split('\n').map(line => `<div>${esc(line) || '<br>'}</div>`).join('\n')).join('\n<div><br></div>\n')
+  return `<div>\n${inner}\n</div>`
 }
 
 /**
