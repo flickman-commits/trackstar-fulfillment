@@ -59,19 +59,28 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
     try { await salesApi.deleteAsset(a.id); toast.message(`Removed ${a.name}`); onChanged() }
     catch (e) { toast.error((e as Error).message) }
   }
-  const startRename = (a: Asset) => { setEditing(a.id); setDraftName(a.name) }
+  // Which card is being renamed, readable synchronously: the blur that
+  // follows Enter (and the one when the input unmounts) must see it is done.
+  const editingRef = useRef<string | null>(null)
+  const stopRename = () => { editingRef.current = null; setEditing(null) }
+  const startRename = (a: Asset) => { editingRef.current = a.id; setEditing(a.id); setDraftName(a.name) }
+  // Enter submits and then the input's blur fires as it unmounts; without
+  // this the second call renames the old name, which is already gone.
+  const renameBusy = useRef(false)
   const rename = async (a: Asset) => {
+    if (renameBusy.current || editingRef.current !== a.id) return
     const name = draftName.trim()
-    if (!name || name === a.name) { setEditing(null); return }
+    if (!name || name === a.name) { stopRename(); return }
+    renameBusy.current = true
     setRenaming(true)
     try {
       const out = await salesApi.renameAsset(a.id, name)
       onRenamed?.(a.id, out.id)
       toast.success(`Renamed to ${out.filename}`)
-      setEditing(null)
+      stopRename()
       onChanged()
     } catch (e) { toast.error((e as Error).message) }
-    finally { setRenaming(false) }
+    finally { setRenaming(false); renameBusy.current = false }
   }
   const onDrop = (e: DragEvent) => {
     e.preventDefault(); setOver(false)
@@ -138,7 +147,7 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
                   <input
                     autoFocus value={draftName} disabled={renaming}
                     onChange={e => setDraftName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Escape') setEditing(null) }}
+                    onKeyDown={e => { if (e.key === 'Escape') stopRename() }}
                     onBlur={() => rename(a)}
                     onClick={e => e.stopPropagation()}
                     className="w-full px-1.5 py-1 text-xs font-medium text-off-black border border-border-gray rounded focus:outline-none focus:ring-2 focus:ring-off-black/15"

@@ -167,25 +167,27 @@ export default function Composer({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-[64px_1fr] items-center gap-2 px-6 py-2.5 border-b border-border-gray flex-shrink-0">
-            <span className={cardLabel}>Subject</span>
-            <input value={current.subject} onChange={e => onChange({ ...current, subject: e.target.value })} onBlur={onCheck} className={`${inputBase} w-full border-transparent bg-transparent px-1 font-medium focus:bg-white focus:border-border-gray`} />
+          {/* Labels sit above their field so the text gets the pane's full width.
+              Subject and body text both start 8px in, so they line up. */}
+          <div className="px-6 pt-3 pb-2.5 border-b border-border-gray flex-shrink-0">
+            <span className={`${cardLabel} block px-2 mb-0.5`}>Subject</span>
+            <input value={current.subject} onChange={e => onChange({ ...current, subject: e.target.value })} onBlur={onCheck} className={`${inputBase} w-full border-transparent bg-transparent px-[7px] font-medium focus:bg-white focus:border-border-gray`} />
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
           <BodyEditor body={current.body} signature={signature} onChange={body => onChange({ ...current, body })} onBlur={onCheck} />
 
           {/* Change it: one instruction, the model does the rest. */}
           {aiActive && (
-            <div className="grid grid-cols-[64px_1fr] items-center gap-2 px-6 pb-2">
-              <span className={cardLabel}><Sparkles className="w-3 h-3 inline -mt-0.5" /></span>
-              <form className="flex items-center gap-2" onSubmit={e => { e.preventDefault(); revise() }}>
+            <div className="flex items-center gap-2 px-8 pb-2">
+              <Sparkles className="w-3.5 h-3.5 text-off-black/40 shrink-0" />
+              <form className="flex-1 flex items-center gap-2" onSubmit={e => { e.preventDefault(); revise() }}>
                 <input value={instruction} onChange={e => setInstruction(e.target.value)} placeholder="Change it: shorter, warmer, mention their Boston team…" className={`${inputBase} flex-1`} disabled={revising} />
                 <button type="submit" disabled={revising || !instruction.trim()} className={btnSecondary}>{revising ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Apply'}</button>
               </form>
             </div>
           )}
 
-          <div className="px-6 pb-2 pl-[96px] text-xs">
+          <div className="px-8 pb-2 text-xs">
             {checking ? (
               <span className="inline-flex items-center gap-1.5 text-off-black/45"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking the house rules…</span>
             ) : problems === null ? (
@@ -200,7 +202,7 @@ export default function Composer({
           </div>
 
           {/* Attachments */}
-          <div className={`mx-6 mb-4 ml-[96px] rounded-md border border-dashed px-3 py-2.5 text-xs flex flex-wrap items-center gap-2 ${over ? 'border-dark-fill bg-white' : missingRequired ? 'border-red-300 bg-red-50/40' : 'border-border-gray bg-subtle-gray'}`}>
+          <div className={`mx-8 mb-4 rounded-md border border-dashed px-3 py-2.5 text-xs flex flex-wrap items-center gap-2 ${over ? 'border-dark-fill bg-white' : missingRequired ? 'border-red-300 bg-red-50/40' : 'border-border-gray bg-subtle-gray'}`}>
             <Paperclip className={`w-3.5 h-3.5 ${missingRequired ? 'text-red-600' : 'text-off-black/40'}`} />
             {attachments.map(a => (
               <span key={a.id} className="inline-flex items-center gap-1.5 pl-1 pr-1.5 py-1 rounded border border-border-gray bg-white font-medium">
@@ -371,8 +373,8 @@ function BodyEditor({ body, signature, onChange, onBlur }: {
   }
   const box = 'block w-full text-sm leading-relaxed text-off-black bg-transparent px-1 focus:outline-none placeholder:text-off-black/30'
   return (
-    <div className="px-6 pt-3 pb-2 grid grid-cols-[64px_1fr] gap-x-2">
-      <span className={`${cardLabel} pt-2`}>Body</span>
+    <div className="px-6 pt-3 pb-2">
+      <span className={`${cardLabel} block px-2 mb-0.5`}>Body</span>
       <div className="rounded-md px-1 py-1 focus-within:bg-subtle-gray/50 transition-colors">
         <AutoGrow value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minRows={8} className={box} />
         <div className="px-1 pt-3 pb-2 text-sm text-off-black" title="Your signature, added on send. Change it in Settings, under Me.">
