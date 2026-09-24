@@ -38,7 +38,11 @@ model Order {
 
   // Custom order fields (populated from Shopify properties for custom orders)
   designStatus       String    @default("not_started") // "not_started" | "in_progress" | "awaiting_review" | "ready_to_send" | "done"
-  dueDate            DateTime? // Computed: order created_at + 14 days
+  dueDate            DateTime? // Computed: order created_at + 14 days (4 if isRushOrder)
+  // "Skip the line": the customer paid the rush fee, so this order is promised
+  // in 4 days instead of 14 and should be designed first. Set from the rush
+  // add-on line item / the print's Rush Order property at import.
+  isRushOrder        Boolean   @default(false)
   customerEmail      String?   // Customer email from Shopify order
   customerName       String?   // Customer first name from Shopify order (for email template)
   bibNumberCustomer  String?   // Bib # provided by customer (custom orders only)
@@ -125,6 +129,7 @@ model Order {
   @@index([customerEmail])
   @@index([createdAt])
   @@index([dueDate])
+  @@index([isRushOrder])
   @@index([designStatus])
 }
 

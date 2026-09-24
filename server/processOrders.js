@@ -23,7 +23,7 @@ import { parseRaceNameFromTitle } from './scrapers/raceNameNormalization.js'
 import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrderIds, saveCountedOrderIds } from './services/customersServed.js'
 import { isExpeditedShipping, getShippingMethod } from './lib/shipping.js'
 import { fetchWithTimeout } from './lib/fetchWithTimeout.js'
-import { buildShopifyMatchMap, buildEtsyMatchMap } from './lib/lineItemMatching.js'
+import { buildShopifyMatchMap, buildEtsyMatchMap, isRushAddonLineItem } from './lib/lineItemMatching.js'
 
 // Artelo API configuration
 // artelo.com, not artelo.io: the old host now redirects across domains and
@@ -58,6 +58,43 @@ function isTruthyFlag(value) {
 /**
  * Check if a race name indicates a custom order
  */
+// Design turnaround promised to a custom-order customer, from the moment the
+// order is placed. Rush ("skip the line") is the paid upgrade.
+const CUSTOM_DUE_DAYS = 14
+const RUSH_DUE_DAYS = 4
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Due date for a custom order placed at `placedAt`. Calendar days, matching
+ *  the 14-day rule this replaces. */
+export function customDueDate(placedAt, isRush) {
+  // new Date(null) is epoch 0, not Invalid Date, so a missing timestamp would
+  // otherwise compute a due date in 1970 and sort to the top of the queue
+  // forever. Reject empty input before parsing.
+  if (placedAt === null || placedAt === undefined || placedAt === '') return null
+  const t = placedAt instanceof Date ? placedAt.getTime() : new Date(placedAt).getTime()
+  if (!Number.isFinite(t)) return null
+  return new Date(t + (isRush ? RUSH_DUE_DAYS : CUSTOM_DUE_DAYS) * DAY_MS)
+}
+
+/**
+ * Did this Shopify order buy the rush upgrade?
+ *
+ * Two independent signals, either one is enough:
+ *   - the print carries the "Rush Order" property the wizard writes
+ *   - a rush add-on line item is present anywhere in the order (this is the
+ *     one the customer was actually charged for)
+ *
+ * Belt and braces on purpose: the property alone would miss an order placed
+ * through a path that does not write it, and the line item alone would miss
+ * one where the poster landed but the add-on call failed. Either way the
+ * customer who paid gets the fast lane.
+ */
+export function shopifyOrderIsRush(shopifyOrderData, printLineItemIsRush) {
+  if (printLineItemIsRush) return true
+  const items = shopifyOrderData?.line_items
+  return Array.isArray(items) && items.some(isRushAddonLineItem)
+}
+
 function isCustomOrder(raceName) {
   if (!raceName) return false
   return CUSTOM_ORDER_RACE_NAMES.some(keyword =>
@@ -178,7 +215,8 @@ function extractShopifyPersonalization(lineItem) {
     customerPace: null,
     customerEventType: null,
     lookupOutcome: null,
-    photoPath: null
+    photoPath: null,
+    isRush: false
   }
 
   if (!lineItem) {
@@ -247,6 +285,12 @@ function extractShopifyPersonalization(lineItem) {
       }
       else if (name === 'Creative Direction' || name === 'Creative Direction:' || name === 'creative_direction') {
         result.creativeDirection = value || null
+      }
+      // Rush upgrade. The wizard writes a readable "Rush Order" so it shows in
+      // the Shopify admin and on the packing slip; the underscore form is
+      // accepted too in case a future path writes a hidden property.
+      else if (name === 'Rush Order' || name === 'Rush Order:' || name === 'rush_order' || name === '_rush') {
+        result.isRush = isTruthyFlag(value) || value.toLowerCase() === 'yes'
       }
       else if (name === 'Gift' || name === 'Gift:' || name === 'gift') {
         // Easify (and the Instant Lookup widget mirroring it) sends the literal
@@ -781,10 +825,25 @@ export async function processOrders(options = {}) {
                     updateData.timeCustomer = extracted.timeCustomer
                     updateData.creativeDirection = extracted.creativeDirection
 
-                    // Compute due date from Shopify order created_at + 14 days
+                    const isRush = shopifyOrderIsRush(shopifyData.shopifyOrderData, extracted.isRush)
+                    updateData.isRushOrder = isRush
+
+                    // Compute due date from Shopify order created_at.
+                    //
+                    // The existing date is normally left alone (a human may
+                    // have moved it). The exception is an order that turns out
+                    // to be rush while still carrying the standard 14-day date:
+                    // that date was computed before we knew, and leaving it
+                    // would bury a paid rush order at the back of the queue.
                     const orderCreatedAt = shopifyData.shopifyOrderData?.created_at
-                    if (orderCreatedAt && !existing.dueDate) {
-                      updateData.dueDate = new Date(new Date(orderCreatedAt).getTime() + 14 * 24 * 60 * 60 * 1000)
+                    if (orderCreatedAt) {
+                      const computed = customDueDate(orderCreatedAt, isRush)
+                      const standard = customDueDate(orderCreatedAt, false)
+                      const stillStandard = existing.dueDate && standard &&
+                        Math.abs(new Date(existing.dueDate).getTime() - standard.getTime()) < 60 * 1000
+                      if (computed && (!existing.dueDate || (isRush && !existing.isRushOrder && stillStandard))) {
+                        updateData.dueDate = computed
+                      }
                     }
                   }
 
@@ -829,7 +888,7 @@ export async function processOrders(options = {}) {
                     // Backfill due date if missing: Etsy create_timestamp (seconds) + 14 days
                     const etsyCreatedAt = etsyReceipt.create_timestamp
                     if (etsyCreatedAt && !existing.dueDate) {
-                      updateData.dueDate = new Date(etsyCreatedAt * 1000 + 14 * 24 * 60 * 60 * 1000)
+                      updateData.dueDate = customDueDate(etsyCreatedAt * 1000, false)
                     }
                   }
 
@@ -882,6 +941,7 @@ export async function processOrders(options = {}) {
               let customerEmail = null
               let customerName = null
               let dueDate = null
+              let isRushOrder = false
               // Instant Lookup widget result (standard orders, Shopify only).
               // Captured for ALL order types; null when the widget wasn't used.
               let lookupVerified = null
@@ -941,13 +1001,16 @@ export async function processOrders(options = {}) {
                     creativeDirection = extracted.creativeDirection
                     // isGiftOrder is captured above for all order types.
 
-                    // Compute due date: order created_at + 14 days
+                    isRushOrder = shopifyOrderIsRush(shopifyData.shopifyOrderData, extracted.isRush)
+
+                    // Compute due date: order created_at + 14 days, or 4 when
+                    // the customer paid to skip the line.
                     const orderCreatedAt = shopifyData.shopifyOrderData?.created_at
                     if (orderCreatedAt) {
-                      dueDate = new Date(new Date(orderCreatedAt).getTime() + 14 * 24 * 60 * 60 * 1000)
+                      dueDate = customDueDate(orderCreatedAt, isRushOrder)
                     }
 
-                    log(`[processOrders] 🎨 Custom order detected: ${order.orderId}-${lineItemIndex}`)
+                    log(`[processOrders] 🎨 Custom order detected: ${order.orderId}-${lineItemIndex}${isRushOrder ? ' ⚡ RUSH' : ''}`)
                   }
 
                   if (extracted.needsAttention && trackstarOrderType !== 'custom') {
@@ -987,10 +1050,11 @@ export async function processOrders(options = {}) {
                     timeCustomer = extracted.timeCustomer || timeCustomer
                     creativeDirection = extracted.creativeDirection || creativeDirection
 
-                    // Compute due date: Etsy create_timestamp (seconds) + 14 days
+                    // Compute due date: Etsy create_timestamp (seconds) + 14
+                    // days. Rush is not sold on Etsy, so never the short date.
                     const etsyCreatedAt = etsyReceipt.create_timestamp
                     if (etsyCreatedAt) {
-                      dueDate = new Date(etsyCreatedAt * 1000 + 14 * 24 * 60 * 60 * 1000)
+                      dueDate = customDueDate(etsyCreatedAt * 1000, false)
                     }
 
                     log(`[processOrders] 🎨 Custom Etsy order detected: ${order.orderId}-${lineItemIndex}`)
@@ -1025,6 +1089,7 @@ export async function processOrders(options = {}) {
                   trackstarOrderType,
                   designStatus: trackstarOrderType === 'custom' ? 'not_started' : 'not_started',
                   dueDate,
+                  isRushOrder,
                   customerEmail,
                   customerName,
                   bibNumberCustomer,

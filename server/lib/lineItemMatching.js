@@ -10,9 +10,9 @@
  *    8x10 (Hannah), and positional `[lineItemIndex]` lookup glued Victor's
  *    name onto the 8x10 print and Hannah's onto the 12x18.
  *
- * 2. ADD-ONS. The $15 photo upcharge is its own Shopify product, so a photo
- *    order arrives as TWO line items: the poster and the add-on. Only the
- *    poster is a print. Leaving the add-on in the candidate pool caused both
+ * 2. ADD-ONS. The photo upcharge and the rush ("skip the line") fee are each
+ *    their own Shopify product, so such an order arrives as TWO OR MORE line
+ *    items: the poster and the add-ons. Only the poster is a print. Leaving the add-on in the candidate pool caused both
  *    of the bugs this module exists to prevent: a print row pairing with the
  *    add-on (so the dashboard showed "Photo Add-On" as the product), and an
  *    extra Artelo item importing as a second, bogus order row.
@@ -27,6 +27,12 @@
 const PHOTO_ADDON_PRODUCT_ID = Number(process.env.PHOTO_ADDON_PRODUCT_ID || 10329625723163)
 const PHOTO_ADDON_TITLE_RE = /^photo add-?on$/i
 
+// Rush ("skip the line") is the second paid add-on and behaves exactly like
+// the photo one: its own product, its own line item, never a print. Same three
+// signals, so a renamed product or a missing property still gets caught.
+const RUSH_ADDON_PRODUCT_ID = Number(process.env.RUSH_ADDON_PRODUCT_ID || 0)
+const RUSH_ADDON_TITLE_RE = /rush\s*order|skip\s*the\s*line/i
+
 export function isPhotoAddonLineItem(lineItem) {
   if (!lineItem) return false
   if (Number(lineItem.product_id) === PHOTO_ADDON_PRODUCT_ID) return true
@@ -34,9 +40,23 @@ export function isPhotoAddonLineItem(lineItem) {
   return PHOTO_ADDON_TITLE_RE.test(String(lineItem.title || '').trim())
 }
 
+export function isRushAddonLineItem(lineItem) {
+  if (!lineItem) return false
+  // Guard the id check: RUSH_ADDON_PRODUCT_ID is 0 until the env var is set,
+  // and a line item with no product_id would otherwise match it.
+  if (RUSH_ADDON_PRODUCT_ID && Number(lineItem.product_id) === RUSH_ADDON_PRODUCT_ID) return true
+  if ((lineItem.properties || []).some(p => p?.name === '_rush_for')) return true
+  return RUSH_ADDON_TITLE_RE.test(String(lineItem.title || '').trim())
+}
+
+/** Any paid add-on: a charge that rides along with a print but is not one. */
+export function isAddonLineItem(lineItem) {
+  return isPhotoAddonLineItem(lineItem) || isRushAddonLineItem(lineItem)
+}
+
 /** The line items that are actual prints, i.e. everything but the add-ons. */
 export function printableLineItems(lineItems) {
-  return (lineItems || []).filter(li => !isPhotoAddonLineItem(li))
+  return (lineItems || []).filter(li => !isAddonLineItem(li))
 }
 
 function normalizePrintSize(raw) {
@@ -106,7 +126,7 @@ function buildMatchMapByScore(arteloItems, upstreamItems, scoreSizeMatchFns) {
 export function buildShopifyMatchMap(arteloItems, shopifyLineItems) {
   const prints = []
   ;(shopifyLineItems || []).forEach((li, j) => {
-    if (!isPhotoAddonLineItem(li)) prints.push({ li, originalIndex: j })
+    if (!isAddonLineItem(li)) prints.push({ li, originalIndex: j })
   })
   const map = buildMatchMapByScore(arteloItems, prints.map(p => p.li), [
     // SKU containing the size token is the strongest signal (SKU encodes
@@ -158,7 +178,7 @@ export function resolveShopifyLineIndex(order) {
   // No Artelo snapshot (or this row lost its match). Fall back to positional
   // over the prints only, so we still never land on an add-on.
   const prints = []
-  lineItems.forEach((li, j) => { if (!isPhotoAddonLineItem(li)) prints.push(j) })
+  lineItems.forEach((li, j) => { if (!isAddonLineItem(li)) prints.push(j) })
   if (!prints.length) return -1
   return prints[Math.min(idx, prints.length - 1)]
 }

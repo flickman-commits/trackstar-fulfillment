@@ -284,6 +284,7 @@ export default async function handler(req, res) {
         trackstarOrderType: order.trackstarOrderType,
         designStatus: order.designStatus,
         dueDate: order.dueDate,
+        isRushOrder: order.isRushOrder,
         customerEmail: order.customerEmail,
         customerName: order.customerName,
         bibNumberCustomer: order.bibNumberCustomer,

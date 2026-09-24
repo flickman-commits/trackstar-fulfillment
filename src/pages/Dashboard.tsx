@@ -139,6 +139,7 @@ interface Order {
   frameType?: string | null  // Only surfaced for creator-sample callout — Artelo has it baked into other orders
   designStatus?: DesignStatus
   dueDate?: string
+  isRushOrder?: boolean
   customerEmail?: string
   customerName?: string
   bibNumberCustomer?: string
@@ -316,6 +317,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     trackstarOrderType: order.trackstarOrderType as 'standard' | 'custom' | 'race_partner' | 'bulk' | undefined,
     designStatus: order.designStatus as DesignStatus | undefined,
     dueDate: order.dueDate as string | undefined,
+    isRushOrder: order.isRushOrder as boolean | undefined,
     customerEmail: order.customerEmail as string | undefined,
     customerName: order.customerName as string | undefined,
     bibNumberCustomer: order.bibNumberCustomer as string | undefined,
@@ -2245,7 +2247,9 @@ export default function Dashboard() {
       return activeOrders.sort((a, b) => {
         const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
         const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
-        return dateA - dateB
+        if (dateA !== dateB) return dateA - dateB
+        // Same due date: the one that paid to skip the line goes first.
+        return Number(b.isRushOrder || false) - Number(a.isRushOrder || false)
       })
     }
     // Standard view: filter by status; expedited orders pinned to top, then newest Shopify order first
@@ -2923,8 +2927,13 @@ Thank you!`
                               </>
                             ) : (
                               <>
-                                <span className={`text-xs ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black/40'}`}>
-                                  Due: {formatDueDate(order.dueDate)}
+                                <span className={`text-xs flex items-center gap-1.5 ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black/40'}`}>
+                                  {order.isRushOrder && (
+                                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800" title="Customer paid to skip the line: 4-day turnaround">
+                                      ⚡ Rush
+                                    </span>
+                                  )}
+                                  <span>Due: {formatDueDate(order.dueDate)}</span>
                                 </span>
                                 <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
                                   {order.effectiveRaceName || order.raceName || '-'}
@@ -4705,6 +4714,7 @@ Thank you!`
                           <span className="text-off-black/40">Due {formatDueDate(selectedOrder.dueDate)}</span>
                           <div className="flex items-center gap-3">
                             <span className="text-off-black/40">{selectedOrder.productSize}</span>
+                            {selectedOrder.isRushOrder && <span className="font-medium text-amber-700">⚡ Rush order (4-day)</span>}
                             {selectedOrder.isGift && <span className="text-pink-600">🎁 Gift</span>}
                           </div>
                         </div>
