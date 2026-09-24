@@ -255,8 +255,8 @@ export default function Composer({
 }
 
 /**
- * The Templates button: the team's templates from the Notion page, filled in
- * for this person, plus the sequence's own copy for this touch. Picking one
+ * The Templates button: the saved templates from Settings, filled in for
+ * this person (this deal's motion first), plus the sequence's copy for this touch. Picking one
  * replaces the body; a template marked "stay on the thread" keeps the subject.
  */
 function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive }: {
@@ -327,12 +327,8 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive }: {
               ))}
             </div>
           ))}
-          {data && (
-            <div className="px-4 py-2.5 border-t border-border-gray flex items-center justify-between text-[11px] text-off-black/45">
-              <span>{data.source === 'notion' ? 'Live from Notion' : 'Copy of the Notion page from Sep 24'}</span>
-              <a href={data.url} target="_blank" rel="noopener noreferrer" className={textLink}>Edit in Notion <ExternalLink className="w-3 h-3" /></a>
-            </div>
-          )}
+          {data && data.items.length === 0 && <div className="px-4 py-3 text-xs text-off-black/50">No saved templates yet.</div>}
+          {data && <div className="px-4 py-2.5 border-t border-border-gray text-[11px] text-off-black/45">Add or change these in Settings, under Templates.</div>}
         </div>
       )}
     </div>

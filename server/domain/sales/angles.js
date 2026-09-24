@@ -190,6 +190,7 @@ function fill(text, { company, contact, socialProof, oneLiner }) {
     .replaceAll('[First Name]', greetingName(contact))
     .replaceAll('[Race Name]', company.name)
     .replaceAll('[Org Name]', company.name)
+    .replaceAll('[Team Name]', company.name)
     .replaceAll('[Landmark]', company.courseLandmark || 'Your finish line')
     .replaceAll('[Season Year]', String(seasonYear))
     .replaceAll('[Social Proof]', socialProof || DEFAULT_SOCIAL_PROOF)
@@ -251,6 +252,7 @@ export const TEMPLATE_PLACEHOLDERS = [
   ['[First Name]', 'the person\'s first name from Attio, or "there"'],
   ['[Race Name]', 'the deal name (races)'],
   ['[Org Name]', 'the deal name (charities)'],
+  ['[Team Name]', 'the same as [Org Name]'],
   ['[Landmark]', 'the course landmark if the deal has one, else "Your finish line"'],
   ['[Season Year]', 'the year of the next edition, from the race date'],
   ['[Social Proof]', 'the social proof line from Settings'],
