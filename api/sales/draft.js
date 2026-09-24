@@ -16,6 +16,7 @@ import { gmailStatus } from '../../server/domain/sales/gmail.js'
 import { isAttioConfigured, memberForEmail, stageTitles } from '../../server/domain/sales/attio.js'
 import { isAssetStorageConfigured } from '../../server/domain/sales/assets.js'
 import { lastRun } from '../../server/domain/sales/queue.js'
+import { getSenderFor } from '../../server/domain/sales/settings.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -33,6 +34,8 @@ export default async function handler(req, res) {
         attio: { configured: isAttioConfigured(), member: member ? { id: member.id, email: member.email, name: `${member.firstName} ${member.lastName}`.trim() } : null, stages },
         library: { configured: isAssetStorageConfigured() },
         me: { id: actor.id, email: actor.email, firstName: actor.firstName || null, role: actor.role },
+        // Shown under the body in the composer, where it will sit when sent.
+        signature: (await getSenderFor(actor.id, actor)).signature,
         lastRun: await lastRun(),
       })
     }

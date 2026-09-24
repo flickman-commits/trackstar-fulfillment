@@ -31,6 +31,17 @@ function fmtDate(s?: string | null) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })
 }
 
+/** "Sat, Apr 3, 2027 · in 6 months", or "· 3 weeks ago" once it has run. */
+function raceDateLabel(s: string) {
+  const d = new Date(`${s.slice(0, 10)}T00:00:00`)
+  const day = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const days = Math.round((d.getTime() - today.getTime()) / 864e5)
+  const abs = Math.abs(days)
+  const span = abs === 0 ? 'today' : abs < 14 ? `${abs} day${abs === 1 ? '' : 's'}` : abs < 60 ? `${Math.round(abs / 7)} weeks` : `${Math.round(abs / 30.4)} months`
+  return `${day} · ${days === 0 ? 'today' : days > 0 ? `in ${span}` : `${span} ago`}`
+}
+
 export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: {
   deal: Deal | null
   person: Person | null
@@ -60,6 +71,15 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
           {deal.priority && <span className={`${chip} ${deal.priority === 'High' ? chipTone.amber : chipTone.neutral}`}>{deal.priority}</span>}
           <span className={`${chip} ${chipTone.quiet}`}>{deal.touchCount} {deal.touchCount === 1 ? 'touch' : 'touches'}</span>
         </div>
+        {/* Races: the date, from Attio's Race date field. Blank there means blank here. */}
+        {deal.motion === 'Race' && !free && (
+          <div className="mt-2.5 text-sm">
+            <span className={cardLabel}>Race date</span>
+            <div className={deal.raceDate ? 'text-off-black font-medium' : 'text-off-black/45'}>
+              {deal.raceDate ? raceDateLabel(deal.raceDate) : 'Not set in Attio'}
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-3 mt-2.5 flex-wrap">
           {person?.linkedin && <a href={person.linkedin} target="_blank" rel="noopener noreferrer" className={textLink}>LinkedIn <ExternalLink className="w-3 h-3" /></a>}
           {(person?.webUrl || deal.webUrl) && (

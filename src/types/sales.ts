@@ -170,6 +170,8 @@ export interface SalesStatus {
   attio: { configured: boolean; member: { id: string; email: string; name: string } | null; stages?: string[] | null }
   library: { configured: boolean }
   me: { id: string; email: string; firstName: string | null; role: string }
+  /** Your signature HTML, as it goes out under the body. */
+  signature?: string
   lastRun: OvernightRun | null
 }
 

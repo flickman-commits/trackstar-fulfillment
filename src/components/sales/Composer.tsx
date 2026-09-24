@@ -23,7 +23,7 @@ export default function Composer({
   deal, person, draft, variants, index, drafting, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach,
-  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc,
+  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature,
 }: {
   deal: Deal | null
   person: Person | null
@@ -50,6 +50,8 @@ export default function Composer({
   onSkip: (reason?: string) => void
   /** Written from New email, outside the queue: any stage is fine, Skip means close. */
   adhoc?: boolean
+  /** Your signature HTML, shown where it will sit in the sent email. */
+  signature?: string
 }) {
   const [whyOpen, setWhyOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
@@ -162,15 +164,8 @@ export default function Composer({
             <span className={cardLabel}>Subject</span>
             <input value={current.subject} onChange={e => onChange({ ...current, subject: e.target.value })} onBlur={onCheck} className={`${inputBase} w-full border-transparent bg-transparent px-1 font-medium focus:bg-white focus:border-border-gray`} />
           </div>
-          <div className="flex-1 min-h-0 grid grid-cols-[64px_1fr] gap-2 px-6 pt-3 pb-2">
-            <span className={`${cardLabel} pt-2`}>Body</span>
-            <textarea
-              value={current.body}
-              onChange={e => onChange({ ...current, body: e.target.value })}
-              onBlur={onCheck}
-              className="w-full h-full min-h-[240px] resize-none text-sm leading-relaxed text-off-black bg-transparent px-1 py-1 focus:outline-none focus:bg-subtle-gray/60 rounded"
-            />
-          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+          <BodyEditor body={current.body} signature={signature} onChange={body => onChange({ ...current, body })} onBlur={onCheck} />
 
           {/* Change it: one instruction, the model does the rest. */}
           {aiActive && (
@@ -210,7 +205,7 @@ export default function Composer({
             {attachments.length === 0 && (
               <span className={missingRequired ? 'text-red-600' : 'text-off-black/45'}>{missingRequired ? 'A charity first touch needs a co-branded example. Drag one in from the library.' : 'Drag a deck or image here from the library.'}</span>
             )}
-            <span className="ml-auto text-off-black/40">Your signature is added when it sends.</span>
+          </div>
           </div>
         </>
       )}
@@ -331,6 +326,71 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive }: {
           {data && <div className="px-4 py-2.5 border-t border-border-gray text-[11px] text-off-black/45">Add or change these in Settings, under Templates.</div>}
         </div>
       )}
+    </div>
+  )
+}
+
+/** A textarea that grows with its text, so the pane scrolls rather than the box. */
+function AutoGrow({ value, onChange, onBlur, className, placeholder, minRows = 3 }: {
+  value: string; onChange: (v: string) => void; onBlur?: () => void; className?: string; placeholder?: string; minRows?: number
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
+  return <textarea ref={ref} rows={minRows} value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} className={`${className || ''} resize-none overflow-hidden`} />
+}
+
+/** Where a P.S. starts: a paragraph that opens with "P.S.", as composeHtml splits it on send. */
+const PS_START = /(^|\n[ \t]*\n)(?=[ \t]*p\.?s\.?[\s:.-])/i
+const IS_PS_PREFIX = /^\s*p\.?s\.?[:.-]?\s*/i
+
+function splitBody(body: string) {
+  const m = PS_START.exec(body)
+  if (!m) return { main: body, ps: '' }
+  const at = m.index + m[1].length
+  // The box sits beside a "P.S." label, so it holds what comes after it.
+  return { main: body.slice(0, at).replace(/\s+$/, ''), ps: body.slice(at).trim().replace(IS_PS_PREFIX, '') }
+}
+
+/**
+ * The body, then your signature, then the P.S., in the order they go out.
+ * The draft stays one string (the server moves anything from "P.S." on to
+ * below the signature); this only shows it that way and lets the P.S. be
+ * written in its own box. Local text is kept while typing so a paragraph
+ * never jumps boxes under the cursor.
+ */
+function BodyEditor({ body, signature, onChange, onBlur }: {
+  body: string; signature?: string; onChange: (body: string) => void; onBlur: () => void
+}) {
+  const [parts, setParts] = useState(() => splitBody(body))
+  const emitted = useRef(body)
+  useEffect(() => {
+    if (body !== emitted.current) { setParts(splitBody(body)); emitted.current = body }
+  }, [body])
+  const update = (main: string, ps: string) => {
+    setParts({ main, ps })
+    const extra = ps.trim().replace(IS_PS_PREFIX, '')
+    const next = extra ? `${main.replace(/\s+$/, '')}\n\nP.S. ${extra}` : main
+    emitted.current = next
+    onChange(next)
+  }
+  const box = 'w-full text-sm leading-relaxed text-off-black bg-transparent px-1 py-1 focus:outline-none focus:bg-subtle-gray/60 rounded'
+  return (
+    <div className="px-6 pt-3 pb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-3">
+      <span className={`${cardLabel} pt-2`}>Body</span>
+      <AutoGrow value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minRows={8} className={`${box} min-h-[180px]`} />
+
+      <span className={`${cardLabel} pt-1`}>Signature</span>
+      <div className="px-1 text-sm text-off-black/80 border-l-2 border-border-gray pl-3" title="Added when it sends. Change it in Settings, under Me.">
+        {signature ? <div dangerouslySetInnerHTML={{ __html: signature }} /> : <span className="text-xs text-off-black/40">No signature yet. Add one in Settings, under Me.</span>}
+      </div>
+
+      <span className={`${cardLabel} pt-2`}>P.S.</span>
+      <AutoGrow value={parts.ps} onChange={v => update(parts.main, v)} onBlur={onBlur} minRows={1} placeholder="Optional. Goes under your signature." className={box} />
     </div>
   )
 }
