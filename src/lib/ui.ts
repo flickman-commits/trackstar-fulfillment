@@ -85,3 +85,50 @@ export const chipTone = {
   blue: 'bg-blue-100 text-blue-800 border-blue-300',
   red: 'bg-red-100 text-red-800 border-red-300',
 } as const
+
+/*
+ * The fulfilment page's own building blocks, named so other tools can use
+ * them. Each string is copied from Dashboard.tsx, not invented, so a page
+ * built from these reads as the same product.
+ */
+
+/** Page background and the centred column every tool page sits in. */
+export const pageShell = 'h-[calc(100dvh-92px)] md:h-screen overflow-hidden bg-[#f3f3f3] flex flex-col'
+export const pageColumn = 'mx-auto px-4 md:px-8 lg:px-12 w-full flex flex-col h-full'
+
+/** Stars, then the big title. */
+export const pageHeader = 'pt-4 md:pt-8 lg:pt-10 pb-3 md:pb-6 flex items-center md:items-end justify-between gap-3 md:gap-6 flex-shrink-0'
+export const pageTitle = 'text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1'
+export const pageLogo = 'h-8 md:h-11 w-fit'
+
+/** The page's one big action, top right ("Import New Orders"). */
+export const btnHero = 'inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed'
+/** Its quieter sibling, same height. */
+export const btnHeroSecondary = 'inline-flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-border-gray text-off-black/70 rounded-md hover:bg-subtle-gray transition-colors font-medium text-xs md:text-sm whitespace-nowrap'
+
+/** "DESIGNS TO BE PERSONALIZED" and its count chip. */
+export const sectionTitle = 'text-base md:text-lg font-semibold text-off-black uppercase tracking-tight'
+export const sectionCount = 'px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded'
+
+/** The white card a list lives in, and the toolbar row at its top. */
+export const listCard = 'bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col min-h-0'
+export const listToolbar = 'p-3 md:p-4 border-b border-border-gray flex-shrink-0'
+/** Toolbar search and select, grey until used. */
+export const toolbarInput = 'w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors'
+export const toolbarSelect = (active: boolean) =>
+  `w-full appearance-none pl-3 md:pl-4 pr-9 py-2.5 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors cursor-pointer ${
+    active ? 'bg-dark-fill text-white border-dark-fill' : 'bg-subtle-gray border-border-gray text-off-black'
+  }`
+/** The grey column-header strip above a list ("SRC  ORDER #  STATUS"). */
+export const listHead = 'bg-subtle-gray border-b border-border-gray text-xs font-semibold text-off-black/60 uppercase tracking-wider'
+
+/** Order modal: section heading, the grey card under it, and a card's own label. */
+export const sectionLabel = 'text-xs font-semibold text-off-black/50 uppercase tracking-tight'
+export const infoCard = 'bg-subtle-gray border border-border-gray rounded-md p-3'
+export const cardLabel = 'text-[10px] font-semibold text-off-black/40 uppercase tracking-wider'
+/** The blue text link beside a section heading ("+ Add comment", "View Results"). */
+export const textLink = 'inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors'
+
+/** "View Completed Orders" footer pill and its count. */
+export const footerPill = 'inline-flex items-center gap-2 px-4 py-2 bg-white border border-border-gray rounded-full shadow-sm text-sm text-off-black/70 hover:bg-subtle-gray transition-colors'
+export const footerPillCount = 'px-2 py-0.5 text-xs font-medium rounded-full bg-off-black/5 text-off-black/60'

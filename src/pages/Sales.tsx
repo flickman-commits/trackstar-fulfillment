@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, ExternalLink, PenLine } from 'lucide-react'
+import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, ExternalLink, PenLine, Search, ChevronDown, Loader2 } from 'lucide-react'
 import { salesApi, SalesApiError, type DealHit } from '@/lib/salesApi'
-import { btnSecondary, btnGhost } from '@/lib/ui'
+import {
+  btnSecondary, btnHero, btnHeroSecondary, pageShell, pageColumn, pageHeader, pageTitle, pageLogo,
+  sectionTitle, sectionCount, segment, segmentGroup, listCard, listToolbar, toolbarInput, toolbarSelect, textLink,
+} from '@/lib/ui'
 import type { Asset, Deal, DraftResult, Motion, Person, SalesStatus, TodayPayload, Variant } from '@/types/sales'
 import Queue, { type QueueMode } from '@/components/sales/Queue'
 import Composer from '@/components/sales/Composer'
@@ -42,6 +45,7 @@ export default function Sales() {
   const [mode, setMode] = useState<QueueMode>(() => { try { return localStorage.getItem('sales.mode') === 'followups' ? 'followups' : 'new' } catch { return 'new' } })
   const [scope, setScope] = useState<'mine' | 'all'>(() => { try { return localStorage.getItem('sales.scope') === 'all' ? 'all' : 'mine' } catch { return 'mine' } })
   const [motion, setMotion] = useState<Motion | null>(null)
+  const [query, setQuery] = useState('')
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [personId, setPersonId] = useState<string | null>(null)
@@ -357,100 +361,154 @@ export default function Sales() {
   const isSent = Boolean(!adhoc && selectedId && sentIds.has(selectedId))
   const queueClear = !adhoc && today && (mode === 'new' ? today.newOutreach.length === 0 : today.followUps.length === 0) && pendingIds.size === 0
 
+  const ownerName = today?.member?.name || status?.attio.member?.name || status?.me.firstName || 'Mine'
+  const sectionCountValue = mode === 'new' ? (today?.newOutreach.length ?? 0) : (today?.followUps.length ?? 0)
+
   return (
-    <div className="min-h-screen lg:h-screen flex flex-col px-4 md:px-6 py-4 max-w-[1700px]">
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 mb-3">
-        <div className="flex items-center gap-4 flex-wrap">
-          <h1 className="text-xl font-semibold text-off-black">Sales</h1>
-          <div className="flex items-center gap-3">
-            <span className="text-xl font-semibold tabular-nums">{sentCount}<span className="text-[13px] font-medium text-off-black/55 ml-1.5">of {cap} sent today</span></span>
-            <span className="flex gap-[3px]" aria-label={`${sentCount} of ${cap} sent`}>
-              {Array.from({ length: cap }).map((_, i) => (
-                <span key={i} className={`block w-[14px] h-[7px] rounded-[3px] ${i < sentCount ? 'bg-dark-fill' : i < sentCount + pendingIds.size ? 'bg-amber-400' : 'bg-border-gray'}`} />
-              ))}
-            </span>
-          </div>
-          {today && (
-            <span className="text-[12.5px] text-off-black/55 flex gap-3">
-              <span>This week <b className="text-off-black tabular-nums">{today.counts.week.sent}</b> sent</span>
-              <span><b className="text-off-black tabular-nums">{today.followUps.length}</b> follow-ups due</span>
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <select value={motion || ''} onChange={e => setMotion((e.target.value || null) as Motion | null)} className="text-xs bg-transparent text-off-black/60 focus:outline-none" title="One motion only">
-            <option value="">All motions</option><option value="Race">Race</option><option value="Charity">Charity</option><option value="Corporate">Corporate</option>
-          </select>
-          <button onClick={() => setNewOpen(true)} className={btnSecondary} title="Write to any deal, or any address"><PenLine className="w-3.5 h-3.5" /> New email</button>
-          <button onClick={() => loadToday(true)} className={btnGhost} title="Re-read Attio"><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /></button>
-          <button onClick={() => setProgressOpen(true)} className={btnGhost}><BarChart3 className="w-3.5 h-3.5" /> Progress</button>
-          <button onClick={() => setSettingsOpen(true)} className={btnGhost} title="Settings"><SlidersHorizontal className="w-3.5 h-3.5" /></button>
-        </div>
-      </div>
-
-      {status && !status.gmail.connected && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-3 text-[13px] text-amber-800">
-          <span><Mail className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />Connect your Gmail to send from here.</span>
-          <a href={salesApi.gmailConnectUrl} className={btnSecondary}>Connect Gmail</a>
-        </div>
-      )}
-      {todayError && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 mb-3 text-[13px] text-red-800">
-          <span>{todayError.code === 'attio_not_configured' ? 'Attio is not connected, so there is no queue to show.' : todayError.code === 'not_a_rep' ? todayError.message : `Could not read the queue: ${todayError.message}`}</span>
-          <button onClick={() => setSettingsOpen(true)} className={btnSecondary}>Settings</button>
-        </div>
-      )}
-
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3">
-        <Queue mode={mode} onMode={setMode} scope={scope} onScope={setScope} today={today} pendingSendIds={pendingIds} selectedId={selectedId} onSelect={setSelectedId} loading={loading} />
-
-        {queueClear && !selected && !adhoc ? (
-          <div className="flex-1 min-w-0 flex items-center justify-center rounded-lg border border-border-gray bg-white min-h-[320px]">
-            <div className="text-center max-w-[44ch] px-6">
-              <Check className="w-8 h-8 mx-auto text-success-green mb-2" />
-              <div className="text-xl font-semibold">{mode === 'new' ? `New outreach is done. ${sentCount} sent today.` : 'No follow-ups due.'}</div>
-              <p className="text-sm text-off-black/60 mt-2">
-                {mode === 'new'
-                  ? (sentCount >= cap ? 'That is the cap. ' : '') + (today?.followUps.length ? `${today.followUps.length} follow-ups are waiting on the other pill.` : 'Tomorrow\'s batch is read from Attio overnight.')
-                  : today?.later.length ? `${today.later.length} coming up this week.` : 'Nothing on the clock.'}
-              </p>
+    <div className={pageShell}>
+      <div className={`${pageColumn} max-w-7xl`}>
+        {/* Header: the fulfilment page's stars and big title, the day's count under it. */}
+        <div className={pageHeader}>
+          <div className="flex flex-col gap-3 min-w-0">
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className={pageLogo} />
+            <div>
+              <h1 className={pageTitle}>Sales</h1>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-off-black/60">
+                <span className="flex items-center gap-2">
+                  <span><b className="text-off-black tabular-nums">{sentCount}</b> of {cap} sent today</span>
+                  <span className="hidden sm:flex gap-[3px]" aria-label={`${sentCount} of ${cap} sent`}>
+                    {Array.from({ length: cap }).map((_, i) => (
+                      <span key={i} className={`block w-[12px] h-[6px] rounded-[3px] ${i < sentCount ? 'bg-dark-fill' : i < sentCount + pendingIds.size ? 'bg-amber-400' : 'bg-off-black/10'}`} />
+                    ))}
+                  </span>
+                </span>
+                {today && <span><b className="text-off-black tabular-nums">{today.counts.week.sent}</b> this week</span>}
+                {today && <span><b className="text-off-black tabular-nums">{today.followUps.length}</b> follow-ups due</span>}
+              </div>
             </div>
           </div>
-        ) : isSent && selected ? (
-          <div className="flex-1 min-w-0 flex items-center justify-center rounded-lg border border-border-gray bg-white min-h-[320px]">
-            <div className="text-center px-6">
-              <Check className="w-6 h-6 mx-auto text-success-green mb-2" />
-              <div className="text-base font-semibold">Sent{selected.sentAt ? ` at ${new Date(selected.sentAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}</div>
-              <p className="text-sm text-off-black/60 mt-1">The next touch is on the clock in Attio. It comes back under Follow Ups when it is due.</p>
-              {selected.webUrl && <a href={selected.webUrl} target="_blank" rel="noopener noreferrer" className={`${btnGhost} mt-2`}>Open in Attio <ExternalLink className="w-3 h-3" /></a>}
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => setSettingsOpen(true)} className={btnHeroSecondary} title="Settings"><SlidersHorizontal className="w-4 h-4" /><span className="hidden lg:inline">Settings</span></button>
+            <button onClick={() => setProgressOpen(true)} className={btnHeroSecondary}><BarChart3 className="w-4 h-4" /><span className="hidden md:inline">Progress</span></button>
+            <button onClick={() => setNewOpen(true)} className={btnHero} title="Write to any deal, or any address"><PenLine className="w-4 h-4" /> New email</button>
           </div>
-        ) : (
-          <Composer
-            deal={deal} person={person} draft={current?.draft || null}
-            variants={variants} index={Math.min(variantIndex, Math.max(0, variants.length - 1))}
-            drafting={drafting} gmailConnected={gmailConnected} aiActive={aiActive}
-            canSend={gmailConnected && !capReached} capReached={capReached}
-            problems={problems} checking={checking} onCheck={checkDraft}
-            attachments={attachedAssets} onAttach={attach} onDetach={detach}
-            onChange={updateVariant}
-            onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-            onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} adhoc={Boolean(adhoc)}
-          />
+        </div>
+
+        {status && !status.gmail.connected && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 mb-3 text-sm text-amber-800 flex-shrink-0">
+            <span><Mail className="w-4 h-4 inline mr-1.5 -mt-0.5" />Connect your Gmail to send from here.</span>
+            <a href={salesApi.gmailConnectUrl} className={btnSecondary}>Connect Gmail</a>
+          </div>
+        )}
+        {todayError && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 mb-3 text-sm text-red-800 flex-shrink-0">
+            <span>{todayError.code === 'attio_not_configured' ? 'Attio is not connected, so there is no queue to show.' : todayError.code === 'not_a_rep' ? todayError.message : `Could not read the queue: ${todayError.message}`}</span>
+            <button onClick={() => setSettingsOpen(true)} className={btnSecondary}>Settings</button>
+          </div>
         )}
 
-        <aside className="w-full lg:w-[320px] shrink-0 overflow-y-auto flex flex-col gap-2 min-h-0">
-          <WhoPane
-            deal={deal} person={person} busy={busy} onNote={addNote}
-            onSelectPerson={id => { setPersonId(id); if (deal) { setPrepared(prev => { const n = { ...prev }; delete n[deal.id]; return n }); prepare(deal, { silent: false, force: true, personId: id }) } }}
-          />
-          <LibraryPanel assets={assets} configured={libraryConfigured} attachedIds={new Set(attachedAssets.map(a => a.id))} onAttach={attach} onChanged={() => loadAssets(selectedId)} />
-        </aside>
-      </div>
+        <section className="flex-1 flex flex-col min-h-0 pb-4">
+          {/* Section header: which list, how many, and the switch between the two. */}
+          <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <h2 className={sectionTitle}>{mode === 'new' ? 'New Outreach' : 'Follow Ups'}</h2>
+              {today && <span className={sectionCount}>{sectionCountValue}</span>}
+              {loading && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
+            </div>
+            <div className={segmentGroup}>
+              <button onClick={() => setMode('new')} className={segment(mode === 'new', 'md')}>New Outreach</button>
+              <button onClick={() => setMode('followups')} className={segment(mode === 'followups', 'md')}>Follow Ups</button>
+            </div>
+          </div>
+
+          <div className={listCard}>
+            {/* Search and filters, inside the card like the order list's. */}
+            <div className={listToolbar}>
+              <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
+                  <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search people and deals..." className={toolbarInput} />
+                </div>
+                <div className="relative md:w-48">
+                  <select value={scope} onChange={e => setScope(e.target.value as 'mine' | 'all')} className={toolbarSelect(scope === 'all')} title="Deals you own in Attio plus unowned ones, or everyone's">
+                    <option value="mine" className="bg-white text-off-black">{ownerName}</option>
+                    <option value="all" className="bg-white text-off-black">Everyone</option>
+                  </select>
+                  <ChevronDown className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${scope === 'all' ? 'text-white' : 'text-off-black/40'}`} />
+                </div>
+                <div className="relative md:w-48">
+                  <select value={motion || ''} onChange={e => setMotion((e.target.value || null) as Motion | null)} className={toolbarSelect(Boolean(motion))}>
+                    <option value="" className="bg-white text-off-black">All motions</option>
+                    <option value="Race" className="bg-white text-off-black">Race</option>
+                    <option value="Charity" className="bg-white text-off-black">Charity</option>
+                    <option value="Corporate" className="bg-white text-off-black">Corporate</option>
+                  </select>
+                  <ChevronDown className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${motion ? 'text-white' : 'text-off-black/40'}`} />
+                </div>
+                <button onClick={() => loadToday(true)} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm text-off-black/70 hover:bg-off-black/5 transition-colors" title="Re-read Attio">
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /><span className="md:hidden lg:inline">Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Three panes in the one card: who is next, the email, who they are. */}
+            <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+              <Queue mode={mode} scope={scope} today={today} pendingSendIds={pendingIds} selectedId={selectedId} onSelect={setSelectedId} loading={loading} query={query} />
+
+              {queueClear && !selected && !adhoc ? (
+                <div className="flex-1 min-w-0 flex items-center justify-center min-h-[320px]">
+                  <div className="text-center max-w-[44ch] px-6">
+                    <Check className="w-8 h-8 mx-auto text-success-green mb-2" />
+                    <div className="text-xl font-bold text-off-black">{mode === 'new' ? `New outreach is done. ${sentCount} sent today.` : 'No follow-ups due.'}</div>
+                    <p className="text-sm text-off-black/60 mt-2">
+                      {mode === 'new'
+                        ? (sentCount >= cap ? 'That is the cap. ' : '') + (today?.followUps.length ? `${today.followUps.length} follow-ups are waiting under Follow Ups.` : 'Tomorrow\'s batch is read from Attio overnight.')
+                        : today?.later.length ? `${today.later.length} coming up this week.` : 'Nothing on the clock.'}
+                    </p>
+                  </div>
+                </div>
+              ) : isSent && selected ? (
+                <div className="flex-1 min-w-0 flex items-center justify-center min-h-[320px]">
+                  <div className="text-center px-6">
+                    <Check className="w-6 h-6 mx-auto text-success-green mb-2" />
+                    <div className="text-lg font-bold text-off-black">Sent{selected.sentAt ? ` at ${new Date(selected.sentAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}</div>
+                    <p className="text-sm text-off-black/60 mt-1">The next touch is on the clock in Attio. It comes back under Follow Ups when it is due.</p>
+                    {selected.webUrl && <a href={selected.webUrl} target="_blank" rel="noopener noreferrer" className={`${textLink} mt-3`}>Open in Attio <ExternalLink className="w-3 h-3" /></a>}
+                  </div>
+                </div>
+              ) : (
+                <Composer
+                  deal={deal} person={person} draft={current?.draft || null}
+                  variants={variants} index={Math.min(variantIndex, Math.max(0, variants.length - 1))}
+                  drafting={drafting} gmailConnected={gmailConnected} aiActive={aiActive}
+                  canSend={gmailConnected && !capReached} capReached={capReached}
+                  problems={problems} checking={checking} onCheck={checkDraft}
+                  attachments={attachedAssets} onAttach={attach} onDetach={detach}
+                  onChange={updateVariant}
+                  onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
+                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} adhoc={Boolean(adhoc)}
+                />
+              )}
+
+              <aside className="w-full lg:w-[340px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray p-5 space-y-6 min-h-0">
+                <WhoPane
+                  deal={deal} person={person} busy={busy} onNote={addNote}
+                  onSelectPerson={id => { setPersonId(id); if (deal) { setPrepared(prev => { const n = { ...prev }; delete n[deal.id]; return n }); prepare(deal, { silent: false, force: true, personId: id }) } }}
+                />
+                <LibraryPanel assets={assets} configured={libraryConfigured} attachedIds={new Set(attachedAssets.map(a => a.id))} onAttach={attach} onChanged={() => loadAssets(selectedId)} />
+              </aside>
+            </div>
+          </div>
+
+          <p className="hidden lg:block text-center text-xs text-off-black/40 mt-3 flex-shrink-0">
+            I and K move between people · J and L switch versions · ⌘↵ sends · S skips
+          </p>
+        </section>
 
       {settingsOpen && <SettingsModal status={status} aiOn={aiOn} onAiChange={setAiOn} onClose={() => { setSettingsOpen(false); loadStatus(); loadToday() }} />}
       {progressOpen && <ProgressModal scope={scope} onClose={() => setProgressOpen(false)} />}
       {newOpen && <NewEmail onPickDeal={pickDeal} onPickAddress={pickAddress} onClose={() => setNewOpen(false)} />}
+      </div>
     </div>
   )
 }

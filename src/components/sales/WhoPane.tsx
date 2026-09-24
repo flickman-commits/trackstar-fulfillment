@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ExternalLink, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
-import { btnGhost, chip, chipTone, fieldLabel, inputBase } from '@/lib/ui'
+import { btnGhost, btnPrimary, cardLabel, chip, chipTone, infoCard, inputBase, sectionLabel, segment, textLink } from '@/lib/ui'
 import { type Deal, type Person } from '@/types/sales'
 
 /**
@@ -50,50 +50,56 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
   const sends = deal.sends || []
 
   return (
-    <div className="flex flex-col gap-2 text-sm">
-      <section className="rounded-lg border border-border-gray bg-white px-3.5 py-3">
-        <div className="min-w-0">
-          <div className="text-[15px] font-bold truncate">{person ? person.fullName || `${person.firstName} ${person.lastName}`.trim() : 'Nobody on the deal'}</div>
-          <div className="text-xs text-off-black/60">{person?.title || ''}{person?.title ? ' · ' : ''}{deal.company?.name || deal.name}</div>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            {person?.linkedin && <a href={person.linkedin} target="_blank" rel="noopener noreferrer" className="text-[11px] text-off-black/60 hover:text-off-black inline-flex items-center gap-0.5">LinkedIn <ExternalLink className="w-3 h-3" /></a>}
-            {person?.location && <span className="text-[11px] text-off-black/50">{person.location}</span>}
-            {(person?.webUrl || deal.webUrl) && (
-              <a href={person?.webUrl || deal.webUrl || '#'} target="_blank" rel="noopener noreferrer" className="text-[11px] text-off-black/60 hover:text-off-black inline-flex items-center gap-0.5">Attio <ExternalLink className="w-3 h-3" /></a>
-            )}
-          </div>
+    <div className="space-y-5 text-sm">
+      <section>
+        <div className="text-lg font-bold text-off-black leading-tight">{person ? person.fullName || `${person.firstName} ${person.lastName}`.trim() : 'Nobody on the deal'}</div>
+        <div className="text-sm text-off-black/60 mt-0.5">{person?.title || ''}{person?.title ? ' · ' : ''}{deal.company?.name || deal.name}</div>
+        {/* Where the deal stands, read-only. Stage moves happen in Attio. */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {deal.stage && <span className={`${chip} ${STAGE_TONE[String(deal.stage)] || chipTone.quiet}`}>{deal.stage}</span>}
+          {deal.priority && <span className={`${chip} ${deal.priority === 'High' ? chipTone.amber : chipTone.neutral}`}>{deal.priority}</span>}
+          <span className={`${chip} ${chipTone.quiet}`}>{deal.touchCount} {deal.touchCount === 1 ? 'touch' : 'touches'}</span>
+        </div>
+        <div className="flex items-center gap-3 mt-2.5 flex-wrap">
+          {person?.linkedin && <a href={person.linkedin} target="_blank" rel="noopener noreferrer" className={textLink}>LinkedIn <ExternalLink className="w-3 h-3" /></a>}
+          {(person?.webUrl || deal.webUrl) && (
+            <a href={person?.webUrl || deal.webUrl || '#'} target="_blank" rel="noopener noreferrer" className={textLink}>Open in Attio <ExternalLink className="w-3 h-3" /></a>
+          )}
+          {person?.location && <span className="text-xs text-off-black/50">{person.location}</span>}
         </div>
         {deal.people.length > 1 && (
-          <div className="mt-2 flex flex-wrap gap-1">
+          <div className="mt-3 flex flex-wrap gap-1.5">
             {deal.people.map(p => (
-              <button key={p.id} onClick={() => onSelectPerson(p.id)} className={`text-[11px] px-2 py-0.5 rounded-full border ${p.id === person?.id ? 'bg-dark-fill text-white border-dark-fill' : 'border-border-gray text-off-black/60 hover:bg-subtle-gray'} ${!p.email ? 'opacity-50' : ''}`} title={p.email || 'No email'}>
+              <button key={p.id} onClick={() => onSelectPerson(p.id)} className={`${segment(p.id === person?.id)} border ${p.id === person?.id ? 'border-dark-fill' : 'border-border-gray bg-white'} ${!p.email ? 'opacity-50' : ''}`} title={p.email || 'No email'}>
                 {p.firstName || p.fullName}
               </button>
             ))}
           </div>
         )}
-        {/* Where the deal stands, read-only. Stage moves happen in Attio. */}
-        <div className="mt-2 flex flex-wrap items-center gap-1">
-          {deal.stage && <span className={`${chip} ${STAGE_TONE[String(deal.stage)] || chipTone.quiet}`}>{deal.stage}</span>}
-          {deal.priority && <span className={`${chip} ${deal.priority === 'High' ? chipTone.amber : chipTone.neutral}`}>{deal.priority}</span>}
-          <span className={`${chip} ${chipTone.quiet}`}>{deal.touchCount} {deal.touchCount === 1 ? 'touch' : 'touches'}</span>
-        </div>
-        {person?.description && <p className="mt-2 text-[12.5px] text-off-black/70 leading-snug">{person.description}</p>}
       </section>
 
+      {person?.description && (
+        <section>
+          <h3 className={`${sectionLabel} mb-2`}>About them</h3>
+          <div className={infoCard}><p className="text-sm text-off-black/75 leading-snug">{person.description}</p></div>
+        </section>
+      )}
+
       {(deal.company?.description || deal.notes) && (
-        <section className="rounded-lg border border-border-gray bg-white px-3.5 py-3">
-          <span className={fieldLabel}>{deal.company?.name || deal.name}</span>
-          {deal.company?.description && <p className="text-[12.5px] text-off-black/70 leading-snug">{deal.company.description}</p>}
-          {deal.company && (deal.company.location || deal.company.employeeRange || deal.company.categories.length > 0) && (
-            <p className="text-[11px] text-off-black/45 mt-1">{[deal.company.location, deal.company.employeeRange && `${deal.company.employeeRange} people`, ...deal.company.categories.slice(0, 3)].filter(Boolean).join(' · ')}</p>
-          )}
-          {deal.notes && (
-            <div className="mt-2">
-              <span className="font-mono text-[10px] tracking-wider uppercase text-off-black/40">Team notes</span>
-              <p className="text-[12.5px] text-off-black/70 leading-snug whitespace-pre-wrap">{deal.notes}</p>
-            </div>
-          )}
+        <section>
+          <h3 className={`${sectionLabel} mb-2`}>{deal.company?.name || deal.name}</h3>
+          <div className={`${infoCard} space-y-2.5`}>
+            {deal.company?.description && <p className="text-sm text-off-black/75 leading-snug">{deal.company.description}</p>}
+            {deal.company && (deal.company.location || deal.company.employeeRange || deal.company.categories.length > 0) && (
+              <p className="text-xs text-off-black/50">{[deal.company.location, deal.company.employeeRange && `${deal.company.employeeRange} people`, ...deal.company.categories.slice(0, 3)].filter(Boolean).join(' · ')}</p>
+            )}
+            {deal.notes && (
+              <div>
+                <div className={cardLabel}>Team notes</div>
+                <p className="text-sm text-off-black/75 leading-snug whitespace-pre-wrap mt-0.5">{deal.notes}</p>
+              </div>
+            )}
+          </div>
         </section>
       )}
 
@@ -101,53 +107,59 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
           the last one left off. Emails sent from the tool carry their text;
           anything older than the tool lives in Gmail, one click away. */}
       {(sends.length > 0 || person?.email) && (
-        <section className="rounded-lg border border-border-gray bg-white px-3.5 py-2">
-          <button onClick={() => setHistoryOpen(o => !o)} className="w-full flex items-center justify-between text-xs font-semibold text-off-black/70">
-            <span>Past emails{sends.length ? ` · ${sends.length}` : ''}</span>{historyOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          </button>
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => setHistoryOpen(o => !o)} className={`${sectionLabel} inline-flex items-center gap-1 hover:text-off-black/70`}>
+              Past emails{sends.length ? ` · ${sends.length}` : ''} {historyOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+            {person?.email && (
+              <a href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(person.email)}`} target="_blank" rel="noopener noreferrer" className={textLink}>
+                Whole chain in Gmail <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
           {historyOpen && (
-            <div className="mt-2 space-y-2">
+            <div className="space-y-2">
               {sends.slice().reverse().map(s => (
-                <details key={s.id} className="text-xs rounded border border-border-gray bg-subtle-gray/50 px-2 py-1.5">
+                <details key={s.id} className={`${infoCard} text-xs`}>
                   <summary className="cursor-pointer list-none">
-                    <span className="flex justify-between gap-2 text-off-black/50"><span>Touch {s.touchNumber}{s.sentByEmail ? ` · ${s.sentByEmail.split('@')[0]}` : ''}</span><span>{fmtDate(s.sentAt)}</span></span>
-                    <span className="block font-medium truncate">{s.subject}</span>
+                    <span className={`flex justify-between gap-2 ${cardLabel}`}><span>Touch {s.touchNumber}{s.sentByEmail ? ` · ${s.sentByEmail.split('@')[0]}` : ''}</span><span>{fmtDate(s.sentAt)}</span></span>
+                    <span className="block text-sm font-medium text-off-black truncate mt-0.5">{s.subject}</span>
                   </summary>
-                  {s.body && <p className="mt-1.5 whitespace-pre-wrap leading-snug text-off-black/70 border-t border-border-gray pt-1.5">{s.body}</p>}
+                  {s.body && <p className="mt-2 whitespace-pre-wrap leading-snug text-off-black/70 border-t border-border-gray pt-2">{s.body}</p>}
                   {!s.attioOk && <p className="text-amber-700 mt-1">Attio was not updated for this one.</p>}
                   {s.gmailThreadId && (
-                    <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(s.gmailThreadId)}`} target="_blank" rel="noopener noreferrer" className="mt-1 text-off-black/50 hover:text-off-black inline-flex items-center gap-0.5">Open the thread <ExternalLink className="w-3 h-3" /></a>
+                    <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(s.gmailThreadId)}`} target="_blank" rel="noopener noreferrer" className={`${textLink} mt-1.5`}>Open the thread <ExternalLink className="w-3 h-3" /></a>
                   )}
                 </details>
               ))}
-              {person?.email && (
-                <a
-                  href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(person.email)}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 w-full rounded border border-border-gray px-2 py-1.5 text-xs text-off-black/60 hover:text-off-black hover:bg-subtle-gray"
-                >
-                  Read the whole chain in Gmail <ExternalLink className="w-3 h-3" />
-                </a>
-              )}
               {sends.length === 0 && (
-                <p className="text-[11px] text-off-black/45 leading-snug">Nothing was sent from this tool yet. Earlier emails, including anyone who has left, are in Gmail.</p>
+                <p className="text-xs text-off-black/45 leading-snug">Nothing was sent from this tool yet. Earlier emails, including anyone who has left, are in Gmail.</p>
               )}
             </div>
           )}
         </section>
       )}
 
-      {!free && <section className="rounded-lg border border-border-gray bg-white px-3.5 py-2">
-        <button onClick={() => setNoteOpen(o => !o)} className="w-full flex items-center justify-between text-xs font-semibold text-off-black/70">
-          <span>Add a note to the deal</span>{noteOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        </button>
-        {noteOpen && (
-          <form className="mt-2 flex flex-col gap-2" onSubmit={async e => { e.preventDefault(); if (!note.trim()) return; await onNote(note.trim()); setNote('') }}>
-            <textarea rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Goes on the deal in Attio, with your name." className={`${inputBase} w-full resize-y text-xs`} />
-            <div className="flex justify-end"><button type="submit" disabled={busy || !note.trim()} className={btnGhost}>{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save to Attio'}</button></div>
-          </form>
-        )}
-      </section>}
+      {!free && (
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className={sectionLabel}>Notes</h3>
+            {!noteOpen && <button onClick={() => setNoteOpen(true)} className={textLink}>+ Add note</button>}
+          </div>
+          {noteOpen ? (
+            <form className="flex flex-col gap-2" onSubmit={async e => { e.preventDefault(); if (!note.trim()) return; await onNote(note.trim()); setNote(''); setNoteOpen(false) }}>
+              <textarea autoFocus rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Goes on the deal in Attio, with your name." className={`${inputBase} w-full resize-y`} />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => { setNoteOpen(false); setNote('') }} className={btnGhost}>Cancel</button>
+                <button type="submit" disabled={busy || !note.trim()} className={btnPrimary}>{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save to Attio'}</button>
+              </div>
+            </form>
+          ) : (
+            <p className="text-xs text-off-black/45">A note goes on the deal in Attio, with your name.</p>
+          )}
+        </section>
+      )}
     </div>
   )
 }

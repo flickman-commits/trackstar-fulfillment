@@ -1,7 +1,7 @@
 import { useRef, useState, type DragEvent } from 'react'
 import { FileText, Image as ImageIcon, Loader2, Plus, Trash2, Upload, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import { btnGhost, fieldLabel } from '@/lib/ui'
+import { sectionLabel, textLink } from '@/lib/ui'
 import { salesApi } from '@/lib/salesApi'
 import { ASSET_DRAG_TYPE } from './Composer'
 import type { Asset } from '@/types/sales'
@@ -63,8 +63,8 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
 
   if (!configured) {
     return (
-      <section className="rounded-lg border border-border-gray bg-white px-3.5 py-3 text-xs text-off-black/55">
-        <span className={fieldLabel}>Library</span>
+      <section className="text-xs text-off-black/55">
+        <h3 className={`${sectionLabel} mb-2`}>Library</h3>
         Storage is not configured on the server (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY), so there is nowhere to keep decks and mockups yet.
       </section>
     )
@@ -72,23 +72,24 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
 
   return (
     <section
-      className={`rounded-lg border bg-white flex flex-col min-h-0 transition-colors ${over ? 'border-dark-fill ring-2 ring-dark-fill/20' : 'border-border-gray'}`}
+      className={`flex flex-col rounded-md transition-colors ${over ? 'ring-2 ring-dark-fill/20 bg-subtle-gray' : ''}`}
       onDragOver={e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setOver(true) } }}
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
     >
-      <div className="flex items-center justify-between gap-2 px-3.5 pt-3 pb-2">
-        <span className={`${fieldLabel} mb-0`}>Library <span className="normal-case tracking-normal font-normal text-off-black/40">· drag onto the email</span></span>
-        <div className="flex items-center gap-1">
-          <select value={filter} onChange={e => setFilter(e.target.value as 'all' | 'image' | 'deck')} className="text-[11px] bg-transparent text-off-black/55 focus:outline-none">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h3 className={sectionLabel}>Library</h3>
+        <div className="flex items-center gap-3">
+          <select value={filter} onChange={e => setFilter(e.target.value as 'all' | 'image' | 'deck')} className="text-xs bg-transparent text-off-black/55 focus:outline-none cursor-pointer">
             <option value="all">All</option><option value="image">Images</option><option value="deck">Decks</option>
           </select>
-          <button onClick={() => fileInput.current?.click()} className={btnGhost} title="Upload files"><Upload className="w-3.5 h-3.5" /></button>
+          <button onClick={() => fileInput.current?.click()} className={textLink} title="Upload files"><Upload className="w-3 h-3" /> Upload</button>
           <input ref={fileInput} type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pptx,.ppt,.key" className="hidden" onChange={e => { if (e.target.files) upload(e.target.files); e.target.value = '' }} />
         </div>
       </div>
 
-      <div className={`px-2 pb-2 grid gap-1.5 ${compact ? 'grid-cols-3' : 'grid-cols-2'} overflow-y-auto max-h-[42vh]`}>
+      <p className="text-xs text-off-black/45 mb-2">Drag a card onto the email, or double-click it.</p>
+      <div className={`grid gap-2 ${compact ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {Object.entries(uploading).map(([name, frac]) => (
           <div key={name} className="rounded-md border border-dashed border-border-gray p-2 text-[11px] text-off-black/55">
             <Loader2 className="w-3.5 h-3.5 animate-spin inline mr-1" />{name}
@@ -103,17 +104,17 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
               draggable
               onDragStart={e => { e.dataTransfer.setData(ASSET_DRAG_TYPE, JSON.stringify(a)); e.dataTransfer.effectAllowed = 'copy' }}
               onDoubleClick={() => onAttach(a)}
-              className={`group relative rounded-md border cursor-grab active:cursor-grabbing ${attached ? 'border-dark-fill' : 'border-border-gray hover:border-off-black/40'}`}
+              className={`group relative rounded-md border bg-white cursor-grab active:cursor-grabbing ${attached ? 'border-dark-fill' : 'border-border-gray hover:border-off-black/40'}`}
               title={`${a.name}${a.size ? ` · ${fmtSize(a.size)}` : ''}. Drag onto the email, or double-click.`}
             >
               <div className="h-[104px] rounded-t-md bg-subtle-gray grid place-items-center overflow-hidden">
                 {a.kind === 'image' && a.previewUrl ? (
                   <img src={a.previewUrl} alt="" className="w-full h-full object-cover" draggable={false} />
                 ) : a.kind === 'image' ? <ImageIcon className="w-6 h-6 text-off-black/30" /> : (
-                  <div className="text-center"><FileText className="w-7 h-7 text-off-black/40 mx-auto" /><div className="font-mono text-[9px] uppercase text-off-black/40 mt-1">{a.filename.split('.').pop()}{a.size ? ` · ${fmtSize(a.size)}` : ''}</div></div>
+                  <div className="text-center"><FileText className="w-7 h-7 text-off-black/40 mx-auto" /><div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mt-1">{a.filename.split('.').pop()}{a.size ? ` · ${fmtSize(a.size)}` : ''}</div></div>
                 )}
               </div>
-              <div className="px-1.5 py-1 text-[11px] leading-tight line-clamp-2 min-h-[34px]" title={a.name}>{a.name}</div>
+              <div className="px-2 py-1.5 text-xs font-medium text-off-black leading-tight line-clamp-2 min-h-[38px]" title={a.name}>{a.name}</div>
               <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => onAttach(a)} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-subtle-gray" title={attached ? 'Attached' : 'Attach to this email'}>
                   {attached ? <Check className="w-3.5 h-3.5 text-success-green" /> : <Plus className="w-3.5 h-3.5" />}
@@ -126,7 +127,7 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
         })}
         {shown.length === 0 && Object.keys(uploading).length === 0 && (
           <div className={`${compact ? 'col-span-3' : 'col-span-2'} rounded-md border border-dashed border-border-gray px-3 py-5 text-center text-[11.5px] text-off-black/50`}>
-            Drop decks, mockups and images here.<br />Name files for what they are: <span className="font-mono">Chicago_SIR_Mockup.png</span>.
+            Drop decks, mockups and images here.<br />Name files for what they are: <span className="font-medium text-off-black/70">Chicago_SIR_Mockup.png</span>.
           </div>
         )}
       </div>
