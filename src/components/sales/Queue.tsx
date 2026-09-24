@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
 import { chip, chipTone, listHead } from '@/lib/ui'
-import type { Deal, OvernightRun } from '@/types/sales'
+import type { Deal } from '@/types/sales'
 
 /**
  * The left column: today's work, read from Attio.
@@ -96,7 +96,7 @@ export default function Queue({
   scope: 'mine' | 'all'
   today: {
     sentToday: Deal[]; newOutreach: Deal[]; newWaiting: number; followUps: Deal[]; later: Deal[]; exhausted: Deal[]
-    needsContact: Deal[]; contactedBefore: Deal[]; skipped: Deal[]; overnight: OvernightRun | null; cap: number; member: { id: string; email: string; name: string } | null
+    needsContact: Deal[]; contactedBefore: Deal[]; skipped: Deal[]; cap: number; member: { id: string; email: string; name: string } | null
   } | null
   pendingSendIds: Set<string>
   selectedId: string | null; onSelect: (id: string) => void
@@ -104,11 +104,6 @@ export default function Queue({
   /** The toolbar search. Filters every list below. */
   query?: string
 }) {
-  const [noteOpen, setNoteOpen] = useState(false)
-  const overnight = today?.overnight || null
-  const note = overnight?.notes || ''
-  const firstSentence = note.split(/(?<=[.!?])\s+/)[0] || ''
-  const rest = note.slice(firstSentence.length).trim()
   const f = (list?: Deal[]) => (list || []).filter(d => matches(d, query))
 
   const newLeft = (today?.newOutreach || []).filter(d => !pendingSendIds.has(d.id)).length
@@ -123,17 +118,6 @@ export default function Queue({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {overnight && (
-          <div className="px-5 py-3 border-b border-border-gray text-xs text-off-black/60 leading-snug">
-            <button onClick={() => setNoteOpen(o => !o)} className="w-full flex items-center justify-between font-semibold text-off-black text-[13px]">
-              <span>Overnight · {overnight.prepared} written</span>
-              {rest ? (noteOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />) : null}
-            </button>
-            <p className="mt-1">{firstSentence || 'No notes from the run.'}</p>
-            {noteOpen && rest && <p className="mt-1">{rest}</p>}
-          </div>
-        )}
-
         {loading && !today ? (
           <div className="flex items-center justify-center h-32 text-off-black/40"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : (

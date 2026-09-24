@@ -1,8 +1,8 @@
 /**
  * /api/sales/draft
  *
- *   GET                                                  what is wired up: model, Gmail, Attio, the last overnight run
- *   POST { action:'variants', dealId, personId?, useTemplate?, force? }   drafts for the next touch
+ *   GET                                                  what is wired up: model, Gmail, Attio
+ *   POST { action:'variants', dealId, personId?, useTemplate? }   drafts for the next touch
  *   POST { action:'check', dealId, subject, body }         guardrail reasons, no side effects
  *   POST { action:'revise', dealId, subject, body, instruction }   the model rewrites to an instruction
  *   POST { action:'send', dealId, personId, subject, body, assetIds?, adhoc? }   sends through your Gmail. Final.
@@ -15,7 +15,6 @@ import { llmInfo } from '../../server/lib/llm.js'
 import { gmailStatus } from '../../server/domain/sales/gmail.js'
 import { isAttioConfigured, memberForEmail, stageTitles } from '../../server/domain/sales/attio.js'
 import { isAssetStorageConfigured } from '../../server/domain/sales/assets.js'
-import { lastRun } from '../../server/domain/sales/queue.js'
 import { getSenderFor } from '../../server/domain/sales/settings.js'
 
 export default async function handler(req, res) {
@@ -36,7 +35,6 @@ export default async function handler(req, res) {
         me: { id: actor.id, email: actor.email, firstName: actor.firstName || null, role: actor.role },
         // Shown under the body in the composer, where it will sit when sent.
         signature: (await getSenderFor(actor.id, actor)).signature,
-        lastRun: await lastRun(),
       })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -53,7 +51,6 @@ export default async function handler(req, res) {
         dealId,
         personId: body.personId ? String(body.personId) : undefined,
         useTemplate: Boolean(body.useTemplate),
-        force: Boolean(body.force),
         actor,
       }))
     }

@@ -3,8 +3,8 @@
  *
  * The copy in angles.js is the default. Anything a rep changes in Settings
  * is stored per pipeline and touch in SystemConfig and wins field by field,
- * so a wording change reaches the next draft, the next overnight run and
- * the next rep with no deploy. Reset means "delete the override".
+ * so a wording change reaches the next draft and the next rep with no
+ * deploy. Reset means "delete the override".
  *
  * Placeholders ([First Name], [Race Name], ...) are filled at draft time from
  * the Attio deal; see TEMPLATE_PLACEHOLDERS in angles.js.

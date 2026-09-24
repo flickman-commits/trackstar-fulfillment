@@ -14,7 +14,7 @@ import type { AttioCheck, Pipeline, SalesSettings, SalesStatus, Sender, Template
  * delete), and the sequence copy each touch's draft starts from. Sending:
  * the workspace's cap, undo window and business day (admins). Connections:
  * your Gmail, and whether Attio has the fields the tool reads. Automation:
- * the AI switch and the last overnight run.
+ * the AI switch.
  */
 type Tab = 'me' | 'templates' | 'sending' | 'connections' | 'automation'
 
@@ -205,7 +205,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
 
             {tab === 'templates' && tView === 'sequence' && templates && steps && (
               <>
-                <p className="text-xs text-off-black/55">What each touch's draft starts from, before anyone picks a template. Changes reach the next draft and the overnight run.</p>
+                <p className="text-xs text-off-black/55">What each touch's draft starts from, before anyone picks a template. Changes reach the next draft.</p>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className={segmentGroup}>
                     {(['CHARITY', 'RACE'] as Pipeline[]).map(p => <button key={p} onClick={() => { setTPipeline(p); setTAngle(steps[p][0].angle) }} className={segment(tPipeline === p)}>{p === 'CHARITY' ? 'Charity' : 'Race'}</button>)}
@@ -253,7 +253,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                     </select>
                   </div>
                 </div>
-                <p className="text-xs text-off-black/50">The cap is how much new outreach the overnight run prepares per rep and what the page counts toward. Follow-ups are never capped; they are owed.</p>
+                <p className="text-xs text-off-black/50">The cap is how many first touches each rep gets a day, and what the page counts toward. Follow-ups are never capped; they are owed.</p>
                 <div>
                   <label className={fieldLabel}>Social proof line</label>
                   <textarea rows={2} value={s.socialProof} onChange={e => setS({ ...s, socialProof: e.target.value })} className={`${inputBase} w-full resize-y`} />
@@ -307,7 +307,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 <div className="rounded-lg border border-border-gray p-3 flex items-center justify-between gap-3">
                   <div>
                     <div className="font-medium">Use AI on this page</div>
-                    <div className="text-xs text-off-black/55 mt-0.5">Rewrite and Change it call the model. Off means Rewrite resets to the cadence template. The overnight run is unaffected.</div>
+                    <div className="text-xs text-off-black/55 mt-0.5">Rewrite and Change it call the model. Off means Rewrite resets to the cadence template.</div>
                   </div>
                   <button onClick={() => onAiChange(!aiOn)} disabled={!status?.llm.configured} className={`${aiOn && status?.llm.configured ? btnPrimary : btnSecondary} shrink-0`}>
                     {status?.llm.configured ? (aiOn ? 'On' : 'Off') : 'No model'}
@@ -316,16 +316,6 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 <dl className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1.5 text-xs">
                   <dt className="text-off-black/50">Model</dt><dd>{status?.llm.configured ? `${status.llm.provider} · ${status.llm.model}` : 'not configured'}</dd>
                   <dt className="text-off-black/50">Enrichment</dt><dd>Attio's, on the company and the person. Nothing is researched here.</dd>
-                  <dt className="text-off-black/50">Overnight run</dt>
-                  <dd>
-                    {status?.lastRun ? (
-                      <>
-                        {new Date(status.lastRun.finishedAt).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })} · {status.lastRun.prepared} written ({status.lastRun.followUps} follow-ups, {status.lastRun.fresh} first touches)
-                        {status.lastRun.notes && <p className="text-off-black/60 mt-1 leading-snug">{status.lastRun.notes}</p>}
-                        {status.lastRun.skipped?.length > 0 && <p className="text-amber-700 mt-1">Skipped: {status.lastRun.skipped.join('; ')}</p>}
-                      </>
-                    ) : 'has not run yet. It is the last phase of the nightly CRM upkeep.'}
-                  </dd>
                 </dl>
               </>
             )}

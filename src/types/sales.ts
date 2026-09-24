@@ -89,8 +89,6 @@ export interface Deal {
   exhausted: boolean
   lastSentAt: string | null
   lastSubject: string | null
-  hasPrep: boolean
-  preparedAt: string | null
   skippedUntil: string | null
   overdueDays: number
   reason: string
@@ -99,11 +97,6 @@ export interface Deal {
   sentSubject?: string
   /** Only on the full detail. */
   sends?: Send[]
-}
-
-export interface OvernightRun {
-  finishedAt: string; prepared: number; followUps: number; fresh: number
-  skipped: string[]; notes: string
 }
 
 export interface TodayPayload {
@@ -125,7 +118,6 @@ export interface TodayPayload {
   contactedBefore: Deal[]
   skipped: Deal[]
   counts: { deals: number; inScope: number; byStage: Record<string, number>; week: { sent: number } }
-  overnight: OvernightRun | null
 }
 
 export interface Progress {
@@ -145,9 +137,8 @@ export interface DraftResult {
   personId: string
   dealId: string
   model: string
-  /** Who wrote it: a model now, the cadence template, or the overnight routine ('prepared'). */
-  source?: 'model' | 'template' | 'prepared'
-  preparedAt?: string
+  /** Who wrote it: a model now, or the cadence template. */
+  source?: 'model' | 'template'
   warning?: string
 }
 
@@ -172,7 +163,6 @@ export interface SalesStatus {
   me: { id: string; email: string; firstName: string | null; role: string }
   /** Your signature HTML, as it goes out under the body. */
   signature?: string
-  lastRun: OvernightRun | null
 }
 
 export interface SalesSettings {

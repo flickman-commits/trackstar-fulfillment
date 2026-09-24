@@ -143,7 +143,6 @@ export default function Composer({
                 {!adhoc && <span className="px-2 py-0.5 rounded bg-off-black/10 text-off-black/60 font-medium">
                   {draft.touchNumber === 1 ? 'First touch' : `Follow-up ${draft.touchNumber - 1}`}
                 </span>}
-                {draft.source === 'prepared' && <span>written overnight</span>}
                 {draft.source === 'template' && <span className="text-amber-700">template, fill in the opener</span>}
                 {draft.source === 'model' && <span>written just now</span>}
               </>

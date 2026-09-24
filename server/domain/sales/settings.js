@@ -4,8 +4,8 @@
  * The cadence wording, the daily cap, which races to source from, the social
  * proof line: these change when the business changes its mind, and that
  * should not need a deploy. Defaults live here so the tool works with nothing
- * configured; overrides live in SystemConfig and win field by field. Both the
- * UI and the overnight routine read the merged result through one function,
+ * configured; overrides live in SystemConfig and win field by field. Every
+ * caller reads the merged result through one function,
  * so there is exactly one answer to "what are the current settings".
  *
  * What is NOT here, on purpose: the guardrails (no dashes, no money-back

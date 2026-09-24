@@ -746,7 +746,7 @@ model ToplineWaitlist {
 // Sales machinery. Attio holds the deal, the company, the person, the stage
 // and the touch count. Postgres holds only what Attio cannot: the Gmail ids a
 // follow-up needs to land in the same thread, the send log that says how many
-// went out today, the draft the overnight routine wrote, and a skip. Every
+// went out today, and a skip. Every
 // row points at an Attio record id and nothing here is a fact about a deal.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -774,17 +774,6 @@ model SalesSend {
 
   @@index([attioDealId, sentAt])
   @@index([sentAt])
-}
-
-// The email the overnight routine wrote for a deal, waiting for a person.
-model SalesPrep {
-  attioDealId   String   @id
-  attioPersonId String?
-  touchNumber   Int
-  angle         String?
-  variants      Json     // [{subject, body}]
-  source        String   @default("routine")
-  preparedAt    DateTime @default(now())
 }
 
 // "Skip today": hidden from the queue until `until`. The reason is for tomorrow's person.

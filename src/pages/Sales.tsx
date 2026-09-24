@@ -142,9 +142,9 @@ export default function Sales() {
   const suggested = useMemo(() => assets.find(a => a.id === suggestedId) || null, [assets, suggestedId])
 
   /**
-   * Draft one deal. A click shows the overnight draft if there is one, else
-   * the template, at once and with no model call; the model only writes
-   * when a rep presses Rewrite (`force`).
+   * Draft one deal. A click fills in the template for its next touch, with
+   * no model call; the model only writes when a rep presses Rewrite (`force`)
+   * with AI on.
    */
   const prepare = useCallback(async (d: Deal, opts: { silent: boolean; force?: boolean; personId?: string | null }) => {
     const target = (opts.personId && d.people.find(p => p.id === opts.personId)) || d.person
@@ -204,7 +204,7 @@ export default function Sales() {
     setNewOpen(false)
     const id = `adhoc:${email.toLowerCase()}`
     const person: Person = { id, firstName: '', lastName: '', fullName: email, email, emails: [email], title: null, description: null, linkedin: null, location: null, lastInteractionAt: null, lastEmailAt: null, webUrl: null }
-    const synthetic: Deal = { id, name: email, stage: 'Not Contacted', motion: null, pipeline: 'RACE', ownerId: null, company: null, people: [person], person, hasEmail: true, touchCount: 0, nextAction: null, nextActionDate: null, raceDate: null, runners: null, tier: null, sizeTier: null, priority: null, notes: null, value: null, units: null, createdAt: null, webUrl: null, nextTouchNumber: null, nextAngle: null, exhausted: false, lastSentAt: null, lastSubject: null, hasPrep: false, preparedAt: null, skippedUntil: null, overdueDays: 0, reason: 'One-off' }
+    const synthetic: Deal = { id, name: email, stage: 'Not Contacted', motion: null, pipeline: 'RACE', ownerId: null, company: null, people: [person], person, hasEmail: true, touchCount: 0, nextAction: null, nextActionDate: null, raceDate: null, runners: null, tier: null, sizeTier: null, priority: null, notes: null, value: null, units: null, createdAt: null, webUrl: null, nextTouchNumber: null, nextAngle: null, exhausted: false, lastSentAt: null, lastSubject: null, skippedUntil: null, overdueDays: 0, reason: 'One-off' }
     setAdhoc(synthetic); setPersonId(null); setVariantIndex(0); setProblems(null); setSuggestedId(null)
     setPrepared(prev => ({ ...prev, [id]: { draft: { touchNumber: 0, step: { angle: 'free', purpose: 'Whatever you want to say. Your signature is added on send.', subject: '', nextActionDays: 0 }, exhausted: false, variants: [], personId: id, dealId: id, model: 'you' }, variants: [{ subject: '', body: 'Hey there,\n\n' }], template: true } }))
   }, [])
@@ -228,7 +228,7 @@ export default function Sales() {
 
   const noteSync = (sync?: { ok: boolean; skipped?: string; error?: string }) => {
     if (!sync || sync.ok) return
-    toast.warning(`Sent, but Attio was not updated: ${sync.error || sync.skipped || 'unknown reason'}. The overnight upkeep will reconcile it.`, { duration: 10000 })
+    toast.warning(`Sent, but Attio was not updated: ${sync.error || sync.skipped || 'unknown reason'}. The nightly CRM upkeep will reconcile it.`, { duration: 10000 })
   }
 
   /** Send, after an undo window. Selection moves on immediately so the rhythm holds. */
@@ -447,7 +447,7 @@ export default function Sales() {
                     <div className="text-xl font-bold text-off-black">{mode === 'new' ? `New outreach is done. ${sentCount} sent today.` : 'No follow-ups due.'}</div>
                     <p className="text-sm text-off-black/60 mt-2">
                       {mode === 'new'
-                        ? (sentCount >= cap ? 'That is the cap. ' : '') + (today?.followUps.length ? `${today.followUps.length} follow-ups are waiting under Follow Ups.` : 'Tomorrow\'s batch is read from Attio overnight.')
+                        ? (sentCount >= cap ? 'That is the cap. ' : '') + (today?.followUps.length ? `${today.followUps.length} follow-ups are waiting under Follow Ups.` : 'Tomorrow\'s batch comes from Attio in the morning.')
                         : today?.later.length ? `${today.later.length} coming up this week.` : 'Nothing on the clock.'}
                     </p>
                   </div>

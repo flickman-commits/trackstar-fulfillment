@@ -4,14 +4,14 @@
  * Two lists, one question each:
  *
  *   New outreach: deals at Not Contacted with a person to write to. How many
- *   is the daily cap minus what already went out today. Ones the overnight
- *   routine drafted come first, then by priority, then by race date.
+ *   is the daily cap minus what already went out today. By priority, then by
+ *   race date.
  *
  *   Follow-ups: deals at Reached Out whose next touch is due. Due means the
  *   deal's next_action_date is today or earlier, or, when nobody set one, the
  *   cadence gap has passed since our last send. The touch number is Attio's
- *   touch_count plus one, so an email sent from Gmail directly and logged by
- *   the overnight upkeep still advances the sequence here.
+ *   touch_count plus one, so an email sent from Gmail directly and counted by
+ *   the nightly CRM upkeep still advances the sequence here.
  *
  * Deals at In Conversation or later are a person's job, not a sequence's,
  * and never appear. Skips hide a deal until tomorrow. "Mine" means the deals
@@ -105,17 +105,17 @@ function overdueDays(deal, dayStart) {
   return Math.max(0, daysBetween(due, dayStart))
 }
 
-function reasonFor(deal, lastSend, prep) {
+function reasonFor(deal, lastSend) {
   const { touchNumber, step, exhausted } = nextStepFor(deal)
   if (exhausted) return 'Sequence complete · decide next year vs. lost'
-  if (touchNumber === 1) return `First touch${deal.priority ? ` · ${deal.priority} priority` : ''}${prep ? ' · written overnight' : ''}`
+  if (touchNumber === 1) return `First touch${deal.priority ? ` · ${deal.priority} priority` : ''}`
   const last = lastContactAt(deal, lastSend)
   const ago = last ? daysBetween(last, new Date()) : null
-  return `Touch ${touchNumber} · ${step.angle}${ago != null ? ` · last emailed ${ago}d ago, no reply` : ''}${prep ? ' · written overnight' : ''}`
+  return `Touch ${touchNumber} · ${step.angle}${ago != null ? ` · last emailed ${ago}d ago, no reply` : ''}`
 }
 
-/** A deal as the page shows it: the Attio view plus what the send log and prep table add. */
-function shape(deal, { lastSend, prep, skip, dayStart }) {
+/** A deal as the page shows it: the Attio view plus what the send log and skips add. */
+function shape(deal, { lastSend, skip, dayStart }) {
   const { touchNumber, step, exhausted } = nextStepFor(deal)
   const person = primaryPerson(deal)
   return {
@@ -129,11 +129,9 @@ function shape(deal, { lastSend, prep, skip, dayStart }) {
     exhausted,
     lastSentAt: lastContactAt(deal, lastSend)?.toISOString() || null,
     lastSubject: lastSend?.subject || null,
-    hasPrep: Boolean(prep),
-    preparedAt: prep?.preparedAt || null,
     skippedUntil: skip?.until || null,
     overdueDays: overdueDays(deal, dayStart),
-    reason: reasonFor(deal, lastSend, prep),
+    reason: reasonFor(deal, lastSend),
   }
 }
 
@@ -167,19 +165,17 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
   const dayStart = startOfToday(settings.timezone, now)
   const weekStart = new Date(dayStart.getTime() - 6 * 86400000)
 
-  const [deals, { lastByDeal, today }, preps, skips, owner] = await Promise.all([
+  const [deals, { lastByDeal, today }, skips, owner] = await Promise.all([
     loadDeals({ fresh }),
     sendIndex(dayStart),
-    prisma.salesPrep.findMany(),
     prisma.salesSkip.findMany({ where: { until: { gt: now } } }),
     ownerFilter(actor, scopeMode),
   ])
-  const prepByDeal = Object.fromEntries(preps.map(p => [p.attioDealId, p]))
   const skipByDeal = Object.fromEntries(skips.map(s => [s.attioDealId, s]))
   const sentTodayIds = new Set(today.map(s => s.attioDealId).filter(Boolean))
 
   const inScope = deals.filter(d => owner.matches(d) && (!motion || d.motion === motion))
-  const ctx = d => ({ lastSend: lastByDeal[d.id], prep: prepByDeal[d.id], skip: skipByDeal[d.id], dayStart })
+  const ctx = d => ({ lastSend: lastByDeal[d.id], skip: skipByDeal[d.id], dayStart })
 
   // What went out today, in order, whoever's it is.
   const sentToday = today
@@ -198,7 +194,6 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
   const fresh_ = notContacted.filter(d => !d.lastSentAt)
   const newReady = fresh_.filter(d => d.hasEmail).sort((a, b) =>
     byPriority(a, b)
-    || Number(b.hasPrep) - Number(a.hasPrep)
     || String(a.raceDate || '9999').localeCompare(String(b.raceDate || '9999'))
     || String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
   const needsContact = fresh_.filter(d => !d.hasEmail)
@@ -209,7 +204,7 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
     .filter(d => OPEN_FOR_FOLLOW_UP.includes(d.stage) && !sentTodayIds.has(d.id) && !skipByDeal[d.id])
     .map(d => shape(d, ctx(d)))
   const due = reached.filter(d => d.hasEmail && !d.exhausted && isDue(d, lastByDeal[d.id], dayStart))
-    .sort((a, b) => byPriority(a, b) || b.overdueDays - a.overdueDays || Number(b.hasPrep) - Number(a.hasPrep))
+    .sort((a, b) => byPriority(a, b) || b.overdueDays - a.overdueDays)
   const later = reached.filter(d => d.hasEmail && !d.exhausted && !isDue(d, lastByDeal[d.id], dayStart))
     .sort((a, b) => byPriority(a, b) || String(a.nextActionDate || '9999').localeCompare(String(b.nextActionDate || '9999')))
   const exhausted = reached.filter(d => d.exhausted)
@@ -240,16 +235,7 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
       byStage: Object.fromEntries(Object.entries(inScope.reduce((m, d) => { m[d.stage || 'None'] = (m[d.stage || 'None'] || 0) + 1; return m }, {}))),
       week: { sent: weekSent },
     },
-    overnight: await lastRun(),
   }
-}
-
-export const LAST_RUN_KEY = 'sales_last_run'
-
-export async function lastRun() {
-  const row = await prisma.systemConfig.findUnique({ where: { key: LAST_RUN_KEY } })
-  if (!row?.value) return null
-  try { return JSON.parse(row.value) } catch { return null }
 }
 
 /** One deal with everything the composer and the Who pane need. */
@@ -258,14 +244,13 @@ export async function dealForWork(dealId, { fresh = false } = {}) {
   const dayStart = startOfToday(settings.timezone, new Date())
   const deal = await getDeal(dealId, { fresh })
   if (!deal) throw new Error('That deal is not in Attio any more')
-  const [sends, prep, skip] = await Promise.all([
+  const [sends, skip] = await Promise.all([
     prisma.salesSend.findMany({ where: { attioDealId: dealId }, orderBy: { sentAt: 'asc' } }),
-    prisma.salesPrep.findUnique({ where: { attioDealId: dealId } }),
     prisma.salesSkip.findUnique({ where: { attioDealId: dealId } }),
   ])
   const lastSend = sends[sends.length - 1] || null
   return {
-    ...shape(deal, { lastSend, prep, skip: skip && skip.until > new Date() ? skip : null, dayStart }),
+    ...shape(deal, { lastSend, skip: skip && skip.until > new Date() ? skip : null, dayStart }),
     sends: sends.map(s => ({ id: s.id, touchNumber: s.touchNumber, subject: s.subject, body: s.body, sentAt: s.sentAt, sentByEmail: s.sentByEmail, gmailThreadId: s.gmailThreadId, attachments: s.attachments, attioOk: s.attioOk })),
   }
 }
