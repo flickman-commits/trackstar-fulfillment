@@ -213,8 +213,8 @@ function base64Lines(buf) {
  *
  * No attachments: a plain text/html part. Images: multipart/related, each
  * image carried with a Content-ID and referenced from the HTML as
- * <img src="cid:..."> above the sign-off, so it renders in the body where it
- * does its job instead of sitting at the bottom as a file to open. Gmail still
+ * <img src="cid:..."> at the end of the email, after the signature and any
+ * P.S., so it shows in the message instead of only as a file to open. Gmail still
  * lists it as an attachment, so the copy's "attached" stays true. Files that
  * are not images (a deck, a PDF) wrap the whole thing in multipart/mixed and
  * hang off the end as ordinary attachments.
@@ -245,10 +245,15 @@ export function buildMime({ to, subject, html, inReplyTo, attachment, attachment
   const inline = list.filter(a => a.inline)
   const files = list.filter(a => !a.inline)
 
-  // The images go above the sign-off, where the copy points at them.
+  // The images go at the very end, after the signature and any P.S. The
+  // wrapper's own closing tag is the last one; the first </div> can be deep
+  // inside the signature, which is where they used to land.
   const cids = inline.map(() => `img_${crypto.randomBytes(8).toString('hex')}`)
   const imgTags = cids.map(cid => `<p><img src="cid:${cid}" alt="Trackstar example" width="600" style="max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0;" /></p>`).join('\n')
-  const body = inline.length ? html.replace('</div>', `${imgTags}\n</div>`) : html
+  const end = html.lastIndexOf('</div>')
+  const body = !inline.length ? html
+    : end >= 0 ? `${html.slice(0, end)}${imgTags}\n${html.slice(end)}`
+    : `${html}\n${imgTags}`
 
   const htmlPart = [
     'Content-Type: text/html; charset=utf-8',

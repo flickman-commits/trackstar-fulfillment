@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate } from 'lucide-react'
 import { MotionTag } from './Queue'
-import { salesApi, type OutreachTemplates } from '@/lib/salesApi'
+import type { LibraryTemplate, OutreachTemplate, TemplateFill } from '@/lib/salesApi'
+import { menuFor } from '@/lib/salesTemplates'
+
+/** The saved templates and their fill values, loaded once by the page. */
+export interface TemplateLibrary { templates: LibraryTemplate[]; fill: TemplateFill }
 import { btnPrimary, btnSecondary, btnGhost, inputBase, cardLabel, textLink } from '@/lib/ui'
 import type { Asset, Deal, DraftResult, Person, Variant } from '@/types/sales'
 
@@ -23,7 +27,7 @@ export default function Composer({
   deal, person, draft, variants, index, drafting, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach,
-  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature,
+  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature, library,
 }: {
   deal: Deal | null
   person: Person | null
@@ -52,6 +56,8 @@ export default function Composer({
   adhoc?: boolean
   /** Your signature HTML, shown where it will sit in the sent email. */
   signature?: string
+  /** The saved templates, for the Templates menu. Null until loaded. */
+  library: TemplateLibrary | null
 }) {
   const [whyOpen, setWhyOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
@@ -203,7 +209,7 @@ export default function Composer({
               </span>
             ))}
             {attachments.length === 0 && (
-              <span className={missingRequired ? 'text-red-600' : 'text-off-black/45'}>{missingRequired ? 'A charity first touch needs a co-branded example. Drag one in from the library.' : 'Drag a deck or image here from the library.'}</span>
+              <span className={missingRequired ? 'text-red-600' : 'text-off-black/45'}>{missingRequired ? 'A charity first touch needs a co-branded example. Drag one in from the library.' : 'Drag a deck or image here from the library. Images show at the end of the email.'}</span>
             )}
           </div>
           </div>
@@ -226,7 +232,7 @@ export default function Composer({
               </div>
             </form>
           )}
-          <TemplateMenu deal={deal} person={person} disabled={drafting || !current} onRewrite={onRewrite} aiActive={aiActive}
+          <TemplateMenu deal={deal} person={person} disabled={drafting || !current} onRewrite={onRewrite} aiActive={aiActive} library={library}
             onPick={t => current && onChange({ ...current, subject: t.subject ?? current.subject, body: t.body })} />
           {aiActive && (
             <button onClick={onRewrite} disabled={drafting || !person} className={btnSecondary} title="Write it again">
@@ -254,21 +260,17 @@ export default function Composer({
  * this person (this deal's motion first), plus the sequence's copy for this touch. Picking one
  * replaces the body; a template marked "stay on the thread" keeps the subject.
  */
-function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive }: {
+function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, library }: {
   deal: Deal
   person: Person | null
   disabled: boolean
   onPick: (t: { subject: string | null; body: string }) => void
   onRewrite: () => void
   aiActive: boolean
+  library: TemplateLibrary | null
 }) {
   const [open, setOpen] = useState(false)
-  const [data, setData] = useState<OutreachTemplates | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  const key = `${deal.id}:${person?.id || ''}`
-  const loadedFor = useRef<string | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -278,20 +280,9 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive }: {
     return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
   }, [open])
 
-  useEffect(() => {
-    if (!open || loadedFor.current === key) return
-    loadedFor.current = key
-    setLoading(true); setError(null)
-    const adhoc = deal.id.startsWith('adhoc:')
-    salesApi.templates(adhoc
-      ? { firstName: person?.firstName, email: person?.email || undefined, org: deal.company?.name || '' }
-      : { dealId: deal.id, personId: person?.id })
-      .then(setData)
-      .catch(e => { setError((e as Error).message); loadedFor.current = null })
-      .finally(() => setLoading(false))
-  }, [open, key, deal, person])
-
-  const groups = (data?.items || []).reduce<Record<string, OutreachTemplates['items']>>((acc, t) => {
+  // Loaded with the page and filled here from the person on screen: no wait.
+  const items = library ? menuFor(library.templates, deal, person, library.fill) : []
+  const groups = items.reduce<Record<string, OutreachTemplate[]>>((acc, t) => {
     (acc[t.group] = acc[t.group] || []).push(t); return acc
   }, {})
 
@@ -308,8 +299,7 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive }: {
               <span className="block text-xs text-off-black/50 mt-0.5">The tool's own copy for where this deal is. Edit it in Settings.</span>
             </button>
           )}
-          {loading && <div className="px-4 py-4 text-xs text-off-black/50 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading the templates…</div>}
-          {error && <div className="px-4 py-3 text-xs text-red-700">{error}</div>}
+          {!library && <div className="px-4 py-4 text-xs text-off-black/50 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading the templates…</div>}
           {Object.entries(groups).map(([group, items]) => (
             <div key={group}>
               <div className="px-4 py-2 bg-subtle-gray border-b border-border-gray text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">{group}</div>
@@ -322,8 +312,8 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive }: {
               ))}
             </div>
           ))}
-          {data && data.items.length === 0 && <div className="px-4 py-3 text-xs text-off-black/50">No saved templates yet.</div>}
-          {data && <div className="px-4 py-2.5 border-t border-border-gray text-[11px] text-off-black/45">Add or change these in Settings, under Templates.</div>}
+          {library && items.length === 0 && <div className="px-4 py-3 text-xs text-off-black/50">No saved templates yet.</div>}
+          {library && <div className="px-4 py-2.5 border-t border-border-gray text-[11px] text-off-black/45">Add or change these in Settings, under Templates.</div>}
         </div>
       )}
     </div>
@@ -346,22 +336,22 @@ function AutoGrow({ value, onChange, onBlur, className, placeholder, minRows = 3
 
 /** Where a P.S. starts: a paragraph that opens with "P.S.", as composeHtml splits it on send. */
 const PS_START = /(^|\n[ \t]*\n)(?=[ \t]*p\.?s\.?[\s:.-])/i
-const IS_PS_PREFIX = /^\s*p\.?s\.?[:.-]?\s*/i
+const IS_PS = /^\s*p\.?s\.?[\s:.-]/i
 
 function splitBody(body: string) {
   const m = PS_START.exec(body)
   if (!m) return { main: body, ps: '' }
   const at = m.index + m[1].length
-  // The box sits beside a "P.S." label, so it holds what comes after it.
-  return { main: body.slice(0, at).replace(/\s+$/, ''), ps: body.slice(at).trim().replace(IS_PS_PREFIX, '') }
+  return { main: body.slice(0, at).replace(/\s+$/, ''), ps: body.slice(at).trim() }
 }
 
 /**
- * The body, then your signature, then the P.S., in the order they go out.
- * The draft stays one string (the server moves anything from "P.S." on to
- * below the signature); this only shows it that way and lets the P.S. be
- * written in its own box. Local text is kept while typing so a paragraph
- * never jumps boxes under the cursor.
+ * The email as one page: what you write, your signature where it will sit,
+ * and room under it for a P.S. It stays one string underneath; on send the
+ * server puts anything from "P.S." on below the signature, so text typed
+ * under the signature gets a "P.S." if it does not start with one.
+ * Attachments are not in here: they are chips below and go at the very end.
+ * Local text is kept while typing so nothing jumps under the cursor.
  */
 function BodyEditor({ body, signature, onChange, onBlur }: {
   body: string; signature?: string; onChange: (body: string) => void; onBlur: () => void
@@ -373,24 +363,24 @@ function BodyEditor({ body, signature, onChange, onBlur }: {
   }, [body])
   const update = (main: string, ps: string) => {
     setParts({ main, ps })
-    const extra = ps.trim().replace(IS_PS_PREFIX, '')
-    const next = extra ? `${main.replace(/\s+$/, '')}\n\nP.S. ${extra}` : main
+    const extra = ps.trim()
+    const next = extra ? `${main.replace(/\s+$/, '')}\n\n${IS_PS.test(extra) ? extra : `P.S. ${extra}`}` : main
     emitted.current = next
     onChange(next)
   }
-  const box = 'w-full text-sm leading-relaxed text-off-black bg-transparent px-1 py-1 focus:outline-none focus:bg-subtle-gray/60 rounded'
+  const box = 'block w-full text-sm leading-relaxed text-off-black bg-transparent px-1 focus:outline-none placeholder:text-off-black/30'
   return (
-    <div className="px-6 pt-3 pb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-3">
+    <div className="px-6 pt-3 pb-2 grid grid-cols-[64px_1fr] gap-x-2">
       <span className={`${cardLabel} pt-2`}>Body</span>
-      <AutoGrow value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minRows={8} className={`${box} min-h-[180px]`} />
-
-      <span className={`${cardLabel} pt-1`}>Signature</span>
-      <div className="px-1 text-sm text-off-black/80 border-l-2 border-border-gray pl-3" title="Added when it sends. Change it in Settings, under Me.">
-        {signature ? <div dangerouslySetInnerHTML={{ __html: signature }} /> : <span className="text-xs text-off-black/40">No signature yet. Add one in Settings, under Me.</span>}
+      <div className="rounded-md px-1 py-1 focus-within:bg-subtle-gray/50 transition-colors">
+        <AutoGrow value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minRows={8} className={box} />
+        <div className="px-1 pt-3 pb-2 text-sm text-off-black" title="Your signature, added on send. Change it in Settings, under Me.">
+          {signature
+            ? <div dangerouslySetInnerHTML={{ __html: signature }} />
+            : <span className="text-xs text-off-black/40">No signature yet. Add one in Settings, under Me.</span>}
+        </div>
+        <AutoGrow value={parts.ps} onChange={v => update(parts.main, v)} onBlur={onBlur} minRows={1} placeholder="P.S. (optional)" className={box} />
       </div>
-
-      <span className={`${cardLabel} pt-2`}>P.S.</span>
-      <AutoGrow value={parts.ps} onChange={v => update(parts.main, v)} onBlur={onBlur} minRows={1} placeholder="Optional. Goes under your signature." className={box} />
     </div>
   )
 }

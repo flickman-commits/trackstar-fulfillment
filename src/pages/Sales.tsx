@@ -9,7 +9,7 @@ import {
 } from '@/lib/ui'
 import type { Asset, Deal, DraftResult, Motion, Person, SalesStatus, TodayPayload, Variant } from '@/types/sales'
 import Queue, { type QueueMode } from '@/components/sales/Queue'
-import Composer from '@/components/sales/Composer'
+import Composer, { type TemplateLibrary } from '@/components/sales/Composer'
 import WhoPane from '@/components/sales/WhoPane'
 import LibraryPanel from '@/components/sales/LibraryPanel'
 import SettingsModal from '@/components/sales/SettingsModal'
@@ -46,6 +46,10 @@ export default function Sales() {
   const [scope, setScope] = useState<'mine' | 'all'>(() => { try { return localStorage.getItem('sales.scope') === 'all' ? 'all' : 'mine' } catch { return 'mine' } })
   const [motion, setMotion] = useState<Motion | null>(null)
   const [query, setQuery] = useState('')
+  const [library, setLibrary] = useState<TemplateLibrary | null>(null)
+  // The saved templates, read once with the page so the Templates menu opens at once.
+  const loadLibrary = useCallback(() => { salesApi.library().then(r => setLibrary({ templates: r.templates, fill: r.fill })).catch(() => { /* the menu says it is loading; Settings shows errors */ }) }, [])
+  useEffect(() => { loadLibrary() }, [loadLibrary])
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [personId, setPersonId] = useState<string | null>(null)
@@ -476,7 +480,7 @@ export default function Sales() {
                   attachments={attachedAssets} onAttach={attach} onDetach={detach}
                   onChange={updateVariant}
                   onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} adhoc={Boolean(adhoc)} signature={status?.signature}
+                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library}
                 />
               )}
 
@@ -503,7 +507,7 @@ export default function Sales() {
           </div>
         </section>
 
-      {settingsOpen && <SettingsModal status={status} aiOn={aiOn} onAiChange={setAiOn} onClose={() => { setSettingsOpen(false); loadStatus(); loadToday() }} />}
+      {settingsOpen && <SettingsModal status={status} aiOn={aiOn} onAiChange={setAiOn} onClose={() => { setSettingsOpen(false); loadStatus(); loadToday(); loadLibrary() }} />}
       {progressOpen && <ProgressModal scope={scope} onClose={() => setProgressOpen(false)} />}
       {newOpen && <NewEmail onPickDeal={pickDeal} onPickAddress={pickAddress} onClose={() => setNewOpen(false)} />}
       </div>

@@ -13,7 +13,6 @@
  */
 import crypto from 'node:crypto'
 import prisma from '../../db.js'
-import { fillTemplate } from './angles.js'
 import { NO_DASHES } from './guardrails.js'
 
 export const LIBRARY_KEY = 'sales_template_library'
@@ -153,31 +152,4 @@ export async function deleteTemplate(id) {
   const list = (await listTemplates({ force: true })).filter(t => t.id !== id)
   await write(list)
   return list
-}
-
-/**
- * The menu for one person on one deal: every template, filled in. The
- * deal's motion comes first; the others follow, since a charity reply can
- * still be the right shape for a race. A null subject keeps the thread's.
- */
-export async function templatesFor({ deal, person, sender }) {
-  const list = await listTemplates()
-  const company = { name: deal?.name || deal?.company?.name || '', raceDate: deal?.raceDate, courseLandmark: deal?.courseLandmark }
-  const senderName = sender?.name || ''
-  const fill = text => fillTemplate(text, { company, contact: person }).replace(/\[Your name\]/gi, senderName)
-  const motion = deal?.motion || null
-  const rank = t => (t.motion === motion ? 0 : t.motion === 'Any' ? 1 : 2)
-  return {
-    items: list
-      .map((t, i) => ({ t, i }))
-      .sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i)
-      .map(({ t }) => ({
-        id: t.id,
-        group: t.motion === 'Any' ? 'Any deal' : t.motion,
-        title: t.name,
-        useFor: t.useFor || null,
-        subject: t.subject ? fill(t.subject) : null,
-        body: fill(t.body),
-      })),
-  }
 }

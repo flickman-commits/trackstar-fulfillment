@@ -171,21 +171,21 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                       ))}
                       {library.length === 0 && <p className="text-xs text-off-black/45 px-2.5 py-2">No templates yet.</p>}
                     </div>
-                    {isAdmin && <button onClick={() => pickLib(null)} className={`${btnSecondary} mt-3`}><Plus className="w-3.5 h-3.5" /> New template</button>}
+                    <button onClick={() => pickLib(null)} className={`${btnSecondary} mt-3`}><Plus className="w-3.5 h-3.5" /> New template</button>
                   </div>
                   {libDraft ? (
                     <div className="space-y-3 min-w-0">
                       <div className="grid grid-cols-[1fr_130px] gap-3">
-                        <div><label className={fieldLabel}>Name</label><input value={libDraft.name || ''} onChange={e => setLibDraft({ ...libDraft, name: e.target.value })} disabled={!isAdmin} placeholder="First Touch (Loom)" className={`${inputBase} w-full`} /></div>
+                        <div><label className={fieldLabel}>Name</label><input value={libDraft.name || ''} onChange={e => setLibDraft({ ...libDraft, name: e.target.value })} placeholder="First Touch (Loom)" className={`${inputBase} w-full`} /></div>
                         <div><label className={fieldLabel}>For</label>
-                          <select value={libDraft.motion || 'Any'} onChange={e => setLibDraft({ ...libDraft, motion: e.target.value as TemplateMotion })} disabled={!isAdmin} className={`${inputBase} w-full`}>
+                          <select value={libDraft.motion || 'Any'} onChange={e => setLibDraft({ ...libDraft, motion: e.target.value as TemplateMotion })} className={`${inputBase} w-full`}>
                             <option value="Charity">Charity</option><option value="Race">Race</option><option value="Any">Any deal</option>
                           </select>
                         </div>
                       </div>
-                      <div><label className={fieldLabel}>When to use it</label><input value={libDraft.useFor || ''} onChange={e => setLibDraft({ ...libDraft, useFor: e.target.value })} disabled={!isAdmin} placeholder="Follow-up where the first touch went out without the video" className={`${inputBase} w-full`} /></div>
-                      <div><label className={fieldLabel}>Subject</label><input value={libDraft.subject || ''} onChange={e => setLibDraft({ ...libDraft, subject: e.target.value })} disabled={!isAdmin} placeholder="Leave empty to reply on the thread" className={`${inputBase} w-full`} /></div>
-                      <div><label className={fieldLabel}>Body</label><textarea rows={13} value={libDraft.body || ''} onChange={e => setLibDraft({ ...libDraft, body: e.target.value })} disabled={!isAdmin} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
+                      <div><label className={fieldLabel}>When to use it</label><input value={libDraft.useFor || ''} onChange={e => setLibDraft({ ...libDraft, useFor: e.target.value })} placeholder="Follow-up where the first touch went out without the video" className={`${inputBase} w-full`} /></div>
+                      <div><label className={fieldLabel}>Subject</label><input value={libDraft.subject || ''} onChange={e => setLibDraft({ ...libDraft, subject: e.target.value })} placeholder="Leave empty to reply on the thread" className={`${inputBase} w-full`} /></div>
+                      <div><label className={fieldLabel}>Body</label><textarea rows={13} value={libDraft.body || ''} onChange={e => setLibDraft({ ...libDraft, body: e.target.value })} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
                       <details className="text-xs text-off-black/55">
                         <summary className="cursor-pointer">Placeholders</summary>
                         <dl className="mt-1 grid grid-cols-[130px_1fr] gap-x-2 gap-y-0.5">
@@ -193,12 +193,10 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                         </dl>
                         <p className="mt-1">Leave out the sign-off; your signature is added on send. A P.S. goes last. No em or en dashes.</p>
                       </details>
-                      {isAdmin ? (
-                        <div className="flex items-center justify-between gap-2">
-                          {libSaved ? <button onClick={deleteLib} className={`${btnGhost} text-red-700 hover:text-red-800`}><Trash2 className="w-3.5 h-3.5" /> Delete</button> : <button onClick={() => pickLib(library[0] || null)} className={btnGhost}>Cancel</button>}
+                      <div className="flex items-center justify-between gap-2">
+                          {libSaved ? (isAdmin ? <button onClick={deleteLib} className={`${btnGhost} text-red-700 hover:text-red-800`}><Trash2 className="w-3.5 h-3.5" /> Delete</button> : <span className="text-xs text-off-black/40">An admin can delete templates.</span>) : <button onClick={() => pickLib(library[0] || null)} className={btnGhost}>Cancel</button>}
                           <button onClick={saveLib} disabled={libSaving || !libDirty} className={btnPrimary}>{libSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} {libSaved ? 'Save changes' : 'Add template'}</button>
                         </div>
-                      ) : <p className="text-xs text-off-black/45">Templates are edited by an admin. You can still change any draft before it goes.</p>}
                     </div>
                   ) : <div className="text-sm text-off-black/45 flex items-center justify-center">Pick a template, or add one.</div>}
                 </div>
@@ -219,8 +217,8 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 <p className="text-xs text-off-black/55">{steps[tPipeline].find(st => st.angle === tAngle)?.purpose}</p>
                 {tDraft && (
                   <>
-                    <div><label className={fieldLabel}>Subject</label><input value={tDraft.subject} onChange={e => setTDraft({ ...tDraft, subject: e.target.value })} disabled={!isAdmin} className={`${inputBase} w-full`} /></div>
-                    <div><label className={fieldLabel}>Body</label><textarea rows={12} value={tDraft.body} onChange={e => setTDraft({ ...tDraft, body: e.target.value })} disabled={!isAdmin} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
+                    <div><label className={fieldLabel}>Subject</label><input value={tDraft.subject} onChange={e => setTDraft({ ...tDraft, subject: e.target.value })} className={`${inputBase} w-full`} /></div>
+                    <div><label className={fieldLabel}>Body</label><textarea rows={12} value={tDraft.body} onChange={e => setTDraft({ ...tDraft, body: e.target.value })} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
                     <details className="text-xs text-off-black/55">
                       <summary className="cursor-pointer">Placeholders the template can use</summary>
                       <dl className="mt-1 grid grid-cols-[130px_1fr] gap-x-2 gap-y-0.5">
@@ -228,13 +226,10 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                       </dl>
                       <p className="mt-1">No em or en dashes; the server refuses them. The signature is added on send, so end on the ask. A P.S. goes last and starts with "P.S.".</p>
                     </details>
-                    {isAdmin && (
-                      <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2">
                         <button onClick={() => saveTemplate(true)} disabled={tSaving || !templates[tPipeline][tAngle]?.edited} className={btnGhost}>Reset to default</button>
                         <button onClick={() => saveTemplate(false)} disabled={tSaving || (templateDefaults != null && tDraft.subject === templates[tPipeline][tAngle].subject && tDraft.body === templates[tPipeline][tAngle].body)} className={btnSecondary}>{tSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save this touch</button>
                       </div>
-                    )}
-                    {!isAdmin && <p className="text-xs text-off-black/45">Templates are edited by an admin. You can still change any draft before it goes.</p>}
                   </>
                 )}
               </>

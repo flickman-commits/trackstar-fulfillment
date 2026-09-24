@@ -1,18 +1,15 @@
 /**
  * /api/sales/templates
  *
- *   GET ?dealId=&personId=     the template library, filled in for that person (the composer's menu)
- *   GET ?firstName=&org=       the same for a one-off to a bare address, with no deal
- *   GET ?action=list           the library as stored, for Settings
- *   POST { action:'save', id?, name, motion, useFor?, subject?, body }   admin: add or change one
+ *   GET                        the library as stored, plus what the browser needs to fill one in
+ *   POST { action:'save', id?, name, motion, useFor?, subject?, body }   any sales rep: add or change one
  *   POST { action:'delete', id }                                          admin: remove one
  */
 import { setCors } from '../_lib/auth.js'
 import { requireSalesRep, requireAdminRole, recordAudit } from '../_lib/users.js'
-import { getDeal } from '../../server/domain/sales/attio.js'
-import { primaryPerson } from '../../server/domain/sales/queue.js'
-import { getSenderFor } from '../../server/domain/sales/settings.js'
-import { listTemplates, saveTemplate, deleteTemplate, templatesFor, MOTIONS } from '../../server/domain/sales/templateLibrary.js'
+import { getSenderFor, getSettings } from '../../server/domain/sales/settings.js'
+import { listTemplates, saveTemplate, deleteTemplate, MOTIONS } from '../../server/domain/sales/templateLibrary.js'
+import { DEFAULT_SOCIAL_PROOF, NEEDS_OPENER } from '../../server/domain/sales/angles.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -21,26 +18,17 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const q = req.query || {}
-      if (q.action === 'list') return res.status(200).json({ templates: await listTemplates({ force: true }), motions: MOTIONS })
-
-      const dealId = String(q.dealId || '')
-      let deal, person
-      if (dealId && !dealId.startsWith('adhoc:')) {
-        deal = await getDeal(dealId)
-        if (!deal) return res.status(404).json({ error: 'No such deal in Attio' })
-        person = (q.personId && deal.people.find(p => p.id === q.personId)) || primaryPerson(deal)
-      } else {
-        deal = { name: String(q.org || '').slice(0, 200) }
-        person = { firstName: String(q.firstName || '').slice(0, 60), lastName: '', email: String(q.email || '').slice(0, 200) }
-      }
-      const sender = await getSenderFor(actor.id, actor)
-      return res.status(200).json(await templatesFor({ deal, person, sender }))
+      // Everything the composer needs to fill a template in the browser, in
+      // one small read with no Attio call: the person is already on screen.
+      const [templates, settings, sender] = await Promise.all([listTemplates(), getSettings(), getSenderFor(actor.id, actor)])
+      return res.status(200).json({
+        templates, motions: MOTIONS,
+        fill: { senderName: sender.name || '', socialProof: settings.socialProof || DEFAULT_SOCIAL_PROOF, needsOpener: NEEDS_OPENER },
+      })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
-    if (actor.role !== 'admin' && !actor.isSystem) return res.status(403).json({ error: 'Templates are edited by an admin.' })
     if (body.action === 'save') {
       try {
         const templates = await saveTemplate(body, actor)
