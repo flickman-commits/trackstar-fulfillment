@@ -3228,9 +3228,23 @@ Thank you!`
                               </div>
                             </td>
                             <td className="px-3 py-4">
-                              <span className={`text-sm ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black'}`}>
-                                {formatDueDate(order.dueDate)}
-                              </span>
+                              {/* The rush chip sits with the due date, not with
+                                  the order number: the short date is the thing
+                                  it explains, and without it a 4-day date just
+                                  looks like an order about to be late. */}
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {order.isRushOrder && (
+                                  <span
+                                    className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 whitespace-nowrap"
+                                    title="Customer paid to skip the line: 4-day design turnaround"
+                                  >
+                                    ⚡ Rush
+                                  </span>
+                                )}
+                                <span className={`text-sm ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black'}`}>
+                                  {formatDueDate(order.dueDate)}
+                                </span>
+                              </div>
                             </td>
                             <td className="px-3 py-4 hidden md:table-cell">
                               <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
