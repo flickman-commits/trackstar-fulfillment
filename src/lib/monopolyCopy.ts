@@ -286,19 +286,22 @@ export const DEPOSIT_AMOUNT = 250
 
 export const TIMELINE: TimelinePhase[] = [
   {
-    phase: 'Locking in races',
-    window: 'Closes September 30, 2026',
-    note: 'Every space must be committed before design can start',
+    // Moved out a month, and stated as a window rather than a cutoff. Races
+    // are interested and slow, which a countdown does not fix; it just makes
+    // the page sound like it is closing on people who are still deciding.
+    phase: 'Filling the board',
+    window: 'Through the end of October 2026',
+    note: 'Design begins once all 22 spaces are spoken for',
   },
   {
     phase: 'Design',
-    window: 'October to December 2026',
+    window: 'November 2026 to January 2027',
     note: 'Twelve weeks. Board composition locks the day it begins',
   },
   {
     phase: 'Production',
-    window: 'January to October 2027',
-    note: 'Nine months, costed at the long end of the quote with a month of slack',
+    window: 'February to October 2027',
+    note: 'Nine months, costed at the long end of the quote',
   },
   {
     phase: 'On shelves',

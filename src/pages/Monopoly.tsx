@@ -718,7 +718,7 @@ export default function Monopoly() {
       {/* ═══ CTA ═══ */}
       <Section dark>
         <div className="mx-auto max-w-2xl text-center">
-          <H2 dark>Marathon Monopoly is happening. Are you in?</H2>
+          <H2 dark>Marathon Monopoly is happening. We would love your race on it.</H2>
           <div className="mt-8">
             <CtaButton />
           </div>
@@ -930,12 +930,15 @@ function CtaButton() {
 }
 
 /**
- * The deadline, above the headline.
+ * The commitment window, above the headline.
  *
- * This replaced a "19 of 22 spaces open" progress bar. That is the wrong
- * scarcity to lead with while most of the board is unsold: a bar sitting at 14%
- * reads as "nobody is buying this". A date is a wall, and unlike a fill gauge it
- * does not get weaker the emptier the board is.
+ * This replaced a "19 of 22 spaces open" progress bar. That is the wrong thing
+ * to lead with while most of the board is unsold: a bar sitting at 14% reads as
+ * "nobody is buying this". A date holds up regardless of how full the board is.
+ *
+ * It states a window rather than a countdown. Races are interested and slow,
+ * and a cutoff does not speed that up; it just makes the page sound like it is
+ * closing on people who are still making up their minds.
  */
 function CommitmentDeadline({ remaining, total }: { remaining: number; total: number }) {
   return (
@@ -957,14 +960,14 @@ function CommitmentDeadline({ remaining, total }: { remaining: number; total: nu
           padding: '6px 12px',
         }}
       >
-        Commitments close September 30
+        Taking commitments through October
       </span>
-      {/* Held back until four races are in. "22 of 22 left" is arithmetically
-          true and reads as nobody has signed, which is the opposite of what a
-          scarcity line is for. Once it is counting down it starts working. */}
+      {/* Held back until four races are in. "22 of 22 open" is arithmetically
+          true and reads as nobody has signed, which is the opposite of what
+          this line is for. Once the board has names on it, it starts working. */}
       {total - remaining >= SPACES_LEFT_THRESHOLD && (
         <span style={{ fontSize: 14, color: MONOPOLY.inkMuted }}>
-          Only {remaining} (of {total}) race spaces left
+          {remaining} of {total} race spaces still open
         </span>
       )}
     </div>
