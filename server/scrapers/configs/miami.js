@@ -3,7 +3,7 @@
  * Athlinks platform (ChronoTrack-backed). Master: https://www.athlinks.com/event/3294
  *
  * Per-year event IDs (discover via alaska.athlinks.com/MasterEvents/Api/3294):
- *   2022: 999644  2023: 1042170  2024: 1039374  2025: 1087859
+ *   2022: 999644  2023: 1042170  2024: 1039374  2025: 1087859  2026: 1101322
  *
  * Course names: full = "Marathon", half = "Half Marathon". Elite-only
  * ("Marathon Elite" / "Half Marathon Elite"), race-chair and wheelchair
@@ -37,6 +37,7 @@ export default {
     2023: 1042170,
     2024: 1039374,
     2025: 1087859,
+    2026: 1101322,
   },
   raceDates: {
     2022: '2022-02-06',
