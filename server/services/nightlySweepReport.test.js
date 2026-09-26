@@ -80,3 +80,21 @@ test('a broken scraper is the agent\'s until its grace period runs out', () => {
   const expected = Date.now() - Date.parse('2026-09-27T00:00:00Z') >= 3 * 86400000 ? 'matt' : 'claude'
   assert.equal(owner({ kind: 'scraper_drifted', nightsOpen: 5, firstSeenAt: fiveNightsAgo }), expected)
 })
+
+test('coming up lists the soonest races and what each is missing', () => {
+  const out = formatSweepBrief({
+    healthy: true, remaining: [], fixed: [],
+    stats: { upcoming: { upcoming: [
+      { race: 'Berlin Marathon', year: 2026, date: '2026-09-27', daysOut: 1, ready: false, problems: ['no 2026 event id yet'] },
+      { race: 'Chicago Marathon', year: 2026, date: '2026-10-11', daysOut: 15, ready: true, problems: [] },
+    ] } },
+  })
+  assert.match(out, /\*\*Coming up:\*\* Berlin Sep 27: no 2026 event id yet · Chicago Oct 11 ✓/)
+})
+
+test('an upcoming race is prep work, a race that just ran escalates fast', () => {
+  assert.equal(owner({ kind: 'race_not_ready', daysOut: 1, nightsOpen: 30, firstSeenAt: longAgo }), 'claude')
+  const threeNightsAgo = new Date(Date.now() - 3 * 86400000).toISOString()
+  const expected = Date.now() - Date.parse('2026-09-27T00:00:00Z') >= 2 * 86400000 ? 'matt' : 'claude'
+  assert.equal(owner({ kind: 'race_results_untested', nightsOpen: 3, firstSeenAt: threeNightsAgo }), expected)
+})

@@ -14,7 +14,8 @@ sends back, change the scraper code, prove the change against the live site on a
 Vercel preview, and ship it to `main`.
 
 Matt's morning report has three blocks — **Things fixed**, **Things that need
-you**, and one line of scraper health. The goal of every night is for the middle
+you**, and one line of scraper health — plus a **Coming up** line for the next
+few races. The goal of every night is for the middle
 block to say "Nothing, I handled everything" and mean it.
 
 **You reach Trackstar only through the Trackstar_Ops MCP tools.** Your sandbox's
@@ -78,9 +79,25 @@ partial sweep is not a clean one.
    the repair loop rather than retrying capture.
 6. **Race dates** — `race_dates` for computed years, pinned under the date rules
    below. The date backlog cleared in September 2026; this is now maintenance.
-7. **Upcoming races** — anything we sell running in the next eight weeks should
-   have its year configured before race day. Preparation only; a race that has
-   not run cannot be verified.
+7. **Upcoming races** (`race_not_ready`) — the sweep checks every race with a
+   pinned date in the next eight weeks and flags what is missing: this year's
+   event id, or a scraper that fails or is untested on last year's results.
+   Matt sees these on the "Coming up" line of his report, soonest first.
+   - *Last year failing or untested:* treat it as step 2 or step 5 now, while
+     there is time. The platform will be the same on race day.
+   - *No event id yet:* look for it with `fetch_timing_page` on the platform's
+     listing (or `discover_event_ids` on Athlinks). Many timing sites create the
+     event only in race week, so "not published yet" is a normal answer; check
+     again each night as the race gets close. Never extrapolate an id.
+   - A race that has not run cannot be verified against results, so an id saved
+     before race day is checked again after it.
+
+**A race that just ran** (`race_results_untested`) moves ahead of everything
+except paid-order problems. Its orders arrive in the next few days and every one
+needs this year's results. Once results are posted: find the event id if it is
+missing, `capture_fixture` for this year, `probe_scrapers`. If the site has not
+posted results yet, that is fine for a day or two; it escalates to Matt after two
+nights.
 
 ## Budget
 

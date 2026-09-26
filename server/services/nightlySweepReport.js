@@ -25,6 +25,8 @@ const KIND_LABELS = {
   // Failures that already fired a Slack alert and would otherwise scroll away.
   lookup_failing: 'Storefront lookups failing',
   year_not_configured: 'Year missing from the scraper config',
+  race_not_ready: 'Upcoming race not ready',
+  race_results_untested: 'Race just ran, results untested',
 }
 
 const label = kind => KIND_LABELS[kind] || kind
@@ -66,6 +68,13 @@ const REPAIR_TOOLS_SINCE = '2026-09-27T00:00:00Z'
 const REPAIR_GRACE_NIGHTS = 3
 
 /**
+ * A race that has just run is the tightest window there is: its orders arrive
+ * in the next few days, and every one needs this year's results to resolve.
+ * Two nights, then a person hears about it.
+ */
+const JUST_RAN_GRACE_NIGHTS = 2
+
+/**
  * Backlog that is SUPPOSED to sit — the nightly quota works through it.
  *
  * An untested race-year ageing for five nights is the queue behaving normally;
@@ -98,6 +107,11 @@ function nightsOwned(f) {
 export function owner(f) {
   if (NO_TOOL_KINDS.has(f.kind)) return 'matt'
   if (EXPECTED_BACKLOG_KINDS.has(f.kind)) return 'claude'
+  // Before race day this is preparation, and many timing sites publish the
+  // event only in race week. It shows on the "Coming up" line instead, and
+  // becomes urgent as race_results_untested once the race has run.
+  if (f.kind === 'race_not_ready') return 'claude'
+  if (f.kind === 'race_results_untested') return nightsOwned(f) >= JUST_RAN_GRACE_NIGHTS ? 'matt' : 'claude'
   if (QUIET_AFTER_FIRST_NIGHT.has(f.kind)) return (f.nightsOpen || 0) <= 0 ? 'matt' : 'quiet'
   if (AGENT_REPAIR_KINDS.has(f.kind)) return nightsOwned(f) >= REPAIR_GRACE_NIGHTS ? 'matt' : 'claude'
   if (f.action === 'tier2_flag') return 'matt'
@@ -358,6 +372,8 @@ function needsYouLine(kind, items) {
       return `${list} ${plural(n, 'needs', 'need')} an event id I couldn't find, and customers are waiting on ${plural(n, 'it', 'them')}.${since}`
     case 'lookup_failing':
       return `Shoppers' lookups keep failing for ${list}, and I couldn't get ${plural(n, 'it', 'them')} working.${since}`
+    case 'race_results_untested':
+      return `${list} just ran and I haven't got this year's results working yet, so new orders can't be looked up.${since}`
     case 'selling_without_scraper':
       return `New ${plural(n, 'product', 'products')} on sale with no scraper (shoppers type their time by hand): ${list}.`
     case 'new_discount_code':
@@ -457,6 +473,20 @@ export function formatSweepBrief(stored) {
     if (h.untested) parts.push(`${h.untested} not tested yet`)
     out.push('')
     out.push(`**Scrapers:** ${parts.join(' · ')}`)
+  }
+
+  /* ── Coming up ──
+     The next few races we scrape, soonest first, so a race-week gap is seen
+     before the orders arrive rather than after. */
+  const upcoming = (stored.stats?.upcoming?.upcoming || []).slice(0, 5)
+  if (upcoming.length) {
+    const fmt = iso => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+    const items = upcoming.map(r => {
+      const name = r.race.replace(/ Marathon$/, '')
+      return r.ready ? `${name} ${fmt(r.date)} ✓` : `${name} ${fmt(r.date)}: ${r.problems[0]}`
+    })
+    out.push('')
+    out.push(`**Coming up:** ${items.join(' · ')}`)
   }
 
   return out.join('\n')
