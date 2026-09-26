@@ -409,24 +409,27 @@ function BodyEditor({ body, signature, onChange, onBlur }: {
 }
 
 
-/** 9:14 AM on the given day, local time. A minute past the hour reads as a person, not a scheduler. */
-function at914(d: Date) { const x = new Date(d); x.setHours(9, 14, 0, 0); return x }
+/** 9:15 AM on the given day, local time. The sender runs every 5 minutes, so times sit on 5-minute marks. */
+function at915(d: Date) { const x = new Date(d); x.setHours(9, 15, 0, 0); return x }
+
+/** Up to the next 5-minute mark, so a custom time is the time it actually goes. */
+function toFiveMinutes(d: Date) { const x = new Date(d); x.setSeconds(0, 0); const m = x.getMinutes(); if (m % 5) x.setMinutes(m + (5 - (m % 5))); return x }
 
 /** The quick picks: this morning if it is still early on a weekday, the next weekday morning, and next Monday. */
 function presets(now = new Date()) {
   const out: { label: string; at: Date }[] = []
   const weekday = (d: Date) => d.getDay() !== 0 && d.getDay() !== 6
-  const today = at914(now)
+  const today = at915(now)
   if (weekday(now) && today.getTime() > now.getTime() + 60_000) out.push({ label: 'This morning', at: today })
   const next = new Date(now); next.setDate(next.getDate() + 1)
   while (!weekday(next)) next.setDate(next.getDate() + 1)
-  out.push({ label: next.getDay() === 1 ? 'Monday morning' : 'Tomorrow morning', at: at914(next) })
+  out.push({ label: next.getDay() === 1 ? 'Monday morning' : 'Tomorrow morning', at: at915(next) })
   const monday = new Date(now); monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7 || 7))
-  if (!out.some(p => p.at.getTime() === at914(monday).getTime())) out.push({ label: 'Monday morning', at: at914(monday) })
+  if (!out.some(p => p.at.getTime() === at915(monday).getTime())) out.push({ label: 'Monday morning', at: at915(monday) })
   return out
 }
 
-/** "2026-09-28T09:14" for a datetime-local input, in local time. */
+/** "2026-09-28T09:15" for a datetime-local input, in local time. */
 function localInput(d: Date) {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
@@ -446,7 +449,7 @@ function SendLater({ disabled, title, onPick }: { disabled: boolean; title: stri
     window.addEventListener('mousedown', onDown); window.addEventListener('keydown', onKey)
     return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
   }, [open])
-  const customAt = custom ? new Date(custom) : null
+  const customAt = custom ? toFiveMinutes(new Date(custom)) : null
   const customOk = Boolean(customAt && !Number.isNaN(customAt.getTime()) && customAt.getTime() > Date.now() + 60_000)
   const pick = (at: Date) => { setOpen(false); onPick(at) }
 
@@ -465,10 +468,10 @@ function SendLater({ disabled, title, onPick }: { disabled: boolean; title: stri
           ))}
           <form className="px-4 py-3 space-y-2" onSubmit={e => { e.preventDefault(); if (customOk && customAt) pick(customAt) }}>
             <span className={cardLabel}>Pick a time</span>
-            <input type="datetime-local" value={custom} onChange={e => setCustom(e.target.value)} className={`${inputBase} w-full`} />
+            <input type="datetime-local" step={300} value={custom} onChange={e => setCustom(e.target.value)} className={`${inputBase} w-full`} />
             <button type="submit" disabled={!customOk} className={`${btnPrimary} w-full`}>{customOk && customAt ? `Schedule for ${whenLabel(customAt)}` : 'Pick a time in the future'}</button>
           </form>
-          <p className="px-4 pb-3 text-[11px] text-off-black/45 leading-snug">Goes from your Gmail at that time. If they reply or the deal moves first, it waits for you instead.</p>
+          <p className="px-4 pb-3 text-[11px] text-off-black/45 leading-snug">Goes from your Gmail at that time (times are on 5-minute marks). If they reply or the deal moves first, it waits for you instead.</p>
         </div>
       )}
     </div>

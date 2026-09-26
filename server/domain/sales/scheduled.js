@@ -1,10 +1,11 @@
 /**
  * Send later.
  *
- * A rep finishes an email and picks a time ("Monday 9:14 AM"). The email is
+ * A rep finishes an email and picks a time ("Monday 9:15 AM"). The email is
  * checked now against the same rules as Send, kept in SalesScheduled, and
- * sent by the every-minute cron through that rep's own Gmail, with the same
- * Attio write-back as pressing Send.
+ * sent by the every-5-minutes cron through that rep's own Gmail, with the
+ * same Attio write-back as pressing Send. Times are kept on 5-minute marks
+ * so the time shown is the time it goes.
  *
  * The world can move between Friday night and Monday morning, so at send
  * time the email is held instead of sent when:
@@ -23,7 +24,8 @@ import { listAssets, isAssetStorageConfigured } from './assets.js'
 import { gmailStatus } from './gmail.js'
 
 const MAX_AHEAD_MS = 60 * 86400000
-const STUCK_MS = 10 * 60_000
+// Two cron runs past its time with the row still "sending" means a run died.
+const STUCK_MS = 12 * 60_000
 const OPEN = ['scheduled', 'sending', 'held']
 
 function view(row) {
@@ -44,6 +46,9 @@ export async function scheduleSend({ dealId, personId, to, subject, body, assetI
   if (!subject?.trim() || !body?.trim()) throw new Error('Subject and body are required')
   const when = new Date(sendAt)
   if (Number.isNaN(when.getTime())) throw new Error('Pick a time to send it')
+  // Up to the next 5-minute mark: the cron runs at :00, :05, :10...
+  when.setUTCSeconds(0, 0)
+  if (when.getUTCMinutes() % 5) when.setUTCMinutes(when.getUTCMinutes() + (5 - (when.getUTCMinutes() % 5)))
   if (when.getTime() < Date.now() + 60_000) throw new Error('Pick a time at least a minute from now')
   if (when.getTime() > Date.now() + MAX_AHEAD_MS) throw new Error('Pick a time within the next 60 days')
   if (!(await gmailStatus(actor.id)).connected) throw new Error('Gmail is not connected. Open Settings and press Connect Gmail.')

@@ -1,7 +1,7 @@
 /**
  * /api/sales/send-due — the Send later cron.
  *
- * Runs every minute (vercel.json). Sends each scheduled email whose time has
+ * Runs every 5 minutes (vercel.json). Sends each scheduled email whose time has
  * come, through the Gmail of the person who scheduled it, or holds it with
  * the reason when the deal moved since. See server/domain/sales/scheduled.js.
  */

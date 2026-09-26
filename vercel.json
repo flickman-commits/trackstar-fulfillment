@@ -24,7 +24,7 @@
     },
     {
       "path": "/api/sales/send-due",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {
