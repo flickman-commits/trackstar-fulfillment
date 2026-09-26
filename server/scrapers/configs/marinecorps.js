@@ -25,6 +25,14 @@ export default {
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
+  // MCM weekend also runs a 10K on the same RTRT event, and a 10K finisher
+  // came back labelled "Marathon" (2023, 1:42:35). Declaring the course lets
+  // the scraper drop entrants who only ran the 10K. Course id read off the
+  // 2025 profile payload ("course":"marathon").
+  eventSearchOrder: ['marathon'],
+  eventLabels: { marathon: 'Marathon' },
+  courseMap: { marathon: 'marathon' },
+  distances: { marathon: 26.2 },
   // Public app identifiers observed from the web tracker
   aliases: [
     'Marine Corps Marathon',

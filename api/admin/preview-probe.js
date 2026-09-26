@@ -14,17 +14,9 @@
 import { safeEqual } from '../_lib/auth.js'
 import { probeOne, sameTime } from '../../server/lib/scraperHealth.js'
 import { seedOverrides } from '../../server/scrapers/scraperOverrides.js'
-import { getRaceConfigSummaries } from '../../server/scrapers/index.js'
 
 const MAX_TARGETS = 12
 const CONCURRENCY = 3
-const PACE_TOLERANCE_S = 20
-
-const toSeconds = t => {
-  const parts = String(t || '').split(':').map(Number)
-  if (parts.some(Number.isNaN) || parts.length < 2) return null
-  return parts.reduce((acc, n) => acc * 60 + n, 0)
-}
 
 /**
  * The stricter gate a code change has to clear.
@@ -43,15 +35,8 @@ function strictCheck(row, fixture) {
   if (fixture.time && !row.actualTime) {
     return { ...row, status: 'drifted', detail: `Right runner but no finish time came back; known finish is ${fixture.time}.` }
   }
-  const secs = toSeconds(row.actualTime)
-  const pace = toSeconds(row.actualPace)
-  if (secs && pace) {
-    const summary = getRaceConfigSummaries([row.year]).find(c => c.raceName === row.race)
-    const miles = /half/i.test(row.actualEventType || '') ? 13.1 : summary?.distanceMiles
-    if (miles && Math.abs(secs / miles - pace) > PACE_TOLERANCE_S) {
-      return { ...row, status: 'drifted', detail: `Pace ${row.actualPace}/mi does not equal ${row.actualTime} over ${miles} miles.` }
-    }
-  }
+  // Zero times and pace that does not fit the time are already drifted by
+  // probeOne itself (numbersProblem), so production and preview agree on them.
   return row
 }
 

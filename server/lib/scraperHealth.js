@@ -200,6 +200,40 @@ export function sameTime(a, b) {
   return na !== '' && na === norm(b)
 }
 
+const PACE_TOLERANCE_S = 20
+
+export function toSeconds(t) {
+  const parts = String(t || '').split(':').map(Number)
+  if (parts.some(Number.isNaN) || parts.length < 2) return null
+  return parts.reduce((acc, n) => acc * 60 + n, 0)
+}
+
+/**
+ * Numbers that cannot be a real finish, whatever the fixture says. A bib match
+ * proves the right runner came back, not that the time is usable: Baltimore
+ * 2022 returned 00:00:00 and Marine Corps 2023 a 1:42 "marathon" at 16:31/mi,
+ * and both read as live. Returns a detail string, or null when nothing is wrong.
+ */
+export function numbersProblem(row) {
+  if (!row.actualTime) return null
+  const secs = toSeconds(row.actualTime)
+  if (secs === 0) return `Right runner but the finish time is ${row.actualTime}.`
+  const pace = toSeconds(row.actualPace)
+  if (!secs || !pace) return null
+  const summary = getRaceConfigSummaries([row.year]).find(c => c.raceName === row.race)
+  const miles = /half/i.test(row.actualEventType || '') ? 13.1 : summary?.distanceMiles
+  if (miles && Math.abs(secs / miles - pace) > PACE_TOLERANCE_S) {
+    return `Pace ${row.actualPace}/mi does not equal ${row.actualTime} over ${miles} miles.`
+  }
+  return null
+}
+
+/** A live row whose numbers cannot be right is drifted. */
+function withNumbersChecked(row) {
+  const problem = row.status === STATUS.LIVE ? numbersProblem(row) : null
+  return problem ? { ...row, status: STATUS.DRIFTED, detail: problem } : row
+}
+
 /**
  * Does this candidate match the fixture?
  *
@@ -246,12 +280,12 @@ export async function probeOne(race, year, fixture) {
     if (result?.found) {
       const actual = { bib: result.bibNumber ?? null, time: result.officialTime ?? null }
       if (matchesFixture(fixture, actual)) {
-        return {
+        return withNumbersChecked({
           ...base, status: STATUS.LIVE, actualBib: actual.bib, ms,
           // Carried for the preview gate, which also asserts time and pace;
           // a bib alone cannot tell chip time from gun time.
           actualTime: actual.time, actualPace: result.officialPace ?? null, actualEventType: result.eventType ?? null,
-        }
+        })
       }
       return {
         ...base,
@@ -268,10 +302,10 @@ export async function probeOne(race, year, fixture) {
     if (result?.ambiguous || candidates.length) {
       const hit = candidates.find(m => matchesFixture(fixture, m))
       if (hit) {
-        return {
+        return withNumbersChecked({
           ...base, status: STATUS.LIVE, actualBib: hit.bib ?? null, ms,
           actualTime: hit.time ?? null, actualPace: hit.pace ?? null, actualEventType: hit.eventType ?? null,
-        }
+        })
       }
       return {
         ...base,

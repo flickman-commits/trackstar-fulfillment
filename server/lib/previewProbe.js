@@ -152,7 +152,9 @@ export async function probePreview({ ref, races, years = null }) {
   const text = await resp.text()
   if (!resp.ok) {
     const hint = resp.status === 401 || resp.status === 403
-      ? (/<html/i.test(text)
+      // Vercel's protection wall answers with an HTML login page or, to a
+      // non-browser client, JSON carrying a "protection" block.
+      ? (/<html/i.test(text) || /"protection"\s*:/.test(text)
         ? ' Vercel Deployment Protection blocked it; production needs VERCEL_AUTOMATION_BYPASS_SECRET.'
         : ' The preview refused the secret; PREVIEW_PROBE_SECRET must be set for Preview as well as Production.')
       : ''

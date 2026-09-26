@@ -100,39 +100,31 @@ export class MikaTimingScraper extends BaseScraper {
     console.log(`${'='.repeat(50)}`)
 
     try {
-      const nameParts = runnerName.trim().split(/\s+/)
+      // A middle initial is not part of the surname: "Bill G. Schuette" sent
+      // search[name]=G. Schuette and Mika found nobody. Drop initials between
+      // the first name and the surname; multi-word surnames are kept whole.
+      const words = runnerName.trim().split(/\s+/)
+      const nameParts = words.length > 2
+        ? [words[0], ...words.slice(1, -1).filter(w => !/^[A-Za-z]\.?$/.test(w)), words[words.length - 1]]
+        : words
       const firstName = nameParts.length > 1 ? nameParts[0] : ''
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0]
 
       const eventCode = await this.resolveEventCode()
-      const searchParams = new URLSearchParams({
-        pid: 'list',
-        event_main_group: String(this.year),
-        'search[name]': lastName,
-        'search[firstname]': firstName,
-        event: eventCode,
-        num_results: '50',
-        search_sort: 'name'
-      })
 
-      const searchUrl = `${this.baseUrl}/?${searchParams.toString()}`
-      console.log(`[${this.tag}] Search URL: ${searchUrl}`)
+      let page = await this._searchPage(eventCode, lastName, firstName)
+      // Mika matches the first name literally, so "Bill Schuette" finds nobody
+      // when he registered as William. Retry on the surname alone and let
+      // filterNameMatches (which knows nicknames) choose among the results.
+      if (page.ok && !page.yearMismatch && !page.results.length && firstName) {
+        console.log(`[${this.tag}] No results for first name "${firstName}"; retrying on surname only`)
+        page = await this._searchPage(eventCode, lastName, '')
+      }
+      if (!page.ok) return this.notFoundResult()
 
-      const response = await fetchWithTimeout(searchUrl, {
-        headers: {
-          'User-Agent': USER_AGENT,
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        }
-      })
-
-      console.log(`[${this.tag}] Response status: ${response.status}`)
-
-      if (!response.ok) return this.notFoundResult()
-
-      const html = await response.text()
+      const { searchUrl, results, yearMismatch } = page
 
       // Safety check: verify the results page is showing the correct year
-      const yearMismatch = this._checkYearMismatch(html)
       if (yearMismatch) {
         console.error(`[${this.tag}] YEAR MISMATCH: Expected ${this.year}, got ${yearMismatch}`)
         return {
@@ -140,8 +132,6 @@ export class MikaTimingScraper extends BaseScraper {
           researchNotes: `Year mismatch: requested ${this.year} but results page shows ${yearMismatch}. Results may have been moved or the site structure changed.`
         }
       }
-
-      const results = this._parseResultsHtml(html)
 
       console.log(`[${this.tag}] Found ${results.length} results in HTML`)
 
@@ -191,6 +181,32 @@ export class MikaTimingScraper extends BaseScraper {
         researchNotes: `Error: ${error.message}`
       }
     }
+  }
+
+  /** One list-page search. firstName may be empty for a surname-only search. */
+  async _searchPage(eventCode, lastName, firstName) {
+    const params = {
+      pid: 'list',
+      event_main_group: String(this.year),
+      'search[name]': lastName,
+    }
+    if (firstName) params['search[firstname]'] = firstName
+    Object.assign(params, { event: eventCode, num_results: '50', search_sort: 'name' })
+    const searchUrl = `${this.baseUrl}/?${new URLSearchParams(params).toString()}`
+    console.log(`[${this.tag}] Search URL: ${searchUrl}`)
+
+    const response = await fetchWithTimeout(searchUrl, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      }
+    })
+    console.log(`[${this.tag}] Response status: ${response.status}`)
+    if (!response.ok) return { ok: false, searchUrl, results: [] }
+
+    const html = await response.text()
+    const yearMismatch = this._checkYearMismatch(html)
+    return { ok: true, searchUrl, yearMismatch, results: yearMismatch ? [] : this._parseResultsHtml(html) }
   }
 
   /**

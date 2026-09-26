@@ -5,6 +5,7 @@
  * Per-year raceIds (Marathon + Half):
  *   2023: M=15218  H=15398
  *   2024: M=17012  H=17022
+ *   2025: M=18686  H=18689  (read off MTEC's own year menu and event page)
  *   2026: M=20331  H=20333
  *
  * Verified finisher: Jay Smith, 3:02:52 (2024 Marathon, raceId 17012, rid=398).
@@ -48,6 +49,7 @@ export default {
   raceIds: {
     2023: { marathon: 15218, half: 15398 },
     2024: { marathon: 17012, half: 17022 },
+    2025: { marathon: 18686, half: 18689 },
     2026: { marathon: 20331, half: 20333 },
   },
   raceSlugs: {
@@ -58,6 +60,12 @@ export default {
     2024: {
       marathon: "2024_Grandma%27s_Marathon-Grandma%27s_Marathon",
       half: '2024_Garry_Bjorklund_Half_Marathon-Half_Marathon',
+    },
+    // 2025 marathon is the first year on the event-prefixed scheme; the half
+    // still lives under its own event. Both copied from MTEC's links.
+    2025: {
+      marathon: "2025_Grandma%27s_Marathon-Marathon",
+      half: '2025_Garry_Bjorklund_Half_Marathon-Half_Marathon',
     },
     // 2026 leaderboard slugs use the event-prefixed scheme (verified live).
     2026: {
