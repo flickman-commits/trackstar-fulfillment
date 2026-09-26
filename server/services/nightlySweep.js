@@ -27,7 +27,8 @@ import prisma from '../../api/_lib/prisma.js'
 import { buildCatalogCoverage, coveredYears, NEEDS_HELP, STATUS } from '../lib/scraperHealth.js'
 import { repairPlan } from '../lib/scraperRepair.js'
 import { syncProductCatalog } from './shopifyProducts.js'
-import { getRaceConfigSummaries, getSupportedRaces, getVerifiedRaceDates } from '../scrapers/index.js'
+import { getRaceConfigSummaries, getSupportedRaces, getVerifiedRaceDates, getScraperForRace } from '../scrapers/index.js'
+import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
 
 /** Run a check so that a thrown error becomes a reported fact, not a gap. */
 async function check(name, fn) {
@@ -133,6 +134,107 @@ async function scraperCheck() {
   }
 
   return { years, statusTally: tally, racesConfigured: getSupportedRaces().length, raceHealth, findings }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   2b. Upcoming races: ready before race day, tested right after it
+   ──────────────────────────────────────────────────────────────────────── */
+
+/** How far ahead to look. Long enough to chase an id, short enough to matter. */
+const UPCOMING_DAYS = 56
+/** Orders for a race arrive in the days after it; results should be tested by then. */
+const JUST_RAN_DAYS = 4
+
+/** Config keys that hold dates, not scraper settings. */
+const DATE_KEYS = new Set(['raceDates', 'raceDateSources', 'raceDatesWeekdayExceptions'])
+
+/**
+ * Does the config carry what the scraper needs for this year?
+ *
+ * Platforms key years differently - eventIds, eventCodes, subEventIds - and
+ * some build the URL from the year and need nothing. So: every year-keyed
+ * setting that last year's race had, this year's must have too. A config with
+ * no year-keyed settings at all is a pattern config and is always ready.
+ */
+export function yearConfigured(config, year) {
+  const yearKeyed = Object.entries(config || {}).filter(([key, value]) =>
+    !DATE_KEYS.has(key) && value && typeof value === 'object' && !Array.isArray(value)
+    && Object.keys(value).some(k => /^\d{4}$/.test(k)))
+  const relevant = yearKeyed.filter(([, value]) => value[year - 1] !== undefined)
+  const fields = relevant.length ? relevant : yearKeyed
+  if (!fields.length) return true
+  return fields.every(([, value]) => value[year] !== undefined)
+}
+
+const shortDate = iso => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+
+async function upcomingRaceCheck() {
+  await ensureOverridesLoaded()
+  const now = new Date()
+  const today = new Date(`${now.toISOString().slice(0, 10)}T00:00:00Z`)
+  const thisYear = today.getUTCFullYear()
+  const summaries = getRaceConfigSummaries([thisYear, thisYear + 1])
+  const health = await prisma.scraperHealth.findMany()
+  const statusOf = (race, year) => health.find(h => h.race === race && h.year === year)?.status || null
+
+  const findings = []
+  const upcoming = []
+
+  for (const cfg of summaries) {
+    for (const [yearKey, value] of Object.entries(cfg.raceDates || {})) {
+      if (!value) continue
+      // Summaries carry a Date or an ISO timestamp; only the calendar day matters.
+      const iso = (value instanceof Date ? value.toISOString() : String(value)).slice(0, 10)
+      const year = Number(yearKey)
+      const daysOut = Math.round((Date.parse(`${iso}T00:00:00Z`) - today.getTime()) / DAY)
+
+      // Just ran: shoppers are ordering now, so the scraper has to find
+      // this year's finishers, not just last year's.
+      if (daysOut < 0 && daysOut >= -JUST_RAN_DAYS) {
+        const status = statusOf(cfg.raceName, year)
+        if (status !== STATUS.LIVE) {
+          findings.push({
+            severity: 'high',
+            kind: 'race_results_untested',
+            subject: `${cfg.raceName} ${year}`,
+            detail: `Ran ${shortDate(iso)}. Orders are coming in and this year's results have not been tested yet (${status || 'never probed'}).`,
+            action: 'tier1_fixable',
+            platform: cfg.platform,
+          })
+        }
+        continue
+      }
+      if (daysOut < 0 || daysOut > UPCOMING_DAYS) continue
+
+      const problems = []
+      let config = null
+      try {
+        config = getScraperForRace(cfg.raceName, year).config
+      } catch (err) {
+        problems.push(`scraper will not build for ${year}: ${err.message}`)
+      }
+      if (config && !yearConfigured(config, year)) problems.push(`no ${year} event id yet`)
+      const last = statusOf(cfg.raceName, year - 1)
+      if (last === STATUS.DRIFTED || last === STATUS.BROKEN) problems.push(`scraper failing on last year's results (${year - 1})`)
+      else if (last !== STATUS.LIVE) problems.push(`scraper not yet tested on last year's results (${year - 1})`)
+
+      upcoming.push({ race: cfg.raceName, year, date: iso, daysOut, ready: !problems.length, problems })
+      if (!problems.length) continue
+      findings.push({
+        severity: daysOut <= 14 ? 'high' : 'medium',
+        kind: 'race_not_ready',
+        subject: `${cfg.raceName} ${year}`,
+        detail: `Runs ${shortDate(iso)} (${daysOut} day${daysOut === 1 ? '' : 's'}): ${problems.join('; ')}.`,
+        action: 'tier1_fixable',
+        daysOut,
+        problems,
+        platform: cfg.platform,
+      })
+    }
+  }
+
+  upcoming.sort((a, b) => a.daysOut - b.daysOut)
+  return { upcoming, findings }
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -660,6 +762,7 @@ export async function runNightlySweep({ persistBaseline = true } = {}) {
   const checks = [
     await check('catalog', catalogCheck),
     await check('scrapers', scraperCheck),
+    await check('upcoming', upcomingRaceCheck),
     await check('race_dates', raceDateCheck),
     await check('orders', orderCheck),
     await check('commerce', commerceCheck),
