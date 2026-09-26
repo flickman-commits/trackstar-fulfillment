@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Check, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Loader2, Clock } from 'lucide-react'
 import { chip, chipTone, listHead } from '@/lib/ui'
-import type { Deal } from '@/types/sales'
+import type { Deal, ScheduledEmail } from '@/types/sales'
 
 /**
  * The left column: today's work, read from Attio.
@@ -90,19 +90,22 @@ function matches(d: Deal, q: string) {
 }
 
 export default function Queue({
-  mode, scope, today, pendingSendIds, selectedId, onSelect, loading, query = '',
+  mode, scope, today, pendingSendIds, selectedId, onSelect, loading, query = '', openScheduledId = null, onOpenScheduled,
 }: {
   mode: QueueMode
   scope: 'mine' | 'all'
   today: {
     sentToday: Deal[]; newOutreach: Deal[]; newWaiting: number; followUps: Deal[]; later: Deal[]; exhausted: Deal[]
-    needsContact: Deal[]; contactedBefore: Deal[]; skipped: Deal[]; cap: number; member: { id: string; email: string; name: string } | null
+    needsContact: Deal[]; contactedBefore: Deal[]; skipped: Deal[]; scheduled?: ScheduledEmail[]; cap: number; member: { id: string; email: string; name: string } | null
   } | null
   pendingSendIds: Set<string>
   selectedId: string | null; onSelect: (id: string) => void
   loading: boolean
   /** The toolbar search. Filters every list below. */
   query?: string
+  /** Send later: the email open in the middle, and how to open one. */
+  openScheduledId?: string | null
+  onOpenScheduled?: (item: ScheduledEmail) => void
 }) {
   const f = (list?: Deal[]) => (list || []).filter(d => matches(d, query))
 
@@ -118,6 +121,35 @@ export default function Queue({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
+        {/* Send later: what is waiting, soonest first. Held ones need a look. */}
+        {(() => {
+          const waiting = (today?.scheduled || []).filter(w => !query || `${w.deal?.person?.fullName || ''} ${w.toEmail} ${w.deal?.name || ''}`.toLowerCase().includes(query.toLowerCase()))
+          if (!waiting.length) return null
+          const held = waiting.filter(w => w.status === 'held').length
+          return (
+            <Fold title={`Scheduled${held ? ` · ${held} held` : ''}`} count={waiting.length} defaultOpen>
+              {waiting.map((w, i) => (
+                <button
+                  key={w.id} onClick={() => onOpenScheduled?.(w)}
+                  className={`w-full text-left grid grid-cols-[16px_1fr_auto] items-center gap-3 px-5 py-3.5 border-b border-border-gray last:border-b-0 transition-colors ${
+                    w.id === openScheduledId ? 'bg-off-black/[0.045] shadow-[inset_3px_0_0_0_#242424]' : `hover:bg-subtle-gray ${i % 2 === 1 ? 'bg-subtle-gray/30' : ''}`
+                  }`}
+                >
+                  <Clock className={`w-4 h-4 ${w.status === 'held' ? 'text-amber-600' : 'text-off-black/40'}`} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium truncate text-off-black">
+                      {w.deal?.person?.fullName || w.toEmail}{w.deal && <span className="font-normal text-off-black/45"> · {w.deal.name}</span>}
+                    </span>
+                    <span className={`block text-xs mt-0.5 truncate ${w.status === 'held' ? 'text-amber-700' : 'text-off-black/50'}`}>
+                      {w.status === 'held' ? `Held · ${w.error || 'needs a look'}` : `${w.touchNumber ? `Touch ${w.touchNumber} · ` : ''}Sends ${new Date(w.sendAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}, ${new Date(w.sendAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                    </span>
+                  </span>
+                  <MotionTag motion={w.deal?.motion} />
+                </button>
+              ))}
+            </Fold>
+          )
+        })()}
         {loading && !today ? (
           <div className="flex items-center justify-center h-32 text-off-black/40"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : (

@@ -21,6 +21,10 @@
     {
       "path": "/api/orders/actions?action=weekly-ads-debrief",
       "schedule": "0 21 * * 5"
+    },
+    {
+      "path": "/api/sales/send-due",
+      "schedule": "* * * * *"
     }
   ],
   "functions": {

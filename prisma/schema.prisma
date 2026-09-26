@@ -781,6 +781,36 @@ model SalesSend {
   @@index([sentAt])
 }
 
+// "Send later": an email a rep finished and set to go at a time, sent by the
+// every-minute cron (api/sales/send-due.js) through that rep's Gmail. Queue
+// machinery only: the deal and person are Attio ids. Status runs
+// scheduled -> sending -> sent, or held (with why) when the deal moved or
+// the send failed, or cancelled.
+model SalesScheduled {
+  id             String    @id @default(cuid())
+  // Null for a one-off to an address with no deal behind it.
+  attioDealId    String?
+  attioPersonId  String?
+  toEmail        String
+  adhoc          Boolean   @default(false)
+  // The touch this was written as. If Attio's count moved by send time, it is held.
+  touchNumber    Int?
+  subject        String
+  body           String
+  assetIds       String[]  @default([])
+  sendAt         DateTime
+  status         String    @default("scheduled")
+  error          String?
+  createdById    String
+  createdByEmail String?
+  createdAt      DateTime  @default(now())
+  sentAt         DateTime?
+  salesSendId    String?
+
+  @@index([status, sendAt])
+  @@index([createdById, status])
+}
+
 // "Skip today": hidden from the queue until `until`. The reason is for tomorrow's person.
 model SalesSkip {
   attioDealId String   @id

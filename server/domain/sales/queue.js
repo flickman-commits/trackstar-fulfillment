@@ -177,12 +177,15 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
   const dayStart = startOfToday(settings.timezone, now)
   const weekStart = new Date(dayStart.getTime() - 6 * 86400000)
 
-  const [deals, { lastByDeal, today }, skips, owner] = await Promise.all([
+  const [deals, { lastByDeal, today }, skips, owner, waiting] = await Promise.all([
     loadDeals({ fresh }),
     sendIndex(dayStart),
     prisma.salesSkip.findMany({ where: { until: { gt: now } } }),
     ownerFilter(actor, scopeMode),
+    // Send later: emails waiting for their time, or held for a look.
+    prisma.salesScheduled.findMany({ where: { status: { in: ['scheduled', 'sending', 'held'] } }, orderBy: { sendAt: 'asc' } }),
   ])
+  const waitingDealIds = new Set(waiting.map(w => w.attioDealId).filter(Boolean))
   const skipByDeal = Object.fromEntries(skips.map(s => [s.attioDealId, s]))
   const sentTodayIds = new Set(today.map(s => s.attioDealId).filter(Boolean))
 
@@ -200,7 +203,7 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
   // whose company or person already has an email interaction was written
   // to before the stage was kept, and is not a first touch.
   const notContacted = inScope
-    .filter(d => OPEN_FOR_OUTREACH.includes(d.stage) && !sentTodayIds.has(d.id) && !skipByDeal[d.id])
+    .filter(d => OPEN_FOR_OUTREACH.includes(d.stage) && !sentTodayIds.has(d.id) && !skipByDeal[d.id] && !waitingDealIds.has(d.id))
     .map(d => shape(d, ctx(d)))
   const contactedBefore = notContacted.filter(d => d.lastSentAt)
   const fresh_ = notContacted.filter(d => !d.lastSentAt)
@@ -213,7 +216,7 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
 
   // Follow-ups: reached out, the clock has run, not skipped.
   const reached = inScope
-    .filter(d => OPEN_FOR_FOLLOW_UP.includes(d.stage) && !sentTodayIds.has(d.id) && !skipByDeal[d.id])
+    .filter(d => OPEN_FOR_FOLLOW_UP.includes(d.stage) && !sentTodayIds.has(d.id) && !skipByDeal[d.id] && !waitingDealIds.has(d.id))
     .map(d => shape(d, ctx(d)))
   const due = reached.filter(d => d.hasEmail && !d.exhausted && isDue(d, lastByDeal[d.id], dayStart))
     .sort((a, b) => byPriority(a, b) || b.overdueDays - a.overdueDays)
@@ -241,6 +244,18 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
     needsContact,
     contactedBefore: contactedBefore.sort((a, b) => String(b.lastSentAt).localeCompare(String(a.lastSentAt))),
     skipped: skippedToday,
+    // Yours (or everyone's under "all"), soonest first, each with its deal when it has one.
+    scheduled: waiting
+      .filter(w => scopeMode === 'all' || w.createdById === actor?.id)
+      .map(w => {
+        const d = w.attioDealId && deals.find(x => x.id === w.attioDealId)
+        return {
+          id: w.id, dealId: w.attioDealId, personId: w.attioPersonId, toEmail: w.toEmail, adhoc: w.adhoc,
+          touchNumber: w.touchNumber, subject: w.subject, body: w.body, assetIds: w.assetIds,
+          sendAt: w.sendAt, status: w.status, error: w.error, createdByEmail: w.createdByEmail,
+          deal: d ? shape(d, ctx(d)) : null,
+        }
+      }),
     counts: {
       deals: deals.length,
       inScope: inScope.length,

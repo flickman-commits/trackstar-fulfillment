@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate, Clock } from 'lucide-react'
 import { MotionTag } from './Queue'
 import type { LibraryTemplate, OutreachTemplate, TemplateFill } from '@/lib/salesApi'
 import { menuFor } from '@/lib/salesTemplates'
+import { whenLabel } from '@/lib/salesDates'
 
 /** The saved templates and their fill values, loaded once by the page. */
 export interface TemplateLibrary { templates: LibraryTemplate[]; fill: TemplateFill }
@@ -39,7 +40,7 @@ export default function Composer({
   deal, person, draft, variants, index, drafting, writing, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach,
-  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature, library,
+  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature, library, onSchedule,
 }: {
   deal: Deal | null
   person: Person | null
@@ -72,6 +73,8 @@ export default function Composer({
   signature?: string
   /** The saved templates, for the Templates menu. Null until loaded. */
   library: TemplateLibrary | null
+  /** Send later: keep it and send it from your Gmail at this time. */
+  onSchedule?: (at: Date) => void
 }) {
   const [skipOpen, setSkipOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
@@ -258,9 +261,18 @@ export default function Composer({
             </span>
           )}
         </div>
-        <button onClick={onSend} disabled={sendDisabled} className={`${btnPrimary} px-5 py-2.5 text-sm`} title={sendTitle}>
-          <Send className="w-4 h-4" /> Send <kbd className={kbd}><Command className="w-3 h-3" />↵</kbd>
-        </button>
+        <div className="flex items-center gap-2">
+          {onSchedule && (
+            <SendLater
+              disabled={!current || drafting || !person?.email || missingRequired || !gmailConnected || blocked || (deal.exhausted && !adhoc)}
+              title={blocked ? (problems as string[])[0] : !gmailConnected ? 'Connect Gmail in Settings first' : missingRequired ? 'A charity first touch has to carry a co-branded example' : 'Send it from your Gmail at a time you pick'}
+              onPick={onSchedule}
+            />
+          )}
+          <button onClick={onSend} disabled={sendDisabled} className={`${btnPrimary} px-5 py-2.5 text-sm`} title={sendTitle}>
+            <Send className="w-4 h-4" /> Send <kbd className={kbd}><Command className="w-3 h-3" />↵</kbd>
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -392,6 +404,73 @@ function BodyEditor({ body, signature, onChange, onBlur }: {
         </div>
         <AutoGrow value={parts.ps} onChange={v => update(parts.main, v)} onBlur={onBlur} minRows={1} placeholder="P.S. (optional)" className={box} />
       </div>
+    </div>
+  )
+}
+
+
+/** 9:14 AM on the given day, local time. A minute past the hour reads as a person, not a scheduler. */
+function at914(d: Date) { const x = new Date(d); x.setHours(9, 14, 0, 0); return x }
+
+/** The quick picks: this morning if it is still early on a weekday, the next weekday morning, and next Monday. */
+function presets(now = new Date()) {
+  const out: { label: string; at: Date }[] = []
+  const weekday = (d: Date) => d.getDay() !== 0 && d.getDay() !== 6
+  const today = at914(now)
+  if (weekday(now) && today.getTime() > now.getTime() + 60_000) out.push({ label: 'This morning', at: today })
+  const next = new Date(now); next.setDate(next.getDate() + 1)
+  while (!weekday(next)) next.setDate(next.getDate() + 1)
+  out.push({ label: next.getDay() === 1 ? 'Monday morning' : 'Tomorrow morning', at: at914(next) })
+  const monday = new Date(now); monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7 || 7))
+  if (!out.some(p => p.at.getTime() === at914(monday).getTime())) out.push({ label: 'Monday morning', at: at914(monday) })
+  return out
+}
+
+/** "2026-09-28T09:14" for a datetime-local input, in local time. */
+function localInput(d: Date) {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/** Send later: quick picks, or any date and time. */
+function SendLater({ disabled, title, onPick }: { disabled: boolean; title: string; onPick: (at: Date) => void }) {
+  const [open, setOpen] = useState(false)
+  const picks = open ? presets() : []
+  const [custom, setCustom] = useState('')
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    setCustom(localInput(presets()[0].at))
+    const onDown = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('mousedown', onDown); window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
+  }, [open])
+  const customAt = custom ? new Date(custom) : null
+  const customOk = Boolean(customAt && !Number.isNaN(customAt.getTime()) && customAt.getTime() > Date.now() + 60_000)
+  const pick = (at: Date) => { setOpen(false); onPick(at) }
+
+  return (
+    <div ref={box} className="relative">
+      <button onClick={() => setOpen(o => !o)} disabled={disabled} className={`${btnSecondary} px-4 py-2.5 text-sm`} title={title}>
+        <Clock className="w-4 h-4" /> Send later
+      </button>
+      {open && (
+        <div className="absolute bottom-full right-0 mb-2 w-[300px] rounded-lg border border-border-gray bg-white shadow-lg z-20 overflow-hidden">
+          {picks.map(p => (
+            <button key={p.label} onClick={() => pick(p.at)} className="w-full text-left px-4 py-3 border-b border-border-gray hover:bg-subtle-gray">
+              <span className="block text-sm font-medium text-off-black">{p.label}</span>
+              <span className="block text-xs text-off-black/50 mt-0.5">{whenLabel(p.at)}</span>
+            </button>
+          ))}
+          <form className="px-4 py-3 space-y-2" onSubmit={e => { e.preventDefault(); if (customOk && customAt) pick(customAt) }}>
+            <span className={cardLabel}>Pick a time</span>
+            <input type="datetime-local" value={custom} onChange={e => setCustom(e.target.value)} className={`${inputBase} w-full`} />
+            <button type="submit" disabled={!customOk} className={`${btnPrimary} w-full`}>{customOk && customAt ? `Schedule for ${whenLabel(customAt)}` : 'Pick a time in the future'}</button>
+          </form>
+          <p className="px-4 pb-3 text-[11px] text-off-black/45 leading-snug">Goes from your Gmail at that time. If they reply or the deal moves first, it waits for you instead.</p>
+        </div>
+      )}
     </div>
   )
 }

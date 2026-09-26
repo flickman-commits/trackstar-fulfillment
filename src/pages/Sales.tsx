@@ -7,9 +7,11 @@ import {
   btnSecondary, btnHero, btnHeroSecondary, pageShell,
   segment, segmentGroup, listCard, listToolbar, toolbarInput, toolbarSelect, textLink,
 } from '@/lib/ui'
-import type { Asset, Deal, DraftResult, Motion, Person, SalesStatus, TodayPayload, Variant } from '@/types/sales'
+import type { ScheduledEmail, Asset, Deal, DraftResult, Motion, Person, SalesStatus, TodayPayload, Variant } from '@/types/sales'
 import Queue, { type QueueMode } from '@/components/sales/Queue'
 import Composer, { type TemplateLibrary } from '@/components/sales/Composer'
+import { whenLabel } from '@/lib/salesDates'
+import ScheduledCard from '@/components/sales/ScheduledCard'
 import WhoPane from '@/components/sales/WhoPane'
 import LibraryPanel from '@/components/sales/LibraryPanel'
 import SettingsModal from '@/components/sales/SettingsModal'
@@ -47,6 +49,9 @@ export default function Sales() {
   const [scope, setScope] = useState<'mine' | 'all'>(() => { try { return localStorage.getItem('sales.scope') === 'all' ? 'all' : 'mine' } catch { return 'mine' } })
   const [motion, setMotion] = useState<Motion | null>(null)
   const [query, setQuery] = useState('')
+  // Send later: the waiting email open in the middle, and a deal to select once the queue reloads.
+  const [openScheduled, setOpenScheduled] = useState<ScheduledEmail | null>(null)
+  const pendingSelect = useRef<string | null>(null)
   const [library, setLibrary] = useState<TemplateLibrary | null>(null)
   // The saved templates, read once with the page so the Templates menu opens at once.
   const loadLibrary = useCallback(() => { salesApi.library().then(r => setLibrary({ templates: r.templates, fill: r.fill })).catch(() => { /* the menu says it is loading; Settings shows errors */ }) }, [])
@@ -118,6 +123,9 @@ export default function Sales() {
   const sentIds = useMemo(() => new Set(today?.sentToday.map(d => d.id) || []), [today])
 
   useEffect(() => {
+    if (pendingSelect.current && items.some(d => d.id === pendingSelect.current)) {
+      setSelectedId(pendingSelect.current); pendingSelect.current = null; return
+    }
     if (items.length === 0) { setSelectedId(null); return }
     if (!selectedId || !items.some(d => d.id === selectedId)) {
       const first = items.find(d => !sentIds.has(d.id) && !pendingIds.has(d.id) && d.hasEmail) || items[0]
@@ -286,6 +294,67 @@ export default function Sales() {
     }
   }, [variants, variantIndex, deal, person, pendingIds, gmailConnected, capReached, cap, attachedAssets, today?.undoSeconds, advance, loadToday, problems, adhoc])
 
+  // Send later: check it now, send it from Gmail at `at`. The deal leaves the
+  // queue and waits under Scheduled until then.
+  const schedule = useCallback(async (at: Date) => {
+    const v = variants[variantIndex]
+    if (!deal || !person?.email || !v) return
+    if (problems && problems.length) { toast.error(problems[0]); return }
+    const free = deal.id.startsWith('adhoc:')
+    const id = deal.id
+    try {
+      await salesApi.schedule({
+        ...(free ? { to: person.email } : { dealId: deal.id, personId: person.id }),
+        subject: v.subject, body: v.body, assetIds: attachedAssets.map(a => a.id), adhoc: Boolean(adhoc), sendAt: at.toISOString(),
+      })
+      toast.success(`Scheduled for ${whenLabel(at)}. It goes from your Gmail then.`)
+      setPrepared(prev => { const n = { ...prev }; delete n[id]; return n })
+      setAttached(prev => { const n = { ...prev }; delete n[id]; return n })
+      if (adhoc) setAdhoc(null); else advance(id)
+      loadToday()
+    } catch (e) { toast.error((e as Error).message, { duration: 8000 }) }
+  }, [variants, variantIndex, deal, person, problems, attachedAssets, adhoc, advance, loadToday])
+
+  const openScheduledItem = useCallback((item: ScheduledEmail) => { setAdhoc(null); setOpenScheduled(item) }, [])
+  const selectDeal = useCallback((id: string) => { setOpenScheduled(null); setSelectedId(id) }, [])
+
+  /** Take a scheduled email back into the composer, as written. */
+  const editScheduled = useCallback(async (item: ScheduledEmail) => {
+    try {
+      const { scheduled: s } = await salesApi.cancelScheduled(item.id)
+      setOpenScheduled(null)
+      const text = [{ subject: s.subject, body: s.body }]
+      if (!s.dealId) {
+        pickAddress(s.toEmail)
+        const id = `adhoc:${s.toEmail.toLowerCase()}`
+        setPrepared(prev => ({ ...prev, [id]: { ...prev[id], variants: text } }))
+        setAttached(prev => ({ ...prev, [id]: s.assetIds }))
+        loadToday()
+        return
+      }
+      const draft: DraftResult = { touchNumber: s.touchNumber || 1, step: { angle: '', purpose: '', subject: '', nextActionDays: 0 }, exhausted: false, variants: text, personId: s.personId || '', dealId: s.dealId, model: 'scheduled' }
+      seeded.current.add(s.dealId)
+      setPrepared(prev => ({ ...prev, [s.dealId as string]: { draft, variants: text, template: true } }))
+      setAttached(prev => ({ ...prev, [s.dealId as string]: s.assetIds }))
+      setVariantIndex(0)
+      if (s.adhoc && item.deal) { setAdhoc(item.deal); loadToday(); return }
+      pendingSelect.current = s.dealId
+      setMode((s.touchNumber || 1) === 1 ? 'new' : 'followups')
+      await loadToday()
+      toast.message('Back in the composer. Send it, or schedule it again.')
+    } catch (e) { toast.error((e as Error).message) }
+  }, [pickAddress, loadToday])
+
+  const cancelScheduled = useCallback(async (item: ScheduledEmail) => {
+    try { await salesApi.cancelScheduled(item.id); setOpenScheduled(null); toast.message('Cancelled. It is back in the queue.'); loadToday() }
+    catch (e) { toast.error((e as Error).message) }
+  }, [loadToday])
+
+  const sendScheduledNow = useCallback(async (item: ScheduledEmail) => {
+    try { const r = await salesApi.sendScheduledNow(item.id); setOpenScheduled(null); toast.success(`Sent to ${item.deal?.person?.firstName || item.toEmail}`); noteSync(r.sync); loadToday() }
+    catch (e) { toast.error((e as Error).message, { duration: 8000 }) }
+  }, [loadToday])
+
   const skip = useCallback(async (reason?: string) => {
     if (!deal) return
     if (adhoc) { setAdhoc(null); return }
@@ -441,9 +510,14 @@ export default function Sales() {
             {!today && !todayError ? <LoadingStars /> : (
             /* Three panes in the one card: who is next, the email, who they are. */
             <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
-              <Queue mode={mode} scope={scope} today={today} pendingSendIds={pendingIds} selectedId={selectedId} onSelect={setSelectedId} loading={loading} query={query} />
+              <Queue mode={mode} scope={scope} today={today} pendingSendIds={pendingIds} selectedId={openScheduled ? null : selectedId} onSelect={selectDeal} loading={loading} query={query} openScheduledId={openScheduled?.id || null} onOpenScheduled={openScheduledItem} />
 
-              {queueClear && !selected && !adhoc ? (
+              {openScheduled ? (
+                <ScheduledCard
+                  key={openScheduled.id} item={openScheduled} assets={assets}
+                  onEdit={() => editScheduled(openScheduled)} onCancel={() => cancelScheduled(openScheduled)} onSendNow={() => sendScheduledNow(openScheduled)}
+                />
+              ) : queueClear && !selected && !adhoc ? (
                 <div className="flex-1 min-w-0 flex items-center justify-center min-h-[320px]">
                   <div className="text-center max-w-[44ch] px-6">
                     <Check className="w-8 h-8 mx-auto text-success-green mb-2" />
@@ -474,13 +548,15 @@ export default function Sales() {
                   attachments={attachedAssets} onAttach={attach} onDetach={detach}
                   onChange={updateVariant}
                   onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library}
+                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library} onSchedule={schedule}
                 />
               )}
 
               <aside className="w-full lg:w-[320px] xl:w-[340px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray p-5 space-y-6 min-h-0">
                 <WhoPane
-                  deal={deal} person={person} busy={busy} onNote={addNote}
+                  deal={openScheduled ? openScheduled.deal : deal}
+                  person={openScheduled ? (openScheduled.deal?.people.find(p => p.id === openScheduled.personId) || openScheduled.deal?.person || null) : person}
+                  busy={busy} onNote={addNote}
                   onSelectPerson={id => { setPersonId(id); if (deal) { setPrepared(prev => { const n = { ...prev }; delete n[deal.id]; return n }); prepare(deal, { silent: false, force: true, personId: id }) } }}
                 />
                 <LibraryPanel assets={assets} configured={libraryConfigured} attachedIds={new Set(attachedAssets.map(a => a.id))} onAttach={attach} onChanged={() => loadAssets(selectedId)}

@@ -3,7 +3,7 @@
  * so the Sales screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { Asset, AttioCheck, Deal, DraftResult, Motion, Pipeline, Progress, SalesSettings, SalesStatus, Sender, Stage, TemplateStep, TemplateTable, TodayPayload } from '@/types/sales'
+import type { ScheduledEmail, Asset, AttioCheck, Deal, DraftResult, Motion, Pipeline, Progress, SalesSettings, SalesStatus, Sender, Stage, TemplateStep, TemplateTable, TodayPayload } from '@/types/sales'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -75,6 +75,11 @@ export const salesApi = {
   send: (body: { dealId: string; personId: string; subject: string; body: string; assetIds: string[]; adhoc?: boolean }) =>
     post<{ send: { id: string; touchNumber: number; sentAt: string; gmailThreadId: string | null }; attached: string[]; sync: SyncResult }>('/api/sales/draft', { action: 'send', ...body }),
   /** A one-off to any address. No deal, nothing written to Attio. */
+  /** Send later: check it now, send it from your Gmail at `sendAt`. */
+  schedule: (body: { dealId?: string; personId?: string; to?: string; subject: string; body: string; assetIds: string[]; adhoc?: boolean; sendAt: string }) =>
+    post<{ scheduled: ScheduledEmail }>('/api/sales/scheduled', { action: 'schedule', ...body }),
+  cancelScheduled: (id: string) => post<{ scheduled: ScheduledEmail }>('/api/sales/scheduled', { action: 'cancel', id }),
+  sendScheduledNow: (id: string) => post<{ sync?: SyncResult }>('/api/sales/scheduled', { action: 'send-now', id }),
   sendTo: (body: { to: string; subject: string; body: string; assetIds: string[] }) =>
     post<{ send: { id: string; touchNumber: number; sentAt: string; gmailThreadId: string | null }; attached: string[]; sync: SyncResult }>('/api/sales/draft', { action: 'send-to', ...body }),
 

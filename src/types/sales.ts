@@ -117,7 +117,28 @@ export interface TodayPayload {
   /** Stage says Not Contacted, but Attio's inbox sync shows email history. Fix the stage in Attio. */
   contactedBefore: Deal[]
   skipped: Deal[]
+  /** Send later: emails waiting for their time, or held for a look. */
+  scheduled: ScheduledEmail[]
   counts: { deals: number; inScope: number; byStage: Record<string, number>; week: { sent: number } }
+}
+
+/** An email set to go later. Held means the tool stopped it at send time and says why in `error`. */
+export interface ScheduledEmail {
+  id: string
+  dealId: string | null
+  personId: string | null
+  toEmail: string
+  adhoc: boolean
+  touchNumber: number | null
+  subject: string
+  body: string
+  assetIds: string[]
+  sendAt: string
+  status: 'scheduled' | 'sending' | 'held'
+  error: string | null
+  createdByEmail: string | null
+  /** The deal as the queue shows it, when there is one. */
+  deal: Deal | null
 }
 
 export interface Progress {
