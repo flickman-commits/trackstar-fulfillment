@@ -148,8 +148,10 @@ export async function handleMcpRequest(req, res, presented) {
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
         instructions:
-          'Trackstar fulfillment. Read-only: overnight health sweeps, order lookup, ' +
-          'scraper coverage, and which race dates are verified rather than guessed.',
+          'Trackstar fulfillment: overnight health sweeps, order lookup, scraper coverage, ' +
+          'and which race dates are verified rather than guessed. Read-only with the read ' +
+          'token; the write token adds the nightly repair tools (tracing and probing ' +
+          'scrapers, testing a branch on its preview, saving verified event ids).',
       }))
     }
 

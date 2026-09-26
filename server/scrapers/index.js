@@ -515,6 +515,14 @@ export function getVerifiedRaceDates() {
   return out
 }
 
+/** The distance a race's name states, for configs that do not set one. */
+function distanceFromName(name) {
+  if (/ten[- ]?miler|10[- ]?mile/i.test(name)) return 10
+  if (/half/i.test(name)) return 13.1
+  if (/marathon/i.test(name)) return 26.2
+  return null
+}
+
 export function getRaceConfigSummaries(years = []) {
   return ALL_CONFIGS.map(config => {
     const explicitYears = config.eventIds ? Object.keys(config.eventIds).map(Number).sort() : []
@@ -557,6 +565,9 @@ export function getRaceConfigSummaries(years = []) {
       // No explicit ids means the scraper builds its URL from the year itself,
       // so there is no such thing as an unconfigured year for this race.
       hasYearPattern: explicitYears.length === 0,
+      // Full-distance miles. Pace checks read this; without it every race was
+      // checked as a marathon, which is wrong for the Army Ten-Miler.
+      distanceMiles: config.distanceMiles || config.distances?.marathon || distanceFromName(config.raceName),
     }
   })
 }

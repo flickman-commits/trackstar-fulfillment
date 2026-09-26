@@ -91,25 +91,48 @@ async function scraperCheck() {
   for (const race of plan) {
     for (const y of race.years) {
       const drifted = y.status === STATUS.DRIFTED
+      const broken = y.status === STATUS.BROKEN
       findings.push({
-        severity: drifted ? 'high' : 'medium',
-        kind: drifted ? 'scraper_drifted' : y.status,
+        severity: drifted || broken ? 'high' : 'medium',
+        kind: drifted ? 'scraper_drifted' : broken ? 'scraper_broken' : y.status,
         subject: `${race.race} ${y.year}`,
         detail: drifted
           // Drift is the dangerous one: the site answers, so nothing errors,
           // but the runner coming back is not the one we asked for.
-          ? 'Site responds but returns the wrong runner. Needs diagnosis, never an automatic fix.'
-          : `${y.status} on ${race.platform}`,
-        // Only an id we can look up is safe to fix unattended. Drift means the
-        // page changed shape and a person has to work out how.
-        action: drifted ? 'tier2_flag' : (y.route === 'discover' || y.route === 'capture-fixture' ? 'tier1_fixable' : 'tier2_flag'),
+          ? 'Site responds but returns the wrong runner.'
+          : broken
+            ? 'Scraper errors or times out against the timing site.'
+            : `${y.status} on ${race.platform}`,
+        // Drift and errors are code repairs now: the agent can see the site
+        // through trace_scraper and test a fix on a preview before it merges.
+        // A manual id is still the one route with no tool behind it.
+        action: y.route === 'manual-id' ? 'tier2_flag' : 'tier1_fixable',
         route: y.route,
         platform: race.platform,
       })
     }
   }
 
-  return { years, statusTally: tally, racesConfigured: getSupportedRaces().length, findings }
+  // Per race, not per race-year: the morning report says "61 of 64 scrapers
+  // working", and a race counts as working only when every year that has a
+  // verdict is live. Untested races are counted apart, never as passing.
+  const window = new Set(years)
+  const byRace = {}
+  for (const h of health) {
+    if (!window.has(h.year)) continue
+    const r = (byRace[h.race] ||= { live: 0, failing: 0 })
+    if (h.status === STATUS.LIVE) r.live++
+    if (h.status === STATUS.DRIFTED || h.status === STATUS.BROKEN) r.failing++
+  }
+  const raceHealth = { total: getSupportedRaces().length, passing: 0, failing: [], untested: 0 }
+  for (const name of getSupportedRaces()) {
+    const r = byRace[name]
+    if (r?.failing) raceHealth.failing.push(name)
+    else if (r?.live) raceHealth.passing++
+    else raceHealth.untested++
+  }
+
+  return { years, statusTally: tally, racesConfigured: getSupportedRaces().length, raceHealth, findings }
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -369,7 +392,6 @@ async function orderCheck() {
     where: { status: { not: 'completed' } },
     include: {
       runnerResearch: { orderBy: { id: 'desc' }, take: 1 },
-      approvalToken: true,
     },
   })
 
@@ -417,13 +439,6 @@ async function orderCheck() {
           detail: `${o.raceName}: stored ${research.officialTime} @ ${research.officialPace}/mi, but that time over the configured distance is ${expected}/mi.`,
           action: 'tier2_flag' })
       }
-    }
-
-    // The link we asked them to approve through is dead.
-    if (o.approvalToken && o.approvalToken.expiresAt < new Date()) {
-      findings.push({ severity: 'high', kind: 'approval_link_expired', subject: o.orderNumber,
-        detail: `Approval link expired ${o.approvalToken.expiresAt.toISOString().slice(0, 10)} on an order still in ${o.designStatus || o.status}.`,
-        action: 'tier0_auto' })
     }
 
     // A photo order reaching production without the photo confirmed placed

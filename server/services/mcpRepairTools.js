@@ -28,6 +28,10 @@ import { runNightlySweep, combineSweepPasses, NIGHTLY_REPORT_KEY } from './night
 import { formatSweepAsMarkdown } from './nightlySweepReport.js'
 import { runProbe, coveredYears } from '../lib/scraperHealth.js'
 import { proposeEventIds, saveOverride, captureFixture } from '../lib/scraperRepair.js'
+import { traceScraper, fetchTimingPage } from '../lib/scraperTrace.js'
+import { invalidateOverrides } from '../scrapers/scraperOverrides.js'
+import { probePreview, waitForDeploy } from '../lib/previewProbe.js'
+import { getCanonicalRaceName } from '../scrapers/index.js'
 import { syncProductCatalog } from './shopifyProducts.js'
 
 /** Where run_sweep parks the pass-1 report for finish_sweep to collect. */
@@ -58,7 +62,9 @@ export const REPAIR_TOOLS = [
       'fixed nothing. Be aware of what the comparison does NOT cover: it checks scrapers, ' +
       'lookups, orders and event ids, but it never looks at race dates. Committing 56 dates ' +
       'still returns fixed:0, and a date you got wrong will not show up here as anything. ' +
-      'Nothing verifies date work except you, so claim only what you actually sourced.',
+      'Nothing verifies date work except you, so claim only what you actually sourced. ' +
+      'Pass every scraper you repaired in fixes; each is checked against production and ' +
+      'only confirmed ones appear under "Things fixed".',
     inputSchema: {
       type: 'object',
       properties: {
@@ -73,8 +79,41 @@ export const REPAIR_TOOLS = [
             'is where git blame sends the next person. Cover what shipped, what you ' +
             'deliberately left alone, and anything you were unsure about.',
         },
+        fixes: {
+          type: 'array',
+          description:
+            'One entry per scraper you repaired tonight. Each is checked against production ' +
+            'before it reaches the report: the race-years must have been failing, untested or ' +
+            'unconfigured when run_sweep started, and must probe live on production now. A fix ' +
+            'that fails the check is reported as "tried, not confirmed", never as fixed.',
+          items: {
+            type: 'object',
+            properties: {
+              race: { type: 'string' },
+              years: { type: 'array', items: { type: 'number' } },
+              summary: {
+                type: 'string',
+                maxLength: 200,
+                description:
+                  'One plain sentence for Matt: what was wrong and what you changed, e.g. ' +
+                  '"Berlin 2025 returned no runners because Mika moved its search endpoint; ' +
+                  'pointed the scraper at the new one." No jargon, no file names.',
+              },
+              commit: { type: 'string', description: 'The sha on main that carries the fix.' },
+            },
+            required: ['race', 'years', 'summary'],
+          },
+        },
+        needsMatt: {
+          type: 'array',
+          description:
+            'Things you could not do that only a person can, as plain sentences with the ' +
+            'decision you need, e.g. "Philadelphia 2026 needs its MyChipTime event id, which ' +
+            'is not published until race week." At most 5. Leave empty when nothing needs him.',
+          items: { type: 'string', maxLength: 240 },
+          maxItems: 5,
+        },
       },
-      required: ['notes'],
     },
   },
   {
@@ -123,6 +162,93 @@ export const REPAIR_TOOLS = [
     },
   },
   {
+    name: 'trace_scraper',
+    description:
+      'Run one scraper search on the server and see every HTTP request it made and what ' +
+      'came back, trimmed to readable text. This is how you diagnose a broken or drifted ' +
+      'scraper: your sandbox cannot reach timing sites, the server can. Pass find (e.g. the ' +
+      'runner surname) to get only the text around it in each response. Rate limited per ' +
+      'race-year, so read what you get before tracing again.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        race: { type: 'string' },
+        year: { type: 'number' },
+        name: { type: 'string', description: 'Runner full name to search, ideally the fixture runner.' },
+        find: { type: 'string', description: 'Optional: return only text around this string in each response.' },
+      },
+      required: ['race', 'year', 'name'],
+    },
+  },
+  {
+    name: 'fetch_timing_page',
+    description:
+      'Fetch one URL on a known timing-site host from the server and return a readable ' +
+      'version: JSON with long arrays shortened, HTML reduced to text and table cells. Use ' +
+      'find to see just the part you need. For exploring an endpoint a scraper should be ' +
+      'calling. Limited to 20 requests per host per hour; respect it, it is what keeps us unblocked.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        find: { type: 'string' },
+        method: { type: 'string', enum: ['GET', 'POST'] },
+        body: { type: 'string', description: 'POST body, as the site expects it.' },
+        contentType: { type: 'string', description: 'Content-Type for a POST body.' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'save_event_id',
+    description:
+      'Save an event id you read off the timing site for a race-year, for scrapers whose ' +
+      'config keys years by eventIds. It is tested by searching a real finisher straight ' +
+      'away, and rolled back if that search finds nobody, so a wrong id never sticks. For ' +
+      'configs keyed differently (eventCodes, subEventIds, course maps), edit the config file ' +
+      'and ship it through probe_preview instead. Never guess an id from an adjacent year.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        race: { type: 'string' },
+        year: { type: 'number' },
+        eventIds: { description: 'The id value exactly as the config expects it for that year (number, string or object).' },
+        platform: { type: 'string', description: 'Only when the id belongs to the fallback platform (e.g. athlinks for San Francisco).' },
+        probeName: { type: 'string', description: 'A real finisher of that race-year to verify with; defaults to names from our orders.' },
+      },
+      required: ['race', 'year', 'eventIds'],
+    },
+  },
+  {
+    name: 'probe_preview',
+    description:
+      'Test a pushed branch before it merges: finds the Vercel preview for ref, waits for it ' +
+      'to build, and probes every fixture-backed year of the given races with the branch\'s ' +
+      'code against the live timing sites. Merge only when allPassing is true. Writes no ' +
+      'health rows; production\'s own probe after deploy does that. At most 12 race-years per call.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string', description: 'Branch name or commit sha you pushed.' },
+        races: { type: 'array', items: { type: 'string' } },
+        years: { type: 'array', items: { type: 'number' }, description: 'Optional subset; default is every year with a fixture.' },
+      },
+      required: ['ref', 'races'],
+    },
+  },
+  {
+    name: 'wait_for_deploy',
+    description:
+      'After pushing a fix to main, wait until production is serving that commit (up to ~4 ' +
+      'minutes per call). Then run probe_scrapers on the fixed races; if they are not live, ' +
+      'revert the commit on main and push.',
+    inputSchema: {
+      type: 'object',
+      properties: { sha: { type: 'string' } },
+      required: ['sha'],
+    },
+  },
+  {
     name: 'sync_catalog',
     description: 'Re-read the Shopify product catalog so coverage reflects what is on sale right now.',
     inputSchema: { type: 'object', properties: {} },
@@ -163,6 +289,65 @@ function actionable(report) {
   }
 }
 
+/** Findings that mean a race-year needed repair when the night started. */
+const REPAIRABLE_KINDS = new Set(['scraper_drifted', 'scraper_broken', 'no_year', 'no_probe', 'year_not_configured'])
+
+/** "Berlin Marathon 2025" -> the canonical race name, ignoring the year. */
+function raceOf(subject) {
+  const name = String(subject || '').replace(/\s+\d{4}$/, '')
+  return getCanonicalRaceName(name) || name
+}
+
+/**
+ * Check each fix the agent claims before it reaches Matt's report.
+ *
+ * The agent writes the sentence; production decides whether it is true. A fix
+ * counts only when the race-years were actually in trouble at run_sweep and
+ * production probed them live after that. Without the first check an agent
+ * could "fix" a scraper that was never broken; without the second, a fix that
+ * never deployed would read as shipped - the 2026-09-09 failure again.
+ */
+async function verifyFixes(before, fixes) {
+  const startedAt = new Date(before.startedAt)
+  const verified = []
+  const unverified = []
+
+  for (const fix of fixes.slice(0, 20)) {
+    const race = getCanonicalRaceName(fix.race) || fix.race
+    const years = (Array.isArray(fix.years) ? fix.years : []).map(Number).filter(Number.isFinite)
+    const entry = { race, years, summary: String(fix.summary || '').trim().slice(0, 200), commit: fix.commit || null }
+    if (!years.length || !entry.summary) {
+      unverified.push({ ...entry, reason: 'no years or no summary given' })
+      continue
+    }
+
+    const wasBroken = years.some(y => before.findings.some(f =>
+      (REPAIRABLE_KINDS.has(f.kind) && raceOf(f.subject) === race && f.subject.endsWith(String(y)))
+      || (f.kind === 'lookup_failing' && raceOf(f.subject) === race)
+    ))
+    if (!wasBroken) {
+      unverified.push({ ...entry, reason: 'nothing was wrong with it when the run started' })
+      continue
+    }
+
+    const rows = await prisma.scraperHealth.findMany({ where: { race, year: { in: years } } })
+    const missing = years.filter(y => !rows.some(r => r.year === y))
+    const stale = rows.filter(r => r.checkedAt < startedAt).map(r => r.year)
+    const notLive = rows.filter(r => r.status !== 'live').map(r => `${r.year} ${r.status}`)
+    if (missing.length || stale.length || notLive.length) {
+      const why = [
+        missing.length && `never probed: ${missing.join(', ')}`,
+        stale.length && `not probed on production since the run started: ${stale.join(', ')}`,
+        notLive.length && `not live: ${notLive.join(', ')}`,
+      ].filter(Boolean).join('; ')
+      unverified.push({ ...entry, reason: why })
+      continue
+    }
+    verified.push(entry)
+  }
+  return { verified, unverified }
+}
+
 export const REPAIR_HANDLERS = {
   async run_sweep() {
     // persistBaseline false: the delta baseline should move when the night is
@@ -176,7 +361,7 @@ export const REPAIR_HANDLERS = {
     return text({ startedAt: before.startedAt, ...actionable(before) })
   },
 
-  async finish_sweep({ notes }) {
+  async finish_sweep({ notes = null, fixes = [], needsMatt = [] }) {
     // Asking for brevity in the skill did not hold: the 2026-09-09 run filed
     // 2.4KB of headings and per-race bullet lists into a phone-sized email.
     // Enforced here because this is the last thing standing between an agent
@@ -201,8 +386,15 @@ export const REPAIR_HANDLERS = {
     const after = await runNightlySweep({ persistBaseline: true })
 
     const combined = combineSweepPasses(before, after)
+    const { verified, unverified } = await verifyFixes(before, Array.isArray(fixes) ? fixes : [])
     const stored = {
       ...combined,
+      verifiedFixes: verified,
+      unverifiedFixes: unverified,
+      needsMatt: (Array.isArray(needsMatt) ? needsMatt : [])
+        .map(line => String(line).trim().slice(0, 240))
+        .filter(Boolean)
+        .slice(0, 5),
       notes: notes || null,
       markdown: formatSweepAsMarkdown(combined),
       storedAt: new Date().toISOString(),
@@ -216,6 +408,8 @@ export const REPAIR_HANDLERS = {
 
     return text({
       filed: true,
+      verifiedFixes: verified.map(f => `${f.race} ${f.years.join(', ')}`),
+      notConfirmed: unverified.map(f => `${f.race} ${f.years.join(', ')}: ${f.reason}`),
       counts: combined.counts,
       fixed: combined.fixed.map(f => `${f.kind}: ${f.subject}`),
       introduced: combined.introduced.map(f => `${f.kind}: ${f.subject}`),
@@ -234,7 +428,9 @@ export const REPAIR_HANDLERS = {
       ...result,
       next: result.ok
         ? 'Fixture stored. Run probe_scrapers on this race to turn it into a verdict - capturing alone clears nothing.'
-        : 'No fixture captured, so this race-year stays untested. Do not retry repeatedly.',
+        : 'No fixture captured. Read attempts: year_not_configured needs an event id, error or ' +
+          'no_results on a year that has orders means the scraper is broken there - trace_scraper ' +
+          'it rather than retrying capture.',
     })
   },
 
@@ -245,6 +441,43 @@ export const REPAIR_HANDLERS = {
       apply: Boolean(apply),
     })
     return text(result)
+  },
+
+  async trace_scraper({ race, year, name, find }) {
+    return text(await traceScraper({ race, year: Number(year), name, find: find || null }))
+  },
+
+  async fetch_timing_page({ url, find, method, body, contentType }) {
+    return text(await fetchTimingPage({ url, find: find || null, method: method || 'GET', body: body || null, contentType: contentType || null }))
+  },
+
+  async save_event_id({ race, year, eventIds, platform, probeName }) {
+    const canonical = getCanonicalRaceName(race) || race
+    const y = Number(year)
+    const previous = await prisma.scraperOverride.findUnique({ where: { race_year: { race: canonical, year: y } } })
+    const result = await saveOverride({ race: canonical, year: y, eventIds, platform: platform || null, probeName: probeName || null })
+    if (result.verified) {
+      return text({ ...result, next: 'Saved and verified. Run probe_scrapers on this race so production records it live.' })
+    }
+    // saveOverride keeps an unverified id for the dashboard's manual flow.
+    // Unattended, an id that finds nobody is worse than none, so put back
+    // whatever was there before.
+    if (previous) {
+      const { id: _id, ...restore } = previous
+      await prisma.scraperOverride.update({ where: { race_year: { race: canonical, year: y } }, data: restore })
+    } else {
+      await prisma.scraperOverride.delete({ where: { race_year: { race: canonical, year: y } } })
+    }
+    invalidateOverrides()
+    return text({ ...result, saved: false, rolledBack: true, next: 'The id found no finisher, so it was rolled back. Check it against the timing site listing.' })
+  },
+
+  async probe_preview({ ref, races, years }) {
+    return text(await probePreview({ ref, races, years }))
+  },
+
+  async wait_for_deploy({ sha }) {
+    return text(await waitForDeploy({ sha }))
   },
 
   async sync_catalog() {

@@ -24,7 +24,7 @@ function sign(payload) {
 }
 
 /** Constant-time string compare that won't throw on length mismatch. */
-function safeEqual(a, b) {
+export function safeEqual(a, b) {
   const aBuf = Buffer.from(String(a))
   const bBuf = Buffer.from(String(b))
   if (aBuf.length !== bBuf.length) return false

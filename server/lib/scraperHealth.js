@@ -194,7 +194,7 @@ function sameBib(a, b) {
 }
 
 /** "2:23:01" and "02:23:01" are the same finish. */
-function sameTime(a, b) {
+export function sameTime(a, b) {
   const norm = v => String(v ?? '').trim().replace(/^0+(?=\d:)/, '')
   const na = norm(a)
   return na !== '' && na === norm(b)
@@ -246,7 +246,12 @@ export async function probeOne(race, year, fixture) {
     if (result?.found) {
       const actual = { bib: result.bibNumber ?? null, time: result.officialTime ?? null }
       if (matchesFixture(fixture, actual)) {
-        return { ...base, status: STATUS.LIVE, actualBib: actual.bib, ms }
+        return {
+          ...base, status: STATUS.LIVE, actualBib: actual.bib, ms,
+          // Carried for the preview gate, which also asserts time and pace;
+          // a bib alone cannot tell chip time from gun time.
+          actualTime: actual.time, actualPace: result.officialPace ?? null, actualEventType: result.eventType ?? null,
+        }
       }
       return {
         ...base,
@@ -262,7 +267,12 @@ export async function probeOne(race, year, fixture) {
     const candidates = result?.possibleMatches || []
     if (result?.ambiguous || candidates.length) {
       const hit = candidates.find(m => matchesFixture(fixture, m))
-      if (hit) return { ...base, status: STATUS.LIVE, actualBib: hit.bib ?? null, ms }
+      if (hit) {
+        return {
+          ...base, status: STATUS.LIVE, actualBib: hit.bib ?? null, ms,
+          actualTime: hit.time ?? null, actualPace: hit.pace ?? null, actualEventType: hit.eventType ?? null,
+        }
+      }
       return {
         ...base,
         status: STATUS.DRIFTED,
