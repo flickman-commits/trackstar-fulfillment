@@ -32,7 +32,7 @@ export default {
     2023: 'Mesa Marathon official results page + David Baker 2023 race recap',
     2024: 'mesanow.org + mesamarathon.com',
     2025: 'mesamarathon.com + runready.com',
-    2026: 'mesamarathon.com',
+    2026: 'endurancesportswire.com "Mesa Marathon Celebrates Arizona\'s Birthday with Sold-Out, Record-Size Field" (run Feb. 14, Arizona\'s 114th birthday; JJ Santana 2:19:09) + marathonguide.com mesa-marathon-2/2026 results page',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['Marathon', 'Half Marathon'],

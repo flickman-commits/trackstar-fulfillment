@@ -37,7 +37,7 @@ export default {
     2023: 'kpax.com coverage + goandrace.com + mybestruns.com',
     2024: 'runsignup.com results + missoula marathon official',
     2025: 'runsignup.com results + missoula marathon official',
-    2026: 'competitivetiming.com event page',
+    2026: 'missoulian.com "Photos: 2026 Missoula Marathon" race-day gallery + kpax.com race report (Nate Wellington wins the men\'s marathon; Owen Smith sets the men\'s half record)',
   },
   eventTypes: ['Marathon', 'Half Marathon'],
   eventSearchOrder: ['marathon', 'half'],
