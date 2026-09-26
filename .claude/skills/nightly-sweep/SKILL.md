@@ -1,214 +1,185 @@
 ---
 name: nightly-sweep
-description: Run the nightly fulfillment-tool upkeep pass — pull the health sweep, fix what is provably safe, commit verified scraper config updates to main, and file a three-sentence report for Matt's morning email. Use when the scheduled nightly routine fires, or when Matt asks to "run the sweep" / "do the nightly check" by hand.
+description: Run the nightly fulfillment-tool upkeep pass — sweep, repair broken scrapers (diagnose on the server, fix the code, prove it on a preview, merge to main, confirm in production), work the untested backlog, and file the morning report. Use when the scheduled nightly routine fires, or when Matt asks to "run the sweep" / "do the nightly check" by hand.
 ---
 
 # Nightly sweep
 
 ## What this is
 
-The judgment half of the nightly upkeep. The other half — `/api/admin/nightly-sweep` —
-already ran and established the facts with production credentials. You read
-those facts and decide what to do about them.
+The nightly routine that keeps Trackstar's scrapers working without Matt. The
+server establishes the facts with production credentials; you act on them. Since
+2026-09-27 that includes **repairing scrapers**: you can see what a timing site
+sends back, change the scraper code, prove the change against the live site on a
+Vercel preview, and ship it to `main`.
 
-**You reach Trackstar through MCP tools, not HTTP.** The cloud sandbox's egress
-proxy refuses direct requests to fast.trackstar.art - curl will fail and no
-amount of retrying changes that - while MCP traffic is allowed. If you find
-yourself writing a curl command against Trackstar, stop: use the tools.
+Matt's morning report has three blocks — **Things fixed**, **Things that need
+you**, and one line of scraper health. The goal of every night is for the middle
+block to say "Nothing, I handled everything" and mean it.
 
-**You do not have database credentials and must not go looking for them.** Every
-change you make reaches production one of two ways: an MCP tool built for that
-job, or a commit to `main`. That boundary is the whole safety story.
+**You reach Trackstar only through the Trackstar_Ops MCP tools.** Your sandbox's
+network refuses fast.trackstar.art and every timing site. Do not curl either;
+`trace_scraper` and `fetch_timing_page` are how you see a timing site, and they
+run on the server. If the tools are missing or failing, say so in your final
+message and stop.
 
-Replaces the older coverage-check routine, which reported and stopped. The
-difference here is that you are allowed to fix things — under the rules below.
+**You have no database credentials and must not look for any.** Everything
+reaches production through an MCP tool built for that job or a commit to `main`.
 
-**You are the only scheduler.** There is no Vercel cron on the sweep any more.
-If this routine does not run, no report is stored, and the morning email says
-how long it has been rather than rendering stale numbers as today's. That is
-deliberate: a cron quietly producing a report while the agent is broken is how
-you get a healthy-looking email for a week without noticing.
-
-**Race configs live in `server/scrapers/configs/`.** Each race has one file
-(`boston.js`, `chicago.js`, etc.). The `raceDates` object inside holds
-year → date mappings. When you verify a date, add or update that entry,
-commit, and push — no searching required.
+**Never write a status or progress file into the repository.** Report through
+`finish_sweep`, even on a night you could not work.
 
 ## Where your work lands
 
-**Commit to `main` and push. Do not create a branch or open a pull request.**
+Race-date and config changes whose gates passed: commit to `main` and push.
 
-A branch is where a verified date goes to die. Nobody merges it overnight, so
-the date never reaches the poster it was supposed to fix, while the report
-claims it shipped. On 2026-09-09 a run pushed 56 dates to a `claude/*` branch
-and reported them as "committed to production" — they were not, and they sat
-there unmerged and unnoticed.
-
-What makes this safe is *what* you are allowed to change, not where it lands: a
-`raceDates` entry backed by two independent sources, or a config whose
-verification gates passed. Anything you could not prove does not get committed
-anywhere — it goes in the report as a flag. That is the boundary, and it does
-not move.
-
-If a scheduled-run wrapper hands you a branch name, `main` still wins for this
-routine, and say so in one clause of the report.
+A scraper **code** change: push it to a branch named `sweep/<race>-<yyyymmdd>`
+first. That branch exists only so Vercel builds a preview you can test on. Merge
+it to `main` in the same run once `probe_preview` passes, or delete it if you
+give up. No `sweep/*` branch outlives the run, and nothing else goes on a branch.
+Never open a pull request. If a wrapper hands you a `claude/*` branch name,
+`main` still wins.
 
 ## The shape of the run
 
-Sweep → fix → sweep again → file the report. The second sweep is not
-bookkeeping: comparing the two passes is how "what got fixed" is established.
-You do not get to tell us what you fixed, we check. A fix that did not actually
-clear its finding shows up as still outstanding, which is what you want at 1am
-with nobody watching.
+1. `run_sweep` — the "before" state.
+2. Repair what is broken (the repair loop below).
+3. Work the backlog with what time and budget is left.
+4. `finish_sweep` with the fixes you made and anything only Matt can do. It
+   re-sweeps and **checks every fix you claim against production**; a claim that
+   does not hold shows as "tried, not confirmed", never as fixed.
 
-## Step 1: the first sweep
+If `run_sweep` returns `healthy: false`, some checks did not run. Say so; a
+partial sweep is not a clean one.
 
-Call **`run_sweep`**. It sweeps and returns what it found; the full report stays
-server-side as the "before" state, so you never have to carry two hundred
-findings around in your context.
+## Priority order
 
-Every finding carries `kind`, `subject`, `severity`, `detail`, and an `action`
-of `tier0_auto`, `tier1_fixable`, or `tier2_flag`. `delta.new` is what appeared
-tonight — that is where your attention goes. The standing backlog is a number,
-not a to-do list; do not try to clear 123 untested race-years in one night. Pace yourself—that's roughly two weeks of nightly work.
+1. **Anything touching a paid order** — `year_not_configured` with open orders
+   first (its `detail` says how many), then order findings. Order findings
+   (`no_runner_data`, strangers offered as matches, pace mismatches…) involve
+   customers: never touch the order, and put any decision Matt must make in
+   `needsMatt`.
+2. **Broken scrapers** — `scraper_drifted` (right site, wrong runner) and
+   `scraper_broken` (errors or timeouts). Newest first. Repair loop.
+3. **Storefront lookups failing** (`lookup_failing`) — shoppers hit these before
+   they buy. `probe_scrapers` the race: if it fails, it is a broken scraper (step
+   2); if every year is live, the lookups are failing on something else, usually a
+   slow site. `trace_scraper` shows the `ms` of each request; a site that takes
+   longer than the storefront waits is worth a fix (fewer requests, a faster
+   endpoint), and one you cannot speed up goes in `needsMatt`.
+4. **Missing event ids** (`no_year`) for years that have happened. Read the id off
+   the platform's own listing with `fetch_timing_page` (or `discover_event_ids`
+   on Athlinks), then `save_event_id`, which tests it on a real finisher and rolls
+   back if it finds nobody. Never extrapolate an id from an adjacent year.
+5. **Untested race-years** (`no_probe`) — `capture_fixture`, then `probe_scrapers`.
+   Capture searches names from our own orders before generic surnames and reports
+   what each attempt did: `year_not_configured` means step 4, and `error` or
+   `no_results` on a year we have sold means the scraper is broken there, so go to
+   the repair loop rather than retrying capture.
+6. **Race dates** — `race_dates` for computed years, pinned under the date rules
+   below. The date backlog cleared in September 2026; this is now maintenance.
+7. **Upcoming races** — anything we sell running in the next eight weeks should
+   have its year configured before race day. Preparation only; a race that has
+   not run cannot be verified.
 
-If `healthy` is false, some checks did not run. Say so in the report's first
-sentence. **A partial sweep is not a clean sweep**, and it must never be
-reported as one.
+## Budget
 
-## The nightly quota — you are expected to fill it
+Cost is not a constraint. **Hammering a timing site is.** Sydney's firewall
+blocked us after dozens of rapid loads in one afternoon. The limits are per host:
 
-**A night where you fix nothing is a failed night, not a quiet one.** The goal
-is to clear the standing backlog in about a week, not to nibble at it forever.
-Nobody is going to work through ~120 untested race-years and ~43 unverified race
-dates by hand. That's why you're here—clearing them is the job.
-
-### Be realistic about the two things we actually guard against
-
-**Cost is not one of them.** This runs on Haiku. A heavy night is a few hundred
-thousand tokens on the cheapest model available. Do not ration yourself to save
-money - it is not a meaningful saving and the work matters more.
-
-**Hammering one timing site is.** That is the real risk, and it is per-site.
-Sydney's firewall blocked us after dozens of rapid page loads at a single host
-in one afternoon. A probe is one search request; fifteen of those spread over an
-hour is nothing. Sixty at one host in five minutes is not.
-
-So: go wide across platforms, not deep into one. The backlog is spread over
-sixteen of them, which is what makes a big night safe.
-
-### Per night
-
-**MANDATORY:** 50 race dates researched and verified
-
-| Budget | Limit |
+| Budget | Per night |
 |---|---|
-| Race dates verified and committed | **50** |
-| Race-years touched **per timing platform** | **12** |
-| Race-years touched **in total** | **60** |
-| Fixture captures | **10** |
-| Wall clock | ~60 minutes |
+| Scrapers repaired (merged code changes) | up to **5** |
+| Attempts at one repair before flagging it | **2** preview rounds |
+| Race-years touched per timing platform (probes, captures, traces) | **12** |
+| Race-years touched in total | **60** |
+| `fetch_timing_page` per host | the server stops you at 20/hour; plan for fewer |
 
-Once the backlog of ~43 unverified dates clears, this moves to maintenance mode:
-check for new race dates on products we've added, and keep the system current.
-Cost is not a constraint—this runs on Haiku and a heavy night is negligible.
+Go wide across platforms, not deep into one. Stop working a platform for the
+night after three failures or a 403 in a row from it, and carry on elsewhere.
 
-### Every night, work these in order
+## The repair loop
 
-**MANDATORY (complete before other work):**
+Use this for `scraper_drifted`, `scraper_broken`, and any race-year the steps
+above sent here.
 
-1. **50 race dates researched and verified.** Find races with computed (guessed) dates. Research the actual date against at least two independent sources. Once you have agreement, commit and push. If sources conflict, research until you find consensus. This is your non-negotiable minimum every night until backlog clears.
+**1. Look before you touch anything.** `trace_scraper` with the fixture runner's
+name (it is in the `probe_scrapers` row as `probeName`) and `find` set to their
+surname. Read it: which URL did the scraper call, what status came back, is the
+runner in the response, and what do the fields around them look like? Then read
+the scraper (`server/scrapers/platforms/<Platform>Scraper.js`) and the race config
+(`server/scrapers/configs/<race>.js`). Use `fetch_timing_page` to look at the
+platform's current page or endpoint when the trace shows the old one is gone.
 
-**The quota never outranks the bar.** If the sources are not there, the honest
-night is a short one. Twenty solid dates and a sentence saying the rest were not
-findable beats fifty with seven guesses buried in them. A wrong date is not a
-smaller version of a missing date: a missing one shows up as a build warning
-every time until somebody fixes it, while a wrong one looks finished forever and
-quietly prints the wrong weather on a poster. Report the number you actually
-verified, not the number you were asked for.
+Name the cause in one sentence before writing code. The usual ones:
 
-**Then continue with:**
+- the site moved an endpoint or renamed a field → change the scraper
+- a year's event id is missing or wrong → config entry or `save_event_id`
+- the site is up but slow and we time out → not a parsing bug; fix only if a
+  cheaper request exists, otherwise `needsMatt`
+- the site is blocking us (403, captcha, WAF page) → nothing to fix; back off the
+  platform and put it in `needsMatt`
 
-2. **Tier 0 that unblocks a live order.** Someone has paid us. Always next.
-3. **Anything in `newTonight`.** New means something changed today.
-4. **Untested race-years** - Capture a real finisher's results, then test the scraper against those results. Spread
-   across platforms. This is the biggest pile and the easiest to clear.
-5. **Missing year configs** (`no_year`, `year_not_configured`) -
-   `discover_event_ids` where the platform has a listing we can query; flag the
-   rest for a human. `year_not_configured` is the same gap seen from the other
-   end: an order actually tried that year and could not be looked up. Those
-   carry an order number in `detail`, so do them first.
-6. **Storefront lookups failing** (`lookup_failing`) - a race whose Instant
-   Lookup is erroring for real shoppers, drawn from the last seven days of
-   LookupLog. This is the only finding that happens in front of a customer
-   rather than in front of Eli, so treat a high-severity one as urgent.
-   `probe_scrapers` that race first: a scraper that also fails a probe is a
-   broken scraper, while one that passes points at the timing site being slow
-   or blocking us, which is a flag-for-a-human, not a fix. Do not "fix" it by
-   removing the race from the public lookup without saying so in the report.
-7. **Upcoming races.** Check the calendar for anything running in the next eight
-   weeks that we sell. A year config should exist BEFORE race day, so orders do
-   not pile up waiting. A race that has not run yet cannot be verified against
-   results, so this is preparation and flagging only.
+If you cannot name the cause from what you can see, stop and flag it. A guess
+dressed as a fix is worse than a flag.
 
-If you run out of one category, move to the next. Do not stop because the
-urgent work is done - the backlog IS the work on a normal night.
+**2. Change as little as possible.** Fix the cause, in the scraper or config for
+the affected platform only. Follow `add-race-scraper` for anything about times
+and pace: **chip time, never gun time; pace computed from chip time over the
+matched distance.** A platform-wide scraper change affects every race on that
+platform, so the next step must probe all of them.
 
-### Stop early only if
+**3. Local gates.** `npm run build`, `npm run lint`, `npm test`. `npm run
+test:scrapers` hits live sites, which your sandbox cannot reach; the preview
+replaces it. Do not skip a failing check.
 
-- three consecutive requests to the **same platform** fail or return 403 - back
-  off that one platform for the night and carry on with the others
-- a gate fails twice on the same race - flag it and move on
-- you genuinely cannot tell whether something is safe
+**4. Prove it on the real site.** Push to `sweep/<race>-<yyyymmdd>` and call
+`probe_preview` with that branch and **every race on the platform you changed**
+(12 race-years per call; make several calls if needed). The preview runs your
+code against the live timing sites for every year that has a known finisher,
+and passes a year only if the right runner comes back **with their known finish
+time and a pace that matches it**. Merge only when `allPassing` is true for all
+of them. A fix for 2025 that breaks 2023 is a regression, not a fix.
 
-Running out of budget is a normal ending. Running out of nerve is not.
+If it fails, read the failing rows, fix, push again. Two rounds, then give up:
+delete the branch and flag the race.
 
-## Step 2: Tier 0 — just do it
+**5. Ship.** Merge the branch into `main` (fast-forward or a merge commit), push
+`main`, delete the `sweep/*` branch. The commit message says what was wrong, what
+changed, and which years passed on the preview.
 
-Safe, reversible, no judgment. Use the existing endpoints; never hand-roll a
-database write.
+**6. Confirm in production.** `wait_for_deploy` with the merge commit sha, then
+`probe_scrapers` on the races you fixed. That verdict is what `finish_sweep`
+checks. If production is not live where the preview was, `git revert` the commit
+on `main`, push, and flag it — never leave production worse than you found it.
 
-| Finding | Do this |
-|---|---|
-| `untested` (a few, not all) | Find actual race results, then test the scraper against that race |
-| `selling_without_scraper` appearing new | `sync_catalog` first, to confirm it is real and not a stale snapshot |
+**7. Record it.** Add it to `finish_sweep`'s `fixes`: race, years, and one plain
+sentence for Matt ("Berlin 2025 returned no runners because Mika moved its search
+page; pointed the scraper at the new one."). No file names or jargon.
 
-**Testing a scraper requires actual results.** Finding results alone clears nothing; only
-testing the scraper tells you whether it works. A run that captured test data but never
-verified the scraper worked was wrong, and the second sweep caught it.
+**A race that flips between live and drifted across probes is flaky, not fixed.**
+Flag it; do not re-probe hoping for a pass.
 
-Findings that need an endpoint you do not have - weather, re-research,
-approval links - are Tier 2 for you. Flag them.
+## What you never do
 
-Cap test verifications at **10 per night**. These hit third-party timing sites,
-and hammering them gets us blocked — Sydney's firewall escalated against us
-inside one afternoon of repeated queries.
+Database migrations or schema changes · destructive actions (clearing research,
+deleting, merging races) · touching an order · pricing or Shopify writes ·
+messaging customers · force-pushing · merging anything whose preview did not
+pass on every year · skipping, disabling or loosening a test or gate to get green
+· building a scraper for a brand-new timing platform (that is a build; say so in
+`needsMatt` if a new product needs one).
 
-**One passing test is not proof.** A race that flips between working and broken across
-tests is unstable, not fixed. Report it as unreliable rather than claiming it works.
-Do not test repeatedly hoping for a passing run; that is both dishonest and how we get
-rate-limited.
-
-## Step 3: Tier 1 — ship config changes, but only what you can PROVE
-
-You may commit and merge scraper config changes **only** when the change is
-verified against real results or a real order. Lint passing is not verification;
-lint only proves the file is shaped correctly.
+## Config and date changes
 
 ### Adding or fixing a year config
 
-1. Discover the event id — `discover_event_ids` with `apply: false` to preview,
-   or read it off the platform's own listing. **Never extrapolate an id from an
-   adjacent year.** Ids are not sequential and the offsets are not stable.
-2. Open the event and confirm the title or date is the year you think it is.
-3. Capture a real finisher's results from that race-year.
-4. `npm run lint:scrapers` and `npm run test:scrapers` must both pass, and the
-   test case must show **PASS**, not BLOCKED. A blocked test case proves
-   nothing — the site refused us.
-
-That last step is the gate: the scraper returned the correct chip time *and*
-pace for a person who actually ran. If you cannot get a real finisher through
-it, the config is unproven and drops to Tier 2.
+1. Find the id: `discover_event_ids` with `apply: false` on Athlinks, or read it
+   off the platform's listing with `fetch_timing_page`. **Never extrapolate an id
+   from an adjacent year.** Ids are not sequential and the offsets are not stable.
+2. Confirm the event's title or date is the year you think it is.
+3. For a config keyed by `eventIds`, `save_event_id` tests and saves it. For any
+   other shape, edit the config file and ship it through the repair loop's steps
+   3–6 so the preview proves it on a real finisher.
 
 ### Pinning a race date
 
@@ -305,95 +276,34 @@ way to launder a guess.
 independent sources naming the day, add or update the `raceDates` entry, commit
 and push to `main`. Name the sources in the commit message, one line per date.
 That commit is the audit log — it is what `git blame` on the line shows the next
-person who wonders where the date came from. The report gets a count, not the
-list.
+person who wonders where the date came from. Dates do not go in the morning
+report; the commit is the record.
 
 Wrong dates are the expensive failure here. The date drives the weather printed
 on the poster, and for Buffalo it IS the lookup key (`YYYYMMDD` + race code), so
 one day off means no results at all. That's why research and consensus matter—not
 bureaucracy.
 
-### Getting ready for upcoming races
+## Filing the report
 
-Check the marathon calendar for races running in the next ~8 weeks. For any we
-sell, make sure the year config exists **before** race day. A race that has not
-run yet has no results to verify against, so this is preparation and flagging
-only — never a merged config claiming to work.
+Call **`finish_sweep`** once, at the end, even on a night you fixed nothing:
 
-## Step 4: Tier 2 — flag, do not touch
+- `fixes` — every scraper you repaired, with race, years, a one-sentence summary
+  and the commit. Only what production confirms appears under "Things fixed".
+  Tested race-years and saved event ids are counted automatically; do not list
+  them here.
+- `needsMatt` — at most five plain sentences, each naming the decision or action
+  you need ("Philadelphia 2026's event id isn't published until race week; I'll
+  add it then" does not belong here, because it needs nothing from him).
+  Broken scrapers you gave up on, blocked sites, a product that needs a new
+  platform built. Leave it empty when nothing needs him.
+- `notes` — optional, kept in the full report only. Anything you were unsure
+  about, in a sentence or two.
 
-- **Scraper malfunction** — the site responds but returns incorrect data. Needs
-  root cause diagnosis and is not a nightly job. The Army Ten-Miler bug was a
-  distance unit conversion error; that took real investigation.
-- `selling_without_scraper` on a **new timing platform** — writing a scraper is
-  a build, not an upkeep task.
-- Any date or id you could not prove with multiple sources.
-- Every order issue. These involve real customers and real money.
-- Anything touching pricing, Shopify writes, or messaging customers.
+The report is computed, not written by you. Findings you own escalate to Matt on
+their own if you leave them: a broken scraper after three nights, anything else
+after a week. The untested backlog never escalates.
 
-## Never
-
-Database migrations or schema changes · destructive actions (clearing research,
-deleting, merging races) · bulk price edits · messaging customers · force-pushing
-· merging anything whose gates did not pass.
-
-**Never write a status or progress file into the repository.** A blocked
-run once committed a status file to main describing its own blocker. The
-content was accurate and it still should not have happened: a checked-in
-status note goes stale the moment the problem is fixed, nobody updates it, and
-it is the wrong channel. File the report instead — a POST carrying only
-`notes` is accepted precisely so a run that could not sweep can still say why.
-Then stop. An agent that cannot do its job should get smaller, not busier.
-
-## Step 5: file the report
-
-Call **`finish_sweep`** with your notes. It re-sweeps, compares against the
-before state from `run_sweep`, works out what was found, fixed, and introduced,
-and stores the report.
-
-Call it even if you fixed nothing. A night with no repairs is a normal night;
-a night with no report looks like a broken agent.
-**Matt's existing morning email reads that stored report**; you are not sending
-a separate notification. One more channel is how a report stops being read.
-
-### What the report looks like
-
-Matt's card has three blocks, and the first two are computed — you do not write
-them and you cannot influence them:
-
-- **NEEDS YOU** — findings only a person can move: everything `tier2_flag`,
-  everything you have no endpoint for (approval links, weather, re-research),
-  and anything you own that has gone unfixed for a week. Paid-order problems
-  sort to the top. This block is meant to be empty.
-- **SHIPPED** — what the re-sweep verified, not what you say you did. Date
-  commits do not appear here on the night you make them: the sweep reads the
-  deployed config, so they clear on the following night's run instead.
-- **IN PROGRESS** — your queue, with anything you are quietly failing at named
-  as "stalling" before it ages into NEEDS YOU.
-
-Every item carries how many nights it has been open. A finding you skip does
-not disappear; it gets older in front of him, and after a week it lands in his
-column with your name implicitly on it.
-
-`notes` is your own narrative and is rendered **labelled as unverified**,
-underneath the computed blocks. That labelling is deliberate: it is the one
-part of the report nothing checks, and the 2026-09-10 run used it to report 52
-verified dates when 19 were sourced. Write it as commentary on facts the report
-has already established, never as the source of them.
-
-**Three sentences. Hard cap.** Matt reads this on his phone at 7am, wedged
-between the revenue numbers and the rest of his morning. A wall of text there is
-a report nobody finishes, which makes a buried warning worse than no warning.
-Cover what you shipped, what you deliberately left alone, and anything you were
-unsure about — then stop.
-
-Counts, not lists. "Verified 56 race dates across 12 races; nothing else was
-provable tonight" is the whole first sentence. The races, the dates and the
-sources belong in the commit message, where the next person will actually look
-for them. No headings, no bullets, no section titles — it is three sentences of
-prose.
-
-Do not pad it to look busy and do not soften a finding to make the night look
-clean; a confident wrong answer at 1am is worse than a flagged question. If one
-of the three sentences has to be "I got two dates wrong last night," write that
-one first.
+Be honest. Do not claim a fix you did not see pass in production, and do not
+leave a real problem out of `needsMatt` to make the night look clean. A confident
+wrong answer at 1am is worse than a flagged question.

@@ -20,7 +20,7 @@
  * that could invent wrong results onto a printed poster.
  */
 import { fetchWithTimeout } from './fetchWithTimeout.js'
-import { getScraperForRace, getRaceConfigSummaries } from '../scrapers/index.js'
+import { getScraperForRace, getRaceConfigSummaries, getCanonicalRaceName } from '../scrapers/index.js'
 import { ensureOverridesLoaded, invalidateOverrides } from '../scrapers/scraperOverrides.js'
 
 const ATHLINKS_MASTER_API = 'https://alaska.athlinks.com/MasterEvents/Api'
@@ -191,9 +191,45 @@ export async function saveOverride({ race, year, eventIds, platform = null, prob
   return { saved: true, verified: verification.ok, verification }
 }
 
-// Common surnames, tried in order. A results search needs *a* name; these are
-// simply the most likely to return somebody in a US road race field.
+// Common surnames, the fallback when we have no real name for a race-year.
+// A results search needs *a* name; these are simply the most likely to return
+// somebody in a US road race field.
 const PROBE_NAMES = ['Smith', 'Johnson', 'Garcia', 'Miller', 'Brown']
+
+/** Caps the names tried per capture, so one call stays polite to one host. */
+const MAX_REAL_NAMES = 4
+
+/**
+ * Real people we know entered this race-year: the names on our own orders.
+ *
+ * Generic surnames failed every capture on 2026-09-26, eight attempts across
+ * six platforms, and "Smith" is the worst possible query for a site that pages
+ * or caps results by name. An order name is a person who actually ran, so the
+ * search either finds them or tells us something real about the scraper.
+ * Orders store whatever race name they came in under, so match on the
+ * canonical name rather than the raw string.
+ */
+async function orderNamesFor(race, year) {
+  const { default: prisma } = await import('../../api/_lib/prisma.js')
+  const canonical = getCanonicalRaceName(race) || race
+  const orders = await prisma.order.findMany({
+    where: { OR: [{ raceYear: year }, { yearOverride: year }] },
+    select: { raceName: true, raceNameOverride: true, runnerName: true, runnerNameOverride: true, hadNoTime: true },
+    orderBy: { createdAt: 'desc' },
+    take: 500,
+  })
+  const names = []
+  for (const o of orders) {
+    const orderRace = getCanonicalRaceName(o.raceNameOverride || o.raceName) || o.raceNameOverride || o.raceName
+    if (orderRace !== canonical || o.hadNoTime) continue
+    const name = String(o.runnerNameOverride || o.runnerName || '').trim()
+    // A full name only: a first name alone matches half the field.
+    if (name.split(/\s+/).length < 2 || names.includes(name)) continue
+    names.push(name)
+    if (names.length >= MAX_REAL_NAMES) break
+  }
+  return names
+}
 
 /**
  * Capture a known finisher for a race+year so probes have something to assert.
@@ -201,18 +237,33 @@ const PROBE_NAMES = ['Smith', 'Johnson', 'Garcia', 'Miller', 'Brown']
  * Deliberately stores a REAL runner from a live scrape rather than a
  * hand-written fixture: the capture proves the scraper works right now, and
  * every probe afterwards proves it has not drifted since.
+ *
+ * Every attempt is reported back with what the scraper actually did, because
+ * "no finisher returned" for all five names told the 2026-09-26 run nothing:
+ * an exception, an empty result and a result with no bib all need different
+ * fixes, and only the attempts can tell them apart.
  */
 export async function captureFixture({ race, year, searchName = null, save = true }) {
   await ensureOverridesLoaded()
-  const names = searchName ? [searchName] : PROBE_NAMES
+  let names
+  if (searchName) {
+    names = [searchName]
+  } else {
+    const real = await orderNamesFor(race, year).catch(() => [])
+    names = [...real, ...PROBE_NAMES.slice(0, real.length ? 2 : PROBE_NAMES.length)]
+  }
 
+  const attempts = []
   for (const name of names) {
     let result
     try {
       const scraper = getScraperForRace(race, year)
       result = await scraper.searchRunner(name)
     } catch (err) {
-      return { ok: false, race, year, tried: name, error: err.message }
+      attempts.push({ name, outcome: 'error', error: err.message })
+      // Config and lookup errors repeat for every name; one is enough.
+      if (/no scraper|not configured|no event/i.test(err.message)) break
+      continue
     }
 
     // Either an exact hit or a candidate list is fine — both mean the scraper
@@ -221,11 +272,28 @@ export async function captureFixture({ race, year, searchName = null, save = tru
     // finishers with an empty bib field and a valid time, so requiring a bib
     // made those races permanently uncapturable.
     const usable = c => (c?.bib && String(c.bib).trim()) || (c?.time && String(c.time).trim())
+    const matches = result?.possibleMatches || []
     const candidate = result?.found
       ? { name: result.runnerName || name, bib: result.bibNumber, time: result.officialTime }
-      : (result?.possibleMatches || []).find(usable)
+      : matches.find(usable)
 
-    if (!usable(candidate)) continue
+    // A missing event id fails the same way for every name: stop and say so,
+    // since the fix is a config entry and not a better search.
+    if (result?.researchStatus === 'year_not_configured') {
+      attempts.push({ name, outcome: 'year_not_configured', note: result.researchNotes || null })
+      break
+    }
+
+    if (!usable(candidate)) {
+      attempts.push({
+        name,
+        outcome: result?.found || matches.length ? 'no_bib_or_time' : 'no_results',
+        candidates: matches.length,
+        ...(result?.error ? { error: String(result.error) } : {}),
+        ...(result?.researchNotes ? { note: String(result.researchNotes).slice(0, 300) } : {}),
+      })
+      continue
+    }
 
     const bib = candidate.bib && String(candidate.bib).trim() ? String(candidate.bib).trim() : null
     const fixture = {
@@ -244,10 +312,16 @@ export async function captureFixture({ race, year, searchName = null, save = tru
         update: fixture,
       })
     }
-    return { ok: true, ...fixture }
+    attempts.push({ name, outcome: 'captured' })
+    return { ok: true, ...fixture, attempts }
   }
 
-  return { ok: false, race, year, tried: names.join(', '), error: 'No finisher with a bib or finish time returned' }
+  return {
+    ok: false, race, year,
+    tried: names.join(', '),
+    attempts,
+    error: 'No finisher with a bib or finish time returned',
+  }
 }
 
 /**
@@ -258,7 +332,7 @@ export async function repairPlan(years) {
   const configs = getRaceConfigSummaries(years)
   const { default: prisma } = await import('../../api/_lib/prisma.js')
   const health = await prisma.scraperHealth.findMany({
-    where: { status: { in: ['no_year', 'no_probe', 'drifted'] } },
+    where: { status: { in: ['no_year', 'no_probe', 'drifted', 'broken'] } },
   })
 
   const byRace = {}
@@ -270,10 +344,14 @@ export async function repairPlan(years) {
     entry.years.push({
       year: h.year,
       status: h.status,
-      // no_year on an Athlinks race can be discovered; anywhere else it needs
-      // a pasted id. no_probe is always auto-fixable, since capturing a
-      // fixture only needs the scraper to already work.
-      route: h.status === 'no_probe' ? 'capture-fixture' : (athlinks ? 'discover' : 'manual-id'),
+      // no_year on an Athlinks race can be discovered; anywhere else the id
+      // has to be read off the timing site. no_probe is always auto-fixable,
+      // since capturing a fixture only needs the scraper to already work.
+      // drifted and broken mean the code no longer matches the site, which the
+      // nightly agent now repairs through a preview-tested change.
+      route: h.status === 'no_probe' ? 'capture-fixture'
+        : h.status === 'drifted' || h.status === 'broken' ? 'repair-code'
+        : (athlinks ? 'discover' : 'manual-id'),
     })
   }
   return Object.values(byRace)

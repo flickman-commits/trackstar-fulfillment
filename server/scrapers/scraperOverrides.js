@@ -93,6 +93,23 @@ export function listOverrides() {
   })
 }
 
+/**
+ * Replace the cache with overrides handed over by another deployment.
+ *
+ * A preview deployment probing a candidate fix may not share production's
+ * database, and without the overrides it would test the file config alone,
+ * which is not what production runs. Production sends its list and the preview
+ * uses exactly that, marked fresh so the next ensureOverridesLoaded keeps it.
+ */
+export function seedOverrides(list) {
+  const next = new Map()
+  for (const o of list || []) {
+    next.set(`${o.race}::${o.year}`, { eventIds: o.eventIds, platform: o.platform || null, verifiedAt: o.verifiedAt || null })
+  }
+  cache = next
+  loadedAt = Date.now()
+}
+
 /** Drop the cache so the next read hits the DB. Call after a write. */
 export function invalidateOverrides() {
   loadedAt = 0
