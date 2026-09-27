@@ -7,6 +7,8 @@ const row = fields => ({ race: 'Tokyo Marathon', year: 2025, status: 'live', act
 test('a real finish passes', () => {
   assert.equal(numbersProblem(row({ actualTime: '3:58:33', actualPace: '9:06' })), null)
   assert.equal(numbersProblem(row({ actualTime: '2:02:16', actualPace: '4:40' })), null)
+  // Wheelchair marathon, Tokyo 2024 (Johnboy Smith).
+  assert.equal(numbersProblem(row({ actualTime: '1:34:32', actualPace: '3:36' })), null)
 })
 
 test('a zero time is not a finish', () => {
