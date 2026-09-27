@@ -61,5 +61,23 @@ export default {
   subEventIds: {
     2025: { marathon: 238020, tenMile: 237322 },
     // Add more years as they become available
-  }
+  },
+  /**
+   * MTEC fallback. Race Roster's 2024 event (4ya65y777gbafkyk) holds only the
+   * virtual race, ten results, so the in-person 2024 results are MTEC's. With
+   * no 2024 subEventIds the primary answers year_not_configured at once and
+   * this takes over. Marathon raceId read off MTEC's event search
+   * ("2024 Medtronic Twin Cities Marathon", event 5190).
+   */
+  fallback: {
+    platform: 'mtec',
+    eventSearchOrder: ['marathon'],
+    raceIds: {
+      2024: { marathon: 16695 },
+    },
+    raceSlugs: {
+      2024: { marathon: '2024_Medtronic_Twin_Cities_Marathon-Marathon' },
+    },
+    distances: { marathon: 26.2 },
+  },
 }

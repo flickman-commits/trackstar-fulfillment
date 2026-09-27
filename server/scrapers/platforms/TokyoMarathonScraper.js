@@ -163,9 +163,16 @@ export class TokyoMarathonScraper extends BaseScraper {
       const place = $(tds[0]).text().trim()
       const bib = $(tds[2]).text().trim()
       const fullName = $(tds[3]).text().trim()
-      // The name cell has Japanese + English combined (e.g. "鈴木 朋樹TOMOKI SUZUKI")
-      // We extract the latin (English) portion since runners are submitted in English.
-      const latinName = (fullName.match(/[A-Z][A-Z\s.\-']{2,}/g) || []).join(' ').trim()
+      // The name cell holds two lines split by <br>: the registered form, then
+      // the English one ("鈴木 朋樹<br/>TOMOKI SUZUKI"). For foreign runners
+      // both are Latin ("HART ALANA<br/>ALANA HART"), and joining the text
+      // gave "HART ALANAALANA HART", which matched nobody. Use the last line.
+      const lines = ($(tds[3]).html() || '')
+        .split(/<br\s*\/?>/i)
+        .map(part => cheerio.load(part).text().trim())
+        .filter(Boolean)
+      const englishLine = lines.length > 1 ? lines[lines.length - 1] : fullName
+      const latinName = (englishLine.match(/[A-Z][A-Z\s.\-']{2,}/g) || []).join(' ').trim()
       const finalName = latinName || fullName
 
       if (bib && /^\d+$/.test(bib)) {

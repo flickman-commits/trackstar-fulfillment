@@ -167,10 +167,12 @@ export class SVETimingScraper extends BaseScraper {
       console.log(`[${this.tag}] ${rows.length} rows parsed (site reports ${reported})`)
 
       // Keep only divisions we actually sell prints for — this drops the
-      // handcycle, wheelchair (RIM), 10K, 5K and novelty divisions.
+      // handcycle, wheelchair (RIM), 10K, 5K and novelty divisions. Also drop
+      // entrants listed at 00:00:00: that is SVE's "no finish recorded", and
+      // it went out as a real finish time (Baltimore 2022, bib 50074).
       const eligible = rows
         .map(r => ({ ...r, distanceKey: this._distanceKeyFor(r.division) }))
-        .filter(r => r.distanceKey)
+        .filter(r => r.distanceKey && !/^[0:.\s]*$/.test(r.chipTime || ''))
 
       if (eligible.length === 0) {
         if (truncated) return this._truncatedResult(lastName, reported, rows.length)

@@ -142,6 +142,22 @@ export class RTRTScraper extends BaseScraper {
     return null
   }
 
+  /** Distances (miles) this race sells prints for. */
+  _soldMiles() {
+    const miles = Object.values(this.config.distances || {})
+    if (this.config.distanceMiles) miles.push(this.config.distanceMiles)
+    return miles
+  }
+
+  /** True when every course token parses to a distance, and none is sold. */
+  _ranOnlyUnsoldDistances(course, soldMiles) {
+    const tokens = String(course || '').toLowerCase().split(',').map(t => t.trim()).filter(Boolean)
+    if (!tokens.length) return false
+    const parsed = tokens.map(t => this._parseDistanceToken(t))
+    if (parsed.some(d => !d)) return false
+    return !parsed.some(d => soldMiles.some(m => Math.abs(m - d.miles) < 0.2))
+  }
+
   /**
    * Human label for a profile's `course` field.
    *
@@ -270,6 +286,25 @@ export class RTRTScraper extends BaseScraper {
           // Lets the fulfillment dashboard resolve a pick without re-searching.
           pid: p.pid || null,
         })))
+      }
+
+      // Drop entrants who only ran distances this race does not sell. Without
+      // this a Marine Corps 10K finisher came back as a 1:42 "Marathon".
+      // Only for configs that declare their courses, and only when every
+      // course token is a distance we recognise; anything unfamiliar stays.
+      if (this.config.courseMap) {
+        const sold = this._soldMiles()
+        const kept = matches.filter(p => !this._ranOnlyUnsoldDistances(p.course, sold))
+        if (kept.length === 0) {
+          console.log(`[${this.tag}] Name matched, but only in events this race does not sell`)
+          return this.notFoundResult(null, matches.slice(0, 10).map(p => ({
+            name: p.name || `${p.fname || ''} ${p.lname || ''}`.trim(),
+            bib: p.bib,
+            eventType: this._labelForCourse(p.course),
+            pid: p.pid || null,
+          })))
+        }
+        matches = kept
       }
 
       // For multi-course events (e.g. marathon + half at same race), resolve

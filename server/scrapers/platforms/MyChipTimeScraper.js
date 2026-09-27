@@ -250,6 +250,17 @@ export class MyChipTimeScraper extends BaseScraper {
   }
 
   /**
+   * Bib from a results cell. Since Sept 2026 MyChipTime draws the bib as an
+   * SVG badge, so the cell text reads "Details8400"; the plain number is in
+   * the cell's data-sort attribute. Older layouts have the bare number as text.
+   */
+  _cellBib($, cell) {
+    const sorted = String($(cell).attr('data-sort') || '').trim()
+    if (/^\d+$/.test(sorted)) return sorted
+    return $(cell).text().trim()
+  }
+
+  /**
    * Parse searchResultGen.php HTML (column-index based)
    * Used by Austin Marathon
    */
@@ -269,7 +280,7 @@ export class MyChipTimeScraper extends BaseScraper {
       const cells = $(row).find('td')
       if (cells.length < 14) return
 
-      const bib = $(cells[2]).text().trim()
+      const bib = this._cellBib($, cells[2])
       if (!bib || isNaN(parseInt(bib))) return
 
       results.push({
@@ -329,7 +340,7 @@ export class MyChipTimeScraper extends BaseScraper {
       // Detail layout: 14+ cells starting with Gun Time + Chip Time
       if (n >= 14) {
         const chipTime = $(cells[1]).text().trim()
-        const bib = $(cells[2]).text().trim()
+        const bib = this._cellBib($, cells[2])
         if (!bib || isNaN(parseInt(bib))) return
         if (!chipTime || !/\d{1,2}:\d{2}:\d{2}/.test(chipTime)) return
 
@@ -353,7 +364,7 @@ export class MyChipTimeScraper extends BaseScraper {
       // Compact layout: 5 cells — single "Time" column (chip time)
       if (n === 5) {
         const place = $(cells[0]).text().trim()
-        const bib = $(cells[1]).text().trim()
+        const bib = this._cellBib($, cells[1])
         const firstName = $(cells[2]).text().trim()
         const lastName = $(cells[3]).text().trim()
         const time = $(cells[4]).text().trim()
