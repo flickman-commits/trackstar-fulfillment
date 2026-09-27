@@ -6,6 +6,9 @@
  * Per-year raceIds:
  *   2024: 167341
  *   2025: 167737
+ *   2026: 168193 (listed as "2026 St. George Marathon | Oct. 3, 2026" in the
+ *         race selector on results.laurelt.com/stg/results; added before race
+ *         day, so it is re-checked once results post)
  *
  * Verified finisher: Tanner Smith, bib 407, 2:49:08 (2025 Marathon, pk 8264260).
  */
@@ -44,5 +47,6 @@ export default {
   raceIds: {
     2024: 167341,
     2025: 167737,
+    2026: 168193,
   }
 }
