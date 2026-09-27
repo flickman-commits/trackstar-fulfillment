@@ -13,6 +13,7 @@ import { BaseScraper } from '../BaseScraper.js'
 import * as cheerio from 'cheerio'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
+const TEN_POINT_SEVEN_KM = /10\.7\s*km/i
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 export class TokyoMarathonScraper extends BaseScraper {
@@ -75,8 +76,17 @@ export class TokyoMarathonScraper extends BaseScraper {
       }
 
       const html = await searchResp.text()
-      const candidates = this._parseSearchResults(html)
-      console.log(`[${this.tag}] Found ${candidates.length} candidate runners`)
+      const parsed = this._parseSearchResults(html)
+      // The same results page lists the 10.7km race, and its finishers came
+      // back as "Marathon" with their 10.7km time (2025, bib 5301: 0:38:43).
+      // We sell marathon prints, so a 10.7km runner is not a match.
+      const candidates = parsed.filter(c => !TEN_POINT_SEVEN_KM.test(c.category))
+      console.log(`[${this.tag}] Found ${parsed.length} candidate runners, ${parsed.length - candidates.length} in the 10.7km race`)
+      if (candidates.length === 0 && parsed.length) {
+        return this.notFoundResult(null, parsed.slice(0, 10).map(c => ({
+          name: c.name, bib: c.bib, eventType: c.category || '10.7km Race',
+        })))
+      }
 
       if (candidates.length === 0) return this.notFoundResult()
 
@@ -175,11 +185,20 @@ export class TokyoMarathonScraper extends BaseScraper {
       const latinName = (englishLine.match(/[A-Z][A-Z\s.\-']{2,}/g) || []).join(' ').trim()
       const finalName = latinName || fullName
 
+      // Category cell, same two-line shape: "マラソン女子<br />Marathon Women",
+      // "10.7km視覚障がい者男子<br />10.7km Race(Visually Impaired - Men)".
+      const categoryLines = ($(tds[1]).html() || '')
+        .split(/<br\s*\/?>/i)
+        .map(part => cheerio.load(part).text().trim())
+        .filter(Boolean)
+      const category = categoryLines[categoryLines.length - 1] || ''
+
       if (bib && /^\d+$/.test(bib)) {
         candidates.push({
           name: finalName,
           bib: bib,
-          place: place
+          place: place,
+          category,
         })
       }
     })

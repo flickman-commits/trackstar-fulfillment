@@ -46,6 +46,15 @@ test('Tokyo takes the English line of a two-line name cell', () => {
   assert.deepEqual(quiet(() => s._parseSearchResults(html)).map(c => c.name), ['ALANA HART', 'RYO YAMAMOTO', 'JOHNBOY SMITH'])
 })
 
+test('Tokyo reads each row\'s race category', () => {
+  const s = new TokyoMarathonScraper(2025, { raceName: 'Tokyo Marathon' })
+  const html = `<table>
+    <tr><td>10</td><td>10.7km視覚障がい者男子<br />10.7km Race(Visually Impaired - Men)</td><td>5301</td><td><a>山元 龍生<br/>RYUSEI YAMAMOTO</a></td></tr>
+    <tr><td>21933</td><td>マラソン女子<br />Marathon Women</td><td>32019</td><td><a>HART ALANA<br/>ALANA HART</a></td></tr></table>`
+  assert.deepEqual(quiet(() => s._parseSearchResults(html)).map(c => c.category),
+    ['10.7km Race(Visually Impaired - Men)', 'Marathon Women'])
+})
+
 test('RTRT drops entrants who only ran a distance the race does not sell', () => {
   const mcm = new RTRTScraper(2023, marineCorps)
   const sold = mcm._soldMiles()

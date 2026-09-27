@@ -201,6 +201,10 @@ export function sameTime(a, b) {
 }
 
 const PACE_TOLERANCE_S = 20
+// 2:30/mile. Wheelchair racers are the fastest people over a race distance
+// (marathon record ~1:17, about 2:56/mile), and Tokyo's Johnboy Smith is a
+// real 1:33 wheelchair marathoner, so the floor sits below them.
+const FASTEST_PACE_S = 150
 
 export function toSeconds(t) {
   const parts = String(t || '').split(':').map(Number)
@@ -218,10 +222,16 @@ export function numbersProblem(row) {
   if (!row.actualTime) return null
   const secs = toSeconds(row.actualTime)
   if (secs === 0) return `Right runner but the finish time is ${row.actualTime}.`
-  const pace = toSeconds(row.actualPace)
-  if (!secs || !pace) return null
   const summary = getRaceConfigSummaries([row.year]).find(c => c.raceName === row.race)
   const miles = /half/i.test(row.actualEventType || '') ? 13.1 : summary?.distanceMiles
+  // Faster than FASTEST_PACE_S over a race distance is not a real result; it is
+  // a shorter race's time under this race's label (Tokyo 2025 returned a
+  // 10.7km runner's 0:38:43 as a marathon, with a pace that "fit" it).
+  if (secs && miles >= 3 && secs / miles < FASTEST_PACE_S) {
+    return `${row.actualTime} over ${miles} miles is faster than any human; wrong event?`
+  }
+  const pace = toSeconds(row.actualPace)
+  if (!secs || !pace) return null
   if (miles && Math.abs(secs / miles - pace) > PACE_TOLERANCE_S) {
     return `Pace ${row.actualPace}/mi does not equal ${row.actualTime} over ${miles} miles.`
   }
