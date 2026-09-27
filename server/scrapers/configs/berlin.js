@@ -4,6 +4,12 @@
  *
  * Same Mika Timing platform as Boston and Chicago — the parser handles
  * "Finish Net" (chip time) vs "Finish Gun" automatically and prefers chip.
+ * Berlin's list shows "Gun time" then "Finish"; Finish is the net/chip time.
+ *
+ * Event codes: open https://berlin.r.mikatiming.com/{year}/ and read the
+ * `event=` parameter off any result link (the scraper does this itself when a
+ * year is missing below). Each year here was confirmed by searching that
+ * year's winner and matching the published winning time.
  */
 export default {
   platform: 'mika',
@@ -17,9 +23,12 @@ export default {
   eventCode: null,
   // Optional: pre-known event codes (skips the discovery roundtrip)
   eventCodes: {
+    2021: 'BML',               // Guye Adola 2:05:45
+    2022: 'BML',               // Eliud Kipchoge 2:01:09
     2023: 'BML',
     2024: 'BML_HCH3C0OH266',
     2025: 'BML_HCH3C0OH2F2',
+    2026: 'BML_HCH3C0OH37C',   // race day 2026-09-27; Tigst Assefa 2:11:04 women's winner
   },
   raceDates: {
     2022: '2022-09-25',

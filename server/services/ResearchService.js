@@ -532,6 +532,26 @@ export class ResearchService {
       }
     }
 
+    // Suggestions come straight from each platform's list page, and most
+    // platforms send a name and a time with no pace. A shopper who picks one
+    // then sees a card with a gap where the pace should be. Pace is chip time
+    // over the event distance whoever computes it, so fill it here once for
+    // every platform rather than in nineteen scrapers.
+    // Distance comes from the row, else the race's own default event. Never a
+    // blanket "Marathon": guessing wrong halves or doubles the pace, which is
+    // worse than showing none.
+    const defaultEvent = scraper?.config?.defaultEventType || null
+    if (Array.isArray(results.possibleMatches)) {
+      results.possibleMatches = results.possibleMatches.map(m => {
+        if (!m || m.pace || !m.time) return m
+        const pace = derivePace(m.time, m.eventType || defaultEvent)
+        return pace ? { ...m, pace } : m
+      })
+    }
+    if (results.found && !results.officialPace && results.officialTime) {
+      results.officialPace = derivePace(results.officialTime, results.eventType || defaultEvent)
+    }
+
     return results
   }
 

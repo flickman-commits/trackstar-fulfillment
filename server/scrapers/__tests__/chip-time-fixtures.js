@@ -54,6 +54,36 @@ export const CHIP_TIME_FIXTURES = [
     expectedBib: null,
     notes: 'Berlin 2024 men\'s winner - verifies Mika auto-discovery of dynamic event code',
   },
+  {
+    platform: 'mika',
+    race: 'Berlin Marathon',
+    year: 2026,
+    runner: 'Nick Dill',
+    expectedChipTime: '2:54:26',
+    expectedChipPace: '6:39',
+    expectedBib: '56876',
+    notes: 'UNEVEN SPLITS + gun != chip. Official page: Gun time 02:57:39, Finish 02:54:26. Half 1:25:14, second half 1:29:12; slowed from 4:02/km to 4:23/km by 40K, so a per-segment pace would read ~6:54/mi instead of 6:39.',
+  },
+  {
+    platform: 'mika',
+    race: 'Berlin Marathon',
+    year: 2026,
+    runner: 'Kester Antiquina',
+    expectedChipTime: '2:57:56',
+    expectedChipPace: '6:47',
+    expectedBib: '14586',
+    notes: 'Gun != chip by 5:18. Official page: Gun time 03:03:14, Finish 02:57:56. A gun-time regression fails this fixture.',
+  },
+  {
+    platform: 'mika',
+    race: 'Berlin Marathon',
+    year: 2026,
+    runner: 'Tigst Assefa',
+    expectedChipTime: '2:11:04',
+    expectedChipPace: '5:00',
+    expectedBib: 'F2',
+    notes: 'Women\'s winner, alphanumeric elite bib "F2" (guards the Berlin "Bib Number" label parse). Official page: Gun 02:11:04, Finish 02:11:04.',
+  },
 
   // ── RTRT (Marine Corps Historic Half) ─────────────────────────────────
   {

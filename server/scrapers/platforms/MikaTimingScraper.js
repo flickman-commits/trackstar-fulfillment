@@ -149,20 +149,11 @@ export class MikaTimingScraper extends BaseScraper {
 
       if (matches.length === 0) {
         console.log(`[${this.tag}] No exact match for: ${runnerName}. Surfacing ${Math.min(results.length, 10)} candidates.`)
-        return this.notFoundResult(null, results.slice(0, 10).map(r => ({
-          name: r.name,
-          bib: r.bib,
-          time: r.finishTime,
-          city: r.city,
-          state: r.state,
-          eventType: this.config.defaultEventType || 'Marathon',
-        })))
+        return this.notFoundResult(null, results.slice(0, 10).map(r => this._candidate(r)))
       }
 
       if (matches.length > 1) {
-        return this.ambiguousResult(matches.map(m => ({
-          name: m.name, bib: m.bib, time: m.finishTime
-        })))
+        return this.ambiguousResult(matches.map(m => this._candidate(m)))
       }
 
       // Single match
@@ -243,11 +234,16 @@ export class MikaTimingScraper extends BaseScraper {
         const genderPlace = $row.find('.type-place.place-primary').first().text().trim()
 
         // Extract BIB / Runner Number
+        // The label differs by instance: Boston/Chicago print "BIB" or
+        // "Runner Number", Berlin prints "Bib Number" in mixed case. The
+        // uppercase-only match missed Berlin entirely, so every Berlin year
+        // came back with no bib. Elite bibs can be alphanumeric ("F2").
         let bib = ''
         $row.find('.type-field').each((_, field) => {
           const text = $(field).text().trim()
-          if (text.includes('BIB') || text.includes('Runner Number')) {
-            bib = text.replace(/BIB|Runner\s*Number/gi, '').trim()
+          // No word boundaries: Boston/Chicago glue the label to the value ("BIB2").
+          if (/bib|runner\s*number/i.test(text)) {
+            bib = text.replace(/bib(\s*number)?|runner\s*number/gi, '').trim()
           } else if (/^\d{4,6}$/.test(text)) {
             bib = text
           }
@@ -304,6 +300,25 @@ export class MikaTimingScraper extends BaseScraper {
     })
 
     return runners
+  }
+
+  /**
+   * A suggestion or ambiguous-match row. Built from the same numbers as a
+   * direct match, so a runner picked from the list gets the same chip time,
+   * computed pace and bib as one found outright. Suggestions used to carry
+   * the raw time and no pace, and the shopper's card came back half empty.
+   */
+  _candidate(r) {
+    const d = this._extractRunnerData(r)
+    return {
+      name: r.name,
+      bib: d.bibNumber,
+      time: d.officialTime,
+      pace: d.officialPace,
+      city: r.city,
+      state: r.state,
+      eventType: d.eventType,
+    }
   }
 
   _extractRunnerData(runner) {
