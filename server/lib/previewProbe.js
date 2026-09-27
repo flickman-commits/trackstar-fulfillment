@@ -26,10 +26,13 @@ import { loadProbeFixtures } from './scraperHealth.js'
 import { ensureOverridesLoaded, listOverrides } from '../scrapers/scraperOverrides.js'
 import { getCanonicalRaceName } from '../scrapers/index.js'
 
-const POLL_MS = 10_000
-const PREVIEW_WAIT_MS = 170_000
-const DEPLOY_WAIT_MS = 240_000
-const PROBE_CALL_TIMEOUT_MS = 110_000
+// The agent's MCP client abandons a tool call after 60s, and an abandoned call
+// returns nothing, not even "still building". So each wait stays well inside
+// that and hands back retry: true; the caller simply asks again.
+const POLL_MS = 5_000
+const PREVIEW_WAIT_MS = 15_000
+const DEPLOY_WAIT_MS = 45_000
+const PROBE_CALL_TIMEOUT_MS = 40_000
 const PREVIEW_MAX_TARGETS = 12
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -152,7 +155,9 @@ export async function probePreview({ ref, races, years = null }) {
   const text = await resp.text()
   if (!resp.ok) {
     const hint = resp.status === 401 || resp.status === 403
-      ? (/<html/i.test(text)
+      // Vercel's protection wall answers with an HTML login page or, to a
+      // non-browser client, JSON carrying a "protection" block.
+      ? (/<html/i.test(text) || /"protection"\s*:/.test(text)
         ? ' Vercel Deployment Protection blocked it; production needs VERCEL_AUTOMATION_BYPASS_SECRET.'
         : ' The preview refused the secret; PREVIEW_PROBE_SECRET must be set for Preview as well as Production.')
       : ''

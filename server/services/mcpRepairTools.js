@@ -223,7 +223,8 @@ export const REPAIR_TOOLS = [
     name: 'probe_preview',
     description:
       'Test a pushed branch before it merges: finds the Vercel preview for ref, waits for it ' +
-      'to build, and probes every fixture-backed year of the given races with the branch\'s ' +
+      'briefly to build (call again while it returns retry: true), and probes every ' +
+      'fixture-backed year of the given races with the branch\'s ' +
       'code against the live timing sites. Merge only when allPassing is true. Writes no ' +
       'health rows; production\'s own probe after deploy does that. At most 12 race-years per call.',
     inputSchema: {
@@ -239,8 +240,9 @@ export const REPAIR_TOOLS = [
   {
     name: 'wait_for_deploy',
     description:
-      'After pushing a fix to main, wait until production is serving that commit (up to ~4 ' +
-      'minutes per call). Then run probe_scrapers on the fixed races; if they are not live, ' +
+      'After pushing a fix to main, wait until production is serving that commit (up to 45s ' +
+      'per call; call again while it returns retry: true). Then run probe_scrapers on the ' +
+      'fixed races; if they are not live, ' +
       'revert the commit on main and push.',
     inputSchema: {
       type: 'object',
