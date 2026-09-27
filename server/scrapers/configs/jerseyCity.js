@@ -2,7 +2,9 @@
  * Jersey City Marathon - RTRT platform
  * Tracker: https://track.rtrt.me/e/JCM-JERSEYCITYMARATHON-{YYYY}
  *
- * Jersey City switched from RunSignUp to RTRT starting in 2026.
+ * Jersey City switched from RunSignUp to RTRT starting in 2026. RTRT has no
+ * event for 2023-2025 (it answers "Invalid Event Name"), so those years are
+ * served by the RunSignUp fallback below.
  *
  * Event contains both Marathon and Half Marathon participants mixed.
  * The RTRT profiles API returns ALL runners in one response — we
@@ -65,5 +67,25 @@ export default {
     'The Jersey City Marathon & Half Marathon Marquee Experience at Newport',
   ],
   keywords: ['jersey city'],
-  keywordRequiresMarathon: false
+  keywordRequiresMarathon: false,
+  /**
+   * RunSignUp fallback for the years before RTRT. Race 129526; ids read off
+   * runsignup.com/Race/Results/129526 (event ids) and each event's
+   * /Rest/race/129526/results/get-result-sets (result set ids). Results were
+   * timed by CompuScore and carry a separate chip_time column.
+   */
+  fallback: {
+    platform: 'runsignup',
+    raceId: 129526,
+    resultSets: {
+      2023: { marathon: 375787, half: 375786 },
+      2024: { marathon: 450035, half: 447843 },
+      2025: { marathon: 539246, half: 539245 },
+    },
+    eventIds: {
+      2023: { marathon: 607419, half: 607418 },
+      2024: { marathon: 738059, half: 738058 },
+      2025: { marathon: 875360, half: 875359 },
+    },
+  },
 }
