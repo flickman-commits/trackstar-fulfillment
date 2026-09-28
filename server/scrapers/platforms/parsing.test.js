@@ -6,6 +6,7 @@ import assert from 'node:assert/strict'
 import { MyChipTimeScraper } from './MyChipTimeScraper.js'
 import { TokyoMarathonScraper } from './TokyoMarathonScraper.js'
 import { RTRTScraper } from './RTRTScraper.js'
+import { RaceRosterScraper } from './RaceRosterScraper.js'
 import marineCorps from '../configs/marinecorps.js'
 import historicHalf from '../configs/marinecorpsHistoricHalf.js'
 
@@ -82,6 +83,38 @@ test('RTRT treats an empty roster as not run yet before race day, and as an erro
 
     const past = await new RTRTScraper(2025, marineCorps).searchRunner('Jessica Palatka')
     assert.equal(past.researchStatus, 'upstream_error')
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
+test('Race Roster falls back to the results list when participant search is empty', async () => {
+  const realFetch = globalThis.fetch
+  const urls = []
+  const json = body => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  globalThis.fetch = async url => {
+    urls.push(String(url))
+    if (url.includes('/participant-search')) return json({ data: { exact: [], other: [] } })
+    if (url.includes('/results?')) return json({ data: [
+      { id: 'u6jg9a32ns3mpj6g', name: 'Cody Smith', bib: '1391', chipTime: '3:48:28', gunTime: '3:49:24' },
+      { id: 'xgkthjk62dedzfe5', name: 'Aila Smith', bib: '1567', chipTime: '5:15:02', gunTime: '5:23:39' },
+    ] })
+    if (url.includes('/detail/u6jg9a32ns3mpj6g')) return json({ data: { result: {
+      name: 'Cody Smith', bib: '1391', chipTime: '3:48:28', gunTime: '3:49:24', overallPace: '08:43 ', resultSubEventId: 223814,
+    } } })
+    if (url.endsWith('/v2/api/events/dzbk7fwzszetwf9b')) return json({ data: { event: { resultEventId: 76960 } } })
+    throw new Error(`unexpected ${url}`)
+  }
+  try {
+    const config = {
+      raceName: 'Oakland Marathon', eventCodes: { 2025: 'dzbk7fwzszetwf9b' },
+      subEventIds: { 2025: { marathon: 223814 } }, eventSearchOrder: ['marathon'], eventLabels: { marathon: 'Marathon' },
+    }
+    const result = await new RaceRosterScraper(2025, config).searchRunner('Cody Smith')
+    assert.equal(result.found, true)
+    assert.equal(result.bibNumber, '1391')
+    assert.equal(result.officialTime, '3:48:28') // chip, not gun
+    assert.ok(urls.some(u => u.includes('/result-events/76960/sub-events/223814/results?') && u.includes('filter_search=Smith')))
   } finally {
     globalThis.fetch = realFetch
   }
