@@ -60,7 +60,9 @@ function assertNoRtrtError(data, tag, what) {
   const hint = type === 'not_authorized'
     ? ' (appId/appToken pair is invalid or expired for this event - re-pull them from the tracker)'
     : ''
-  throw new Error(`RTRT ${what} failed for ${tag}: ${type} - ${msg}${hint}`)
+  const error = new Error(`RTRT ${what} failed for ${tag}: ${type} - ${msg}${hint}`)
+  error.rtrtType = type
+  throw error
 }
 
 export class RTRTScraper extends BaseScraper {
@@ -397,6 +399,15 @@ export class RTRTScraper extends BaseScraper {
         rawData: profile
       }
     } catch (error) {
+      // RTRT answers no_roster until the tracker is loaded for an event, which
+      // is every search before race day. That is not an outage: telling a
+      // shopper the site is down and to try again later was wrong, and it
+      // logged every pre-race lookup as a failure. Only before the race; an
+      // empty roster after it is a real problem and stays an error.
+      if (error.rtrtType === 'no_roster' && this._raceNotRunYet()) {
+        console.log(`[${this.tag}] No roster yet; ${this.year} has not been run`)
+        return this.notFoundResult(`${this.raceName} ${this.year} has not been run yet; results are posted after race day`)
+      }
       console.error(`[${this.tag}] Error searching for ${runnerName}:`, error.message)
       // An exception here means the lookup could not be completed — network,
       // auth, or a malformed response. It does NOT mean the runner is absent;
@@ -405,6 +416,14 @@ export class RTRTScraper extends BaseScraper {
       // outcome out of the upstream_error bucket that gets alerted on.
       return this.upstreamErrorResult(error.message)
     }
+  }
+
+  /** True until the end of race day, by the configured date. */
+  _raceNotRunYet(now = new Date()) {
+    const raceDate = this.resolveRaceDate()
+    if (!raceDate) return false
+    const endOfRaceDay = new Date(raceDate.getFullYear(), raceDate.getMonth(), raceDate.getDate() + 1)
+    return now < endOfRaceDay
   }
 
   async _searchProfiles(runnerName) {
