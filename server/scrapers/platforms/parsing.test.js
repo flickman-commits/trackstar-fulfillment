@@ -68,3 +68,21 @@ test('RTRT drops entrants who only ran a distance the race does not sell', () =>
   assert.equal(half._ranOnlyUnsoldDistances('5k', half._soldMiles()), true)
   assert.equal(half._ranOnlyUnsoldDistances('5k,halfmarathon', half._soldMiles()), false)
 })
+
+test('RTRT treats an empty roster as not run yet before race day, and as an error after', async () => {
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response(
+    JSON.stringify({ error: { type: 'no_roster', msg: 'No participants found' } }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } })
+  try {
+    const upcoming = new RTRTScraper(2026, { ...marineCorps, raceDates: { 2026: '2999-10-25' } })
+    const before = await upcoming.searchRunner('Jessica Palatka')
+    assert.equal(before.researchStatus, 'not_found')
+    assert.match(before.researchNotes, /has not been run yet/)
+
+    const past = await new RTRTScraper(2025, marineCorps).searchRunner('Jessica Palatka')
+    assert.equal(past.researchStatus, 'upstream_error')
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
