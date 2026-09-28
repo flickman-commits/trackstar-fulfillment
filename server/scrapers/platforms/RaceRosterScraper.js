@@ -7,8 +7,6 @@
  *   - Search:        GET /v2/api/events/{eventUniqueCode}/participant-search?phrase={name}
  *   - Result detail: GET /v2/api/events/{eventUniqueCode}/detail/{resultId}
  *   - Sub-event:     GET /v2/api/events/{eventUniqueCode}/sub-events/{subEventId}
- *   - Results list:  GET /v2/api/result-events/{resultEventId}/sub-events/{subEventId}/results
- *                        ?start=0&limit=100&filter_search={surname}   (fallback search)
  */
 import { BaseScraper } from '../BaseScraper.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
@@ -111,18 +109,9 @@ export class RaceRosterScraper extends BaseScraper {
 
       const exactMatches = searchData?.data?.exact || []
       const otherMatches = searchData?.data?.other || []
-      let allMatches = [...exactMatches, ...otherMatches]
+      const allMatches = [...exactMatches, ...otherMatches]
 
       console.log(`[${this.tag} ${this.year}] Search returned ${allMatches.length} results (${exactMatches.length} exact, ${otherMatches.length} fuzzy)`)
-
-      // Some events have results but an empty participant-search index: Oakland
-      // 2025 lists 980 marathon finishers and the search finds nobody, not even
-      // "Smith". The per-race results list still filters by name, so search
-      // that by surname. Only when the event search came back empty, so races
-      // whose search works make no extra requests.
-      if (allMatches.length === 0) {
-        allMatches = await this.searchResultsList(runnerName, eventCode, subEventId)
-      }
 
       if (allMatches.length === 0) {
         return this.notFoundResult()
@@ -183,32 +172,6 @@ export class RaceRosterScraper extends BaseScraper {
         researchNotes: `Error: ${error.message}`
       }
     }
-  }
-
-  /**
-   * Fallback search through one sub-event's results list. Rows are shaped like
-   * participant-search hits ({ id, name, bib, resultSubEventId }) so the match
-   * goes through the same detail fetch and extraction as a normal search.
-   */
-  async searchResultsList(runnerName, eventCode, subEventId) {
-    const surname = runnerName.trim().split(/\s+/).pop()
-    if (!surname) return []
-
-    if (!this._resultEventId) {
-      const eventData = await this.fetchApi(`/v2/api/events/${eventCode}`)
-      this._resultEventId = eventData?.data?.event?.resultEventId
-    }
-    if (!this._resultEventId) return []
-
-    const listData = await this.fetchApi(
-      `/v2/api/result-events/${this._resultEventId}/sub-events/${subEventId}/results` +
-      `?start=0&limit=100&filter_search=${encodeURIComponent(surname)}`
-    )
-    const rows = Array.isArray(listData?.data) ? listData.data : []
-    console.log(`[${this.tag} ${this.year}] Results-list search for "${surname}" returned ${rows.length} rows`)
-    return rows
-      .filter(r => r && r.id && r.name)
-      .map(r => ({ id: r.id, name: r.name, bib: r.bib, resultSubEventId: subEventId }))
   }
 
   /**
