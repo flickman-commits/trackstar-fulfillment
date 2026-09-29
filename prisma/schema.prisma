@@ -115,6 +115,10 @@ model Order {
   creatorSample    Creator?  @relation("CreatorSample") // Set iff this is a creator-program sample order
   // Bulk partner orders: one runner per row, grouped under a BulkOrder. The
   // address is the runner's own; every print ships separately.
+  // Who is fulfilling this order. Set on import from the per-type default
+  // (SystemConfig "assignment_defaults"), changeable by anyone on the team.
+  assigneeId       String?
+  assignee         User?      @relation("OrderAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   bulkOrderId      String?
   bulkOrder        BulkOrder? @relation(fields: [bulkOrderId], references: [id], onDelete: Cascade)
   shippingAddress  Json?      // { line1, line2, city, state, zip, country }
@@ -131,6 +135,7 @@ model Order {
   @@index([dueDate])
   @@index([isRushOrder])
   @@index([designStatus])
+  @@index([assigneeId])
 }
 
 model Race {
@@ -693,6 +698,7 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   comments     OrderComment[]
+  assignedOrders Order[]  @relation("OrderAssignee")
   editBatches  ProductEditBatch[]
   auditEvents  AuditEvent[]
 

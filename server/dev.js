@@ -23,6 +23,8 @@ app.use((req, res, next) => {
 const routes = [
   { method: 'get',  path: '/api/orders',                    handler: '../api/orders/index.js' },
   { method: 'post', path: '/api/orders/import',              handler: '../api/orders/import.js' },
+  { method: 'get',  path: '/api/orders/assign',              handler: '../api/orders/assign.js' },
+  { method: 'post', path: '/api/orders/assign',              handler: '../api/orders/assign.js' },
   { method: 'post', path: '/api/orders/research-runner',     handler: '../api/orders/research-runner.js' },
   { method: 'get',  path: '/api/orders/actions',              handler: '../api/orders/actions.js' },
   { method: 'post', path: '/api/orders/actions',              handler: '../api/orders/actions.js' },

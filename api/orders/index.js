@@ -184,7 +184,8 @@ export default async function handler(req, res) {
           },
           orderBy: { createdAt: 'desc' }  // Get most recent first
         },
-        _count: { select: { comments: true, proofs: true } }
+        _count: { select: { comments: true, proofs: true } },
+        assignee: { select: { id: true, firstName: true, lastName: true } },
       }
     })
 
@@ -303,6 +304,8 @@ export default async function handler(req, res) {
           : null,
         // Comment count for notes indicator
         commentCount: order._count?.comments || 0,
+        assigneeId: order.assigneeId || null,
+        assigneeName: order.assignee ? order.assignee.firstName : null,
         // Proof count. For a partner this is also the options-sent count:
         // their portal lists every proof on the order, and there is no
         // separate send step to distinguish (partners have email disabled and

@@ -147,6 +147,8 @@ interface Order {
   creativeDirection?: string
   isGift?: boolean
   commentCount?: number
+  assigneeId?: string | null
+  assigneeName?: string | null
   proofCount?: number
   proofSentAt?: string | null
   delayNoticeSentAt?: string | null
@@ -368,6 +370,8 @@ function mapOrder(order: Record<string, unknown>): Order {
     // warnings that count days since a send. None of them were broken; they
     // were never receiving a number.
     commentCount: order.commentCount as number | undefined,
+    assigneeId: (order.assigneeId as string | null | undefined) ?? null,
+    assigneeName: (order.assigneeName as string | null | undefined) ?? null,
     proofCount: order.proofCount as number | undefined,
     proofSentAt: order.proofSentAt as string | null | undefined,
   }
@@ -872,6 +876,14 @@ const SETTINGS_NAV: {
 
 export default function Dashboard() {
   const { user: currentUser, isAdmin } = useAuth()
+  // Who is on the team, for the assignee picker, and whether the queue shows
+  // only my orders. "mine" is the default for anyone who has orders assigned,
+  // so Eli opens the tool to Eli's queue; someone with none sees everything.
+  const [team, setTeam] = useState<{ id: string; firstName: string; lastName: string }[]>([])
+  const [scope, setScope] = useState<'mine' | 'all' | null>(null)
+  useEffect(() => {
+    apiFetch('/api/orders/assign').then(r => r.ok ? r.json() : null).then(d => { if (d?.users) setTeam(d.users) }).catch(() => {})
+  }, [])
   const [searchParams, setSearchParams] = useSearchParams()
   /** The settings nav as this person sees it. Only admins see the Admin group. */
   const visibleNav = SETTINGS_NAV.filter((g) => !g.adminOnly || isAdmin)
@@ -2234,9 +2246,37 @@ export default function Dashboard() {
   // Designs to be personalized
   // Standard view: pending + flagged + ready + missing_year, sorted newest first
   // Custom view: all items where designStatus !== 'sent_to_production', sorted oldest first (by due date)
+  // Mine only applies to the two queues people actually work: standard and custom.
+  const scoped = activeView === 'standard' || activeView === 'custom'
+  const myId = currentUser?.id || null
+  const hasMine = useMemo(() => Boolean(myId) && orders.some(o => o.assigneeId === myId && o.status !== 'completed'), [orders, myId])
+  // First load decides the default; after that it is the person's choice.
+  useEffect(() => { if (scope === null && orders.length > 0) setScope(hasMine ? 'mine' : 'all') }, [scope, orders.length, hasMine])
+  const effectiveScope: 'mine' | 'all' = scoped && scope === 'mine' ? 'mine' : 'all'
+
+  /** Reassign one order. Optimistic, rolled back if the server refuses. */
+  const assignOrder = useCallback(async (orderId: string, assigneeId: string | null) => {
+    const name = assigneeId ? (team.find(u => u.id === assigneeId)?.firstName ?? null) : null
+    const before = orders.find(o => o.id === orderId)
+    const apply = (id: string | null, n: string | null) => {
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, assigneeId: id, assigneeName: n } : o))
+      setSelectedOrder(prev => prev && prev.id === orderId ? { ...prev, assigneeId: id, assigneeName: n } : prev)
+    }
+    apply(assigneeId, name)
+    try {
+      const res = await apiFetch('/api/orders/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, assigneeId }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not reassign')
+      setToast({ message: name ? `Assigned to ${name}` : 'Unassigned', type: 'success' })
+    } catch (e) {
+      apply(before?.assigneeId ?? null, before?.assigneeName ?? null)
+      setToast({ message: e instanceof Error ? e.message : 'Could not reassign', type: 'error' })
+    }
+  }, [orders, team])
+
   const ordersToFulfill = useMemo(() => {
     // Guard: ensure orders match the active view type to prevent cross-contamination
     const typeFiltered = orders.filter(o => (o.trackstarOrderType || 'standard') === activeView)
+      .filter(o => effectiveScope === 'all' || o.assigneeId === myId)
     if (activeView === 'custom' || activeView === 'race_partner') {
       // Design-driven views: show all non-done items, sorted by most recent first for race_partner
       // (custom uses due date; race_partner has no due date so we fall back to createdAt)
@@ -2268,7 +2308,7 @@ export default function Dashboard() {
       const dateB = new Date(b.orderPlacedAt || b.shopifyCreatedAt || b.createdAt).getTime()
       return dateB - dateA
     })
-  }, [orders, activeView])
+  }, [orders, activeView, effectiveScope, myId])
 
   const completedOrders = useMemo(() => {
     // Guard: ensure orders match the active view type
@@ -2676,6 +2716,12 @@ Thank you!`
               <span className="hidden md:inline px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
                 {activeView === 'bulk' ? (bulkCount ?? '') : ordersToFulfill.length}
               </span>
+              {scoped && (
+                <div className={segmentGroup}>
+                  <button onClick={() => setScope('mine')} className={segment(effectiveScope === 'mine')} title="Orders assigned to you">Mine</button>
+                  <button onClick={() => setScope('all')} className={segment(effectiveScope === 'all')} title="Everyone's orders">Everyone</button>
+                </div>
+              )}
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
             </div>
             {/* View Switcher - Mobile (dropdown) */}
@@ -2809,6 +2855,9 @@ Thank you!`
                               {(order.notes || (order.commentCount ?? 0) > 0) && (
                                 <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                               )}
+                              {effectiveScope === 'all' && order.assigneeName && (
+                                <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
+                              )}
                             </div>
                           </div>
                           {/* Row 2: Runner, then race underneath */}
@@ -2903,6 +2952,9 @@ Thank you!`
                               )}
                               {(order.notes || (order.commentCount ?? 0) > 0) && (
                                 <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
+                              )}
+                              {effectiveScope === 'all' && order.assigneeName && (
+                                <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
                               )}
                             </div>
                           </div>
@@ -3047,6 +3099,9 @@ Thank you!`
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
+                                {effectiveScope === 'all' && order.assigneeName && (
+                                  <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
+                                )}
                               </div>
                             </td>
                             <td className="px-3 py-4">
@@ -3149,6 +3204,9 @@ Thank you!`
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
+                                {effectiveScope === 'all' && order.assigneeName && (
+                                  <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
+                                )}
                               </div>
                             </td>
                             <td className="px-3 py-4">
@@ -3224,6 +3282,9 @@ Thank you!`
                                 )}
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
+                                )}
+                                {effectiveScope === 'all' && order.assigneeName && (
+                                  <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
                                 )}
                               </div>
                             </td>
@@ -4301,6 +4362,19 @@ Thank you!`
                     )}
                     {(selectedOrder.notes || (selectedOrder.commentCount ?? 0) > 0) && (
                       <HoverTip text="Has notes or comments"><MessageSquareText className="w-4 h-4 text-amber-500 cursor-help" /></HoverTip>
+                    )}
+                    {(selectedOrder.trackstarOrderType === 'standard' || selectedOrder.trackstarOrderType === 'custom' || !selectedOrder.trackstarOrderType) && team.length > 0 && (
+                      <label className="inline-flex items-center gap-1.5 ml-1 text-xs text-off-black/50" title="Who is fulfilling this order">
+                        <UserCog className="w-3.5 h-3.5" />
+                        <select
+                          value={selectedOrder.assigneeId || ''}
+                          onChange={e => assignOrder(selectedOrder.id, e.target.value || null)}
+                          className="bg-subtle-gray border border-border-gray rounded-md px-2 py-1 text-xs font-medium text-off-black focus:outline-none focus:ring-2 focus:ring-off-black/10"
+                        >
+                          <option value="">Unassigned</option>
+                          {team.map(u => <option key={u.id} value={u.id}>{u.firstName}{u.id === myId ? ' (me)' : ''}</option>)}
+                        </select>
+                      </label>
                     )}
                   </div>
                   <div className="flex items-center gap-1">

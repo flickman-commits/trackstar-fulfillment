@@ -24,6 +24,7 @@ import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrder
 import { isExpeditedShipping, getShippingMethod } from './lib/shipping.js'
 import { fetchWithTimeout } from './lib/fetchWithTimeout.js'
 import { buildShopifyMatchMap, buildEtsyMatchMap, isRushAddonLineItem } from './lib/lineItemMatching.js'
+import { defaultAssigneeFor } from './domain/orders/assignment.js'
 
 // Artelo API configuration
 // artelo.com, not artelo.io: the old host now redirects across domains and
@@ -903,6 +904,16 @@ export async function processOrders(options = {}) {
               }
 
               if (needsUpdate) {
+                // An order that turns out to be custom on a later pass moves to
+                // the custom queue, unless someone already picked an assignee
+                // by hand (anything other than the old type's default).
+                const newType = updateData.trackstarOrderType
+                if (newType && newType !== existing.trackstarOrderType) {
+                  const oldDefault = await defaultAssigneeFor(existing.trackstarOrderType)
+                  if (!existing.assigneeId || existing.assigneeId === oldDefault) {
+                    updateData.assigneeId = await defaultAssigneeFor(newType)
+                  }
+                }
                 await prisma.order.update({
                   where: { id: existing.id },
                   data: updateData
@@ -1087,6 +1098,8 @@ export async function processOrders(options = {}) {
                   status,
                   // Custom order fields
                   trackstarOrderType,
+                  // Straight into the right person's queue.
+                  assigneeId: await defaultAssigneeFor(trackstarOrderType),
                   designStatus: trackstarOrderType === 'custom' ? 'not_started' : 'not_started',
                   dueDate,
                   isRushOrder,

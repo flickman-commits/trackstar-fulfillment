@@ -27,6 +27,7 @@
 
 import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
+import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
 import { setCors, requireAdmin, isCronRequest } from '../_lib/auth.js'
 import { requireAdminRole, recordAudit } from '../_lib/users.js'
@@ -2328,6 +2329,7 @@ async function createCreatorSampleOrder(creator) {
       lineItemIndex: 0,
       source: 'creator_sample',
       trackstarOrderType: 'standard',
+      assigneeId: await defaultAssigneeFor('standard'),
       status: 'pending',
 
       // Race + product (all required NOT NULL — populated from onboarding)
