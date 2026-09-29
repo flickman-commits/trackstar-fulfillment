@@ -16,12 +16,17 @@ export default {
     2023: 2513,
     2024: 2564,
     2025: 2617,
+    // 2026: feeds.xacte.com/metaeventconfig?kw=atm lists event 2652, dated
+    // 2026-10-11 (stream ATM26); eventconfig?id=2652 has one sub-event, 6643
+    // "Army 10 Miler", finish at 52800 ft. Added pre-race; verify after it runs.
+    2026: 2652,
   },
 
   subEvents: {
     2023: { tenMiler: { id: 6255, distance: 16093 } },
     2024: { tenMiler: { id: 6401, distance: 16093 } },
     2025: { tenMiler: { id: 6554, distance: 16093 } },
+    2026: { tenMiler: { id: 6643, distance: 16093 } },
   },
 
   raceDates: {
