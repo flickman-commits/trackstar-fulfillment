@@ -10,12 +10,12 @@
  * the Attio deal; see TEMPLATE_PLACEHOLDERS in angles.js.
  */
 import prisma from '../../db.js'
-import { RACE_TEMPLATES, CHARITY_TEMPLATES, RACE_CADENCE, CHARITY_CADENCE } from './angles.js'
+import { RACE_TEMPLATES, CHARITY_TEMPLATES, PR_TEMPLATES, RACE_CADENCE, CHARITY_CADENCE, PR_CADENCE } from './angles.js'
 import { NO_DASHES } from './guardrails.js'
 
 export const TEMPLATES_KEY = 'sales_templates'
 
-export const DEFAULT_TEMPLATES = { RACE: RACE_TEMPLATES, CHARITY: CHARITY_TEMPLATES }
+export const DEFAULT_TEMPLATES = { RACE: RACE_TEMPLATES, CHARITY: CHARITY_TEMPLATES, PR: PR_TEMPLATES }
 
 let cache = { at: 0, value: null }
 
@@ -29,7 +29,7 @@ export async function getTemplates({ force = false } = {}) {
   if (!force && cache.value && Date.now() - cache.at < 30_000) return cache.value
   const over = await overrides()
   const value = {}
-  for (const pipeline of ['RACE', 'CHARITY']) {
+  for (const pipeline of ['RACE', 'CHARITY', 'PR']) {
     value[pipeline] = {}
     for (const [angle, t] of Object.entries(DEFAULT_TEMPLATES[pipeline])) {
       const o = over[pipeline]?.[angle] || {}
@@ -45,6 +45,7 @@ export function templateSteps() {
   return {
     RACE: RACE_CADENCE.map(s => ({ touch: s.touch, angle: s.angle, purpose: s.purpose })),
     CHARITY: CHARITY_CADENCE.map(s => ({ touch: s.touch, angle: s.angle, purpose: s.purpose })),
+    PR: PR_CADENCE.map(s => ({ touch: s.touch, angle: s.angle, purpose: s.purpose })),
   }
 }
 
@@ -54,7 +55,7 @@ export function templateSteps() {
  * same as in a draft, since a template with one would poison every email.
  */
 export async function setTemplate({ pipeline, angle, subject, body }) {
-  if (!DEFAULT_TEMPLATES[pipeline]) throw new Error('pipeline must be RACE or CHARITY')
+  if (!DEFAULT_TEMPLATES[pipeline]) throw new Error('pipeline must be RACE, CHARITY or PR')
   const def = DEFAULT_TEMPLATES[pipeline][angle]
   if (!def) throw new Error(`No template for ${pipeline} / ${angle}`)
   for (const [k, v] of [['subject', subject], ['body', body]]) {

@@ -32,6 +32,7 @@ const byPriority = (a, b) => (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b
 
 /** Race or Charity, as the cadence file spells it. Corporate follows the race cadence for now. */
 export function pipelineOf(deal) {
+  if (deal.motion === 'PR') return 'PR'
   return deal.motion === 'Charity' ? 'CHARITY' : 'RACE'
 }
 
@@ -121,7 +122,7 @@ function overdueDays(deal, dayStart) {
 
 function reasonFor(deal, lastSend) {
   const { touchNumber, exhausted } = nextStepFor(deal)
-  if (exhausted) return 'Sequence complete · decide next year vs. lost'
+  if (exhausted) return pipelineOf(deal) === 'PR' ? 'Pitched and followed up · no reply yet' : 'Sequence complete · decide next year vs. lost'
   const last = lastContactAt(deal, lastSend)
   return `Touch ${touchNumber}${last ? ` · Last emailed ${sinceLabel(last)}` : ''}`
 }
@@ -189,7 +190,8 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
   const skipByDeal = Object.fromEntries(skips.map(s => [s.attioDealId, s]))
   const sentTodayIds = new Set(today.map(s => s.attioDealId).filter(Boolean))
 
-  const inScope = deals.filter(d => owner.matches(d) && (!motion || d.motion === motion))
+  // PR is its own queue: it shows only when the PR filter is on, never mixed into sales.
+  const inScope = deals.filter(d => owner.matches(d) && (motion ? d.motion === motion : d.motion !== 'PR'))
   const ctx = d => ({ lastSend: lastByDeal[d.id], skip: skipByDeal[d.id], dayStart })
 
   // What went out today, in order, whoever's it is.

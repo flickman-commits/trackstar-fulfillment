@@ -497,6 +497,7 @@ export default function Sales() {
                     <option value="Race" className="bg-white text-off-black">Race</option>
                     <option value="Charity" className="bg-white text-off-black">Charity</option>
                     <option value="Corporate" className="bg-white text-off-black">Corporate</option>
+                    <option value="PR" className="bg-white text-off-black">PR</option>
                   </select>
                   <ChevronDown className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${motion ? 'text-white' : 'text-off-black/40'}`} />
                 </div>

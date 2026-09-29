@@ -179,7 +179,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                         <div><label className={fieldLabel}>Name</label><input value={libDraft.name || ''} onChange={e => setLibDraft({ ...libDraft, name: e.target.value })} placeholder="First Touch (Loom)" className={`${inputBase} w-full`} /></div>
                         <div><label className={fieldLabel}>For</label>
                           <select value={libDraft.motion || 'Any'} onChange={e => setLibDraft({ ...libDraft, motion: e.target.value as TemplateMotion })} className={`${inputBase} w-full`}>
-                            <option value="Charity">Charity</option><option value="Race">Race</option><option value="Any">Any deal</option>
+                            <option value="Charity">Charity</option><option value="Race">Race</option><option value="PR">PR</option><option value="Any">Any deal</option>
                           </select>
                         </div>
                       </div>
@@ -208,7 +208,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 <p className="text-xs text-off-black/55">What each touch's draft starts from, before anyone picks a template. Changes reach the next draft.</p>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className={segmentGroup}>
-                    {(['CHARITY', 'RACE'] as Pipeline[]).map(p => <button key={p} onClick={() => { setTPipeline(p); setTAngle(steps[p][0].angle) }} className={segment(tPipeline === p)}>{p === 'CHARITY' ? 'Charity' : 'Race'}</button>)}
+                    {(['CHARITY', 'RACE', 'PR'] as Pipeline[]).map(p => <button key={p} onClick={() => { setTPipeline(p); setTAngle(steps[p][0].angle) }} className={segment(tPipeline === p)}>{p === 'CHARITY' ? 'Charity' : p === 'PR' ? 'PR' : 'Race'}</button>)}
                   </div>
                   <select value={tAngle} onChange={e => setTAngle(e.target.value)} className={`${inputBase} text-xs`}>
                     {steps[tPipeline].map(st => <option key={st.angle} value={st.angle}>Touch {st.touch} · {st.angle}{templates[tPipeline][st.angle]?.edited ? ' · edited' : ''}</option>)}

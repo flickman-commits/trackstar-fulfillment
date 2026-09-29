@@ -26,6 +26,7 @@ const MOTION_TONE: Record<string, string> = {
   Race: chipTone.race,
   Charity: chipTone.charity,
   Corporate: chipTone.corporate,
+  PR: chipTone.pr,
 }
 
 export function MotionTag({ motion }: { motion?: string | null }) {

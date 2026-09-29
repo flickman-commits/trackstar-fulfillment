@@ -38,7 +38,7 @@ export const WORKSPACE_SLUG = 'trackstar-usa'
 
 /** Stage titles the tool relies on. The full ordered list is read live; see stageTitles(). */
 export const STAGES = ['Needs Enrichment', 'Not Contacted', 'Reached Out', 'In Conversation', 'Call Booked', 'Deck Sent', 'Awaiting Payment', 'Won', 'Revisit Next Year', 'Lost']
-export const MOTIONS = ['Race', 'Charity', 'Corporate']
+export const MOTIONS = ['Race', 'Charity', 'Corporate', 'PR']
 
 /** Deal attributes the tool reads or writes. The settings check reports any that are missing. */
 export const DEAL_ATTRIBUTES = {

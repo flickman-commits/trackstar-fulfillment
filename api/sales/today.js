@@ -39,7 +39,7 @@ export default async function handler(req, res) {
         if (!req.query?.id) return res.status(400).json({ error: 'id is required' })
         return res.status(200).json({ deal: await dealForWork(String(req.query.id), { fresh: req.query?.refresh === '1' }) })
       }
-      const motion = ['Race', 'Charity', 'Corporate'].includes(String(req.query?.motion)) ? String(req.query.motion) : null
+      const motion = ['Race', 'Charity', 'Corporate', 'PR'].includes(String(req.query?.motion)) ? String(req.query.motion) : null
       return res.status(200).json(await morningQueue(actor, { scopeMode, motion, fresh: req.query?.refresh === '1' }))
     }
     if (req.method === 'POST') {

@@ -125,7 +125,28 @@ export const CHARITY_CADENCE = [
   },
 ]
 
+/**
+ * PR: a pitch and one follow-up, then stop. Editors and page owners get a lot
+ * of these; a second nudge is polite, a third is noise. The story itself
+ * comes from a saved template (Templates menu), not from here.
+ */
+export const PR_CADENCE = [
+  {
+    touch: 1, days: 0, angle: 'pitch',
+    purpose: 'The pitch. One story, told for this outlet and its audience. Why it matters to their readers now. One easy ask, like sending a complimentary poster.',
+    subject: 'A clear, specific subject about the story, not about Trackstar',
+    nextActionDays: 4,
+  },
+  {
+    touch: 2, days: 4, angle: 'follow-up',
+    purpose: 'Two or three lines on the same thread. A short nudge in case it got buried, restate the easy ask. No new pitch.',
+    subject: 'Re: the original subject (reply in thread)',
+    nextActionDays: 14,
+  },
+]
+
 export function cadenceFor(pipeline) {
+  if (pipeline === 'PR') return PR_CADENCE
   return pipeline === 'CHARITY' ? CHARITY_CADENCE : RACE_CADENCE
 }
 
@@ -244,6 +265,22 @@ export const CHARITY_TEMPLATES = {
 }
 
 /**
+ * PR sequence copy. The pitch is a blank on purpose: every PR email starts
+ * from a story, picked from the Templates menu. The guardrails refuse to send
+ * the blank.
+ */
+export const PR_TEMPLATES = {
+  'pitch': {
+    subject: '[Subject]',
+    body: `Hey [First Name],\n\n[Pick a story from the Templates menu, or write the pitch here.]`,
+  },
+  'follow-up': {
+    subject: 'Re: [Org Name]',
+    body: `Hey [First Name],\n\nFollowing up on my note below in case it got buried. I would love to send you a complimentary poster so you can see it for yourself.\n\nJust let me know!`,
+  },
+}
+
+/**
  * A ready-to-edit draft for one step, with no model involved.
  * Returns { subject, body } always, so the composer is never empty.
  */
@@ -251,7 +288,7 @@ export const CHARITY_TEMPLATES = {
 export const TEMPLATE_PLACEHOLDERS = [
   ['[First Name]', 'the person\'s first name from Attio, or "there"'],
   ['[Race Name]', 'the deal name (races)'],
-  ['[Org Name]', 'the deal name (charities)'],
+  ['[Org Name]', 'the deal name (charities, and the outlet for PR)'],
   ['[Team Name]', 'the same as [Org Name]'],
   ['[Landmark]', 'the course landmark if the deal has one, else "Your finish line"'],
   ['[Season Year]', 'the year of the next edition, from the race date'],
@@ -264,7 +301,7 @@ export const TEMPLATE_PLACEHOLDERS = [
  * without it the code defaults apply.
  */
 export function templateFor({ pipeline, angle, company, contact, socialProof, oneLiner, templates }) {
-  const table = (templates && templates[pipeline]) || (pipeline === 'CHARITY' ? CHARITY_TEMPLATES : RACE_TEMPLATES)
+  const table = (templates && templates[pipeline]) || (pipeline === 'PR' ? PR_TEMPLATES : pipeline === 'CHARITY' ? CHARITY_TEMPLATES : RACE_TEMPLATES)
   const t = table[angle] || table['first-touch']
   const ctx = { company, contact, socialProof, oneLiner }
   return { subject: fill(t.subject, ctx), body: fill(t.body, ctx) }

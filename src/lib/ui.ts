@@ -75,6 +75,7 @@ export const chipTone = {
   race: 'bg-orange-100 text-orange-800 border-orange-300',
   charity: 'bg-pink-100 text-pink-800 border-pink-300',
   corporate: 'bg-sky-100 text-sky-800 border-sky-300',
+  pr: 'bg-violet-100 text-violet-800 border-violet-300',
   slate: 'bg-slate-100 text-slate-700 border-slate-300',
   amber: 'bg-amber-100 text-amber-800 border-amber-300',
   rose: 'bg-rose-100 text-rose-800 border-rose-300',

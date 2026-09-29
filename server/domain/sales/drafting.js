@@ -100,11 +100,15 @@ The charity program sells these to marathon charity teams, the nonprofits that h
 
 Two tiers exist, but a cold email never names either the numbers or the terms. Money never flows back to the charity: there is no revenue share, no commission and no donation-back, deliberately.`
 
+const PR_CONTEXT = `Trackstar makes personalized marathon posters: the runner's name, finish time, pace, race-day weather and the course map, turned into a piece of art. Matt started it after running his first marathons and wanting posters that looked good on a shared wall.
+
+This is press outreach: editors, writers, producers, podcast hosts and the people behind running Instagram pages. They get many pitches and have little time, so the email brings them a ready story. Tie it to something they are already covering (a race weekend, a gift guide, a trend), make it curious or human, and make the ask easy, such as sending them a complimentary poster. Never pad it; never oversell.`
+
 function buildSystem(pipeline, sender) {
   const charity = pipeline === 'CHARITY'
   return `You write cold and follow-up emails for ${sender.name}, ${sender.role}.
 
-${charity ? CHARITY_CONTEXT : RACE_CONTEXT}
+${pipeline === 'PR' ? PR_CONTEXT : charity ? CHARITY_CONTEXT : RACE_CONTEXT}
 
 House style, which overrides anything else:
 ${HOUSE_STYLE.replace(/Write as Matt, founder of Trackstar/, `Write as ${sender.name}, ${sender.role}`)}
@@ -326,7 +330,7 @@ export async function sendDraft({ dealId, personId, subject, body, assetIds = []
   const cadence = cadenceFor(pipeline)
   const nextActionDate = adhoc ? null : new Date(now.getTime() + step.nextActionDays * 86400000)
   const nextAction = adhoc ? null : touchNumber >= cadence.length
-    ? 'Sequence complete: decide next year vs. lost'
+    ? (pipeline === 'PR' ? 'No reply after the follow-up: move to Revisit Next Year or pitch a new story' : 'Sequence complete: decide next year vs. lost')
     : `Send touch ${touchNumber + 1}: ${cadence[touchNumber].angle}`
 
   const sync = await recordSend(deal, {

@@ -17,7 +17,7 @@ import { NO_DASHES } from './guardrails.js'
 
 export const LIBRARY_KEY = 'sales_template_library'
 const LOOM = 'https://www.loom.com/share/560a96f9b3ac409096445e264345bac3'
-export const MOTIONS = ['Charity', 'Race', 'Any']
+export const MOTIONS = ['Charity', 'Race', 'PR', 'Any']
 
 /** The Notion page's templates as of 2026-09-24, raw. Seeds the library once. */
 const NOTION_SEED = [

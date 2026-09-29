@@ -3,8 +3,8 @@
  * its records as the server reads them, plus what the send log adds.
  */
 
-export type Pipeline = 'RACE' | 'CHARITY'
-export type Motion = 'Race' | 'Charity' | 'Corporate'
+export type Pipeline = 'RACE' | 'CHARITY' | 'PR'
+export type Motion = 'Race' | 'Charity' | 'Corporate' | 'PR'
 
 /** Attio deal stages, in pipeline order. */
 /** Fallback only; the live list comes from Attio via SalesStatus.attio.stages. */

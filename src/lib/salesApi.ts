@@ -36,7 +36,7 @@ export interface OutreachTemplate { id: string; group: string; title: string; us
 /** The values a template's placeholders need that the page does not already have. */
 export interface TemplateFill { senderName: string; socialProof: string; needsOpener: string }
 /** A library template as stored, for Settings. */
-export type TemplateMotion = 'Charity' | 'Race' | 'Any'
+export type TemplateMotion = 'Charity' | 'Race' | 'PR' | 'Any'
 export interface LibraryTemplate { id: string; name: string; motion: TemplateMotion; useFor: string | null; subject: string | null; body: string; updatedAt?: string; updatedBy?: string | null }
 
 /** After a send: whether Attio now agrees. */
