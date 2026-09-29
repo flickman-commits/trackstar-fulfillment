@@ -8,6 +8,7 @@ import BulkView from '@/components/bulk/BulkView'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import AssignmentPanel from '@/components/AssignmentPanel'
+import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
@@ -2858,7 +2859,7 @@ Thank you!`
                                 <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                               )}
                               {effectiveScope === 'all' && order.assigneeName && (
-                                <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
+                                <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
                               )}
                             </div>
                           </div>
@@ -2956,7 +2957,7 @@ Thank you!`
                                 <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                               )}
                               {effectiveScope === 'all' && order.assigneeName && (
-                                <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
+                                <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
                               )}
                             </div>
                           </div>
@@ -3102,7 +3103,7 @@ Thank you!`
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
                                 {effectiveScope === 'all' && order.assigneeName && (
-                                  <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
+                                  <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
                                 )}
                               </div>
                             </td>
@@ -3207,7 +3208,7 @@ Thank you!`
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
                                 {effectiveScope === 'all' && order.assigneeName && (
-                                  <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
+                                  <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
                                 )}
                               </div>
                             </td>
@@ -3286,7 +3287,7 @@ Thank you!`
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
                                 {effectiveScope === 'all' && order.assigneeName && (
-                                  <span className="px-1.5 py-0.5 rounded bg-off-black/5 text-off-black/55 text-[10px] font-medium whitespace-nowrap" title="Assigned to">{order.assigneeName}</span>
+                                  <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
                                 )}
                               </div>
                             </td>
@@ -4367,17 +4368,9 @@ Thank you!`
                       <HoverTip text="Has notes or comments"><MessageSquareText className="w-4 h-4 text-amber-500 cursor-help" /></HoverTip>
                     )}
                     {(selectedOrder.trackstarOrderType === 'standard' || selectedOrder.trackstarOrderType === 'custom' || !selectedOrder.trackstarOrderType) && team.length > 0 && (
-                      <label className="inline-flex items-center gap-1.5 ml-1 text-xs text-off-black/50" title="Who is fulfilling this order">
-                        <UserCog className="w-3.5 h-3.5" />
-                        <select
-                          value={selectedOrder.assigneeId || ''}
-                          onChange={e => assignOrder(selectedOrder.id, e.target.value || null)}
-                          className="bg-subtle-gray border border-border-gray rounded-md px-2 py-1 text-xs font-medium text-off-black focus:outline-none focus:ring-2 focus:ring-off-black/10"
-                        >
-                          <option value="">Unassigned</option>
-                          {team.map(u => <option key={u.id} value={u.id}>{u.firstName}{u.id === myId ? ' (me)' : ''}</option>)}
-                        </select>
-                      </label>
+                      <span className="ml-1">
+                        <AssigneePicker team={team} value={selectedOrder.assigneeId || null} meId={myId} onChange={id => assignOrder(selectedOrder.id, id)} />
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-1">

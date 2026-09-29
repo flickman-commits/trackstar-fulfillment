@@ -302,8 +302,12 @@ export default async function handler(req, res) {
         // single unnamed group that is the first answer, as before; with four
         // proofs across two products the partner can approve one and come back
         // for the other without the order claiming to be finished.
+        // Only the round being answered counts. An earlier round's revision
+        // request was already acted on (that is why this round exists), and
+        // counting it left every order approved in round two or later stuck at
+        // "In Revision" until someone moved it by hand.
         const remaining = await prisma.proof.findMany({
-          where: { orderId: approvalToken.orderId },
+          where: { orderId: approvalToken.orderId, batch: proof.batch },
           select: { status: true, groupLabel: true },
         })
         const groups = new Map()
