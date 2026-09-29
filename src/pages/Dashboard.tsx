@@ -7,6 +7,7 @@ import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import BulkView from '@/components/bulk/BulkView'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
+import AssignmentPanel from '@/components/AssignmentPanel'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
@@ -822,7 +823,7 @@ const REVIEW_PRODUCTS: { name: string; link: string }[] = [
   { name: 'Twin Cities Marathon', link: 'https://yotpo.com/go/A3v2ZhPB' },
 ]
 
-type SettingsPanel = 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'activity' | 'diagnostics' | 'maintenance'
+type SettingsPanel = 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'assignments' | 'activity' | 'diagnostics' | 'maintenance'
 
 /**
  * Settings navigation. Grouped rather than a flat list because the panels do
@@ -867,6 +868,7 @@ const SETTINGS_NAV: {
     adminOnly: true,
     items: [
       { id: 'people', label: 'People', blurb: 'Who can sign in and what they are allowed to do', icon: Users },
+      { id: 'assignments', label: 'Order Assignment', blurb: 'Who new standard and custom orders go to', icon: UserCog },
       { id: 'activity', label: 'Activity Log', blurb: 'Who did what, and when', icon: ScrollText },
       { id: 'diagnostics', label: 'Diagnostics', blurb: 'Test connections and run a full health check', icon: FlaskConical },
       { id: 'maintenance', label: 'Maintenance', blurb: 'Cache and research resets - destructive', icon: Settings },
@@ -3603,6 +3605,7 @@ Thank you!`
                   {settingsPanel === 'stats' && <StatsPanel />}
                   {settingsPanel === 'account' && <AccountPanel />}
                   {settingsPanel === 'people' && isAdmin && <PeoplePanel />}
+                  {settingsPanel === 'assignments' && isAdmin && <AssignmentPanel />}
                   {settingsPanel === 'activity' && isAdmin && <ActivityPanel />}
 
                   {settingsPanel === 'reviews' && (
