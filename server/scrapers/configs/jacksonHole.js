@@ -58,17 +58,23 @@ export default {
   /**
    * RunSignUp fallback. Athlinks mirrors this race late: four days after the
    * 2026 race its event (1143372) still had no results, while RunSignUp (race
-   * 83881, timed by Vector Timing) had them. Ids read off
-   * runsignup.com/Race/Results/83881 (result sets) and /Rest/race/83881
-   * (event ids). Results carry a separate chip_time column.
+   * 83881, timed by Vector Timing) had them. The same night Athlinks search
+   * timed out for 2024 and 2025, so those years fall back here too. Ids read
+   * off runsignup.com/Race/Results/83881 (result sets) and /Rest/race/83881
+   * (event ids, 2024 via previous_year_event_id). Results carry a separate
+   * chip_time column.
    */
   fallback: {
     platform: 'runsignup',
     raceId: 83881,
     resultSets: {
+      2024: { marathon: 494587, half: 494588 },
+      2025: { marathon: 591547, half: 591548 },
       2026: { marathon: 717499, half: 717500 },
     },
     eventIds: {
+      2024: { marathon: 779166, half: 779167 },
+      2025: { marathon: 935344, half: 935345 },
       2026: { marathon: 1059730, half: 1059731 },
     },
   },
