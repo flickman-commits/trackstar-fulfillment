@@ -2530,6 +2530,24 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', handler)
   }, [selectedOrder, isEditing, navigateOrder])
 
+  // 1-4 switch views, in the order the toggle shows them. Only when no
+  // order is open and nobody is typing.
+  useEffect(() => {
+    const views = ['standard', 'custom', 'race_partner', 'bulk'] as const
+    const handler = (e: KeyboardEvent) => {
+      if (selectedOrder || e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
+      const i = ['1', '2', '3', '4'].indexOf(e.key)
+      if (i < 0) return
+      e.preventDefault()
+      setActiveView(views[i])
+      setSearchQuery('')
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [selectedOrder])
+
   // Helper to check if an order has multiple items
   const getOrderItemCount = useCallback((parentOrderNumber: string) => {
     return orders.filter(o => o.parentOrderNumber === parentOrderNumber).length
@@ -2761,13 +2779,15 @@ Thank you!`
                 ['custom', 'Custom'],
                 ['race_partner', 'Partners'],
                 ['bulk', 'Bulk'],
-              ] as const).map(([key, label]) => (
+              ] as const).map(([key, label], i) => (
                 <button
                   key={key}
                   onClick={() => { setActiveView(key); setSearchQuery('') }}
-                  className={segment(activeView === key, 'md')}
+                  className={`${segment(activeView === key, 'md')} inline-flex items-center gap-2`}
+                  title={`${label} (${i + 1})`}
                 >
                   {label}
+                  <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded border border-current/25 text-[10px] font-medium leading-none opacity-60 font-sans">{i + 1}</kbd>
                 </button>
               ))}
             </div>
