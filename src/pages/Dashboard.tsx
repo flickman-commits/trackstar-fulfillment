@@ -2258,6 +2258,13 @@ export default function Dashboard() {
   const effectiveScope: 'mine' | 'all' = scoped && scope === 'mine' ? 'mine' : 'all'
 
   /** Reassign one order. Optimistic, rolled back if the server refuses. */
+  // The Assignee column in the desktop tables: avatar and first name.
+  const assigneeCell = (order: Order) => {
+    const u = team.find(t => t.id === order.assigneeId)
+    if (!u) return <span className="text-sm text-off-black/40">Unassigned</span>
+    return <span className="inline-flex items-center gap-1.5 text-sm text-off-black whitespace-nowrap"><Avatar user={u} size={20} />{u.firstName}</span>
+  }
+
   const assignOrder = useCallback(async (orderId: string, assigneeId: string | null) => {
     const name = assigneeId ? (team.find(u => u.id === assigneeId)?.firstName ?? null) : null
     const before = orders.find(o => o.id === orderId)
@@ -2652,7 +2659,7 @@ Thank you!`
 
   return (
     <div className="h-[calc(100dvh-92px)] md:h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
-      <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 w-full flex flex-col h-full">
+      <div className="max-w-[1800px] mx-auto px-4 md:px-6 lg:px-8 w-full flex flex-col h-full">
         {/* Header - Compact bar on mobile, full greeting on desktop */}
         <div className="pt-4 md:pt-8 lg:pt-10 pb-3 md:pb-6 flex items-center md:items-end justify-between gap-3 md:gap-6 flex-shrink-0">
           {/* Left side: logo, greeting, and summary */}
@@ -3068,6 +3075,7 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Order #</th>
                         <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20">Status</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Details</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Assignee</th>
                         <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Tags</th>
                       </tr>
                     </thead>
@@ -3102,9 +3110,6 @@ Thank you!`
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
-                                {effectiveScope === 'all' && order.assigneeName && (
-                                  <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
-                                )}
                               </div>
                             </td>
                             <td className="px-3 py-4">
@@ -3120,6 +3125,7 @@ Thank you!`
                                 </div>
                               )}
                             </td>
+                            <td className="px-3 py-4">{assigneeCell(order)}</td>
                             <td className="px-3 pr-6 py-4 hidden md:table-cell align-middle">
                               <OrderTags order={order} />
                             </td>
@@ -3130,7 +3136,7 @@ Thank you!`
                       {searchQuery && filteredCompletedOrders.length > 0 && (
                         <>
                           <tr className="bg-subtle-gray/50">
-                            <td colSpan={5} className="px-6 py-3">
+                            <td colSpan={6} className="px-6 py-3">
                               <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
                             </td>
                           </tr>
@@ -3164,6 +3170,7 @@ Thank you!`
                                     {order.effectiveRaceName || order.raceName} {order.effectiveRaceYear || order.raceYear}
                                   </div>
                                 </td>
+                                <td className="px-3 py-4">{assigneeCell(order)}</td>
                                 <td className="px-3 pr-6 py-4 hidden md:table-cell align-middle">
                                   <OrderTags order={order} />
                                 </td>
@@ -3207,9 +3214,6 @@ Thank you!`
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
-                                {effectiveScope === 'all' && order.assigneeName && (
-                                  <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
-                                )}
                               </div>
                             </td>
                             <td className="px-3 py-4">
@@ -3247,6 +3251,7 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-32">Design Status</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Order #</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Due Date</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Assignee</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Runner</th>
                         <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden lg:table-cell">Race</th>
                       </tr>
@@ -3286,9 +3291,6 @@ Thank you!`
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
-                                {effectiveScope === 'all' && order.assigneeName && (
-                                  <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
-                                )}
                               </div>
                             </td>
                             <td className="px-3 py-4">
@@ -3310,6 +3312,7 @@ Thank you!`
                                 </span>
                               </div>
                             </td>
+                            <td className="px-3 py-4">{assigneeCell(order)}</td>
                             <td className="px-3 py-4 hidden md:table-cell">
                               <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
                             </td>
@@ -3323,7 +3326,7 @@ Thank you!`
                       {searchQuery && filteredCompletedOrders.length > 0 && (
                         <>
                           <tr className="bg-subtle-gray/50">
-                            <td colSpan={6} className="px-6 py-3">
+                            <td colSpan={7} className="px-6 py-3">
                               <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
                             </td>
                           </tr>
@@ -3363,6 +3366,7 @@ Thank you!`
                                 <td className="px-3 py-4">
                                   <span className="text-sm text-off-black/40">-</span>
                                 </td>
+                                <td className="px-3 py-4">{assigneeCell(order)}</td>
                                 <td className="px-3 py-4 hidden md:table-cell">
                                   <span className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</span>
                                 </td>
