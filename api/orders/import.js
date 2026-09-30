@@ -10,10 +10,16 @@
 
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { processOrders } from '../../server/processOrders.js'
+import { runLockedImport, getLastImport } from '../../server/lib/importStamp.js'
 
 export default async function handler(req, res) {
-  if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
+  if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
   if (!requireAdmin(req, res)) return
+
+  // GET: when orders were last pulled in, for the "Last refreshed" line.
+  if (req.method === 'GET') {
+    try { return res.status(200).json({ lastImportedAt: await getLastImport() }) } catch { return res.status(500).json({ error: 'Failed to read last import' }) }
+  }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -25,10 +31,10 @@ export default async function handler(req, res) {
 
     console.log(`[API /orders/import] Starting import (research: ${runResearch})`)
 
-    const results = await processOrders({
+    const results = await runLockedImport(() => processOrders({
       runResearch,
       verbose: true
-    })
+    }))
 
     return res.status(200).json(results)
 

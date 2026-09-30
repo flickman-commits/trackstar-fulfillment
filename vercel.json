@@ -25,6 +25,10 @@
     {
       "path": "/api/sales/send-due",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/orders/auto-import",
+      "schedule": "*/10 * * * *"
     }
   ],
   "functions": {

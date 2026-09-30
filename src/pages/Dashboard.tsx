@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Upload, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3 } from 'lucide-react'
+import { Search, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3 } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
@@ -899,6 +899,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [lastImportedAt, setLastImportedAt] = useState<string | null>(null)
   const [isResearching, setIsResearching] = useState(false)
 
   // --- Bulk research state ---
@@ -1234,6 +1235,8 @@ export default function Dashboard() {
       }
 
       const data = await response.json()
+      if (data.skipped === 'already_running') { setToast({ message: 'An import is already running', type: 'success' }); return }
+      if (data.lastImportedAt) setLastImportedAt(data.lastImportedAt)
       const parts = []
       if (data.imported > 0) parts.push(`${data.imported} imported`)
       if (data.updated > 0) parts.push(`${data.updated} updated`)
@@ -1255,6 +1258,26 @@ export default function Dashboard() {
     }
   }
 
+
+  // Orders come in on their own now (the auto-import cron, every 10 minutes).
+  // Check the stamp each minute and reload the list when it moves.
+  useEffect(() => {
+    let last: string | null = null
+    const check = async () => {
+      try {
+        const r = await apiFetch('/api/orders/import')
+        if (!r.ok) return
+        const { lastImportedAt: at } = await r.json()
+        setLastImportedAt(at)
+        if (last && at && at !== last) fetchOrders()
+        last = at
+      } catch { /* next tick */ }
+    }
+    check()
+    const t = setInterval(check, 60_000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const runSettingsAction = async (action: 'refresh-weather' | 'clear-research' | 'clear-race-cache') => {
     setSettingsAction(action)
@@ -2703,7 +2726,7 @@ Thank you!`
           {/* Right side: primary actions, right-aligned */}
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
-              {activeView === 'race_partner' ? (
+              {activeView === 'race_partner' && (
                 <button
                   onClick={() => setShowNewRacePartner(true)}
                   className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap"
@@ -2711,20 +2734,6 @@ Thank you!`
                   <ImagePlus className="w-4 h-4" />
                   <span className="md:hidden">New Partner</span>
                   <span className="hidden md:inline">New Partner</span>
-                </button>
-              ) : (
-                <button
-                  onClick={importOrders}
-                  disabled={isImporting}
-                  className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isImporting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Upload className="w-4 h-4" />
-                  )}
-                  <span className="md:hidden">{isImporting ? 'Importing…' : 'Import'}</span>
-                  <span className="hidden md:inline">{isImporting ? 'Importing…' : 'Import New Orders'}</span>
                 </button>
               )}
             </div>
@@ -2736,6 +2745,7 @@ Thank you!`
         <section className="flex-1 flex flex-col min-h-0 pb-4">
           {/* Section Header */}
           <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
+            <div>
             <div className="flex items-center gap-3">
               <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
                 <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
@@ -2751,6 +2761,18 @@ Thank you!`
                 </div>
               )}
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
+            </div>
+            {activeView !== 'bulk' && lastImportedAt && (
+              <button
+                onClick={importOrders}
+                disabled={isImporting}
+                className="mt-1 inline-flex items-center gap-1.5 text-xs text-off-black/45 hover:text-off-black/70 disabled:cursor-default"
+                title="Orders import on their own every 10 minutes. Click to check now."
+              >
+                {isImporting && <Loader2 className="w-3 h-3 animate-spin" />}
+                {isImporting ? 'Checking for new orders…' : `Last refreshed ${new Date(lastImportedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
+              </button>
+            )}
             </div>
             {/* View Switcher - Mobile (dropdown) */}
             <div className="relative md:hidden">
