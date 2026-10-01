@@ -2314,7 +2314,9 @@ export default function Dashboard() {
     if (activeView === 'custom' || activeView === 'race_partner') {
       // Design-driven views: show all non-done items, sorted by most recent first for race_partner
       // (custom uses due date; race_partner has no due date so we fall back to createdAt)
-      const activeOrders = typeFiltered.filter(o => o.designStatus !== 'sent_to_production')
+      // A partner's design work ends at Approved by Partner, so that is done.
+      const isDone = (o: Order) => o.designStatus === 'sent_to_production' || (activeView === 'race_partner' && o.designStatus === 'approved_by_customer')
+      const activeOrders = typeFiltered.filter(o => !isDone(o))
       if (activeView === 'race_partner') {
         return activeOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       }
@@ -2347,7 +2349,10 @@ export default function Dashboard() {
   const completedOrders = useMemo(() => {
     // Guard: ensure orders match the active view type
     const typeFiltered = orders.filter(o => (o.trackstarOrderType || 'standard') === activeView)
-    if (activeView === 'custom' || activeView === 'race_partner') {
+    if (activeView === 'race_partner') {
+      return typeFiltered.filter(o => o.designStatus === 'sent_to_production' || o.designStatus === 'approved_by_customer')
+    }
+    if (activeView === 'custom') {
       return typeFiltered.filter(o => o.designStatus === 'sent_to_production')
     }
     return typeFiltered.filter(o => o.status === 'completed')
@@ -3121,7 +3126,7 @@ Thank you!`
                     {/* Standard Orders Table */}
                     <thead className="bg-subtle-gray border-b border-border-gray sticky top-0 z-10">
                       <tr>
-                        <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-12">Src</th>
+                        <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-28">Src</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Order #</th>
                         <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20">Status</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Details</th>
@@ -3535,7 +3540,42 @@ Thank you!`
                   ))}
                 </div>
 
-                {/* Desktop table for completed orders modal */}
+                {/* Desktop table for completed orders modal. Partners are not
+                    runner orders: no source, no runner, just who and when. */}
+                {activeView === 'race_partner' ? (
+                <table className="w-full hidden md:table">
+                  <thead className="bg-subtle-gray border-b border-border-gray sticky top-0">
+                    <tr>
+                      <th className="text-left pl-6 pr-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-48">Design Status</th>
+                      <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Partner</th>
+                      <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-24">Year</th>
+                      <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Contact</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-gray">
+                    {filteredCompletedOrders.map((order, index) => {
+                      const cfg = DESIGN_STATUS_CONFIG[order.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.sent_to_production
+                      return (
+                        <tr
+                          key={order.id}
+                          onClick={() => setSelectedOrder(order)}
+                          className={`hover:bg-subtle-gray cursor-pointer transition-colors ${index % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
+                        >
+                          <td className="pl-6 pr-3 py-4">
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${cfg.bgColor} ${cfg.color}`}>
+                              <span>{cfg.icon}</span>
+                              {designLabel(order.designStatus, order.trackstarOrderType)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-4 text-sm font-medium text-off-black">{order.partnerName || order.raceName || 'Partner'}</td>
+                          <td className="px-3 py-4 text-sm text-off-black">{order.raceYear || '-'}</td>
+                          <td className="px-3 pr-6 py-4 text-sm text-off-black/60">{order.customerName || '-'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                ) : (
                 <table className="w-full hidden md:table">
                   <thead className="bg-subtle-gray border-b border-border-gray sticky top-0">
                     <tr>
@@ -3577,6 +3617,7 @@ Thank you!`
                     ))}
                   </tbody>
                 </table>
+                )}
 
                 {filteredCompletedOrders.length === 0 && (
                   <div className="text-center py-16 text-off-black/40 text-sm">
@@ -4403,7 +4444,7 @@ Thank you!`
               }
             }}
           >
-            <div className="bg-white rounded-none md:rounded-md max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className={`bg-white rounded-none md:rounded-md ${selectedOrder.trackstarOrderType === 'race_partner' ? 'max-w-xl' : 'max-w-[45rem]'} w-full max-h-[90vh] overflow-y-auto shadow-xl`} onClick={(e) => e.stopPropagation()}>
               <div className="p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
