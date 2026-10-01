@@ -13,7 +13,9 @@ import { BaseScraper } from '../BaseScraper.js'
 import * as cheerio from 'cheerio'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
-const TEN_POINT_SEVEN_KM = /10\.7\s*km/i
+// The short race on the same results page: 10.7km since 2023, a 10km race on
+// the 2021 edition's page ("10km Junior & Youth Men").
+const SHORT_RACE = /\b10(?:\.7)?\s*km\b/i
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 export class TokyoMarathonScraper extends BaseScraper {
@@ -27,7 +29,10 @@ export class TokyoMarathonScraper extends BaseScraper {
     super(config.raceName, year)
     this.config = config
     this.tag = config.tag || config.raceName
-    this.baseUrl = `https://www.marathon.tokyo/${year}/result`
+    // Results live under the edition's year, which is not always the year it
+    // ran (config.resultsPathYear).
+    const pathYear = config.resultsPathYear?.[year] ?? year
+    this.baseUrl = `https://www.marathon.tokyo/${pathYear}/result`
   }
 
   async getRaceInfo() {
@@ -79,9 +84,9 @@ export class TokyoMarathonScraper extends BaseScraper {
       const parsed = this._parseSearchResults(html)
       // The same results page lists the 10.7km race, and its finishers came
       // back as "Marathon" with their 10.7km time (2025, bib 5301: 0:38:43).
-      // We sell marathon prints, so a 10.7km runner is not a match.
-      const candidates = parsed.filter(c => !TEN_POINT_SEVEN_KM.test(c.category))
-      console.log(`[${this.tag}] Found ${parsed.length} candidate runners, ${parsed.length - candidates.length} in the 10.7km race`)
+      // We sell marathon prints, so a 10.7km (or 10km) runner is not a match.
+      const candidates = parsed.filter(c => !SHORT_RACE.test(c.category))
+      console.log(`[${this.tag}] Found ${parsed.length} candidate runners, ${parsed.length - candidates.length} in the short race`)
       if (candidates.length === 0 && parsed.length) {
         return this.notFoundResult(null, parsed.slice(0, 10).map(c => ({
           name: c.name, bib: c.bib, eventType: c.category || '10.7km Race',

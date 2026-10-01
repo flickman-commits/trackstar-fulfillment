@@ -30,6 +30,12 @@ export default {
     2025: 'Wikipedia 2025 Tokyo Marathon edition article + marathon.tokyo official Past Races archive',
     2026: 'Wikipedia 2026 Tokyo Marathon edition article + Olympics.com Tokyo Marathon 2026 results report',
   },
+  /**
+   * Results are filed under the edition's year. The 2022-03-06 race is
+   * "Tokyo Marathon 2021" at marathon.tokyo/2021/result/; /2022/result/ only
+   * redirects to the home page.
+   */
+  resultsPathYear: { 2022: 2021 },
   eventTypes: ['Marathon'],
   defaultEventType: 'Marathon',
   distanceMiles: 26.2,
