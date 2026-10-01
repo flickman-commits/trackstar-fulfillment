@@ -3125,10 +3125,10 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Order #</th>
                         <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20">Status</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Details</th>
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-36 align-middle">
-                          <div className="flex flex-col items-start gap-1">
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-52">
+                          <div className="flex items-center gap-2 leading-none">
                             Assignee
-                            <span className="inline-flex items-center gap-1 -ml-1.5 normal-case tracking-normal font-medium text-[11px]">
+                            <span className="inline-flex items-center gap-0.5 -my-1 normal-case tracking-normal font-medium text-[11px]">
                               <button onClick={() => setScope('all')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'all' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Everyone's orders">All</button>
                               <button onClick={() => setScope('mine')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'mine' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Orders assigned to you">Mine</button>
                             </span>
@@ -3309,10 +3309,10 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-44">Design Status</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-48">Order #</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Due Date</th>
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-36 align-middle">
-                          <div className="flex flex-col items-start gap-1">
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-52">
+                          <div className="flex items-center gap-2 leading-none">
                             Assignee
-                            <span className="inline-flex items-center gap-1 -ml-1.5 normal-case tracking-normal font-medium text-[11px]">
+                            <span className="inline-flex items-center gap-0.5 -my-1 normal-case tracking-normal font-medium text-[11px]">
                               <button onClick={() => setScope('all')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'all' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Everyone's orders">All</button>
                               <button onClick={() => setScope('mine')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'mine' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Orders assigned to you">Mine</button>
                             </span>
