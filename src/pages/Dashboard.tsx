@@ -2751,7 +2751,7 @@ Thank you!`
                 <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
                 <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
               </h2>
-              <span className="hidden md:inline px-2.5 py-1 bg-off-black/10 text-off-black/60 text-sm font-medium rounded">
+              <span className="hidden md:inline-flex items-center justify-center min-w-[26px] h-[26px] px-2 rounded-full bg-[#4600D6] text-white text-sm font-semibold leading-none shadow-sm">
                 {activeView === 'bulk' ? (bulkCount ?? '') : ordersToFulfill.length}
               </span>
               {scoped && (
