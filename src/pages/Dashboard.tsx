@@ -13,7 +13,7 @@ import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
-import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
+import OrderTags, { raceNotRunYet, staleBeforeRace, HoverTip } from '@/components/OrderTags'
 
 /** Collapsible section with header + chevron toggle */
 function CollapsibleSection({ title, defaultOpen = true, children, badge }: {
@@ -2610,14 +2610,14 @@ Thank you!`
     if (order.researchStatus === 'no_scraper') return { icon: '🚧', label: 'No scraper for this race' }
     // 🛠️ not 🗓️: a calendar here was indistinguishable from the 📅 used for a
     // missing year, and this is a dev gap rather than a date problem.
+    if (order.researchStatus === 'race_not_run' || (staleBeforeRace(order.researchStatus) && raceNotRunYet(order))) {
+      return { icon: '🗓️', label: 'Race has not happened yet' }
+    }
     if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Year not configured' }
     if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site unreachable, retry' }
     if (order.researchStatus === 'time_unavailable') return { icon: '⏱', label: 'Runner matched, time needs manual entry' }
     if (order.researchStatus === 'ambiguous') return { icon: '❓', label: 'Multiple matches' }
     // A future race is a wait, not a failure.
-    if (order.researchStatus === 'race_not_run' || (order.researchStatus === 'not_found' && raceNotRunYet(order))) {
-      return { icon: '🗓️', label: 'Race has not happened yet' }
-    }
     // 🕵️ rather than ❌ or 🔎. A cross reads as "cancelled, ignore this", and the
     // second magnifying glass was a mirror image of the one below. Not found
     // means someone has to go dig, so the icon should point at the work.
@@ -5453,10 +5453,10 @@ Thank you!`
                           // Different visual treatment per status:
                           //   - no_scraper / year_not_configured = red (config gap, blocks fulfillment, dev needed)
                           //   - upstream_error / not_found / ambiguous = amber (transient or resolvable via manual verification)
-                          const isConfigGap = status === 'no_scraper' || status === 'year_not_configured'
+                          const isConfigGap = (status === 'no_scraper' || status === 'year_not_configured') && !raceNotRunYet(selectedOrder)
                         // A future race is not a problem, just a wait, so it
                         // reads calm rather than amber.
-                        const notRun = status === 'race_not_run' || (status === 'not_found' && raceNotRunYet(selectedOrder))
+                        const notRun = status === 'race_not_run' || (staleBeforeRace(status) && raceNotRunYet(selectedOrder))
                         const boxClasses = notRun
                           ? 'bg-blue-50 border border-blue-200 rounded-md p-4'
                           : isConfigGap

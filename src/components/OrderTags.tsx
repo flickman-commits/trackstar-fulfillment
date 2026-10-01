@@ -135,11 +135,20 @@ export function raceNotRunYet(o: TaggableOrder): boolean {
   return !isNaN(d.valueOf()) && d.getTime() > Date.now()
 }
 
+/**
+ * A miss on a race that has not been run says nothing about the scraper or
+ * the runner: the results do not exist yet. Orders researched before the race
+ * date was known can carry one of these, so the date wins.
+ */
+export function staleBeforeRace(status?: string | null): boolean {
+  return status === 'not_found' || status === 'year_not_configured' || status === 'ambiguous' || status === 'upstream_error'
+}
+
 /** Research outcomes from our own scrapers. */
 function researchTag(o: TaggableOrder): OrderTag | null {
   // A future race has no results to find. This also rescues orders that were
   // researched before we checked for it and got stamped "not found".
-  if (o.researchStatus === 'race_not_run' || (o.researchStatus === 'not_found' && raceNotRunYet(o))) {
+  if (o.researchStatus === 'race_not_run' || (staleBeforeRace(o.researchStatus) && raceNotRunYet(o))) {
     return { key: 'race-not-run', label: 'Race not run yet', tone: 'blue',
       title: 'This race has not happened yet, so there are no results to look up. Come back after race day.' }
   }
