@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3 } from 'lucide-react'
+import { Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3 } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
@@ -900,6 +900,7 @@ export default function Dashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [lastImportedAt, setLastImportedAt] = useState<string | null>(null)
+  const [bulkCreating, setBulkCreating] = useState(false)
   const [isResearching, setIsResearching] = useState(false)
 
   // --- Bulk research state ---
@@ -2381,23 +2382,23 @@ export default function Dashboard() {
 
   const filteredOrders = useMemo(() => {
     let base = ordersToFulfill
-    if (raceFilter) {
+    if (raceFilter && activeView === 'standard') {
       base = base.filter(o => (o.effectiveRaceName || o.raceName) === raceFilter)
     }
     if (!searchQuery) return base
     const query = searchQuery.toLowerCase()
     return base.filter(o => matchesSearch(o, query))
-  }, [ordersToFulfill, raceFilter, searchQuery, matchesSearch])
+  }, [ordersToFulfill, raceFilter, searchQuery, matchesSearch, activeView])
 
   const filteredCompletedOrders = useMemo(() => {
     let base = completedOrders
-    if (raceFilter) {
+    if (raceFilter && activeView === 'standard') {
       base = base.filter(o => (o.effectiveRaceName || o.raceName) === raceFilter)
     }
     if (!searchQuery) return base
     const query = searchQuery.toLowerCase()
     return base.filter(o => matchesSearch(o, query))
-  }, [completedOrders, raceFilter, searchQuery, matchesSearch])
+  }, [completedOrders, raceFilter, searchQuery, matchesSearch, activeView])
 
   // --- Bulk research ---
   // Orders eligible for batch research from the *currently visible* queue.
@@ -2698,6 +2699,61 @@ Thank you!`
     return `${displayOrderNumber}_${raceShort}_${lastName}${suffix}.pdf`
   }
 
+  // One toolbar for all four views: search on every one, the race filter
+  // and research button where they apply.
+  // On mobile they stack; on md+ the race select sits beside search.
+  const toolbar = (
+    <div className="p-3 md:p-4 border-b border-border-gray flex-shrink-0">
+      <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
+          <input
+            type="text"
+            placeholder="Search orders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
+          />
+        </div>
+        {activeView === 'standard' && (
+        <div className="relative md:w-64">
+          <select
+            value={raceFilter}
+            onChange={(e) => setRaceFilter(e.target.value)}
+            className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2.5 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors cursor-pointer ${
+              raceFilter
+                ? 'bg-dark-fill text-white border-dark-fill'
+                : 'bg-subtle-gray border-border-gray text-off-black'
+            }`}
+          >
+            <option value="" className="bg-white text-off-black">All races ({raceFilterOptions.reduce((s, [, c]) => s + c, 0)})</option>
+            {raceFilterOptions.map(([name, count]) => (
+              <option key={name} value={name} className="bg-white text-off-black">{name} ({count})</option>
+            ))}
+          </select>
+          <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${raceFilter ? 'text-white' : 'text-off-black/40'}`} />
+        </div>
+        )}
+        {/* Bulk-research trigger — adapts label to the active filter.
+            Hidden in custom / race_partner views (they don't research). */}
+        {activeView === 'standard' && bulkResearchEligible.length > 0 && (
+          <button
+            onClick={runBulkResearch}
+            disabled={bulkRunning}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            <FlaskConical className="w-4 h-4" />
+            {bulkRunning
+              ? 'Researching…'
+              : raceFilter
+                ? `Research ${raceFilter} (${bulkResearchEligible.length})`
+                : `Research queue (${bulkResearchEligible.length})`}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div className="h-[calc(100dvh-92px)] md:h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
       <div className="max-w-[1800px] mx-auto px-4 md:px-6 lg:px-8 w-full flex flex-col h-full">
@@ -2726,14 +2782,13 @@ Thank you!`
           {/* Right side: primary actions, right-aligned */}
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
-              {activeView === 'race_partner' && (
+              {(activeView === 'race_partner' || activeView === 'bulk') && (
                 <button
-                  onClick={() => setShowNewRacePartner(true)}
+                  onClick={() => activeView === 'bulk' ? setBulkCreating(true) : setShowNewRacePartner(true)}
                   className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap"
                 >
-                  <ImagePlus className="w-4 h-4" />
-                  <span className="md:hidden">New Partner</span>
-                  <span className="hidden md:inline">New Partner</span>
+                  {activeView === 'bulk' ? <Plus className="w-4 h-4" /> : <ImagePlus className="w-4 h-4" />}
+                  {activeView === 'bulk' ? 'New Bulk Order' : 'New Partner'}
                 </button>
               )}
             </div>
@@ -2746,23 +2801,20 @@ Thank you!`
           {/* Section Header */}
           <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
             <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 md:gap-6">
               <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
-                <span className="md:hidden">{activeView === 'standard' ? 'Personalization' : activeView === 'custom' ? 'Custom Designs' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
-                <span className="hidden md:inline">{activeView === 'standard' ? 'Designs to be Personalized' : activeView === 'custom' ? 'Custom Designs' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
+                <span className="md:hidden">{activeView === 'standard' ? 'Standard Orders' : activeView === 'custom' ? 'Custom Orders' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
+                <span className="hidden md:inline-block relative">
+                  {activeView === 'standard' ? 'Standard Orders' : activeView === 'custom' ? 'Custom Orders' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}
+                  {/* Notification bubble, overlapping the end of the heading. */}
+                  <span className="absolute -top-3 -right-3.5 z-10 inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-[#4600D6] text-white text-[11px] font-bold leading-none tracking-normal shadow-[0_2px_6px_rgba(70,0,214,0.45)] ring-2 ring-white">
+                    {activeView === 'bulk' ? (bulkCount ?? '') : ordersToFulfill.length}
+                  </span>
+                </span>
               </h2>
-              <span className="hidden md:inline-flex items-center justify-center min-w-[26px] h-[26px] px-2 rounded-full bg-[#4600D6] text-white text-sm font-semibold leading-none shadow-sm">
-                {activeView === 'bulk' ? (bulkCount ?? '') : ordersToFulfill.length}
-              </span>
-              {scoped && (
-                <div className={segmentGroup}>
-                  <button onClick={() => setScope('mine')} className={segment(effectiveScope === 'mine')} title="Orders assigned to you">Mine</button>
-                  <button onClick={() => setScope('all')} className={segment(effectiveScope === 'all')} title="Everyone's orders">Everyone</button>
-                </div>
-              )}
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
             </div>
-            {activeView !== 'bulk' && lastImportedAt && (
+            {lastImportedAt && (
               <button
                 onClick={importOrders}
                 disabled={isImporting}
@@ -2822,58 +2874,14 @@ Thank you!`
               onOpenRunner={(orderNumber) => { const o = orders.find(x => x.orderNumber === orderNumber); if (o) setSelectedOrder(o); else fetchOrders().then(() => { const oo = orders.find(x => x.orderNumber === orderNumber); if (oo) setSelectedOrder(oo) }) }}
               refreshRunners={() => { fetchOrders() }}
               onCount={setBulkCount}
+              toolbar={toolbar}
+              search={searchQuery}
+              creating={bulkCreating}
+              onCreatingChange={setBulkCreating}
             />
           ) : (
           <div className="bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
-            {/* Search + Race filter inside card. On mobile they stack;
-                on md+ they sit side-by-side with the race select fixed width. */}
-            <div className="p-3 md:p-4 border-b border-border-gray flex-shrink-0">
-              <div className="flex flex-col md:flex-row gap-2 md:gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
-                  <input
-                    type="text"
-                    placeholder={activeView === 'standard' ? "Search orders..." : "Search designs..."}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
-                  />
-                </div>
-                <div className="relative md:w-64">
-                  <select
-                    value={raceFilter}
-                    onChange={(e) => setRaceFilter(e.target.value)}
-                    className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2.5 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors cursor-pointer ${
-                      raceFilter
-                        ? 'bg-dark-fill text-white border-dark-fill'
-                        : 'bg-subtle-gray border-border-gray text-off-black'
-                    }`}
-                  >
-                    <option value="" className="bg-white text-off-black">All races ({raceFilterOptions.reduce((s, [, c]) => s + c, 0)})</option>
-                    {raceFilterOptions.map(([name, count]) => (
-                      <option key={name} value={name} className="bg-white text-off-black">{name} ({count})</option>
-                    ))}
-                  </select>
-                  <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${raceFilter ? 'text-white' : 'text-off-black/40'}`} />
-                </div>
-                {/* Bulk-research trigger — adapts label to the active filter.
-                    Hidden in custom / race_partner views (they don't research). */}
-                {activeView === 'standard' && bulkResearchEligible.length > 0 && (
-                  <button
-                    onClick={runBulkResearch}
-                    disabled={bulkRunning}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-                  >
-                    <FlaskConical className="w-4 h-4" />
-                    {bulkRunning
-                      ? 'Researching…'
-                      : raceFilter
-                        ? `Research ${raceFilter} (${bulkResearchEligible.length})`
-                        : `Research queue (${bulkResearchEligible.length})`}
-                  </button>
-                )}
-              </div>
-            </div>
+            {toolbar}
 
             {/* Scrollable Container */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
@@ -3117,7 +3125,15 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Order #</th>
                         <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20">Status</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Details</th>
-                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Assignee</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-48">
+                          <div className="flex items-center gap-2">
+                            Assignee
+                            <span className="inline-flex items-center gap-1 normal-case tracking-normal font-medium text-[11px]">
+                              <button onClick={() => setScope('all')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'all' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Everyone's orders">All</button>
+                              <button onClick={() => setScope('mine')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'mine' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Orders assigned to you">Mine</button>
+                            </span>
+                          </div>
+                        </th>
                         <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Tags</th>
                       </tr>
                     </thead>
@@ -3293,7 +3309,15 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-32">Design Status</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Order #</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Due Date</th>
-                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Assignee</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-48">
+                          <div className="flex items-center gap-2">
+                            Assignee
+                            <span className="inline-flex items-center gap-1 normal-case tracking-normal font-medium text-[11px]">
+                              <button onClick={() => setScope('all')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'all' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Everyone's orders">All</button>
+                              <button onClick={() => setScope('mine')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'mine' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Orders assigned to you">Mine</button>
+                            </span>
+                          </div>
+                        </th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Runner</th>
                         <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden lg:table-cell">Race</th>
                       </tr>

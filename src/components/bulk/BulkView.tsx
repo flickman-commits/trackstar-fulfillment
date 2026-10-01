@@ -127,7 +127,13 @@ function Chip({ tone, children, onClick, title }: { tone: 'green' | 'amber' | 'r
   return <span className={base} title={title}>{children}</span>
 }
 
-export default function BulkView({ onOpenRunner, refreshRunners, onCount }: {
+export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolbar, search = '', creating = false, onCreatingChange }: {
+  /** The dashboard's shared search toolbar, shown at the top of the card. */
+  toolbar?: React.ReactNode
+  search?: string
+  /** The New Bulk Order button lives in the page header; it drives this. */
+  creating?: boolean
+  onCreatingChange?: (open: boolean) => void
   /** Open a runner in the ordinary order modal. */
   onOpenRunner: (orderNumber: string) => void
   /** Ask the dashboard to reload its bulk-runner orders so the modal has fresh data. */
@@ -137,7 +143,9 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount }: {
 }) {
   const [list, setList] = useState<BulkOrder[] | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
+  const setCreating = (v: boolean) => onCreatingChange?.(v)
+  const q = search.trim().toLowerCase()
+  const shown = useMemo(() => !list || !q ? list : list.filter(b => [b.number, b.partnerName, b.raceName, String(b.raceYear)].some(v => String(v || '').toLowerCase().includes(q))), [list, q])
 
   const load = useCallback(async () => {
     try {
@@ -155,14 +163,11 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount }: {
 
   return (
     <div className="bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
-      <div className="p-3 md:p-4 border-b border-border-gray flex items-center justify-between gap-3">
-        <p className="text-sm text-off-black/60">Prepaid runs of co-branded prints, by due date.</p>
-        <button onClick={() => setCreating(true)} className={btnPrimary}><Plus className="w-4 h-4" /> New bulk order</button>
-      </div>
+      {toolbar}
       <div className="flex-1 overflow-y-auto">
         {list === null ? (
           <div className="flex items-center justify-center py-16 text-off-black/40"><Loader2 className="w-5 h-5 animate-spin" /></div>
-        ) : list.length === 0 ? (
+        ) : !shown || shown.length === 0 ? (
           <div className="text-center py-16 text-off-black/40 text-sm">No bulk orders yet.</div>
         ) : (
           <table className="w-full text-sm">
@@ -177,7 +182,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount }: {
               </tr>
             </thead>
             <tbody>
-              {list.map(b => {
+              {shown!.map(b => {
                 const d = daysUntil(b.dueDate)
                 const st = STATUS_STYLE[b.status] || STATUS_STYLE.collecting
                 return (
