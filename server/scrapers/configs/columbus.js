@@ -6,6 +6,7 @@
  * Per-year raceIds:
  *   2023: M=15918  H=15919
  *   2024: M=17889  H=17890
+ *   2025: M=19623  H=19624  (event 6011, read off MTEC's event search)
  *
  * Verified finisher: Benjamen Smith, bib 3734, 3:57:08 (2024 Marathon, raceId 17889).
  */
@@ -42,9 +43,11 @@ export default {
   raceIds: {
     2023: { marathon: 15918, half: 15919 },
     2024: { marathon: 17889, half: 17890 },
+    2025: { marathon: 19623, half: 19624 },
   },
   raceSlugs: {
     2023: { marathon: '2023_Columbus_Marathon-Marathon', half: '2023_Columbus_Marathon-Half_Marathon' },
     2024: { marathon: '2024_Columbus_Marathon-Marathon', half: '2024_Columbus_Marathon-Half_Marathon' },
+    2025: { marathon: '2025_Columbus_Marathon-Marathon', half: '2025_Columbus_Marathon-Half_Marathon' },
   }
 }
