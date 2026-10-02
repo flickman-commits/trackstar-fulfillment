@@ -6,6 +6,8 @@ import assert from 'node:assert/strict'
 import { MyChipTimeScraper } from './MyChipTimeScraper.js'
 import { TokyoMarathonScraper } from './TokyoMarathonScraper.js'
 import { RTRTScraper } from './RTRTScraper.js'
+import { MTECResultsScraper } from './MTECResultsScraper.js'
+import columbus from '../configs/columbus.js'
 import marineCorps from '../configs/marinecorps.js'
 import historicHalf from '../configs/marinecorpsHistoricHalf.js'
 
@@ -85,4 +87,20 @@ test('RTRT treats an empty roster as not run yet before race day, and as an erro
   } finally {
     globalThis.fetch = realFetch
   }
+})
+
+// Columbus 2025: MTEC's participant search answers for the whole event, so a
+// half runner came back from the marathon's raceId and her detail page was
+// fetched under the wrong race, which has no Finish row.
+test('MTEC keeps only search rows for the race being searched', async () => {
+  const s = new MTECResultsScraper(2025, columbus)
+  const row = race => `<tr><td><a href="/runner/show?race=${race}&amp;rid=96121812">Abby Smith</a></td>` +
+    '<td>18744</td><td>29</td><td>F</td><td>Marysville</td><td>OH</td><td>Half Marathon</td></tr>'
+  s._participantSearch = async () => s._parseSearchHtml(`<table>${row(19624)}</table>`)
+  const fetched = []
+  s._fetchRunnerDetail = async (rid, raceId) => { fetched.push(raceId); return { chipTime: '1:59:30' } }
+  const result = await quiet(() => s.searchRunner('Abby Smith'))
+  assert.deepEqual(fetched, [19624])
+  assert.equal(result.eventType, 'Half Marathon')
+  assert.equal(result.officialTime, '1:59:30')
 })

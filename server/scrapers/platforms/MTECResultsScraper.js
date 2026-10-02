@@ -95,6 +95,12 @@ export class MTECResultsScraper extends BaseScraper {
         return this.upstreamErrorResult(err.message)
       }
 
+      // The search answers for the whole event, not just this race: a half
+      // runner comes back when searching the marathon's raceId. Their detail
+      // page under the wrong raceId has no Finish row, so keep only rows whose
+      // link names this race; the half pass finds the others with its own id.
+      searchRows = searchRows.filter(r => !r.race || r.race === String(raceId))
+
       console.log(`[${this.tag}] ${eventLabel} (race ${raceId}): ${searchRows.length} search row(s)`)
 
       // Name-match within this distance only.
@@ -197,10 +203,12 @@ export class MTECResultsScraper extends BaseScraper {
       const href = a.attr('href') || ''
       // /runner/show?race=15918&rid=32 — rid is what we need.
       const rid = (href.match(/[?&]rid=(\d+)/) || [])[1]
+      const race = (href.match(/[?&]race=(\d+)/) || [])[1] || null
       if (!name || !rid) return
       rows.push({
         name,
         rid,
+        race,
         bib: $(cells[1]).text().trim(),
         age: $(cells[2]).text().trim(),
         sex: $(cells[3]).text().trim(),
