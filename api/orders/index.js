@@ -63,6 +63,32 @@ function pickCustomerValue(v) {
 }
 
 /**
+ * Just the keys of the raw order payloads this list reads, built in Postgres
+ * so only those bytes leave the database. Add a key here if the list starts
+ * reading a new one.
+ */
+async function rawSlice(ids) {
+  if (!ids.length) return new Map()
+  const rows = await prisma.$queryRaw`
+    SELECT id,
+      CASE WHEN "shopifyOrderData" IS NULL THEN NULL ELSE jsonb_build_object(
+        'name', "shopifyOrderData"::jsonb->'name',
+        'created_at', "shopifyOrderData"::jsonb->'created_at',
+        'discount_codes', "shopifyOrderData"::jsonb->'discount_codes',
+        'shipping_lines', (SELECT jsonb_agg(jsonb_build_object('title', l->'title', 'price', l->'price'))
+          FROM jsonb_array_elements(CASE WHEN jsonb_typeof("shopifyOrderData"::jsonb->'shipping_lines') = 'array'
+            THEN "shopifyOrderData"::jsonb->'shipping_lines' ELSE '[]'::jsonb END) l)) END AS s,
+      CASE WHEN "etsyOrderData" IS NULL THEN NULL ELSE jsonb_build_object(
+        'create_timestamp', "etsyOrderData"::jsonb->'create_timestamp') END AS e,
+      jsonb_build_object(
+        'shipping', "arteloOrderData"::jsonb->'shipping',
+        'creatorId', "arteloOrderData"::jsonb->'creatorId',
+        'createdAt', "arteloOrderData"::jsonb->'createdAt') AS a
+    FROM "Order" WHERE id = ANY(${ids})`
+  return new Map(rows.map(r => [r.id, r]))
+}
+
+/**
  * Discount codes applied to the Shopify order.
  *
  * Surfaced so a code can act as a fulfillment instruction, not just a price
@@ -186,8 +212,20 @@ export default async function handler(req, res) {
         },
         _count: { select: { comments: true, proofs: true } },
         assignee: { select: { id: true, firstName: true, lastName: true } },
-      }
+      },
+      // The raw Shopify, Etsy and Artelo payloads are about 20MB across all
+      // orders and the list reads a handful of keys from them. Pulling them
+      // whole on every 30-second refresh blew through the Supabase egress
+      // quota, so they are left out here and the few keys come from rawSlice.
+      omit: { shopifyOrderData: true, etsyOrderData: true, arteloOrderData: true },
     })
+    const slices = await rawSlice(orders.map(o => o.id))
+    for (const o of orders) {
+      const r = slices.get(o.id)
+      o.shopifyOrderData = r?.s ?? null
+      o.etsyOrderData = r?.e ?? null
+      o.arteloOrderData = r?.a ?? null
+    }
 
     // Product catalog is synced from Shopify and lives in the DB, so load it
     // once here rather than per order.

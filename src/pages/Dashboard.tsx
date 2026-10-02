@@ -1957,11 +1957,15 @@ export default function Dashboard() {
     }
     fetchOrders().finally(() => setIsRefreshing(false))
 
-    // Auto-poll every 30s to pick up external changes (customer approvals, etc.)
+    // Poll to pick up external changes (customer approvals, etc.), but only
+    // while someone is looking: a background tab polling all day was most of
+    // our Supabase egress. Coming back to the tab refreshes right away.
     const poll = setInterval(() => {
-      fetchOrders()
-    }, 30_000)
-    return () => clearInterval(poll)
+      if (document.visibilityState === 'visible') fetchOrders()
+    }, 60_000)
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchOrders() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [fetchOrders])
 
   // Fetch race shorthands from scraper configs + user overrides (once on mount).
