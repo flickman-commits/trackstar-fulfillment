@@ -4909,13 +4909,36 @@ Thank you!`
 
                       {/* Due date — compact inline, always visible (hidden for race_partner) */}
                       {selectedOrder.trackstarOrderType !== 'race_partner' && (
-                        <div className="flex items-center justify-between text-xs px-1">
-                          <span className="text-off-black/40">Due {formatDueDate(selectedOrder.dueDate)}</span>
-                          <div className="flex items-center gap-3">
-                            <span className="text-off-black/40">{selectedOrder.productSize}</span>
-                            {selectedOrder.isRushOrder && <span className="font-medium text-amber-700">⚡ Rush order (4-day)</span>}
-                            {selectedOrder.isGift && <span className="text-pink-600">🎁 Gift</span>}
-                          </div>
+                        // Same chips as a standard order's Product Details, at a
+                        // size nobody misreads: the artboard size is what the
+                        // designer builds to.
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {selectedOrder.productSize && (
+                            <span className="inline-flex items-center px-2.5 py-1 bg-white border border-border-gray rounded text-sm font-semibold text-off-black" title="Artboard size">
+                              {selectedOrder.productSize}
+                            </span>
+                          )}
+                          {selectedOrder.photoPath && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-[#4600D6]/10 text-[#4600D6] border-[#4600D6]/25">
+                              Photo on print
+                            </span>
+                          )}
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 bg-white border rounded text-sm ${isDueDateUrgent(selectedOrder.dueDate) ? 'border-red-200 text-red-600 font-medium' : 'border-border-gray text-off-black/70'}`}>
+                            <span>⏳</span>
+                            <span>Due {formatDueDate(selectedOrder.dueDate)}</span>
+                          </span>
+                          {selectedOrder.orderPlacedAt && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-border-gray rounded text-sm text-off-black/60"
+                              title={`Ordered on ${new Date(selectedOrder.orderPlacedAt).toLocaleString('en-US', { timeZone: TZ })}`}
+                            >
+                              <span>📅</span>
+                              <span>Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}</span>
+                            </span>
+                          )}
+                          {selectedOrder.isRushOrder && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-amber-50 text-amber-800 border-amber-200">⚡ Rush (4-day)</span>
+                          )}
                         </div>
                       )}
 
