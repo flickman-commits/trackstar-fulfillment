@@ -60,6 +60,9 @@ export default {
    */
   subEventIds: {
     2025: { marathon: 238020, tenMile: 237322 },
+    // Read off the 2026 event's subEvents list (GET /v2/api/events/7z97uu7s5w9bzc3y):
+    // "Medtronic Twin Cities Marathon" 26.2 and "TC 10 Mile", the in-person races.
+    2026: { marathon: 380771, tenMile: 380533 },
     // Add more years as they become available
   },
   /**

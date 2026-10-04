@@ -298,6 +298,26 @@ export const CHIP_TIME_FIXTURES = [
 
   // ── RaceRoster ────────────────────────────────────────────────────────
   {
+    platform: 'laurel',
+    race: 'St. George Marathon',
+    year: 2026,
+    runner: 'Christopher Smith',
+    expectedChipTime: '3:21:59',
+    expectedChipPace: '7:43',
+    expectedBib: '522',
+    notes: 'results.laurelt.com/stg/results?pk=9283147 - Chip Time 3:21:59, page pace 7:42 (truncated; 12119s/26.2 = 7:42.6). Uneven: halves 1:41:42 / 1:40:17',
+  },
+  {
+    platform: 'laurel',
+    race: 'St. George Marathon',
+    year: 2026,
+    runner: 'Jordan Johnson',
+    expectedChipTime: '1:32:45',
+    expectedChipPace: '7:05',
+    expectedBib: '8179',
+    notes: 'results.laurelt.com/stg/results?pk=9289777 - Half Marathon, Chip Time 1:32:45, page pace 7:04 (truncated; 5565s/13.1 = 7:04.8). Catches a marathon-distance pace on a half',
+  },
+  {
     platform: 'raceroster',
     race: 'Pittsburgh Marathon',
     year: 2025,
