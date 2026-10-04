@@ -11,6 +11,9 @@
 import { BaseScraper } from '../BaseScraper.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
+// Miles per event key, used when a config does not give its own distances.
+const DEFAULT_DISTANCES = { marathon: 26.2, halfMarathon: 13.1, tenMile: 10 }
+
 export class RaceRosterScraper extends BaseScraper {
   /**
    * @param {number} year
@@ -89,7 +92,7 @@ export class RaceRosterScraper extends BaseScraper {
       const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
       console.log(`[${this.tag} ${this.year}] Searching ${eventLabel} (sub-event ${subEventId})...`)
 
-      const result = await this.searchEventType(runnerName, eventCode, subEventId, eventLabel)
+      const result = await this.searchEventType(runnerName, eventCode, subEventId, eventLabel, eventKey)
       if (result.found) return result
     }
 
@@ -100,7 +103,7 @@ export class RaceRosterScraper extends BaseScraper {
   /**
    * Search for a runner in a specific sub-event
    */
-  async searchEventType(runnerName, eventCode, subEventId, eventLabel) {
+  async searchEventType(runnerName, eventCode, subEventId, eventLabel, eventKey) {
     try {
       // Step 1: Search for participants
       const searchData = await this.fetchApi(
@@ -163,7 +166,7 @@ export class RaceRosterScraper extends BaseScraper {
         }
       }
 
-      return this.extractRunnerData(result, eventLabel, eventCode)
+      return this.extractRunnerData(result, eventLabel, eventCode, eventKey)
 
     } catch (error) {
       console.error(`[${this.tag} ${this.year}] Error searching for ${runnerName}:`, error.message)
@@ -177,9 +180,13 @@ export class RaceRosterScraper extends BaseScraper {
   /**
    * Extract standardized data from a RaceRoster detail result
    */
-  extractRunnerData(result, eventType, eventCode) {
+  extractRunnerData(result, eventType, eventCode, eventKey) {
     const chipTime = this.formatTime(result.chipTime)
-    const pace = this.formatPace(result.overallPace)
+    // Pace is chip time over the race distance. Race Roster's own overallPace
+    // is not that: Twin Cities 2026 shows 9:25 for a 4:10:03 marathon, which is
+    // 9:33. The page value is kept only for an event with no known distance.
+    const distance = this.config.distances?.[eventKey] ?? DEFAULT_DISTANCES[eventKey]
+    const pace = (chipTime && distance) ? this.calculatePace(chipTime, distance) : this.formatPace(result.overallPace)
     const bib = result.bib || null
 
     console.log(`\n[${this.tag} ${this.year}] FOUND RUNNER:`)

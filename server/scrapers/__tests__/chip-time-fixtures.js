@@ -319,6 +319,26 @@ export const CHIP_TIME_FIXTURES = [
   },
   {
     platform: 'raceroster',
+    race: 'Twin Cities Marathon',
+    year: 2026,
+    runner: 'Per Johnson',
+    expectedChipTime: '4:10:03',
+    expectedChipPace: '9:33',
+    expectedBib: '6697',
+    notes: 'results.raceroster.com 7z97uu7s5w9bzc3y detail n4e9xj9de5rneq9v - Chip Time 4:10:03. Page overallPace says 9:25, which is not 15003s/26.2 = 9:33; pace is computed. Uneven: half 2:02:46, second half 2:07:17',
+  },
+  {
+    platform: 'raceroster',
+    race: 'Twin Cities Marathon',
+    year: 2026,
+    runner: 'Sam Johnson',
+    expectedChipTime: '1:13:06',
+    expectedChipPace: '7:19',
+    expectedBib: '21067',
+    notes: 'TC 10 Mile 2026, detail r6kgdmufpbmymfwc - Chip Time 1:13:06 (page pace 7:16; 4386s/10 = 7:19). Catches a marathon-distance pace on the 10 Mile',
+  },
+  {
+    platform: 'raceroster',
     race: 'Pittsburgh Marathon',
     year: 2025,
     runner: 'Lori Smith',
@@ -333,9 +353,9 @@ export const CHIP_TIME_FIXTURES = [
     year: 2024,
     runner: 'Sara Bagnell',
     expectedChipTime: '2:57:39',
-    expectedChipPace: '6:46',
+    expectedChipPace: '6:47',
     expectedBib: '1362',
-    notes: 'Oakland 2024 women\'s winner - verifies historic year support',
+    notes: 'Oakland 2024 women\'s winner - verifies historic year support. Pace computed: 10659s/26.2 = 6:46.8 (the page truncates to 6:46)',
   },
 
   // ── Brooksee ──────────────────────────────────────────────────────────
