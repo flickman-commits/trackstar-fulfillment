@@ -476,6 +476,8 @@ const NON_RACE_HINTS = [
   /\(any race\)/i,
   /triathlon/i,
   /relay for america/i,
+  // Design posters (NYC apple series), not a race anyone looks a result up for.
+  /catch me if you can/i,
 ]
 
 export async function buildCatalogCoverage() {
@@ -498,10 +500,15 @@ export async function buildCatalogCoverage() {
 
   // Races we sell, deduplicated — several products can point at one race.
   const racesSold = new Set(covered.map(p => p.raceCanonical))
+  // Races we sell with no scraper, by race name rather than by product, so
+  // the coverage denominator counts races on both sides.
+  const raceOf = t => t.replace(/\s+personali[sz]e.*$/i, '').trim().toLowerCase()
+  const racesWithoutScraper = new Set(needsScraper.map(p => raceOf(p.title)))
 
   return {
     products: products.length,
     racesSold: [...racesSold].sort(),
+    racesWithoutScraper: [...racesWithoutScraper].sort(),
     covered,
     needsScraper,
     notARace,

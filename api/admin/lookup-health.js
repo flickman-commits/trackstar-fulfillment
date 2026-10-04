@@ -315,8 +315,11 @@ export default async function handler(req, res) {
       racesTotal: races.length,
       // Headline coverage numbers, catalog-based.
       soldLive,
-      soldTotal: soldRaces.length,
-      needsScraper: catalog.needsScraper.length,
+      // Every race we sell, scraper or not. It used to count only the sold
+      // races that already had a scraper, so it read 35/44 while 27 more
+      // listings had none.
+      soldTotal: soldRaces.length + catalog.racesWithoutScraper.length,
+      needsScraper: catalog.racesWithoutScraper.length,
       activeProducts: catalog.products,
       onWizardTemplate: catalog.onWizardTemplate,
       catalogSyncedAt,
