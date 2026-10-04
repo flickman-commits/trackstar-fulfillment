@@ -19,7 +19,7 @@
  * so nothing falls between two reps.
  */
 import prisma from '../../db.js'
-import { loadDeals, getDeal, memberForEmail } from './attio.js'
+import { loadDeals, getDeal, memberForEmail, loadPrContacts, isPrId } from './attio.js'
 import { cadenceFor, looksLikeMailbox } from './angles.js'
 import { getSettings, startOfToday } from './settings.js'
 import { isGenericInbox } from './guardrails.js'
@@ -88,7 +88,10 @@ function daysBetween(a, b) { return Math.floor((b.getTime() - a.getTime()) / 864
  */
 function lastContactAt(deal, lastSend) {
   const person = deal.person || primaryPerson(deal)
-  const times = [person?.lastEmailAt, deal.company?.lastEmailAt, lastSend?.sentAt]
+  // A PR contact's outlet is a whole newsroom: anyone there emailing anyone
+  // here is not this person. For PR only the person's own date counts.
+  const companyAt = deal.motion === 'PR' ? null : deal.company?.lastEmailAt
+  const times = [person?.lastEmailAt, companyAt, lastSend?.sentAt]
     .filter(Boolean).map(t => new Date(t)).filter(d => !Number.isNaN(d.getTime()))
   return times.length ? new Date(Math.max(...times.map(d => d.getTime()))) : null
 }
@@ -152,9 +155,14 @@ function shape(deal, { lastSend, skip, dayStart }) {
 async function sendIndex(dayStart) {
   const sends = await prisma.salesSend.findMany({ orderBy: { sentAt: 'desc' }, select: { attioDealId: true, sentAt: true, subject: true, touchNumber: true, gmailThreadId: true, rfcMessageId: true } })
   const lastByDeal = {}
-  for (const s of sends) if (s.attioDealId && !lastByDeal[s.attioDealId]) lastByDeal[s.attioDealId] = s
+  const countByDeal = {}
+  for (const s of sends) {
+    if (!s.attioDealId) continue
+    if (!lastByDeal[s.attioDealId]) lastByDeal[s.attioDealId] = s
+    countByDeal[s.attioDealId] = (countByDeal[s.attioDealId] || 0) + 1
+  }
   const today = sends.filter(s => s.sentAt >= dayStart)
-  return { lastByDeal, today }
+  return { lastByDeal, today, countByDeal }
 }
 
 /**
@@ -178,8 +186,10 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
   const dayStart = startOfToday(settings.timezone, now)
   const weekStart = new Date(dayStart.getTime() - 6 * 86400000)
 
-  const [deals, { lastByDeal, today }, skips, owner, waiting] = await Promise.all([
-    loadDeals({ fresh }),
+  // PR is worked from the people-based PR Pipeline list, not from deals.
+  const prMode = motion === 'PR'
+  const [deals, { lastByDeal, today, countByDeal }, skips, owner, waiting] = await Promise.all([
+    prMode ? loadPrContacts({ fresh }) : loadDeals({ fresh }),
     sendIndex(dayStart),
     prisma.salesSkip.findMany({ where: { until: { gt: now } } }),
     ownerFilter(actor, scopeMode),
@@ -190,8 +200,11 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
   const skipByDeal = Object.fromEntries(skips.map(s => [s.attioDealId, s]))
   const sentTodayIds = new Set(today.map(s => s.attioDealId).filter(Boolean))
 
-  // PR is its own queue: it shows only when the PR filter is on, never mixed into sales.
-  const inScope = deals.filter(d => owner.matches(d) && (motion ? d.motion === motion : d.motion !== 'PR'))
+  // PR contacts have no touch count in Attio; the tool's own sends are it.
+  if (prMode) for (const d of deals) d.touchCount = countByDeal[d.id] || 0
+  // PR is its own queue: it shows only when the PR filter is on, never mixed
+  // into sales, and it is not split by owner (one person runs PR).
+  const inScope = prMode ? deals : deals.filter(d => owner.matches(d) && (motion ? d.motion === motion : d.motion !== 'PR'))
   const ctx = d => ({ lastSend: lastByDeal[d.id], skip: skipByDeal[d.id], dayStart })
 
   // What went out today, in order, whoever's it is.
@@ -278,8 +291,10 @@ export async function dealForWork(dealId, { fresh = false } = {}) {
     prisma.salesSkip.findUnique({ where: { attioDealId: dealId } }),
   ])
   const lastSend = sends[sends.length - 1] || null
+  // A PR contact's touches are the tool's sends (the list has no count). A copy, not the cached object.
+  const counted = isPrId(dealId) ? { ...deal, touchCount: sends.length } : deal
   return {
-    ...shape(deal, { lastSend, skip: skip && skip.until > new Date() ? skip : null, dayStart }),
+    ...shape(counted, { lastSend, skip: skip && skip.until > new Date() ? skip : null, dayStart }),
     sends: sends.map(s => ({ id: s.id, touchNumber: s.touchNumber, subject: s.subject, body: s.body, sentAt: s.sentAt, sentByEmail: s.sentByEmail, gmailThreadId: s.gmailThreadId, attachments: s.attachments, attioOk: s.attioOk })),
   }
 }

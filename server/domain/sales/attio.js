@@ -180,6 +180,7 @@ export function personView(record) {
     location: location(record),
     lastInteractionAt: interaction(record, 'last_interaction'),
     lastEmailAt: interaction(record, 'last_email_interaction'),
+    companyId: refs(record, 'company')[0] || null,
     webUrl: record.web_url || null,
   }
 }
@@ -297,15 +298,23 @@ export function forgetAttioCache() { cache.clear() }
  * Every deal in the workspace, as views, with its company and people. Three
  * paged reads, cached briefly, rather than one request per person.
  */
+/** Every company, by id. Shared by the deals list and the PR list. */
+async function companiesById({ fresh = false } = {}) {
+  if (fresh) cache.delete('companies')
+  return cached('companies', CACHE_MS, async () => {
+    const records = await queryAll('companies')
+    return Object.fromEntries(records.map(c => [recordId(c), companyView(c)]))
+  })
+}
+
 export async function loadDeals({ fresh = false } = {}) {
   if (fresh) { cache.delete('deals'); cache.delete('members') }
   return cached('deals', CACHE_MS, async () => {
-    const [dealRecords, companyRecords, personById] = await Promise.all([
+    const [dealRecords, companyById, personById] = await Promise.all([
       queryAll('deals'),
-      queryAll('companies'),
+      companiesById({ fresh }),
       peopleById({ fresh }),
     ])
-    const companyById = Object.fromEntries(companyRecords.map(c => [recordId(c), companyView(c)]))
     return dealRecords.map(dealView).filter(d => d.id).map(d => ({
       ...d,
       company: companyById[d.companyId] || null,
@@ -340,6 +349,7 @@ export async function getDealNow(id) {
  * query-complexity limit when a rep clicked a row.
  */
 export async function getDeal(id, { fresh = false } = {}) {
+  if (isPrId(id)) return getPrContact(id, { fresh })
   if (fresh) {
     cache.delete(`deal:${id}`)
     const deal = await getDealNow(id)
@@ -424,6 +434,7 @@ export async function addDealNote(id, { title, content }) {
  */
 export async function recordSend(deal, { sentAt, touchNumber, nextAction, nextActionDate, subject, body, toEmail, sentBy }) {
   if (!isAttioConfigured()) return { ok: false, skipped: 'ATTIO_API_KEY not set' }
+  if (isPrId(deal.id)) return recordPrSend(deal, { sentAt, touchNumber, subject, body, toEmail, sentBy })
   try {
     const values = { touch_count: touchNumber }
     if (nextActionDate) values.next_action_date = day(nextActionDate)
@@ -455,7 +466,156 @@ export async function setStage(dealId, stage) {
 
 /** A rep's note on the deal, from the tool. */
 export async function noteOnDeal(dealId, text, byEmail) {
-  await addDealNote(dealId, { title: `${day(new Date())} Note from ${byEmail || 'the Sales tool'}`, content: text })
+  const title = `${day(new Date())} Note from ${byEmail || 'the Sales tool'}`
+  if (isPrId(dealId)) {
+    const contact = await getPrContact(dealId)
+    if (!contact?.person) throw new Error('That press contact is not in Attio any more')
+    await addPersonNote(contact.person.id, { title, content: text })
+    return
+  }
+  await addDealNote(dealId, { title, content: text })
+}
+
+// ── PR: the people-based "PR Pipeline" list ──────────────────────────────────
+//
+// PR is worked from a list of people (journalists, editors, page owners),
+// not from deals: one entry per person, several per outlet, with its own
+// Status. Each entry is shaped like a deal so the queue, composer, sends and
+// Send later work unchanged. Its id is "pr:<entry id>". The list's statuses
+// map onto the deal stages the rest of the tool reasons about; the real
+// status rides along as prStatus for display. Touches come from the tool's
+// own send log, since the list has no touch count.
+
+export const PR_LIST = process.env.ATTIO_PR_LIST || 'press_outreach'
+const PR_PREFIX = 'pr:'
+export function isPrId(id) { return String(id || '').startsWith(PR_PREFIX) }
+
+/** PR Pipeline status -> the deal stage the queue logic understands. */
+const PR_STAGE = {
+  'To contact': 'Not Contacted',
+  'Contacted': 'Reached Out',
+  'Moving forward': 'In Conversation',
+  'Published': 'Won',
+  'Not interested': 'Lost',
+  'On hold': 'Revisit Next Year',
+  'Canceled': 'Lost',
+}
+
+function entryVal(entry, slug) {
+  const x = entry?.entry_values?.[slug]?.[0]
+  if (!x) return null
+  return x.status?.title || x.option?.title || (x.value ?? null)
+}
+
+function prView(entry, person, company) {
+  const status = entryVal(entry, 'status') || 'To contact'
+  return {
+    id: `${PR_PREFIX}${entry.id.entry_id}`,
+    entryId: entry.id.entry_id,
+    name: company?.name || person?.fullName || 'Press contact',
+    stage: PR_STAGE[status] || 'Not Contacted',
+    prStatus: status,
+    motion: 'PR',
+    ownerId: null,
+    companyId: company?.id || null,
+    personIds: person ? [person.id] : [],
+    touchCount: 0,
+    nextAction: null,
+    nextActionDate: null,
+    raceDate: null,
+    runners: null,
+    tier: null,
+    sizeTier: null,
+    priority: entryVal(entry, 'priority'),
+    races: [],
+    notes: entryVal(entry, 'notes'),
+    value: null,
+    units: null,
+    courseLandmark: null,
+    identity: null,
+    publishedAt: entryVal(entry, 'date_of_publication'),
+    publishedLink: entryVal(entry, 'link_to_published_piece'),
+    createdAt: entry.created_at || null,
+    webUrl: person?.webUrl || null,
+    company: company || null,
+    people: person ? [person] : [],
+  }
+}
+
+/** Every entry on the PR list, as deal-shaped contacts. Cached like the deals. */
+export async function loadPrContacts({ fresh = false } = {}) {
+  if (fresh) cache.delete('pr')
+  return cached('pr', CACHE_MS, async () => {
+    const entries = []
+    for (let offset = 0; ; offset += PAGE) {
+      const res = await attio(`/lists/${PR_LIST}/entries/query`, { method: 'POST', body: { limit: PAGE, offset } })
+      const data = res?.data || []
+      entries.push(...data)
+      if (data.length < PAGE) break
+    }
+    const [personById, companyById] = await Promise.all([peopleById({ fresh }), companiesById({ fresh })])
+    return entries.map(e => {
+      const person = personById[e.parent_record_id] || null
+      return prView(e, person, person?.companyId ? companyById[person.companyId] : null)
+    })
+  })
+}
+
+/** One PR contact, from a warm list or read on its own: the entry, the person, the outlet. */
+export async function getPrContact(id, { fresh = false } = {}) {
+  if (!fresh) {
+    const all = cache.get('pr')
+    if (all && Date.now() - all.at < CACHE_MS) {
+      const hit = (await all.value.catch(() => null))?.find(c => c.id === id)
+      if (hit) return hit
+    }
+  }
+  if (fresh) cache.delete(`deal:${id}`)
+  return cached(`deal:${id}`, CACHE_MS, async () => {
+    const entryId = String(id).slice(PR_PREFIX.length)
+    let entry
+    try { entry = (await attio(`/lists/${PR_LIST}/entries/${entryId}`))?.data } catch (err) { if (err.status === 404) return null; throw err }
+    if (!entry) return null
+    const person = personView(await getRecord('people', entry.parent_record_id))
+    const company = person?.companyId ? companyView(await getRecord('companies', person.companyId)) : null
+    return prView(entry, person, company)
+  })
+}
+
+async function addPersonNote(personId, { title, content }) {
+  return attio('/notes', {
+    method: 'POST',
+    body: { data: { parent_object: 'people', parent_record_id: personId, title, format: 'plaintext', content } },
+  })
+}
+
+/** After a PR send: To contact becomes Contacted, and the email goes on the person as a note. */
+async function recordPrSend(contact, { sentAt, touchNumber, subject, body, toEmail, sentBy }) {
+  try {
+    if (contact.prStatus === 'To contact') {
+      await attio(`/lists/${PR_LIST}/entries/${contact.entryId}`, { method: 'PATCH', body: { data: { entry_values: { status: 'Contacted' } } } })
+      cache.delete(`deal:${contact.id}`)
+      try {
+        const all = cache.get('pr')
+        const list = all && await all.value
+        const hit = list?.find(c => c.id === contact.id)
+        if (hit) Object.assign(hit, { prStatus: 'Contacted', stage: PR_STAGE.Contacted })
+      } catch { cache.delete('pr') }
+    }
+    const person = contact.person || contact.people?.[0]
+    if (person?.id) {
+      try {
+        await addPersonNote(person.id, {
+          title: `${day(sentAt)} Pitch ${touchNumber} sent: ${subject}`,
+          content: `Sent from the Sales tool by ${sentBy || 'a rep'} to ${toEmail}.\n\nSubject: ${subject}\n\n${body}`,
+        })
+      } catch (err) { console.warn(`[sales.attio] PR note failed for ${contact.name}: ${err.message}`) }
+    }
+    return { ok: true }
+  } catch (err) {
+    console.error(`[sales.attio] PR write failed for ${contact.name}: ${err.message}`)
+    return { ok: false, error: err.message }
+  }
 }
 
 // ── Health ───────────────────────────────────────────────────────────────────

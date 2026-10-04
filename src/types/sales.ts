@@ -97,6 +97,9 @@ export interface Deal {
   sentSubject?: string
   /** Only on the full detail. */
   sends?: Send[]
+  /** PR contacts only: the PR Pipeline status as Attio shows it, and the published piece. */
+  prStatus?: string
+  publishedLink?: string | null
 }
 
 export interface TodayPayload {

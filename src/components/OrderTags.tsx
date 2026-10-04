@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { staleBeforeRace } from '@/lib/raceStatus'
 
 /**
  * One shared tag vocabulary for orders.
@@ -135,14 +136,6 @@ export function raceNotRunYet(o: TaggableOrder): boolean {
   return !isNaN(d.valueOf()) && d.getTime() > Date.now()
 }
 
-/**
- * A miss on a race that has not been run says nothing about the scraper or
- * the runner: the results do not exist yet. Orders researched before the race
- * date was known can carry one of these, so the date wins.
- */
-export function staleBeforeRace(status?: string | null): boolean {
-  return status === 'not_found' || status === 'year_not_configured' || status === 'ambiguous' || status === 'upstream_error'
-}
 
 /** Research outcomes from our own scrapers. */
 function researchTag(o: TaggableOrder): OrderTag | null {

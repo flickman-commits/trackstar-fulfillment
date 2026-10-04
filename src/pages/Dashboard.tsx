@@ -13,7 +13,8 @@ import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
-import OrderTags, { raceNotRunYet, staleBeforeRace, HoverTip } from '@/components/OrderTags'
+import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
+import { staleBeforeRace } from '@/lib/raceStatus'
 
 /** Collapsible section with header + chevron toggle */
 function CollapsibleSection({ title, defaultOpen = true, children, badge }: {

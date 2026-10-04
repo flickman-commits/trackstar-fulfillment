@@ -23,6 +23,14 @@ const STAGE_TONE: Record<string, string> = {
   Won: chipTone.emerald,
   'Revisit Next Year': chipTone.blue,
   Lost: chipTone.red,
+  // The PR Pipeline's own statuses.
+  'To contact': chipTone.slate,
+  Contacted: chipTone.rose,
+  'Moving forward': chipTone.purple,
+  Published: chipTone.emerald,
+  'Not interested': chipTone.red,
+  'On hold': chipTone.blue,
+  Canceled: chipTone.red,
 }
 
 function fmtDate(s?: string | null) {
@@ -67,7 +75,7 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
         <div className="text-sm text-off-black/60 mt-0.5">{person?.title || ''}{person?.title ? ' · ' : ''}{deal.company?.name || deal.name}</div>
         {/* Where the deal stands, read-only. Stage moves happen in Attio. */}
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-          {deal.stage && <span className={`${chip} ${STAGE_TONE[String(deal.stage)] || chipTone.quiet}`}>{deal.stage}</span>}
+          {(deal.prStatus || deal.stage) && <span className={`${chip} ${STAGE_TONE[String(deal.prStatus || deal.stage)] || chipTone.quiet}`}>{deal.prStatus || deal.stage}</span>}
           {deal.priority && <span className={`${chip} ${deal.priority === 'High' ? chipTone.amber : chipTone.neutral}`}>{deal.priority}</span>}
           <span className={`${chip} ${chipTone.quiet}`}>{deal.touchCount} {deal.touchCount === 1 ? 'touch' : 'touches'}</span>
         </div>
@@ -85,6 +93,7 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
           {(person?.webUrl || deal.webUrl) && (
             <a href={person?.webUrl || deal.webUrl || '#'} target="_blank" rel="noopener noreferrer" className={textLink}>Open in Attio <ExternalLink className="w-3 h-3" /></a>
           )}
+          {deal.publishedLink && <a href={deal.publishedLink} target="_blank" rel="noopener noreferrer" className={textLink}>Published piece <ExternalLink className="w-3 h-3" /></a>}
           {person?.location && <span className="text-xs text-off-black/50">{person.location}</span>}
         </div>
         {deal.people.length > 1 && (
