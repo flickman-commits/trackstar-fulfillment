@@ -91,7 +91,7 @@ function matches(d: Deal, q: string) {
 }
 
 export default function Queue({
-  mode, scope, today, pendingSendIds, selectedId, onSelect, loading, query = '', openScheduledId = null, onOpenScheduled,
+  mode, scope, today, pendingSendIds, selectedId, onSelect, loading, query = '', openScheduledId = null, onOpenScheduled, filters,
 }: {
   mode: QueueMode
   scope: 'mine' | 'all'
@@ -107,6 +107,8 @@ export default function Queue({
   /** Send later: the email open in the middle, and how to open one. */
   openScheduledId?: string | null
   onOpenScheduled?: (item: ScheduledEmail) => void
+  /** The Filters button, shown in the strip under the switch. */
+  filters?: React.ReactNode
 }) {
   const f = (list?: Deal[]) => (list || []).filter(d => matches(d, query))
 
@@ -116,9 +118,9 @@ export default function Queue({
 
   return (
     <aside className="w-full lg:w-[290px] xl:w-[310px] shrink-0 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-border-gray">
-      <div className={`flex items-center justify-between px-5 py-3 ${listHead} flex-shrink-0`}>
-        <span>{mode === 'new' ? 'Today' : 'Due now'}</span>
-        <span className="tabular-nums">{mode === 'new' ? `${newLeft} left` : `${dueLeft} due`}</span>
+      <div className={`flex items-center justify-between gap-3 px-5 py-3 ${listHead} flex-shrink-0`}>
+        {filters}
+        <span className="tabular-nums whitespace-nowrap">{mode === 'new' ? `${newLeft} left today` : `${dueLeft} due now`}</span>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">

@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, ExternalLink, PenLine, Search, ChevronDown, Loader2 } from 'lucide-react'
+import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, ExternalLink, PenLine, Search, Loader2 } from 'lucide-react'
 import { salesApi, SalesApiError, type DealHit } from '@/lib/salesApi'
 import {
   btnSecondary, btnHero, btnHeroSecondary, pageShell,
-  segment, segmentGroup, listCard, listToolbar, toolbarInput, toolbarSelect, textLink,
+  segment, segmentGroup, listCard, listToolbar, toolbarInput, textLink,
 } from '@/lib/ui'
 import type { ScheduledEmail, Asset, Deal, DraftResult, Motion, Person, SalesStatus, TodayPayload, Variant } from '@/types/sales'
 import Queue, { type QueueMode } from '@/components/sales/Queue'
 import Composer, { type TemplateLibrary } from '@/components/sales/Composer'
 import { whenLabel } from '@/lib/salesDates'
 import ScheduledCard from '@/components/sales/ScheduledCard'
+import FiltersMenu from '@/components/sales/FiltersMenu'
 import WhoPane from '@/components/sales/WhoPane'
 import LibraryPanel from '@/components/sales/LibraryPanel'
 import SettingsModal from '@/components/sales/SettingsModal'
@@ -518,23 +519,6 @@ export default function Sales({ active = true }: { active?: boolean }) {
                   <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
                   <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search people and deals..." className={toolbarInput} />
                 </div>
-                <div className="relative md:w-44">
-                  <select value={scope} onChange={e => setScope(e.target.value as 'mine' | 'all')} className={toolbarSelect(scope === 'all')} title="Deals you own in Attio plus unowned ones, or everyone's">
-                    <option value="mine" className="bg-white text-off-black">{ownerName}</option>
-                    <option value="all" className="bg-white text-off-black">Everyone</option>
-                  </select>
-                  <ChevronDown className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${scope === 'all' ? 'text-white' : 'text-off-black/40'}`} />
-                </div>
-                <div className="relative md:w-40">
-                  <select value={motion || ''} onChange={e => setMotion((e.target.value || null) as Motion | null)} className={toolbarSelect(Boolean(motion))}>
-                    <option value="" className="bg-white text-off-black">All motions</option>
-                    <option value="Race" className="bg-white text-off-black">Race</option>
-                    <option value="Charity" className="bg-white text-off-black">Charity</option>
-                    <option value="Corporate" className="bg-white text-off-black">Corporate</option>
-                    <option value="PR" className="bg-white text-off-black">PR</option>
-                  </select>
-                  <ChevronDown className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${motion ? 'text-white' : 'text-off-black/40'}`} />
-                </div>
                 <button onClick={() => loadToday(true)} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm text-off-black/70 hover:bg-off-black/5 transition-colors" title="Re-read Attio">
                   <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /><span className="md:hidden">Refresh</span>
                 </button>
@@ -545,7 +529,9 @@ export default function Sales({ active = true }: { active?: boolean }) {
             {!today && !todayError ? <LoadingStars /> : (
             /* Three panes in the one card: who is next, the email, who they are. */
             <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
-              <Queue mode={mode} scope={scope} today={today} pendingSendIds={pendingIds} selectedId={openScheduled ? null : selectedId} onSelect={selectDeal} loading={loading} query={query} openScheduledId={openScheduled?.id || null} onOpenScheduled={openScheduledItem} />
+              <Queue
+                filters={<FiltersMenu scope={scope} onScope={setScope} motion={motion} onMotion={setMotion} ownerName={ownerName} />}
+                mode={mode} scope={scope} today={today} pendingSendIds={pendingIds} selectedId={openScheduled ? null : selectedId} onSelect={selectDeal} loading={loading} query={query} openScheduledId={openScheduled?.id || null} onOpenScheduled={openScheduledItem} />
 
               {openScheduled ? (
                 <ScheduledCard
