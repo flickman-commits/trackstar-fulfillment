@@ -44,10 +44,15 @@ export default {
     2023: 'ka9ytg9wpycg5b67',
     2024: 'snxae6qshkjg3a7z',
     2025: '4n6ka3mtc4j5vnag',
+    // From relatedEvents on the 2025 event ("2026 Air Force Marathon", eid 111482).
+    2026: '4wcuwcgkrptky69y',
   },
   subEventIds: {
     2023: { marathon: 150711, halfMarathon: 150712 },
     2024: { marathon: 204275, halfMarathon: 204279 },
     2025: { marathon: 241768, halfMarathon: 241368 },
+    // Read off GET /v2/api/events/4wcuwcgkrptky69y: the STRUCTURED (in-person,
+    // chip-scored) "Full Marathon" and "Half Marathon" sub-events, not the VIRTUAL ones.
+    2026: { marathon: 306661, halfMarathon: 306662 },
   }
 }
