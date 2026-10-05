@@ -132,8 +132,11 @@ export default function Sales({ active = true }: { active?: boolean }) {
   // The list I/K walks: the active pill's rows, with sent-today first on New.
   const items: Deal[] = useMemo(() => {
     if (!today) return []
-    if (mode === 'new') return [...today.sentToday, ...today.newOutreach, ...today.contactedBefore, ...today.needsContact]
-    return [...today.followUps, ...today.later, ...today.exhausted]
+    // Skipped deals are selectable (to bring one back) but come last, and
+    // nothing ever moves onto one on its own.
+    const skipped = today.skipped
+    if (mode === 'new') return [...today.sentToday, ...today.newOutreach, ...today.contactedBefore, ...today.needsContact, ...skipped]
+    return [...today.followUps, ...today.later, ...today.exhausted, ...skipped]
   }, [mode, today])
   const sentIds = useMemo(() => new Set(today?.sentToday.map(d => d.id) || []), [today])
 
@@ -143,7 +146,7 @@ export default function Sales({ active = true }: { active?: boolean }) {
     }
     if (items.length === 0) { setSelectedId(null); return }
     if (!selectedId || !items.some(d => d.id === selectedId)) {
-      const first = items.find(d => !sentIds.has(d.id) && !pendingIds.has(d.id) && d.hasEmail) || items[0]
+      const first = items.find(d => !sentIds.has(d.id) && !pendingIds.has(d.id) && d.hasEmail && !d.skippedUntil) || items[0]
       setSelectedId(first.id)
     }
   }, [items, selectedId, sentIds, pendingIds])
@@ -235,7 +238,7 @@ export default function Sales({ active = true }: { active?: boolean }) {
 
   const advance = useCallback((fromId: string) => {
     const idx = items.findIndex(d => d.id === fromId)
-    const ok = (d: Deal) => d.id !== fromId && !sentIds.has(d.id) && !pendingIds.has(d.id) && d.hasEmail
+    const ok = (d: Deal) => d.id !== fromId && !sentIds.has(d.id) && !pendingIds.has(d.id) && d.hasEmail && !d.skippedUntil
     const next = items.slice(idx + 1).find(ok) || items.find(ok)
     setSelectedId(next ? next.id : null)
   }, [items, sentIds, pendingIds])
@@ -369,6 +372,13 @@ export default function Sales({ active = true }: { active?: boolean }) {
     try { const r = await salesApi.sendScheduledNow(item.id); setOpenScheduled(null); toast.success(`Sent to ${item.deal?.person?.firstName || item.toEmail}`); noteSync(r.sync); loadToday() }
     catch (e) { toast.error((e as Error).message, { duration: 8000 }) }
   }, [loadToday])
+
+  /** Undo a skip: the deal goes back into today's list, still selected. */
+  const unskip = useCallback(async () => {
+    if (!deal) return
+    try { await salesApi.unskip(deal.id); toast.success(`${deal.name} is back in today's list`); await loadToday() }
+    catch (e) { toast.error((e as Error).message) }
+  }, [deal, loadToday])
 
   const skip = useCallback(async (reason?: string) => {
     if (!deal) return
@@ -573,7 +583,7 @@ export default function Sales({ active = true }: { active?: boolean }) {
                   attachments={attachedAssets} onAttach={attach} onDetach={detach}
                   onChange={updateVariant}
                   onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library} onSchedule={schedule}
+                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} onUnskip={unskip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library} onSchedule={schedule}
                 />
               )}
 

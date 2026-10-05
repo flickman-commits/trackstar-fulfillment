@@ -40,7 +40,7 @@ export default function Composer({
   deal, person, draft, variants, index, drafting, writing, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach,
-  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature, library, onSchedule,
+  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature, library, onSchedule, onUnskip,
 }: {
   deal: Deal | null
   person: Person | null
@@ -75,6 +75,8 @@ export default function Composer({
   library: TemplateLibrary | null
   /** Send later: keep it and send it from your Gmail at this time. */
   onSchedule?: (at: Date) => void
+  /** Undo "Skip today" for this deal. */
+  onUnskip?: () => void
 }) {
   const [skipOpen, setSkipOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
@@ -167,6 +169,12 @@ export default function Composer({
           </div>
         </div>
       </div>
+      {!adhoc && deal.skippedUntil && (
+        <div className="mx-6 mt-3 flex items-center justify-between gap-3 rounded-md border border-border-gray bg-subtle-gray px-3 py-2 text-sm text-off-black/70 flex-shrink-0">
+          <span>You skipped this today. It comes back on its own tomorrow.</span>
+          {onUnskip && <button onClick={onUnskip} className={btnSecondary}>Bring back</button>}
+        </div>
+      )}
 
       {drafting ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-off-black/50 min-h-[300px]">
