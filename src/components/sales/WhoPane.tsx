@@ -50,6 +50,26 @@ function raceDateLabel(s: string) {
   return `${day} · ${days === 0 ? 'today' : days > 0 ? `in ${span}` : `${span} ago`}`
 }
 
+/**
+ * Text from Attio with its addresses made clickable. A bare link shows as its
+ * site ("athletechnews.com") so a long URL does not take over the notes.
+ */
+function Linked({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s)<>,"]+)/g)
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (!/^https?:\/\//.test(part)) return <span key={i}>{part}</span>
+        const url = part.replace(/[.;:]+$/, '')
+        const tail = part.slice(url.length)
+        let site = url
+        try { site = new URL(url).hostname.replace(/^www\./, '') } catch { /* keep as typed */ }
+        return <span key={i}><a href={url} target="_blank" rel="noopener noreferrer" title={url} className="text-blue-600 hover:text-blue-700 underline decoration-blue-600/30 underline-offset-2">{site}</a>{tail}</span>
+      })}
+    </>
+  )
+}
+
 export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: {
   deal: Deal | null
   person: Person | null
@@ -59,8 +79,9 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
 }) {
   const [note, setNote] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [noteOpen, setNoteOpen] = useState(false)
-  useEffect(() => { setNote(''); setHistoryOpen(false); setNoteOpen(false) }, [deal?.id])
+  useEffect(() => { setNote(''); setHistoryOpen(false); setNoteOpen(false); setAboutOpen(false) }, [deal?.id])
 
   if (!deal) return null
   // A one-off to a bare address: nothing in Attio to show or move.
@@ -118,15 +139,18 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
         <section>
           <h3 className={`${sectionLabel} mb-2`}>{deal.company?.name || deal.name}</h3>
           <div className={`${infoCard} space-y-2.5`}>
-            {deal.company?.description && <p className="text-sm text-off-black/75 leading-snug">{deal.company.description}</p>}
+            {deal.company?.description && <p className={`text-sm text-off-black/75 leading-snug ${aboutOpen ? '' : 'line-clamp-3'}`}>{deal.company.description}</p>}
             {deal.company && (deal.company.location || deal.company.employeeRange || deal.company.categories.length > 0) && (
               <p className="text-xs text-off-black/50">{[deal.company.location, deal.company.employeeRange && `${deal.company.employeeRange} people`, ...deal.company.categories.slice(0, 3)].filter(Boolean).join(' · ')}</p>
             )}
             {deal.notes && (
               <div>
                 <div className={cardLabel}>Team notes</div>
-                <p className="text-sm text-off-black/75 leading-snug whitespace-pre-wrap mt-0.5">{deal.notes}</p>
+                <p className={`text-sm text-off-black/75 leading-snug whitespace-pre-wrap mt-0.5 break-words ${aboutOpen ? '' : 'line-clamp-5'}`}><Linked text={deal.notes} /></p>
               </div>
+            )}
+            {((deal.notes?.length || 0) > 240 || (deal.company?.description?.length || 0) > 160) && (
+              <button onClick={() => setAboutOpen(o => !o)} className={textLink}>{aboutOpen ? 'Show less' : 'Show more'}</button>
             )}
           </div>
         </section>

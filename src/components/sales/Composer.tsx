@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate, Clock } from 'lucide-react'
 import { MotionTag } from './Queue'
-import type { LibraryTemplate, OutreachTemplate, TemplateFill } from '@/lib/salesApi'
+import { salesApi, type LibraryTemplate, type OutreachTemplate, type TemplateFill, type TemplateMotion } from '@/lib/salesApi'
+import { toast } from 'sonner'
 import { menuFor } from '@/lib/salesTemplates'
 import { whenLabel } from '@/lib/salesDates'
 
@@ -40,7 +41,7 @@ export default function Composer({
   deal, person, draft, variants, index, drafting, writing, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach,
-  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature, library, onSchedule, onUnskip,
+  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature, library, onSchedule, onUnskip, onTemplateSaved,
 }: {
   deal: Deal | null
   person: Person | null
@@ -77,6 +78,8 @@ export default function Composer({
   onSchedule?: (at: Date) => void
   /** Undo "Skip today" for this deal. */
   onUnskip?: () => void
+  /** A template was saved from the composer; reload the list. */
+  onTemplateSaved?: () => void
 }) {
   const [skipOpen, setSkipOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
@@ -254,7 +257,7 @@ export default function Composer({
               </div>
             </form>
           )}
-          <TemplateMenu deal={deal} person={person} disabled={drafting || !current} onRewrite={onRewrite} aiActive={aiActive} library={library}
+          <TemplateMenu deal={deal} person={person} disabled={drafting || !current} onRewrite={onRewrite} aiActive={aiActive} library={library} current={current} onSaved={onTemplateSaved}
             onPick={t => current && onChange({ ...current, subject: t.subject ?? current.subject, body: t.body })} />
           {aiActive && (
             <button onClick={onRewrite} disabled={drafting || !person} className={btnSecondary} title="Write it again">
@@ -291,7 +294,60 @@ export default function Composer({
  * this person (this deal's motion first), plus the sequence's copy for this touch. Picking one
  * replaces the body; a template marked "stay on the thread" keeps the subject.
  */
-function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, library }: {
+/**
+ * The email as a reusable template: this person's first name back to
+ * [First Name], the deal's name back to [Race Name] or [Org Name], and a
+ * reply subject ("re: ...") saved as "reply on the thread".
+ */
+function asTemplate(v: Variant, deal: Deal, person: Person | null) {
+  const swap = (text: string) => {
+    let t = text
+    const first = (person?.firstName || '').trim()
+    if (first.length > 1) t = t.replace(new RegExp(`\\b${first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'), '[First Name]')
+    const name = (deal.name || '').trim()
+    if (name.length > 2 && !deal.id.startsWith('adhoc:')) t = t.split(name).join(deal.motion === 'Race' ? '[Race Name]' : '[Org Name]')
+    return t
+  }
+  const subject = /^\s*re:/i.test(v.subject) ? null : swap(v.subject)
+  return { subject, body: swap(v.body) }
+}
+
+/** Save what is in the composer as a template, from the bottom of the menu. */
+function SaveAsTemplate({ deal, person, current, onDone }: { deal: Deal; person: Person | null; current: Variant; onDone: (saved: boolean) => void }) {
+  const motions: TemplateMotion[] = ['Race', 'Charity', 'PR', 'Any']
+  const [name, setName] = useState('')
+  const [motion, setMotion] = useState<TemplateMotion>(motions.includes(deal.motion as TemplateMotion) ? deal.motion as TemplateMotion : 'Any')
+  const [saving, setSaving] = useState(false)
+  const t = asTemplate(current, deal, person)
+  const save = async () => {
+    if (!name.trim()) return
+    setSaving(true)
+    try {
+      await salesApi.saveLibraryTemplate({ name: name.trim(), motion, subject: t.subject, body: t.body })
+      toast.success(`Saved "${name.trim()}" to your templates`)
+      onDone(true)
+    } catch (e) { toast.error((e as Error).message) }
+    finally { setSaving(false) }
+  }
+  return (
+    <form className="px-4 py-3 space-y-2 border-t border-border-gray" onSubmit={e => { e.preventDefault(); save() }}>
+      <span className={cardLabel}>Save this email as a template</span>
+      <input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="Name it, e.g. Brand activation pitch" className={`${inputBase} w-full`} />
+      <div className="flex items-center gap-2">
+        <select value={motion} onChange={e => setMotion(e.target.value as TemplateMotion)} className={`${inputBase} text-xs`}>
+          {motions.map(m => <option key={m} value={m}>{m === 'Any' ? 'Any deal' : m}</option>)}
+        </select>
+        <button type="button" onClick={() => onDone(false)} className={`${btnGhost} ml-auto`}>Cancel</button>
+        <button type="submit" disabled={saving || !name.trim()} className={btnPrimary}>{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}</button>
+      </div>
+      <p className="text-[11px] text-off-black/45 leading-snug">
+        {person?.firstName ? `${person.firstName} becomes [First Name]` : 'Saved as written'}{deal.name && !deal.id.startsWith('adhoc:') ? `, ${deal.name} becomes ${deal.motion === 'Race' ? '[Race Name]' : '[Org Name]'}` : ''}{t.subject === null ? ', and it replies on the thread' : ''}.
+      </p>
+    </form>
+  )
+}
+
+function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, library, current, onSaved }: {
   deal: Deal
   person: Person | null
   disabled: boolean
@@ -299,8 +355,11 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
   onRewrite: () => void
   aiActive: boolean
   library: TemplateLibrary | null
+  current?: Variant
+  onSaved?: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -344,6 +403,9 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
             </div>
           ))}
           {library && items.length === 0 && <div className="px-4 py-3 text-xs text-off-black/50">No saved templates yet.</div>}
+          {current && (saving
+            ? <SaveAsTemplate deal={deal} person={person} current={current} onDone={ok => { setSaving(false); if (ok) { setOpen(false); onSaved?.() } }} />
+            : <button onClick={() => setSaving(true)} className="w-full text-left px-4 py-3 border-t border-border-gray hover:bg-subtle-gray text-sm font-medium text-off-black">+ Save this email as a template</button>)}
           {library && <div className="px-4 py-2.5 border-t border-border-gray text-[11px] text-off-black/45">Add or change these in Settings, under Templates.</div>}
         </div>
       )}

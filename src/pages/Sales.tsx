@@ -574,7 +574,7 @@ export default function Sales({ active = true }: { active?: boolean }) {
                   attachments={attachedAssets} onAttach={attach} onDetach={detach}
                   onChange={updateVariant}
                   onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} onUnskip={unskip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library} onSchedule={schedule}
+                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} onUnskip={unskip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library} onSchedule={schedule} onTemplateSaved={loadLibrary}
                 />
               )}
 
