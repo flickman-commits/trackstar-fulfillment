@@ -69,14 +69,35 @@ export async function shopifyFetch(endpoint, options = {}) {
 
   const url = `https://${store}/admin/api/2024-01${endpoint}`
 
-  const response = await fetchWithTimeout(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Shopify-Access-Token': token,
-      ...options.headers
+  // Retry what is temporary: a rate limit (429, Shopify's REST bucket refills
+  // at 2 calls a second), a 5xx, or a timeout. Three tries, honoring
+  // Retry-After. A one-off failure here used to drop an order's Shopify data
+  // for that whole import run.
+  let response
+  for (let attempt = 1; ; attempt++) {
+    try {
+      response = await fetchWithTimeout(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': token,
+          ...options.headers
+        }
+      })
+    } catch (error) {
+      if (attempt >= 3) throw error
+      console.warn(`[shopifyFetch] ${endpoint} attempt ${attempt} failed (${error.message}), retrying`)
+      await new Promise(r => setTimeout(r, 1000 * attempt))
+      continue
     }
-  })
+    if ((response.status === 429 || response.status >= 500) && attempt < 3) {
+      const wait = Math.min(Number(response.headers.get('retry-after')) * 1000 || 1000 * attempt, 5000)
+      console.warn(`[shopifyFetch] ${endpoint} got ${response.status}, retrying in ${wait}ms`)
+      await new Promise(r => setTimeout(r, wait))
+      continue
+    }
+    break
+  }
 
   if (!response.ok) {
     const errorText = await response.text()

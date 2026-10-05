@@ -754,6 +754,21 @@ export async function processOrders(options = {}) {
             //
             // Only skip when we have not already created a row for it — an
             // existing row is someone's real data and is not ours to drop.
+            // A Shopify order whose Shopify data did not load is retried on the
+            // next run (every 10 minutes) rather than imported blind: a row
+            // made now would have no runner, race or matching, and is the
+            // "Unknown Race" row Eli kept finding.
+            // Only for a day: an order Shopify never returns (deleted, say)
+            // still has to reach the dashboard, even blind.
+            const placedAt = new Date(order.createdAt || order.created_at || Date.now()).getTime()
+            if (!existing && isShopify && !shopifyData && Date.now() - placedAt < 24 * 3600 * 1000) {
+              log(`[processOrders] Deferring line item ${lineItemIndex} on order ${order.orderId} (Shopify order did not load, will retry next run)`)
+              results.skipped++
+              orderResult.action = 'deferred'
+              results.orders.push(orderResult)
+              continue
+            }
+
             // Artelo itself marks the add-on: its item has no product (no size,
             // no frame). That holds whether or not the Shopify order loaded,
             // which the match below depends on. A run where the Shopify fetch
