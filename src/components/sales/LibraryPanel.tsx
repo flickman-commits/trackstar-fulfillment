@@ -140,7 +140,7 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
             >
               <div
                 onClick={() => { if (a.kind === 'image' && a.previewUrl) setViewing(a); else if (a.previewUrl) window.open(a.previewUrl, '_blank', 'noopener') }}
-                className={`rounded-t-md bg-subtle-gray overflow-hidden cursor-zoom-in ${a.kind === 'image' && a.previewUrl ? '' : 'aspect-[4/5] grid place-items-center'}`}
+                className={`rounded-t-md bg-subtle-gray overflow-hidden cursor-zoom-in ${a.kind === 'image' && a.previewUrl ? '' : 'aspect-square grid place-items-center'}`}
               >
                 {a.kind === 'image' && a.previewUrl ? (
                   // The whole mockup at its own shape: it fills the card's width and sets the height,
