@@ -1,7 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AppShell from '@/components/AppShell'
 import { Toaster } from 'sonner'
-import { useEffect, Component } from 'react'
+import { useEffect, useState, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import Dashboard from '@/pages/Dashboard'
 import ApprovalPortal from '@/pages/ApprovalPortal'
@@ -111,6 +111,25 @@ function RedirectToMonopolyHost({ path = '/' }: { path?: string }) {
   )
 }
 
+/**
+ * Sales stays mounted once opened. The first visit of a session reads the
+ * queue from Attio (the stars); after that, going to Fulfillment and back
+ * shows it exactly as it was left, drafts included. Only a full page load
+ * starts it over. Hidden with display:none while another page is up.
+ */
+function SalesKeepAlive() {
+  const { pathname } = useLocation()
+  const onSales = pathname === '/sales' || pathname === '/send'
+  const [opened, setOpened] = useState(onSales)
+  useEffect(() => { if (onSales) setOpened(true) }, [onSales])
+  if (!opened) return null
+  return (
+    <div className={onSales ? 'contents' : 'hidden'} aria-hidden={!onSales}>
+      <Sales active={onSales} />
+    </div>
+  )
+}
+
 export default function App() {
   if (isMonopolyHost()) {
     return (
@@ -180,11 +199,13 @@ export default function App() {
                 <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
                 {/* Sales is for reps: anyone signed in whose email is on the Attio
                     workspace, or an admin. The API decides; the page shows why not. */}
-                <Route path="/sales" element={<Sales />} />
-                {/* The daily send list is the Sales page. /send is the short name the brief uses. */}
-                <Route path="/send" element={<Sales />} />
+                {/* Rendered by SalesKeepAlive below, so it survives leaving the page.
+                    /send is the short name the brief uses. */}
+                <Route path="/sales" element={null} />
+                <Route path="/send" element={null} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>
+              <SalesKeepAlive />
               </AppShell>
             </SignInGate>
           } />

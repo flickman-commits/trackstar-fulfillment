@@ -36,8 +36,22 @@ import { useDocumentHead } from '@/lib/useDocumentHead'
 type Prepared = { draft: DraftResult; variants: Variant[]; template: boolean }
 const AI_KEY = 'sales.ai'
 
-export default function Sales() {
+/** The tab title, only while Sales is the page on screen. */
+function SalesHead() {
   useDocumentHead({ title: 'Sales · Trackstar' })
+  return null
+}
+
+/** How old the queue can get, while you were on another page, before coming back reads it again (quietly). */
+const STALE_MS = 10 * 60_000
+
+/**
+ * `active` is false while Sales is kept alive in the background (App.tsx):
+ * it stays mounted so the queue, open drafts and selection survive a trip to
+ * Fulfillment, and only a full page load starts it from scratch. While
+ * inactive it does not listen to the keyboard or own the tab title.
+ */
+export default function Sales({ active = true }: { active?: boolean }) {
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -100,9 +114,10 @@ export default function Sales() {
   }, [location.search, navigate])
 
   const loadStatus = useCallback(() => { salesApi.status().then(setStatus).catch(() => setStatus(null)) }, [])
+  const loadedAt = useRef(0)
   const loadToday = useCallback(async (refresh = false) => {
     setLoading(true)
-    try { setToday(await salesApi.today({ scope, motion, refresh })); setTodayError(null) }
+    try { setToday(await salesApi.today({ scope, motion, refresh })); setTodayError(null); loadedAt.current = Date.now() }
     catch (e) { const err = e as SalesApiError; setTodayError({ message: err.message, code: err.code }) }
     finally { setLoading(false) }
   }, [scope, motion])
@@ -370,8 +385,16 @@ export default function Sales() {
     finally { setBusy(false) }
   }, [deal])
 
-  // Keyboard: ⌘↵ sends, S skips.
+  // Back from another page after a while: read the queue again, quietly. The
+  // stars only show when there is nothing on screen yet.
   useEffect(() => {
+    if (active && loadedAt.current && Date.now() - loadedAt.current > STALE_MS) { loadToday(); loadStatus() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
+
+  // Keyboard: ⌘↵ sends, S skips. Only while Sales is the page on screen.
+  useEffect(() => {
+    if (!active) return
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(); return }
       const t = e.target as HTMLElement
@@ -383,7 +406,7 @@ export default function Sales() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [send, skip, settingsOpen, progressOpen, newOpen])
+  }, [active, send, skip, settingsOpen, progressOpen, newOpen])
 
   const updateVariant = (v: Variant) => {
     if (!deal || !current) return
@@ -432,6 +455,7 @@ export default function Sales() {
 
   return (
     <div className={pageShell}>
+      {active && <SalesHead />}
       <div className="px-3 md:px-5 w-full flex flex-col h-full">
         {/* Header: stars and title on one line, the day's count on the right. */}
         <div className="pt-4 md:pt-5 pb-3 md:pb-4 flex items-center justify-between gap-4 flex-shrink-0">
