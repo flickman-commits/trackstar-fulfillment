@@ -1,5 +1,5 @@
-import { useRef, useState, type DragEvent } from 'react'
-import { FileText, Image as ImageIcon, Loader2, Plus, Trash2, Upload, Check, Pencil } from 'lucide-react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { FileText, Image as ImageIcon, Loader2, Plus, Trash2, Upload, Check, Pencil, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { sectionLabel, textLink } from '@/lib/ui'
 import { salesApi } from '@/lib/salesApi'
@@ -35,6 +35,7 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
   const [filter, setFilter] = useState<'all' | 'image' | 'deck'>('all')
   const fileInput = useRef<HTMLInputElement>(null)
   const resigned = useRef(false)
+  const [viewing, setViewing] = useState<Asset | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
   const [renaming, setRenaming] = useState(false)
@@ -100,6 +101,8 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
   }
 
   return (
+    <>
+    {viewing && <Viewer asset={viewing} attached={attachedIds.has(viewing.id)} onAttach={() => { onAttach(viewing); setViewing(null) }} onClose={() => setViewing(null)} />}
     <section
       className={`flex flex-col rounded-md transition-colors ${over ? 'ring-2 ring-dark-fill/20 bg-subtle-gray' : ''}`}
       onDragOver={e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setOver(true) } }}
@@ -117,8 +120,8 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
         </div>
       </div>
 
-      <p className="text-xs text-off-black/45 mb-2">Drag a card onto the email, or double-click it.</p>
-      <div className={`grid gap-2 ${compact ? 'grid-cols-3' : 'grid-cols-2'}`}>
+      <p className="text-xs text-off-black/45 mb-2">Click a mockup to see it full size. Drag it onto the email, or use +.</p>
+      <div className={`grid items-start gap-2 ${compact ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {Object.entries(uploading).map(([name, frac]) => (
           <div key={name} className="rounded-md border border-dashed border-border-gray p-2 text-[11px] text-off-black/55">
             <Loader2 className="w-3.5 h-3.5 animate-spin inline mr-1" />{name}
@@ -132,14 +135,17 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
               key={a.id}
               draggable
               onDragStart={e => { e.dataTransfer.setData(ASSET_DRAG_TYPE, JSON.stringify(a)); e.dataTransfer.effectAllowed = 'copy' }}
-              onDoubleClick={() => onAttach(a)}
-              className={`group relative rounded-md border bg-white cursor-grab active:cursor-grabbing ${attached ? 'border-dark-fill' : 'border-border-gray hover:border-off-black/40'}`}
-              title={`${a.name}${a.size ? ` · ${fmtSize(a.size)}` : ''}. Drag onto the email, or double-click.`}
+              className={`group relative rounded-md border bg-white ${attached ? 'border-dark-fill' : 'border-border-gray hover:border-off-black/40'}`}
+              title={`${a.name}${a.size ? ` · ${fmtSize(a.size)}` : ''}. Click to see it full size; drag onto the email to attach.`}
             >
-              <div className="aspect-[4/5] rounded-t-md bg-subtle-gray grid place-items-center overflow-hidden p-1.5">
+              <div
+                onClick={() => { if (a.kind === 'image' && a.previewUrl) setViewing(a); else if (a.previewUrl) window.open(a.previewUrl, '_blank', 'noopener') }}
+                className={`rounded-t-md bg-subtle-gray overflow-hidden cursor-zoom-in ${a.kind === 'image' && a.previewUrl ? '' : 'aspect-[4/5] grid place-items-center'}`}
+              >
                 {a.kind === 'image' && a.previewUrl ? (
-                  // The whole mockup, never cropped. A link that has expired asks for fresh ones, once.
-                  <img src={a.previewUrl} alt="" className="w-full h-full object-contain" draggable={false} onError={() => { if (!resigned.current) { resigned.current = true; onChanged() } }} />
+                  // The whole mockup at its own shape: it fills the card's width and sets the height,
+                  // so nothing is cropped and there is no empty band. An expired link asks for fresh ones, once.
+                  <img src={a.previewUrl} alt="" className="block w-full h-auto" draggable={false} onError={() => { if (!resigned.current) { resigned.current = true; onChanged() } }} />
                 ) : a.kind === 'image' ? <ImageIcon className="w-6 h-6 text-off-black/30" /> : (
                   <div className="text-center"><FileText className="w-7 h-7 text-off-black/40 mx-auto" /><div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mt-1">{a.filename.split('.').pop()}{a.size ? ` · ${fmtSize(a.size)}` : ''}</div></div>
                 )}
@@ -156,14 +162,14 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
                   />
                 </form>
               ) : (
-                <div className="px-2 py-1.5 text-xs font-medium text-off-black leading-tight line-clamp-2 min-h-[38px] cursor-text" title={`${a.name}. Double-click the name to rename.`} onDoubleClick={e => { e.stopPropagation(); startRename(a) }}>{a.name}</div>
+                <div className="px-2 py-1.5 text-xs font-medium text-off-black leading-tight line-clamp-2 cursor-text" title={`${a.name}. Double-click the name to rename.`} onDoubleClick={e => { e.stopPropagation(); startRename(a) }}>{a.name}</div>
               )}
               <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => onAttach(a)} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-subtle-gray" title={attached ? 'Attached' : 'Attach to this email'}>
+                <button onClick={e => { e.stopPropagation(); onAttach(a) }} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-subtle-gray" title={attached ? 'Attached' : 'Attach to this email'}>
                   {attached ? <Check className="w-3.5 h-3.5 text-success-green" /> : <Plus className="w-3.5 h-3.5" />}
                 </button>
-                <button onClick={() => startRename(a)} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-subtle-gray" title="Rename"><Pencil className="w-3 h-3" /></button>
-                <button onClick={() => remove(a)} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-red-50 hover:text-red-700" title="Remove from the library"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button onClick={e => { e.stopPropagation(); startRename(a) }} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-subtle-gray" title="Rename"><Pencil className="w-3 h-3" /></button>
+                <button onClick={e => { e.stopPropagation(); remove(a) }} className="w-6 h-6 rounded bg-white/95 border border-border-gray grid place-items-center hover:bg-red-50 hover:text-red-700" title="Remove from the library"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
               {attached && <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-dark-fill text-white grid place-items-center"><Check className="w-2.5 h-2.5" strokeWidth={3} /></div>}
             </div>
@@ -176,5 +182,28 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
         )}
       </div>
     </section>
+    </>
   )
 }
+
+/** One mockup, full screen. Esc or a click outside closes it. */
+function Viewer({ asset, attached, onAttach, onClose }: { asset: Asset; attached: boolean; onAttach: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="fixed inset-0 z-50 bg-off-black/80 flex flex-col items-center justify-center p-6 gap-3" onClick={onClose} role="dialog" aria-label={asset.name}>
+      <img src={asset.previewUrl || ''} alt={asset.name} className="max-w-full max-h-[calc(100vh-120px)] object-contain rounded shadow-2xl" onClick={e => e.stopPropagation()} />
+      <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
+        <span className="text-sm font-medium text-white">{asset.name}</span>
+        <button onClick={onAttach} disabled={attached} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white text-off-black text-xs font-medium hover:bg-white/90 disabled:opacity-60">
+          {attached ? <><Check className="w-3.5 h-3.5" /> Attached</> : <><Plus className="w-3.5 h-3.5" /> Attach to email</>}
+        </button>
+        <button onClick={onClose} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 text-white text-xs font-medium hover:bg-white/20"><X className="w-3.5 h-3.5" /> Close</button>
+      </div>
+    </div>
+  )
+}
+

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
+import { ExternalLink, Loader2 } from 'lucide-react'
 import { btnGhost, btnPrimary, cardLabel, chip, chipTone, infoCard, inputBase, sectionLabel, segment, textLink } from '@/lib/ui'
 import { type Deal, type Person } from '@/types/sales'
 
@@ -33,11 +33,6 @@ const STAGE_TONE: Record<string, string> = {
   Canceled: chipTone.red,
 }
 
-function fmtDate(s?: string | null) {
-  if (!s) return ''
-  const d = s.length === 10 ? new Date(`${s}T00:00:00`) : new Date(s)
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })
-}
 
 /** "Sat, Apr 3, 2027 · in 6 months", or "· 3 weeks ago" once it has run. */
 function raceDateLabel(s: string) {
@@ -78,16 +73,23 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
   busy: boolean
 }) {
   const [note, setNote] = useState('')
-  const [historyOpen, setHistoryOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [noteOpen, setNoteOpen] = useState(false)
-  useEffect(() => { setNote(''); setHistoryOpen(false); setNoteOpen(false); setAboutOpen(false) }, [deal?.id])
+  // Notes saved from here this session, so the one you just wrote stays in view.
+  const [added, setAdded] = useState<Record<string, string[]>>({})
+  useEffect(() => { setNote(''); setNoteOpen(false); setAboutOpen(false) }, [deal?.id])
 
   if (!deal) return null
   // A one-off to a bare address: nothing in Attio to show or move.
   const free = deal.id.startsWith('adhoc:')
 
   const sends = deal.sends || []
+  // The latest thread sent from here, or every email with them in Gmail.
+  const thread = sends.slice().reverse().find(s => s.gmailThreadId)?.gmailThreadId
+  const gmailUrl = thread
+    ? `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(thread)}`
+    : person?.email ? `https://mail.google.com/mail/u/0/#search/${encodeURIComponent(person.email)}` : null
+  const myNotes = added[deal.id] || []
 
   return (
     <div className="space-y-5 text-sm">
@@ -114,6 +116,8 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
           {(person?.webUrl || deal.webUrl) && (
             <a href={person?.webUrl || deal.webUrl || '#'} target="_blank" rel="noopener noreferrer" className={textLink}>Open in Attio <ExternalLink className="w-3 h-3" /></a>
           )}
+          {gmailUrl && <a href={gmailUrl} target="_blank" rel="noopener noreferrer" className={textLink}>View thread in Gmail <ExternalLink className="w-3 h-3" /></a>}
+          {!free && !noteOpen && <button onClick={() => setNoteOpen(true)} className={textLink}>+ Add note</button>}
           {deal.publishedLink && <a href={deal.publishedLink} target="_blank" rel="noopener noreferrer" className={textLink}>Published piece <ExternalLink className="w-3 h-3" /></a>}
           {person?.location && <span className="text-xs text-off-black/50">{person.location}</span>}
         </div>
@@ -127,6 +131,33 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
           </div>
         )}
       </section>
+
+      {!free && (noteOpen || myNotes.length > 0) && (
+        <section>
+          <h3 className={`${sectionLabel} mb-2`}>Notes</h3>
+          {myNotes.length > 0 && (
+            <div className="space-y-1.5 mb-2">
+              {myNotes.map((n, i) => <div key={i} className={`${infoCard} text-sm text-off-black/75 whitespace-pre-wrap`}>{n}</div>)}
+            </div>
+          )}
+          {noteOpen && (
+            <form className="flex flex-col gap-2" onSubmit={async e => {
+              e.preventDefault()
+              const text = note.trim()
+              if (!text) return
+              await onNote(text)
+              setAdded(prev => ({ ...prev, [deal.id]: [...(prev[deal.id] || []), text] }))
+              setNote(''); setNoteOpen(false)
+            }}>
+              <textarea autoFocus rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Goes on the deal in Attio, with your name." className={`${inputBase} w-full resize-y`} />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => { setNoteOpen(false); setNote('') }} className={btnGhost}>Cancel</button>
+                <button type="submit" disabled={busy || !note.trim()} className={btnPrimary}>{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save to Attio'}</button>
+              </div>
+            </form>
+          )}
+        </section>
+      )}
 
       {person?.description && (
         <section>
@@ -156,63 +187,6 @@ export default function WhoPane({ deal, person, onSelectPerson, onNote, busy }: 
         </section>
       )}
 
-      {/* What has already gone to this person, so a follow-up can pick up where
-          the last one left off. Emails sent from the tool carry their text;
-          anything older than the tool lives in Gmail, one click away. */}
-      {(sends.length > 0 || person?.email) && (
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <button onClick={() => setHistoryOpen(o => !o)} className={`${sectionLabel} inline-flex items-center gap-1 hover:text-off-black/70`}>
-              Past emails{sends.length ? ` · ${sends.length}` : ''} {historyOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-            </button>
-            {person?.email && (
-              <a href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(person.email)}`} target="_blank" rel="noopener noreferrer" className={textLink}>
-                Whole chain in Gmail <ExternalLink className="w-3 h-3" />
-              </a>
-            )}
-          </div>
-          {historyOpen && (
-            <div className="space-y-2">
-              {sends.slice().reverse().map(s => (
-                <details key={s.id} className={`${infoCard} text-xs`}>
-                  <summary className="cursor-pointer list-none">
-                    <span className={`flex justify-between gap-2 ${cardLabel}`}><span>Touch {s.touchNumber}{s.sentByEmail ? ` · ${s.sentByEmail.split('@')[0]}` : ''}</span><span>{fmtDate(s.sentAt)}</span></span>
-                    <span className="block text-sm font-medium text-off-black truncate mt-0.5">{s.subject}</span>
-                  </summary>
-                  {s.body && <p className="mt-2 whitespace-pre-wrap leading-snug text-off-black/70 border-t border-border-gray pt-2">{s.body}</p>}
-                  {!s.attioOk && <p className="text-amber-700 mt-1">Attio was not updated for this one.</p>}
-                  {s.gmailThreadId && (
-                    <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(s.gmailThreadId)}`} target="_blank" rel="noopener noreferrer" className={`${textLink} mt-1.5`}>Open the thread <ExternalLink className="w-3 h-3" /></a>
-                  )}
-                </details>
-              ))}
-              {sends.length === 0 && (
-                <p className="text-xs text-off-black/45 leading-snug">Nothing was sent from this tool yet. Earlier emails, including anyone who has left, are in Gmail.</p>
-              )}
-            </div>
-          )}
-        </section>
-      )}
-
-      {!free && (
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className={sectionLabel}>Notes</h3>
-            {!noteOpen && <button onClick={() => setNoteOpen(true)} className={textLink}>+ Add note</button>}
-          </div>
-          {noteOpen ? (
-            <form className="flex flex-col gap-2" onSubmit={async e => { e.preventDefault(); if (!note.trim()) return; await onNote(note.trim()); setNote(''); setNoteOpen(false) }}>
-              <textarea autoFocus rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Goes on the deal in Attio, with your name." className={`${inputBase} w-full resize-y`} />
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => { setNoteOpen(false); setNote('') }} className={btnGhost}>Cancel</button>
-                <button type="submit" disabled={busy || !note.trim()} className={btnPrimary}>{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save to Attio'}</button>
-              </div>
-            </form>
-          ) : (
-            <p className="text-xs text-off-black/45">A note goes on the deal in Attio, with your name.</p>
-          )}
-        </section>
-      )}
     </div>
   )
 }
