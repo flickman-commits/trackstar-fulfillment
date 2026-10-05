@@ -343,18 +343,96 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
   )
 }
 
-/** A textarea that grows with its text, so the pane scrolls rather than the box. */
-function AutoGrow({ value, onChange, onBlur, className, placeholder, minRows = 3 }: {
+/** A selection in one of the body's boxes, waiting to become a link. */
+type LinkTarget = { field: 'main' | 'ps'; start: number; end: number; text: string }
+
+/** A pasted address, if that is all the clipboard holds. */
+function asUrl(text: string) {
+  const t = text.trim()
+  if (/^(https?:\/\/|mailto:)\S+$/i.test(t)) return t
+  if (/^www\.\S+\.\S+$/i.test(t)) return `https://${t}`
+  return null
+}
+
+/** What was typed in the link box, made into an address a mail app will open. */
+function normalizeUrl(raw: string) {
+  const t = raw.trim()
+  if (!t) return ''
+  if (/^(https?:\/\/|mailto:)/i.test(t)) return t
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return `mailto:${t}`
+  return `https://${t.replace(/^\/+/, '')}`
+}
+
+/**
+ * A textarea that grows with its text, so the pane scrolls rather than the box.
+ * ⌘K (Ctrl+K) asks for a link on the selection; pasting an address over
+ * selected text links it straight away. Links are written [text](url), and
+ * the email turns them into real links when it sends.
+ */
+function AutoGrow({ value, onChange, onBlur, className, placeholder, minRows = 3, inputRef, onLink }: {
   value: string; onChange: (v: string) => void; onBlur?: () => void; className?: string; placeholder?: string; minRows?: number
+  inputRef?: React.RefObject<HTMLTextAreaElement>
+  onLink?: (sel: { start: number; end: number; text: string }) => void
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null)
+  const own = useRef<HTMLTextAreaElement>(null)
+  const ref = inputRef || own
   useEffect(() => {
     const el = ref.current
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
-  }, [value])
-  return <textarea ref={ref} rows={minRows} value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} className={`${className || ''} resize-none overflow-hidden`} />
+  }, [value, ref])
+  return (
+    <textarea
+      ref={ref} rows={minRows} value={value} placeholder={placeholder}
+      onChange={e => onChange(e.target.value)} onBlur={onBlur}
+      onKeyDown={e => {
+        if (onLink && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+          e.preventDefault()
+          const el = e.currentTarget
+          onLink({ start: el.selectionStart, end: el.selectionEnd, text: value.slice(el.selectionStart, el.selectionEnd) })
+        }
+      }}
+      onPaste={e => {
+        const el = e.currentTarget
+        if (el.selectionStart === el.selectionEnd) return
+        const url = asUrl(e.clipboardData.getData('text'))
+        if (!url) return
+        e.preventDefault()
+        const text = value.slice(el.selectionStart, el.selectionEnd)
+        onChange(`${value.slice(0, el.selectionStart)}[${text}](${url})${value.slice(el.selectionEnd)}`)
+      }}
+      className={`${className || ''} resize-none overflow-hidden`}
+    />
+  )
+}
+
+/** The ⌘K box: the words to show and where they go. */
+function LinkBox({ target, onSave, onCancel }: { target: LinkTarget; onSave: (text: string, url: string) => void; onCancel: () => void }) {
+  const [text, setText] = useState(target.text)
+  const [url, setUrl] = useState('')
+  const ok = Boolean(text.trim() && normalizeUrl(url))
+  return (
+    <form
+      className="absolute left-2 right-2 top-7 z-20 rounded-lg border border-border-gray bg-white shadow-lg p-3 space-y-2"
+      onSubmit={e => { e.preventDefault(); if (ok) onSave(text.trim(), normalizeUrl(url)) }}
+      onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onCancel() } }}
+    >
+      <div className="grid grid-cols-[52px_1fr] items-center gap-2">
+        <span className={cardLabel}>Text</span>
+        <input value={text} onChange={e => setText(e.target.value)} placeholder="What the reader sees" className={`${inputBase} w-full`} autoFocus={!target.text} />
+        <span className={cardLabel}>Link</span>
+        <input value={url} onChange={e => setUrl(e.target.value)} placeholder="trackstar.art/collections/all" className={`${inputBase} w-full`} autoFocus={Boolean(target.text)} />
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] text-off-black/45">Shows as [text](link) here, a real link in the email.</span>
+        <div className="flex gap-2">
+          <button type="button" onClick={onCancel} className={btnGhost}>Cancel</button>
+          <button type="submit" disabled={!ok} className={btnPrimary}>Add link</button>
+        </div>
+      </div>
+    </form>
+  )
 }
 
 /** Where a P.S. starts: a paragraph that opens with "P.S.", as composeHtml splits it on send. */
@@ -392,17 +470,36 @@ function BodyEditor({ body, signature, onChange, onBlur }: {
     onChange(next)
   }
   const box = 'block w-full text-sm leading-relaxed text-off-black bg-transparent px-1 focus:outline-none placeholder:text-off-black/30'
+  const [link, setLink] = useState<LinkTarget | null>(null)
+  const mainRef = useRef<HTMLTextAreaElement>(null)
+  const psRef = useRef<HTMLTextAreaElement>(null)
+  const addLink = (text: string, url: string) => {
+    if (!link) return
+    const value = link.field === 'main' ? parts.main : parts.ps
+    const md = `[${text}](${url})`
+    const next = `${value.slice(0, link.start)}${md}${value.slice(link.end)}`
+    if (link.field === 'main') update(next, parts.ps); else update(parts.main, next)
+    const el = (link.field === 'main' ? mainRef : psRef).current
+    const caret = link.start + md.length
+    setLink(null)
+    // Back to typing, just after the new link.
+    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(caret, caret) })
+  }
   return (
-    <div className="px-6 pt-3 pb-2">
-      <span className={`${cardLabel} block px-2 mb-0.5`}>Body</span>
+    <div className="px-6 pt-3 pb-2 relative">
+      <span className="flex items-center justify-between px-2 mb-0.5">
+        <span className={cardLabel}>Body</span>
+        <span className="text-[10px] text-off-black/35">⌘K adds a link</span>
+      </span>
+      {link && <LinkBox target={link} onSave={addLink} onCancel={() => { const el = (link.field === 'main' ? mainRef : psRef).current; setLink(null); requestAnimationFrame(() => el?.focus()) }} />}
       <div className="rounded-md px-1 py-1 focus-within:bg-subtle-gray/50 transition-colors">
-        <AutoGrow value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minRows={8} className={box} />
+        <AutoGrow value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minRows={8} className={box} inputRef={mainRef} onLink={sel => setLink({ field: 'main', ...sel })} />
         <div className="px-1 pt-3 pb-2 text-sm text-off-black" title="Your signature, added on send. Change it in Settings, under Me.">
           {signature
             ? <div dangerouslySetInnerHTML={{ __html: signature }} />
             : <span className="text-xs text-off-black/40">No signature yet. Add one in Settings, under Me.</span>}
         </div>
-        <AutoGrow value={parts.ps} onChange={v => update(parts.main, v)} onBlur={onBlur} minRows={1} placeholder="P.S. (optional)" className={box} />
+        <AutoGrow value={parts.ps} onChange={v => update(parts.main, v)} onBlur={onBlur} minRows={1} placeholder="P.S. (optional)" className={box} inputRef={psRef} onLink={sel => setLink({ field: 'ps', ...sel })} />
       </div>
     </div>
   )

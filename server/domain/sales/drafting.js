@@ -15,7 +15,7 @@
 import prisma from '../../db.js'
 import { complete, isLlmConfigured } from '../../lib/llm.js'
 import { cadenceFor, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateFor, greetingName, RACE_ONE_LINERS } from './angles.js'
-import { sendMessage, gmailStatus } from './gmail.js'
+import { sendMessage, gmailStatus, lineToHtml } from './gmail.js'
 import { readAsset, isAssetStorageConfigured } from './assets.js'
 import { getSettings, getSenderFor } from './settings.js'
 import { getTemplates } from './templates.js'
@@ -50,8 +50,7 @@ export function composeHtml(body, { signature = '', senderName = 'Matt' } = {}) 
   // and an empty line between paragraphs, with no font set. The reader's own
   // mail app then shows it in its default font and size, like any email a
   // person typed. Only the signature carries styling, its own.
-  const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const para = t => t.split('\n').map(line => `<div>${esc(line) || '<br>'}</div>`).join('\n')
+  const para = t => t.split('\n').map(line => `<div>${lineToHtml(line) || '<br>'}</div>`).join('\n')
   const blank = '<div><br></div>'
   const blocks = [
     ...main.map(para),

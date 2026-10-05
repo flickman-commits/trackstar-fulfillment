@@ -39,7 +39,8 @@ export function draftProblems(draft, { pipeline, touchNumber, companyName }) {
 
   // A blank left in from a template ("[First Name]", "[Pick a story...]",
   // the write-one-specific-line marker) must never reach a person.
-  const blank = all.match(/\[[A-Z][^\]\n]{2,}\]/)
+  // "[text](https://...)" is a link from the composer, not a blank.
+  const blank = all.match(/\[[A-Z][^\]\n]{2,}\](?!\()/)
   if (blank) problems.push(`Still has a blank to fill in: ${blank[0].length > 60 ? `${blank[0].slice(0, 57)}...]` : blank[0]}`)
 
   if (NAMED_AS_PARTNER.test(all)) problems.push('Presents the recipient\'s own team as an existing partner ("a few Team X partners use these"). They are not a partner yet. Say "a few partners", or name a real one.')

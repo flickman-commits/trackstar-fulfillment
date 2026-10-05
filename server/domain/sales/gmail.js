@@ -326,11 +326,28 @@ function base64url(s) {
  * paragraph, <br> inside a paragraph. Keeps drafts looking like a person typed
  * them rather than a newsletter.
  */
-export function textToHtml(text) {
+/**
+ * One line of a draft as HTML: escaped, with the composer's links,
+ * written [text](https://...), turned into real ones. Only http(s) and
+ * mailto addresses become links; anything else stays as typed.
+ */
+const LINK = /\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/g
+export function lineToHtml(line) {
   const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  let out = ''
+  let last = 0
+  for (const m of String(line).matchAll(LINK)) {
+    out += esc(line.slice(last, m.index))
+    out += `<a href="${esc(m[2]).replace(/"/g, '&quot;')}">${esc(m[1])}</a>`
+    last = m.index + m[0].length
+  }
+  return out + esc(line.slice(last))
+}
+
+export function textToHtml(text) {
   // Same shape as composeHtml: no font set, so the reader's default applies.
   const paragraphs = String(text || '').replace(/\r\n/g, '\n').split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
-  const inner = paragraphs.map(p => p.split('\n').map(line => `<div>${esc(line) || '<br>'}</div>`).join('\n')).join('\n<div><br></div>\n')
+  const inner = paragraphs.map(p => p.split('\n').map(line => `<div>${lineToHtml(line) || '<br>'}</div>`).join('\n')).join('\n<div><br></div>\n')
   return `<div>\n${inner}\n</div>`
 }
 
