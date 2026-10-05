@@ -754,6 +754,18 @@ export async function processOrders(options = {}) {
             //
             // Only skip when we have not already created a row for it — an
             // existing row is someone's real data and is not ours to drop.
+            // Artelo itself marks the add-on: its item has no product (no size,
+            // no frame). That holds whether or not the Shopify order loaded,
+            // which the match below depends on. A run where the Shopify fetch
+            // came back empty imported the add-on as "Unknown Race".
+            if (!existing && arteloItem && !arteloItem.product) {
+              log(`[processOrders] Skipping line item ${lineItemIndex} on order ${order.orderId} (Artelo item has no product: an add-on, not a print)`)
+              results.skipped++
+              orderResult.action = 'skipped'
+              results.orders.push(orderResult)
+              continue
+            }
+
             if (!existing && isShopify && shopifyData?.shopifyOrderData?.line_items?.length) {
               if ((shopifyMatchMap?.[lineItemIndex] ?? -1) < 0) {
                 log(`[processOrders] Skipping line item ${lineItemIndex} on order ${order.orderId} (no print to match, treating as photo add-on)`)
