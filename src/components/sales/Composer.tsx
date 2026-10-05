@@ -415,29 +415,46 @@ function AutoGrow({ value, onChange, onBlur, className, placeholder, minRows = 3
   )
 }
 
-/** The ⌘K box: the words to show and where they go. */
+/**
+ * Links Matt adds often, one click away in the ⌘K box. Instagram handles and
+ * pages are taken from trackstar.art and flickmanmedia.com; change them here.
+ */
+const QUICK_LINKS: { label: string; text: string; url: string }[] = [
+  { label: 'Trackstar IG', text: 'Instagram', url: 'https://www.instagram.com/trackstar_art/' },
+  { label: 'My IG', text: 'Instagram', url: 'https://www.instagram.com/flickman/' },
+  { label: 'Homepage', text: 'Trackstar', url: 'https://trackstar.art' },
+  { label: 'Marathons', text: 'our marathon prints', url: 'https://trackstar.art/collections/marathons' },
+]
+
+/** The ⌘K box: compact, with the usual links one click away. */
 function LinkBox({ target, onSave, onCancel }: { target: LinkTarget; onSave: (text: string, url: string) => void; onCancel: () => void }) {
   const [text, setText] = useState(target.text)
   const [url, setUrl] = useState('')
   const ok = Boolean(text.trim() && normalizeUrl(url))
+  const small = 'px-2 py-1 text-xs bg-white border border-border-gray rounded focus:outline-none focus:ring-2 focus:ring-off-black/10 placeholder:text-off-black/35'
+  // With words selected, a quick link goes straight in; otherwise it fills the box.
+  const quick = (q: typeof QUICK_LINKS[number]) => {
+    if (text.trim()) onSave(text.trim(), q.url)
+    else { setText(q.text); setUrl(q.url) }
+  }
   return (
     <form
-      className="absolute left-2 right-2 top-7 z-20 rounded-lg border border-border-gray bg-white shadow-lg p-3 space-y-2"
+      className="absolute left-2 top-7 z-20 w-[420px] max-w-[calc(100%-1rem)] rounded-lg border border-border-gray bg-white shadow-lg p-2 space-y-1.5"
       onSubmit={e => { e.preventDefault(); if (ok) onSave(text.trim(), normalizeUrl(url)) }}
       onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onCancel() } }}
     >
-      <div className="grid grid-cols-[52px_1fr] items-center gap-2">
-        <span className={cardLabel}>Text</span>
-        <input value={text} onChange={e => setText(e.target.value)} placeholder="What the reader sees" className={`${inputBase} w-full`} autoFocus={!target.text} />
-        <span className={cardLabel}>Link</span>
-        <input value={url} onChange={e => setUrl(e.target.value)} placeholder="trackstar.art/collections/all" className={`${inputBase} w-full`} autoFocus={Boolean(target.text)} />
+      <div className="flex items-center gap-1.5">
+        <input value={text} onChange={e => setText(e.target.value)} placeholder="Text" className={`${small} w-28 shrink-0`} autoFocus={!target.text} />
+        <input value={url} onChange={e => setUrl(e.target.value)} placeholder="Paste or type a link" className={`${small} flex-1 min-w-0`} autoFocus={Boolean(target.text)} />
+        <button type="submit" disabled={!ok} className={`${btnPrimary} px-2.5 py-1`}>Add</button>
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-off-black/45">Shows as [text](link) here, a real link in the email.</span>
-        <div className="flex gap-2">
-          <button type="button" onClick={onCancel} className={btnGhost}>Cancel</button>
-          <button type="submit" disabled={!ok} className={btnPrimary}>Add link</button>
-        </div>
+      <div className="flex flex-wrap items-center gap-1">
+        {QUICK_LINKS.map(q => (
+          <button key={q.label} type="button" onClick={() => quick(q)} title={q.url} className="px-2 py-0.5 rounded border border-border-gray bg-subtle-gray text-[11px] font-medium text-off-black/70 hover:bg-off-black/5">
+            {q.label}
+          </button>
+        ))}
+        <button type="button" onClick={onCancel} className="ml-auto text-[11px] text-off-black/45 hover:text-off-black">Esc</button>
       </div>
     </form>
   )
