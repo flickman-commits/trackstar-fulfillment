@@ -413,9 +413,6 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
   )
 }
 
-/** A selection in one of the body's boxes, waiting to become a link. */
-type LinkTarget = { field: 'main' | 'ps'; start: number; end: number; text: string }
-
 /** A pasted address, if that is all the clipboard holds. */
 function asUrl(text: string) {
   const t = text.trim()
@@ -434,50 +431,6 @@ function normalizeUrl(raw: string) {
 }
 
 /**
- * A textarea that grows with its text, so the pane scrolls rather than the box.
- * ⌘K (Ctrl+K) asks for a link on the selection; pasting an address over
- * selected text links it straight away. Links are written [text](url), and
- * the email turns them into real links when it sends.
- */
-function AutoGrow({ value, onChange, onBlur, className, placeholder, minRows = 3, inputRef, onLink }: {
-  value: string; onChange: (v: string) => void; onBlur?: () => void; className?: string; placeholder?: string; minRows?: number
-  inputRef?: React.RefObject<HTMLTextAreaElement>
-  onLink?: (sel: { start: number; end: number; text: string }) => void
-}) {
-  const own = useRef<HTMLTextAreaElement>(null)
-  const ref = inputRef || own
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [value, ref])
-  return (
-    <textarea
-      ref={ref} rows={minRows} value={value} placeholder={placeholder}
-      onChange={e => onChange(e.target.value)} onBlur={onBlur}
-      onKeyDown={e => {
-        if (onLink && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-          e.preventDefault()
-          const el = e.currentTarget
-          onLink({ start: el.selectionStart, end: el.selectionEnd, text: value.slice(el.selectionStart, el.selectionEnd) })
-        }
-      }}
-      onPaste={e => {
-        const el = e.currentTarget
-        if (el.selectionStart === el.selectionEnd) return
-        const url = asUrl(e.clipboardData.getData('text'))
-        if (!url) return
-        e.preventDefault()
-        const text = value.slice(el.selectionStart, el.selectionEnd)
-        onChange(`${value.slice(0, el.selectionStart)}[${text}](${url})${value.slice(el.selectionEnd)}`)
-      }}
-      className={`${className || ''} resize-none overflow-hidden`}
-    />
-  )
-}
-
-/**
  * Links Matt adds often, one click away in the ⌘K box. Instagram handles and
  * pages are taken from trackstar.art and flickmanmedia.com; change them here.
  */
@@ -488,10 +441,13 @@ const QUICK_LINKS: { label: string; text: string; url: string }[] = [
   { label: 'Marathons', text: 'our marathon prints', url: 'https://trackstar.art/collections/marathons' },
 ]
 
+/** What the ⌘K box is editing: the selected words, or a link the caret is in. */
+type LinkTarget = { text: string; url: string; existing: boolean }
+
 /** The ⌘K box: compact, with the usual links one click away. */
-function LinkBox({ target, onSave, onCancel }: { target: LinkTarget; onSave: (text: string, url: string) => void; onCancel: () => void }) {
+function LinkBox({ target, onSave, onRemove, onCancel }: { target: LinkTarget; onSave: (text: string, url: string) => void; onRemove: () => void; onCancel: () => void }) {
   const [text, setText] = useState(target.text)
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(target.url)
   const ok = Boolean(text.trim() && normalizeUrl(url))
   const small = 'px-2 py-1 text-xs bg-white border border-border-gray rounded focus:outline-none focus:ring-2 focus:ring-off-black/10 placeholder:text-off-black/35'
   // With words selected, a quick link goes straight in; otherwise it fills the box.
@@ -501,14 +457,15 @@ function LinkBox({ target, onSave, onCancel }: { target: LinkTarget; onSave: (te
   }
   return (
     <form
-      className="absolute left-2 top-7 z-20 w-[420px] max-w-[calc(100%-1rem)] rounded-lg border border-border-gray bg-white shadow-lg p-2 space-y-1.5"
+      className="absolute left-0 top-full mt-1 z-20 w-[420px] max-w-full rounded-lg border border-border-gray bg-white shadow-lg p-2 space-y-1.5"
       onSubmit={e => { e.preventDefault(); if (ok) onSave(text.trim(), normalizeUrl(url)) }}
       onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onCancel() } }}
+      onMouseDown={e => e.stopPropagation()}
     >
       <div className="flex items-center gap-1.5">
         <input value={text} onChange={e => setText(e.target.value)} placeholder="Text" className={`${small} w-28 shrink-0`} autoFocus={!target.text} />
         <input value={url} onChange={e => setUrl(e.target.value)} placeholder="Paste or type a link" className={`${small} flex-1 min-w-0`} autoFocus={Boolean(target.text)} />
-        <button type="submit" disabled={!ok} className={`${btnPrimary} px-2.5 py-1`}>Add</button>
+        <button type="submit" disabled={!ok} className={`${btnPrimary} px-2.5 py-1`}>{target.existing ? 'Save' : 'Add'}</button>
       </div>
       <div className="flex flex-wrap items-center gap-1">
         {QUICK_LINKS.map(q => (
@@ -516,9 +473,194 @@ function LinkBox({ target, onSave, onCancel }: { target: LinkTarget; onSave: (te
             {q.label}
           </button>
         ))}
-        <button type="button" onClick={onCancel} className="ml-auto text-[11px] text-off-black/45 hover:text-off-black">Esc</button>
+        {target.existing && <button type="button" onClick={onRemove} className="ml-auto text-[11px] text-red-700 hover:text-red-800">Remove link</button>}
+        <button type="button" onClick={onCancel} className={`${target.existing ? '' : 'ml-auto'} text-[11px] text-off-black/45 hover:text-off-black`}>Esc</button>
       </div>
     </form>
+  )
+}
+
+// ── The rich text box ───────────────────────────────────────────────────────
+// The draft stays one plain string with links written [text](url), which is
+// what the server, templates and Send later all read. The box shows that
+// string with real, blue, underlined links and turns edits back into it.
+
+const MD_LINK = /\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/g
+const escHtml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** The draft string as the box's HTML: one <div> per line, links as <a>. */
+function toEditorHtml(md: string) {
+  if (!md) return ''
+  return md.split('\n').map(line => {
+    let out = ''
+    let last = 0
+    for (const m of line.matchAll(MD_LINK)) {
+      out += escHtml(line.slice(last, m.index))
+      out += `<a href="${escHtml(m[2])}" title="${escHtml(m[2])}">${escHtml(m[1])}</a>`
+      last = (m.index || 0) + m[0].length
+    }
+    out += escHtml(line.slice(last))
+    return `<div>${out || '<br>'}</div>`
+  }).join('')
+}
+
+const BLOCKS = new Set(['DIV', 'P', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'H1', 'H2', 'H3'])
+
+/** The box's HTML back to the draft string. Lines are blocks; a <br> inside a line breaks it. */
+function fromEditor(root: HTMLElement) {
+  const lines: string[] = []
+  let cur = ''
+  let open = false
+  const flush = () => { lines.push(cur); cur = ''; open = false }
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) { cur += (node.nodeValue || '').replace(/\u00a0/g, ' '); open = true; return }
+    if (!(node instanceof HTMLElement)) return
+    if (node.tagName === 'BR') {
+      // A <br> alone at the end of a line is the browser's placeholder, not a new line.
+      if (node.nextSibling || !node.parentElement || node.parentElement === root) flush()
+      else open = true
+      return
+    }
+    if (node.tagName === 'A') {
+      const href = node.getAttribute('href') || ''
+      const text = (node.textContent || '').replace(/\u00a0/g, ' ')
+      cur += /^(https?:\/\/|mailto:)/i.test(href) && text ? `[${text}](${href})` : text
+      open = true
+      return
+    }
+    if (BLOCKS.has(node.tagName)) {
+      if (open) flush()
+      node.childNodes.forEach(walk)
+      flush()
+      return
+    }
+    node.childNodes.forEach(walk)
+  }
+  root.childNodes.forEach(walk)
+  if (open) flush()
+  return lines.join('\n').replace(/\n+$/, '')
+}
+
+/**
+ * One editable block of the email. Links show as blue underlined words; ⌘K
+ * (Ctrl+K) adds one on the selection or edits the one under the caret, and
+ * pasting an address over selected words links them. ⌘-click opens a link.
+ * Paste is always plain text, so nothing arrives with someone else's fonts.
+ */
+function RichBox({ value, onChange, onBlur, placeholder, minHeight, boxRef }: {
+  value: string; onChange: (v: string) => void; onBlur?: () => void; placeholder?: string; minHeight: number
+  boxRef?: React.RefObject<HTMLDivElement>
+}) {
+  const own = useRef<HTMLDivElement>(null)
+  const ref = boxRef || own
+  const shown = useRef<string | null>(null)
+  const saved = useRef<Range | null>(null)
+  const anchor = useRef<HTMLAnchorElement | null>(null)
+  const [link, setLink] = useState<LinkTarget | null>(null)
+
+  // Draw the draft when it changes from outside (a template, a reset); never while typing.
+  useEffect(() => {
+    const el = ref.current
+    if (!el || value === shown.current) return
+    el.innerHTML = toEditorHtml(value)
+    shown.current = value
+  }, [value, ref])
+
+  const emit = () => {
+    const el = ref.current
+    if (!el) return
+    const md = fromEditor(el)
+    shown.current = md
+    onChange(md)
+  }
+
+  const openLink = () => {
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount || !ref.current?.contains(sel.anchorNode)) return
+    const range = sel.getRangeAt(0)
+    const inLink = (range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer as HTMLElement)?.closest('a')
+    if (inLink && ref.current.contains(inLink)) {
+      anchor.current = inLink
+      const whole = document.createRange(); whole.selectNodeContents(inLink)
+      saved.current = whole
+      setLink({ text: inLink.textContent || '', url: inLink.getAttribute('href') || '', existing: true })
+    } else {
+      anchor.current = null
+      saved.current = range.cloneRange()
+      setLink({ text: range.toString(), url: '', existing: false })
+    }
+  }
+
+  const restore = () => {
+    const el = ref.current
+    if (!el || !saved.current) return null
+    el.focus()
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(saved.current)
+    return sel
+  }
+
+  const saveLink = (text: string, url: string) => {
+    setLink(null)
+    if (anchor.current) {
+      anchor.current.setAttribute('href', url)
+      anchor.current.setAttribute('title', url)
+      anchor.current.textContent = text
+      anchor.current = null
+    } else if (restore()) {
+      // insertHTML keeps the browser's undo history (⌘Z) working.
+      document.execCommand('insertHTML', false, `<a href="${escHtml(url)}" title="${escHtml(url)}">${escHtml(text)}</a>`)
+    }
+    emit()
+    requestAnimationFrame(() => ref.current?.focus())
+  }
+
+  const removeLink = () => {
+    setLink(null)
+    const a = anchor.current
+    if (a) { a.replaceWith(document.createTextNode(a.textContent || '')); anchor.current = null; emit() }
+    requestAnimationFrame(() => ref.current?.focus())
+  }
+
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline
+        data-placeholder={placeholder}
+        style={{ minHeight }}
+        onInput={emit}
+        onBlur={onBlur}
+        onKeyDown={e => {
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openLink() }
+        }}
+        onClick={e => {
+          const a = (e.target as HTMLElement).closest('a')
+          if (a && (e.metaKey || e.ctrlKey)) { e.preventDefault(); window.open(a.getAttribute('href') || '', '_blank', 'noopener') }
+        }}
+        onPaste={e => {
+          e.preventDefault()
+          const text = e.clipboardData.getData('text/plain')
+          const sel = window.getSelection()
+          const url = asUrl(text)
+          if (url && sel && !sel.isCollapsed) {
+            const words = sel.toString()
+            document.execCommand('insertHTML', false, `<a href="${escHtml(url)}" title="${escHtml(url)}">${escHtml(words)}</a>`)
+          } else {
+            document.execCommand('insertText', false, text)
+          }
+          emit()
+        }}
+        className={`block w-full text-sm leading-relaxed text-off-black bg-transparent px-1 focus:outline-none whitespace-pre-wrap break-words
+          [&_a]:text-blue-600 [&_a]:underline [&_a]:underline-offset-2 [&_a]:cursor-text
+          ${value ? '' : 'before:content-[attr(data-placeholder)] before:text-off-black/30 before:pointer-events-none'}`}
+      />
+      {link && <LinkBox target={link} onSave={saveLink} onRemove={removeLink} onCancel={() => { setLink(null); anchor.current = null; restore() }} />}
+    </div>
   )
 }
 
@@ -556,37 +698,20 @@ function BodyEditor({ body, signature, onChange, onBlur }: {
     emitted.current = next
     onChange(next)
   }
-  const box = 'block w-full text-sm leading-relaxed text-off-black bg-transparent px-1 focus:outline-none placeholder:text-off-black/30'
-  const [link, setLink] = useState<LinkTarget | null>(null)
-  const mainRef = useRef<HTMLTextAreaElement>(null)
-  const psRef = useRef<HTMLTextAreaElement>(null)
-  const addLink = (text: string, url: string) => {
-    if (!link) return
-    const value = link.field === 'main' ? parts.main : parts.ps
-    const md = `[${text}](${url})`
-    const next = `${value.slice(0, link.start)}${md}${value.slice(link.end)}`
-    if (link.field === 'main') update(next, parts.ps); else update(parts.main, next)
-    const el = (link.field === 'main' ? mainRef : psRef).current
-    const caret = link.start + md.length
-    setLink(null)
-    // Back to typing, just after the new link.
-    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(caret, caret) })
-  }
   return (
     <div className="px-6 pt-3 pb-2 relative">
       <span className="flex items-center justify-between px-2 mb-0.5">
         <span className={cardLabel}>Body</span>
         <span className="text-[10px] text-off-black/35">⌘K adds a link</span>
       </span>
-      {link && <LinkBox target={link} onSave={addLink} onCancel={() => { const el = (link.field === 'main' ? mainRef : psRef).current; setLink(null); requestAnimationFrame(() => el?.focus()) }} />}
       <div className="rounded-md px-1 py-1 focus-within:bg-subtle-gray/50 transition-colors">
-        <AutoGrow value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minRows={8} className={box} inputRef={mainRef} onLink={sel => setLink({ field: 'main', ...sel })} />
+        <RichBox value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minHeight={176} />
         <div className="px-1 pt-3 pb-2 text-sm text-off-black" title="Your signature, added on send. Change it in Settings, under Me.">
           {signature
             ? <div dangerouslySetInnerHTML={{ __html: signature }} />
             : <span className="text-xs text-off-black/40">No signature yet. Add one in Settings, under Me.</span>}
         </div>
-        <AutoGrow value={parts.ps} onChange={v => update(parts.main, v)} onBlur={onBlur} minRows={1} placeholder="P.S. (optional)" className={box} inputRef={psRef} onLink={sel => setLink({ field: 'ps', ...sel })} />
+        <RichBox value={parts.ps} onChange={v => update(parts.main, v)} onBlur={onBlur} minHeight={24} placeholder="P.S. (optional)" />
       </div>
     </div>
   )
