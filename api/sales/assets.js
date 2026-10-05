@@ -15,9 +15,13 @@ import { requireSalesRep, recordAudit } from '../_lib/users.js'
 import { listAssets, assetPreviewUrl, assetUploadUrl, deleteAsset, renameAsset, pickAssetFor, isAssetStorageConfigured } from '../../server/domain/sales/assets.js'
 import { getDeal } from '../../server/domain/sales/attio.js'
 
+// Thumbnail links last 12 hours: Sales stays open in the background all day,
+// and a 15-minute link left the library showing broken images.
+const PREVIEW_SECONDS = 12 * 3600
+
 async function withPreviews(files) {
   return Promise.all(files.map(async f => {
-    try { return { ...f, previewUrl: await assetPreviewUrl(f.id) } }
+    try { return { ...f, previewUrl: await assetPreviewUrl(f.id, PREVIEW_SECONDS) } }
     catch { return { ...f, previewUrl: null } }
   }))
 }

@@ -34,6 +34,7 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
   const [uploading, setUploading] = useState<Record<string, number>>({})
   const [filter, setFilter] = useState<'all' | 'image' | 'deck'>('all')
   const fileInput = useRef<HTMLInputElement>(null)
+  const resigned = useRef(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
   const [renaming, setRenaming] = useState(false)
@@ -135,9 +136,10 @@ export default function LibraryPanel({ assets, configured, attachedIds, onAttach
               className={`group relative rounded-md border bg-white cursor-grab active:cursor-grabbing ${attached ? 'border-dark-fill' : 'border-border-gray hover:border-off-black/40'}`}
               title={`${a.name}${a.size ? ` · ${fmtSize(a.size)}` : ''}. Drag onto the email, or double-click.`}
             >
-              <div className="h-[104px] rounded-t-md bg-subtle-gray grid place-items-center overflow-hidden">
+              <div className="aspect-[4/5] rounded-t-md bg-subtle-gray grid place-items-center overflow-hidden p-1.5">
                 {a.kind === 'image' && a.previewUrl ? (
-                  <img src={a.previewUrl} alt="" className="w-full h-full object-cover" draggable={false} />
+                  // The whole mockup, never cropped. A link that has expired asks for fresh ones, once.
+                  <img src={a.previewUrl} alt="" className="w-full h-full object-contain" draggable={false} onError={() => { if (!resigned.current) { resigned.current = true; onChanged() } }} />
                 ) : a.kind === 'image' ? <ImageIcon className="w-6 h-6 text-off-black/30" /> : (
                   <div className="text-center"><FileText className="w-7 h-7 text-off-black/40 mx-auto" /><div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mt-1">{a.filename.split('.').pop()}{a.size ? ` · ${fmtSize(a.size)}` : ''}</div></div>
                 )}

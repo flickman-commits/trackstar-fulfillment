@@ -122,8 +122,11 @@ export default function Sales({ active = true }: { active?: boolean }) {
     catch (e) { const err = e as SalesApiError; setTodayError({ message: err.message, code: err.code }) }
     finally { setLoading(false) }
   }, [scope, motion])
-  const loadAssets = useCallback(async (dealId?: string | null) => {
-    try { const r = await salesApi.assets(dealId || undefined); setAssets(r.assets); setLibraryConfigured(r.configured); setSuggestedId(r.suggestedId) }
+  const assetsAt = useRef(0)
+  // `refresh` skips the server's one-minute copy of the file list: after an
+  // upload, rename or delete the change must show at once.
+  const loadAssets = useCallback(async (dealId?: string | null, refresh = false) => {
+    try { const r = await salesApi.assets(dealId || undefined, refresh); setAssets(r.assets); setLibraryConfigured(r.configured); setSuggestedId(r.suggestedId); assetsAt.current = Date.now() }
     catch { /* the library is optional */ }
   }, [])
 
@@ -400,6 +403,8 @@ export default function Sales({ active = true }: { active?: boolean }) {
   // stars only show when there is nothing on screen yet.
   useEffect(() => {
     if (active && loadedAt.current && Date.now() - loadedAt.current > STALE_MS) { loadToday(); loadStatus() }
+    // Thumbnail links last 12 hours; sign new ones well before.
+    if (active && assetsAt.current && Date.now() - assetsAt.current > 6 * 3600_000) loadAssets(selectedId, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
@@ -580,7 +585,7 @@ export default function Sales({ active = true }: { active?: boolean }) {
                   busy={busy} onNote={addNote}
                   onSelectPerson={id => { setPersonId(id); if (deal) { setPrepared(prev => { const n = { ...prev }; delete n[deal.id]; return n }); prepare(deal, { silent: false, force: true, personId: id }) } }}
                 />
-                <LibraryPanel assets={assets} configured={libraryConfigured} attachedIds={new Set(attachedAssets.map(a => a.id))} onAttach={attach} onChanged={() => loadAssets(selectedId)}
+                <LibraryPanel assets={assets} configured={libraryConfigured} attachedIds={new Set(attachedAssets.map(a => a.id))} onAttach={attach} onChanged={() => loadAssets(selectedId, true)}
                   onRenamed={(from, to) => setAttached(prev => Object.fromEntries(Object.entries(prev).map(([k, ids]) => [k, ids.map(x => (x === from ? to : x))])))} />
               </aside>
             </div>
