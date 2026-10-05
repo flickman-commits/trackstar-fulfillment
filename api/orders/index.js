@@ -63,27 +63,47 @@ function pickCustomerValue(v) {
 }
 
 /**
- * Just the keys of the raw order payloads this list reads, built in Postgres
+ * Just the keys of the raw order payloads this list reads, including what
+ * getProductInfo (line items, Etsy transactions, Artelo item sizes) and
+ * isBigSpender (order totals) read, built in Postgres
  * so only those bytes leave the database. Add a key here if the list starts
  * reading a new one.
  */
-async function rawSlice(ids) {
+export async function rawSlice(ids) {
   if (!ids.length) return new Map()
   const rows = await prisma.$queryRaw`
     SELECT id,
       CASE WHEN "shopifyOrderData" IS NULL THEN NULL ELSE jsonb_build_object(
         'name', "shopifyOrderData"::jsonb->'name',
         'created_at', "shopifyOrderData"::jsonb->'created_at',
+        'total_price', "shopifyOrderData"::jsonb->'total_price',
+        'current_total_price', "shopifyOrderData"::jsonb->'current_total_price',
         'discount_codes', "shopifyOrderData"::jsonb->'discount_codes',
         'shipping_lines', (SELECT jsonb_agg(jsonb_build_object('title', l->'title', 'price', l->'price'))
           FROM jsonb_array_elements(CASE WHEN jsonb_typeof("shopifyOrderData"::jsonb->'shipping_lines') = 'array'
-            THEN "shopifyOrderData"::jsonb->'shipping_lines' ELSE '[]'::jsonb END) l)) END AS s,
+            THEN "shopifyOrderData"::jsonb->'shipping_lines' ELSE '[]'::jsonb END) l),
+        'line_items', (SELECT jsonb_agg(jsonb_build_object('product_id', l->'product_id', 'variant_id', l->'variant_id',
+            'title', l->'title', 'sku', l->'sku', 'variant_title', l->'variant_title', 'properties', l->'properties') ORDER BY n)
+          FROM jsonb_array_elements(CASE WHEN jsonb_typeof("shopifyOrderData"::jsonb->'line_items') = 'array'
+            THEN "shopifyOrderData"::jsonb->'line_items' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(l, n))) END AS s,
       CASE WHEN "etsyOrderData" IS NULL THEN NULL ELSE jsonb_build_object(
-        'create_timestamp', "etsyOrderData"::jsonb->'create_timestamp') END AS e,
+        'create_timestamp', "etsyOrderData"::jsonb->'create_timestamp',
+        'grandtotal', "etsyOrderData"::jsonb->'grandtotal',
+        'total', "etsyOrderData"::jsonb->'total',
+        'total_price', "etsyOrderData"::jsonb->'total_price',
+        'transactions', (SELECT jsonb_agg(jsonb_build_object('listing_id', x->'listing_id', 'title', x->'title',
+            'sku', x->'sku', 'variations', x->'variations') ORDER BY n)
+          FROM jsonb_array_elements(CASE WHEN jsonb_typeof("etsyOrderData"::jsonb->'transactions') = 'array'
+            THEN "etsyOrderData"::jsonb->'transactions' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(x, n))) END AS e,
       jsonb_build_object(
         'shipping', "arteloOrderData"::jsonb->'shipping',
         'creatorId', "arteloOrderData"::jsonb->'creatorId',
-        'createdAt', "arteloOrderData"::jsonb->'createdAt') AS a
+        'createdAt', "arteloOrderData"::jsonb->'createdAt',
+        'orderItems', (SELECT jsonb_agg(CASE WHEN jsonb_typeof(x->'product') = 'object'
+            THEN jsonb_build_object('product', jsonb_build_object('size', x->'product'->'size'))
+            ELSE jsonb_build_object('product', NULL) END ORDER BY n)
+          FROM jsonb_array_elements(CASE WHEN jsonb_typeof("arteloOrderData"::jsonb->'orderItems') = 'array'
+            THEN "arteloOrderData"::jsonb->'orderItems' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(x, n))) AS a
     FROM "Order" WHERE id = ANY(${ids})`
   return new Map(rows.map(r => [r.id, r]))
 }
