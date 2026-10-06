@@ -270,6 +270,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                       <div className="font-medium flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Gmail</div>
                       <div className="text-xs text-off-black/55 mt-0.5">
                         {!status?.gmail.configured ? 'Not configured on the server (GOOGLE_OAUTH_CLIENT_ID / SECRET).'
+                          : status.gmail.connected && !status.gmail.canUseDrive ? `Sending as ${status.gmail.email}. Reconnect to let approved custom designs save to Google Drive.`
                           : status.gmail.connected ? `Sending as ${status.gmail.email}.`
                           : 'Not connected. Emails cannot be sent until it is.'}
                       </div>

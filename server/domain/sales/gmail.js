@@ -39,7 +39,11 @@ import prisma from '../../db.js'
  */
 const SCOPE_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose'
 const SCOPE_METADATA = 'https://www.googleapis.com/auth/gmail.metadata'
-const SCOPES = [SCOPE_COMPOSE, SCOPE_METADATA]
+// Drive, so approved custom designs can be copied into a folder in this
+// person's My Drive (server/services/customGallery.js). A service account
+// cannot own files there. Added later, so older grants need a reconnect.
+const SCOPE_DRIVE = 'https://www.googleapis.com/auth/drive'
+const SCOPES = [SCOPE_COMPOSE, SCOPE_METADATA, SCOPE_DRIVE]
 
 /**
  * One connection per person. Keys are scoped by user id so a second rep can
@@ -164,7 +168,26 @@ export async function gmailStatus(userId) {
     // A connection made before the metadata scope existed can send but not
     // see replies. Reconnecting fixes it; the UI says so.
     canReadReplies: scopes.includes(SCOPE_METADATA),
+    canUseDrive: scopes.includes(SCOPE_DRIVE),
   }
+}
+
+/**
+ * A Google Drive client acting as the first person whose connection includes
+ * Drive, or null when nobody's does. Used by the custom gallery upload.
+ */
+export async function driveClientForAnyone() {
+  const rows = await prisma.systemConfig.findMany({ where: { key: { startsWith: 'gmail_scopes:' } } })
+  for (const row of rows) {
+    if (!String(row.value).includes(SCOPE_DRIVE)) continue
+    const uid = row.key.slice('gmail_scopes:'.length)
+    const refresh = await getConfig(keyRefresh(uid))
+    if (!refresh) continue
+    const client = oauthClient()
+    client.setCredentials({ refresh_token: refresh })
+    return google.drive({ version: 'v3', auth: client })
+  }
+  return null
 }
 
 async function gmailClient(userId) {

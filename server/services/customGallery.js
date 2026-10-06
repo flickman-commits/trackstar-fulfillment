@@ -2,11 +2,12 @@
  * Custom gallery: every custom design a customer approves gets copied into one
  * Google Drive folder, so the team can browse everything we have made.
  *
- * Auth is the same service account as googleSheets.js. Setup, once:
- *   1. Enable the Google Drive API on the service account's Cloud project.
- *   2. Share the folder with GOOGLE_SERVICE_ACCOUNT_EMAIL as Editor.
- * A service account has no storage of its own, so the folder must live in a
- * shared drive (or the upload fails with a storage-quota error).
+ * Auth: the person's own Google connection (the Sales tool's Gmail connect,
+ * which now asks for Drive too), so the file lands in their My Drive and
+ * counts against their storage. A service account cannot do that: it has no
+ * storage, and Google refuses its uploads into a My Drive folder. The service
+ * account is only the fallback, which works if the folder ever moves to a
+ * shared drive.
  *
  * Folder: CUSTOM_GALLERY_FOLDER_ID, defaulting to the one Matt set up.
  * Best effort: a failure is logged and never blocks the customer's approval.
@@ -14,11 +15,14 @@
 import { google } from 'googleapis'
 import { Readable } from 'node:stream'
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
+import { driveClientForAnyone } from '../domain/sales/gmail.js'
 
 const DEFAULT_FOLDER_ID = '1fypaQ9e7OderffveNyydacDcCZoY2d7S'
 
 let cachedDrive = null
-function getDrive() {
+async function getDrive() {
+  const personal = await driveClientForAnyone().catch(() => null)
+  if (personal) return personal
   if (cachedDrive) return cachedDrive
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
   const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
@@ -55,7 +59,8 @@ export async function saveApprovedMockup({ order, proof }) {
       `Option ${proof.version}`,
     ].filter(Boolean).join(' - ')) + `.${ext}`
 
-    const { data } = await getDrive().files.create({
+    const drive = await getDrive()
+    const { data } = await drive.files.create({
       requestBody: { name, parents: [process.env.CUSTOM_GALLERY_FOLDER_ID || DEFAULT_FOLDER_ID] },
       media: { mimeType, body: Readable.from(buf) },
       fields: 'id',
