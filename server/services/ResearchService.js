@@ -568,6 +568,29 @@ export class ResearchService {
     const raceYear = effectiveValues.effectiveRaceYear ?? order.raceYear
     const runnerName = effectiveValues.effectiveRunnerName ?? order.runnerName
 
+    // A race that has not been run has no results. researchOrder checks this
+    // before it gets here; researchBatch (the Research queue, the import's
+    // research step) did not, so those runs scraped a future race and stamped
+    // it "not found" or "year not configured", undoing the right answer.
+    if (race?.raceDate && new Date(race.raceDate) > new Date()) {
+      const raceDay = new Date(race.raceDate).toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+      })
+      const notRunData = {
+        orderId: order.id,
+        raceId: race.id,
+        runnerName,
+        bibNumber: null, officialTime: null, officialPace: null,
+        researchStatus: 'race_not_run',
+        researchNotes: `${raceName} ${raceYear} takes place on ${raceDay}. Results will not exist until after race day.`,
+        possibleMatches: null,
+      }
+      const existing = await prisma.runnerResearch.findFirst({ where: { orderId: order.id, raceId: race.id } })
+      return existing
+        ? prisma.runnerResearch.update({ where: { id: existing.id }, data: notRunData })
+        : prisma.runnerResearch.create({ data: notRunData })
+    }
+
     // Check cache first
     let existingResearch = await prisma.runnerResearch.findFirst({
       where: {
