@@ -71,14 +71,18 @@ export default {
    * no 2024 subEventIds the primary answers year_not_configured at once and
    * this takes over. Marathon raceId read off MTEC's event search
    * ("2024 Medtronic Twin Cities Marathon", event 5190).
+   * 2022 is the same story (Race Roster holds only the virtual races); its
+   * marathon raceId 14047 (event 4530) is read off MTEC's year menu.
    */
   fallback: {
     platform: 'mtec',
     eventSearchOrder: ['marathon'],
     raceIds: {
+      2022: { marathon: 14047 },
       2024: { marathon: 16695 },
     },
     raceSlugs: {
+      2022: { marathon: '2022_Medtronic_Twin_Cities_Marathon-Marathon' },
       2024: { marathon: '2024_Medtronic_Twin_Cities_Marathon-Marathon' },
     },
     distances: { marathon: 26.2 },
