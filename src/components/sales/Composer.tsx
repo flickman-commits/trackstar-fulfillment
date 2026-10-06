@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate, Clock } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate, Clock, BookmarkPlus } from 'lucide-react'
 import { MotionTag } from './Queue'
 import { salesApi, type LibraryTemplate, type OutreachTemplate, type TemplateFill, type TemplateMotion } from '@/lib/salesApi'
 import { toast } from 'sonner'
@@ -41,7 +41,7 @@ export default function Composer({
   deal, person, draft, variants, index, drafting, writing, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach,
-  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, adhoc, signature, library, onSchedule, onUnskip, onTemplateSaved,
+  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, onRemove, adhoc, signature, library, onSchedule, onUnskip, onTemplateSaved,
 }: {
   deal: Deal | null
   person: Person | null
@@ -68,6 +68,8 @@ export default function Composer({
   onRevise: (instruction: string) => Promise<void>
   onSend: () => void
   onSkip: (reason?: string) => void
+  /** Take this one out for good (Lost in Attio; PR: Not interested). */
+  onRemove?: (reason?: string) => void
   /** Written from New email, outside the queue: any stage is fine, Skip means close. */
   adhoc?: boolean
   /** Your signature HTML, shown where it will sit in the sent email. */
@@ -83,6 +85,8 @@ export default function Composer({
 }) {
   const [skipOpen, setSkipOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
+  const [removeOpen, setRemoveOpen] = useState(false)
+  const [removeReason, setRemoveReason] = useState('')
   const [instruction, setInstruction] = useState('')
   const [revising, setRevising] = useState(false)
   const [over, setOver] = useState(false)
@@ -241,9 +245,9 @@ export default function Composer({
         </>
       )}
 
-      <div className="flex items-center justify-between gap-2 px-6 py-3 border-t border-border-gray flex-shrink-0">
-        <div className="flex items-center gap-2 relative">
-          {adhoc ? <button onClick={() => onSkip()} className={btnSecondary} title="Back to the queue (S)">Close</button> : <button onClick={() => setSkipOpen(o => !o)} className={btnSecondary} title="Hide until tomorrow (S)">Skip today</button>}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-3 border-t border-border-gray flex-shrink-0 [&_button]:whitespace-nowrap">
+        <div className="flex flex-wrap items-center gap-2 relative">
+          {adhoc ? <button onClick={() => onSkip()} className={btnSecondary} title="Back to the queue (S)">Close</button> : <button onClick={() => { setRemoveOpen(false); setSkipOpen(o => !o) }} className={btnSecondary} title="Hide until tomorrow (S)">Skip today</button>}
           {skipOpen && !adhoc && (
             <form
               className="absolute bottom-full left-0 mb-2 w-72 rounded-lg border border-border-gray bg-white shadow-lg p-3 flex flex-col gap-2 z-10"
@@ -257,8 +261,28 @@ export default function Composer({
               </div>
             </form>
           )}
-          <TemplateMenu deal={deal} person={person} disabled={drafting || !current} onRewrite={onRewrite} aiActive={aiActive} library={library} current={current} onSaved={onTemplateSaved}
+          {onRemove && !deal.id.startsWith('adhoc:') && (
+            <button onClick={() => { setSkipOpen(false); setRemoveOpen(o => !o) }} className={`${btnGhost} text-off-black/45 hover:text-red-700`} title="Stop working this one: it leaves every list">Remove</button>
+          )}
+          {removeOpen && onRemove && (
+            <form
+              className="absolute bottom-full left-0 mb-2 w-80 rounded-lg border border-border-gray bg-white shadow-lg p-3 flex flex-col gap-2 z-10"
+              onSubmit={e => { e.preventDefault(); onRemove(removeReason.trim() || undefined); setRemoveOpen(false); setRemoveReason('') }}
+            >
+              <span className="text-sm font-medium text-off-black">Remove {deal.name}?</span>
+              <span className="text-xs text-off-black/60 leading-snug">
+                {deal.motion === 'PR' ? 'Sets them to Not interested in the PR Pipeline' : 'Moves the deal to Lost in Attio'}, so it stops showing up here. A reason goes on it as a note. You can undo right after.
+              </span>
+              <input autoFocus value={removeReason} onChange={e => setRemoveReason(e.target.value)} placeholder="Why? (optional, e.g. not a fit)" className={`${inputBase} w-full`} onKeyDown={e => { if (e.key === 'Escape') { setRemoveOpen(false); setRemoveReason('') } }} />
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => { setRemoveOpen(false); setRemoveReason('') }} className={btnGhost}>Cancel</button>
+                <button type="submit" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700">Remove</button>
+              </div>
+            </form>
+          )}
+          <TemplateMenu deal={deal} person={person} disabled={drafting || !current} onRewrite={onRewrite} aiActive={aiActive} library={library}
             onPick={t => current && onChange({ ...current, subject: t.subject ?? current.subject, body: t.body })} />
+          {current && <SaveTemplateButton deal={deal} person={person} current={current} disabled={drafting} onSaved={onTemplateSaved} />}
           {aiActive && (
             <button onClick={onRewrite} disabled={drafting || !person} className={btnSecondary} title="Write it again">
               <RefreshCw className={`w-3.5 h-3.5 ${drafting ? 'animate-spin' : ''}`} /> Rewrite
@@ -272,7 +296,7 @@ export default function Composer({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto">
           {onSchedule && (
             <SendLater
               disabled={!current || drafting || !person?.email || missingRequired || !gmailConnected || blocked || (deal.exhausted && !adhoc)}
@@ -312,7 +336,31 @@ function asTemplate(v: Variant, deal: Deal, person: Person | null) {
   return { subject, body: swap(v.body) }
 }
 
-/** Save what is in the composer as a template, from the bottom of the menu. */
+/** "Save as template", beside the Templates menu. */
+function SaveTemplateButton({ deal, person, current, disabled, onSaved }: { deal: Deal; person: Person | null; current: Variant; disabled: boolean; onSaved?: () => void }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [open])
+  return (
+    <div ref={box} className="relative">
+      <button onClick={() => setOpen(o => !o)} disabled={disabled} className={btnSecondary} title="Save this email to your templates">
+        <BookmarkPlus className="w-3.5 h-3.5" /> Save as template
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 mb-2 w-[340px] rounded-lg border border-border-gray bg-white shadow-lg z-20 overflow-hidden" onKeyDown={e => { if (e.key === 'Escape') setOpen(false) }}>
+          <SaveAsTemplate deal={deal} person={person} current={current} onDone={ok => { setOpen(false); if (ok) onSaved?.() }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The save form: a name and who it is for. */
 function SaveAsTemplate({ deal, person, current, onDone }: { deal: Deal; person: Person | null; current: Variant; onDone: (saved: boolean) => void }) {
   const motions: TemplateMotion[] = ['Race', 'Charity', 'PR', 'Any']
   const [name, setName] = useState('')
@@ -330,7 +378,7 @@ function SaveAsTemplate({ deal, person, current, onDone }: { deal: Deal; person:
     finally { setSaving(false) }
   }
   return (
-    <form className="px-4 py-3 space-y-2 border-t border-border-gray" onSubmit={e => { e.preventDefault(); save() }}>
+    <form className="px-4 py-3 space-y-2" onSubmit={e => { e.preventDefault(); save() }}>
       <span className={cardLabel}>Save this email as a template</span>
       <input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="Name it, e.g. Brand activation pitch" className={`${inputBase} w-full`} />
       <div className="flex items-center gap-2">
@@ -347,7 +395,7 @@ function SaveAsTemplate({ deal, person, current, onDone }: { deal: Deal; person:
   )
 }
 
-function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, library, current, onSaved }: {
+function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, library }: {
   deal: Deal
   person: Person | null
   disabled: boolean
@@ -355,11 +403,8 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
   onRewrite: () => void
   aiActive: boolean
   library: TemplateLibrary | null
-  current?: Variant
-  onSaved?: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -403,9 +448,6 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
             </div>
           ))}
           {library && items.length === 0 && <div className="px-4 py-3 text-xs text-off-black/50">No saved templates yet.</div>}
-          {current && (saving
-            ? <SaveAsTemplate deal={deal} person={person} current={current} onDone={ok => { setSaving(false); if (ok) { setOpen(false); onSaved?.() } }} />
-            : <button onClick={() => setSaving(true)} className="w-full text-left px-4 py-3 border-t border-border-gray hover:bg-subtle-gray text-sm font-medium text-off-black">+ Save this email as a template</button>)}
           {library && <div className="px-4 py-2.5 border-t border-border-gray text-[11px] text-off-black/45">Add or change these in Settings, under Templates.</div>}
         </div>
       )}

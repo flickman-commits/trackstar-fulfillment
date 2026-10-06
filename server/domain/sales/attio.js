@@ -464,13 +464,48 @@ export async function setStage(dealId, stage) {
   return getDeal(dealId, { fresh: true })
 }
 
+/** A PR contact's list status, set by a person from the tool. */
+async function setPrStatus(id, status) {
+  if (!PR_STAGE[status]) throw new Error(`Unknown PR status: ${status}`)
+  const entryId = String(id).slice(PR_PREFIX.length)
+  await attio(`/lists/${PR_LIST}/entries/${entryId}`, { method: 'PATCH', body: { data: { entry_values: { status } } } })
+  cache.delete(`deal:${id}`)
+  cache.delete('pr')
+}
+
+/**
+ * "Remove": a person decides not to work this one. The deal goes to Lost in
+ * Attio (a PR contact to Not interested), which takes it out of every list
+ * in the tool and says so where the team looks. A stage move a person asked
+ * for, so it is theirs, like any move made in Attio. Returns what it was, so
+ * the page can offer Undo.
+ */
+export async function removeFromOutreach(id, { reason = null, byEmail = null } = {}) {
+  const current = await getDeal(id, { fresh: true })
+  if (!current) throw new Error('That is not in Attio any more')
+  const previous = isPrId(id) ? current.prStatus : current.stage
+  if (isPrId(id)) await setPrStatus(id, 'Not interested')
+  else await patchDeal(id, { stage: 'Lost' })
+  try {
+    await noteOnDeal(id, `Removed from outreach in the Sales tool${reason ? `: ${reason}` : ''}. Was ${previous}.`, byEmail)
+  } catch (err) { console.warn(`[sales.attio] remove note failed for ${current.name}: ${err.message}`) }
+  return { previous }
+}
+
+/** Undo "Remove": back to the stage (or PR status) it had. */
+export async function restoreToOutreach(id, previous) {
+  if (isPrId(id)) await setPrStatus(id, previous || 'To contact')
+  else await setStage(id, previous || 'Not Contacted')
+}
+
 /** A rep's note on the deal, from the tool. */
 export async function noteOnDeal(dealId, text, byEmail) {
   const title = `${day(new Date())} Note from ${byEmail || 'the Sales tool'}`
   if (isPrId(dealId)) {
     const contact = await getPrContact(dealId)
-    if (!contact?.person) throw new Error('That press contact is not in Attio any more')
-    await addPersonNote(contact.person.id, { title, content: text })
+    const person = contact?.people?.[0]
+    if (!person?.id) throw new Error('That press contact is not in Attio any more')
+    await addPersonNote(person.id, { title, content: text })
     return
   }
   await addDealNote(dealId, { title, content: text })

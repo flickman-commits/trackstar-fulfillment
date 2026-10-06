@@ -60,6 +60,9 @@ export const salesApi = {
   search: (q: string) => request<{ deals: DealHit[] }>(`/api/sales/today?action=search&q=${encodeURIComponent(q)}`),
   progress: (scope: 'mine' | 'all' = 'mine') => request<Progress>(`/api/sales/today?action=progress&scope=${scope}`),
   skip: (id: string, reason?: string) => post<{ success: true; until: string }>('/api/sales/today', { action: 'skip', id, reason }),
+  /** Take it out for good: Lost in Attio (PR: Not interested). Returns the stage it had, for Undo. */
+  remove: (id: string, reason?: string) => post<{ success: true; previous: string }>('/api/sales/today', { action: 'remove', id, reason }),
+  restore: (id: string, previous: string) => post<{ success: true }>('/api/sales/today', { action: 'restore', id, previous }),
   unskip: (id: string) => post<{ success: true }>('/api/sales/today', { action: 'unskip', id }),
   setStage: (id: string, stage: Stage) => post<{ deal: Deal; stage: string }>('/api/sales/today', { action: 'stage', id, stage }),
   addNote: (id: string, text: string) => post<{ success: true }>('/api/sales/today', { action: 'note', id, text }),

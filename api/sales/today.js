@@ -10,6 +10,8 @@
  *   POST { action:'unskip', id }
  *   POST { action:'stage', id, stage }         a person moves the deal in Attio
  *   POST { action:'note', id, text }           a note on the deal in Attio
+ *   POST { action:'remove', id, reason? }      a person takes it out for good: Lost (PR: Not interested), with a note
+ *   POST { action:'restore', id, previous }    undo a remove: back to the stage it had
  *
  * mine (default) is the deals whose Attio owner is you, plus unowned ones;
  * all is everyone's, for covering when the other person is out.
@@ -19,7 +21,7 @@ import { setCors } from '../_lib/auth.js'
 import { requireSalesRep } from '../_lib/users.js'
 import { getSettings, startOfToday } from '../../server/domain/sales/settings.js'
 import { morningQueue, dealForWork, progress, searchDeals } from '../../server/domain/sales/queue.js'
-import { setStage, noteOnDeal, isAttioConfigured } from '../../server/domain/sales/attio.js'
+import { setStage, noteOnDeal, isAttioConfigured, removeFromOutreach, restoreToOutreach } from '../../server/domain/sales/attio.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -57,6 +59,16 @@ export default async function handler(req, res) {
         })
         if (reason) await noteOnDeal(id, `Skipped today: ${reason}`, actor.email).catch(err => console.warn(`[sales] skip note failed: ${err.message}`))
         return res.status(200).json({ success: true, until })
+      }
+      if (body.action === 'remove') {
+        const reason = String(body.reason || '').trim().slice(0, 500) || null
+        const out = await removeFromOutreach(id, { reason, byEmail: actor.email })
+        await prisma.salesSkip.deleteMany({ where: { attioDealId: id } })
+        return res.status(200).json({ success: true, previous: out.previous })
+      }
+      if (body.action === 'restore') {
+        await restoreToOutreach(id, String(body.previous || '') || null)
+        return res.status(200).json({ success: true })
       }
       if (body.action === 'unskip') {
         await prisma.salesSkip.deleteMany({ where: { attioDealId: id } })

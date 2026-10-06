@@ -377,6 +377,30 @@ export default function Sales({ active = true }: { active?: boolean }) {
     catch (e) { toast.error((e as Error).message, { duration: 8000 }) }
   }, [loadToday])
 
+  /**
+   * Remove: out for good (Lost in Attio; a PR contact Not interested). The
+   * page moves on at once; Undo puts the stage back.
+   */
+  const remove = useCallback(async (reason?: string) => {
+    if (!deal) return
+    const target = deal
+    try {
+      const r = await salesApi.remove(target.id, reason)
+      if (adhoc) setAdhoc(null); else advance(target.id)
+      toast(`Removed ${target.name}`, {
+        duration: 8000,
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try { await salesApi.restore(target.id, r.previous); toast.success(`${target.name} is back at ${r.previous}`); await loadToday(); setSelectedId(target.id) }
+            catch (e) { toast.error((e as Error).message) }
+          },
+        },
+      })
+      loadToday()
+    } catch (e) { toast.error((e as Error).message) }
+  }, [deal, adhoc, advance, loadToday])
+
   /** Undo a skip: the deal goes back into today's list, still selected. */
   const unskip = useCallback(async () => {
     if (!deal) return
@@ -574,7 +598,7 @@ export default function Sales({ active = true }: { active?: boolean }) {
                   attachments={attachedAssets} onAttach={attach} onDetach={detach}
                   onChange={updateVariant}
                   onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} onUnskip={unskip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library} onSchedule={schedule} onTemplateSaved={loadLibrary}
+                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} onRemove={remove} onUnskip={unskip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library} onSchedule={schedule} onTemplateSaved={loadLibrary}
                 />
               )}
 
