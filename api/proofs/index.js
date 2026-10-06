@@ -15,6 +15,7 @@
  *   POST   { action: "approve", token, proofId, approval, feedback? } — Customer approves/revises
  */
 
+import { saveApprovedMockup } from '../../server/services/customGallery.js'
 import prisma from '../_lib/prisma.js'
 import { ensureApprovalToken, touchApprovalToken } from '../_lib/approvalToken.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
@@ -203,7 +204,7 @@ export default async function handler(req, res) {
               id: true, orderNumber: true, parentOrderNumber: true,
               customerName: true, customerEmail: true, raceName: true,
               designStatus: true, trackstarOrderType: true, shopifyOrderData: true,
-              designerNote: true
+              designerNote: true, runnerName: true, raceYear: true
             }
           }
         }
@@ -332,6 +333,13 @@ export default async function handler(req, res) {
         })
 
         console.log(`[approve] Customer ${approval} proof v${proof.version} for order ${approvalToken.order.orderNumber}`)
+
+        // Custom designs the customer approved go to the shared gallery folder.
+        // Awaited so the serverless function does not end mid-upload; it never
+        // throws, so the customer's approval is not affected by Drive.
+        if (approval === 'approve' && approvalToken.order.trackstarOrderType === 'custom') {
+          await saveApprovedMockup({ order: approvalToken.order, proof })
+        }
 
         // Send Slack notification (fire and forget)
         if (process.env.SLACK_PROOF_WEBHOOK_URL) {
