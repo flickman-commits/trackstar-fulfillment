@@ -75,6 +75,7 @@ export async function rawSlice(ids) {
   const rows = await prisma.$queryRaw`
     SELECT id,
       CASE WHEN "shopifyOrderData" IS NULL THEN NULL ELSE jsonb_build_object(
+        'id', "shopifyOrderData"::jsonb->'id',
         'name', "shopifyOrderData"::jsonb->'name',
         'created_at', "shopifyOrderData"::jsonb->'created_at',
         'total_price', "shopifyOrderData"::jsonb->'total_price',
@@ -369,7 +370,7 @@ export default async function handler(req, res) {
         creativeDirection: order.creativeDirection,
         isGift: order.isGift,
         // The order in Shopify admin, for the order modal's View in Shopify.
-        shopifyAdminUrl: shopifyAdminUrl(order.shopifyOrderData?.id),
+        shopifyAdminUrl: ['standard', 'custom'].includes(order.trackstarOrderType) ? shopifyAdminUrl(order.shopifyOrderData?.id) : null,
         // Race-partner virtual fields (aliases for existing columns — no schema change)
         partnerName: order.trackstarOrderType === 'race_partner' ? order.raceName : null,
         partnerContactName: order.trackstarOrderType === 'race_partner' ? order.customerName : null,
