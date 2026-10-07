@@ -112,7 +112,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-off-black/40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-gray">
           <h2 className="text-base font-semibold text-off-black">Sales settings</h2>
           <button onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button>
@@ -159,7 +159,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
             )}
             {tab === 'templates' && tView === 'library' && (
               !library ? <div className="flex items-center justify-center h-32 text-off-black/40"><Loader2 className="w-4 h-4 animate-spin" /></div> : (
-                <div className="grid grid-cols-[200px_1fr] gap-4 min-h-[380px]">
+                <div className="grid grid-cols-[260px_1fr] gap-6 min-h-[380px]">
                   <div className="flex flex-col border-r border-border-gray pr-3">
                     <p className="text-xs text-off-black/55 mb-2">What the Templates button in the composer offers.</p>
                     <div className="flex-1 space-y-0.5">
@@ -185,7 +185,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                       </div>
                       <div><label className={fieldLabel}>When to use it</label><input value={libDraft.useFor || ''} onChange={e => setLibDraft({ ...libDraft, useFor: e.target.value })} placeholder="Follow-up where the first touch went out without the video" className={`${inputBase} w-full`} /></div>
                       <div><label className={fieldLabel}>Subject</label><input value={libDraft.subject || ''} onChange={e => setLibDraft({ ...libDraft, subject: e.target.value })} placeholder="Leave empty to reply on the thread" className={`${inputBase} w-full`} /></div>
-                      <div><label className={fieldLabel}>Body</label><textarea rows={13} value={libDraft.body || ''} onChange={e => setLibDraft({ ...libDraft, body: e.target.value })} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
+                      <div><label className={fieldLabel}>Body</label><textarea rows={20} value={libDraft.body || ''} onChange={e => setLibDraft({ ...libDraft, body: e.target.value })} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
                       <details className="text-xs text-off-black/55">
                         <summary className="cursor-pointer">Placeholders</summary>
                         <dl className="mt-1 grid grid-cols-[130px_1fr] gap-x-2 gap-y-0.5">
@@ -218,7 +218,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                 {tDraft && (
                   <>
                     <div><label className={fieldLabel}>Subject</label><input value={tDraft.subject} onChange={e => setTDraft({ ...tDraft, subject: e.target.value })} className={`${inputBase} w-full`} /></div>
-                    <div><label className={fieldLabel}>Body</label><textarea rows={12} value={tDraft.body} onChange={e => setTDraft({ ...tDraft, body: e.target.value })} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
+                    <div><label className={fieldLabel}>Body</label><textarea rows={20} value={tDraft.body} onChange={e => setTDraft({ ...tDraft, body: e.target.value })} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
                     <details className="text-xs text-off-black/55">
                       <summary className="cursor-pointer">Placeholders the template can use</summary>
                       <dl className="mt-1 grid grid-cols-[130px_1fr] gap-x-2 gap-y-0.5">
