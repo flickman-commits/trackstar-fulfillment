@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck } from 'lucide-react'
+import { Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
@@ -151,6 +151,8 @@ interface Order {
   timeCustomer?: string
   creativeDirection?: string
   isGift?: boolean
+  /** The order in Shopify admin; null for Etsy and hand-made orders. */
+  shopifyAdminUrl?: string | null
   commentCount?: number
   assigneeId?: string | null
   assigneeName?: string | null
@@ -332,6 +334,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     timeCustomer: order.timeCustomer as string | undefined,
     creativeDirection: order.creativeDirection as string | undefined,
     isGift: order.isGift as boolean | undefined,
+    shopifyAdminUrl: order.shopifyAdminUrl as string | null | undefined,
     partnerName: order.partnerName as string | null | undefined,
     partnerContactName: order.partnerContactName as string | null | undefined,
     creatorShipping: order.creatorShipping as Order['creatorShipping'],
@@ -5286,7 +5289,19 @@ Thank you!`
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-0.5">Product Details</div>
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product Details</div>
+                          {selectedOrder.shopifyAdminUrl && (
+                            <a
+                              href={selectedOrder.shopifyAdminUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-0.5 text-xs text-off-black/45 hover:text-off-black transition-colors"
+                            >
+                              View in Shopify <ArrowUpRight className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
                         {/* Race leads as the headline, year rides beside it. */}
                         <div className="flex items-baseline gap-2 min-w-0">
                           <h3 className="text-lg font-bold text-off-black truncate leading-tight">

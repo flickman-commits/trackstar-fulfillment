@@ -11,7 +11,7 @@ import { btnPrimary, btnSecondary, btnGhost, inputBase, fieldLabel, segment, seg
  * Each type has a regular person. For a busy stretch, add help: a teammate,
  * the days, and their share. While a shift is on, each new order goes to
  * whoever is furthest below their share of the open queue; when it ends the
- * helper's unfinished orders go back to the regular. "Spread the queue" hands
+ * helper's unfinished orders go back to the regular. "Spread the order list" hands
  * a helper their share of what is already waiting. Server side:
  * server/domain/orders/assignment.js.
  */
@@ -155,13 +155,13 @@ export default function AssignmentPanel() {
                         <button
                           className={btnSecondary}
                           disabled={busy === `spread-${s.id}`}
-                          title="Move unstarted orders from the queue to them, up to their share"
+                          title="Move unstarted orders from the order list to them, up to their share"
                           onClick={async () => {
                             const d = await post(`spread-${s.id}`, { action: 'spread', id: s.id })
                             if (d) { toast.success(d.moved ? `${d.moved} waiting order${d.moved === 1 ? '' : 's'} moved to ${name(s.userId)}` : `${name(s.userId)} already has their share`); load() }
                           }}
                         >
-                          {busy === `spread-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Shuffle className="w-3 h-3" />} Spread the queue
+                          {busy === `spread-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Shuffle className="w-3 h-3" />} Spread the order list
                         </button>
                       )}
                       <button
@@ -192,7 +192,7 @@ export default function AssignmentPanel() {
                       setAdding(null)
                       await load()
                       toast.success(d.shift.from <= today
-                        ? `${name(v.userId)} is on. Use Spread the queue to give them some of what is waiting.`
+                        ? `${name(v.userId)} is on. Use Spread the order list to give them some of what is waiting.`
                         : `${name(v.userId)} starts ${fmt(d.shift.from)}`)
                     }
                   }}

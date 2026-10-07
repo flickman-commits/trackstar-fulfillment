@@ -109,6 +109,13 @@ export async function rawSlice(ids) {
   return new Map(rows.map(r => [r.id, r]))
 }
 
+/** The order's page in Shopify admin, or null when it is not a Shopify order. */
+function shopifyAdminUrl(shopifyOrderId) {
+  const handle = String(process.env.SHOPIFY_STORE || '').replace(/\.myshopify\.com$/, '').trim()
+  if (!shopifyOrderId || !handle) return null
+  return `https://admin.shopify.com/store/${handle}/orders/${shopifyOrderId}`
+}
+
 /** A print carries "Rush Order: Yes" but the order has no rush add-on line. */
 function rushSelectedNotPaid(shopify) {
   const items = (Array.isArray(shopify?.line_items) ? shopify.line_items : []).filter(li => !isRemovedLineItem(li))
@@ -361,6 +368,8 @@ export default async function handler(req, res) {
         timeCustomer: order.timeCustomer,
         creativeDirection: order.creativeDirection,
         isGift: order.isGift,
+        // The order in Shopify admin, for the order modal's View in Shopify.
+        shopifyAdminUrl: shopifyAdminUrl(order.shopifyOrderData?.id),
         // Race-partner virtual fields (aliases for existing columns — no schema change)
         partnerName: order.trackstarOrderType === 'race_partner' ? order.raceName : null,
         partnerContactName: order.trackstarOrderType === 'race_partner' ? order.customerName : null,
