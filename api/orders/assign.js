@@ -1,7 +1,8 @@
 /**
  * /api/orders/assign - who fulfills which order.
  *
- *   GET                                   the team (active users) and the per-type defaults
+ *   GET                                   the team (active users) and the per-type defaults;
+ *                                         for admins also the shifts and open counts
  *   POST { orderId, assigneeId }          reassign one order; null unassigns
  *   POST { action:'defaults', standard, custom }   change the import defaults (admins only)
  *   POST { action:'add-shift', type, userId, weight, from, until }   extra help for some days (admins)
@@ -16,7 +17,7 @@
  */
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { requireAdminRole, recordAudit } from '../_lib/users.js'
+import { requireAdminRole, recordAudit, loadActiveUser } from '../_lib/users.js'
 import {
   getAssignmentDefaults, setAssignmentDefaults, ASSIGNABLE_TYPES,
   getShifts, addShift, endShift, spreadQueue, openCounts, businessDate,
@@ -34,17 +35,15 @@ export default async function handler(req, res) {
         orderBy: { firstName: 'asc' },
         select: { id: true, firstName: true, lastName: true },
       })
+      const base = { users, defaults: await getAssignmentDefaults({ force: true }), me: actor.id || null }
+      // The team list feeds everyone's reassign menu; shifts and queue
+      // counts are the admin's planning view and go to admins only.
+      const me = await loadActiveUser(actor)
+      if (!me || (me.role !== 'admin' && !me.isSystem)) return res.status(200).json(base)
       const ids = users.map(u => u.id)
       const open = {}
       for (const t of ASSIGNABLE_TYPES) open[t] = await openCounts(t, ids)
-      return res.status(200).json({
-        users,
-        defaults: await getAssignmentDefaults({ force: true }),
-        shifts: await getShifts(),
-        open,
-        today: businessDate(),
-        me: actor.id || null,
-      })
+      return res.status(200).json({ ...base, shifts: await getShifts(), open, today: businessDate() })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
