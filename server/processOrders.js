@@ -379,7 +379,8 @@ async function fetchShopifyOrderData(shopifyOrderId) {
  * item (same product first): its position, size, frame and order data
  * change, and everything people did on it (research, design, assignee,
  * comments) stays. A row whose print was removed with nothing in its place
- * is flagged with a comment instead, never deleted. Runs before the import
+ * is flagged with a comment instead, never deleted. When the replacement
+ * already has a row of its own, both are left as they are. Runs before the import
  * loop, so the loop then finds each row where it belongs.
  */
 export async function reconcileEditedOrder(prisma, order, shopifyData, log = () => {}) {
@@ -399,6 +400,10 @@ export async function reconcileEditedOrder(prisma, order, shopifyData, log = () 
   const claimed = new Set(rows.filter(r => !orphans.includes(r)).map(itemIdOf).filter(Boolean))
   const lines = shopifyData?.shopifyOrderData?.line_items || []
   const lineOf = id => lines.find(l => String(l.id) === String(id))
+  // The same product is still on the order as a live line: a swap (a frame
+  // added), not a print taken away.
+  const swappedIn = old => Boolean(old) && lines.some(l => l.id !== old.id && l.current_quantity !== 0
+    && String(l.product_id) === String(old.product_id))
 
   for (const row of orphans) {
     const oldLine = lineOf(itemIdOf(row))
@@ -432,7 +437,10 @@ export async function reconcileEditedOrder(prisma, order, shopifyData, log = () 
       row.lineItemIndex = target.t
       out.moved++
       log(`[processOrders] Order ${order.orderId} was edited: row ${row.id} moved to item ${target.t} (${from} -> ${to})`)
-    } else if (row.status !== 'flagged') {
+    } else if (row.status !== 'flagged' && !swappedIn(oldLine)) {
+      // Flag only when nothing replaced it. A replacement that already has
+      // its own row (imported before this ran) is left for a person: two
+      // rows for one print is visible; a wrong "will not print" is not.
       await prisma.order.update({ where: { id: row.id }, data: { status: 'flagged' } })
       await prisma.orderComment.create({
         data: { orderId: row.id, authorName: 'Trackstar', text: `This print${oldLine?.variant_title ? ` (${oldLine.variant_title})` : ''} was removed from the order in Shopify and nothing replaced it. Artelo will not print it.` },

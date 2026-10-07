@@ -77,3 +77,13 @@ test('a print removed with nothing in its place is flagged, not deleted', async 
   assert.deepEqual(out, { moved: 0, flagged: 1 })
   assert.equal(db.rows[0].status, 'flagged')
 })
+
+test('a replacement that already has its own row is not flagged as removed', async () => {
+  const db = fakePrisma([
+    { id: 'r0', lineItemIndex: 0, status: 'ready', productSize: '8x10', frameType: 'Unframed', arteloOrderData: { orderItems: before } },
+    { id: 'r1', lineItemIndex: 1, status: 'missing_year', runnerName: 'Unknown Runner', arteloOrderData: { orderItems: after } },
+  ])
+  const out = await reconcileEditedOrder(db, { orderId: '4084', orderItems: after }, { shopifyOrderData: { line_items: lines } })
+  assert.deepEqual(out, { moved: 0, flagged: 0 })
+  assert.equal(db.rows[0].status, 'ready')
+})
