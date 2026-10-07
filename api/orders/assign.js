@@ -36,25 +36,29 @@ export default async function handler(req, res) {
         orderBy: { firstName: 'asc' },
         select: { id: true, firstName: true, lastName: true },
       })
-      // Who new orders of each type go to today, for the pill on the
-      // dashboard: names and a helper's last day, not shares or counts.
+      // Who new orders of each type go to today, for "Current Team" on the
+      // dashboard: names and a helper's last day for everyone; each one's
+      // share and open count for admins. The team list also feeds everyone's
+      // reassign menu; shifts and counts are the admin's planning view.
+      const me = await loadActiveUser(actor)
+      const isAdmin = Boolean(me && (me.role === 'admin' || me.isSystem))
       const shifts = await getShifts()
+      const ids = users.map(u => u.id)
+      const open = {}
       const queues = {}
       for (const t of ASSIGNABLE_TYPES) {
-        queues[t] = (await rosterFor(t)).map(r => ({
+        if (isAdmin) open[t] = await openCounts(t, ids)
+        const roster = await rosterFor(t)
+        const weightSum = roster.reduce((a, r) => a + r.weight, 0) || 1
+        queues[t] = roster.map(r => ({
           userId: r.userId,
           regular: r.regular,
           until: r.shiftId ? shifts.find(x => x.id === r.shiftId)?.until || null : null,
+          ...(isAdmin ? { share: Math.round((r.weight / weightSum) * 100), open: open[t][r.userId] || 0 } : {}),
         }))
       }
       const base = { users, defaults: await getAssignmentDefaults({ force: true }), queues, me: actor.id || null }
-      // The team list feeds everyone's reassign menu; shifts and queue
-      // counts are the admin's planning view and go to admins only.
-      const me = await loadActiveUser(actor)
-      if (!me || (me.role !== 'admin' && !me.isSystem)) return res.status(200).json(base)
-      const ids = users.map(u => u.id)
-      const open = {}
-      for (const t of ASSIGNABLE_TYPES) open[t] = await openCounts(t, ids)
+      if (!isAdmin) return res.status(200).json(base)
       return res.status(200).json({ ...base, shifts, open, today: businessDate() })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })

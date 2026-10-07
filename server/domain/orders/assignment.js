@@ -141,13 +141,25 @@ export async function rosterFor(orderType, today = businessDate()) {
   return roster
 }
 
-/** Unfinished orders of this type, per assignee. */
+/**
+ * Unfinished work of this type, per assignee. A bulk run counts once until it
+ * is sent to Artelo; a partner order until the partner approves a design.
+ */
 export async function openCounts(orderType, userIds) {
-  const rows = await prisma.order.groupBy({
-    by: ['assigneeId'],
-    where: { trackstarOrderType: orderType, status: { not: 'completed' }, assigneeId: { in: userIds } },
-    _count: { _all: true },
-  })
+  const rows = orderType === 'bulk'
+    ? await prisma.bulkOrder.groupBy({
+      by: ['assigneeId'],
+      where: { status: { not: 'submitted' }, assigneeId: { in: userIds } },
+      _count: { _all: true },
+    })
+    : await prisma.order.groupBy({
+      by: ['assigneeId'],
+      where: {
+        trackstarOrderType: orderType, status: { not: 'completed' }, assigneeId: { in: userIds },
+        ...(orderType === 'race_partner' ? { designStatus: { notIn: ['sent_to_production', 'approved_by_customer'] } } : {}),
+      },
+      _count: { _all: true },
+    })
   return Object.fromEntries(userIds.map(id => [id, rows.find(r => r.assigneeId === id)?._count._all || 0]))
 }
 
