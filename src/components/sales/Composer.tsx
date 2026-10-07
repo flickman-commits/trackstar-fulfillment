@@ -492,7 +492,7 @@ const QUICK_LINKS: { label: string; text: string; url: string }[] = [
 ]
 
 /** What the ⌘K box is editing: the selected words, or a link the caret is in. */
-type LinkTarget = { text: string; url: string; existing: boolean }
+type LinkTarget = { text: string; url: string; existing: boolean; top: number; left: number }
 
 /** The ⌘K box: compact, with the usual links one click away. */
 function LinkBox({ target, onSave, onRemove, onCancel }: { target: LinkTarget; onSave: (text: string, url: string) => void; onRemove: () => void; onCancel: () => void }) {
@@ -507,7 +507,8 @@ function LinkBox({ target, onSave, onRemove, onCancel }: { target: LinkTarget; o
   }
   return (
     <form
-      className="absolute left-0 top-full mt-1 z-20 w-[420px] max-w-full rounded-lg border border-border-gray bg-white shadow-lg p-2 space-y-1.5"
+      style={{ top: target.top, left: target.left }}
+      className="absolute z-20 w-[420px] max-w-full rounded-lg border border-border-gray bg-white shadow-lg p-2 space-y-1.5"
       onSubmit={e => { e.preventDefault(); if (ok) onSave(text.trim(), normalizeUrl(url)) }}
       onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onCancel() } }}
       onMouseDown={e => e.stopPropagation()}
@@ -624,20 +625,41 @@ function RichBox({ value, onChange, onBlur, placeholder, minHeight, boxRef }: {
     onChange(md)
   }
 
+  const wrap = useRef<HTMLDivElement>(null)
+  /** Where the box goes: just under the selected words, kept inside the editor. */
+  const spot = (range: Range) => {
+    const box = wrap.current?.getBoundingClientRect()
+    let r = range.getBoundingClientRect()
+    if (!r.width && !r.height) {
+      // A bare caret has no box of its own; measure a one-character range around it.
+      const probe = range.cloneRange()
+      const node = probe.startContainer
+      if (node.nodeType === Node.TEXT_NODE && (node.nodeValue || '').length) {
+        const at = Math.min(probe.startOffset, (node.nodeValue || '').length - 1)
+        probe.setStart(node, Math.max(0, at)); probe.setEnd(node, Math.max(0, at) + 1)
+        r = probe.getBoundingClientRect()
+      } else if (node instanceof HTMLElement) r = node.getBoundingClientRect()
+    }
+    if (!box) return { top: 0, left: 0 }
+    const width = Math.min(420, box.width)
+    return { top: r.bottom - box.top + 6, left: Math.max(0, Math.min(r.left - box.left, box.width - width)) }
+  }
+
   const openLink = () => {
     const sel = window.getSelection()
     if (!sel || !sel.rangeCount || !ref.current?.contains(sel.anchorNode)) return
     const range = sel.getRangeAt(0)
+    const at = spot(range)
     const inLink = (range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer as HTMLElement)?.closest('a')
     if (inLink && ref.current.contains(inLink)) {
       anchor.current = inLink
       const whole = document.createRange(); whole.selectNodeContents(inLink)
       saved.current = whole
-      setLink({ text: inLink.textContent || '', url: inLink.getAttribute('href') || '', existing: true })
+      setLink({ text: inLink.textContent || '', url: inLink.getAttribute('href') || '', existing: true, ...at })
     } else {
       anchor.current = null
       saved.current = range.cloneRange()
-      setLink({ text: range.toString(), url: '', existing: false })
+      setLink({ text: range.toString(), url: '', existing: false, ...at })
     }
   }
 
@@ -674,7 +696,7 @@ function RichBox({ value, onChange, onBlur, placeholder, minHeight, boxRef }: {
   }
 
   return (
-    <div className="relative">
+    <div ref={wrap} className="relative">
       <div
         ref={ref}
         contentEditable
