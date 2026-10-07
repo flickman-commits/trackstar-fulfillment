@@ -27,7 +27,7 @@ export const ROLE_LABEL = {
 const CAPS = {
   admin: '*',
   sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.reviews', 'settings.stats'],
-  fulfillment: ['creators', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  fulfillment: ['creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
   designer: ['tools.pace', 'tools.weather', 'settings.stats'],
 }
 

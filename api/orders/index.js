@@ -4,7 +4,7 @@ import { hasScraperForRace } from '../../server/scrapers/index.js'
 import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
 import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
 import { getProductInfo, loadProductCatalog } from '../../server/lib/productCatalog.js'
-import { isRushAddonLineItem } from '../../server/lib/lineItemMatching.js'
+import { isRushAddonLineItem, isRemovedLineItem } from '../../server/lib/lineItemMatching.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 
 
@@ -111,7 +111,7 @@ export async function rawSlice(ids) {
 
 /** A print carries "Rush Order: Yes" but the order has no rush add-on line. */
 function rushSelectedNotPaid(shopify) {
-  const items = Array.isArray(shopify?.line_items) ? shopify.line_items : []
+  const items = (Array.isArray(shopify?.line_items) ? shopify.line_items : []).filter(li => !isRemovedLineItem(li))
   const ticked = items.some(li => (li.properties || []).some(p =>
     p?.name === 'Rush Order' && String(p.value || '').toLowerCase().startsWith('yes')))
   return ticked && !items.some(isRushAddonLineItem)

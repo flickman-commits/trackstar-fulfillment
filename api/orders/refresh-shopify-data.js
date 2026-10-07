@@ -20,7 +20,7 @@ import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { shopifyFetch } from '../../server/services/shopifyAuth.js'
 import { parseRaceNameFromTitle } from '../../server/scrapers/raceNameNormalization.js'
-import { resolveShopifyLineIndex } from '../../server/lib/lineItemMatching.js'
+import { resolveShopifyLineIndex, carryEditedProperties } from '../../server/lib/lineItemMatching.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -57,8 +57,9 @@ export default async function handler(req, res) {
  */
 async function refreshOrderFromShopify(shopifyOrderId) {
   const data = await shopifyFetch(`/orders/${shopifyOrderId}.json`)
-  const shopifyOrder = data.order
-  if (!shopifyOrder) return null
+  if (!data.order) return null
+  // Order edits: the personalization rides from a removed line to its replacement.
+  const shopifyOrder = { ...data.order, line_items: carryEditedProperties(data.order.line_items) }
 
   const parsed = extractShopifyData(shopifyOrder.line_items)
   const notes = await fetchShopifyComments(shopifyOrderId)
@@ -87,7 +88,7 @@ async function refreshOrderFromShopify(shopifyOrderId) {
         hadNoTime: lineItemData.hadNoTime || false,
         notes: notes || existing.notes,
         shopifyOrderData: shopifyOrder,
-        status: lineItemData.needsAttention ? 'missing_year' : existing.status,
+        status: lineItemData.needsAttention ? 'missing_year' : existing.status === 'missing_year' ? 'pending' : existing.status,
         // Widget / Easify parity fields
         customerBib: lineItemData.customerBib,
         customerFinishTime: lineItemData.customerFinishTime,

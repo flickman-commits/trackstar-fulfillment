@@ -23,7 +23,7 @@ import { parseRaceNameFromTitle } from './scrapers/raceNameNormalization.js'
 import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrderIds, saveCountedOrderIds } from './services/customersServed.js'
 import { isExpeditedShipping, getShippingMethod } from './lib/shipping.js'
 import { fetchWithTimeout } from './lib/fetchWithTimeout.js'
-import { buildShopifyMatchMap, buildEtsyMatchMap, isRushAddonLineItem } from './lib/lineItemMatching.js'
+import { buildShopifyMatchMap, buildEtsyMatchMap, isRushAddonLineItem, isRemovedLineItem, carryEditedProperties } from './lib/lineItemMatching.js'
 import { defaultAssigneeFor } from './domain/orders/assignment.js'
 
 // Artelo API configuration
@@ -97,7 +97,7 @@ export function shopifyOrderIsRush(shopifyOrderData, _printLineItemIsRush) {
   // add to cart failed), and order 4074 got a free 4-day turnaround that way.
   // A ticked box with no charge shows as "Rush not paid" instead.
   const items = shopifyOrderData?.line_items
-  return Array.isArray(items) && items.some(isRushAddonLineItem)
+  return Array.isArray(items) && items.some(li => isRushAddonLineItem(li) && !isRemovedLineItem(li))
 }
 
 function isCustomOrder(raceName) {
@@ -344,11 +344,12 @@ function extractShopifyPersonalization(lineItem) {
 async function fetchShopifyOrderData(shopifyOrderId) {
   try {
     const data = await shopifyFetch(`/orders/${shopifyOrderId}.json`)
-    const order = data.order
-
-    if (!order || !order.line_items?.length) {
+    if (!data.order?.line_items?.length) {
       return null
     }
+    // An order edited after purchase (a frame added) has a bare new line and
+    // the personalization on the removed one; see carryEditedProperties.
+    const order = { ...data.order, line_items: carryEditedProperties(data.order.line_items) }
 
     // Fetch timeline comments (internal notes) - shared across all line items
     const comments = await fetchShopifyComments(shopifyOrderId)
@@ -361,6 +362,86 @@ async function fetchShopifyOrderData(shopifyOrderId) {
     console.error(`[processOrders] Failed to fetch Shopify data for order ${shopifyOrderId}:`, error.message)
     return null
   }
+}
+
+/**
+ * An order edited in Shopify after it was imported.
+ *
+ * A customer who adds a frame or changes size after paying gets an order
+ * edit: the print's line is removed and the new variant added. Artelo drops
+ * the old item and lists the new one, often at a different position, while
+ * our rows are keyed by position. Left alone, the old row keeps the runner
+ * and the research for a print nobody will make, and the new item imports
+ * as "Unknown Runner".
+ *
+ * Artelo's orderItemId is the Shopify line id, so a row whose item is no
+ * longer in the order is known exactly. Such a row is moved onto the new
+ * item (same product first): its position, size, frame and order data
+ * change, and everything people did on it (research, design, assignee,
+ * comments) stays. A row whose print was removed with nothing in its place
+ * is flagged with a comment instead, never deleted. Runs before the import
+ * loop, so the loop then finds each row where it belongs.
+ */
+export async function reconcileEditedOrder(prisma, order, shopifyData, log = () => {}) {
+  const out = { moved: 0, flagged: 0 }
+  const items = order.orderItems || []
+  const currentIds = new Set(items.map(i => i?.orderItemId).filter(Boolean).map(String))
+  if (!currentIds.size) return out
+
+  const rows = await prisma.order.findMany({ where: { parentOrderNumber: String(order.orderId) } })
+  const itemIdOf = row => {
+    const id = row.arteloOrderData?.orderItems?.[row.lineItemIndex]?.orderItemId
+    return id ? String(id) : null
+  }
+  const orphans = rows.filter(r => r.status !== 'completed' && itemIdOf(r) && !currentIds.has(itemIdOf(r)))
+  if (!orphans.length) return out
+
+  const claimed = new Set(rows.filter(r => !orphans.includes(r)).map(itemIdOf).filter(Boolean))
+  const lines = shopifyData?.shopifyOrderData?.line_items || []
+  const lineOf = id => lines.find(l => String(l.id) === String(id))
+
+  for (const row of orphans) {
+    const oldLine = lineOf(itemIdOf(row))
+    const open = items
+      .map((it, t) => ({ it, t }))
+      .filter(({ it, t }) => it?.product && it.orderItemId && !claimed.has(String(it.orderItemId))
+        && !rows.some(r => r.lineItemIndex === t && r.id !== row.id))
+    const target = open.find(({ it }) => oldLine && String(lineOf(it.orderItemId)?.product_id) === String(oldLine.product_id))
+      || open[0]
+
+    if (target) {
+      const rawSize = target.it.product.size || 'Unknown'
+      const newLine = lineOf(target.it.orderItemId)
+      await prisma.order.update({
+        where: { id: row.id },
+        data: {
+          lineItemIndex: target.t,
+          orderNumber: `${order.orderId}-${target.t}`,
+          arteloOrderData: order,
+          productSize: rawSize.startsWith('x') ? rawSize.slice(1) : rawSize,
+          frameType: target.it.product.frameColor || 'Unknown',
+          ...(shopifyData ? { shopifyOrderData: shopifyData.shopifyOrderData } : {}),
+        },
+      })
+      const from = oldLine?.variant_title || `${row.productSize} / ${row.frameType}`
+      const to = newLine?.variant_title || `${target.it.product.size} / ${target.it.product.frameColor}`
+      await prisma.orderComment.create({
+        data: { orderId: row.id, authorName: 'Trackstar', text: `Order edited in Shopify: ${from} became ${to}. This print's details moved to the new item.` },
+      })
+      claimed.add(String(target.it.orderItemId))
+      row.lineItemIndex = target.t
+      out.moved++
+      log(`[processOrders] Order ${order.orderId} was edited: row ${row.id} moved to item ${target.t} (${from} -> ${to})`)
+    } else if (row.status !== 'flagged') {
+      await prisma.order.update({ where: { id: row.id }, data: { status: 'flagged' } })
+      await prisma.orderComment.create({
+        data: { orderId: row.id, authorName: 'Trackstar', text: `This print${oldLine?.variant_title ? ` (${oldLine.variant_title})` : ''} was removed from the order in Shopify and nothing replaced it. Artelo will not print it.` },
+      })
+      out.flagged++
+      log(`[processOrders] Order ${order.orderId} was edited: row ${row.id} was removed, flagged`)
+    }
+  }
+  return out
 }
 
 /**
@@ -722,6 +803,12 @@ export async function processOrders(options = {}) {
         const etsyMatchMap = isEtsy
           ? buildEtsyMatchMap(order.orderItems || [], etsyReceipt?.transactions || [])
           : null
+
+        // Edited after import (a frame added, a size changed): put each
+        // existing row on the item it now describes before matching.
+        if (isShopify && shopifyData) {
+          await reconcileEditedOrder(prisma, order, shopifyData, log)
+        }
 
         // Process each line item separately
         for (let lineItemIndex = 0; lineItemIndex < numItems; lineItemIndex++) {

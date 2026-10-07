@@ -59,6 +59,46 @@ export function printableLineItems(lineItems) {
   return (lineItems || []).filter(li => !isAddonLineItem(li))
 }
 
+/**
+ * A line taken out by a Shopify order edit. Shopify keeps it in `line_items`
+ * (with its properties) at current_quantity 0; it is not a print any more.
+ * A line without the field (older payloads, Etsy) counts as live.
+ */
+export function isRemovedLineItem(lineItem) {
+  return lineItem?.current_quantity === 0
+}
+
+/** The customer's own answers on a line: any property not starting with "_". */
+function hasPersonalization(lineItem) {
+  return (lineItem?.properties || []).some(p => p?.name && !String(p.name).startsWith('_') && String(p.value ?? '').trim())
+}
+
+/**
+ * Order edits: when a customer changes their mind after paying (adds a frame,
+ * changes size), the order is edited in Shopify by removing the print and
+ * adding the new variant. The added line arrives bare: the personalization
+ * (runner, year, bib, the lookup result) stayed on the removed line.
+ *
+ * This hands each bare live print the properties of a removed print, same
+ * product first, each removed line used once, and marks it with
+ * `_carried_from` so the hand-over is visible. Returns the same array when
+ * there is nothing to carry, and never touches the removed lines themselves.
+ */
+export function carryEditedProperties(lineItems) {
+  if (!Array.isArray(lineItems)) return lineItems
+  const donors = lineItems.filter(li => isRemovedLineItem(li) && !isAddonLineItem(li) && hasPersonalization(li))
+  if (!donors.length) return lineItems
+  const used = new Set()
+  return lineItems.map(li => {
+    if (isRemovedLineItem(li) || isAddonLineItem(li) || hasPersonalization(li)) return li
+    const donor = donors.find(d => !used.has(d) && String(d.product_id) === String(li.product_id))
+      || donors.find(d => !used.has(d))
+    if (!donor) return li
+    used.add(donor)
+    return { ...li, properties: [...(donor.properties || []), { name: '_carried_from', value: String(donor.id) }] }
+  })
+}
+
 function normalizePrintSize(raw) {
   if (!raw) return ''
   // Artelo prefixes with "x" (e.g. "x8x10"); strip it. Lowercase + trim.
@@ -126,9 +166,23 @@ function buildMatchMapByScore(arteloItems, upstreamItems, scoreSizeMatchFns) {
 export function buildShopifyMatchMap(arteloItems, shopifyLineItems) {
   const prints = []
   ;(shopifyLineItems || []).forEach((li, j) => {
-    if (!isAddonLineItem(li)) prints.push({ li, originalIndex: j })
+    if (!isAddonLineItem(li) && !isRemovedLineItem(li)) prints.push({ li, originalIndex: j })
   })
-  const map = buildMatchMapByScore(arteloItems, prints.map(p => p.li), [
+  // Artelo's orderItemId is the Shopify line item id, so when both are there
+  // the pairing is exact and nothing needs guessing. Only the items left
+  // over (older Artelo payloads without the id) go to the score match.
+  const n = arteloItems?.length || 0
+  const exact = new Array(n).fill(-1)
+  const taken = new Set()
+  for (let i = 0; i < n; i++) {
+    const id = arteloItems[i]?.orderItemId
+    if (!id) continue
+    const k = prints.findIndex((p, k) => !taken.has(k) && String(p.li?.id) === String(id))
+    if (k >= 0) { exact[i] = k; taken.add(k) }
+  }
+  const restI = [...Array(n).keys()].filter(i => exact[i] < 0 && !(arteloItems[i]?.orderItemId && arteloItems[i]?.product === null))
+  const restK = prints.map((_, k) => k).filter(k => !taken.has(k))
+  const scored = buildMatchMapByScore(restI.map(i => arteloItems[i]), restK.map(k => prints[k].li), [
     // SKU containing the size token is the strongest signal (SKU encodes
     // the actual variant, while variant_title is display text that can be
     // misleading — e.g. "Black Oak" used as a label for "Black Premium Oak").
@@ -136,7 +190,8 @@ export function buildShopifyMatchMap(arteloItems, shopifyLineItems) {
     // variant_title is a weaker signal but still useful
     (li, size) => (li?.variant_title || '').toLowerCase().includes(size) ? 50 : 0,
   ])
-  return map.map(k => (k >= 0 ? prints[k].originalIndex : -1))
+  restI.forEach((i, r) => { if (scored[r] >= 0) exact[i] = restK[scored[r]] })
+  return exact.map(k => (k >= 0 ? prints[k].originalIndex : -1))
 }
 
 /**

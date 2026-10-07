@@ -23,14 +23,14 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const ROLE_BLURB: Record<Role, string> = {
   admin: 'Everything, including people, data and maintenance',
   sales: 'Fulfillment, Sales, Creators, all tools; Pricing, Reviews and Stats',
-  fulfillment: 'Fulfillment and Creators; Pace, Weather, Pricing and Stats',
+  fulfillment: 'Fulfillment and Creators; Discounts, Pace, Weather, Pricing and Stats',
   designer: 'Fulfillment; Pace, Weather and Stats',
 }
 
 const CAPS: Record<Role, '*' | Capability[]> = {
   admin: '*',
   sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.reviews', 'settings.stats'],
-  fulfillment: ['creators', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  fulfillment: ['creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
   designer: ['tools.pace', 'tools.weather', 'settings.stats'],
 }
 
