@@ -17,6 +17,24 @@ import prisma from './prisma.js'
 import { requireAdmin } from './auth.js'
 import { ROLE_LABEL, normalizeRole, can } from './roles.js'
 
+const SEEN_EVERY_MS = 5 * 60_000
+const seenAt = new Map()
+
+/**
+ * Last seen: when this person last used the app, not when they last typed a
+ * password (sessions last 30 days, so that was weeks stale). Written at most
+ * every five minutes per person per instance, and never in the way of the
+ * request it rides on.
+ */
+export function touchLastSeen(userId) {
+  if (!userId) return
+  const now = Date.now()
+  if (now - (seenAt.get(userId) || 0) < SEEN_EVERY_MS) return
+  seenAt.set(userId, now)
+  prisma.user.update({ where: { id: userId }, data: { lastSeenAt: new Date(now) } })
+    .catch(err => console.warn(`[users] last seen not saved: ${err.message}`))
+}
+
 export { ROLES } from './roles.js'
 
 /**
@@ -81,6 +99,7 @@ export async function loadActiveUser(actor) {
     select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true },
   })
   if (!user || !user.isActive) return null
+  touchLastSeen(user.id)
   return user
 }
 
@@ -118,7 +137,7 @@ export async function requireCapability(req, res, capability) {
     res.status(401).json({ error: 'Your account is no longer active. Sign in again.' })
     return null
   }
-  if (user.isSystem || can(user.role, capability)) return user
+  if (user.isSystem || await can(user.role, capability)) return user
   res.status(403).json({ error: 'That is not part of your role. Ask Matt if you need it.', code: 'not_allowed' })
   return null
 }
@@ -156,7 +175,7 @@ export async function requireSalesRep(req, res) {
     return null
   }
   if (user.role === 'admin' || user.isSystem) return user
-  if (!can(user.role, 'sales')) {
+  if (!(await can(user.role, 'sales'))) {
     res.status(403).json({ error: 'Sales is not part of your role. Ask Matt if you need it.', code: 'not_a_rep' })
     return null
   }

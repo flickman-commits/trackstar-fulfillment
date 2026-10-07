@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3 } from 'lucide-react'
+import { Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import BulkView from '@/components/bulk/BulkView'
 import PricingCalculator from '@/components/PricingCalculator'
-import { PeoplePanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
+import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import AssignmentPanel from '@/components/AssignmentPanel'
 import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
 import StatsPanel from '@/components/StatsPanel'
@@ -828,7 +828,7 @@ const REVIEW_PRODUCTS: { name: string; link: string }[] = [
   { name: 'Twin Cities Marathon', link: 'https://yotpo.com/go/A3v2ZhPB' },
 ]
 
-type SettingsPanel = 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'assignments' | 'activity' | 'diagnostics' | 'maintenance'
+type SettingsPanel = 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'roles' | 'assignments' | 'activity' | 'diagnostics' | 'maintenance'
 
 /**
  * Settings navigation. Grouped rather than a flat list because the panels do
@@ -874,6 +874,7 @@ const SETTINGS_NAV: {
     adminOnly: true,
     items: [
       { id: 'people', label: 'People', blurb: 'Who can sign in and what they are allowed to do', icon: Users },
+      { id: 'roles', label: 'Roles', blurb: 'What each role can see and use', icon: ShieldCheck },
       { id: 'assignments', label: 'Order Assignment', blurb: 'Who new standard and custom orders go to', icon: UserCog },
       { id: 'activity', label: 'Activity Log', blurb: 'Who did what, and when', icon: ScrollText },
       { id: 'diagnostics', label: 'Diagnostics', blurb: 'Test connections and run a full health check', icon: FlaskConical },
@@ -3734,6 +3735,7 @@ Thank you!`
                   {settingsPanel === 'stats' && can('settings.stats') && <StatsPanel />}
                   {settingsPanel === 'account' && <AccountPanel />}
                   {settingsPanel === 'people' && isAdmin && <PeoplePanel />}
+                  {settingsPanel === 'roles' && isAdmin && <RolesPanel />}
                   {settingsPanel === 'assignments' && isAdmin && <AssignmentPanel />}
                   {settingsPanel === 'activity' && isAdmin && <ActivityPanel />}
 

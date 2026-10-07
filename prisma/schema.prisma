@@ -696,6 +696,8 @@ model User {
   inviteToken     String?   @unique
   inviteExpiresAt DateTime?
   lastLoginAt  DateTime?
+  // When they last used the app (throttled to every 5 minutes); see touchLastSeen.
+  lastSeenAt   DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

@@ -33,7 +33,7 @@ const MIN_PASSWORD = 10
 
 const PUBLIC_FIELDS = {
   id: true, email: true, firstName: true, lastName: true, role: true, isActive: true,
-  lastLoginAt: true, createdAt: true, inviteExpiresAt: true, passwordHash: true,
+  lastLoginAt: true, lastSeenAt: true, createdAt: true, inviteExpiresAt: true, passwordHash: true,
 }
 
 /** Never let a password hash out of the API, even to an admin. */

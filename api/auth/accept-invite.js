@@ -11,6 +11,7 @@
 import prisma from '../_lib/prisma.js'
 import { setCors, buildSessionCookie, createSessionToken } from '../_lib/auth.js'
 import { hashPassword } from '../_lib/users.js'
+import { capsFor } from '../_lib/roles.js'
 
 const MIN_PASSWORD = 10
 
@@ -50,6 +51,7 @@ export default async function handler(req, res) {
         inviteToken: null,
         inviteExpiresAt: null,
         lastLoginAt: new Date(),
+        lastSeenAt: new Date(),
       },
     })
 
@@ -58,7 +60,7 @@ export default async function handler(req, res) {
       firstName: user.firstName, lastName: user.lastName,
     }
     res.setHeader('Set-Cookie', buildSessionCookie(req, { token: createSessionToken(actor) }))
-    return res.status(200).json({ ok: true, user: actor })
+    return res.status(200).json({ ok: true, user: { ...actor, caps: await capsFor(actor.role) } })
   } catch (error) {
     console.error('[auth/accept-invite] Error:', error)
     return res.status(500).json({ error: error.message })

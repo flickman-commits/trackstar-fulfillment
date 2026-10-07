@@ -2,6 +2,7 @@
  * Settings workspaces for people and accountability.
  *
  *   <PeoplePanel />   who can sign in, what they may do   (admin only)
+ *   <RolesPanel />    what each role includes, as checkboxes (admin only)
  *   <ActivityPanel /> the audit log of consequential actions (admin only)
  *   <AccountPanel />  your own account                    (everyone)
  *
@@ -13,12 +14,12 @@
  * team member's ability to change their own password. It is the one piece of
  * the old People panel everyone still needs.
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import { toast } from 'sonner'
-import { Loader2, RefreshCw, UserPlus, Copy, Check, LogOut } from 'lucide-react'
+import { Loader2, RefreshCw, UserPlus, Copy, Check, LogOut, ChevronDown } from 'lucide-react'
 import { useAuth, fullName, PasswordInput } from '@/lib/auth'
 import { btnPrimary, btnSecondary, btnDanger, btnGhost, inputBase, fieldLabel } from '@/lib/ui'
-import { ROLES, ROLE_LABEL, ROLE_BLURB, normalizeRole } from '@/lib/roles'
+import { ROLES, ROLE_LABEL, normalizeRole, describeCaps, type Role, type Caps, type Capability } from '@/lib/roles'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -27,9 +28,41 @@ function roleLabel(role?: string) {
   return ROLE_LABEL[normalizeRole(role)]
 }
 
-/** The role picker's options, each with what it includes. */
-function RoleOptions() {
-  return <>{ROLES.map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</>
+/**
+ * The role picker. The browser's own arrow sits wherever the platform puts
+ * it and collided with "Sales & Marketing", so the arrow is drawn here, with
+ * room kept for it.
+ */
+function RoleSelect({ value, onChange, disabled, title, className = '' }: {
+  value: string
+  onChange: (role: string) => void
+  disabled?: boolean
+  title?: string
+  className?: string
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      <select
+        className="w-full appearance-none bg-white border border-border-gray rounded-md pl-2.5 pr-8 py-1.5 text-xs text-off-black focus:outline-none focus:ring-2 focus:ring-off-black/10 disabled:opacity-50"
+        value={value}
+        title={title}
+        disabled={disabled}
+        onChange={e => onChange(e.target.value)}
+      >
+        {ROLES.map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+      </select>
+      <ChevronDown className="w-3.5 h-3.5 text-off-black/45 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+    </div>
+  )
+}
+
+type RoleTable = Record<Exclude<Role, 'admin'>, Capability[]>
+
+/** What a role includes, from the live table (admin is everything). */
+function capsOf(table: RoleTable | null, role?: string): Caps | undefined {
+  const r = normalizeRole(role)
+  if (r === 'admin') return '*'
+  return table?.[r]
 }
 
 interface TeamMember {
@@ -43,6 +76,8 @@ interface TeamMember {
   isActive: boolean
   hasPassword: boolean
   lastLoginAt: string | null
+  /** When they last used the app; lastLoginAt is only when they last typed a password. */
+  lastSeenAt: string | null
   createdAt: string
   inviteExpiresAt: string | null
 }
@@ -103,11 +138,14 @@ export function PeoplePanel() {
   const [showInvite, setShowInvite] = useState(false)
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', role: 'designer' as string })
 
+  const [roleTable, setRoleTable] = useState<RoleTable | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api('/api/admin/users')
+      const [res, roles] = await Promise.all([api('/api/admin/users'), api('/api/admin/roles').catch(() => null)])
       const data = await res.json()
+      if (roles?.ok) setRoleTable((await roles.json()).caps)
       if (res.ok) setMembers(data.users || [])
       else toast.error(data.error || 'Could not load the team')
     } catch {
@@ -215,14 +253,8 @@ export function PeoplePanel() {
             </div>
             <div>
               <label className={fieldLabel}>Role</label>
-              <select
-                className={inputBase}
-                value={form.role}
-                onChange={e => setForm({ ...form, role: e.target.value })}
-              >
-                <RoleOptions />
-              </select>
-              <p className="text-[11px] text-off-black/45 mt-1">{ROLE_BLURB[normalizeRole(form.role)]}</p>
+              <RoleSelect value={form.role} onChange={role => setForm({ ...form, role })} />
+              <p className="text-[11px] text-off-black/45 mt-1">{describeCaps(capsOf(roleTable, form.role))}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -271,24 +303,22 @@ export function PeoplePanel() {
                   </td>
                   <td className="px-3 py-2">
                     {m.isActive ? (
-                      <select
-                        className="text-xs bg-white border border-border-gray rounded px-2 py-1"
+                      <RoleSelect
+                        className="w-44"
                         value={normalizeRole(m.role)}
-                        title={ROLE_BLURB[normalizeRole(m.role)]}
+                        title={describeCaps(capsOf(roleTable, m.role))}
                         disabled={busyId === m.id}
-                        onChange={e => post(
-                          { action: 'role', id: m.id, role: e.target.value },
-                          `${m.name} is now ${roleLabel(e.target.value).toLowerCase()}`
+                        onChange={role => post(
+                          { action: 'role', id: m.id, role },
+                          `${m.name} is now ${roleLabel(role).toLowerCase()}`
                         )}
-                      >
-                        <RoleOptions />
-                      </select>
+                      />
                     ) : (
                       <span className="text-off-black/70">{roleLabel(m.role)}</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-off-black/55">
-                    {m.isActive ? ago(m.lastLoginAt) : 'Deactivated'}
+                    {m.isActive ? ago(m.lastSeenAt || m.lastLoginAt) : 'Deactivated'}
                   </td>
                   {(
                     <td className="px-3 py-2">
@@ -410,7 +440,7 @@ export function AccountPanel() {
         </p>
         <p className="text-xs text-off-black/50">{user?.email}</p>
         <p className="text-xs text-off-black/45 mt-2">
-          {ROLE_BLURB[normalizeRole(user?.role)]}. Ask Matt if you need more.
+          {describeCaps(user?.caps)}. Ask Matt if you need more.
         </p>
       </div>
 
@@ -553,6 +583,109 @@ export function ActivityPanel() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+interface RolesData {
+  roles: { id: Role; label: string }[]
+  capabilities: { id: Capability; group: string; label: string }[]
+  caps: RoleTable
+  defaults: RoleTable
+}
+
+/**
+ * What each role includes, as checkboxes. Admin always has everything and is
+ * shown checked and fixed; Data and Admin settings are not on offer and stay
+ * admin only. Saved changes apply to everyone on their next page load (or
+ * within ten minutes); the server checks the same table on every request.
+ */
+export function RolesPanel() {
+  const [data, setData] = useState<RolesData | null>(null)
+  const [draft, setDraft] = useState<RoleTable | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    api('/api/admin/roles')
+      .then(async res => {
+        const d = await res.json()
+        if (!res.ok) throw new Error(d.error || 'Could not load roles')
+        setData(d); setDraft(d.caps)
+      })
+      .catch(e => toast.error((e as Error).message))
+  }, [])
+
+  if (!data || !draft) return <div className="flex items-center justify-center h-40 text-off-black/40"><Loader2 className="w-4 h-4 animate-spin" /></div>
+
+  const editable = data.roles.filter(r => r.id !== 'admin') as { id: Exclude<Role, 'admin'>; label: string }[]
+  const dirty = JSON.stringify(draft) !== JSON.stringify(data.caps)
+  const toggle = (role: Exclude<Role, 'admin'>, cap: Capability) => {
+    const has = draft[role].includes(cap)
+    setDraft({ ...draft, [role]: has ? draft[role].filter(c => c !== cap) : [...draft[role], cap] })
+  }
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await api('/api/admin/roles', { method: 'PUT', body: JSON.stringify({ caps: draft }) })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Could not save')
+      setData({ ...data, caps: d.caps }); setDraft(d.caps)
+      toast.success('Roles saved. Everyone gets them on their next page load.')
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+  const groups = [...new Set(data.capabilities.map(c => c.group))]
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-off-black/55">
+        Everyone sees Fulfillment. Tick what else each role gets. Admin always has everything, and Data and Admin settings stay admin only.
+      </p>
+      <div className="rounded-lg border border-border-gray overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-subtle-gray text-off-black/55">
+            <tr>
+              <th className="text-left font-medium px-3 py-2"></th>
+              {editable.map(r => <th key={r.id} className="font-medium px-3 py-2 w-36 text-center">{r.label}</th>)}
+              <th className="font-medium px-3 py-2 w-24 text-center text-off-black/35">Admin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map(g => (
+              <Fragment key={g}>
+                <tr className="border-t border-border-gray">
+                  <td colSpan={editable.length + 2} className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/40">{g}</td>
+                </tr>
+                {data.capabilities.filter(c => c.group === g).map(c => (
+                  <tr key={c.id} className="hover:bg-subtle-gray/60">
+                    <td className="px-3 py-2 text-off-black">{c.label}</td>
+                    {editable.map(r => (
+                      <td key={r.id} className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          aria-label={`${r.label}: ${c.label}`}
+                          className="w-4 h-4 accent-off-black cursor-pointer"
+                          checked={draft[r.id].includes(c.id)}
+                          onChange={() => toggle(r.id, c.id)}
+                        />
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 text-center"><input type="checkbox" checked disabled className="w-4 h-4 opacity-40" aria-label={`Admin: ${c.label}`} /></td>
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={() => setDraft(data.defaults)} className={btnGhost}>Reset to defaults</button>
+        <button onClick={() => setDraft(data.caps)} disabled={!dirty} className={btnSecondary}>Discard</button>
+        <button onClick={save} disabled={!dirty || saving} className={btnPrimary}>{saving && <Loader2 className="w-3 h-3 animate-spin" />} Save roles</button>
+      </div>
     </div>
   )
 }

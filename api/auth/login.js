@@ -23,7 +23,8 @@ import {
   readSessionToken,
   SESSION_COOKIE,
 } from '../_lib/auth.js'
-import { verifyPassword, hashPassword, normalizeEmail, isValidEmail } from '../_lib/users.js'
+import { verifyPassword, hashPassword, normalizeEmail, isValidEmail, touchLastSeen } from '../_lib/users.js'
+import { capsFor } from '../_lib/roles.js'
 
 function safeEqual(a, b) {
   const aBuf = Buffer.from(String(a))
@@ -47,7 +48,8 @@ export default async function handler(req, res) {
       res.setHeader('Set-Cookie', buildSessionCookie(req, { clear: true }))
       return res.status(401).json({ authenticated: false })
     }
-    return res.status(200).json({ authenticated: true, user })
+    touchLastSeen(user.id)
+    return res.status(200).json({ authenticated: true, user: { ...user, caps: await capsFor(user.role) } })
   }
 
   if (req.method === 'DELETE') {
@@ -93,7 +95,7 @@ export default async function handler(req, res) {
     })
     console.log(`[auth/login] Bootstrapped first admin: ${created.email}`)
     res.setHeader('Set-Cookie', buildSessionCookie(req, { token: createSessionToken(created) }))
-    return res.status(200).json({ ok: true, user: created, bootstrapped: true })
+    return res.status(200).json({ ok: true, user: { ...created, caps: '*' }, bootstrapped: true })
   }
 
   const user = await prisma.user.findUnique({ where: { email } })
@@ -109,12 +111,12 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'This account has been deactivated.' })
   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), lastSeenAt: new Date() } })
 
   const actor = {
     id: user.id, email: user.email, role: user.role,
     firstName: user.firstName, lastName: user.lastName,
   }
   res.setHeader('Set-Cookie', buildSessionCookie(req, { token: createSessionToken(actor) }))
-  return res.status(200).json({ ok: true, user: actor })
+  return res.status(200).json({ ok: true, user: { ...actor, caps: await capsFor(actor.role) } })
 }

@@ -13,7 +13,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { roleCan, type Capability } from '@/lib/roles'
+import { roleCan, type Capability, type Caps } from '@/lib/roles'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -24,6 +24,8 @@ export interface CurrentUser {
   lastName: string
   /** admin | sales | fulfillment | designer; older accounts may still say "staff". See src/lib/roles.ts. */
   role: string
+  /** What the role includes, as set in Settings > Admin > Roles. */
+  caps?: Caps
 }
 
 /** "Matt Hickman", or just "Matt" when no last name is set. */
@@ -72,6 +74,18 @@ export function AuthProvider({ user, setUser, children }: {
     }
   }, [setUser])
 
+  // Re-read every ten minutes while the tab is open, and when it comes back
+  // into view: a changed role shows without a reload, a deactivated account
+  // stops, and Last seen stays true for people who never close the tab.
+  const signedIn = Boolean(user)
+  useEffect(() => {
+    if (!signedIn) return
+    const tick = () => { if (document.visibilityState === 'visible') refresh() }
+    const id = window.setInterval(tick, 10 * 60_000)
+    document.addEventListener('visibilitychange', tick)
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', tick) }
+  }, [signedIn, refresh])
+
   const signOut = useCallback(async () => {
     try {
       await fetch(`${API_BASE}/api/auth/login`, { method: 'DELETE', credentials: 'include' })
@@ -81,7 +95,7 @@ export function AuthProvider({ user, setUser, children }: {
   }, [setUser])
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin: user?.role === 'admin', can: (c: Capability) => Boolean(user) && roleCan(user?.role, c), refresh, signOut }}>
+    <AuthContext.Provider value={{ user, isAdmin: user?.role === 'admin', can: (c: Capability) => Boolean(user) && roleCan(user?.role, c, user?.caps), refresh, signOut }}>
       {children}
     </AuthContext.Provider>
   )
