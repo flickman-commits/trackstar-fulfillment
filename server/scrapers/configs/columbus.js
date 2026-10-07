@@ -4,6 +4,7 @@
  * same event slug.
  *
  * Per-year raceIds:
+ *   2022: M=14101  H=14102  (read off MTEC's year menus on the 2023 race pages)
  *   2023: M=15918  H=15919
  *   2024: M=17889  H=17890
  *   2025: M=19623  H=19624  (event 6011, read off MTEC's event search)
@@ -42,12 +43,14 @@ export default {
   keywords: ['columbus'],
   keywordRequiresMarathon: true,
   raceIds: {
+    2022: { marathon: 14101, half: 14102 },
     2023: { marathon: 15918, half: 15919 },
     2024: { marathon: 17889, half: 17890 },
     2025: { marathon: 19623, half: 19624 },
     2026: { marathon: 21870, half: 21871 },
   },
   raceSlugs: {
+    2022: { marathon: '2022_Columbus_Marathon-Marathon', half: '2022_Columbus_Marathon-Half_Marathon' },
     2023: { marathon: '2023_Columbus_Marathon-Marathon', half: '2023_Columbus_Marathon-Half_Marathon' },
     2024: { marathon: '2024_Columbus_Marathon-Marathon', half: '2024_Columbus_Marathon-Half_Marathon' },
     2025: { marathon: '2025_Columbus_Marathon-Marathon', half: '2025_Columbus_Marathon-Half_Marathon' },

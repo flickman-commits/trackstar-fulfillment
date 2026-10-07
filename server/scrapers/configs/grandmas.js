@@ -3,6 +3,7 @@
  * MTEC Results. Each distance is a separate raceId.
  *
  * Per-year raceIds (Marathon + Half):
+ *   2022: M=12984  H=13410  (read off MTEC's year menus on the 2023 race pages)
  *   2023: M=15218  H=15398
  *   2024: M=17012  H=17022
  *   2025: M=18686  H=18689  (read off MTEC's own year menu and event page)
@@ -47,12 +48,17 @@ export default {
   keywords: ["grandma's", 'grandmas', 'garry bjorklund'],
   keywordRequiresMarathon: false,
   raceIds: {
+    2022: { marathon: 12984, half: 13410 },
     2023: { marathon: 15218, half: 15398 },
     2024: { marathon: 17012, half: 17022 },
     2025: { marathon: 18686, half: 18689 },
     2026: { marathon: 20331, half: 20333 },
   },
   raceSlugs: {
+    2022: {
+      marathon: "2022_Grandma%27s_Marathon-Grandma%27s_Marathon",
+      half: "2022_Grandma%27s_Marathon-Garry_Bjorklund_Half_Marathon",
+    },
     2023: {
       marathon: "2023_Grandma%27s_Marathon-Grandma%27s_Marathon",
       half: '2023_Garry_Bjorklund_Half_Marathon-Half_Marathon',
