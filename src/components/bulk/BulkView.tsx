@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnSecondary, btnGhost, inputBase } from '@/lib/ui'
 import ProofFullscreen from '@/components/ProofFullscreen'
+import AssigneePicker, { Avatar, type Teammate } from '@/components/AssigneePicker'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -60,6 +61,8 @@ export interface BulkOrder {
   intakeNote: string | null
   notes: string | null
   partnerOrderId: string | null
+  /** Who runs it; new ones go to the bulk default in Order Assignment. */
+  assigneeId: string | null
   progress: { total: number; withAddress: number; researched: number; found: number; files: number; completed: number }
   runners?: BulkRunner[]
   readiness?: {
@@ -127,7 +130,10 @@ function Chip({ tone, children, onClick, title }: { tone: 'green' | 'amber' | 'r
   return <span className={base} title={title}>{children}</span>
 }
 
-export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolbar, search = '', creating = false, onCreatingChange }: {
+export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolbar, search = '', creating = false, onCreatingChange, team = [], meId }: {
+  /** The team, for the Assignee column and picker. */
+  team?: Teammate[]
+  meId?: string | null
   /** The dashboard's shared search toolbar, shown at the top of the card. */
   toolbar?: React.ReactNode
   search?: string
@@ -158,7 +164,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
   useEffect(() => { load() }, [load])
 
   if (selectedId) {
-    return <BulkDetail id={selectedId} onBack={() => { setSelectedId(null); load() }} onOpenRunner={onOpenRunner} refreshRunners={refreshRunners} />
+    return <BulkDetail id={selectedId} onBack={() => { setSelectedId(null); load() }} onOpenRunner={onOpenRunner} refreshRunners={refreshRunners} team={team} meId={meId} />
   }
 
   return (
@@ -178,6 +184,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
                 <th className="text-left px-3 py-2.5 font-semibold">Race</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Due</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Payment</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Assignee</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Status</th>
               </tr>
             </thead>
@@ -198,6 +205,12 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
                       ) : <span className="text-off-black/40">No race date</span>}
                     </td>
                     <td className="px-3 py-3">{b.paidAt ? <Chip tone="green">Paid</Chip> : <Chip tone="amber">Unpaid</Chip>}</td>
+                    <td className="px-3 py-3">{(() => {
+                      const u = team.find(t => t.id === b.assigneeId)
+                      return u
+                        ? <span className="inline-flex items-center gap-1.5 text-sm text-off-black whitespace-nowrap"><Avatar user={u} size={20} />{u.firstName}</span>
+                        : <span className="text-sm text-off-black/40">Unassigned</span>
+                    })()}</td>
                     <td className="px-3 py-3"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap ${st.bg} ${st.color} ${st.border}`}>{st.icon} {STATUS_LABEL[b.status] || b.status}</span></td>
                   </tr>
                 )
@@ -262,7 +275,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
 // ─── Detail ────────────────────────────────────────────────────────────────
 
-function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; onBack: () => void; onOpenRunner: (n: string) => void; refreshRunners: () => void }) {
+function BulkDetail({ id, onBack, onOpenRunner, refreshRunners, team, meId }: { id: string; onBack: () => void; onOpenRunner: (n: string) => void; refreshRunners: () => void; team: Teammate[]; meId?: string | null }) {
   const [b, setB] = useState<BulkOrder | null>(null)
   const [intakeText, setIntakeText] = useState('')
   const [intakeOpen, setIntakeOpen] = useState(false)
@@ -686,6 +699,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners }: { id: string; 
             <div className="flex items-center gap-2.5">
               <span className="text-2xl leading-none">{st.icon}</span>
               <h2 className="text-xl font-bold text-off-black">{b.partnerName}</h2>
+              {team.length > 0 && <AssigneePicker team={team} value={b.assigneeId} meId={meId} onChange={assigneeId => update({ assigneeId })} />}
             </div>
             <div className="text-sm text-off-black/60 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="font-mono text-[12px]">{b.number}</span>

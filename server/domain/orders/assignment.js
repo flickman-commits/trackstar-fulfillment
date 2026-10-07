@@ -1,15 +1,17 @@
 /**
  * Who fulfills an order.
  *
- * Every standard and custom order gets an assignee when it is imported, from
- * a per-type default kept in SystemConfig ("assignment_defaults", a JSON map
- * of order type to user id) so the defaults can change without a deploy.
- * Anyone on the team can reassign an order afterwards. Partner and bulk
- * orders are not assigned: they are run as projects, not a queue.
+ * Every order gets an assignee when it comes in, from a per-type default
+ * kept in SystemConfig ("assignment_defaults", a JSON map of order type to
+ * user id) so the defaults can change without a deploy: standard and custom
+ * orders on import, partner orders and bulk runs when they are created.
+ * Anyone on the team can reassign afterwards. Help shifts (below) are for
+ * the two queues, standard and custom.
  */
 import prisma from '../../db.js'
 
-export const ASSIGNABLE_TYPES = ['standard', 'custom']
+export const ASSIGNABLE_TYPES = ['standard', 'custom', 'race_partner', 'bulk']
+export const SHIFT_TYPES = ['standard', 'custom']
 const KEY = 'assignment_defaults'
 
 let cache = null
@@ -89,7 +91,7 @@ export function isShiftOn(shift, today = businessDate()) {
 }
 
 export async function addShift({ type, userId, weight = 1, from, until }) {
-  if (!ASSIGNABLE_TYPES.includes(type)) throw new Error('Pick standard or custom orders')
+  if (!SHIFT_TYPES.includes(type)) throw new Error('Help is for standard or custom orders')
   if (!isDate(from) || !isDate(until)) throw new Error('Pick the first and last day')
   if (until < from) throw new Error('The last day is before the first')
   if (until < businessDate()) throw new Error('Those dates are already over')

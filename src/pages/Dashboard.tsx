@@ -2838,7 +2838,7 @@ Thank you!`
                 </span>
               </h2>
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
-              <QueuePill people={(activeView === 'standard' || activeView === 'custom') ? queues[activeView] : undefined} team={team} />
+              <QueuePill people={queues[activeView]} team={team} />
             </div>
             {lastImportedAt && (
               <button
@@ -2904,6 +2904,8 @@ Thank you!`
               search={searchQuery}
               creating={bulkCreating}
               onCreatingChange={setBulkCreating}
+              team={team}
+              meId={myId}
             />
           ) : (
           <div className="bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
@@ -3274,6 +3276,7 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Partner</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-24">Year</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Contact</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Assignee</th>
                         <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Options Sent</th>
                       </tr>
                     </thead>
@@ -3306,6 +3309,7 @@ Thank you!`
                             <td className="px-3 py-4 hidden md:table-cell">
                               <span className="text-sm text-off-black/70">{order.partnerContactName || order.customerEmail || '-'}</span>
                             </td>
+                            <td className="px-3 py-4">{assigneeCell(order)}</td>
                             {/* Every proof on a partner order is an option on
                                 their portal, so the count is the whole story.
                                 This column read as empty for two reasons: it
@@ -4500,7 +4504,7 @@ Thank you!`
                     {(selectedOrder.notes || (selectedOrder.commentCount ?? 0) > 0) && (
                       <HoverTip text="Has notes or comments"><MessageSquareText className="w-4 h-4 text-amber-500 cursor-help" /></HoverTip>
                     )}
-                    {(selectedOrder.trackstarOrderType === 'standard' || selectedOrder.trackstarOrderType === 'custom' || !selectedOrder.trackstarOrderType) && team.length > 0 && (
+                    {(selectedOrder.trackstarOrderType === 'standard' || selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner' || !selectedOrder.trackstarOrderType) && team.length > 0 && (
                       <span className="ml-1">
                         <AssigneePicker team={team} value={selectedOrder.assigneeId || null} meId={myId} onChange={id => assignOrder(selectedOrder.id, id)} />
                       </span>

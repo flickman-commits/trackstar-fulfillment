@@ -6,7 +6,7 @@
  *   GET ?options=1              frame and size choices for the form
  *   POST { action, ... }
  *     create      { partnerName, raceName, raceYear, quantity, frameType, productSize, partnerOrderId?, stripeInvoiceUrl? }
- *     update      { id, ...fields }          any editable field
+ *     update      { id, ...fields }          any editable field, assigneeId included
  *     paid        { id, paid: bool }
  *     intake      { id, text }               paste or CSV; returns what was added and any problems
  *     remove-runner { id, orderNumber }
@@ -24,6 +24,7 @@ import {
   addressComplete, FRAME_OPTIONS, SIZE_OPTIONS, sheetProblems,
 } from '../../server/domain/bulk/bulkOrders.js'
 import { getCanonicalRaceName } from '../../server/scrapers/index.js'
+import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 
 const RUNNER_SELECT = {
   id: true, orderNumber: true, lineItemIndex: true, runnerName: true, runnerNameOverride: true, customerEmail: true,
@@ -77,7 +78,7 @@ function progressOf(runners) {
   }
 }
 
-const EDITABLE = ['partnerName', 'raceName', 'raceYear', 'quantity', 'frameType', 'productSize', 'stripeInvoiceUrl', 'productionFileUrl', 'previewImageUrl', 'raceDate', 'dueDate', 'status', 'intakeNote', 'notes', 'partnerOrderId']
+const EDITABLE = ['partnerName', 'raceName', 'raceYear', 'quantity', 'frameType', 'productSize', 'stripeInvoiceUrl', 'productionFileUrl', 'previewImageUrl', 'raceDate', 'dueDate', 'status', 'intakeNote', 'notes', 'partnerOrderId', 'assigneeId']
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -126,6 +127,7 @@ export default async function handler(req, res) {
           stripeInvoiceUrl: body.stripeInvoiceUrl ? String(body.stripeInvoiceUrl) : null,
           partnerOrderId: body.partnerOrderId ? String(body.partnerOrderId) : null,
           raceDate, dueDate: dueDateFor(raceDate),
+          assigneeId: await defaultAssigneeFor('bulk'),
         },
       })
       return res.status(200).json({ bulkOrder: await loadOne(bulk.id) })
@@ -148,6 +150,10 @@ export default async function handler(req, res) {
         if (typeof v === 'string') v = v.trim() || null
         if (k === 'partnerName' && !v) continue
         if (k === 'raceName' && v) v = getCanonicalRaceName(v) || v
+        if (k === 'assigneeId' && v) {
+          const u = await prisma.user.findUnique({ where: { id: v }, select: { isActive: true } })
+          if (!u?.isActive) return res.status(400).json({ error: 'That teammate is not active' })
+        }
         data[k] = v
       }
       // A race date set by hand resets the due date unless one was also given.

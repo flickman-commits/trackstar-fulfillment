@@ -38,6 +38,7 @@ import { getRaceShorthands } from '../../server/scrapers/index.js'
 import WeatherService from '../../server/services/WeatherService.js'
 import { Resend } from 'resend'
 import { runWeeklyAdsDebrief, isFridayFourPmEastern } from '../../server/services/weeklyAdsDebrief.js'
+import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 
 // Build the customer-facing approval/portal URL. Prod uses the Vercel
 // production URL; falls back to APP_BASE_URL for other environments.
@@ -1772,6 +1773,7 @@ async function handleCreateRacePartner({ partnerName, raceYear, contactName, con
       status: 'pending',
       customerEmail: contactEmail ? String(contactEmail).trim() : null,
       customerName: contactName ? String(contactName).trim() : null,
+      assigneeId: await defaultAssigneeFor('race_partner'),
     }
   })
 

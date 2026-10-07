@@ -16,12 +16,16 @@ import { btnPrimary, btnSecondary, btnGhost, inputBase, fieldLabel, segment, seg
  * server/domain/orders/assignment.js.
  */
 type User = { id: string; firstName: string; lastName: string }
-type OrderType = 'standard' | 'custom'
+type OrderType = 'standard' | 'custom' | 'race_partner' | 'bulk'
 type Shift = { id: string; type: OrderType; userId: string; weight: number; from: string; until: string; handedBackAt?: string }
 
-const TYPES: { key: OrderType; label: string; blurb: string }[] = [
-  { key: 'standard', label: 'Standard orders', blurb: 'Personalized prints from the storefront and Etsy' },
-  { key: 'custom', label: 'Custom orders', blurb: 'Any-race and triathlon custom designs' },
+// Help shifts are for the two queues; partners and bulk runs are projects
+// with one owner each, so they only have a regular.
+const TYPES: { key: OrderType; label: string; blurb: string; help: boolean }[] = [
+  { key: 'standard', label: 'Standard orders', blurb: 'Personalized prints from the storefront and Etsy', help: true },
+  { key: 'custom', label: 'Custom orders', blurb: 'Any-race and triathlon custom designs', help: true },
+  { key: 'race_partner', label: 'Partner orders', blurb: 'Race partner design projects', help: false },
+  { key: 'bulk', label: 'Bulk orders', blurb: 'Prepaid co-branded runs for a race', help: false },
 ]
 const SHARES: { weight: number; label: string }[] = [
   { weight: 0.5, label: 'Half' },
@@ -44,7 +48,7 @@ export default function AssignmentPanel() {
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState<Record<string, string>>({})
   const [shifts, setShifts] = useState<Shift[]>([])
-  const [open, setOpen] = useState<Record<OrderType, Record<string, number>>>({ standard: {}, custom: {} })
+  const [open, setOpen] = useState<Partial<Record<OrderType, Record<string, number>>>>({})
   const [today, setToday] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [adding, setAdding] = useState<OrderType | null>(null)
@@ -56,7 +60,7 @@ export default function AssignmentPanel() {
       setDraft(d.defaults || {})
       setSaved(d.defaults || {})
       setShifts(d.shifts || [])
-      setOpen(d.open || { standard: {}, custom: {} })
+      setOpen(d.open || {})
       setToday(d.today || new Date().toISOString().slice(0, 10))
     } catch {
       toast.error('Could not load the team.')
@@ -120,7 +124,7 @@ export default function AssignmentPanel() {
               </div>
             </div>
 
-            <div className="border-t border-border-gray px-3 py-2.5 space-y-2 bg-subtle-gray/50">
+            {t.help && <div className="border-t border-border-gray px-3 py-2.5 space-y-2 bg-subtle-gray/50">
               {roster.length > 1 && (
                 <div className="text-xs text-off-black/60">
                   Today new orders split{' '}
@@ -198,7 +202,7 @@ export default function AssignmentPanel() {
                   <Plus className="w-3 h-3" /> Add help
                 </button>
               )}
-            </div>
+            </div>}
           </div>
         )
       })}

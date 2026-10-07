@@ -229,6 +229,9 @@ model BulkOrder {
   intakeNote        String?   // Shown to the partner on the intake page
   notes             String?
   partnerOrderId    String?   // The race_partner design order this belongs to, if any
+  // Who runs it. New ones go to the bulk default (Order Assignment settings).
+  assigneeId        String?
+  assignee          User?     @relation("BulkAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -703,6 +706,7 @@ model User {
 
   comments     OrderComment[]
   assignedOrders Order[]  @relation("OrderAssignee")
+  assignedBulkOrders BulkOrder[] @relation("BulkAssignee")
   editBatches  ProductEditBatch[]
   auditEvents  AuditEvent[]
 
