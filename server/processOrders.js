@@ -90,8 +90,12 @@ export function customDueDate(placedAt, isRush) {
  * one where the poster landed but the add-on call failed. Either way the
  * customer who paid gets the fast lane.
  */
-export function shopifyOrderIsRush(shopifyOrderData, printLineItemIsRush) {
-  if (printLineItemIsRush) return true
+export function shopifyOrderIsRush(shopifyOrderData, _printLineItemIsRush) {
+  // Rush is what the customer PAID for: the rush add-on line item. The
+  // "Rush Order: Yes" note on the print only says they ticked the box; the
+  // charge can still be missing (they removed it in the cart, or the theme's
+  // add to cart failed), and order 4074 got a free 4-day turnaround that way.
+  // A ticked box with no charge shows as "Rush not paid" instead.
   const items = shopifyOrderData?.line_items
   return Array.isArray(items) && items.some(isRushAddonLineItem)
 }

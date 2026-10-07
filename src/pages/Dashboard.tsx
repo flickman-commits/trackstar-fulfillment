@@ -143,6 +143,7 @@ interface Order {
   designStatus?: DesignStatus
   dueDate?: string
   isRushOrder?: boolean
+  rushUnpaid?: boolean
   customerEmail?: string
   customerName?: string
   bibNumberCustomer?: string
@@ -323,6 +324,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     designStatus: order.designStatus as DesignStatus | undefined,
     dueDate: order.dueDate as string | undefined,
     isRushOrder: order.isRushOrder as boolean | undefined,
+    rushUnpaid: order.rushUnpaid as boolean | undefined,
     customerEmail: order.customerEmail as string | undefined,
     customerName: order.customerName as string | undefined,
     bibNumberCustomer: order.bibNumberCustomer as string | undefined,
@@ -4939,6 +4941,14 @@ Thank you!`
                           )}
                           {selectedOrder.isRushOrder && (
                             <span className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-amber-50 text-amber-800 border-amber-200">⚡ Rush (4-day)</span>
+                          )}
+                          {selectedOrder.rushUnpaid && (
+                            <span
+                              className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-red-50 text-red-700 border-red-200"
+                              title="The customer ticked Skip the line, but the rush charge is not on the order, so this is on the standard 2-week turnaround. Offer them the rush if they still want it."
+                            >
+                              Rush not paid
+                            </span>
                           )}
                         </div>
                       )}

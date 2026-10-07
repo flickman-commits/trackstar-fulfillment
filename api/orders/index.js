@@ -4,6 +4,7 @@ import { hasScraperForRace } from '../../server/scrapers/index.js'
 import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
 import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
 import { getProductInfo, loadProductCatalog } from '../../server/lib/productCatalog.js'
+import { isRushAddonLineItem } from '../../server/lib/lineItemMatching.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 
 
@@ -106,6 +107,14 @@ export async function rawSlice(ids) {
             THEN "arteloOrderData"::jsonb->'orderItems' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(x, n))) AS a
     FROM "Order" WHERE id = ANY(${ids})`
   return new Map(rows.map(r => [r.id, r]))
+}
+
+/** A print carries "Rush Order: Yes" but the order has no rush add-on line. */
+function rushSelectedNotPaid(shopify) {
+  const items = Array.isArray(shopify?.line_items) ? shopify.line_items : []
+  const ticked = items.some(li => (li.properties || []).some(p =>
+    p?.name === 'Rush Order' && String(p.value || '').toLowerCase().startsWith('yes')))
+  return ticked && !items.some(isRushAddonLineItem)
 }
 
 /**
@@ -344,6 +353,8 @@ export default async function handler(req, res) {
         designStatus: order.designStatus,
         dueDate: order.dueDate,
         isRushOrder: order.isRushOrder,
+        // Ticked "skip the line" but the rush charge is not on the order.
+        rushUnpaid: !order.isRushOrder && rushSelectedNotPaid(order.shopifyOrderData),
         customerEmail: order.customerEmail,
         customerName: order.customerName,
         bibNumberCustomer: order.bibNumberCustomer,
