@@ -59,6 +59,14 @@ export const PHOTO_ADDON_PRICE = 20
 export const PHOTO_ADDON_COST = 0
 
 /**
+ * The storefront charges flat shipping on a retail order under the
+ * free-shipping line. The shopper pays it, so on those units it is revenue
+ * set against the shipping we pay Artelo.
+ */
+export const RETAIL_SHIPPING_CHARGE = 7
+export const FREE_SHIPPING_OVER = 100
+
+/**
  * Published wholesale tiers, by units in the shipment.
  *
  * Below 10 units there is no wholesale price — the sheet starts at 10, so a

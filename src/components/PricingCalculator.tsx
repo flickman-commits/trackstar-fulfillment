@@ -63,6 +63,9 @@ interface PricingData {
     wholesaleExcludedSizes?: string[]
     photoAddOnPrice: number
     photoAddOnCost: number
+    /** Flat shipping the shopper pays on a retail order under freeShippingOver. */
+    retailShippingCharge?: number
+    freeShippingOver?: number
   }
 }
 
@@ -222,9 +225,14 @@ export default function PricingCalculator() {
       const unitBranding = channel === 'retail' ? r.brandingCost / qty : 0
       const unitCost = r.productionCost + unitShipping + unitBranding + (includePhoto ? photoAddOnCost : 0)
       const unitPrice = price + (includePhoto ? photoAddOnPrice : 0)
-      // Percentage applies per unit; the flat fee is per order, so it divides.
-      const unitFee = unitPrice * feePercent + feeFixed / qty
-      const gp = unitPrice - unitCost - unitFee
+      // A retail order under the free-shipping line pays flat shipping. That
+      // money is ours, so it counts toward what the unit brings in.
+      const shippingCharged = channel === 'retail' && (a.freeShippingOver ?? 0) > 0 && unitPrice < (a.freeShippingOver ?? 0)
+        ? (a.retailShippingCharge ?? 0) : 0
+      const revenue = unitPrice + shippingCharged
+      // Percentage applies to what is charged; the flat fee is per order, so it divides.
+      const unitFee = revenue * feePercent + feeFixed / qty
+      const gp = revenue - unitCost - unitFee
 
       return {
         ...r,
@@ -232,12 +240,14 @@ export default function PricingCalculator() {
         // Undiscounted per-unit price, for showing the customer their saving.
         listPrice: base + (includePhoto ? photoAddOnPrice : 0),
         unitPrice,
+        shippingCharged,
+        revenue,
         unitShipping,
         unitBranding,
         unitCost,
         unitFee,
         gp,
-        gpPct: unitPrice > 0 ? (gp / unitPrice) * 100 : null,
+        gpPct: revenue > 0 ? (gp / revenue) * 100 : null,
       }
     })
   }, [data, channel, discountPct, includePhoto, shipMode, bulkShippingOverride, singleRows])
@@ -416,6 +426,11 @@ export default function PricingCalculator() {
                       {r.offSheet
                         ? <span className="text-off-black/30" title="24x36 is not sold wholesale">not offered</span>
                         : money(r.unitPrice)}
+                      {r.shippingCharged > 0 && (
+                        <span className="block text-[10px] text-off-black/45 leading-tight whitespace-nowrap" title={`Orders under ${money(data.assumptions.freeShippingOver ?? 0)} pay flat shipping, which the shopper covers`}>
+                          + {money(r.shippingCharged)} shipping
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">{money(r.productionCost)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-off-black/60">
@@ -482,7 +497,7 @@ export default function PricingCalculator() {
             </p>
             <p>
               {channel === 'retail'
-                ? 'Retail ships one print per order, so that unit carries the full shipping, the $0.80 package branding and the flat 30c of the payment fee.'
+                ? `Retail ships one print per order, so that unit carries the full shipping, the $0.80 package branding and the flat 30c of the payment fee. Orders under ${money(data.assumptions.freeShippingOver ?? 100)} pay ${money(data.assumptions.retailShippingCharge ?? 7)} shipping, which counts as revenue on those units.`
                 : shipMode === 'individual'
                   ? `Each of the ${data.quantity} prints ships separately to its runner at Artelo's single-unit rate, so shipping does not fall with volume. The flat 30c processing fee still divides across the run, and package branding is not applied. Production cost does not fall with volume - Artelo gives no quantity discount.`
                   : `Bulk ships as one consignment of ${data.quantity}${bulkShippingOverride.trim() ? ` at your quoted ${money(Number(bulkShippingOverride))}` : ''}, so shipping and the flat 30c processing fee divide across the run, and package branding is not applied at all. Production cost does not fall with volume - Artelo gives no quantity discount.`}
