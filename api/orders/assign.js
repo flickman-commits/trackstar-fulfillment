@@ -4,6 +4,11 @@
  *   GET                                   the team (active users) and the per-type defaults
  *   POST { orderId, assigneeId }          reassign one order; null unassigns
  *   POST { action:'defaults', standard, custom }   change the import defaults (admins only)
+ *   POST { action:'add-shift', type, userId, weight, from, until }   extra help for some days (admins)
+ *   POST { action:'end-shift', id }                end a shift now (admins)
+ *   POST { action:'spread', id }                   give a helper their share of the waiting queue (admins)
+ *
+ * Shifts, the share balance and the hand-back: server/domain/orders/assignment.js.
  *
  * Reassigning is open to the whole team: covering for someone is the point.
  * Changing the defaults changes where every future order lands, so it needs
@@ -12,7 +17,10 @@
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireAdminRole, recordAudit } from '../_lib/users.js'
-import { getAssignmentDefaults, setAssignmentDefaults, ASSIGNABLE_TYPES } from '../../server/domain/orders/assignment.js'
+import {
+  getAssignmentDefaults, setAssignmentDefaults, ASSIGNABLE_TYPES,
+  getShifts, addShift, endShift, spreadQueue, openCounts, businessDate,
+} from '../../server/domain/orders/assignment.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -26,7 +34,17 @@ export default async function handler(req, res) {
         orderBy: { firstName: 'asc' },
         select: { id: true, firstName: true, lastName: true },
       })
-      return res.status(200).json({ users, defaults: await getAssignmentDefaults({ force: true }), me: actor.id || null })
+      const ids = users.map(u => u.id)
+      const open = {}
+      for (const t of ASSIGNABLE_TYPES) open[t] = await openCounts(t, ids)
+      return res.status(200).json({
+        users,
+        defaults: await getAssignmentDefaults({ force: true }),
+        shifts: await getShifts(),
+        open,
+        today: businessDate(),
+        me: actor.id || null,
+      })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
@@ -44,6 +62,28 @@ export default async function handler(req, res) {
       const saved = await setAssignmentDefaults(map)
       await recordAudit({ action: 'order.assignment-defaults', summary: 'Changed default assignees', detail: saved, actor: admin })
       return res.status(200).json({ defaults: saved })
+    }
+
+    if (['add-shift', 'end-shift', 'spread'].includes(body.action)) {
+      const admin = await requireAdminRole(req, res, actor)
+      if (!admin) return
+      try {
+        if (body.action === 'add-shift') {
+          const shift = await addShift({ type: body.type, userId: body.userId, weight: body.weight, from: body.from, until: body.until })
+          await recordAudit({ action: 'order.shift-add', summary: `Added ${body.type} help ${shift.from} to ${shift.until}`, detail: shift, actor: admin })
+          return res.status(200).json({ shift })
+        }
+        if (body.action === 'end-shift') {
+          const out = await endShift(String(body.id || ''))
+          await recordAudit({ action: 'order.shift-end', summary: `Ended a help shift early; ${out.handedBack} order(s) back to the regular`, detail: { id: body.id, ...out }, actor: admin })
+          return res.status(200).json(out)
+        }
+        const out = await spreadQueue(String(body.id || ''))
+        await recordAudit({ action: 'order.shift-spread', summary: `Moved ${out.moved} waiting order(s) to a helper`, detail: { id: body.id, ...out }, actor: admin })
+        return res.status(200).json(out)
+      } catch (err) {
+        return res.status(400).json({ error: err.message })
+      }
     }
 
     const orderId = String(body.orderId || '')

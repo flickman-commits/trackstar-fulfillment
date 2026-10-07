@@ -875,7 +875,7 @@ const SETTINGS_NAV: {
     items: [
       { id: 'people', label: 'People', blurb: 'Who can sign in and what they are allowed to do', icon: Users },
       { id: 'roles', label: 'Roles', blurb: 'What each role can see and use', icon: ShieldCheck },
-      { id: 'assignments', label: 'Order Assignment', blurb: 'Who new standard and custom orders go to', icon: UserCog },
+      { id: 'assignments', label: 'Order Assignment', blurb: 'Who new orders go to, and extra help for busy stretches', icon: UserCog },
       { id: 'activity', label: 'Activity Log', blurb: 'Who did what, and when', icon: ScrollText },
       { id: 'diagnostics', label: 'Diagnostics', blurb: 'Test connections and run a full health check', icon: FlaskConical },
       { id: 'maintenance', label: 'Maintenance', blurb: 'Cache and research resets - destructive', icon: Settings },
