@@ -29,6 +29,7 @@ import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
+import { setDesignStatus, DESIGN_STATUSES } from '../../server/domain/orders/designStatus.js'
 import { setCors, requireAdmin, isCronRequest } from '../_lib/auth.js'
 import { requireAdminRole, requireCapability, recordAudit } from '../_lib/users.js'
 import { alertError } from '../_lib/alerts.js'
@@ -38,7 +39,6 @@ import { getRaceShorthands } from '../../server/scrapers/index.js'
 import WeatherService from '../../server/services/WeatherService.js'
 import { Resend } from 'resend'
 import { runWeeklyAdsDebrief, isFridayFourPmEastern } from '../../server/services/weeklyAdsDebrief.js'
-import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 
 // Build the customer-facing approval/portal URL. Prod uses the Vercel
 // production URL; falls back to APP_BASE_URL for other environments.
@@ -554,69 +554,19 @@ async function handleReopen({ orderNumber }, res, actor) {
 }
 
 // --- design-status ---
-const VALID_DESIGN_STATUSES = ['not_started', 'in_progress', 'awaiting_review', 'in_revision', 'approved_by_customer', 'final_pdf_uploaded', 'sent_to_production']
-
+// The rules live in server/domain/orders/designStatus.js, shared with the MCP server.
 async function handleDesignStatus({ orderNumber, designStatus }, res) {
   if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
-  if (!designStatus || !VALID_DESIGN_STATUSES.includes(designStatus)) {
-    return res.status(400).json({
-      error: `Invalid designStatus. Must be one of: ${VALID_DESIGN_STATUSES.join(', ')}`
-    })
+  if (!designStatus || !DESIGN_STATUSES.includes(designStatus)) {
+    return res.status(400).json({ error: `Invalid designStatus. Must be one of: ${DESIGN_STATUSES.join(', ')}` })
   }
-
   const existing = await prisma.order.findFirst({ where: { orderNumber } })
   if (!existing) return res.status(404).json({ error: 'Order not found' })
   if (existing.trackstarOrderType !== 'custom' && existing.trackstarOrderType !== 'race_partner') {
     return res.status(400).json({ error: 'Design status can only be updated for custom or race partner orders' })
   }
-
-  const updateData = { designStatus }
-  if (designStatus === 'sent_to_production') {
-    updateData.status = 'completed'
-    updateData.researchedAt = new Date()
-  }
-  if (existing.designStatus === 'sent_to_production' && designStatus !== 'sent_to_production') {
-    updateData.status = 'pending'
-    updateData.researchedAt = null
-  }
-
-  // Unapprove: when moving back from approved_by_customer, reset the approved proof
-  // so the customer portal doesn't stay stuck on the "approved" screen
-  if (existing.designStatus === 'approved_by_customer' && designStatus === 'in_revision') {
-    await prisma.proof.updateMany({
-      where: { orderId: existing.id, status: 'approved' },
-      data: { status: 'revision_requested' }
-    })
-    console.log(`[actions/design-status] Reset approved proofs to revision_requested for order ${orderNumber}`)
-  }
-
-  const order = await prisma.order.update({
-    where: { id: existing.id },
-    data: updateData
-  })
-
-  // Mint an approval token as soon as design work begins, so Dan can message
-  // the customer (and share the portal) even before any proofs exist.
-  if (designStatus === 'in_progress') {
-    await ensureApprovalToken(existing.id)
-  }
-
+  const order = await setDesignStatus(existing, designStatus)
   console.log(`[actions/design-status] Order ${orderNumber} design status → ${designStatus}`)
-
-  // Slack notification when sent to production
-  if (designStatus === 'sent_to_production' && process.env.SLACK_PROOF_WEBHOOK_URL) {
-    const shopifyData = existing.shopifyOrderData
-    const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
-      ? String(shopifyData.name) : `#${existing.parentOrderNumber}`
-    fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: `🖨️ <@U09UVEP1N3Y> Final PDF ready for order *${displayNum}* - ready for production!`
-      })
-    }).catch(e => console.warn('[actions] Slack failed:', e.message))
-  }
-
   return res.status(200).json({ success: true, order })
 }
 
