@@ -86,3 +86,31 @@ export default function AssigneePicker({ team, value, meId, onChange }: {
     </div>
   )
 }
+
+/**
+ * Who new orders in this queue go to today: the regular, plus anyone helping
+ * on a shift (with their last day). Set in Settings > Admin > Order Assignment.
+ */
+export function QueuePill({ people, team }: {
+  people?: { userId: string; regular: boolean; until: string | null }[]
+  team: Teammate[]
+}) {
+  const shown = (people || []).map(p => ({ ...p, user: team.find(u => u.id === p.userId) })).filter(p => p.user)
+  if (!shown.length) return null
+  const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  return (
+    <span
+      className="hidden md:inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-border-gray bg-white text-xs text-off-black/70"
+      title={shown.length > 1 ? 'New orders are shared between these people today' : 'New orders go to this person'}
+    >
+      {shown.map((p, i) => (
+        <span key={p.userId} className="inline-flex items-center gap-1.5">
+          {i > 0 && <span className="text-off-black/25 -ml-0.5 mr-0.5">+</span>}
+          <Avatar user={p.user!} size={20} />
+          <span className="font-medium text-off-black">{p.user!.firstName}</span>
+          {p.until && <span className="text-off-black/40">until {day(p.until)}</span>}
+        </span>
+      ))}
+    </span>
+  )
+}

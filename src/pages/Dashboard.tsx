@@ -8,7 +8,7 @@ import BulkView from '@/components/bulk/BulkView'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import AssignmentPanel from '@/components/AssignmentPanel'
-import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
+import AssigneePicker, { Avatar, QueuePill } from '@/components/AssigneePicker'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
@@ -889,9 +889,11 @@ export default function Dashboard() {
   // only my orders. "mine" is the default for anyone who has orders assigned,
   // so Eli opens the tool to Eli's queue; someone with none sees everything.
   const [team, setTeam] = useState<{ id: string; firstName: string; lastName: string }[]>([])
+  // Who new orders of each type go to today (regular, plus any help on a shift).
+  const [queues, setQueues] = useState<Record<string, { userId: string; regular: boolean; until: string | null }[]>>({})
   const [scope, setScope] = useState<'mine' | 'all' | null>(null)
   useEffect(() => {
-    apiFetch('/api/orders/assign').then(r => r.ok ? r.json() : null).then(d => { if (d?.users) setTeam(d.users) }).catch(() => {})
+    apiFetch('/api/orders/assign').then(r => r.ok ? r.json() : null).then(d => { if (d?.users) setTeam(d.users); if (d?.queues) setQueues(d.queues) }).catch(() => {})
   }, [])
   const [searchParams, setSearchParams] = useSearchParams()
   /** The settings nav as this person sees it. Only admins see the Admin group. */
@@ -2836,6 +2838,7 @@ Thank you!`
                 </span>
               </h2>
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
+              <QueuePill people={(activeView === 'standard' || activeView === 'custom') ? queues[activeView] : undefined} team={team} />
             </div>
             {lastImportedAt && (
               <button

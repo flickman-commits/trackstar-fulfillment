@@ -1,7 +1,8 @@
 /**
  * /api/orders/assign - who fulfills which order.
  *
- *   GET                                   the team (active users) and the per-type defaults;
+ *   GET                                   the team (active users), the per-type defaults and
+ *                                         who each queue goes to today;
  *                                         for admins also the shifts and open counts
  *   POST { orderId, assigneeId }          reassign one order; null unassigns
  *   POST { action:'defaults', standard, custom }   change the import defaults (admins only)
@@ -20,7 +21,7 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireAdminRole, recordAudit, loadActiveUser } from '../_lib/users.js'
 import {
   getAssignmentDefaults, setAssignmentDefaults, ASSIGNABLE_TYPES,
-  getShifts, addShift, endShift, spreadQueue, openCounts, businessDate,
+  getShifts, addShift, endShift, spreadQueue, openCounts, businessDate, rosterFor,
 } from '../../server/domain/orders/assignment.js'
 
 export default async function handler(req, res) {
@@ -35,7 +36,18 @@ export default async function handler(req, res) {
         orderBy: { firstName: 'asc' },
         select: { id: true, firstName: true, lastName: true },
       })
-      const base = { users, defaults: await getAssignmentDefaults({ force: true }), me: actor.id || null }
+      // Who new orders of each type go to today, for the pill on the
+      // dashboard: names and a helper's last day, not shares or counts.
+      const shifts = await getShifts()
+      const queues = {}
+      for (const t of ASSIGNABLE_TYPES) {
+        queues[t] = (await rosterFor(t)).map(r => ({
+          userId: r.userId,
+          regular: r.regular,
+          until: r.shiftId ? shifts.find(x => x.id === r.shiftId)?.until || null : null,
+        }))
+      }
+      const base = { users, defaults: await getAssignmentDefaults({ force: true }), queues, me: actor.id || null }
       // The team list feeds everyone's reassign menu; shifts and queue
       // counts are the admin's planning view and go to admins only.
       const me = await loadActiveUser(actor)
@@ -43,7 +55,7 @@ export default async function handler(req, res) {
       const ids = users.map(u => u.id)
       const open = {}
       for (const t of ASSIGNABLE_TYPES) open[t] = await openCounts(t, ids)
-      return res.status(200).json({ ...base, shifts: await getShifts(), open, today: businessDate() })
+      return res.status(200).json({ ...base, shifts, open, today: businessDate() })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
