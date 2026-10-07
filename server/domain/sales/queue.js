@@ -21,6 +21,7 @@
 import prisma from '../../db.js'
 import { loadDeals, getDeal, memberForEmail, loadPrContacts, isPrId } from './attio.js'
 import { cadenceFor, looksLikeMailbox } from './angles.js'
+import { loadWorkspace } from './sequences.js'
 import { getSettings, startOfToday } from './settings.js'
 import { isGenericInbox } from './guardrails.js'
 
@@ -180,6 +181,8 @@ async function ownerFilter(actor, scopeMode) {
  * Everything the Sales page needs, in one call.
  */
 export async function morningQueue(actor, { scopeMode = 'mine', motion = null, fresh = false, uncapped = false } = {}) {
+  // The saved sequences decide touches and waits; load them before reasoning about either.
+  await loadWorkspace()
   const settings = await getSettings()
   const cap = settings.dailyCap
   const now = new Date()
@@ -282,6 +285,7 @@ export async function morningQueue(actor, { scopeMode = 'mine', motion = null, f
 
 /** One deal with everything the composer and the Who pane need. */
 export async function dealForWork(dealId, { fresh = false } = {}) {
+  await loadWorkspace()
   const settings = await getSettings()
   const dayStart = startOfToday(settings.timezone, new Date())
   const deal = await getDeal(dealId, { fresh })

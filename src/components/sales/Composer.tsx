@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate, Clock, BookmarkPlus } from 'lucide-react'
 import { MotionTag } from './Queue'
 import { salesApi, type LibraryTemplate, type OutreachTemplate, type TemplateFill, type TemplateMotion } from '@/lib/salesApi'
@@ -434,7 +435,7 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
           {!aiActive && (
             <button onClick={() => { onRewrite(); setOpen(false) }} className="w-full text-left px-4 py-3 border-b border-border-gray hover:bg-subtle-gray">
               <span className="block text-sm font-medium text-off-black">This touch in the sequence</span>
-              <span className="block text-xs text-off-black/50 mt-0.5">The tool's own copy for where this deal is. Edit it in Settings.</span>
+              <span className="block text-xs text-off-black/50 mt-0.5">The template this deal's sequence uses for this touch.</span>
             </button>
           )}
           {!library && <div className="px-4 py-4 text-xs text-off-black/50 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading the templates…</div>}
@@ -456,7 +457,12 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
               {showAll ? `Only ${deal.motion || 'this motion'} templates` : `Show all templates (${hidden} more)`}
             </button>
           )}
-          {library && <div className="px-4 py-2.5 border-t border-border-gray text-[11px] text-off-black/45">Add or change these in Settings, under Templates.</div>}
+          {library && (
+            <div className="px-4 py-2.5 border-t border-border-gray text-[11px] text-off-black/45 flex items-center justify-between">
+              <span>Templates and sequences have their own pages.</span>
+              <Link to="/sales/templates" className="text-blue-600 hover:text-blue-700" onClick={() => setOpen(false)}>Edit templates</Link>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -598,7 +604,7 @@ function fromEditor(root: HTMLElement) {
  * pasting an address over selected words links them. ⌘-click opens a link.
  * Paste is always plain text, so nothing arrives with someone else's fonts.
  */
-function RichBox({ value, onChange, onBlur, placeholder, minHeight, boxRef }: {
+export function RichBox({ value, onChange, onBlur, placeholder, minHeight, boxRef }: {
   value: string; onChange: (v: string) => void; onBlur?: () => void; placeholder?: string; minHeight: number
   boxRef?: React.RefObject<HTMLDivElement>
 }) {

@@ -145,7 +145,15 @@ export const PR_CADENCE = [
   },
 ]
 
+/**
+ * The saved sequences (sequences.js), once loaded. Until then, and for any
+ * pipeline with none saved, the coded cadences above apply.
+ */
+let LIVE = null
+export function setLiveCadences(cadences) { LIVE = cadences }
+
 export function cadenceFor(pipeline) {
+  if (LIVE?.[pipeline]?.length) return LIVE[pipeline]
   if (pipeline === 'PR') return PR_CADENCE
   return pipeline === 'CHARITY' ? CHARITY_CADENCE : RACE_CADENCE
 }
@@ -197,10 +205,10 @@ export function looksLikeMailbox(contact) {
  * Square brackets and capitals so it cannot be mistaken for finished copy,
  * and so a draft carrying it is easy to spot in Gmail before sending.
  */
-export const NEEDS_OPENER = '[WRITE ONE SPECIFIC, TRUE LINE ABOUT THIS TEAM. Their race, a fundraising milestone, a recent post. Never send this generic.]'
+export const NEEDS_OPENER = '[WRITE YOUR FIRST LINE: something specific and true about them. Never send this generic.]'
 
-/** `[Race Name]` and friends, filled in from the row. */
-function fill(text, { company, contact, socialProof, oneLiner }) {
+/** `[Race Name]` and friends, filled in from the row; then any custom variables. */
+function fill(text, { company, contact, socialProof, oneLiner, variables = [], senderName = '' }) {
   const seasonYear = (() => {
     const now = new Date()
     if (!company.raceDate) return now.getFullYear() + 1
@@ -214,13 +222,24 @@ function fill(text, { company, contact, socialProof, oneLiner }) {
     .replaceAll('[Team Name]', company.name)
     .replaceAll('[Landmark]', company.courseLandmark || 'Your finish line')
     .replaceAll('[Season Year]', String(seasonYear))
-    .replaceAll('[Social Proof]', socialProof || DEFAULT_SOCIAL_PROOF)
+    // Social Proof is a variable you set; the old setting and default are fallbacks.
+    .replaceAll('[Social Proof]', variables.find(v => v.name.toLowerCase() === 'social proof')?.value || socialProof || DEFAULT_SOCIAL_PROOF)
     // "Never send a generic first line" is a hard rule, and a template cannot
     // know anything specific about this org. So when there is no real opener
     // to fill in, leave a blank that is obviously unfinished rather than a
     // plausible sentence someone might send by accident.
     .replaceAll('[One-liner]', oneLiner || NEEDS_OPENER)
+    // The first line is always the person's to write.
+    .replaceAll('[First line]', NEEDS_OPENER)
+    .replace(/\[Your name\]/gi, senderName)
+    .replace(/\[([A-Za-z][A-Za-z0-9 '-]*)\]/g, (whole, name) => {
+      const v = variables.find(x => x.name.toLowerCase() === name.toLowerCase())
+      return v ? v.value : whole
+    })
 }
+
+/** fill(), for a template from the library. */
+export function fillTemplate(text, ctx) { return fill(String(text || ''), ctx) }
 
 export const RACE_TEMPLATES = {
   'first-touch': {

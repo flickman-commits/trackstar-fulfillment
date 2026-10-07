@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send } from 'lucide-react'
+import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send, FileText, ListOrdered, Braces } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 /**
@@ -163,6 +163,48 @@ function ToolsTile({
 }
 
 /**
+ * Sales, with its workspace one hover away: Outreach (today's emails), and
+ * the Templates, Sequences and Variables pages. Clicking the tile still goes
+ * straight to Outreach. Same flyout as Tools, same forgiving close.
+ */
+function SalesTile({ item, active }: { item: Item; active: boolean }) {
+  const [open, setOpen] = useState(false)
+  const closeTimer = useRef<number | null>(null)
+  const cancelClose = () => { if (closeTimer.current) { window.clearTimeout(closeTimer.current); closeTimer.current = null } }
+  const show = () => { cancelClose(); setOpen(true) }
+  const hide = () => { cancelClose(); closeTimer.current = window.setTimeout(() => setOpen(false), 160) }
+  const pages = [
+    { to: '/sales', label: 'Outreach', hint: "Today's emails to send", icon: Send },
+    { to: '/sales/templates', label: 'Templates', hint: 'The wording, in one place', icon: FileText },
+    { to: '/sales/sequences', label: 'Sequences', hint: 'Which template, and when', icon: ListOrdered },
+    { to: '/sales/variables', label: 'Variables', hint: 'Words templates fill in', icon: Braces },
+  ]
+  return (
+    <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
+      <Tile item={item} active={active || open} />
+      {open && (
+        <div className="absolute left-full top-0 pl-2 z-40">
+          <div className="w-60 p-1.5 rounded-2xl bg-dark-fill shadow-[0_6px_24px_rgba(0,0,0,0.25)] border border-white/[0.08]">
+            {pages.map(pg => {
+              const Icon = pg.icon
+              return (
+                <Link key={pg.to} to={pg.to} onClick={() => setOpen(false)} className="group/row flex items-center gap-3 w-full px-3 py-2 rounded-xl text-left hover:bg-white/10 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.06] text-white/70 group-hover/row:text-white shrink-0"><Icon className="w-4 h-4" /></span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium text-white leading-tight">{pg.label}</span>
+                    <span className="block text-[11px] text-white/45 leading-tight mt-0.5 truncate">{pg.hint}</span>
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
  * The same tools, laid along the bottom for a phone.
  *
  * On a narrow screen a fixed side rail would eat a third of the width, so the
@@ -270,7 +312,9 @@ export default function AppSidebar({
           x axis and swallow the Tools flyout. Four tiles never need to scroll. */}
       <div className="flex-1 flex flex-col gap-0.5 px-1.5 pt-2.5 overflow-visible">
         {items.map(item => (
-          <Tile key={item.id} item={item} active={activeId === item.id} />
+          item.id === 'sales'
+            ? <SalesTile key={item.id} item={item} active={activeId === item.id} />
+            : <Tile key={item.id} item={item} active={activeId === item.id} />
         ))}
         <ToolsTile
           active={activeId === 'discounts' || activeId === 'pace'}

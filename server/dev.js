@@ -99,6 +99,8 @@ const routes = [
   { method: 'get',    path: '/api/sales/today',            handler: '../api/sales/today.js' },
   { method: 'get',    path: '/api/sales/templates',        handler: '../api/sales/templates.js' },
   { method: 'post',   path: '/api/sales/templates',        handler: '../api/sales/templates.js' },
+  { method: 'get',    path: '/api/sales/workspace',        handler: '../api/sales/workspace.js' },
+  { method: 'post',   path: '/api/sales/workspace',        handler: '../api/sales/workspace.js' },
   { method: 'get',    path: '/api/sales/scheduled',        handler: '../api/sales/scheduled.js' },
   { method: 'post',   path: '/api/sales/scheduled',        handler: '../api/sales/scheduled.js' },
   { method: 'get',    path: '/api/sales/send-due',         handler: '../api/sales/send-due.js' },

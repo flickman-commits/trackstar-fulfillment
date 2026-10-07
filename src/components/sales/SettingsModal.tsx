@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react'
-import { X, Loader2, Plug, Mail, Plus, Trash2 } from 'lucide-react'
+import { X, Loader2, Plug, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnPrimary, btnSecondary, btnGhost, fieldLabel, inputBase, segment, segmentGroup } from '@/lib/ui'
 import { useEscape } from '@/lib/useEscape'
-import { salesApi, type LibraryTemplate, type TemplateMotion } from '@/lib/salesApi'
-import type { AttioCheck, Pipeline, SalesSettings, SalesStatus, Sender, TemplateStep, TemplateTable } from '@/types/sales'
+import { salesApi } from '@/lib/salesApi'
+import type { AttioCheck, SalesSettings, SalesStatus, Sender } from '@/types/sales'
 
 /**
  * Everything that is not today's work.
  *
  * Me: your name and signature, which every email you send carries.
- * Templates: the saved templates the composer's menu offers (add, change,
- * delete), and the sequence copy each touch's draft starts from. Sending:
+ * (Templates, sequences and variables have their own pages in the Sales
+ * workspace; see SalesWorkspace.tsx.) Sending:
  * the workspace's cap, undo window and business day (admins). Connections:
  * your Gmail, and whether Attio has the fields the tool reads. Automation:
  * the AI switch.
  */
-type Tab = 'me' | 'templates' | 'sending' | 'connections' | 'automation'
+type Tab = 'me' | 'sending' | 'connections' | 'automation'
 
 export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   status: SalesStatus | null
@@ -31,72 +31,16 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   const [me, setMe] = useState<Sender | null>(null)
   const [saving, setSaving] = useState(false)
   const [check, setCheck] = useState<AttioCheck | null>(null)
-  const [templates, setTemplates] = useState<TemplateTable | null>(null)
-  const [templateDefaults, setTemplateDefaults] = useState<TemplateTable | null>(null)
-  const [steps, setSteps] = useState<Record<Pipeline, TemplateStep[]> | null>(null)
-  const [placeholders, setPlaceholders] = useState<[string, string][]>([])
-  const [tPipeline, setTPipeline] = useState<Pipeline>('CHARITY')
-  const [tAngle, setTAngle] = useState<string>('first-touch')
-  const [tDraft, setTDraft] = useState<{ subject: string; body: string } | null>(null)
-  const [tSaving, setTSaving] = useState(false)
   const [checking, setChecking] = useState(false)
-  const [tView, setTView] = useState<'library' | 'sequence'>('library')
-  const [library, setLibrary] = useState<LibraryTemplate[] | null>(null)
-  const [libId, setLibId] = useState<string | null>(null)
-  const [libDraft, setLibDraft] = useState<Partial<LibraryTemplate> | null>(null)
-  const [libSaving, setLibSaving] = useState(false)
 
-  useEffect(() => { salesApi.settings().then(r => { setS(r.settings); setMe(r.sender); setTemplates(r.templates); setTemplateDefaults(r.templateDefaults); setSteps(r.templateSteps); setPlaceholders(r.placeholders) }).catch(e => toast.error((e as Error).message)) }, [])
-  // The editor shows one touch at a time; switching touches loads its copy.
-  useEffect(() => { const t = templates?.[tPipeline]?.[tAngle]; setTDraft(t ? { subject: t.subject, body: t.body } : null) }, [templates, tPipeline, tAngle])
-  useEffect(() => {
-    if (tab !== 'templates' || library) return
-    salesApi.library().then(r => { setLibrary(r.templates); const first = r.templates[0]; setLibId(first?.id || null); setLibDraft(first ? { ...first } : null) })
-      .catch(e => toast.error((e as Error).message))
-  }, [tab, library])
-  const pickLib = (t: LibraryTemplate | null) => {
-    setLibId(t?.id || null)
-    setLibDraft(t ? { ...t } : { name: '', motion: 'Charity', useFor: '', subject: '', body: 'Hey [First Name],\n\n' })
-  }
-  const libSaved = library?.find(t => t.id === libId)
-  const libDirty = Boolean(libDraft) && (!libSaved || (['name', 'motion', 'useFor', 'subject', 'body'] as const).some(k => (libDraft?.[k] || '') !== (libSaved[k] || '')))
-  const saveLib = async () => {
-    if (!libDraft) return
-    setLibSaving(true)
-    try {
-      const r = await salesApi.saveLibraryTemplate({ ...libDraft, id: libId || undefined })
-      setLibrary(r.templates)
-      const saved = libId ? r.templates.find(t => t.id === libId) : r.templates[r.templates.length - 1]
-      if (saved) { setLibId(saved.id); setLibDraft({ ...saved }) }
-      toast.success('Template saved')
-    } catch (e) { toast.error((e as Error).message) }
-    finally { setLibSaving(false) }
-  }
-  const deleteLib = async () => {
-    if (!libId || !libSaved || !window.confirm(`Delete "${libSaved.name}"? This cannot be undone.`)) return
-    try {
-      const r = await salesApi.deleteLibraryTemplate(libId)
-      setLibrary(r.templates); pickLib(r.templates[0] || null); if (!r.templates.length) { setLibId(null); setLibDraft(null) }
-      toast.message('Template deleted')
-    } catch (e) { toast.error((e as Error).message) }
-  }
-
-  const saveTemplate = async (reset = false) => {
-    if (!tDraft) return
-    setTSaving(true)
-    try {
-      const r = await salesApi.saveTemplate(reset ? { pipeline: tPipeline, angle: tAngle, subject: '', body: '' } : { pipeline: tPipeline, angle: tAngle, subject: tDraft.subject, body: tDraft.body })
-      setTemplates(r.templates); toast.success(reset ? 'Back to the default' : 'Template saved')
-    } catch (e) { toast.error((e as Error).message) }
-    finally { setTSaving(false) }
-  }
+  useEffect(() => { salesApi.settings().then(r => { setS(r.settings); setMe(r.sender) }).catch(e => toast.error((e as Error).message)) }, [])
 
   const save = async () => {
     if (!s || !me) return
     setSaving(true)
     try {
       await salesApi.saveSender({ name: me.name, role: me.role, story: me.story, signature: me.signature })
-      if (isAdmin) await salesApi.saveSettings({ dailyCap: s.dailyCap, socialProof: s.socialProof, timezone: s.timezone, undoSeconds: s.undoSeconds })
+      if (isAdmin) await salesApi.saveSettings({ dailyCap: s.dailyCap, timezone: s.timezone, undoSeconds: s.undoSeconds })
       toast.success('Saved'); onClose()
     } catch (e) { toast.error((e as Error).message) }
     finally { setSaving(false) }
@@ -107,8 +51,8 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
   }
 
   const TZ = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'UTC']
-  const tabs: Tab[] = isAdmin ? ['me', 'templates', 'sending', 'connections', 'automation'] : ['me', 'templates', 'connections', 'automation']
-  const label: Record<Tab, string> = { me: 'Me', templates: 'Templates', sending: 'Sending', connections: 'Connections', automation: 'Automation' }
+  const tabs: Tab[] = isAdmin ? ['me', 'sending', 'connections', 'automation'] : ['me', 'connections', 'automation']
+  const label: Record<Tab, string> = { me: 'Me', sending: 'Sending', connections: 'Connections', automation: 'Automation' }
 
   return (
     <div className="fixed inset-0 z-50 bg-off-black/40 flex items-center justify-center p-4" onClick={onClose}>
@@ -151,90 +95,6 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
               </>
             )}
 
-            {tab === 'templates' && (
-              <div className={segmentGroup}>
-                <button onClick={() => setTView('library')} className={segment(tView === 'library')}>Saved templates</button>
-                <button onClick={() => setTView('sequence')} className={segment(tView === 'sequence')}>Sequence</button>
-              </div>
-            )}
-            {tab === 'templates' && tView === 'library' && (
-              !library ? <div className="flex items-center justify-center h-32 text-off-black/40"><Loader2 className="w-4 h-4 animate-spin" /></div> : (
-                <div className="grid grid-cols-[260px_1fr] gap-6 min-h-[380px]">
-                  <div className="flex flex-col border-r border-border-gray pr-3">
-                    <p className="text-xs text-off-black/55 mb-2">What the Templates button in the composer offers.</p>
-                    <div className="flex-1 space-y-0.5">
-                      {library.map(t => (
-                        <button key={t.id} onClick={() => pickLib(t)} className={`w-full text-left px-2.5 py-2 rounded-md ${t.id === libId ? 'bg-off-black/[0.06]' : 'hover:bg-subtle-gray'}`}>
-                          <span className="block text-[13px] font-medium text-off-black leading-tight">{t.name}</span>
-                          <span className="block text-[11px] text-off-black/45 mt-0.5">{t.motion === 'Any' ? 'Any deal' : t.motion}</span>
-                        </button>
-                      ))}
-                      {library.length === 0 && <p className="text-xs text-off-black/45 px-2.5 py-2">No templates yet.</p>}
-                    </div>
-                    <button onClick={() => pickLib(null)} className={`${btnSecondary} mt-3`}><Plus className="w-3.5 h-3.5" /> New template</button>
-                  </div>
-                  {libDraft ? (
-                    <div className="space-y-3 min-w-0">
-                      <div className="grid grid-cols-[1fr_130px] gap-3">
-                        <div><label className={fieldLabel}>Name</label><input value={libDraft.name || ''} onChange={e => setLibDraft({ ...libDraft, name: e.target.value })} placeholder="First Touch (Loom)" className={`${inputBase} w-full`} /></div>
-                        <div><label className={fieldLabel}>For</label>
-                          <select value={libDraft.motion || 'Any'} onChange={e => setLibDraft({ ...libDraft, motion: e.target.value as TemplateMotion })} className={`${inputBase} w-full`}>
-                            <option value="Charity">Charity</option><option value="Race">Race</option><option value="PR">PR</option><option value="Any">Any deal</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div><label className={fieldLabel}>When to use it</label><input value={libDraft.useFor || ''} onChange={e => setLibDraft({ ...libDraft, useFor: e.target.value })} placeholder="Follow-up where the first touch went out without the video" className={`${inputBase} w-full`} /></div>
-                      <div><label className={fieldLabel}>Subject</label><input value={libDraft.subject || ''} onChange={e => setLibDraft({ ...libDraft, subject: e.target.value })} placeholder="Leave empty to reply on the thread" className={`${inputBase} w-full`} /></div>
-                      <div><label className={fieldLabel}>Body</label><textarea rows={20} value={libDraft.body || ''} onChange={e => setLibDraft({ ...libDraft, body: e.target.value })} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
-                      <details className="text-xs text-off-black/55">
-                        <summary className="cursor-pointer">Placeholders</summary>
-                        <dl className="mt-1 grid grid-cols-[130px_1fr] gap-x-2 gap-y-0.5">
-                          {[...placeholders, ['[Your name]', 'your first name, from Me'] as [string, string]].map(([k, v]) => [<dt key={`${k}k`} className="font-medium text-off-black/70">{k}</dt>, <dd key={`${k}v`}>{v}</dd>])}
-                        </dl>
-                        <p className="mt-1">Leave out the sign-off; your signature is added on send. A P.S. goes last. No em or en dashes.</p>
-                      </details>
-                      <div className="flex items-center justify-between gap-2">
-                          {libSaved ? (isAdmin ? <button onClick={deleteLib} className={`${btnGhost} text-red-700 hover:text-red-800`}><Trash2 className="w-3.5 h-3.5" /> Delete</button> : <span className="text-xs text-off-black/40">An admin can delete templates.</span>) : <button onClick={() => pickLib(library[0] || null)} className={btnGhost}>Cancel</button>}
-                          <button onClick={saveLib} disabled={libSaving || !libDirty} className={btnPrimary}>{libSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} {libSaved ? 'Save changes' : 'Add template'}</button>
-                        </div>
-                    </div>
-                  ) : <div className="text-sm text-off-black/45 flex items-center justify-center">Pick a template, or add one.</div>}
-                </div>
-              )
-            )}
-
-            {tab === 'templates' && tView === 'sequence' && templates && steps && (
-              <>
-                <p className="text-xs text-off-black/55">What each touch's draft starts from, before anyone picks a template. Changes reach the next draft.</p>
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className={segmentGroup}>
-                    {(['CHARITY', 'RACE', 'PR'] as Pipeline[]).map(p => <button key={p} onClick={() => { setTPipeline(p); setTAngle(steps[p][0].angle) }} className={segment(tPipeline === p)}>{p === 'CHARITY' ? 'Charity' : p === 'PR' ? 'PR' : 'Race'}</button>)}
-                  </div>
-                  <select value={tAngle} onChange={e => setTAngle(e.target.value)} className={`${inputBase} text-xs`}>
-                    {steps[tPipeline].map(st => <option key={st.angle} value={st.angle}>Touch {st.touch} · {st.angle}{templates[tPipeline][st.angle]?.edited ? ' · edited' : ''}</option>)}
-                  </select>
-                </div>
-                <p className="text-xs text-off-black/55">{steps[tPipeline].find(st => st.angle === tAngle)?.purpose}</p>
-                {tDraft && (
-                  <>
-                    <div><label className={fieldLabel}>Subject</label><input value={tDraft.subject} onChange={e => setTDraft({ ...tDraft, subject: e.target.value })} className={`${inputBase} w-full`} /></div>
-                    <div><label className={fieldLabel}>Body</label><textarea rows={20} value={tDraft.body} onChange={e => setTDraft({ ...tDraft, body: e.target.value })} className={`${inputBase} w-full resize-y text-[13px] leading-relaxed`} /></div>
-                    <details className="text-xs text-off-black/55">
-                      <summary className="cursor-pointer">Placeholders the template can use</summary>
-                      <dl className="mt-1 grid grid-cols-[130px_1fr] gap-x-2 gap-y-0.5">
-                        {placeholders.map(([k, v]) => [<dt key={`${k}k`} className="font-mono text-[11px]">{k}</dt>, <dd key={`${k}v`}>{v}</dd>])}
-                      </dl>
-                      <p className="mt-1">No em or en dashes; the server refuses them. The signature is added on send, so end on the ask. A P.S. goes last and starts with "P.S.".</p>
-                    </details>
-                    <div className="flex items-center justify-between gap-2">
-                        <button onClick={() => saveTemplate(true)} disabled={tSaving || !templates[tPipeline][tAngle]?.edited} className={btnGhost}>Reset to default</button>
-                        <button onClick={() => saveTemplate(false)} disabled={tSaving || (templateDefaults != null && tDraft.subject === templates[tPipeline][tAngle].subject && tDraft.body === templates[tPipeline][tAngle].body)} className={btnSecondary}>{tSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save this touch</button>
-                      </div>
-                  </>
-                )}
-              </>
-            )}
-
             {tab === 'sending' && isAdmin && (
               <>
                 <div className="grid grid-cols-3 gap-3">
@@ -254,11 +114,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                   </div>
                 </div>
                 <p className="text-xs text-off-black/50">The cap is how many first touches each rep gets a day, and what the page counts toward. Later touches are never capped; they are owed.</p>
-                <div>
-                  <label className={fieldLabel}>Social proof line</label>
-                  <textarea rows={2} value={s.socialProof} onChange={e => setS({ ...s, socialProof: e.target.value })} className={`${inputBase} w-full resize-y`} />
-                  <p className="text-xs text-off-black/50 mt-1">Leads the fourth race touch. Update the numbers as the season moves.</p>
-                </div>
+                <p className="text-xs text-off-black/50">Templates, sequences and variables (the Social Proof line included) are in the Sales workspace: hover Sales in the left rail.</p>
               </>
             )}
 

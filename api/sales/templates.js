@@ -8,7 +8,8 @@
 import { setCors } from '../_lib/auth.js'
 import { requireSalesRep, requireAdminRole, recordAudit } from '../_lib/users.js'
 import { getSenderFor, getSettings } from '../../server/domain/sales/settings.js'
-import { listTemplates, saveTemplate, deleteTemplate, MOTIONS } from '../../server/domain/sales/templateLibrary.js'
+import { saveTemplate, deleteTemplate, MOTIONS } from '../../server/domain/sales/templateLibrary.js'
+import { loadWorkspace, usedBy } from '../../server/domain/sales/sequences.js'
 import { DEFAULT_SOCIAL_PROOF, NEEDS_OPENER } from '../../server/domain/sales/angles.js'
 
 export default async function handler(req, res) {
@@ -20,10 +21,11 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       // Everything the composer needs to fill a template in the browser, in
       // one small read with no Attio call: the person is already on screen.
-      const [templates, settings, sender] = await Promise.all([listTemplates(), getSettings(), getSenderFor(actor.id, actor)])
+      const [{ templates, variables }, settings, sender] = await Promise.all([loadWorkspace(), getSettings(), getSenderFor(actor.id, actor)])
+      const socialProof = variables.find(v => v.name.toLowerCase() === 'social proof')?.value || settings.socialProof || DEFAULT_SOCIAL_PROOF
       return res.status(200).json({
         templates, motions: MOTIONS,
-        fill: { senderName: sender.name || '', socialProof: settings.socialProof || DEFAULT_SOCIAL_PROOF, needsOpener: NEEDS_OPENER },
+        fill: { senderName: sender.name || '', socialProof, needsOpener: NEEDS_OPENER, variables },
       })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -40,6 +42,9 @@ export default async function handler(req, res) {
     }
     if (body.action === 'delete') {
       if (!(await requireAdminRole(req, res, actor))) return
+      const { sequences } = await loadWorkspace({ force: true })
+      const used = usedBy(sequences, String(body.id || ''))
+      if (used.length) return res.status(400).json({ error: `Used in ${used.join(', ')}. Pick another template for that step first.` })
       const templates = await deleteTemplate(String(body.id || ''))
       await recordAudit({ actor, action: 'sales.template_library', summary: `Deleted a template (${String(body.id || '').slice(0, 40)})` })
       return res.status(200).json({ templates })

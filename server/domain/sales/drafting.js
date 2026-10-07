@@ -14,7 +14,8 @@
  */
 import prisma from '../../db.js'
 import { complete, isLlmConfigured } from '../../lib/llm.js'
-import { cadenceFor, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateFor, greetingName, RACE_ONE_LINERS } from './angles.js'
+import { cadenceFor, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateFor, fillTemplate, greetingName, RACE_ONE_LINERS } from './angles.js'
+import { loadWorkspace } from './sequences.js'
 import { sendMessage, gmailStatus, lineToHtml } from './gmail.js'
 import { readAsset, isAssetStorageConfigured } from './assets.js'
 import { getSettings, getSenderFor } from './settings.js'
@@ -77,11 +78,23 @@ function templateCompany(deal) {
  * rep's first touch keeps the structure and swaps the who-I-am sentence for
  * theirs: their name, their role, their story if they saved one.
  */
-export function buildTemplate(deal, person, step, { socialProof, sender, templates } = {}) {
+export function buildTemplate(deal, person, step, { socialProof, sender, templates, library, variables } = {}) {
   const pipeline = pipelineOf(deal)
   const identity = pipeline === 'RACE' && deal.identity && RACE_ONE_LINERS[deal.identity]
   const oneLiner = step.touch === 1 && identity ? RACE_ONE_LINERS[deal.identity](templateCompany(deal)) : null
-  const t = templateFor({ pipeline, angle: step.angle, company: templateCompany(deal), contact: person, oneLiner, socialProof, templates })
+  // The sequence step names a library template; that is the copy. Without one
+  // (an old setup, a test) the coded copy for the touch applies.
+  const chosen = step.templateId && (library || []).find(x => x.id === step.templateId)
+  const ctx = { company: templateCompany(deal), contact: person, oneLiner, socialProof, variables: variables || [], senderName: sender?.name || '' }
+  const t = chosen
+    ? {
+        subject: chosen.subject
+          ? fillTemplate(chosen.subject, ctx)
+          // No subject means "reply on the thread": keep the last one, marked as a reply.
+          : `Re: ${String(deal.lastSubject || deal.name || '').replace(/^(re:\s*)+/i, '')}`,
+        body: fillTemplate(chosen.body, ctx),
+      }
+    : templateFor({ pipeline, angle: step.angle, company: templateCompany(deal), contact: person, oneLiner, socialProof, templates })
   if (sender?.name && sender.name !== 'Matt') {
     const intro = `I'm ${sender.name}, ${sender.role || 'from Trackstar'}.${sender.story ? ` ${sender.story}` : ''}`
     t.body = t.body
@@ -172,20 +185,24 @@ export function buildPrompt({ deal, person, touchNumber, step, previous, socialP
  */
 export async function draftVariants({ dealId, personId, useTemplate = false, actor }) {
   // Everything a draft needs, read at once rather than one after another.
-  const [deal, settings, sender, templates] = await Promise.all([
+  const [deal, settings, sender, templates, workspace] = await Promise.all([
     dealForWork(dealId),
     getSettings(),
     getSenderFor(actor?.id, actor),
     getTemplates(),
+    loadWorkspace(),
   ])
+  const library = workspace.templates
+  const variables = workspace.variables
   const person = (personId && deal.people.find(p => p.id === personId)) || deal.person
   if (!person) throw new Error('This deal has nobody to write to. Add a person to it in Attio.')
   const { touchNumber, step, exhausted } = nextStepFor(deal)
-  const socialProof = settings.socialProof || DEFAULT_SOCIAL_PROOF
+  // Social Proof is a variable now; the old setting is only a fallback.
+  const socialProof = variables.find(v => v.name.toLowerCase() === 'social proof')?.value || settings.socialProof || DEFAULT_SOCIAL_PROOF
   const base = { touchNumber, step, exhausted, personId: person.id, dealId: deal.id }
 
   if (useTemplate || !isLlmConfigured()) {
-    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender, templates })], model: 'template', source: 'template' }
+    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender, templates, library, variables })], model: 'template', source: 'template' }
   }
 
   const previous = deal.sends.map(s => ({ touchNumber: s.touchNumber, subject: s.subject, body: s.body }))
@@ -201,7 +218,7 @@ export async function draftVariants({ dealId, personId, useTemplate = false, act
     }))
   } catch (err) {
     console.warn(`[sales.draft] model failed (${err.message}); falling back to the template`)
-    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender, templates })], model: 'template', source: 'template', warning: `Wrote this from the template: ${err.message}` }
+    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender, templates, library, variables })], model: 'template', source: 'template', warning: `Wrote this from the template: ${err.message}` }
   }
 
   const raw = Array.isArray(json?.variants) ? json.variants : Array.isArray(json) ? json : []

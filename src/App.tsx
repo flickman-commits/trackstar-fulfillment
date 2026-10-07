@@ -15,6 +15,7 @@ import Monopoly from '@/pages/Monopoly'
 import MonopolyModel from '@/pages/MonopolyModel'
 import ProductsBulkEdit from '@/pages/ProductsBulkEdit'
 import Sales from '@/pages/Sales'
+import SalesWorkspace from '@/pages/SalesWorkspace'
 import { SignInGate, RequireAdmin } from '@/lib/auth'
 
 interface ErrorBoundaryProps {
@@ -202,6 +203,10 @@ export default function App() {
                 {/* Rendered by SalesKeepAlive below, so it survives leaving the page.
                     /send is the short name the brief uses. */}
                 <Route path="/sales" element={null} />
+                {/* The Sales workspace: templates, sequences and variables. */}
+                <Route path="/sales/templates" element={<SalesWorkspace />} />
+                <Route path="/sales/sequences" element={<SalesWorkspace />} />
+                <Route path="/sales/variables" element={<SalesWorkspace />} />
                 <Route path="/send" element={null} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>

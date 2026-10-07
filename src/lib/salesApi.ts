@@ -34,7 +34,18 @@ export interface DealHit { id: string; name: string | null; stage: string | null
 /** A library template filled in for the person, for the composer's menu. A null subject means reply on the thread. */
 export interface OutreachTemplate { id: string; group: string; title: string; useFor: string | null; subject: string | null; body: string }
 /** The values a template's placeholders need that the page does not already have. */
-export interface TemplateFill { senderName: string; socialProof: string; needsOpener: string }
+export interface TemplateFill { senderName: string; socialProof: string; needsOpener: string; variables?: CustomVariable[] }
+/** A variable you set yourself, used in templates as [Name]. */
+export interface CustomVariable { name: string; value: string }
+/** One step of a sequence: which template, how long to wait after the previous email, and whether it replies on the thread. */
+export interface SequenceStep { templateId: string; waitDays: number; replyInThread: boolean }
+export type SequencePipeline = 'RACE' | 'CHARITY' | 'PR'
+export interface Workspace {
+  sequences: Record<SequencePipeline, SequenceStep[]>
+  variables: CustomVariable[]
+  templates: LibraryTemplate[]
+  builtIn: [string, string][]
+}
 /** A library template as stored, for Settings. */
 export type TemplateMotion = 'Charity' | 'Race' | 'PR' | 'Any'
 export interface LibraryTemplate { id: string; name: string; motion: TemplateMotion; useFor: string | null; subject: string | null; body: string; updatedAt?: string; updatedBy?: string | null }
@@ -54,6 +65,10 @@ export const salesApi = {
   },
   deal: (id: string, refresh = false) => request<{ deal: Deal }>(`/api/sales/today?action=deal&id=${encodeURIComponent(id)}${refresh ? '&refresh=1' : ''}`),
   /** The saved templates, and what the browser needs to fill them in. One small read, no Attio. */
+  /** The Templates, Sequences and Variables pages. */
+  workspace: () => request<Workspace>('/api/sales/workspace'),
+  saveSequence: (pipeline: SequencePipeline, steps: SequenceStep[]) => post<{ sequences: Workspace['sequences'] }>('/api/sales/workspace', { action: 'save-sequence', pipeline, steps }),
+  saveVariables: (variables: CustomVariable[]) => post<{ variables: CustomVariable[] }>('/api/sales/workspace', { action: 'save-variables', variables }),
   library: () => request<{ templates: LibraryTemplate[]; fill: TemplateFill }>('/api/sales/templates'),
   saveLibraryTemplate: (t: Partial<LibraryTemplate>) => post<{ templates: LibraryTemplate[] }>('/api/sales/templates', { action: 'save', ...t }),
   deleteLibraryTemplate: (id: string) => post<{ templates: LibraryTemplate[] }>('/api/sales/templates', { action: 'delete', id }),

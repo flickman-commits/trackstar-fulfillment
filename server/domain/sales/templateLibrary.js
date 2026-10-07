@@ -111,6 +111,23 @@ export async function listTemplates({ force = false } = {}) {
   return value
 }
 
+/**
+ * Every template opens with a line the person writes: put [First line] after
+ * the greeting ("Hey [First Name],"), or first when there is none. The old
+ * [One-liner] becomes [First line].
+ */
+export function withFirstLine(body) {
+  const text = String(body || '').replace(/\[One-liner\]/g, '[First line]')
+  if (/\[First line\]/i.test(text)) return text
+  const [first, ...rest] = text.split('\n')
+  const after = rest.join('\n').replace(/^\n+/, '')
+  if (/^\s*(hey|hi|hello|dear)\b/i.test(first || '')) return `${first}\n\n[First line]${after ? `\n\n${after}` : ''}`
+  return `[First line]${text ? `\n\n${text}` : ''}`
+}
+
+/** Replace the whole list (used by the one-time move of sequence copy into the library). */
+export async function writeTemplates(list) { await write(list) }
+
 async function write(list) {
   const value = JSON.stringify(list)
   await prisma.systemConfig.upsert({ where: { key: LIBRARY_KEY }, update: { value }, create: { key: LIBRARY_KEY, value } })
@@ -128,7 +145,7 @@ export async function saveTemplate({ id, name, motion, useFor, subject, body }, 
     motion: MOTIONS.includes(motion) ? motion : 'Any',
     useFor: String(useFor || '').trim().slice(0, 300) || null,
     subject: String(subject || '').trim().slice(0, 200) || null,
-    body: String(body || '').replace(/\r\n/g, '\n').trim().slice(0, 6000),
+    body: withFirstLine(String(body || '').replace(/\r\n/g, '\n').trim()).slice(0, 6000),
   }
   if (!clean.name) throw new Error('Give the template a name')
   if (!clean.body) throw new Error('The template needs a body')

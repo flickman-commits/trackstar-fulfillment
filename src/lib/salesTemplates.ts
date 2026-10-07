@@ -47,7 +47,13 @@ export function fillText(text: string, deal: Deal, person: Person | null, fill: 
     .split('[Season Year]').join(String(seasonYear(deal.raceDate)))
     .split('[Social Proof]').join(fill.socialProof)
     .split('[One-liner]').join(fill.needsOpener)
+    // The first line is always written by hand: a visible blank the send checks catch.
+    .split('[First line]').join(fill.needsOpener)
     .replace(/\[Your name\]/gi, fill.senderName)
+    .replace(/\[([A-Za-z][A-Za-z0-9 '-]*)\]/g, (whole, name: string) => {
+      const v = (fill.variables || []).find(x => x.name.toLowerCase() === name.toLowerCase())
+      return v ? v.value : whole
+    })
 }
 
 /** Whether a template belongs with this email: its own motion, or one marked for any deal. */
