@@ -416,7 +416,10 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
   }, [open])
 
   // Loaded with the page and filled here from the person on screen: no wait.
-  const items = library ? menuFor(library.templates, deal, person, library.fill) : []
+  const [showAll, setShowAll] = useState(false)
+  useEffect(() => { setShowAll(false) }, [deal.id])
+  const items = library ? menuFor(library.templates, deal, person, library.fill, showAll) : []
+  const hidden = library ? library.templates.length - items.length : 0
   const groups = items.reduce<Record<string, OutreachTemplate[]>>((acc, t) => {
     (acc[t.group] = acc[t.group] || []).push(t); return acc
   }, {})
@@ -448,6 +451,11 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
             </div>
           ))}
           {library && items.length === 0 && <div className="px-4 py-3 text-xs text-off-black/50">No saved templates yet.</div>}
+          {library && (hidden > 0 || showAll) && (
+            <button onClick={() => setShowAll(v => !v)} className="w-full text-left px-4 py-2.5 border-t border-border-gray text-xs text-blue-600 hover:text-blue-700 hover:bg-subtle-gray">
+              {showAll ? `Only ${deal.motion || 'this motion'} templates` : `Show all templates (${hidden} more)`}
+            </button>
+          )}
           {library && <div className="px-4 py-2.5 border-t border-border-gray text-[11px] text-off-black/45">Add or change these in Settings, under Templates.</div>}
         </div>
       )}

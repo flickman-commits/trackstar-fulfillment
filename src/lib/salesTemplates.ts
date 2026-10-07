@@ -50,10 +50,21 @@ export function fillText(text: string, deal: Deal, person: Person | null, fill: 
     .replace(/\[Your name\]/gi, fill.senderName)
 }
 
-/** The menu: every template filled in, this deal's motion first, then Any, then the rest. */
-export function menuFor(templates: LibraryTemplate[], deal: Deal, person: Person | null, fill: TemplateFill) {
+/** Whether a template belongs with this email: its own motion, or one marked for any deal. */
+export function fitsMotion(t: LibraryTemplate, deal: Deal) {
+  return t.motion === 'Any' || t.motion === deal.motion
+}
+
+/**
+ * The menu: templates filled in for this person. Only this email's motion
+ * (and "Any deal") unless `all`; when the motion has none of its own, all
+ * of them, so the menu is never empty for no reason.
+ */
+export function menuFor(templates: LibraryTemplate[], deal: Deal, person: Person | null, fill: TemplateFill, all = false) {
+  const ownMotion = templates.some(t => t.motion === deal.motion)
   const rank = (t: LibraryTemplate) => (t.motion === deal.motion ? 0 : t.motion === 'Any' ? 1 : 2)
   return templates
+    .filter(t => all || !ownMotion || fitsMotion(t, deal))
     .map((t, i) => ({ t, i }))
     .sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i)
     .map(({ t }) => ({
