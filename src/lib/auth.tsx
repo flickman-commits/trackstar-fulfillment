@@ -13,6 +13,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
+import { roleCan, type Capability } from '@/lib/roles'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -21,7 +22,8 @@ export interface CurrentUser {
   email: string
   firstName: string
   lastName: string
-  role: 'admin' | 'staff'
+  /** admin | sales | fulfillment | designer; older accounts may still say "staff". See src/lib/roles.ts. */
+  role: string
 }
 
 /** "Matt Hickman", or just "Matt" when no last name is set. */
@@ -32,6 +34,8 @@ export function fullName(user: { firstName?: string; lastName?: string } | null)
 interface AuthValue {
   user: CurrentUser | null
   isAdmin: boolean
+  /** Whether the signed-in person's role includes this part of the app. */
+  can: (capability: Capability) => boolean
   refresh: () => Promise<void>
   signOut: () => Promise<void>
 }
@@ -39,6 +43,7 @@ interface AuthValue {
 const AuthContext = createContext<AuthValue>({
   user: null,
   isAdmin: false,
+  can: () => false,
   refresh: async () => {},
   signOut: async () => {},
 })
@@ -76,7 +81,7 @@ export function AuthProvider({ user, setUser, children }: {
   }, [setUser])
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin: user?.role === 'admin', refresh, signOut }}>
+    <AuthContext.Provider value={{ user, isAdmin: user?.role === 'admin', can: (c: Capability) => Boolean(user) && roleCan(user?.role, c), refresh, signOut }}>
       {children}
     </AuthContext.Provider>
   )
@@ -91,13 +96,25 @@ export function AuthProvider({ user, setUser, children }: {
  * session independently, so this is the signpost and not the lock.
  */
 export function RequireAdmin({ children }: { children: ReactNode }) {
-  const { user, isAdmin } = useAuth()
+  const { isAdmin } = useAuth()
   if (isAdmin) return <>{children}</>
+  return <NotYours what="This page is admin only" />
+}
+
+/** The same signpost for a page a role does not include (Sales for a designer, say). */
+export function RequireCap({ cap, children }: { cap: Capability; children: ReactNode }) {
+  const { can } = useAuth()
+  if (can(cap)) return <>{children}</>
+  return <NotYours what="This page is not part of your role" />
+}
+
+function NotYours({ what }: { what: string }) {
+  const { user } = useAuth()
   return (
     <div className={shell}>
       <div className="w-full max-w-sm text-center">
         <div className={card}>
-          <p className="text-body-sm font-medium text-off-black">This page is admin only</p>
+          <p className="text-body-sm font-medium text-off-black">{what}</p>
           <p className="text-xs text-off-black/50 mt-2">
             You are signed in as {fullName(user) || 'a team member'}. Ask an admin if you need access.
           </p>

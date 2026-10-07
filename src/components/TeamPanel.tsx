@@ -18,24 +18,18 @@ import { toast } from 'sonner'
 import { Loader2, RefreshCw, UserPlus, Copy, Check, LogOut } from 'lucide-react'
 import { useAuth, fullName, PasswordInput } from '@/lib/auth'
 import { btnPrimary, btnSecondary, btnDanger, btnGhost, inputBase, fieldLabel } from '@/lib/ui'
+import { ROLES, ROLE_LABEL, ROLE_BLURB, normalizeRole } from '@/lib/roles'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
-/**
- * What each role is called on screen.
- *
- * The stored value stays "staff": it is written into every session token and
- * checked by every gated endpoint, so renaming it would be a migration that
- * signs everyone out to change a word nobody sees. This maps the value to the
- * label instead, which is the only place the word was ever visible.
- */
-const ROLE_LABEL: Record<string, string> = {
-  admin: 'Admin',
-  staff: 'Team member',
+/** What each role is called on screen. Roles and what they include: src/lib/roles.ts. */
+function roleLabel(role?: string) {
+  return ROLE_LABEL[normalizeRole(role)]
 }
 
-function roleLabel(role?: string) {
-  return ROLE_LABEL[role || ''] || role || ''
+/** The role picker's options, each with what it includes. */
+function RoleOptions() {
+  return <>{ROLES.map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</>
 }
 
 interface TeamMember {
@@ -45,7 +39,7 @@ interface TeamMember {
   lastName: string
   /** Composed server-side so the table and the toasts agree on one spelling. */
   name: string
-  role: 'admin' | 'staff'
+  role: string
   isActive: boolean
   hasPassword: boolean
   lastLoginAt: string | null
@@ -107,7 +101,7 @@ export function PeoplePanel() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [inviteUrl, setInviteUrl] = useState('')
   const [showInvite, setShowInvite] = useState(false)
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', role: 'staff' as 'admin' | 'staff' })
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', role: 'designer' as string })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -148,7 +142,7 @@ export function PeoplePanel() {
     if (data?.inviteUrl) {
       setInviteUrl(data.inviteUrl)
       setShowInvite(false)
-      setForm({ firstName: '', lastName: '', email: '', role: 'staff' })
+      setForm({ firstName: '', lastName: '', email: '', role: 'designer' })
     }
   }
 
@@ -224,11 +218,11 @@ export function PeoplePanel() {
               <select
                 className={inputBase}
                 value={form.role}
-                onChange={e => setForm({ ...form, role: e.target.value as 'admin' | 'staff' })}
+                onChange={e => setForm({ ...form, role: e.target.value })}
               >
-                <option value="staff">Team member</option>
-                <option value="admin">Admin</option>
+                <RoleOptions />
               </select>
+              <p className="text-[11px] text-off-black/45 mt-1">{ROLE_BLURB[normalizeRole(form.role)]}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -279,15 +273,15 @@ export function PeoplePanel() {
                     {m.isActive ? (
                       <select
                         className="text-xs bg-white border border-border-gray rounded px-2 py-1"
-                        value={m.role}
+                        value={normalizeRole(m.role)}
+                        title={ROLE_BLURB[normalizeRole(m.role)]}
                         disabled={busyId === m.id}
                         onChange={e => post(
                           { action: 'role', id: m.id, role: e.target.value },
                           `${m.name} is now ${roleLabel(e.target.value).toLowerCase()}`
                         )}
                       >
-                        <option value="staff">Team member</option>
-                        <option value="admin">Admin</option>
+                        <RoleOptions />
                       </select>
                     ) : (
                       <span className="text-off-black/70">{roleLabel(m.role)}</span>
@@ -416,9 +410,7 @@ export function AccountPanel() {
         </p>
         <p className="text-xs text-off-black/50">{user?.email}</p>
         <p className="text-xs text-off-black/45 mt-2">
-          {user?.role === 'admin'
-            ? 'Admins can manage people and run the destructive actions.'
-            : 'Ask an admin if you need to run something that is limited to admins.'}
+          {ROLE_BLURB[normalizeRole(user?.role)]}. Ask Matt if you need more.
         </p>
       </div>
 

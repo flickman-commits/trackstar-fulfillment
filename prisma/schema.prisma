@@ -688,7 +688,9 @@ model User {
   // scrypt, stored as "scrypt:<saltHex>:<hashHex>". Null while an invite is
   // outstanding, which is also what blocks sign-in until they set one.
   passwordHash String?
-  role         String    @default("staff") // "admin" | "staff"
+  // admin | sales | fulfillment | designer (api/_lib/roles.js). "staff" from
+  // before roles reads as designer.
+  role         String    @default("designer")
   isActive     Boolean   @default(true)
   // Invite flow: a single-use token that lets someone set their first password.
   inviteToken     String?   @unique

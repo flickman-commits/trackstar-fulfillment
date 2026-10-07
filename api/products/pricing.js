@@ -23,7 +23,7 @@
  * about a negotiation gets baked into the server.
  */
 
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors } from '../_lib/auth.js'
 import {
   buildPricingGrid,
   SIZES,
@@ -37,10 +37,11 @@ import {
   WHOLESALE_TIERS,
   WHOLESALE_EXCLUDED_SIZES,
 } from '../../server/services/pricing.js'
+import { requireCapability } from '../_lib/users.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  if (!(await requireCapability(req, res, 'settings.pricing'))) return
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {

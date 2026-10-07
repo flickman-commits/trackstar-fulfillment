@@ -16,7 +16,7 @@ import MonopolyModel from '@/pages/MonopolyModel'
 import ProductsBulkEdit from '@/pages/ProductsBulkEdit'
 import Sales from '@/pages/Sales'
 import SalesWorkspace from '@/pages/SalesWorkspace'
-import { SignInGate, RequireAdmin } from '@/lib/auth'
+import { SignInGate, RequireAdmin, RequireCap, useAuth } from '@/lib/auth'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -120,9 +120,12 @@ function RedirectToMonopolyHost({ path = '/' }: { path?: string }) {
  */
 function SalesKeepAlive() {
   const { pathname } = useLocation()
+  const { can } = useAuth()
   const onSales = pathname === '/sales' || pathname === '/send'
   const [opened, setOpened] = useState(onSales)
   useEffect(() => { if (onSales) setOpened(true) }, [onSales])
+  // A role without Sales gets the signpost, and Sales never loads behind it.
+  if (!can('sales')) return onSales ? <RequireCap cap="sales"><></></RequireCap> : null
   if (!opened) return null
   return (
     <div className={onSales ? 'contents' : 'hidden'} aria-hidden={!onSales}>
@@ -195,7 +198,7 @@ export default function App() {
                 {/* Admin view: the creator programme, the bulk product editor
                     and the brief admin all change things outside the day to day
                     fulfillment work. */}
-                <Route path="/creators" element={<RequireAdmin><CreatorsHome /></RequireAdmin>} />
+                <Route path="/creators" element={<RequireCap cap="creators"><CreatorsHome /></RequireCap>} />
                 <Route path="/products" element={<RequireAdmin><ProductsBulkEdit /></RequireAdmin>} />
                 <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
                 {/* Sales is for reps: anyone signed in whose email is on the Attio
@@ -204,9 +207,9 @@ export default function App() {
                     /send is the short name the brief uses. */}
                 <Route path="/sales" element={null} />
                 {/* The Sales workspace: templates, sequences and variables. */}
-                <Route path="/sales/templates" element={<SalesWorkspace />} />
-                <Route path="/sales/sequences" element={<SalesWorkspace />} />
-                <Route path="/sales/variables" element={<SalesWorkspace />} />
+                <Route path="/sales/templates" element={<RequireCap cap="sales"><SalesWorkspace /></RequireCap>} />
+                <Route path="/sales/sequences" element={<RequireCap cap="sales"><SalesWorkspace /></RequireCap>} />
+                <Route path="/sales/variables" element={<RequireCap cap="sales"><SalesWorkspace /></RequireCap>} />
                 <Route path="/send" element={null} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>

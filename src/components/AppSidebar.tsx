@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send, FileText, ListOrdered, Braces } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import type { Capability } from '@/lib/roles'
 
 /**
  * The tool rail.
@@ -94,10 +95,12 @@ function Tile({ item, active }: { item: Item; active?: boolean }) {
  * the gap between the tile and the menu does not slam it shut halfway.
  */
 function ToolsTile({
+  can,
   active,
   onOpenDiscounts,
   onOpenPaceConverter,
 }: {
+  can: (c: Capability) => boolean
   active: boolean
   onOpenDiscounts: () => void
   onOpenPaceConverter: () => void
@@ -112,10 +115,13 @@ function ToolsTile({
   const hide = () => { cancelClose(); closeTimer.current = window.setTimeout(() => setOpen(false), 160) }
 
   const tools = [
-    { id: 'discounts', label: 'Discounts', hint: 'One-time discount code', icon: Ticket, onClick: onOpenDiscounts },
-    { id: 'pace', label: 'Pace Converter', hint: 'Finish time to pace', icon: Calculator, onClick: onOpenPaceConverter },
-    { id: 'weather', label: 'Weather Lookup', hint: 'Race-day weather on WeatherSpark', icon: CloudSun, href: 'https://weatherspark.com' },
-  ]
+    { id: 'discounts', cap: 'tools.discounts' as Capability, label: 'Discounts', hint: 'One-time discount code', icon: Ticket, onClick: onOpenDiscounts },
+    { id: 'pace', cap: 'tools.pace' as Capability, label: 'Pace Converter', hint: 'Finish time to pace', icon: Calculator, onClick: onOpenPaceConverter },
+    { id: 'weather', cap: 'tools.weather' as Capability, label: 'Weather Lookup', hint: 'Race-day weather on WeatherSpark', icon: CloudSun, href: 'https://weatherspark.com' },
+  ].filter(t => can(t.cap))
+
+  // Nothing to offer this role: no Tools tile at all.
+  if (!tools.length) return null
 
   const rowCls = 'group/row flex items-center gap-3 w-full px-3 py-2 rounded-xl text-left hover:bg-white/10 transition-colors'
   const rowInner = (t: (typeof tools)[number]) => {
@@ -217,23 +223,23 @@ function SalesTile({ item, active }: { item: Item; active: boolean }) {
  * menu has no meaning on a thumb.
  */
 export function MobileToolBar({
-  isAdmin,
+  can,
   onOpenDiscounts,
   onOpenPaceConverter,
   onOpenSettings,
   activeId,
 }: {
-  isAdmin: boolean
+  can: (c: Capability) => boolean
   onOpenDiscounts: () => void
   onOpenPaceConverter: () => void
   onOpenSettings: () => void
   activeId?: string
 }) {
   const items: Item[] = [
-    ...railItems(isAdmin),
-    { id: 'discounts', label: 'Discounts', icon: Ticket, onClick: onOpenDiscounts, title: 'One-time discount code' },
-    { id: 'pace', label: 'Pace', icon: Calculator, onClick: onOpenPaceConverter, title: 'Finish time to pace' },
-    { id: 'weather', label: 'Weather', icon: CloudSun, href: 'https://weatherspark.com', title: 'Race-day weather on WeatherSpark' },
+    ...railItems(can),
+    ...(can('tools.discounts') ? [{ id: 'discounts', label: 'Discounts', icon: Ticket, onClick: onOpenDiscounts, title: 'One-time discount code' } as Item] : []),
+    ...(can('tools.pace') ? [{ id: 'pace', label: 'Pace', icon: Calculator, onClick: onOpenPaceConverter, title: 'Finish time to pace' } as Item] : []),
+    ...(can('tools.weather') ? [{ id: 'weather', label: 'Weather', icon: CloudSun, href: 'https://weatherspark.com', title: 'Race-day weather on WeatherSpark' } as Item] : []),
     { id: 'settings', label: 'Settings', icon: Settings, onClick: onOpenSettings, title: 'Settings' },
   ]
   return (
@@ -280,31 +286,31 @@ function MobileTile({ item, active }: { item: Item; active?: boolean }) {
 }
 
 /** The places you go. Shared by the desktop rail and the mobile bar. */
-function railItems(isAdmin: boolean): Item[] {
+function railItems(can: (c: Capability) => boolean): Item[] {
   return [
     { id: 'fulfillment', label: 'Fulfillment', icon: Package, to: '/', title: 'Orders to personalize, custom designs and partners' },
     // Creators is admin-only, same as the route behind it. Sales is for anyone
     // on the Attio workspace; the API says no to everyone else.
-    ...(isAdmin ? [{ id: 'creators', label: 'Creators', icon: Users, to: '/creators', title: 'The creator programme' } as Item] : []),
-    { id: 'sales', label: 'Sales', icon: Send, to: '/sales', title: 'Outreach: the emails to send today, read from Attio' },
+    ...(can('creators') ? [{ id: 'creators', label: 'Creators', icon: Users, to: '/creators', title: 'The creator programme' } as Item] : []),
+    ...(can('sales') ? [{ id: 'sales', label: 'Sales', icon: Send, to: '/sales', title: 'Outreach: the emails to send today, read from Attio' } as Item] : []),
   ]
 }
 
 export default function AppSidebar({
-  isAdmin,
+  can,
   onOpenDiscounts,
   onOpenPaceConverter,
   onOpenSettings,
   activeId,
 }: {
-  isAdmin: boolean
+  can: (c: Capability) => boolean
   onOpenDiscounts: () => void
   onOpenPaceConverter: () => void
   onOpenSettings: () => void
   /** Which tile reads as current. 'fulfillment' on the dashboard. */
   activeId?: string
 }) {
-  const items = railItems(isAdmin)
+  const items = railItems(can)
 
   return (
     <aside className="hidden md:flex fixed left-3 top-3 bottom-3 w-[78px] z-30 flex-col rounded-[22px] bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.10)]">
@@ -317,6 +323,7 @@ export default function AppSidebar({
             : <Tile key={item.id} item={item} active={activeId === item.id} />
         ))}
         <ToolsTile
+          can={can}
           active={activeId === 'discounts' || activeId === 'pace'}
           onOpenDiscounts={onOpenDiscounts}
           onOpenPaceConverter={onOpenPaceConverter}

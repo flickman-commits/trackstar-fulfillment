@@ -12,6 +12,7 @@ import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
+import type { Capability } from '@/lib/roles'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
 import { staleBeforeRace } from '@/lib/raceStatus'
@@ -843,22 +844,23 @@ const SETTINGS_NAV: {
   /** Hidden from anyone who is not an admin. The endpoints behind these refuse
       a non-admin session too, so this is presentation, not the enforcement. */
   adminOnly?: boolean
-  items: { id: SettingsPanel; label: string; blurb: string; icon: typeof Settings }[]
+  /** The role permission (src/lib/roles.ts) an item needs; none means everyone. */
+  items: { id: SettingsPanel; label: string; blurb: string; icon: typeof Settings; cap?: Capability }[]
 }[] = [
   {
     group: 'Tools',
     items: [
-      { id: 'pricing', label: 'Pricing Calculator', blurb: 'Costs, retail and margin across DTC and wholesale', icon: DollarSign },
-      { id: 'reviews', label: 'Request Reviews', blurb: 'Copy a review request message for any product', icon: Star },
-      { id: 'stats', label: 'Stats', blurb: 'Gifting rate, add-on take rate and more, from Shopify', icon: BarChart3 },
+      { id: 'pricing', label: 'Pricing Calculator', blurb: 'Costs, retail and margin across DTC and wholesale', icon: DollarSign, cap: 'settings.pricing' },
+      { id: 'reviews', label: 'Request Reviews', blurb: 'Copy a review request message for any product', icon: Star, cap: 'settings.reviews' },
+      { id: 'stats', label: 'Stats', blurb: 'Gifting rate, add-on take rate and more, from Shopify', icon: BarChart3, cap: 'settings.stats' },
     ],
   },
   {
     group: 'Data',
     items: [
-      { id: 'races', label: 'Race Database', blurb: 'Race dates, locations and weather', icon: CloudSun },
-      { id: 'lookup', label: 'Instant Lookup', blurb: 'Which races work, which need help', icon: Search },
-      { id: 'storefront', label: 'Customers Served', blurb: 'The counter shown on the Shopify storefront', icon: Users },
+      { id: 'races', label: 'Race Database', blurb: 'Race dates, locations and weather', icon: CloudSun, cap: 'settings.data' },
+      { id: 'lookup', label: 'Instant Lookup', blurb: 'Which races work, which need help', icon: Search, cap: 'settings.data' },
+      { id: 'storefront', label: 'Customers Served', blurb: 'The counter shown on the Shopify storefront', icon: Users, cap: 'settings.data' },
     ],
   },
   {
@@ -881,7 +883,7 @@ const SETTINGS_NAV: {
 ]
 
 export default function Dashboard() {
-  const { user: currentUser, isAdmin } = useAuth()
+  const { user: currentUser, isAdmin, can } = useAuth()
   // Who is on the team, for the assignee picker, and whether the queue shows
   // only my orders. "mine" is the default for anyone who has orders assigned,
   // so Eli opens the tool to Eli's queue; someone with none sees everything.
@@ -892,7 +894,11 @@ export default function Dashboard() {
   }, [])
   const [searchParams, setSearchParams] = useSearchParams()
   /** The settings nav as this person sees it. Only admins see the Admin group. */
-  const visibleNav = SETTINGS_NAV.filter((g) => !g.adminOnly || isAdmin)
+  // A role sees only its own items; a group with none left disappears.
+  const visibleNav = SETTINGS_NAV
+    .filter((g) => !g.adminOnly || isAdmin)
+    .map((g) => ({ ...g, items: g.items.filter((i) => !i.cap || can(i.cap)) }))
+    .filter((g) => g.items.length > 0)
   const visibleItems = visibleNav.flatMap((g) => g.items)
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -918,6 +924,10 @@ export default function Dashboard() {
   const [bulkSummary, setBulkSummary] = useState<BulkSummary | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>('pricing')
+  // Open on a panel this role can see (a designer has no Pricing Calculator).
+  useEffect(() => {
+    if (!visibleItems.some((i) => i.id === settingsPanel) && visibleItems[0]) setSettingsPanel(visibleItems[0].id)
+  }, [visibleItems, settingsPanel])
   const [settingsQuery, setSettingsQuery] = useState('')
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
   type HealthCheck = { status: 'ok' | 'warn' | 'error'; detail?: string | null; latency?: string }
@@ -3720,14 +3730,14 @@ Thank you!`
                     ))}
                   </div>
 
-                  {settingsPanel === 'pricing' && <PricingCalculator />}
-                  {settingsPanel === 'stats' && <StatsPanel />}
+                  {settingsPanel === 'pricing' && can('settings.pricing') && <PricingCalculator />}
+                  {settingsPanel === 'stats' && can('settings.stats') && <StatsPanel />}
                   {settingsPanel === 'account' && <AccountPanel />}
                   {settingsPanel === 'people' && isAdmin && <PeoplePanel />}
                   {settingsPanel === 'assignments' && isAdmin && <AssignmentPanel />}
                   {settingsPanel === 'activity' && isAdmin && <ActivityPanel />}
 
-                  {settingsPanel === 'reviews' && (
+                  {settingsPanel === 'reviews' && can('settings.reviews') && (
                     <div>
                       {REVIEW_PRODUCTS.map((product) => (
                         <button
@@ -3760,9 +3770,9 @@ Thank you!`
                     </div>
                   )}
 
-                  {settingsPanel === 'lookup' && <LookupHealthPanel embedded />}
+                  {settingsPanel === 'lookup' && can('settings.data') && <LookupHealthPanel embedded />}
 
-                  {settingsPanel === 'races' && (
+                  {settingsPanel === 'races' && can('settings.data') && (
                     <div className="flex flex-col min-h-0">
                   <div className="flex-shrink-0 space-y-3 pb-4">
                     <div className="flex items-center justify-between">
@@ -4147,7 +4157,7 @@ Thank you!`
                     </div>
                   )}
 
-                  {settingsPanel === 'storefront' && (
+                  {settingsPanel === 'storefront' && can('settings.data') && (
                     <div className="space-y-4">
                 {/* Customers Served Counter */}
                 <div>

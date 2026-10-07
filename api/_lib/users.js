@@ -5,26 +5,25 @@
  * memory-hard KDF rather than a bare hash, so a stolen database is not a
  * stolen password list.
  *
- * Roles are two: `admin` can do the irreversible things and manage people,
- * `staff` does the day to day work. The stored value stays "staff" while the
- * UI calls it "Team member": it is baked into every issued session token, so
- * renaming it would sign everyone out to change a word only the screen shows. Anything not explicitly marked destructive
- * is open to both, because inventing a permission matrix nobody has asked for
- * makes the tool harder to use without making it safer.
+ * Roles are four (roles.js): `admin` does the irreversible things and manages
+ * people; `sales`, `fulfillment` and `designer` each see the parts of the tool
+ * their work needs. A stored "staff" from before roles reads as designer.
+ * What a role may do is checked against the database on every request
+ * (requireCapability), so a changed role applies without signing anyone out.
  */
 
 import crypto from 'crypto'
 import prisma from './prisma.js'
 import { requireAdmin } from './auth.js'
+import { ROLE_LABEL, normalizeRole, can } from './roles.js'
 
-export const ROLES = ['admin', 'staff']
+export { ROLES } from './roles.js'
 
 /**
  * What a role is called in anything a person reads - audit summaries, errors.
- * The stored value stays "staff"; only the wording changes.
  */
 export function roleLabel(role) {
-  return role === 'admin' ? 'admin' : 'team member'
+  return (ROLE_LABEL[normalizeRole(role)] || 'team member').toLowerCase()
 }
 
 /** "Matt Hickman", or just "Matt" when no last name is set. */
@@ -106,6 +105,25 @@ export async function requireAdminRole(req, res, actor) {
 }
 
 /**
+ * Signed in, active, and allowed this part of the app by their role (see
+ * roles.js). Reads the role from the database, so a change takes effect at
+ * once rather than at the next sign-in. Responds 401/403 and returns null on
+ * failure; returns the user otherwise.
+ */
+export async function requireCapability(req, res, capability) {
+  const actor = requireAdmin(req, res)
+  if (!actor) return null
+  const user = await loadActiveUser(actor)
+  if (!user) {
+    res.status(401).json({ error: 'Your account is no longer active. Sign in again.' })
+    return null
+  }
+  if (user.isSystem || can(user.role, capability)) return user
+  res.status(403).json({ error: 'That is not part of your role. Ask Matt if you need it.', code: 'not_allowed' })
+  return null
+}
+
+/**
  * Authenticate AND require the admin role, in one call.
  *
  * `requireAdmin` is a misnomer inherited from when this app had one shared
@@ -138,6 +156,10 @@ export async function requireSalesRep(req, res) {
     return null
   }
   if (user.role === 'admin' || user.isSystem) return user
+  if (!can(user.role, 'sales')) {
+    res.status(403).json({ error: 'Sales is not part of your role. Ask Matt if you need it.', code: 'not_a_rep' })
+    return null
+  }
   try {
     const { memberForEmail, isAttioConfigured } = await import('../../server/domain/sales/attio.js')
     if (isAttioConfigured() && await memberForEmail(user.email)) return user

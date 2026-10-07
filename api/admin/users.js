@@ -124,7 +124,7 @@ export default async function handler(req, res) {
         // can correct it from My Account once they accept the invite.
         const firstName = String(body.firstName || '').trim() || email.split('@')[0]
         const lastName = String(body.lastName || '').trim()
-        const role = ROLES.includes(body.role) ? body.role : 'staff'
+        const role = ROLES.includes(body.role) ? body.role : 'designer'
         if (!isValidEmail(email)) return res.status(400).json({ error: 'Enter a valid email address' })
 
         const existing = await prisma.user.findUnique({ where: { email } })

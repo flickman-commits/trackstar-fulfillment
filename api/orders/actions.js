@@ -30,7 +30,7 @@ import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
 import { setCors, requireAdmin, isCronRequest } from '../_lib/auth.js'
-import { requireAdminRole, recordAudit } from '../_lib/users.js'
+import { requireAdminRole, requireCapability, recordAudit } from '../_lib/users.js'
 import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
 import { shopifyFetch, shopifyGraphQL } from '../../server/services/shopifyAuth.js'
@@ -123,15 +123,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ shorthands: { ...defaults, ...overrides }, overrides })
     }
     if (action === 'creator-home-metrics') {
-      if (!requireAdmin(req, res)) return
+      if (!(await requireCapability(req, res, 'creators'))) return
       return await handleCreatorHomeMetrics(res)
     }
     if (action === 'list-creators') {
-      if (!requireAdmin(req, res)) return
+      if (!(await requireCapability(req, res, 'creators'))) return
       return await handleListCreators(res)
     }
     if (action === 'list-briefs') {
-      if (!requireAdmin(req, res)) return
+      if (!(await requireCapability(req, res, 'creators'))) return
       return await handleListBriefs(res)
     }
     if (action === 'creator-portal-data') {
@@ -196,6 +196,15 @@ export default async function handler(req, res) {
       actor = requireAdmin(req, res)
       if (!actor) return
     }
+
+    // Role gates (api/_lib/roles.js): the creator programme and discount codes
+    // belong to some roles only. Read fresh from the database.
+    const CAPABILITY_FOR = {
+      'update-creator': 'creators', 'create-brief': 'creators', 'update-brief': 'creators', 'create-creator-invite': 'creators',
+      'approve-creator-sample': 'creators', 'decline-creator-sample': 'creators', 'set-creator-sample-tracking': 'creators',
+      'create-discount': 'tools.discounts',
+    }
+    if (CAPABILITY_FOR[action] && !(await requireCapability(req, res, CAPABILITY_FOR[action]))) return
 
     // Actions that throw work away, spend money, or reach a customer. These
     // re-check the database for an active admin rather than trusting the

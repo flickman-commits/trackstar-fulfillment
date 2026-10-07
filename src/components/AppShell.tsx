@@ -24,7 +24,7 @@ import StandardTools from '@/components/StandardTools'
  * where all of those settings act anyway.
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { isAdmin } = useAuth()
+  const { can } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const [railPanel, setRailPanel] = useState<null | 'discounts' | 'pace'>(null)
@@ -54,14 +54,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     // bottom on a phone, so neither covers the page's own content.
     <div className="md:pl-[92px] pb-[92px] md:pb-0">
       <MobileToolBar
-        isAdmin={isAdmin}
+        can={can}
         activeId={activeId}
         onOpenDiscounts={() => setRailPanel(p => (p === 'discounts' ? null : 'discounts'))}
         onOpenPaceConverter={() => setRailPanel(p => (p === 'pace' ? null : 'pace'))}
         onOpenSettings={openSettings}
       />
       <AppSidebar
-        isAdmin={isAdmin}
+        can={can}
         activeId={activeId}
         onOpenDiscounts={() => setRailPanel(p => (p === 'discounts' ? null : 'discounts'))}
         onOpenPaceConverter={() => setRailPanel(p => (p === 'pace' ? null : 'pace'))}

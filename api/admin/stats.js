@@ -5,12 +5,13 @@
  * orders. Adding a metric means adding one entry to METRICS in
  * server/services/shopifyStats.js; this endpoint returns whatever is there.
  */
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors } from '../_lib/auth.js'
 import { computeStats, RANGES } from '../../server/services/shopifyStats.js'
+import { requireCapability } from '../_lib/users.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  if (!(await requireCapability(req, res, 'settings.stats'))) return
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
