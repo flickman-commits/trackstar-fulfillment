@@ -709,6 +709,7 @@ model User {
   assignedBulkOrders BulkOrder[] @relation("BulkAssignee")
   editBatches  ProductEditBatch[]
   auditEvents  AuditEvent[]
+  apiKeys      ApiKey[]
 
   @@index([email])
 }
@@ -832,4 +833,28 @@ model SalesSkip {
   reason      String?
   byEmail     String?
   createdAt   DateTime @default(now())
+}
+
+// A credential for reaching the tool from outside: the MCP server (Claude on
+// a phone, the nightly routine) and anything else that integrates. The
+// secret is shown once and only its hash is kept. A key acts as a person
+// (userId) and can do no more than that person's role allows, narrowed
+// further by its scopes; a key with no person is a service key for a
+// routine and can only read or repair. Revoked keys are kept for the record.
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String                 // "Matt's phone", "Nightly sweep"
+  prefix      String                 // First characters of the secret, to tell keys apart
+  hash        String    @unique      // sha256 of the secret
+  scopes      String[]               // read | write | admin | repair
+  userId      String?
+  createdById String?
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

@@ -5,6 +5,7 @@ import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shippin
 import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
 import { getProductInfo, loadProductCatalog } from '../../server/lib/productCatalog.js'
 import { isRushAddonLineItem, isRemovedLineItem } from '../../server/lib/lineItemMatching.js'
+import { shopifyAdminUrl } from '../../server/lib/links.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 
 
@@ -108,13 +109,6 @@ export async function rawSlice(ids) {
             THEN "arteloOrderData"::jsonb->'orderItems' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(x, n))) AS a
     FROM "Order" WHERE id = ANY(${ids})`
   return new Map(rows.map(r => [r.id, r]))
-}
-
-/** The order's page in Shopify admin, or null when it is not a Shopify order. */
-function shopifyAdminUrl(shopifyOrderId) {
-  const handle = String(process.env.SHOPIFY_STORE || '').replace(/\.myshopify\.com$/, '').trim()
-  if (!shopifyOrderId || !handle) return null
-  return `https://admin.shopify.com/store/${handle}/orders/${shopifyOrderId}`
 }
 
 /** A print carries "Rush Order: Yes" but the order has no rush add-on line. */

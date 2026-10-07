@@ -65,12 +65,12 @@ const routes = [
   { method: 'put',    path: '/api/admin/roles',            handler: '../api/admin/roles.js' },
   // Nightly health sweep (cron runs it; admins can pull the JSON any time)
   { method: 'get',    path: '/api/admin/nightly-sweep',    handler: '../api/admin/nightly-sweep.js' },
-  // Trackstar MCP. paramAdapter copies :token into req.query, matching how
-  // Vercel resolves the [token] dynamic segment.
+  // Trackstar MCP (API keys: Settings > Admin > API Keys).
   { method: 'get',    path: '/api/mcp',                    handler: '../api/mcp/index.js' },
   { method: 'post',   path: '/api/mcp',                    handler: '../api/mcp/index.js' },
-  { method: 'get',    path: '/api/mcp/:token',             handler: '../api/mcp/[token].js', paramAdapter: true },
-  { method: 'post',   path: '/api/mcp/:token',             handler: '../api/mcp/[token].js', paramAdapter: true },
+  { method: 'get',    path: '/api/admin/api-keys',         handler: '../api/admin/api-keys.js' },
+  { method: 'post',   path: '/api/admin/api-keys',         handler: '../api/admin/api-keys.js' },
+  { method: 'delete', path: '/api/admin/api-keys',         handler: '../api/admin/api-keys.js' },
   { method: 'post',   path: '/api/admin/nightly-sweep',    handler: '../api/admin/nightly-sweep.js' },
   // Proofs & Approval
   { method: 'get',    path: '/api/proofs',                 handler: '../api/proofs/index.js' },
