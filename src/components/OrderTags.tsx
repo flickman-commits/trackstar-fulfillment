@@ -141,7 +141,7 @@ export function raceNotRunYet(o: TaggableOrder): boolean {
 function researchTag(o: TaggableOrder): OrderTag | null {
   // A future race has no results to find. This also rescues orders that were
   // researched before we checked for it and got stamped "not found".
-  if (o.researchStatus === 'race_not_run' || (staleBeforeRace(o.researchStatus) && raceNotRunYet(o))) {
+  if (o.researchStatus === 'race_not_run' || ((!o.researchStatus || staleBeforeRace(o.researchStatus)) && raceNotRunYet(o))) {
     return { key: 'race-not-run', label: 'Race not run yet', tone: 'blue',
       title: 'This race has not happened yet, so there are no results to look up. Come back after race day.' }
   }
@@ -249,7 +249,16 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
     }
   }
 
-  return tags.sort((a, b) =>
+  // A race that has not happened has one thing to say: wait. "Needs research"
+  // (from the customer's checkout lookup, which found nothing because there
+  // was nothing yet), "Year missing" and the rest are all noise until race
+  // day, so only the wait, the photo and the priority flags stay. Everything
+  // comes back on its own once the date passes.
+  const shown = research?.key === 'race-not-run'
+    ? tags.filter(t => ['race-not-run', 'photo', 'expedited', 'big-spender'].includes(t.key))
+    : tags
+
+  return shown.sort((a, b) =>
     (a.weight ?? TONE_WEIGHT[a.tone]) - (b.weight ?? TONE_WEIGHT[b.tone]))
 }
 
