@@ -153,6 +153,43 @@ function buildMatchMapByScore(arteloItems, upstreamItems, scoreSizeMatchFns) {
   return result
 }
 
+const propOf = (li, name) => (li?.properties || []).find(p => p?.name === name)?.value
+
+/**
+ * The photo add-on names its print (`_addon_for`, the print's title) and
+ * carries the photo path. Some storefront versions write `_photo_path` on
+ * the print as well; others only on the add-on (order 4053), and reading the
+ * print alone lost the photo. This copies the add-on's path onto the print
+ * it names (or the only print, when it names none) when the print has none.
+ * Returns the same array when there is nothing to copy.
+ */
+export function withAddonPhotos(lineItems) {
+  if (!Array.isArray(lineItems)) return lineItems
+  const addons = lineItems.filter(li => isPhotoAddonLineItem(li) && !isRemovedLineItem(li) && propOf(li, '_photo_path'))
+  if (!addons.length) return lineItems
+  const out = lineItems.map(li => li)
+  const prints = () => out.map((li, i) => ({ li, i })).filter(({ li }) => !isAddonLineItem(li) && !isRemovedLineItem(li))
+  for (const addon of addons) {
+    const forTitle = String(propOf(addon, '_addon_for') || '').trim().toLowerCase()
+    const open = prints().filter(({ li }) => !propOf(li, '_photo_path'))
+    const target = forTitle
+      ? open.find(({ li }) => String(li.title || '').trim().toLowerCase() === forTitle)
+      : (prints().length === 1 ? open[0] : null)
+    if (!target) continue
+    out[target.i] = { ...target.li, properties: [...(target.li.properties || []), { name: '_photo_path', value: propOf(addon, '_photo_path') }] }
+  }
+  return out
+}
+
+/**
+ * Everything the storefront and order edits scatter across lines, put back
+ * on the print it belongs to: personalization carried over an edit, then the
+ * photo from its add-on. Use on every Shopify order before reading it.
+ */
+export function normalizeShopifyLines(lineItems) {
+  return withAddonPhotos(carryEditedProperties(lineItems))
+}
+
 /**
  * Build mapping from Artelo line-item index → Shopify line-item index.
  * Returns an array `map` where `map[arteloIdx] = shopifyIdx | -1`.

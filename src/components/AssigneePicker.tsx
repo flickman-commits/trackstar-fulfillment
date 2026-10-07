@@ -99,13 +99,13 @@ export function QueuePill({ people, team }: { people?: QueueMember[]; team: Team
   if (!shown.length) return null
   const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
   return (
-    <div className="hidden md:flex flex-col items-end gap-1">
+    <div className="hidden md:flex flex-col items-end gap-1 whitespace-nowrap">
       <span className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Current Team</span>
       <div className="flex items-center gap-1.5">
         {shown.map(p => {
           const facts = [
             shown.length > 1 && p.share != null ? `${p.share}%` : null,
-            p.open != null ? `${p.open} open` : null,
+            p.open != null ? `${p.open} order${p.open === 1 ? '' : 's'}` : null,
           ].filter(Boolean).join(' · ')
           return (
             <span

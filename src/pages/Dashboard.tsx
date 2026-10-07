@@ -895,9 +895,10 @@ export default function Dashboard() {
   // Who new orders of each type go to today (regular, plus any help on a shift).
   const [queues, setQueues] = useState<Record<string, QueueMember[]>>({})
   const [scope, setScope] = useState<'mine' | 'all' | null>(null)
-  useEffect(() => {
+  const loadTeam = useCallback(() => {
     apiFetch('/api/orders/assign').then(r => r.ok ? r.json() : null).then(d => { if (d?.users) setTeam(d.users); if (d?.queues) setQueues(d.queues) }).catch(() => {})
   }, [])
+  useEffect(() => { loadTeam() }, [loadTeam])
   const [searchParams, setSearchParams] = useSearchParams()
   /** The settings nav as this person sees it. Only admins see the Admin group. */
   // A role sees only its own items; a group with none left disappears.
@@ -1205,6 +1206,14 @@ export default function Dashboard() {
       setIsLoading(false)
     }
   }, [activeView])
+
+  // Order Assignment changed who has what (help added or ended, the order
+  // list spread): reload the list and Current Team so nobody has to refresh.
+  useEffect(() => {
+    const onChanged = () => { fetchOrders(); loadTeam() }
+    window.addEventListener('trackstar:orders-changed', onChanged)
+    return () => window.removeEventListener('trackstar:orders-changed', onChanged)
+  }, [fetchOrders, loadTeam])
 
   // Create a new race-partner "order" (used to send proof links to race orgs)
   const createRacePartner = async () => {
@@ -2778,6 +2787,15 @@ Thank you!`
                 : `Research queue (${bulkResearchEligible.length})`}
           </button>
         )}
+        {(activeView === 'race_partner' || activeView === 'bulk') && (
+          <button
+            onClick={() => activeView === 'bulk' ? setBulkCreating(true) : setShowNewRacePartner(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 md:px-5 py-2.5 md:py-3 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium text-sm whitespace-nowrap"
+          >
+            {activeView === 'bulk' ? <Plus className="w-4 h-4" /> : <ImagePlus className="w-4 h-4" />}
+            {activeView === 'bulk' ? 'New Bulk Order' : 'New Partner'}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -2807,27 +2825,13 @@ Thank you!`
             </div>
           </div>
 
-          {/* Right side: primary actions, right-aligned */}
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex items-center gap-2">
-              {(activeView === 'race_partner' || activeView === 'bulk') && (
-                <button
-                  onClick={() => activeView === 'bulk' ? setBulkCreating(true) : setShowNewRacePartner(true)}
-                  className="inline-flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium text-xs md:text-sm whitespace-nowrap"
-                >
-                  {activeView === 'bulk' ? <Plus className="w-4 h-4" /> : <ImagePlus className="w-4 h-4" />}
-                  {activeView === 'bulk' ? 'New Bulk Order' : 'New Partner'}
-                </button>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Orders to Personalize Section */}
         {!isLoading && (
         <section className="flex-1 flex flex-col min-h-0 pb-4">
           {/* Section Header */}
-          <div className="flex items-center md:items-end justify-between mb-3 md:mb-4 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
             <div>
             <div className="flex items-center gap-3 md:gap-6">
               <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
@@ -2875,8 +2879,9 @@ Thank you!`
                 separate actions, and grouping them says so. Matches the channel
                 switcher in the pricing panel. Mobile keeps its dropdown, which
                 is the right control when the options do not fit side by side. */}
-            <div className="hidden md:flex flex-col items-end gap-2.5">
-            <QueuePill people={queues[activeView]} team={team} />
+            <div className="hidden md:block relative">
+            {/* Floats above the switcher so the header keeps its height. */}
+            <div className="absolute bottom-full right-0 mb-2.5"><QueuePill people={queues[activeView]} team={team} /></div>
             <div className={`inline-flex ${segmentGroup}`}>
               {([
                 ['standard', 'Standard'],
@@ -4475,7 +4480,7 @@ Thank you!`
               }
             }}
           >
-            <div className={`bg-white rounded-none md:rounded-md ${selectedOrder.trackstarOrderType === 'race_partner' ? 'max-w-xl' : 'max-w-[45rem]'} w-full max-h-[90vh] overflow-y-auto shadow-xl`} onClick={(e) => e.stopPropagation()}>
+            <div className={`bg-white rounded-none md:rounded-md max-w-[45rem] w-full max-h-[90vh] overflow-y-auto shadow-xl`} onClick={(e) => e.stopPropagation()}>
               <div className="p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">

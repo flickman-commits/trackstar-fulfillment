@@ -87,3 +87,12 @@ test('a replacement that already has its own row is not flagged as removed', asy
   assert.deepEqual(out, { moved: 0, flagged: 0 })
   assert.equal(db.rows[0].status, 'ready')
 })
+
+test('a photo that is only on the add-on lands on the print it names (order 4053)', async () => {
+  const { withAddonPhotos } = await import('./lineItemMatching.js')
+  const print = { id: 1, product_id: 5, title: 'Berlin Marathon Personalized Race Print', current_quantity: 1, properties: [{ name: 'Runner Name (First & Last)', value: 'Charles Bunge' }] }
+  const addon = { id: 2, product_id: 10329625723163, title: 'Photo Add-On', current_quantity: 1, properties: [{ name: '_photo_path', value: '2026-10-05/x.jpg' }, { name: '_addon_for', value: 'Berlin Marathon Personalized Race Print' }] }
+  const out = withAddonPhotos([print, addon])
+  assert.equal(out[0].properties.find(p => p.name === '_photo_path').value, '2026-10-05/x.jpg')
+  assert.equal(withAddonPhotos([{ ...print, properties: [...print.properties, { name: '_photo_path', value: 'own.jpg' }] }, addon])[0].properties.find(p => p.name === '_photo_path').value, 'own.jpg')
+})

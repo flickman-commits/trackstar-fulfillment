@@ -74,6 +74,8 @@ export default function AssignmentPanel() {
       const res = await apiFetch('/api/orders/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Could not save')
+      // The dashboard behind Settings reloads its order list and Current Team.
+      window.dispatchEvent(new Event('trackstar:orders-changed'))
       return d
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not save')

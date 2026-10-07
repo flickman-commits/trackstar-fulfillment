@@ -23,7 +23,7 @@ import { parseRaceNameFromTitle } from './scrapers/raceNameNormalization.js'
 import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrderIds, saveCountedOrderIds } from './services/customersServed.js'
 import { isExpeditedShipping, getShippingMethod } from './lib/shipping.js'
 import { fetchWithTimeout } from './lib/fetchWithTimeout.js'
-import { buildShopifyMatchMap, buildEtsyMatchMap, isRushAddonLineItem, isRemovedLineItem, carryEditedProperties } from './lib/lineItemMatching.js'
+import { buildShopifyMatchMap, buildEtsyMatchMap, isRushAddonLineItem, isRemovedLineItem, normalizeShopifyLines } from './lib/lineItemMatching.js'
 import { assigneeForNewOrder, isAutoAssignee, endExpiredShifts } from './domain/orders/assignment.js'
 
 // Artelo API configuration
@@ -347,9 +347,10 @@ async function fetchShopifyOrderData(shopifyOrderId) {
     if (!data.order?.line_items?.length) {
       return null
     }
-    // An order edited after purchase (a frame added) has a bare new line and
-    // the personalization on the removed one; see carryEditedProperties.
-    const order = { ...data.order, line_items: carryEditedProperties(data.order.line_items) }
+    // Put scattered details back on their print: personalization left on a
+    // line removed by an order edit, and a photo that is only on its add-on.
+    // See normalizeShopifyLines.
+    const order = { ...data.order, line_items: normalizeShopifyLines(data.order.line_items) }
 
     // Fetch timeline comments (internal notes) - shared across all line items
     const comments = await fetchShopifyComments(shopifyOrderId)

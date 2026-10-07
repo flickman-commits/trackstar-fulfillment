@@ -20,7 +20,7 @@ import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { shopifyFetch } from '../../server/services/shopifyAuth.js'
 import { parseRaceNameFromTitle } from '../../server/scrapers/raceNameNormalization.js'
-import { resolveShopifyLineIndex, carryEditedProperties } from '../../server/lib/lineItemMatching.js'
+import { resolveShopifyLineIndex, normalizeShopifyLines } from '../../server/lib/lineItemMatching.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -59,7 +59,7 @@ async function refreshOrderFromShopify(shopifyOrderId) {
   const data = await shopifyFetch(`/orders/${shopifyOrderId}.json`)
   if (!data.order) return null
   // Order edits: the personalization rides from a removed line to its replacement.
-  const shopifyOrder = { ...data.order, line_items: carryEditedProperties(data.order.line_items) }
+  const shopifyOrder = { ...data.order, line_items: normalizeShopifyLines(data.order.line_items) }
 
   const parsed = extractShopifyData(shopifyOrder.line_items)
   const notes = await fetchShopifyComments(shopifyOrderId)
