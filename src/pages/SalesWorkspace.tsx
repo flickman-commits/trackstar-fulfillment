@@ -408,6 +408,9 @@ function Sequences({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
 
 // ── Variables ────────────────────────────────────────────────────────────────
 
+/** Built-ins that are not read from the deal: the opener you write, and your own name. */
+const PER_EMAIL = new Set(['First line', 'Your name'])
+
 function Variables({ ws, reload }: { ws: Workspace; reload: () => Promise<void> }) {
   const [rows, setRows] = useState<CustomVariable[]>(ws.variables.map(v => ({ ...v })))
   const [saving, setSaving] = useState(false)
@@ -429,7 +432,7 @@ function Variables({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
               ? <button onClick={save} disabled={saving} className={`${btnPrimary} px-4 py-2`}>{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save</button>
               : <span className="text-xs text-off-black/45">All saved</span>}
           </div>
-          <p className="text-sm text-off-black/55 mb-3">Text you set once and use in any template as [Name]. Change it here and every template that uses it changes with it. These are yours to edit; the ones below are filled in by the tool from Attio and your profile, so that list does not change.</p>
+          <p className="text-sm text-off-black/55 mb-3">Text you set once and use in any template as [Name]. Change it here and every template that uses it changes with it. These are the ones you add here; the ones below come from Attio and your profile.</p>
           <div className="space-y-2">
             {rows.map((r, i) => (
               <div key={i} className="grid grid-cols-[200px_1fr_auto] gap-2 items-start">
@@ -449,17 +452,22 @@ function Variables({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
           <button onClick={() => setRows([...rows, { name: '', value: '' }])} className={`${btnSecondary} mt-3`}><Plus className="w-3.5 h-3.5" /> Add variable</button>
         </section>
 
-        <section>
-          <h2 className={`${sectionLabel} mb-2`}>Filled by the tool</h2>
-          <div className="rounded-lg border border-border-gray divide-y divide-border-gray">
-            {ws.builtIn.map(([name, what]) => (
-              <div key={name} className="grid grid-cols-[200px_1fr] gap-3 px-4 py-2.5 text-sm">
-                <span className="font-medium text-off-black">[{name}]</span>
-                <span className="text-off-black/60">{what}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+        {([
+          ['Filled from the Attio deal', ws.builtIn.filter(([n]) => !PER_EMAIL.has(n))],
+          ['Filled by you or your profile', ws.builtIn.filter(([n]) => PER_EMAIL.has(n))],
+        ] as const).map(([title, list]) => list.length > 0 && (
+          <section key={title}>
+            <h2 className={`${sectionLabel} mb-2`}>{title}</h2>
+            <div className="rounded-lg border border-border-gray divide-y divide-border-gray">
+              {list.map(([name, what]) => (
+                <div key={name} className="grid grid-cols-[200px_1fr] gap-3 px-4 py-2.5 text-sm">
+                  <span className="font-medium text-off-black">[{name}]</span>
+                  <span className="text-off-black/60">{what}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </div>
   )
