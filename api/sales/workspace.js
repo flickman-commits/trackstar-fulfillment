@@ -10,6 +10,7 @@
 import { setCors } from '../_lib/auth.js'
 import { requireSalesRep, recordAudit } from '../_lib/users.js'
 import { loadWorkspace, saveSequence, saveVariables, BUILT_IN_VARIABLES, PIPELINES } from '../../server/domain/sales/sequences.js'
+import { getSenderFor } from '../../server/domain/sales/settings.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -17,8 +18,9 @@ export default async function handler(req, res) {
   if (!actor) return
   try {
     if (req.method === 'GET') {
-      const { sequences, variables, templates } = await loadWorkspace({ force: true })
-      return res.status(200).json({ sequences, variables, templates, builtIn: BUILT_IN_VARIABLES, pipelines: PIPELINES })
+      const [{ sequences, variables, templates }, sender] = await Promise.all([loadWorkspace({ force: true }), getSenderFor(actor.id, actor)])
+      // The signature, so the template editor shows the email as it will go out.
+      return res.status(200).json({ sequences, variables, templates, builtIn: BUILT_IN_VARIABLES, pipelines: PIPELINES, signature: sender.signature || '' })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})

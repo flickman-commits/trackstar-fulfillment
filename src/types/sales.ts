@@ -160,6 +160,8 @@ export interface DraftResult {
   variants: Variant[]
   personId: string
   dealId: string
+  /** Library files the sequence step's template carries. */
+  templateAssetIds?: string[]
   model: string
   /** Who wrote it: a model now, or the cadence template. */
   source?: 'model' | 'template'

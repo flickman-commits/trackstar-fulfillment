@@ -139,14 +139,20 @@ async function write(list) {
  * Add or change one template. No id adds it. An empty subject means "reply
  * on the thread" and keeps whatever subject the draft has. Dashes are
  * refused here as in a draft, since one would go out in every email.
+ * `assetIds` are library files (mockups, a deck) attached whenever the
+ * template is used; a P.S. is just a paragraph starting "P.S." in the body,
+ * which the send puts under the signature.
  */
-export async function saveTemplate({ id, name, motion, useFor, subject, body }, actor) {
+const MAX_TEMPLATE_ASSETS = 6
+
+export async function saveTemplate({ id, name, motion, useFor, subject, body, assetIds }, actor) {
   const clean = {
     name: String(name || '').trim().slice(0, 120),
     motion: MOTIONS.includes(motion) ? motion : 'Any',
     useFor: String(useFor || '').trim().slice(0, 300) || null,
     subject: String(subject || '').trim().slice(0, 200) || null,
     body: String(body || '').replace(/\r\n/g, '\n').replace(/\[One-liner\]/g, '[First line]').trim().slice(0, 6000),
+    assetIds: [...new Set((Array.isArray(assetIds) ? assetIds : []).map(String).filter(Boolean))].slice(0, MAX_TEMPLATE_ASSETS),
   }
   if (!clean.name) throw new Error('Give the template a name')
   if (!clean.body) throw new Error('The template needs a body')

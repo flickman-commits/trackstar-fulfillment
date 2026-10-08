@@ -79,6 +79,7 @@ export function menuFor(templates: LibraryTemplate[], deal: Deal, person: Person
       title: t.name,
       useFor: t.useFor,
       notes: t.notes,
+      assetIds: t.assetIds,
       subject: t.subject ? fillText(t.subject, deal, person, fill) : null,
       body: fillText(t.body, deal, person, fill),
     }))

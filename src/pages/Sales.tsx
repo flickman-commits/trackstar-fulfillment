@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, ExternalLink, PenLine, Search, Loader2 } from 'lucide-react'
+import { Mail, SlidersHorizontal, BarChart3, Check, RefreshCw, PenLine, Search, Loader2 } from 'lucide-react'
 import { salesApi, SalesApiError, type DealHit } from '@/lib/salesApi'
 import {
   btnSecondary, btnHero, btnHeroSecondary, pageShell,
-  segment, segmentGroup, listCard, listToolbar, toolbarInput, textLink,
+  segment, segmentGroup, listCard, listToolbar, toolbarInput,
 } from '@/lib/ui'
 import type { ScheduledEmail, Asset, Deal, DraftResult, Motion, Person, SalesStatus, TodayPayload, Variant } from '@/types/sales'
 import Queue, { type QueueMode } from '@/components/sales/Queue'
@@ -19,6 +19,7 @@ import SettingsModal from '@/components/sales/SettingsModal'
 import ProgressModal from '@/components/sales/ProgressModal'
 import NewEmail from '@/components/sales/NewEmail'
 import LoadingStars from '@/components/sales/LoadingStars'
+import SentEmail from '@/components/sales/SentEmail'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 
 /**
@@ -456,14 +457,18 @@ export default function Sales({ active = true }: { active?: boolean }) {
   // A charity first touch has to carry an example, so put the library's pick
   // in as a normal attachment the moment the draft says it is touch 1. It is
   // a chip like any other: removable, and nothing is added behind your back.
+  // A sequence step's template can carry its own images: those go in the
+  // same way, once per deal, and win over the library's pick.
   useEffect(() => {
     if (!deal || !current?.draft || seeded.current.has(deal.id)) return
+    const fromTemplate = (current.draft.templateAssetIds || []).filter(id => assets.some(a => a.id === id))
     const needsImage = deal.pipeline === 'CHARITY' && current.draft.touchNumber === 1
-    if (!needsImage || !suggested) return
+    if (!fromTemplate.length && (!needsImage || !suggested)) return
     // Once per deal, so taking the chip off keeps it off.
     seeded.current.add(deal.id)
-    setAttached(prev => (prev[deal.id]?.length ? prev : { ...prev, [deal.id]: [suggested.id] }))
-  }, [deal, current?.draft, suggested])
+    const ids = fromTemplate.length ? fromTemplate : [suggested!.id]
+    setAttached(prev => (prev[deal.id]?.length ? prev : { ...prev, [deal.id]: ids }))
+  }, [deal, current?.draft, suggested, assets])
 
   const rewrite = () => { if (deal && !deal.id.startsWith('adhoc:')) prepare({ ...deal, exhausted: adhoc ? false : deal.exhausted }, { silent: false, force: true, personId }) }
   const revise = async (instruction: string) => {
@@ -479,6 +484,12 @@ export default function Sales({ active = true }: { active?: boolean }) {
     if (!deal) return
     const k = deal.id
     setAttached(prev => ({ ...prev, [k]: [...new Set([...(prev[k] || []), a.id])] }))
+  }
+  const attachIds = (ids: string[]) => {
+    if (!deal) return
+    const k = deal.id
+    const known = ids.filter(id => assets.some(a => a.id === id))
+    if (known.length) setAttached(prev => ({ ...prev, [k]: [...new Set([...(prev[k] || []), ...known])] }))
   }
   const detach = (id: string) => {
     if (!deal) return
@@ -579,15 +590,8 @@ export default function Sales({ active = true }: { active?: boolean }) {
                     </p>
                   </div>
                 </div>
-              ) : isSent && selected ? (
-                <div className="flex-1 min-w-0 flex items-center justify-center min-h-[320px]">
-                  <div className="text-center px-6">
-                    <Check className="w-6 h-6 mx-auto text-success-green mb-2" />
-                    <div className="text-lg font-bold text-off-black">Sent{selected.sentAt ? ` at ${new Date(selected.sentAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}</div>
-                    <p className="text-sm text-off-black/60 mt-1">The next touch is on the clock in Attio. It comes back under Follow Ups when it is due.</p>
-                    {selected.webUrl && <a href={selected.webUrl} target="_blank" rel="noopener noreferrer" className={`${textLink} mt-3`}>Open in Attio <ExternalLink className="w-3 h-3" /></a>}
-                  </div>
-                </div>
+              ) : isSent && selected && deal ? (
+                <SentEmail deal={deal} sentAt={selected.sentAt} signature={status?.signature} assets={assets} />
               ) : (
                 <Composer
                   deal={deal} person={person} draft={current?.draft || null}
@@ -598,7 +602,7 @@ export default function Sales({ active = true }: { active?: boolean }) {
                   attachments={attachedAssets} onAttach={attach} onDetach={detach}
                   onChange={updateVariant}
                   onPrev={() => setVariantIndex(i => Math.max(0, i - 1))} onNext={() => setVariantIndex(i => Math.min(variants.length - 1, i + 1))}
-                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} onRemove={remove} onUnskip={unskip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library} onSchedule={schedule} onTemplateSaved={loadLibrary}
+                  onRewrite={rewrite} onRevise={revise} onSend={send} onSkip={skip} onRemove={remove} onUnskip={unskip} adhoc={Boolean(adhoc)} signature={status?.signature} library={library} onSchedule={schedule} onTemplateSaved={loadLibrary} onAttachIds={attachIds}
                 />
               )}
 

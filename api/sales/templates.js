@@ -2,7 +2,7 @@
  * /api/sales/templates
  *
  *   GET                        the library as stored, plus what the browser needs to fill one in
- *   POST { action:'save', id?, name, motion, useFor?, subject?, body }   any sales rep: add or change one
+ *   POST { action:'save', id?, name, motion, useFor?, subject?, body, assetIds? }   any sales rep: add or change one
  *   POST { action:'delete', id }                                          admin: remove one
  *   POST { action:'add-note', id, text, from? }                           any sales rep: a note beside a template
  *   POST { action:'delete-note', id, noteId }                             any sales rep: remove one

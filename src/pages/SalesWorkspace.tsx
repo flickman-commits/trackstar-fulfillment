@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowDown, ArrowUp, Braces, Loader2, Plus, Search, StickyNote, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Braces, FileText, ImagePlus, Loader2, Plus, Search, StickyNote, Trash2, X } from 'lucide-react'
 import {
   btnPrimary, btnSecondary, btnGhost, inputBase, fieldLabel, cardLabel, sectionLabel, segment, segmentGroup,
   pageShell, listCard, chip, chipTone,
 } from '@/lib/ui'
 import { salesApi, type CustomVariable, type LibraryTemplate, type SequencePipeline, type SequenceStep, type TemplateMotion, type TemplateNote, type Workspace } from '@/lib/salesApi'
-import { RichBox } from '@/components/sales/Composer'
+import { BodyEditor } from '@/components/sales/Composer'
+import type { Asset } from '@/types/sales'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 import { useAuth } from '@/lib/auth'
 
@@ -96,7 +97,8 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
   useEffect(() => { if (wanted) setId(wanted) }, [wanted])
 
   const shown = ws.templates.filter(t => (filter === 'All' || t.motion === filter) && (!query || `${t.name} ${t.useFor || ''} ${t.body} ${(t.notes || []).map(n => `${n.text} ${n.from || ''}`).join(' ')}`.toLowerCase().includes(query.toLowerCase())))
-  const dirty = Boolean(draft) && (!saved || (['name', 'motion', 'useFor', 'subject', 'body'] as const).some(k => (draft?.[k] || '') !== (saved[k] || '')))
+  const dirty = Boolean(draft) && (!saved || (['name', 'motion', 'useFor', 'subject', 'body'] as const).some(k => (draft?.[k] || '') !== (saved[k] || ''))
+    || (draft?.assetIds || []).join() !== (saved.assetIds || []).join())
   const names = [...ws.builtIn.map(([n]) => n), ...ws.variables.map(v => v.name)]
 
   const insert = (name: string) => {
@@ -212,8 +214,8 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
                 </div>
               </div>
               <div className="rounded-md border border-border-gray px-2 py-2 focus-within:ring-2 focus-within:ring-off-black/10" onFocusCapture={() => { lastField.current = 'body' }}>
-                <RichBox
-                  boxRef={bodyRef} value={draft.body || ''} minHeight={320}
+                <BodyEditor
+                  bare boxRef={bodyRef} body={draft.body || ''} minHeight={280} signature={ws.signature}
                   onChange={v => setDraft(d => (d ? { ...d, body: v } : d))}
                   onBlur={() => {
                     const sel = window.getSelection()
@@ -223,9 +225,10 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
               </div>
               <p className="text-xs text-off-black/45 mt-1.5 leading-snug">
                 [First line] is the opener you write for each email: it shows as a blank in the composer and the email will not send until it is written. New templates start with one; delete it if this template does not need it.
-                Leave out the sign-off: your signature is added on send. ⌘K adds a link.
+                Leave out the sign-off: your signature is added on send, and anything under it goes out as a P.S. ⌘K adds a link.
               </p>
             </div>
+            <TemplateImages ids={draft.assetIds || []} onChange={assetIds => setDraft(d => (d ? { ...d, assetIds } : d))} />
             <div className="flex items-center justify-between pt-2">
               {saved && isAdmin ? <button onClick={remove} className={`${btnGhost} text-red-700 hover:text-red-800`}><Trash2 className="w-3.5 h-3.5" /> Delete</button> : <span />}
               <button onClick={save} disabled={saving || !dirty || !draft.name?.trim()} className={`${btnPrimary} px-4 py-2`}>{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} {saved ? 'Save changes' : 'Add template'}</button>
@@ -235,6 +238,70 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
         <TemplateNotes template={saved} reload={reload} />
         </div>
       ) : <div className="grid place-items-center text-sm text-off-black/45">Pick a template, or add one.</div>}
+    </div>
+  )
+}
+
+/**
+ * Images (and other library files) that go with the template: attached
+ * whenever it is picked in the composer, at the end of the email.
+ */
+function TemplateImages({ ids, onChange }: { ids: string[]; onChange: (ids: string[]) => void }) {
+  const [assets, setAssets] = useState<Asset[] | null>(null)
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => { salesApi.assets().then(r => setAssets(r.assets || [])).catch(() => setAssets([])) }, [])
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [open])
+  const chosen = ids.map(id => assets?.find(a => a.id === id) || null)
+  const toggle = (id: string) => onChange(ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])
+
+  return (
+    <div ref={box} className="relative">
+      <div className="flex items-center justify-between mb-1">
+        <label className={`${fieldLabel} mb-0`}>Images</label>
+        <button onClick={() => setOpen(o => !o)} className={btnGhost}><ImagePlus className="w-3.5 h-3.5" /> Add from library</button>
+      </div>
+      {ids.length === 0 ? (
+        <p className="text-xs text-off-black/45">None. Images added here are attached whenever this template is used.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {chosen.map((a, i) => (
+            <div key={ids[i]} className="group relative w-24 rounded-md border border-border-gray bg-white overflow-hidden">
+              <div className="aspect-square bg-subtle-gray grid place-items-center">
+                {a?.previewUrl ? <img src={a.previewUrl} alt={a.name} className="w-full h-full object-contain" /> : <FileText className="w-5 h-5 text-off-black/30" />}
+              </div>
+              <div className="px-1.5 py-1 text-[10px] text-off-black/70 truncate">{a?.name || 'Not in the library'}</div>
+              <button onClick={() => toggle(ids[i])} title="Remove" className="absolute top-1 right-1 p-0.5 rounded bg-white/90 text-off-black/50 opacity-0 group-hover:opacity-100 hover:text-red-700"><X className="w-3 h-3" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      {open && (
+        <div className="absolute right-0 top-8 z-20 w-[420px] max-h-80 overflow-y-auto rounded-lg border border-border-gray bg-white shadow-lg p-2">
+          {!assets ? <div className="p-4 grid place-items-center text-off-black/40"><Loader2 className="w-4 h-4 animate-spin" /></div>
+            : assets.length === 0 ? <p className="p-3 text-xs text-off-black/50">The library is empty. Upload images from the library panel on the Outreach page.</p>
+            : (
+              <div className="grid grid-cols-4 gap-2">
+                {assets.map(a => {
+                  const on = ids.includes(a.id)
+                  return (
+                    <button key={a.id} onClick={() => toggle(a.id)} className={`text-left rounded-md border overflow-hidden ${on ? 'border-off-black ring-1 ring-off-black' : 'border-border-gray hover:border-off-black/40'}`} title={a.name}>
+                      <div className="aspect-square bg-subtle-gray grid place-items-center">
+                        {a.previewUrl ? <img src={a.previewUrl} alt={a.name} className="w-full h-full object-contain" /> : <FileText className="w-5 h-5 text-off-black/30" />}
+                      </div>
+                      <div className="px-1.5 py-1 text-[10px] text-off-black/70 truncate">{a.name}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+        </div>
+      )}
     </div>
   )
 }

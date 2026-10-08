@@ -32,7 +32,7 @@ const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'PO
 export interface DealHit { id: string; name: string | null; stage: string | null; motion: string | null; ownerId: string | null; webUrl: string | null; person: { fullName: string; email: string | null } | null }
 
 /** A library template filled in for the person, for the composer's menu. A null subject means reply on the thread. */
-export interface OutreachTemplate { id: string; group: string; title: string; useFor: string | null; subject: string | null; body: string; notes?: TemplateNote[] }
+export interface OutreachTemplate { id: string; group: string; title: string; useFor: string | null; subject: string | null; body: string; assetIds?: string[]; notes?: TemplateNote[] }
 /** The values a template's placeholders need that the page does not already have. */
 export interface TemplateFill { senderName: string; socialProof: string; needsOpener: string; variables?: CustomVariable[] }
 /** A variable you set yourself, used in templates as [Name]. */
@@ -45,12 +45,14 @@ export interface Workspace {
   variables: CustomVariable[]
   templates: LibraryTemplate[]
   builtIn: [string, string][]
+  /** Your signature HTML, shown in the template editor where it will sit. */
+  signature?: string
 }
 /** A library template as stored, for Settings. */
 export type TemplateMotion = 'Charity' | 'Race' | 'PR' | 'Any'
 /** A reminder kept beside a template; never part of the email. */
 export interface TemplateNote { id: string; text: string; from: string | null; addedAt: string; addedBy: string | null }
-export interface LibraryTemplate { id: string; name: string; motion: TemplateMotion; useFor: string | null; subject: string | null; body: string; notes?: TemplateNote[]; updatedAt?: string; updatedBy?: string | null }
+export interface LibraryTemplate { id: string; name: string; motion: TemplateMotion; useFor: string | null; subject: string | null; body: string; assetIds?: string[]; notes?: TemplateNote[]; updatedAt?: string; updatedBy?: string | null }
 
 /** After a send: whether Attio now agrees. */
 export interface SyncResult { ok: boolean; skipped?: string; error?: string }

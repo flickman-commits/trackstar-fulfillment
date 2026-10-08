@@ -199,7 +199,9 @@ export async function draftVariants({ dealId, personId, useTemplate = false, act
   const { touchNumber, step, exhausted } = nextStepFor(deal)
   // Social Proof is a variable now; the old setting is only a fallback.
   const socialProof = variables.find(v => v.name.toLowerCase() === 'social proof')?.value || settings.socialProof || DEFAULT_SOCIAL_PROOF
-  const base = { touchNumber, step, exhausted, personId: person.id, dealId: deal.id }
+  // Images the step's template carries, attached in the composer like a chip you added.
+  const templateAssetIds = (step?.templateId && library.find(t => t.id === step.templateId)?.assetIds) || []
+  const base = { touchNumber, step, exhausted, personId: person.id, dealId: deal.id, templateAssetIds }
 
   if (useTemplate || !isLlmConfigured()) {
     return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender, templates, library, variables })], model: 'template', source: 'template' }

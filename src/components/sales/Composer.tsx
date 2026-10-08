@@ -42,7 +42,7 @@ export default function Composer({
   deal, person, draft, variants, index, drafting, writing, gmailConnected, canSend, capReached, aiActive,
   problems, checking, onCheck,
   attachments, onAttach, onDetach,
-  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, onRemove, adhoc, signature, library, onSchedule, onUnskip, onTemplateSaved,
+  onChange, onPrev, onNext, onRewrite, onRevise, onSend, onSkip, onRemove, adhoc, signature, library, onSchedule, onUnskip, onTemplateSaved, onAttachIds,
 }: {
   deal: Deal | null
   person: Person | null
@@ -61,6 +61,8 @@ export default function Composer({
   onCheck: () => void
   attachments: Asset[]
   onAttach: (asset: Asset) => void
+  /** Attach library files by id, for a template that carries images. */
+  onAttachIds?: (ids: string[]) => void
   onDetach: (id: string) => void
   onChange: (v: Variant) => void
   onPrev: () => void
@@ -282,8 +284,8 @@ export default function Composer({
             </form>
           )}
           <TemplateMenu deal={deal} person={person} disabled={drafting || !current} onRewrite={onRewrite} aiActive={aiActive} library={library}
-            onPick={t => current && onChange({ ...current, subject: t.subject ?? current.subject, body: t.body })} />
-          {current && <SaveTemplateButton deal={deal} person={person} current={current} disabled={drafting} onSaved={onTemplateSaved} />}
+            onPick={t => { if (!current) return; onChange({ ...current, subject: t.subject ?? current.subject, body: t.body }); if (t.assetIds?.length) onAttachIds?.(t.assetIds) }} />
+          {current && <SaveTemplateButton deal={deal} person={person} current={current} assetIds={attachments.map(a => a.id)} disabled={drafting} onSaved={onTemplateSaved} />}
           {aiActive && (
             <button onClick={onRewrite} disabled={drafting || !person} className={btnSecondary} title="Write it again">
               <RefreshCw className={`w-3.5 h-3.5 ${drafting ? 'animate-spin' : ''}`} /> Rewrite
@@ -338,7 +340,7 @@ function asTemplate(v: Variant, deal: Deal, person: Person | null) {
 }
 
 /** "Save as template", beside the Templates menu. */
-function SaveTemplateButton({ deal, person, current, disabled, onSaved }: { deal: Deal; person: Person | null; current: Variant; disabled: boolean; onSaved?: () => void }) {
+function SaveTemplateButton({ deal, person, current, assetIds, disabled, onSaved }: { deal: Deal; person: Person | null; current: Variant; assetIds: string[]; disabled: boolean; onSaved?: () => void }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -354,7 +356,7 @@ function SaveTemplateButton({ deal, person, current, disabled, onSaved }: { deal
       </button>
       {open && (
         <div className="absolute bottom-full left-0 mb-2 w-[340px] rounded-lg border border-border-gray bg-white shadow-lg z-20 overflow-hidden" onKeyDown={e => { if (e.key === 'Escape') setOpen(false) }}>
-          <SaveAsTemplate deal={deal} person={person} current={current} onDone={ok => { setOpen(false); if (ok) onSaved?.() }} />
+          <SaveAsTemplate deal={deal} person={person} current={current} assetIds={assetIds} onDone={ok => { setOpen(false); if (ok) onSaved?.() }} />
         </div>
       )}
     </div>
@@ -362,7 +364,7 @@ function SaveTemplateButton({ deal, person, current, disabled, onSaved }: { deal
 }
 
 /** The save form: a name and who it is for. */
-function SaveAsTemplate({ deal, person, current, onDone }: { deal: Deal; person: Person | null; current: Variant; onDone: (saved: boolean) => void }) {
+function SaveAsTemplate({ deal, person, current, assetIds, onDone }: { deal: Deal; person: Person | null; current: Variant; assetIds: string[]; onDone: (saved: boolean) => void }) {
   const motions: TemplateMotion[] = ['Race', 'Charity', 'PR', 'Any']
   const [name, setName] = useState('')
   const [motion, setMotion] = useState<TemplateMotion>(motions.includes(deal.motion as TemplateMotion) ? deal.motion as TemplateMotion : 'Any')
@@ -372,7 +374,7 @@ function SaveAsTemplate({ deal, person, current, onDone }: { deal: Deal; person:
     if (!name.trim()) return
     setSaving(true)
     try {
-      await salesApi.saveLibraryTemplate({ name: name.trim(), motion, subject: t.subject, body: t.body })
+      await salesApi.saveLibraryTemplate({ name: name.trim(), motion, subject: t.subject, body: t.body, assetIds })
       toast.success(`Saved "${name.trim()}" to your templates`)
       onDone(true)
     } catch (e) { toast.error((e as Error).message) }
@@ -400,7 +402,7 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
   deal: Deal
   person: Person | null
   disabled: boolean
-  onPick: (t: { subject: string | null; body: string }) => void
+  onPick: (t: { subject: string | null; body: string; assetIds?: string[] }) => void
   onRewrite: () => void
   aiActive: boolean
   library: TemplateLibrary | null
@@ -431,7 +433,7 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
         <LayoutTemplate className="w-3.5 h-3.5" /> Templates <ChevronDown className="w-3 h-3 opacity-60" />
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 w-[380px] max-h-[60vh] overflow-y-auto rounded-lg border border-border-gray bg-white shadow-lg z-20">
+        <div className="absolute bottom-full left-0 mb-2 w-[380px] max-h-[60vh] overflow-y-auto overflow-x-hidden whitespace-normal break-words [&_button]:!whitespace-normal rounded-lg border border-border-gray bg-white shadow-lg z-20">
           {!aiActive && (
             <button onClick={() => { onRewrite(); setOpen(false) }} className="w-full text-left px-4 py-3 border-b border-border-gray hover:bg-subtle-gray">
               <span className="block text-sm font-medium text-off-black">This touch in the sequence</span>
@@ -770,8 +772,13 @@ function splitBody(body: string) {
  * Attachments are not in here: they are chips below and go at the very end.
  * Local text is kept while typing so nothing jumps under the cursor.
  */
-function BodyEditor({ body, signature, onChange, onBlur }: {
+export function BodyEditor({ body, signature, onChange, onBlur, boxRef, minHeight = 176, bare = false }: {
   body: string; signature?: string; onChange: (body: string) => void; onBlur: () => void
+  /** The main box, for a caller that inserts at the cursor (the template editor's variables). */
+  boxRef?: React.RefObject<HTMLDivElement>
+  minHeight?: number
+  /** No label row or outer padding: the caller frames it. */
+  bare?: boolean
 }) {
   const [parts, setParts] = useState(() => splitBody(body))
   const emitted = useRef(body)
@@ -786,13 +793,15 @@ function BodyEditor({ body, signature, onChange, onBlur }: {
     onChange(next)
   }
   return (
-    <div className="px-6 pt-3 pb-2 relative">
-      <span className="flex items-center justify-between px-2 mb-0.5">
-        <span className={cardLabel}>Body</span>
-        <span className="text-[10px] text-off-black/35">⌘K adds a link</span>
-      </span>
+    <div className={bare ? 'relative' : 'px-6 pt-3 pb-2 relative'}>
+      {!bare && (
+        <span className="flex items-center justify-between px-2 mb-0.5">
+          <span className={cardLabel}>Body</span>
+          <span className="text-[10px] text-off-black/35">⌘K adds a link</span>
+        </span>
+      )}
       <div className="rounded-md px-1 py-1 focus-within:bg-subtle-gray/50 transition-colors">
-        <RichBox value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minHeight={176} />
+        <RichBox boxRef={boxRef} value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minHeight={minHeight} />
         <div className="px-1 pt-3 pb-2 text-sm text-off-black" title="Your signature, added on send. Change it in Settings, under Me.">
           {signature
             ? <div dangerouslySetInnerHTML={{ __html: signature }} />
