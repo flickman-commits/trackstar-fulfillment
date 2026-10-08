@@ -11,9 +11,9 @@
  * are filled from Attio and the sender; custom ones are plain text you set
  * here (Social Proof, a Loom link) and change without touching a template.
  *
- * Every template carries [First line]: the opener is always written by a
- * person, so the composer shows it as a visible blank the guardrails will not
- * let go out.
+ * Templates start with [First line]: an opener written per email, shown in
+ * the composer as a visible blank the guardrails will not let go out. A
+ * template can leave it out when its opening needs no personal line.
  *
  * The first read migrates what came before: the cadence that lived in code,
  * with the per-touch copy edited in Settings, becomes library templates and

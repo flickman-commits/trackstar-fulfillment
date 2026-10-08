@@ -17,8 +17,8 @@ import { useAuth } from '@/lib/auth'
  * Templates hold all the wording. A sequence holds none: it is the order of
  * templates for a motion and the days to wait between them. Variables are the
  * [Bracketed] words a template can use, the tool's own (from Attio) and the
- * ones you set yourself. Every template keeps a [First line] the person
- * writes for each email.
+ * ones you set yourself. New templates start with a [First line] the person
+ * writes for each email; one can be taken out.
  */
 type Section = 'templates' | 'sequences' | 'variables'
 const MOTION_OF: Record<SequencePipeline, TemplateMotion> = { RACE: 'Race', CHARITY: 'Charity', PR: 'PR' }
@@ -222,7 +222,7 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
                 />
               </div>
               <p className="text-xs text-off-black/45 mt-1.5 leading-snug">
-                [First line] is the opener you write for each email; it is added after the greeting if a template leaves it out, and the email will not send until it is written.
+                [First line] is the opener you write for each email: it shows as a blank in the composer and the email will not send until it is written. New templates start with one; delete it if this template does not need it.
                 Leave out the sign-off: your signature is added on send. ⌘K adds a link.
               </p>
             </div>

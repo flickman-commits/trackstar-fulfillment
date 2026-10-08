@@ -112,9 +112,10 @@ export async function listTemplates({ force = false } = {}) {
 }
 
 /**
- * Every template opens with a line the person writes: put [First line] after
- * the greeting ("Hey [First Name],"), or first when there is none. The old
- * [One-liner] becomes [First line].
+ * Put [First line] after the greeting ("Hey [First Name],"), or first when
+ * there is none, and turn the old [One-liner] into it. Used once, when the
+ * library was migrated. A template saved without [First line] keeps it out:
+ * new templates start with one, and taking it out is the writer's call.
  */
 export function withFirstLine(body) {
   const text = String(body || '').replace(/\[One-liner\]/g, '[First line]')
@@ -145,7 +146,7 @@ export async function saveTemplate({ id, name, motion, useFor, subject, body }, 
     motion: MOTIONS.includes(motion) ? motion : 'Any',
     useFor: String(useFor || '').trim().slice(0, 300) || null,
     subject: String(subject || '').trim().slice(0, 200) || null,
-    body: withFirstLine(String(body || '').replace(/\r\n/g, '\n').trim()).slice(0, 6000),
+    body: String(body || '').replace(/\r\n/g, '\n').replace(/\[One-liner\]/g, '[First line]').trim().slice(0, 6000),
   }
   if (!clean.name) throw new Error('Give the template a name')
   if (!clean.body) throw new Error('The template needs a body')

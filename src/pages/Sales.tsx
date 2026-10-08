@@ -616,11 +616,8 @@ export default function Sales({ active = true }: { active?: boolean }) {
             )}
           </div>
 
-          {/* Bottom row: the shortcuts, and the page's own actions. */}
+          {/* Bottom row: the page's own actions. */}
           <div className="flex items-center justify-between gap-3 mt-3 flex-shrink-0">
-            <p className="hidden lg:block text-xs text-off-black/40">
-              ⌘↵ sends · S skips
-            </p>
             <div className="flex items-center gap-2 ml-auto">
               <button onClick={() => setSettingsOpen(true)} className={btnHeroSecondary} title="Settings"><SlidersHorizontal className="w-4 h-4" /><span className="hidden md:inline">Settings</span></button>
               <button onClick={() => setProgressOpen(true)} className={btnHeroSecondary}><BarChart3 className="w-4 h-4" /><span className="hidden md:inline">Progress</span></button>
