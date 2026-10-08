@@ -32,7 +32,7 @@ const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'PO
 export interface DealHit { id: string; name: string | null; stage: string | null; motion: string | null; ownerId: string | null; webUrl: string | null; person: { fullName: string; email: string | null } | null }
 
 /** A library template filled in for the person, for the composer's menu. A null subject means reply on the thread. */
-export interface OutreachTemplate { id: string; group: string; title: string; useFor: string | null; subject: string | null; body: string }
+export interface OutreachTemplate { id: string; group: string; title: string; useFor: string | null; subject: string | null; body: string; notes?: TemplateNote[] }
 /** The values a template's placeholders need that the page does not already have. */
 export interface TemplateFill { senderName: string; socialProof: string; needsOpener: string; variables?: CustomVariable[] }
 /** A variable you set yourself, used in templates as [Name]. */
@@ -48,7 +48,9 @@ export interface Workspace {
 }
 /** A library template as stored, for Settings. */
 export type TemplateMotion = 'Charity' | 'Race' | 'PR' | 'Any'
-export interface LibraryTemplate { id: string; name: string; motion: TemplateMotion; useFor: string | null; subject: string | null; body: string; updatedAt?: string; updatedBy?: string | null }
+/** A reminder kept beside a template; never part of the email. */
+export interface TemplateNote { id: string; text: string; from: string | null; addedAt: string; addedBy: string | null }
+export interface LibraryTemplate { id: string; name: string; motion: TemplateMotion; useFor: string | null; subject: string | null; body: string; notes?: TemplateNote[]; updatedAt?: string; updatedBy?: string | null }
 
 /** After a send: whether Attio now agrees. */
 export interface SyncResult { ok: boolean; skipped?: string; error?: string }
@@ -72,6 +74,8 @@ export const salesApi = {
   library: () => request<{ templates: LibraryTemplate[]; fill: TemplateFill }>('/api/sales/templates'),
   saveLibraryTemplate: (t: Partial<LibraryTemplate>) => post<{ templates: LibraryTemplate[] }>('/api/sales/templates', { action: 'save', ...t }),
   deleteLibraryTemplate: (id: string) => post<{ templates: LibraryTemplate[] }>('/api/sales/templates', { action: 'delete', id }),
+  addTemplateNote: (id: string, text: string, from: string) => post<{ templates: LibraryTemplate[] }>('/api/sales/templates', { action: 'add-note', id, text, from }),
+  deleteTemplateNote: (id: string, noteId: string) => post<{ templates: LibraryTemplate[] }>('/api/sales/templates', { action: 'delete-note', id, noteId }),
   search: (q: string) => request<{ deals: DealHit[] }>(`/api/sales/today?action=search&q=${encodeURIComponent(q)}`),
   progress: (scope: 'mine' | 'all' = 'mine') => request<Progress>(`/api/sales/today?action=progress&scope=${scope}`),
   skip: (id: string, reason?: string) => post<{ success: true; until: string }>('/api/sales/today', { action: 'skip', id, reason }),

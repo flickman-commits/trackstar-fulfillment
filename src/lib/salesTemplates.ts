@@ -78,6 +78,7 @@ export function menuFor(templates: LibraryTemplate[], deal: Deal, person: Person
       group: t.motion === 'Any' ? 'Any deal' : t.motion,
       title: t.name,
       useFor: t.useFor,
+      notes: t.notes,
       subject: t.subject ? fillText(t.subject, deal, person, fill) : null,
       body: fillText(t.body, deal, person, fill),
     }))

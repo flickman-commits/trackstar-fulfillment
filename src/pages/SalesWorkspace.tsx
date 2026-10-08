@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowDown, ArrowUp, Braces, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Braces, Loader2, Plus, Search, StickyNote, Trash2, X } from 'lucide-react'
 import {
   btnPrimary, btnSecondary, btnGhost, inputBase, fieldLabel, cardLabel, sectionLabel, segment, segmentGroup,
   pageShell, listCard, chip, chipTone,
 } from '@/lib/ui'
-import { salesApi, type CustomVariable, type LibraryTemplate, type SequencePipeline, type SequenceStep, type TemplateMotion, type Workspace } from '@/lib/salesApi'
+import { salesApi, type CustomVariable, type LibraryTemplate, type SequencePipeline, type SequenceStep, type TemplateMotion, type TemplateNote, type Workspace } from '@/lib/salesApi'
 import { RichBox } from '@/components/sales/Composer'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 import { useAuth } from '@/lib/auth'
@@ -95,7 +95,7 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
   useEffect(() => { setDraft(saved ? { ...saved } : id === 'new' ? { name: '', motion: filter === 'All' ? 'Any' : filter, useFor: '', subject: '', body: 'Hey [First Name],\n\n[First line]\n\n' } : null) }, [id, ws]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (wanted) setId(wanted) }, [wanted])
 
-  const shown = ws.templates.filter(t => (filter === 'All' || t.motion === filter) && (!query || `${t.name} ${t.useFor || ''} ${t.body}`.toLowerCase().includes(query.toLowerCase())))
+  const shown = ws.templates.filter(t => (filter === 'All' || t.motion === filter) && (!query || `${t.name} ${t.useFor || ''} ${t.body} ${(t.notes || []).map(n => `${n.text} ${n.from || ''}`).join(' ')}`.toLowerCase().includes(query.toLowerCase())))
   const dirty = Boolean(draft) && (!saved || (['name', 'motion', 'useFor', 'subject', 'body'] as const).some(k => (draft?.[k] || '') !== (saved[k] || '')))
   const names = [...ws.builtIn.map(([n]) => n), ...ws.variables.map(v => v.name)]
 
@@ -157,7 +157,12 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
                   <span className="text-sm font-medium text-off-black truncate flex-1">{t.name}</span>
                   <span className={`${chip} ${MOTION_TONE[t.motion] || chipTone.quiet} text-[10px] px-1.5 py-0.5`}>{t.motion === 'Any' ? 'Any' : t.motion}</span>
                 </span>
-                {used.length > 0 && <span className="block text-[11px] text-off-black/45 mt-0.5">In {used.join(', ')}</span>}
+                {(used.length > 0 || (t.notes?.length ?? 0) > 0) && (
+                  <span className="flex items-center gap-2 text-[11px] text-off-black/45 mt-0.5">
+                    {used.length > 0 && <span className="truncate">In {used.join(', ')}</span>}
+                    {(t.notes?.length ?? 0) > 0 && <span className="inline-flex items-center gap-0.5 shrink-0"><StickyNote className="w-3 h-3" />{t.notes!.length}</span>}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -169,7 +174,8 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
       </aside>
 
       {draft ? (
-        <div className="min-h-0 overflow-y-auto">
+        <div className="min-h-0 flex">
+        <div className="min-h-0 overflow-y-auto flex-1 min-w-0">
           <div className="max-w-3xl px-8 py-6 space-y-4">
             <div className="grid grid-cols-[1fr_150px] gap-3">
               <div><label className={fieldLabel}>Name</label><input value={draft.name || ''} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="Brand activation pitch" className={`${inputBase} w-full`} /></div>
@@ -226,8 +232,80 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
             </div>
           </div>
         </div>
+        <TemplateNotes template={saved} reload={reload} />
+        </div>
       ) : <div className="grid place-items-center text-sm text-off-black/45">Pick a template, or add one.</div>}
     </div>
+  )
+}
+
+/**
+ * Notes beside a template: advice and reminders (a PR friend's notes on a
+ * pitch). They never go into an email; the composer shows them as a
+ * reminder when the template is picked.
+ */
+function TemplateNotes({ template, reload }: { template: LibraryTemplate | null; reload: () => Promise<void> }) {
+  const [text, setText] = useState('')
+  const [from, setFrom] = useState('')
+  const [busy, setBusy] = useState<string | null>(null)
+  useEffect(() => { setText(''); setFrom('') }, [template?.id])
+  const notes: TemplateNote[] = [...(template?.notes || [])].reverse()
+
+  const add = async () => {
+    if (!template || !text.trim()) return
+    setBusy('add')
+    try { await salesApi.addTemplateNote(template.id, text, from); setText(''); await reload() }
+    catch (e) { toast.error((e as Error).message) } finally { setBusy(null) }
+  }
+  const remove = async (n: TemplateNote) => {
+    if (!template || !window.confirm('Remove this note?')) return
+    setBusy(n.id)
+    try { await salesApi.deleteTemplateNote(template.id, n.id); await reload() }
+    catch (e) { toast.error((e as Error).message) } finally { setBusy(null) }
+  }
+
+  return (
+    <aside className="w-80 shrink-0 border-l border-border-gray bg-subtle-gray/40 flex flex-col min-h-0">
+      <div className="px-4 pt-5 pb-3 flex items-center gap-1.5">
+        <StickyNote className="w-3.5 h-3.5 text-off-black/45" />
+        <span className={sectionLabel}>Notes</span>
+        {notes.length > 0 && <span className="text-[11px] text-off-black/40">{notes.length}</span>}
+      </div>
+      {!template ? (
+        <p className="px-4 text-xs text-off-black/45 leading-snug">Add the template first, then keep notes on it here.</p>
+      ) : (
+        <>
+          <div className="px-4 space-y-2">
+            <textarea
+              value={text} onChange={e => setText(e.target.value)} rows={3}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); add() } }}
+              placeholder="A reminder or advice for this pitch. Never sent."
+              className={`${inputBase} w-full resize-y text-sm`}
+            />
+            <div className="flex items-center gap-2">
+              <input value={from} onChange={e => setFrom(e.target.value)} placeholder="From (optional)" className={`${inputBase} flex-1 min-w-0 text-sm`} />
+              <button onClick={add} disabled={!text.trim() || busy === 'add'} className={btnSecondary}>{busy === 'add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add</button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-2.5">
+            {notes.length === 0 && <p className="text-xs text-off-black/40 leading-snug">No notes yet. Notes show as a reminder when you pick this template in the composer.</p>}
+            {notes.map(n => (
+              <div key={n.id} className="group relative rounded-md border border-border-gray bg-white px-3 py-2.5">
+                <p className="text-[13px] text-off-black leading-snug whitespace-pre-wrap break-words pr-5">{n.text}</p>
+                <p className="text-[11px] text-off-black/45 mt-1.5">
+                  {n.from ? <span className="font-medium text-off-black/60">{n.from}</span> : null}
+                  {n.from ? ' · ' : ''}{new Date(n.addedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+                <button
+                  onClick={() => remove(n)} disabled={busy === n.id} title="Remove note"
+                  className="absolute top-2 right-2 p-0.5 rounded text-off-black/30 opacity-0 group-hover:opacity-100 hover:text-red-700 hover:bg-red-50 transition-opacity"
+                ><X className="w-3.5 h-3.5" /></button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </aside>
   )
 }
 

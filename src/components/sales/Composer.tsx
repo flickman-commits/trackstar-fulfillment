@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate, Clock, BookmarkPlus } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Command, RefreshCw, Loader2, Send, Paperclip, ChevronDown, CheckCircle2, AlertCircle, X, FileText, Image as ImageIcon, Sparkles, ExternalLink, LayoutTemplate, Clock, BookmarkPlus, StickyNote } from 'lucide-react'
 import { MotionTag } from './Queue'
 import { salesApi, type LibraryTemplate, type OutreachTemplate, type TemplateFill, type TemplateMotion } from '@/lib/salesApi'
 import { toast } from 'sonner'
@@ -446,6 +446,15 @@ function TemplateMenu({ deal, person, disabled, onPick, onRewrite, aiActive, lib
                 <button key={t.id} onClick={() => { onPick(t); setOpen(false) }} className="w-full text-left px-4 py-3 border-b border-border-gray last:border-b-0 hover:bg-subtle-gray">
                   <span className="block text-sm font-medium text-off-black">{t.title}</span>
                   {t.useFor && <span className="block text-xs text-off-black/55 mt-0.5 leading-snug">{t.useFor}</span>}
+                  {(t.notes?.length ?? 0) > 0 && (() => {
+                    const last = t.notes![t.notes!.length - 1]
+                    return (
+                      <span className="flex items-start gap-1 mt-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-1.5 py-1 leading-snug" title={t.notes!.map(n => `${n.from ? `${n.from}: ` : ''}${n.text}`).join('\n\n')}>
+                        <StickyNote className="w-3 h-3 mt-0.5 shrink-0" />
+                        <span className="line-clamp-2">{last.from ? <span className="font-medium">{last.from}: </span> : null}{last.text}{t.notes!.length > 1 ? <span className="text-amber-700/70"> (+{t.notes!.length - 1} more)</span> : null}</span>
+                      </span>
+                    )
+                  })()}
                   <span className="block text-[11px] text-off-black/40 mt-1 truncate">{t.subject ? `Subject: ${t.subject}` : 'Replies on the thread, keeps the subject'}</span>
                 </button>
               ))}

@@ -4,11 +4,13 @@
  *   GET                        the library as stored, plus what the browser needs to fill one in
  *   POST { action:'save', id?, name, motion, useFor?, subject?, body }   any sales rep: add or change one
  *   POST { action:'delete', id }                                          admin: remove one
+ *   POST { action:'add-note', id, text, from? }                           any sales rep: a note beside a template
+ *   POST { action:'delete-note', id, noteId }                             any sales rep: remove one
  */
 import { setCors } from '../_lib/auth.js'
 import { requireSalesRep, requireAdminRole, recordAudit } from '../_lib/users.js'
 import { getSenderFor, getSettings } from '../../server/domain/sales/settings.js'
-import { saveTemplate, deleteTemplate, MOTIONS } from '../../server/domain/sales/templateLibrary.js'
+import { saveTemplate, deleteTemplate, addTemplateNote, deleteTemplateNote, MOTIONS } from '../../server/domain/sales/templateLibrary.js'
 import { loadWorkspace, usedBy } from '../../server/domain/sales/sequences.js'
 import { DEFAULT_SOCIAL_PROOF, NEEDS_OPENER } from '../../server/domain/sales/angles.js'
 
@@ -35,6 +37,19 @@ export default async function handler(req, res) {
       try {
         const templates = await saveTemplate(body, actor)
         await recordAudit({ actor, action: 'sales.template_library', summary: `${body.id ? 'Edited' : 'Added'} the template "${String(body.name || '').slice(0, 80)}"` })
+        return res.status(200).json({ templates })
+      } catch (e) {
+        return res.status(400).json({ error: e.message })
+      }
+    }
+    if (body.action === 'add-note' || body.action === 'delete-note') {
+      try {
+        const id = String(body.id || '')
+        const templates = body.action === 'add-note'
+          ? await addTemplateNote(id, { text: body.text, from: body.from }, actor)
+          : await deleteTemplateNote(id, String(body.noteId || ''))
+        const name = templates.find(t => t.id === id)?.name || id
+        await recordAudit({ actor, action: 'sales.template_note', summary: `${body.action === 'add-note' ? 'Added a note to' : 'Removed a note from'} the template "${String(name).slice(0, 80)}"` })
         return res.status(200).json({ templates })
       } catch (e) {
         return res.status(400).json({ error: e.message })

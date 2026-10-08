@@ -165,6 +165,43 @@ export async function saveTemplate({ id, name, motion, useFor, subject, body }, 
   return list
 }
 
+/**
+ * Notes on a template: reminders and advice kept beside it (a PR friend's
+ * "lead with the number", "never pitch on a Monday"). They never go into an
+ * email. Each says who it is from, when it was added, and who added it.
+ * Kept on the template, so saving the template's text leaves them alone.
+ */
+const MAX_NOTES = 50
+
+export async function addTemplateNote(id, { text, from }, actor) {
+  const clean = String(text || '').replace(/\r\n/g, '\n').trim().slice(0, 2000)
+  if (!clean) throw new Error('Write the note first')
+  const list = (await listTemplates({ force: true })).slice()
+  const i = list.findIndex(t => t.id === id)
+  if (i < 0) throw new Error('That template is gone. Reload the page.')
+  const notes = Array.isArray(list[i].notes) ? list[i].notes : []
+  if (notes.length >= MAX_NOTES) throw new Error(`A template holds ${MAX_NOTES} notes at most. Remove an old one first.`)
+  const note = {
+    id: crypto.randomUUID(),
+    text: clean,
+    from: String(from || '').trim().slice(0, 80) || null,
+    addedAt: new Date().toISOString(),
+    addedBy: actor?.email || null,
+  }
+  list[i] = { ...list[i], notes: [...notes, note] }
+  await write(list)
+  return list
+}
+
+export async function deleteTemplateNote(id, noteId) {
+  const list = (await listTemplates({ force: true })).slice()
+  const i = list.findIndex(t => t.id === id)
+  if (i < 0) throw new Error('That template is gone. Reload the page.')
+  list[i] = { ...list[i], notes: (list[i].notes || []).filter(n => n.id !== noteId) }
+  await write(list)
+  return list
+}
+
 export async function deleteTemplate(id) {
   const list = (await listTemplates({ force: true })).filter(t => t.id !== id)
   await write(list)
