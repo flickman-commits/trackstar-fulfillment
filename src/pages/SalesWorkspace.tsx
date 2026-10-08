@@ -425,13 +425,22 @@ function Variables({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
         <section>
           <div className="flex items-center justify-between mb-2">
             <h2 className={sectionLabel}>Your variables</h2>
-            <button onClick={save} disabled={saving || !dirty} className={`${btnPrimary} px-4 py-2`}>{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save</button>
+            {dirty || saving
+              ? <button onClick={save} disabled={saving} className={`${btnPrimary} px-4 py-2`}>{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save</button>
+              : <span className="text-xs text-off-black/45">All saved</span>}
           </div>
-          <p className="text-sm text-off-black/55 mb-3">Text you set once and use in any template as [Name]. Change it here and every template that uses it changes with it.</p>
+          <p className="text-sm text-off-black/55 mb-3">Text you set once and use in any template as [Name]. Change it here and every template that uses it changes with it. These are yours to edit; the ones below are filled in by the tool from Attio and your profile, so that list does not change.</p>
           <div className="space-y-2">
             {rows.map((r, i) => (
               <div key={i} className="grid grid-cols-[200px_1fr_auto] gap-2 items-start">
-                <input value={r.name} onChange={e => setRows(rows.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Name, e.g. Loom Link" className={`${inputBase} w-full font-medium`} />
+                <div>
+                  <input value={r.name} onChange={e => setRows(rows.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Name, e.g. Loom Link" className={`${inputBase} w-full font-medium`} />
+                  {r.name.trim() && (() => {
+                    const token = `[${r.name.trim()}]`.toLowerCase()
+                    const n = ws.templates.filter(t => `${t.subject || ''} ${t.body}`.toLowerCase().includes(token)).length
+                    return <p className="text-[11px] text-off-black/45 mt-1 px-1">Use as <span className="font-mono text-off-black/70">[{r.name.trim()}]</span>{n ? ` · in ${n} template${n === 1 ? '' : 's'}` : ''}</p>
+                  })()}
+                </div>
                 <textarea rows={2} value={r.value} onChange={e => setRows(rows.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} placeholder="What it becomes in the email" className={`${inputBase} w-full resize-y`} />
                 <button onClick={() => setRows(rows.filter((_, j) => j !== i))} className={`${btnGhost} hover:text-red-700 mt-0.5`} title="Remove"><X className="w-3.5 h-3.5" /></button>
               </div>
