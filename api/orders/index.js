@@ -79,14 +79,16 @@ export async function rawSlice(ids) {
         'id', "shopifyOrderData"::jsonb->'id',
         'name', "shopifyOrderData"::jsonb->'name',
         'created_at', "shopifyOrderData"::jsonb->'created_at',
+        'financial_status', "shopifyOrderData"::jsonb->'financial_status',
         'total_price', "shopifyOrderData"::jsonb->'total_price',
         'current_total_price', "shopifyOrderData"::jsonb->'current_total_price',
         'discount_codes', "shopifyOrderData"::jsonb->'discount_codes',
         'shipping_lines', (SELECT jsonb_agg(jsonb_build_object('title', l->'title', 'price', l->'price'))
           FROM jsonb_array_elements(CASE WHEN jsonb_typeof("shopifyOrderData"::jsonb->'shipping_lines') = 'array'
             THEN "shopifyOrderData"::jsonb->'shipping_lines' ELSE '[]'::jsonb END) l),
-        'line_items', (SELECT jsonb_agg(jsonb_build_object('product_id', l->'product_id', 'variant_id', l->'variant_id',
-            'title', l->'title', 'sku', l->'sku', 'variant_title', l->'variant_title', 'properties', l->'properties') ORDER BY n)
+        'line_items', (SELECT jsonb_agg(jsonb_build_object('id', l->'id', 'product_id', l->'product_id', 'variant_id', l->'variant_id',
+            'title', l->'title', 'sku', l->'sku', 'variant_title', l->'variant_title', 'properties', l->'properties',
+            'quantity', l->'quantity', 'current_quantity', l->'current_quantity') ORDER BY n)
           FROM jsonb_array_elements(CASE WHEN jsonb_typeof("shopifyOrderData"::jsonb->'line_items') = 'array'
             THEN "shopifyOrderData"::jsonb->'line_items' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(l, n))) END AS s,
       CASE WHEN "etsyOrderData" IS NULL THEN NULL ELSE jsonb_build_object(
@@ -103,20 +105,26 @@ export async function rawSlice(ids) {
         'creatorId', "arteloOrderData"::jsonb->'creatorId',
         'createdAt', "arteloOrderData"::jsonb->'createdAt',
         'orderItems', (SELECT jsonb_agg(CASE WHEN jsonb_typeof(x->'product') = 'object'
-            THEN jsonb_build_object('product', jsonb_build_object('size', x->'product'->'size'))
-            ELSE jsonb_build_object('product', NULL) END ORDER BY n)
+            THEN jsonb_build_object('orderItemId', x->'orderItemId', 'product', jsonb_build_object('size', x->'product'->'size'))
+            ELSE jsonb_build_object('orderItemId', x->'orderItemId', 'product', NULL) END ORDER BY n)
           FROM jsonb_array_elements(CASE WHEN jsonb_typeof("arteloOrderData"::jsonb->'orderItems') = 'array'
             THEN "arteloOrderData"::jsonb->'orderItems' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(x, n))) AS a
     FROM "Order" WHERE id = ANY(${ids})`
   return new Map(rows.map(r => [r.id, r]))
 }
 
-/** A print carries "Rush Order: Yes" but the order has no rush add-on line. */
+/**
+ * Rush was asked for but is not paid: a print carries "Rush Order: Yes" or a
+ * rush line was added by editing the order, and either there is no live rush
+ * line or the order is still waiting on the customer's payment.
+ */
 function rushSelectedNotPaid(shopify) {
   const items = (Array.isArray(shopify?.line_items) ? shopify.line_items : []).filter(li => !isRemovedLineItem(li))
   const ticked = items.some(li => (li.properties || []).some(p =>
     p?.name === 'Rush Order' && String(p.value || '').toLowerCase().startsWith('yes')))
-  return ticked && !items.some(isRushAddonLineItem)
+  const rushLine = items.some(isRushAddonLineItem)
+  const paid = ['paid', 'partially_refunded'].includes(shopify?.financial_status)
+  return (ticked || rushLine) && !(rushLine && paid)
 }
 
 /**

@@ -96,9 +96,14 @@ export function shopifyOrderIsRush(shopifyOrderData, _printLineItemIsRush) {
   // charge can still be missing (they removed it in the cart, or the theme's
   // add to cart failed), and order 4074 got a free 4-day turnaround that way.
   // A ticked box with no charge shows as "Rush not paid" instead.
+  // Paid, not just present: an order edited to add the rush product sits at
+  // "partially_paid" until the customer settles the difference.
+  if (!PAID_STATUSES.includes(shopifyOrderData?.financial_status)) return false
   const items = shopifyOrderData?.line_items
   return Array.isArray(items) && items.some(li => isRushAddonLineItem(li) && !isRemovedLineItem(li))
 }
+
+const PAID_STATUSES = ['paid', 'partially_refunded']
 
 function isCustomOrder(raceName) {
   if (!raceName) return false
@@ -1036,6 +1041,32 @@ export async function processOrders(options = {}) {
 
                   needsUpdate = true
                   results.enriched++
+                }
+              }
+
+              // Rush decided after purchase. We edit the Shopify order to add the
+              // rush product; Shopify keeps it "partially_paid" until the
+              // customer pays the difference. Checked on every run, because the
+              // edit comes long after the first import:
+              //   - paid rush, not yet marked: rush, due 4 days from the
+              //     original purchase, which also moves it up the queue;
+              //   - marked rush with no paid rush (ticked the box, never paid):
+              //     back to standard, unless it is already in production.
+              if (
+                existing.trackstarOrderType === 'custom' && shopifyData?.shopifyOrderData &&
+                existing.designStatus !== 'sent_to_production' && updateData.isRushOrder === undefined
+              ) {
+                const paidRush = shopifyOrderIsRush(shopifyData.shopifyOrderData)
+                const placed = shopifyData.shopifyOrderData.created_at
+                if (paidRush !== !!existing.isRushOrder && placed) {
+                  // Only move a date the tool set itself; a hand-moved date stays.
+                  const before = customDueDate(placed, !!existing.isRushOrder)
+                  const untouched = !existing.dueDate || (before && Math.abs(new Date(existing.dueDate).getTime() - before.getTime()) < 60 * 1000)
+                  updateData.isRushOrder = paidRush
+                  updateData.shopifyOrderData = shopifyData.shopifyOrderData
+                  if (untouched) updateData.dueDate = customDueDate(placed, paidRush)
+                  needsUpdate = true
+                  log(`[processOrders] ${paidRush ? '⚡ Rush paid' : 'Rush not paid'} on ${existing.orderNumber}${untouched ? `, due ${updateData.dueDate.toISOString().slice(0, 10)}` : ' (due date was set by hand, left alone)'}`)
                 }
               }
 

@@ -4977,7 +4977,7 @@ Thank you!`
                           {selectedOrder.rushUnpaid && (
                             <span
                               className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-red-50 text-red-700 border-red-200"
-                              title="The customer ticked Skip the line, but the rush charge is not on the order, so this is on the standard 2-week turnaround. Offer them the rush if they still want it."
+                              title="Rush was asked for but not paid: either the rush charge is missing, or it was added to the order and the customer has not paid it yet. Standard 2-week turnaround until they do; it switches to rush on its own once paid."
                             >
                               Rush not paid
                             </span>
