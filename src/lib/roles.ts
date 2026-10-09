@@ -9,7 +9,7 @@ export type Role = 'admin' | 'sales' | 'fulfillment' | 'designer'
 
 export type Capability =
   | 'sales' | 'creators'
-  | 'tools.discounts' | 'tools.pace' | 'tools.weather'
+  | 'tools.discounts' | 'tools.pace' | 'tools.weather' | 'tools.surveys'
   | 'settings.pricing' | 'settings.reviews' | 'settings.stats' | 'settings.data' | 'settings.admin'
 
 export type Caps = '*' | Capability[]
@@ -29,6 +29,7 @@ export const CAPABILITY_LABEL: Partial<Record<Capability, string>> = {
   'tools.discounts': 'Discounts',
   'tools.pace': 'Pace',
   'tools.weather': 'Weather',
+  'tools.surveys': 'Design Survey',
   'settings.pricing': 'Pricing',
   'settings.reviews': 'Reviews',
   'settings.stats': 'Stats',
@@ -36,9 +37,9 @@ export const CAPABILITY_LABEL: Partial<Record<Capability, string>> = {
 
 const DEFAULT_CAPS: Record<Role, Caps> = {
   admin: '*',
-  sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.reviews', 'settings.stats'],
+  sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.pricing', 'settings.reviews', 'settings.stats'],
   fulfillment: ['creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
-  designer: ['tools.pace', 'tools.weather', 'settings.stats'],
+  designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
 }
 
 /** "staff" (from before roles) and anything unknown read as designer, the narrowest. */

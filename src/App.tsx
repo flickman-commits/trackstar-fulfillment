@@ -7,6 +7,8 @@ import Dashboard from '@/pages/Dashboard'
 import ApprovalPortal from '@/pages/ApprovalPortal'
 import BulkIntake from '@/pages/BulkIntake'
 import RunnerClaim from '@/pages/RunnerClaim'
+import SurveyVote from './pages/SurveyVote'
+import DesignSurveys from './pages/DesignSurveys'
 import CreatorsHome from '@/pages/CreatorsHome'
 import BriefsAdmin from '@/pages/BriefsAdmin'
 import CreatorPortal from '@/pages/CreatorPortal'
@@ -182,6 +184,8 @@ export default function App() {
           <Route path="/intake/:token" element={<BulkIntake />} />
           {/* One runner entering their own address for a bulk order. */}
           <Route path="/runner/:token" element={<RunnerClaim />} />
+          {/* Design Survey: the community votes on new designs from a story link. */}
+          <Route path="/vote/:token" element={<SurveyVote />} />
           <Route path="/creator/:token" element={<CreatorPortal />} />
           <Route path="/apply" element={<CreatorApply />} />
           {/* The page lives on monopoly.trackstar.art now. */}
@@ -195,6 +199,7 @@ export default function App() {
               <AppShell>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/surveys" element={<DesignSurveys />} />
                 {/* Admin view: the creator programme, the bulk product editor
                     and the brief admin all change things outside the day to day
                     fulfillment work. */}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2 } from 'lucide-react'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, type ReactNode } from 'react'
 
 const PdfViewer = lazy(() => import('@/components/PdfViewer'))
 
@@ -39,6 +39,7 @@ export default function ProofFullscreen({
   onIndexChange,
   onClose,
   counterLabel,
+  footer,
 }: {
   proofs: FullscreenProof[]
   index: number
@@ -46,6 +47,8 @@ export default function ProofFullscreen({
   onClose: () => void
   /** e.g. "Marathon: Option 2 of 3". Falls back to a plain count. */
   counterLabel?: string
+  /** An action for the design on screen, pinned under it (Design Survey's vote). */
+  footer?: ReactNode
 }) {
   // A number, not a boolean. Zoom used to be fit-or-2.5x with nothing in
   // between, which is fine for a peek and useless for reading small type on a
@@ -383,6 +386,12 @@ export default function ProofFullscreen({
               title={`Option ${i + 1}`}
             />
           ))}
+        </div>
+      )}
+
+      {footer && (
+        <div className="px-4 pt-1 shrink-0" style={{ backgroundColor: '#141414', paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}>
+          {footer}
         </div>
       )}
     </div>

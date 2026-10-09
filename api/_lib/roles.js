@@ -35,6 +35,7 @@ export const CAPABILITIES = [
   { id: 'tools.discounts', group: 'Tools', label: 'Discount codes' },
   { id: 'tools.pace', group: 'Tools', label: 'Pace calculator' },
   { id: 'tools.weather', group: 'Tools', label: 'Race weather' },
+  { id: 'tools.surveys', group: 'Tools', label: 'Design Survey' },
   { id: 'settings.pricing', group: 'Settings', label: 'Pricing Calculator' },
   { id: 'settings.reviews', group: 'Settings', label: 'Request Reviews' },
   { id: 'settings.stats', group: 'Settings', label: 'Stats' },
@@ -43,9 +44,9 @@ const GRANTABLE = new Set(CAPABILITIES.map(c => c.id))
 const EDITABLE_ROLES = ROLES.filter(r => r !== 'admin')
 
 export const DEFAULT_CAPS = {
-  sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.reviews', 'settings.stats'],
+  sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.pricing', 'settings.reviews', 'settings.stats'],
   fulfillment: ['creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
-  designer: ['tools.pace', 'tools.weather', 'settings.stats'],
+  designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
 }
 
 const KEY = 'role_capabilities'

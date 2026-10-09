@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send, FileText, ListOrdered, Braces } from 'lucide-react'
+import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send, FileText, ListOrdered, Braces, Vote } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Capability } from '@/lib/roles'
 
@@ -118,6 +118,7 @@ function ToolsTile({
     { id: 'discounts', cap: 'tools.discounts' as Capability, label: 'Discounts', hint: 'One-time discount code', icon: Ticket, onClick: onOpenDiscounts },
     { id: 'pace', cap: 'tools.pace' as Capability, label: 'Pace Converter', hint: 'Finish time to pace', icon: Calculator, onClick: onOpenPaceConverter },
     { id: 'weather', cap: 'tools.weather' as Capability, label: 'Weather Lookup', hint: 'Race-day weather on WeatherSpark', icon: CloudSun, href: 'https://weatherspark.com' },
+    { id: 'surveys', cap: 'tools.surveys' as Capability, label: 'Design Survey', hint: 'Community votes on new designs', icon: Vote, to: '/surveys' },
   ].filter(t => can(t.cap))
 
   // Nothing to offer this role: no Tools tile at all.
@@ -151,7 +152,11 @@ function ToolsTile({
         <div className="absolute left-full top-0 pl-2 z-40">
           <div className="w-60 p-1.5 rounded-2xl bg-dark-fill shadow-[0_6px_24px_rgba(0,0,0,0.25)] border border-white/[0.08]">
             {tools.map(t =>
-              t.href ? (
+              'to' in t && t.to ? (
+                <Link key={t.id} to={t.to} className={rowCls} onClick={() => setOpen(false)}>
+                  {rowInner(t)}
+                </Link>
+              ) : t.href ? (
                 <a key={t.id} href={t.href} target="_blank" rel="noopener noreferrer" className={rowCls} onClick={() => setOpen(false)}>
                   {rowInner(t)}
                 </a>
@@ -240,6 +245,7 @@ export function MobileToolBar({
     ...(can('tools.discounts') ? [{ id: 'discounts', label: 'Discounts', icon: Ticket, onClick: onOpenDiscounts, title: 'One-time discount code' } as Item] : []),
     ...(can('tools.pace') ? [{ id: 'pace', label: 'Pace', icon: Calculator, onClick: onOpenPaceConverter, title: 'Finish time to pace' } as Item] : []),
     ...(can('tools.weather') ? [{ id: 'weather', label: 'Weather', icon: CloudSun, href: 'https://weatherspark.com', title: 'Race-day weather on WeatherSpark' } as Item] : []),
+    ...(can('tools.surveys') ? [{ id: 'surveys', label: 'Survey', icon: Vote, to: '/surveys', title: 'Design Survey' } as Item] : []),
     { id: 'settings', label: 'Settings', icon: Settings, onClick: onOpenSettings, title: 'Settings' },
   ]
   return (

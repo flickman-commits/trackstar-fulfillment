@@ -858,3 +858,49 @@ model ApiKey {
 
   @@index([userId])
 }
+
+// Design Survey: community votes on new design options (Instagram story link).
+// Built on the proof portal's upload path, but nobody approves anything: each
+// visitor picks one option and can say why.
+model DesignSurvey {
+  id          String         @id @default(cuid())
+  token       String         @unique // the public link, /vote/{token}
+  title       String         // e.g. "Chicago Marathon 2026"
+  question    String?        // shown above the options; a default is used when empty
+  status      String         @default("open") // "open" | "closed"
+  createdById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  options     SurveyOption[]
+  votes       SurveyVote[]
+}
+
+model SurveyOption {
+  id           String       @id @default(cuid())
+  surveyId     String
+  survey       DesignSurvey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  label        String?      // optional name; voters see "Option 1", "Option 2" otherwise
+  imageUrl     String
+  thumbnailUrl String?
+  sortOrder    Int          @default(0)
+  createdAt    DateTime     @default(now())
+  votes        SurveyVote[]
+
+  @@index([surveyId])
+}
+
+model SurveyVote {
+  id        String       @id @default(cuid())
+  surveyId  String
+  survey    DesignSurvey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  optionId  String
+  option    SurveyOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  voterId   String       // random id kept in the voter's browser; one vote each, changeable
+  comment   String?
+  ipHash    String?      // salted hash, only to spot ballot stuffing; never the raw address
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([surveyId, voterId])
+  @@index([optionId])
+}
