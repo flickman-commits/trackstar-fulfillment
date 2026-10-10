@@ -10,10 +10,10 @@ import { btnPrimary, btnSecondary, btnGhost, inputBase, segment, segmentGroup, p
  * side is /vote/{token}, made to be dropped on an Instagram story.
  */
 
-type ListRow = { id: string; token: string; title: string; status: string; createdAt: string; votes: number; optionCount: number; cover: string | null }
+type ListRow = { id: string; token: string; title: string; status: string; endsAt: string | null; createdAt: string; votes: number; optionCount: number; cover: string | null }
 type Option = { id: string; label: string | null; name: string; imageUrl: string; thumbnailUrl: string | null; votes: number; share: number }
 type Survey = {
-  id: string; token: string; title: string; question: string | null; status: string; total: number; crowdedVotes: number
+  id: string; token: string; title: string; question: string | null; status: string; endsAt: string | null; open: boolean; total: number; crowdedVotes: number
   options: Option[]; comments: { id: string; optionId: string; comment: string; createdAt: string }[]
 }
 
@@ -90,7 +90,9 @@ export default function DesignSurveys() {
                   <div className="font-semibold text-sm text-off-black truncate">{s.title}</div>
                   <div className="text-xs text-off-black/50 mt-0.5">
                     {s.optionCount} design{s.optionCount === 1 ? '' : 's'} · {s.votes} vote{s.votes === 1 ? '' : 's'}
-                    {s.status === 'closed' && <span className="ml-1.5 text-off-black/40">· Closed</span>}
+                    {s.status === 'open'
+                      ? <span className="ml-1.5 text-emerald-700 font-medium">· Live</span>
+                      : <span className="ml-1.5 text-off-black/40">· {s.votes || s.endsAt ? 'Ended' : 'Draft'}</span>}
                   </div>
                 </div>
               </button>
@@ -107,6 +109,9 @@ function SurveyEditor({ id, onBack }: { id: string; onBack: () => void }) {
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null)
   const [title, setTitle] = useState('')
   const [question, setQuestion] = useState('')
+  // Two states: Setup (title, designs, link) and Results (what people chose
+  // and why). A survey with votes opens on its results.
+  const [view, setView] = useState<'setup' | 'results' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -114,6 +119,7 @@ function SurveyEditor({ id, onBack }: { id: string; onBack: () => void }) {
     if (!res.ok) { toast.error('Could not load the survey'); return }
     const { survey } = await res.json()
     setS(survey); setTitle(survey.title); setQuestion(survey.question || '')
+    setView(v => v ?? (survey.total > 0 ? 'results' : 'setup'))
   }, [id])
   useEffect(() => { load() }, [load])
   // Votes arrive while the story is up; keep the tallies current.
@@ -154,6 +160,15 @@ function SurveyEditor({ id, onBack }: { id: string; onBack: () => void }) {
   const setStatus = async (status: 'open' | 'closed') => {
     try { await post({ action: 'update', id, status }); load() } catch { toast.error('Could not update') }
   }
+  /** Start (or restart) voting for a set time from now, and copy the link. */
+  const launch = async (hours: number) => {
+    try {
+      await post({ action: 'update', id, durationHours: hours })
+      navigator.clipboard?.writeText(voteUrl(s!.token)).catch(() => {})
+      toast.success(hours ? `Live for ${hours >= 48 ? `${hours / 24} days` : `${hours} hours`}. Link copied for your story.` : 'Live with no end time. Link copied.')
+      load()
+    } catch { toast.error('Could not start the survey') }
+  }
   const rename = async (o: Option, label: string) => {
     if ((o.label || '') === label.trim()) return
     try { await post({ action: 'update-option', optionId: o.id, label }); load() } catch { toast.error('Could not rename') }
@@ -171,13 +186,20 @@ function SurveyEditor({ id, onBack }: { id: string; onBack: () => void }) {
 
   const url = voteUrl(s.token)
   const top = Math.max(0, ...s.options.map(o => o.votes))
-  const nameOf = (optionId: string) => s.options.find(o => o.id === optionId)?.name || 'Removed design'
 
   return (
     <div className="pb-10">
-      <button onClick={onBack} className={`${btnGhost} mb-3 -ml-2`}><ArrowLeft className="w-4 h-4" /> All surveys</button>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <button onClick={onBack} className={`${btnGhost} -ml-2`}><ArrowLeft className="w-4 h-4" /> All surveys</button>
+        <div className={segmentGroup}>
+          <button onClick={() => setView('results')} className={segment(view === 'results', 'md')}>Results</button>
+          <button onClick={() => setView('setup')} className={segment(view === 'setup', 'md')}>Setup</button>
+        </div>
+      </div>
 
-      <div className="bg-white border border-border-gray rounded-lg p-4 mb-4 grid md:grid-cols-[1fr_auto] gap-4">
+      {view === 'results' ? <SurveyResults s={s} url={url} /> : (<>
+
+      <div className="bg-white border border-border-gray rounded-lg p-4 mb-4">
         <div className="space-y-3">
           <div>
             <label className={fieldLabel}>Title</label>
@@ -187,17 +209,6 @@ function SurveyEditor({ id, onBack }: { id: string; onBack: () => void }) {
             <label className={fieldLabel}>Question voters see</label>
             <input value={question} onChange={e => setQuestion(e.target.value)} onBlur={saveMeta} placeholder="Which design is your favorite?" className={`${inputBase} w-full`} />
           </div>
-        </div>
-        <div className="flex flex-col gap-2 md:items-end">
-          <div className={segmentGroup}>
-            <button onClick={() => setStatus('open')} className={segment(s.status === 'open')}>Open</button>
-            <button onClick={() => setStatus('closed')} className={segment(s.status === 'closed')}>Closed</button>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => { navigator.clipboard.writeText(url); toast.success('Link copied. Add it to a story with the link sticker.') }} className={btnPrimary}><Copy className="w-4 h-4" /> Copy link</button>
-            <a href={url} target="_blank" rel="noopener noreferrer" className={btnSecondary}><ExternalLink className="w-4 h-4" /> Open</a>
-          </div>
-          <span className="text-[11px] text-off-black/40 break-all md:text-right">{url}</span>
         </div>
       </div>
 
@@ -246,27 +257,159 @@ function SurveyEditor({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
       )}
 
-      <h2 className="text-sm font-semibold text-off-black uppercase tracking-tight mt-6 mb-2 flex items-center gap-1.5">
-        <MessageSquareText className="w-4 h-4" /> Why they picked it ({s.comments.length})
-      </h2>
-      {s.comments.length === 0 ? (
-        <p className="text-sm text-off-black/45">Comments from voters show up here.</p>
-      ) : (
-        <div className="bg-white border border-border-gray rounded-lg divide-y divide-border-gray">
-          {s.comments.map(c => (
-            <div key={c.id} className="px-4 py-3">
-              <p className="text-sm text-off-black whitespace-pre-wrap">{c.comment}</p>
-              <p className="text-[11px] text-off-black/40 mt-1">
-                {nameOf(c.optionId)} · {new Date(c.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+      <SendOut s={s} url={url} onLaunch={launch} onEnd={() => setStatus('closed')} />
 
       <div className="mt-8">
         <button onClick={del} className={`${btnGhost} text-red-600`}><Trash2 className="w-4 h-4" /> Delete survey</button>
       </div>
+      </>)}
+    </div>
+  )
+}
+
+/**
+ * What the community chose and why. A single-series bar chart, most votes
+ * first, with each design's thumbnail under its own bar so the picture is the
+ * label. Then the reasons, grouped by design in the same order.
+ */
+function SurveyResults({ s, url }: { s: Survey; url: string }) {
+  const ranked = [...s.options].sort((a, b) => b.votes - a.votes)
+  const max = Math.max(1, ...ranked.map(o => o.votes))
+  const leader = ranked[0]?.votes ? ranked[0] : null
+  const tied = leader ? ranked.filter(o => o.votes === leader.votes).length > 1 : false
+  const byOption = (id: string) => s.comments.filter(c => c.optionId === id)
+
+  if (s.options.length === 0) {
+    return <div className="bg-white border border-border-gray rounded-lg py-16 text-center text-sm text-off-black/50">No designs yet. Add them under Setup.</div>
+  }
+
+  return (
+    <div>
+      <div className="bg-white border border-border-gray rounded-lg p-4 md:p-5 mb-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+          <h2 className="text-lg font-semibold text-off-black">{s.title}</h2>
+          <span className="text-xs text-off-black/45">{s.open ? (s.endsAt ? `Live until ${new Date(s.endsAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Live') : s.total ? 'Voting ended' : 'Not sent yet'} · <a href={url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">voter page</a></span>
+        </div>
+        <p className="text-sm text-off-black/60">
+          {s.total === 0 ? 'No votes yet.' : <>
+            <span className="font-semibold text-off-black">{s.total}</span> vote{s.total === 1 ? '' : 's'}
+            {leader && !tied && <> · <span className="font-semibold text-off-black">{leader.name}</span> leads with {leader.share}%</>}
+            {tied && <> · tied at the top</>}
+            {s.crowdedVotes > 0 && <span className="ml-2 text-amber-700" title="More than 5 votes came from one network. Usually an office or a dorm, but worth a glance.">· {s.crowdedVotes} from busy networks</span>}
+          </>}
+        </p>
+
+        {/* Bars grow up from one baseline; the design sits under its bar. */}
+        <div className="mt-5 overflow-x-auto">
+          <div className="flex items-end gap-3 min-w-max px-1">
+            {ranked.map(o => (
+              <div key={o.id} className="w-24 md:w-28 flex flex-col items-center" title={`${o.name}: ${o.votes} vote${o.votes === 1 ? '' : 's'} (${o.share}%)`}>
+                <span className="text-sm font-semibold text-off-black tabular-nums">{o.votes}</span>
+                <span className="text-[11px] text-off-black/45 tabular-nums mb-1">{o.share}%</span>
+                <div className="w-full h-44 flex items-end">
+                  <div
+                    className="w-full rounded-t-[4px] bg-[#4600D6] transition-[height] duration-500"
+                    style={{ height: o.votes ? `${(o.votes / max) * 100}%` : '2px', opacity: o.votes ? 1 : 0.25 }}
+                  />
+                </div>
+                <div className="w-full h-px bg-off-black/15" />
+                <a href={o.imageUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block w-full aspect-[4/5] rounded-md overflow-hidden bg-subtle-gray border border-border-gray">
+                  <img src={o.thumbnailUrl || o.imageUrl} alt={o.name} className="w-full h-full object-cover" />
+                </a>
+                <span className="mt-1.5 text-xs font-medium text-off-black/70 text-center truncate w-full">{o.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <h3 className="text-sm font-semibold text-off-black uppercase tracking-tight mb-2 flex items-center gap-1.5">
+        <MessageSquareText className="w-4 h-4" /> Why people picked them ({s.comments.length})
+      </h3>
+      {s.comments.length === 0 ? (
+        <p className="text-sm text-off-black/45">When voters say why they picked a design, it shows up here.</p>
+      ) : (
+        <div className="space-y-3 pb-4">
+          {ranked.filter(o => byOption(o.id).length > 0).map(o => (
+            <div key={o.id} className="bg-white border border-border-gray rounded-lg p-3 md:p-4 flex gap-3 md:gap-4">
+              <img src={o.thumbnailUrl || o.imageUrl} alt={o.name} className="w-14 md:w-20 aspect-[4/5] object-cover rounded-md border border-border-gray shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-off-black">{o.name} <span className="font-normal text-off-black/45">· {o.votes} vote{o.votes === 1 ? '' : 's'}</span></div>
+                <ul className="mt-1.5 space-y-1.5">
+                  {byOption(o.id).map(c => (
+                    <li key={c.id} className="text-sm text-off-black/80 leading-snug">
+                      &ldquo;{c.comment}&rdquo;
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const DURATIONS = [
+  { h: 24, label: '24 hours' },
+  { h: 48, label: '48 hours' },
+  { h: 72, label: '3 days' },
+  { h: 168, label: '1 week' },
+]
+
+/**
+ * Step two of Setup: send it out. Pick how long it runs; the clock starts now
+ * and the link is copied for the story. While it runs: the deadline, the link,
+ * a way to extend or end it early. After it ends the public page shuts on its
+ * own, and it can be reopened from here.
+ */
+function SendOut({ s, url, onLaunch, onEnd }: { s: Survey; url: string; onLaunch: (hours: number) => void; onEnd: () => void }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t) }, [])
+  const ends = s.endsAt ? new Date(s.endsAt).getTime() : null
+  const live = s.open && (!ends || ends > now)
+  const fmt = (t: number) => new Date(t).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  const left = ends ? Math.max(0, ends - now) : 0
+  const leftText = left >= 86400000 ? `${Math.floor(left / 86400000)}d ${Math.floor((left % 86400000) / 3600000)}h` : `${Math.floor(left / 3600000)}h ${Math.floor((left % 3600000) / 60000)}m`
+  const noDesigns = s.options.length === 0
+
+  return (
+    <div className="mt-6 bg-white border border-border-gray rounded-lg p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-off-black uppercase tracking-tight">Send it out</h2>
+        {live
+          ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Live{ends ? ` · ends ${fmt(ends)} (in ${leftText})` : ' · no end time'}</span>
+          : <span className="text-xs text-off-black/50">{ends && ends <= now ? `Ended ${fmt(ends)}` : s.total > 0 ? 'Ended' : 'Not sent yet'}</span>}
+      </div>
+
+      {live ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button onClick={() => { navigator.clipboard.writeText(url); toast.success('Link copied. Add it to a story with the link sticker.') }} className={btnPrimary}><Copy className="w-4 h-4" /> Copy link</button>
+          <a href={url} target="_blank" rel="noopener noreferrer" className={btnSecondary}><ExternalLink className="w-4 h-4" /> Open</a>
+          {ends
+            ? <button onClick={() => onLaunch(Math.round((left + 24 * 3600000) / 3600000))} className={btnSecondary}>Add 24 hours</button>
+            : DURATIONS.slice(0, 3).map(d => (
+                <button key={d.h} onClick={() => onLaunch(d.h)} className={btnSecondary}>End in {d.label}</button>
+              ))}
+          <button onClick={onEnd} className={btnGhost}>End now</button>
+          <span className="w-full text-[11px] text-off-black/40 break-all">{url}</span>
+        </div>
+      ) : (
+        <>
+          <p className="mt-1 text-sm text-off-black/55">
+            {noDesigns ? 'Add the designs above first.' : 'Pick how long voting runs. The clock starts now, the link is copied, and the page closes itself when time is up.'}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {DURATIONS.map(d => (
+              <button key={d.h} onClick={() => onLaunch(d.h)} disabled={noDesigns} className={d.h === 24 ? btnPrimary : btnSecondary}>
+                {s.total > 0 ? 'Reopen for ' : 'Run for '}{d.label}
+              </button>
+            ))}
+            <button onClick={() => onLaunch(0)} disabled={noDesigns} className={btnGhost}>No end time</button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

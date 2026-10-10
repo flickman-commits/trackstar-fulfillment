@@ -868,6 +868,9 @@ model DesignSurvey {
   title       String         // e.g. "Chicago Marathon 2026"
   question    String?        // shown above the options; a default is used when empty
   status      String         @default("open") // "open" | "closed"
+  // When voting stops. Null means no limit. After this the public page says
+  // the survey has ended and refuses votes, without anyone closing it.
+  endsAt      DateTime?
   createdById String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt

@@ -17,6 +17,11 @@ const MAX_COMMENT = 500
 const supabase = () => createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 const newToken = () => crypto.randomBytes(9).toString('base64url')
 
+/** Open means not closed by hand and not past its end time. */
+export function isOpen(s) {
+  return s.status === 'open' && (!s.endsAt || new Date(s.endsAt).getTime() > Date.now())
+}
+
 export function hashIp(ip) {
   const salt = process.env.SESSION_SECRET || 'survey'
   return crypto.createHash('sha256').update(`${salt}:${ip}`).digest('hex').slice(0, 32)
@@ -28,7 +33,7 @@ export async function listSurveys() {
     include: { _count: { select: { votes: true, options: true } }, options: { orderBy: { sortOrder: 'asc' }, take: 1, select: { thumbnailUrl: true, imageUrl: true } } },
   })
   return rows.map(s => ({
-    id: s.id, token: s.token, title: s.title, status: s.status, createdAt: s.createdAt,
+    id: s.id, token: s.token, title: s.title, status: isOpen(s) ? 'open' : 'closed', endsAt: s.endsAt, createdAt: s.createdAt,
     votes: s._count.votes, optionCount: s._count.options,
     cover: s.options[0]?.thumbnailUrl || s.options[0]?.imageUrl || null,
   }))
@@ -38,15 +43,24 @@ export async function createSurvey({ title, question, createdById }) {
   const t = String(title || '').trim().slice(0, 120)
   if (!t) throw new Error('A title is required')
   return prisma.designSurvey.create({
-    data: { title: t, question: String(question || '').trim().slice(0, 200) || null, token: newToken(), createdById: createdById || null },
+    // Starts unpublished: the link shows "ended" until Send it out starts the clock.
+    data: { title: t, question: String(question || '').trim().slice(0, 200) || null, token: newToken(), status: 'closed', createdById: createdById || null },
   })
 }
 
-export async function updateSurvey(id, { title, question, status }) {
+export async function updateSurvey(id, { title, question, status, durationHours, endsAt }) {
   const data = {}
   if (title !== undefined) data.title = String(title).trim().slice(0, 120) || 'Untitled survey'
   if (question !== undefined) data.question = String(question || '').trim().slice(0, 200) || null
   if (status !== undefined) data.status = status === 'closed' ? 'closed' : 'open'
+  // Sending it out: a duration from now (24h, 48h...), or no limit (0/null).
+  if (durationHours !== undefined) {
+    const h = Number(durationHours)
+    data.endsAt = h > 0 ? new Date(Date.now() + Math.min(h, 24 * 30) * 3600 * 1000) : null
+    data.status = 'open'
+  } else if (endsAt !== undefined) {
+    data.endsAt = endsAt ? new Date(endsAt) : null
+  }
   return prisma.designSurvey.update({ where: { id }, data })
 }
 
@@ -140,6 +154,7 @@ export async function surveyResults(id) {
   const crowded = Object.values(perIp).filter(n => n > 5).reduce((a, n) => a + n, 0)
   return {
     id: s.id, token: s.token, title: s.title, question: s.question, status: s.status, createdAt: s.createdAt,
+    endsAt: s.endsAt, open: isOpen(s),
     total, crowdedVotes: crowded,
     options: s.options.map((o, i) => ({
       id: o.id, label: o.label, name: o.label || `Option ${i + 1}`, imageUrl: o.imageUrl, thumbnailUrl: o.thumbnailUrl,
@@ -164,7 +179,8 @@ export async function publicSurvey(token, voterId) {
   return {
     title: s.title,
     question: s.question || 'Which design is your favorite?',
-    open: s.status === 'open',
+    open: isOpen(s),
+    endsAt: s.endsAt,
     options: s.options.map((o, i) => ({ id: o.id, name: o.label || `Option ${i + 1}`, imageUrl: o.imageUrl, thumbnailUrl: o.thumbnailUrl })),
     myVote: mine ? { optionId: mine.optionId, comment: mine.comment } : null,
   }
@@ -173,9 +189,9 @@ export async function publicSurvey(token, voterId) {
 export async function castVote(token, { voterId, optionId, comment, ip }) {
   const vid = String(voterId || '').trim().slice(0, 64)
   if (vid.length < 8) throw Object.assign(new Error('bad_voter'), { code: 400 })
-  const s = await prisma.designSurvey.findUnique({ where: { token }, select: { id: true, status: true } })
+  const s = await prisma.designSurvey.findUnique({ where: { token }, select: { id: true, status: true, endsAt: true } })
   if (!s) throw Object.assign(new Error('not_found'), { code: 404 })
-  if (s.status !== 'open') throw Object.assign(new Error('closed'), { code: 409 })
+  if (!isOpen(s)) throw Object.assign(new Error('closed'), { code: 409 })
   const opt = await prisma.surveyOption.findFirst({ where: { id: String(optionId || ''), surveyId: s.id }, select: { id: true } })
   if (!opt) throw Object.assign(new Error('bad_option'), { code: 400 })
   const text = String(comment || '').trim().slice(0, MAX_COMMENT) || null

@@ -16,7 +16,16 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 const T = { page: '#0F0F10', card: '#1A1A1C', line: 'rgba(255,255,255,0.12)', accent: '#4600D6', font: "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" }
 
 type Option = { id: string; name: string; imageUrl: string; thumbnailUrl: string | null }
-type Survey = { title: string; question: string; open: boolean; options: Option[]; myVote: { optionId: string; comment: string | null } | null }
+type Survey = { title: string; question: string; open: boolean; endsAt: string | null; options: Option[]; myVote: { optionId: string; comment: string | null } | null }
+
+/** "23h 14m", "14m 05s", for the time left. */
+function timeLeft(ms: number): string {
+  const t = Math.max(0, Math.floor(ms / 1000))
+  const d = Math.floor(t / 86400), h = Math.floor((t % 86400) / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60
+  if (d > 0) return `${d}d ${h}h`
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`
+  return `${m}m ${String(sec).padStart(2, '0')}s`
+}
 
 /** One id per browser, so a second visit changes the vote rather than adding one. */
 function voterId(): string {
@@ -45,6 +54,8 @@ export default function SurveyVote() {
   const [err, setErr] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState<number | null>(null)
   const rail = useRef<HTMLDivElement>(null)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
 
   useEffect(() => {
     fetch(`${API_BASE}/api/public/survey?token=${encodeURIComponent(token || '')}&voter=${encodeURIComponent(voter)}`)
@@ -120,6 +131,24 @@ export default function SurveyVote() {
     </div>
   )
 
+  // Past the end time the page shuts: no designs, no voting, just a thank you.
+  const endsAtMs = survey.endsAt ? new Date(survey.endsAt).getTime() : null
+  const ended = !survey.open || (endsAtMs !== null && endsAtMs <= now)
+  if (ended) return shell(
+    <div className="rounded-2xl p-8 text-center mt-10" style={{ backgroundColor: T.card }}>
+      <h1 className="text-xl font-bold mb-1">This survey has ended</h1>
+      <p className="text-sm text-white/60">Thanks for checking it out. Keep an eye on our page for the design that won.</p>
+      <a href="https://trackstar.art" className="inline-block mt-5 text-xs text-white/40">trackstar.art</a>
+    </div>
+  )
+  const countdown = endsAtMs !== null && (
+    <div className="mt-3 flex justify-center">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: 'rgba(70,0,214,0.25)', color: '#C4B5FD' }}>
+        <span className="w-1.5 h-1.5 rounded-full bg-[#A78BFA] animate-pulse" /> Survey ends in {timeLeft(endsAtMs - now)}
+      </span>
+    </div>
+  )
+
   const total = survey.options.length
   const votedOpt = survey.options.find(o => o.id === voted) || null
   const voteButton = (o: Option, size: 'md' | 'lg' = 'md') => (
@@ -154,6 +183,7 @@ export default function SurveyVote() {
         <h1 className="text-2xl font-bold">Thanks for voting!</h1>
         <p className="text-sm text-white/60 mt-1">You picked {votedOpt.name} for {survey.title}.</p>
       </div>
+      {countdown}
       <button type="button" onClick={() => setFullscreen(survey.options.indexOf(votedOpt))} className="mt-5 block w-full rounded-2xl overflow-hidden" style={{ backgroundColor: T.card }}>
         <img src={votedOpt.imageUrl} alt={votedOpt.name} className="w-full max-h-[48dvh] object-contain" />
       </button>
@@ -202,7 +232,7 @@ export default function SurveyVote() {
     <>
       <h1 className="text-[22px] leading-tight font-bold text-center">{survey.question}</h1>
       <p className="text-sm text-white/55 text-center mt-1">{survey.title} · swipe to see all {total}</p>
-      {!survey.open && <p className="mt-3 text-center text-sm text-amber-300">Voting has closed.</p>}
+      {countdown}
       {err && <p className="mt-3 text-center text-sm text-red-400">{err}</p>}
 
       {/* One card per design, swiped sideways like the approval portal. */}
