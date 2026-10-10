@@ -118,9 +118,10 @@ export class LaurelTimingScraper extends BaseScraper {
 
       const formattedTime = this.formatTime(detail.chipTime)
       const distanceMiles = this.config.distances?.[distKey] || 26.2
-      const pace = detail.pace
-        ? this.formatPace(detail.pace)
-        : this.formatPace(this.calculatePace(detail.chipTime, distanceMiles))
+      // Always chip time over the matched distance. The page's own pace is
+      // truncated on the summary cards (3:21:59 shows 7:42, the real figure is
+      // 7:42.6), and older editions only have the cards.
+      const pace = this.formatPace(this.calculatePace(detail.chipTime, distanceMiles))
 
       console.log(`\n[${this.tag}] FOUND RUNNER:`)
       console.log(`  Name: ${match.fullName}`)
@@ -229,18 +230,28 @@ export class LaurelTimingScraper extends BaseScraper {
 
     // 2) Fallback: parse the visible summary cards.
     if (!out.chipTime || !out.pace) {
+      // Each card is <div class="data"><p class="data-value">3:35:18</p>
+      // <div class="label-container"><p class="data-label">Chip Time</p>…,
+      // so the value is a sibling of the label's container, not of the label.
+      // Older editions (Portland 2021-22) have no embedded split records and
+      // only these cards. "Chip Time" wins over a generic "Finish" card, which
+      // could be the gun time.
       const $ = cheerio.load(html)
+      const cards = {}
       $('.data-label').each((_, el) => {
         const label = $(el).text().trim().toLowerCase()
-        const val = $(el).prev('.data-value').text().trim() || $(el).next('.data-value').text().trim()
-        if (!val) return
-        if (!out.chipTime && (label === 'chip time' || label === 'finish' || label === 'finish time')) {
-          if (/^\d{1,2}:\d{2}:\d{2}/.test(val)) out.chipTime = val
-        }
-        if (!out.pace && (label.startsWith('pace'))) {
-          if (/^\d{1,2}:\d{2}$/.test(val)) out.pace = val
-        }
+        const val = $(el).closest('.data').find('.data-value').first().text().trim()
+          || $(el).prev('.data-value').text().trim() || $(el).next('.data-value').text().trim()
+        if (val && !(label in cards)) cards[label] = val
       })
+      const timeLike = v => v && /^\d{1,2}:\d{2}:\d{2}/.test(v)
+      if (!out.chipTime) {
+        out.chipTime = [cards['chip time'], cards['finish time'], cards['finish']].find(timeLike) || null
+      }
+      if (!out.pace) {
+        const paceKey = Object.keys(cards).find(k => k.startsWith('pace'))
+        if (paceKey && /^\d{1,2}:\d{2}$/.test(cards[paceKey])) out.pace = cards[paceKey]
+      }
     }
 
     // 3) Bib: pull from `.participant-bib` (e.g. "#407").
