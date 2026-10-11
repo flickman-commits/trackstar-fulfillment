@@ -146,6 +146,7 @@ interface Order {
   dueDate?: string
   isRushOrder?: boolean
   rushUnpaid?: boolean
+  rushOverride?: boolean
   customerEmail?: string
   customerName?: string
   bibNumberCustomer?: string
@@ -329,6 +330,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     dueDate: order.dueDate as string | undefined,
     isRushOrder: order.isRushOrder as boolean | undefined,
     rushUnpaid: order.rushUnpaid as boolean | undefined,
+    rushOverride: order.rushOverride as boolean | undefined,
     customerEmail: order.customerEmail as string | undefined,
     customerName: order.customerName as string | undefined,
     bibNumberCustomer: order.bibNumberCustomer as string | undefined,
@@ -2321,6 +2323,23 @@ export default function Dashboard() {
     const u = team.find(t => t.id === order.assigneeId)
     if (!u) return <span className="text-sm text-off-black/40">Unassigned</span>
     return <span className="inline-flex items-center gap-1.5 text-sm text-off-black whitespace-nowrap"><Avatar user={u} size={20} />{u.firstName}</span>
+  }
+
+  // Admin only: move a custom order to rush by hand, so it cuts the line.
+  const [rushEditing, setRushEditing] = useState<string | null>(null)
+  const setRush = async (orderId: string, rush: boolean, dueDate?: string) => {
+    try {
+      const res = await apiFetch('/api/orders/rush', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, rush, dueDate }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not update rush')
+      const patch = { isRushOrder: data.order.isRushOrder, rushOverride: data.order.rushOverride, dueDate: data.order.dueDate, rushUnpaid: false }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o))
+      setSelectedOrder(prev => prev && prev.id === orderId ? { ...prev, ...patch } : prev)
+      setRushEditing(null)
+      setToast({ message: rush ? 'Marked rush. It moves up the custom queue.' : 'Rush removed. Back to the standard due date.', type: 'success' })
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : 'Could not update rush', type: 'error' })
+    }
   }
 
   const assignOrder = useCallback(async (orderId: string, assigneeId: string | null) => {
@@ -5006,6 +5025,40 @@ Thank you!`
                           )}
                           {selectedOrder.isRushOrder && (
                             <span className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-amber-50 text-amber-800 border-amber-200">⚡ Rush (4-day)</span>
+                          )}
+                          {/* Admin only: cut the line by hand. Defaults to 4 days
+                              from purchase, like a paid rush; any date can be set. */}
+                          {isAdmin && !selectedOrder.isRushOrder && rushEditing !== selectedOrder.id && (
+                            <button
+                              onClick={() => setRushEditing(selectedOrder.id)}
+                              className="inline-flex items-center px-2.5 py-1 rounded border border-dashed border-amber-300 text-sm font-medium text-amber-800 hover:bg-amber-50"
+                              title="Admin: move this order to rush so it cuts the line"
+                            >
+                              ⚡ Make rush
+                            </button>
+                          )}
+                          {isAdmin && rushEditing === selectedOrder.id && (() => {
+                            const placed = selectedOrder.orderPlacedAt || selectedOrder.createdAt
+                            // 4 days from purchase, like a paid rush, but never a day
+                            // already gone: an old order would land overdue at once.
+                            const local = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                            const fourDays = local(new Date(Math.max(new Date(placed).getTime() + 4 * 86400000, Date.now())))
+                            return (
+                              <form
+                                onSubmit={e => { e.preventDefault(); const v = (e.currentTarget.elements.namedItem('due') as HTMLInputElement).value; setRush(selectedOrder.id, true, v) }}
+                                className="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-amber-300 bg-amber-50"
+                              >
+                                <span className="text-xs font-medium text-amber-800">Rush, due</span>
+                                <input name="due" type="date" defaultValue={fourDays} className="text-xs bg-white border border-amber-200 rounded px-1.5 py-0.5" />
+                                <button type="submit" className="text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded px-2 py-0.5">Save</button>
+                                <button type="button" onClick={() => setRushEditing(null)} className="text-xs text-amber-800/70 px-1">Cancel</button>
+                              </form>
+                            )
+                          })()}
+                          {isAdmin && selectedOrder.rushOverride && (
+                            <button onClick={() => setRush(selectedOrder.id, false)} className="text-xs text-off-black/45 hover:text-red-600 underline underline-offset-2" title="Admin: back to the standard 2-week due date">
+                              Remove rush
+                            </button>
                           )}
                           {selectedOrder.rushUnpaid && (
                             <span

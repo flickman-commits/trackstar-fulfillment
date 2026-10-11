@@ -364,6 +364,7 @@ export default async function handler(req, res) {
         dueDate: order.dueDate,
         isRushOrder: order.isRushOrder,
         // Ticked "skip the line" but the rush charge is not on the order.
+        rushOverride: order.rushOverride,
         rushUnpaid: !order.isRushOrder && rushSelectedNotPaid(order.shopifyOrderData),
         customerEmail: order.customerEmail,
         customerName: order.customerName,

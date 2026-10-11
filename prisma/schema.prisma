@@ -43,6 +43,9 @@ model Order {
   // in 4 days instead of 14 and should be designed first. Set from the rush
   // add-on line item / the print's Rush Order property at import.
   isRushOrder        Boolean   @default(false)
+  // An admin moved this order to rush by hand (comped or arranged off-site).
+  // The import's paid-rush check never undoes it.
+  rushOverride       Boolean   @default(false)
   customerEmail      String?   // Customer email from Shopify order
   customerName       String?   // Customer first name from Shopify order (for email template)
   bibNumberCustomer  String?   // Bib # provided by customer (custom orders only)

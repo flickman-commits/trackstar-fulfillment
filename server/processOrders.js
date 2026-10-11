@@ -967,7 +967,7 @@ export async function processOrders(options = {}) {
                     updateData.timeCustomer = extracted.timeCustomer
                     updateData.creativeDirection = extracted.creativeDirection
 
-                    const isRush = shopifyOrderIsRush(shopifyData.shopifyOrderData, extracted.isRush)
+                    const isRush = existing.rushOverride || shopifyOrderIsRush(shopifyData.shopifyOrderData, extracted.isRush)
                     updateData.isRushOrder = isRush
 
                     // Compute due date from Shopify order created_at.
@@ -1053,7 +1053,7 @@ export async function processOrders(options = {}) {
               //   - marked rush with no paid rush (ticked the box, never paid):
               //     back to standard, unless it is already in production.
               if (
-                existing.trackstarOrderType === 'custom' && shopifyData?.shopifyOrderData &&
+                existing.trackstarOrderType === 'custom' && shopifyData?.shopifyOrderData && !existing.rushOverride &&
                 existing.designStatus !== 'sent_to_production' && updateData.isRushOrder === undefined
               ) {
                 const paidRush = shopifyOrderIsRush(shopifyData.shopifyOrderData)
