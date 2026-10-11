@@ -298,6 +298,16 @@ export const CHIP_TIME_FIXTURES = [
 
   // ── RaceRoster ────────────────────────────────────────────────────────
   {
+    platform: 'mika',
+    race: 'Chicago Marathon',
+    year: 2026,
+    runner: 'Mark Bakalars',
+    expectedChipTime: '3:43:28',
+    expectedChipPace: '8:32',
+    expectedBib: '15451',
+    notes: 'results.chicagomarathon.com/2026 (unofficial at capture, Oct 11 2026) - Finish Time 03:43:28 (13408s/26.2 = 8:31.8). Uneven: HALF 1:50:01, second half 1:53:27',
+  },
+  {
     platform: 'laurel',
     race: 'Portland Marathon',
     year: 2025,
