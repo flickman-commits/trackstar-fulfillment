@@ -2665,6 +2665,12 @@ Thank you!`
     // Their own numbers, never matched against official results. Distinct icon
     // so it does not read as a confirmed match at a glance.
     if (order.researchSource === 'customer_supplied') return { icon: '✍️', label: 'Customer-entered' }
+    // Instant Lookup at checkout: the customer's result was matched against
+    // official results (auto match, or they picked their row from a list).
+    // That is as good as our own research, so it reads as done, the same as
+    // the "Verified" tag beside it. Typed-in numbers get the pen instead.
+    if (order.lookupOutcome === 'auto_match' || order.lookupOutcome === 'picked_from_list') return { icon: '✅', label: 'Verified at checkout' }
+    if (order.lookupOutcome === 'edited_by_customer' || order.lookupOutcome?.startsWith('manual_')) return { icon: '✍️', label: 'Customer-entered' }
     if (order.status === 'ready') return { icon: '✅', label: 'Ready' }
     if (order.researchStatus === 'found') return { icon: '✅', label: 'Researched' }
     if (order.researchStatus === 'no_scraper') return { icon: '🚧', label: 'No scraper for this race' }
