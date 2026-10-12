@@ -2422,7 +2422,10 @@ export default function Dashboard() {
     // The buyer, who is often not the runner (gifts): find an order from the
     // email in a customer's message, or by the name on it.
     (o.customerEmail || '').toLowerCase().includes(query) ||
-    (o.customerName || '').toLowerCase().includes(query)
+    (o.customerName || '').toLowerCase().includes(query) ||
+    // Bibs match exactly: "12" should find bib 12, not every bib with a 1 and a 2.
+    (!!o.bibNumber && o.bibNumber.toLowerCase() === query) ||
+    (!!o.bibNumberCustomer && o.bibNumberCustomer.toLowerCase() === query)
   , [])
 
   // Race dropdown options — built from the currently-visible queue so the
@@ -2804,7 +2807,7 @@ Thank you!`
           <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
           <input
             type="text"
-            placeholder="Search by order #, runner, race or customer email..."
+            placeholder="Search by order #, runner, bib, race or customer email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
