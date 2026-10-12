@@ -158,6 +158,7 @@ interface Order {
   isGift?: boolean
   /** The order in Shopify admin; null for Etsy and hand-made orders. */
   shopifyAdminUrl?: string | null
+  arteloUrl?: string | null
   commentCount?: number
   assigneeId?: string | null
   assigneeName?: string | null
@@ -341,6 +342,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     creativeDirection: order.creativeDirection as string | undefined,
     isGift: order.isGift as boolean | undefined,
     shopifyAdminUrl: order.shopifyAdminUrl as string | null | undefined,
+    arteloUrl: order.arteloUrl as string | null | undefined,
     partnerName: order.partnerName as string | null | undefined,
     partnerContactName: order.partnerContactName as string | null | undefined,
     creatorShipping: order.creatorShipping as Order['creatorShipping'],
@@ -805,6 +807,9 @@ function getGreeting(): string {
 }
 
 /** The name to greet someone by. Falls back to the part of an email before the @. */
+/** A quiet link to the order in another platform, with that platform's mark. */
+const platformPill = 'inline-flex items-center gap-1 pl-1.5 pr-2 py-0.5 rounded-full border border-border-gray bg-white text-[11px] font-medium text-off-black/60 hover:text-off-black hover:border-off-black/25 transition-colors'
+
 function greetingName(user: { firstName?: string | null; email?: string | null } | null): string {
   return (user?.firstName || '').trim() || (user?.email || '').split('@')[0] || 'there'
 }
@@ -5418,15 +5423,19 @@ Thank you!`
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product Details</div>
-                          {selectedOrder.shopifyAdminUrl && (
-                            <a
-                              href={selectedOrder.shopifyAdminUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-0.5 text-xs text-off-black/45 hover:text-off-black transition-colors"
-                            >
-                              View in Shopify <ArrowUpRight className="w-3 h-3" />
-                            </a>
+                          {(selectedOrder.shopifyAdminUrl || selectedOrder.arteloUrl) && (
+                            <div className="flex items-center gap-1.5">
+                              {selectedOrder.shopifyAdminUrl && (
+                                <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className={platformPill} title="Open this order in Shopify">
+                                  <img src="/shopify-icon.png" alt="" className="w-3.5 h-3.5" /> Shopify <ArrowUpRight className="w-3 h-3 opacity-50" />
+                                </a>
+                              )}
+                              {selectedOrder.arteloUrl && (
+                                <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className={platformPill} title="Open this order in Artelo">
+                                  <img src="/artelo-icon.png" alt="" className="w-3.5 h-3.5 rounded-[3px]" /> Artelo <ArrowUpRight className="w-3 h-3 opacity-50" />
+                                </a>
+                              )}
+                            </div>
                           )}
                         </div>
                         {/* Race leads as the headline, year rides beside it. */}

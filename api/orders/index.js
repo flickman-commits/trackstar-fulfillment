@@ -6,7 +6,7 @@ import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../..
 import { getProductInfo, loadProductCatalog } from '../../server/lib/productCatalog.js'
 import { isRushAddonLineItem, isRemovedLineItem } from '../../server/lib/lineItemMatching.js'
 import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
-import { shopifyAdminUrl } from '../../server/lib/links.js'
+import { shopifyAdminUrl, arteloOrderUrl } from '../../server/lib/links.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 
 
@@ -78,6 +78,7 @@ export async function rawSlice(ids) {
     SELECT id,
       CASE WHEN "shopifyOrderData" IS NULL THEN NULL ELSE jsonb_build_object(
         'id', "shopifyOrderData"::jsonb->'id',
+        'id', "shopifyOrderData"::jsonb->'id',
         'name', "shopifyOrderData"::jsonb->'name',
         'created_at', "shopifyOrderData"::jsonb->'created_at',
         'financial_status', "shopifyOrderData"::jsonb->'financial_status',
@@ -102,6 +103,7 @@ export async function rawSlice(ids) {
           FROM jsonb_array_elements(CASE WHEN jsonb_typeof("etsyOrderData"::jsonb->'transactions') = 'array'
             THEN "etsyOrderData"::jsonb->'transactions' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(x, n))) END AS e,
       jsonb_build_object(
+        'id', "arteloOrderData"::jsonb->'id',
         'shipping', "arteloOrderData"::jsonb->'shipping',
         'creatorId', "arteloOrderData"::jsonb->'creatorId',
         'createdAt', "arteloOrderData"::jsonb->'createdAt',
@@ -375,6 +377,7 @@ export default async function handler(req, res) {
         isGift: order.isGift,
         // The order in Shopify admin, for the order modal's View in Shopify.
         shopifyAdminUrl: ['standard', 'custom'].includes(order.trackstarOrderType) ? shopifyAdminUrl(order.shopifyOrderData?.id) : null,
+        arteloUrl: arteloOrderUrl(order.arteloOrderData?.id),
         // Race-partner virtual fields (aliases for existing columns — no schema change)
         partnerName: order.trackstarOrderType === 'race_partner' ? order.raceName : null,
         partnerContactName: order.trackstarOrderType === 'race_partner' ? order.customerName : null,

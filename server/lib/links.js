@@ -27,3 +27,8 @@ export function shopifyAdminUrl(shopifyOrderId) {
   if (!shopifyOrderId || !handle) return null
   return `https://admin.shopify.com/store/${handle}/orders/${shopifyOrderId}`
 }
+
+/** The order's page in Artelo's dashboard, from the Artelo order id (a UUID). */
+export function arteloOrderUrl(arteloId) {
+  return arteloId && /^[0-9a-f-]{36}$/i.test(String(arteloId)) ? `https://www.artelo.com/app/orders/${arteloId}` : null
+}
