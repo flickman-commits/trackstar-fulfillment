@@ -51,6 +51,7 @@ export interface TaggableOrder {
   isBigSpender?: boolean
   photoPath?: string | null
   photoPlacedAt?: string | null
+  photoUnpaid?: boolean
   orderTotalUsd?: number | null
   shippingMethod?: string | null
   flagReason?: string | null
@@ -184,6 +185,10 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   }
 
   // Photo add-on changes the artwork, so it ranks above ordinary flags.
+  if (o.photoUnpaid) {
+    tags.push({ key: 'photo-unpaid', label: 'Photo not paid', tone: 'red',
+      title: 'A photo was added after the order and the customer has not paid the Photo Add-On yet. Hold this print until the Shopify order reads paid.' })
+  }
   if (o.photoPath) {
     tags.push(o.photoPlacedAt
       ? { key: 'photo', label: 'Photo placed', tone: 'green',

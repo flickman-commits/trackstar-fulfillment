@@ -5,6 +5,7 @@ import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shippin
 import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
 import { getProductInfo, loadProductCatalog } from '../../server/lib/productCatalog.js'
 import { isRushAddonLineItem, isRemovedLineItem } from '../../server/lib/lineItemMatching.js'
+import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
 import { shopifyAdminUrl } from '../../server/lib/links.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 
@@ -468,6 +469,20 @@ export default async function handler(req, res) {
         }
       }
     }
+
+    // A photo attached by hand after purchase is unpaid until the Shopify
+    // order carries a paid Photo Add-On for it.
+    const byParent = new Map()
+    for (const o of orders) if (o.photoAddedManually || o.photoPath) {
+      if (!byParent.has(o.parentOrderNumber)) byParent.set(o.parentOrderNumber, [])
+      byParent.get(o.parentOrderNumber).push(o)
+    }
+    const unpaid = new Set()
+    for (const rows of byParent.values()) {
+      if (!rows.some(r => r.photoAddedManually)) continue
+      for (const id of unpaidPhotoRows(rows, rows[0].shopifyOrderData)) unpaid.add(id)
+    }
+    for (const o of transformedOrders) o.photoUnpaid = unpaid.has(o.id)
 
     return res.status(200).json({ orders: transformedOrders })
   } catch (error) {

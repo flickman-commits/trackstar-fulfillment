@@ -1070,6 +1070,20 @@ export async function processOrders(options = {}) {
                 }
               }
 
+              // Keep the stored Shopify order current while it is open: an edit
+              // after purchase (a Photo Add-On we billed for, a rush) changes
+              // the line items, and the customer paying changes the payment
+              // status. Both decide whether that extra is paid. Only written
+              // when one of them moved, so a quiet order costs nothing.
+              if (shopifyData?.shopifyOrderData && existing.shopifyOrderData && updateData.shopifyOrderData === undefined) {
+                const fresh = shopifyData.shopifyOrderData, stored = existing.shopifyOrderData
+                const lines = o => JSON.stringify((o.line_items || []).map(l => [l.id, l.current_quantity ?? l.quantity]))
+                if (fresh.financial_status !== stored.financial_status || lines(fresh) !== lines(stored)) {
+                  updateData.shopifyOrderData = fresh
+                  needsUpdate = true
+                }
+              }
+
               if (needsUpdate) {
                 // An order that turns out to be custom on a later pass moves to
                 // the custom queue, unless someone already picked an assignee

@@ -8,6 +8,7 @@ import BulkView from '@/components/bulk/BulkView'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import ApiKeysPanel from '@/components/ApiKeysPanel'
+import AddPhotoPanel from '@/components/AddPhotoPanel'
 import AssignmentPanel from '@/components/AssignmentPanel'
 import AssigneePicker, { Avatar, QueuePill, type QueueMember } from '@/components/AssigneePicker'
 import StatsPanel from '@/components/StatsPanel'
@@ -100,6 +101,8 @@ interface Order {
   // overwhelming majority of orders. Not openable directly: the bucket is
   // private and the dashboard mints a signed URL on demand.
   photoPath?: string | null
+  photoAddedManually?: boolean
+  photoUnpaid?: boolean
   // When a designer confirmed the photo is on the artwork. Completing a photo
   // order is blocked until this is set.
   photoPlacedAt?: string | null
@@ -374,6 +377,8 @@ function mapOrder(order: Record<string, unknown>): Order {
     // Personalization photo — drives the photo chip, View Photo and the
     // placement sign-off that gates completion.
     photoPath: order.photoPath as string | null | undefined,
+    photoAddedManually: order.photoAddedManually as boolean | undefined,
+    photoUnpaid: order.photoUnpaid as boolean | undefined,
     photoPlacedAt: order.photoPlacedAt as string | null | undefined,
     // Counts and send timestamps. The API has always returned these and this
     // whitelist has always dropped them, so everything downstream read
@@ -2340,6 +2345,16 @@ export default function Dashboard() {
     } catch (e) {
       setToast({ message: e instanceof Error ? e.message : 'Could not update rush', type: 'error' })
     }
+  }
+
+  const removeManualPhoto = async (orderId: string) => {
+    if (!confirm('Remove this photo from the print? The Photo Add-On stays on the Shopify order; refund it there if needed.')) return
+    try {
+      const res = await apiFetch('/api/orders/photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', orderId }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not remove')
+      fetchOrders()
+      setSelectedOrder(prev => prev && prev.id === orderId ? { ...prev, photoPath: null, photoAddedManually: false, photoUnpaid: false } : prev)
+    } catch (e) { setToast({ message: e instanceof Error ? e.message : 'Could not remove', type: 'error' }) }
   }
 
   const assignOrder = useCallback(async (orderId: string, assigneeId: string | null) => {
@@ -5583,7 +5598,32 @@ Thank you!`
                     {photoError && (
                       <p className="text-[11px] text-red-600">Photo: {photoError}</p>
                     )}
+                    {selectedOrder.photoUnpaid && (
+                      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                        <span className="font-semibold">Photo not paid.</span> It was added after the order and the customer has not paid the Photo Add-On yet. Hold this print until the Shopify order reads paid; it updates on its own within about 10 minutes of payment.
+                        {isAdmin && selectedOrder.photoAddedManually && (
+                          <button onClick={() => removeManualPhoto(selectedOrder.id)} className="ml-2 text-xs underline underline-offset-2 text-red-700/80">Remove photo</button>
+                        )}
+                      </div>
+                    )}
                     {photoCard}
+                    {isAdmin && selectedOrder.trackstarOrderType === 'standard' && (
+                      <AddPhotoPanel
+                        key={selectedOrder.id}
+                        currentId={selectedOrder.id}
+                        isShopify={selectedOrder.source === 'shopify'}
+                        prints={orders
+                          .filter(o => o.parentOrderNumber === selectedOrder.parentOrderNumber && o.trackstarOrderType === 'standard')
+                          .sort((a, b) => a.lineItemIndex - b.lineItemIndex)
+                          .map(o => ({ id: o.id, label: `${o.displayOrderNumber}${getOrderItemCount(o.parentOrderNumber) > 1 ? ` item ${o.lineItemIndex + 1}` : ''}: ${o.effectiveRunnerName || o.runnerName || 'runner'}`, hasPhoto: !!o.photoPath }))}
+                        onDone={({ charged, chargeError }) => {
+                          fetchOrders()
+                          setToast(chargeError
+                            ? { message: chargeError, type: 'error' }
+                            : { message: charged ? 'Photo added. Shopify is emailing the customer to pay for it.' : 'Photo added.', type: 'success' })
+                        }}
+                      />
+                    )}
                     {/* Customer's own numbers. Loud, because the whole point is
                         that nobody goes looking for a "better" answer: we
                         deliberately skip the scrape for these orders, so

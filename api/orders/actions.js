@@ -26,6 +26,7 @@
  */
 
 import crypto from 'crypto'
+import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
 import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
@@ -450,6 +451,15 @@ async function handleComplete({ orderNumber }, res, actor) {
       error: 'photo_not_confirmed',
       message: 'This print includes a customer photo. Confirm the photo is placed before completing the order.',
     })
+  }
+
+  // A photo added after purchase is printed only once the customer has paid
+  // for it (photoPayment.js).
+  if (existing.photoAddedManually) {
+    const siblings = await prisma.order.findMany({ where: { parentOrderNumber: existing.parentOrderNumber }, select: { id: true, photoPath: true, photoAddedManually: true } })
+    if (unpaidPhotoRows(siblings, existing.shopifyOrderData).has(existing.id)) {
+      return res.status(409).json({ error: 'photo_not_paid', message: 'The customer has not paid for the photo yet. Wait for the Shopify order to read paid before completing.' })
+    }
   }
 
   const order = await prisma.order.update({
