@@ -10,7 +10,7 @@ import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/componen
 import ApiKeysPanel from '@/components/ApiKeysPanel'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
 import AssignmentPanel from '@/components/AssignmentPanel'
-import AssigneePicker, { Avatar, QueuePill, type QueueMember } from '@/components/AssigneePicker'
+import AssigneePicker, { Avatar, QueuePill, type QueueMember, setTeamColors } from '@/components/AssigneePicker'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
@@ -910,7 +910,7 @@ export default function Dashboard() {
   const [queues, setQueues] = useState<Record<string, QueueMember[]>>({})
   const [scope, setScope] = useState<'mine' | 'all' | null>(null)
   const loadTeam = useCallback(() => {
-    apiFetch('/api/orders/assign').then(r => r.ok ? r.json() : null).then(d => { if (d?.users) setTeam(d.users); if (d?.queues) setQueues(d.queues) }).catch(() => {})
+    apiFetch('/api/orders/assign').then(r => r.ok ? r.json() : null).then(d => { if (d?.users) { setTeamColors(d.users); setTeam(d.users) } if (d?.queues) setQueues(d.queues) }).catch(() => {})
   }, [])
   useEffect(() => { loadTeam() }, [loadTeam])
   const [searchParams, setSearchParams] = useSearchParams()

@@ -7,9 +7,22 @@ import { Check, UserRound } from 'lucide-react'
  */
 export type Teammate = { id: string; firstName: string; lastName: string }
 
-// Stable per person, so Eli is always the same color wherever he appears.
-const COLORS = ['#4CC38A', '#5B8DEF', '#E8A23B', '#D6618C', '#8B6CEF', '#3BB4C1', '#E5735A']
+// One color per person, never shared. A hash into a short palette put two
+// people on the same color (Creed and Dan were both orange), so colors are
+// handed out in order over the whole team instead: sorted by id, so everyone
+// keeps their color across pages and sessions until the team changes.
+const COLORS = ['#E5735A', '#5B8DEF', '#4CC38A', '#E8A23B', '#8B6CEF', '#D6618C', '#3BB4C1', '#94A23B', '#C46BD8', '#5A6B7B']
+const teamColors = new Map<string, string>()
+
+/** Call with the full team whenever it loads, so each person gets their own color. */
+export function setTeamColors(team: { id: string }[]) {
+  teamColors.clear()
+  ;[...team].sort((a, b) => a.id.localeCompare(b.id)).forEach((u, i) => teamColors.set(u.id, COLORS[i % COLORS.length]))
+}
+
 function colorFor(id: string) {
+  const known = teamColors.get(id)
+  if (known) return known
   let h = 0
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
   return COLORS[h % COLORS.length]
@@ -39,6 +52,7 @@ export default function AssigneePicker({ team, value, meId, onChange, readOnly =
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const current = team.find(u => u.id === value) || null
+  setTeamColors(team)
 
   useEffect(() => {
     if (!open) return
