@@ -5,27 +5,29 @@
  * DEFAULT_CAPS here is only the fallback for a session that has not loaded
  * it yet.
  */
-export type Role = 'admin' | 'sales' | 'fulfillment' | 'designer'
+export type Role = 'admin' | 'sales' | 'fulfillment' | 'head_designer' | 'designer'
 
 export type Capability =
-  | 'sales' | 'creators'
+  | 'sales' | 'creators' | 'orders.assign_custom'
   | 'tools.discounts' | 'tools.pace' | 'tools.weather' | 'tools.surveys'
   | 'settings.pricing' | 'settings.reviews' | 'settings.stats' | 'settings.data' | 'settings.admin'
 
 export type Caps = '*' | Capability[]
 
-export const ROLES: Role[] = ['admin', 'sales', 'fulfillment', 'designer']
+export const ROLES: Role[] = ['admin', 'sales', 'fulfillment', 'head_designer', 'designer']
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Admin',
   sales: 'Sales & Marketing',
   fulfillment: 'Fulfillment',
-  designer: 'Designer',
+  head_designer: 'Head of Design',
+  designer: 'Junior Designer',
 }
 
 export const CAPABILITY_LABEL: Partial<Record<Capability, string>> = {
   sales: 'Sales',
   creators: 'Creators',
+  'orders.assign_custom': 'Assign customs',
   'tools.discounts': 'Discounts',
   'tools.pace': 'Pace',
   'tools.weather': 'Weather',
@@ -39,6 +41,7 @@ const DEFAULT_CAPS: Record<Role, Caps> = {
   admin: '*',
   sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.pricing', 'settings.reviews', 'settings.stats'],
   fulfillment: ['creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  head_designer: ['orders.assign_custom', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
   designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
 }
 

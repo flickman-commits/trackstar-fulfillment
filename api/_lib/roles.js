@@ -4,7 +4,9 @@
  *   admin        Matt. Everything, always, including Settings > Data and Admin.
  *   sales        Sales & Marketing.
  *   fulfillment  Fulfillment.
- *   designer     Designer.
+ *   head_designer  Head of Design (Dan): also assigns custom orders.
+ *   designer     Junior Designer. The id stays "designer" so existing people
+ *                keep their role; only the label changed.
  *
  * What the three non-admin roles include is set by an admin in Settings >
  * Admin > Roles, as checkboxes over CAPABILITIES, and kept in SystemConfig
@@ -19,19 +21,21 @@
  */
 import prisma from './prisma.js'
 
-export const ROLES = ['admin', 'sales', 'fulfillment', 'designer']
+export const ROLES = ['admin', 'sales', 'fulfillment', 'head_designer', 'designer']
 
 export const ROLE_LABEL = {
   admin: 'Admin',
   sales: 'Sales & Marketing',
   fulfillment: 'Fulfillment',
-  designer: 'Designer',
+  head_designer: 'Head of Design',
+  designer: 'Junior Designer',
 }
 
 /** What an admin can hand out, in the order the Roles panel shows them. */
 export const CAPABILITIES = [
   { id: 'sales', group: 'Pages', label: 'Sales' },
   { id: 'creators', group: 'Pages', label: 'Creators' },
+  { id: 'orders.assign_custom', group: 'Orders', label: 'Assign custom orders' },
   { id: 'tools.discounts', group: 'Tools', label: 'Discount codes' },
   { id: 'tools.pace', group: 'Tools', label: 'Pace calculator' },
   { id: 'tools.weather', group: 'Tools', label: 'Race weather' },
@@ -46,6 +50,7 @@ const EDITABLE_ROLES = ROLES.filter(r => r !== 'admin')
 export const DEFAULT_CAPS = {
   sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.pricing', 'settings.reviews', 'settings.stats'],
   fulfillment: ['creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  head_designer: ['orders.assign_custom', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
   designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
 }
 

@@ -9,6 +9,7 @@
  * the two queues, standard and custom.
  */
 import prisma from '../../db.js'
+import { getCanonicalRaceName } from '../../scrapers/index.js'
 
 export const ASSIGNABLE_TYPES = ['standard', 'custom', 'race_partner', 'bulk']
 export const SHIFT_TYPES = ['standard', 'custom']
@@ -173,8 +174,63 @@ export function pickByShare(roster, counts) {
   return best?.userId || null
 }
 
-/** The assignee for a new order: the regular, or the roster's share balance while help is on. */
-export async function assigneeForNewOrder(orderType) {
+/*
+ * Race routing (standard orders, admin only): send every order for one race
+ * to one person, e.g. all Chicago Marathon orders to Eli while someone else
+ * takes the rest. Checked before the regular and help shifts. Kept in
+ * SystemConfig as [{ race, userId }]; race is the canonical race name so
+ * "Bank of America Chicago Marathon" and "Chicago Marathon" both match.
+ */
+const RACE_KEY = 'assignment_race_rules'
+
+export const raceKey = name => (getCanonicalRaceName(name) || String(name || '')).trim().toLowerCase()
+
+export async function getRaceRules() {
+  const row = await prisma.systemConfig.findUnique({ where: { key: RACE_KEY } })
+  try { const v = row?.value ? JSON.parse(row.value) : []; return Array.isArray(v) ? v : [] } catch { return [] }
+}
+
+export async function setRaceRules(rules) {
+  const seen = new Set()
+  const clean = []
+  for (const r of Array.isArray(rules) ? rules : []) {
+    const race = String(r?.race || '').trim()
+    if (!race || !r?.userId || seen.has(raceKey(race))) continue
+    seen.add(raceKey(race))
+    clean.push({ race: getCanonicalRaceName(race) || race, userId: String(r.userId) })
+  }
+  const v = JSON.stringify(clean)
+  await prisma.systemConfig.upsert({ where: { key: RACE_KEY }, update: { value: v }, create: { key: RACE_KEY, value: v } })
+  return clean
+}
+
+/** The person a race is routed to, if any and still active. */
+export async function raceRouteFor(orderType, raceName) {
+  if (orderType !== 'standard' || !raceName) return null
+  const rule = (await getRaceRules()).find(r => raceKey(r.race) === raceKey(raceName))
+  if (!rule) return null
+  const u = await prisma.user.findUnique({ where: { id: rule.userId }, select: { isActive: true } })
+  return u?.isActive ? rule.userId : null
+}
+
+/** Move a race's open standard orders to its routed person (a new rule, applied to the waiting queue). */
+export async function applyRaceRule(race) {
+  const rules = await getRaceRules()
+  const rule = rules.find(r => raceKey(r.race) === raceKey(race))
+  if (!rule) throw new Error('No rule for that race')
+  const open = await prisma.order.findMany({
+    where: { trackstarOrderType: 'standard', status: { not: 'completed' } },
+    select: { id: true, raceName: true, raceNameOverride: true, assigneeId: true },
+  })
+  const ids = open.filter(o => raceKey(o.raceNameOverride || o.raceName) === raceKey(rule.race) && o.assigneeId !== rule.userId).map(o => o.id)
+  if (ids.length) await prisma.order.updateMany({ where: { id: { in: ids } }, data: { assigneeId: rule.userId } })
+  return { moved: ids.length }
+}
+
+/** The assignee for a new order: a race route, else the regular, or the roster's share balance while help is on. */
+export async function assigneeForNewOrder(orderType, raceName = null) {
+  const routed = await raceRouteFor(orderType, raceName)
+  if (routed) return routed
   const roster = await rosterFor(orderType)
   if (roster.length <= 1) return roster[0]?.userId || null
   return pickByShare(roster, await openCounts(orderType, roster.map(r => r.userId)))

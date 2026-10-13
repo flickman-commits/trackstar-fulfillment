@@ -27,11 +27,14 @@ export function Avatar({ user, size = 24 }: { user: Teammate; size?: number }) {
   )
 }
 
-export default function AssigneePicker({ team, value, meId, onChange }: {
+export default function AssigneePicker({ team, value, meId, onChange, readOnly = false, readOnlyReason }: {
   team: Teammate[]
   value: string | null
   meId?: string | null
   onChange: (id: string | null) => void
+  /** Shows who has it without letting this person change it. */
+  readOnly?: boolean
+  readOnlyReason?: string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -52,9 +55,9 @@ export default function AssigneePicker({ team, value, meId, onChange }: {
     <div ref={ref} className="relative inline-block">
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-off-black/5 transition-colors"
-        title="Who is fulfilling this order"
+        onClick={() => { if (!readOnly) setOpen(o => !o) }}
+        className={`inline-flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors ${readOnly ? 'cursor-default' : 'hover:bg-off-black/5'}`}
+        title={readOnly ? (readOnlyReason || 'Who is fulfilling this order') : 'Who is fulfilling this order'}
       >
         <UserRound className="w-4 h-4 text-off-black/40" />
         {current ? (

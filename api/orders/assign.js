@@ -22,7 +22,10 @@ import { requireAdminRole, recordAudit, loadActiveUser } from '../_lib/users.js'
 import {
   getAssignmentDefaults, setAssignmentDefaults, ASSIGNABLE_TYPES,
   getShifts, addShift, endShift, spreadQueue, openCounts, businessDate, rosterFor,
+  getRaceRules, setRaceRules, applyRaceRule,
 } from '../../server/domain/orders/assignment.js'
+import { can } from '../_lib/roles.js'
+import { getCanonicalRaceName } from '../../server/scrapers/index.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -59,7 +62,16 @@ export default async function handler(req, res) {
       }
       const base = { users, defaults: await getAssignmentDefaults({ force: true }), queues, me: actor.id || null }
       if (!isAdmin) return res.status(200).json(base)
-      return res.status(200).json({ ...base, shifts, open, today: businessDate() })
+      // Races with open standard orders, busiest first, for the race routing picker.
+      const openStd = await prisma.order.findMany({ where: { trackstarOrderType: 'standard', status: { not: 'completed' } }, select: { raceName: true, raceNameOverride: true, assigneeId: true } })
+      const byRace = new Map()
+      for (const o of openStd) {
+        const name = getCanonicalRaceName(o.raceNameOverride || o.raceName) || o.raceNameOverride || o.raceName
+        if (!name || name === 'Unknown Race') continue
+        byRace.set(name, (byRace.get(name) || 0) + 1)
+      }
+      const raceOptions = [...byRace.entries()].sort((a, b) => b[1] - a[1]).map(([race, open]) => ({ race, open }))
+      return res.status(200).json({ ...base, shifts, open, today: businessDate(), raceRules: await getRaceRules(), raceOptions })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
@@ -101,12 +113,40 @@ export default async function handler(req, res) {
       }
     }
 
+    // Race routing for standard orders (admins): every order for a race to one person.
+    if (body.action === 'race-rules') {
+      const admin = await requireAdminRole(req, res, actor)
+      if (!admin) return
+      const rules = await setRaceRules(body.rules)
+      await recordAudit({ action: 'order.race-rules', summary: `Race routing: ${rules.map(r => r.race).join(', ') || 'none'}`, detail: rules, actor: admin })
+      return res.status(200).json({ raceRules: rules })
+    }
+    if (body.action === 'apply-race-rule') {
+      const admin = await requireAdminRole(req, res, actor)
+      if (!admin) return
+      try {
+        const out = await applyRaceRule(String(body.race || ''))
+        await recordAudit({ action: 'order.race-rule-applied', summary: `Moved ${out.moved} open ${body.race} order(s) to its routed person`, detail: { race: body.race, ...out }, actor: admin })
+        return res.status(200).json(out)
+      } catch (err) { return res.status(400).json({ error: err.message }) }
+    }
+
     const orderId = String(body.orderId || '')
     if (!orderId) return res.status(400).json({ error: 'orderId is required' })
     const assigneeId = body.assigneeId ? String(body.assigneeId) : null
     if (assigneeId) {
       const u = await prisma.user.findUnique({ where: { id: assigneeId }, select: { isActive: true } })
       if (!u?.isActive) return res.status(400).json({ error: 'That teammate is not active' })
+    }
+    // Custom orders are handed out by whoever runs design (Head of Design, or
+    // an admin), not by anyone on the team.
+    const target = await prisma.order.findUnique({ where: { id: orderId }, select: { trackstarOrderType: true } })
+    if (!target) return res.status(404).json({ error: 'Order not found' })
+    if (target.trackstarOrderType === 'custom') {
+      const me = await loadActiveUser(actor)
+      if (!me || !(me.isSystem || await can(me.role, 'orders.assign_custom'))) {
+        return res.status(403).json({ error: 'Only the Head of Design or an admin can assign custom orders.', code: 'not_allowed' })
+      }
     }
     const order = await prisma.order.update({
       where: { id: orderId },

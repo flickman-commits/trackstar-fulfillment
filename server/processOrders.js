@@ -1279,7 +1279,7 @@ export async function processOrders(options = {}) {
                   // Custom order fields
                   trackstarOrderType,
                   // Straight into the right person's queue.
-                  assigneeId: await assigneeForNewOrder(trackstarOrderType),
+                  assigneeId: await assigneeForNewOrder(trackstarOrderType, raceName),
                   designStatus: trackstarOrderType === 'custom' ? 'not_started' : 'not_started',
                   dueDate,
                   isRushOrder,

@@ -52,6 +52,8 @@ export default function AssignmentPanel() {
   const [today, setToday] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [adding, setAdding] = useState<OrderType | null>(null)
+  const [raceRules, setRaceRules] = useState<{ race: string; userId: string }[]>([])
+  const [raceOptions, setRaceOptions] = useState<{ race: string; open: number }[]>([])
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +64,8 @@ export default function AssignmentPanel() {
       setShifts(d.shifts || [])
       setOpen(d.open || {})
       setToday(d.today || new Date().toISOString().slice(0, 10))
+      setRaceRules(d.raceRules || [])
+      setRaceOptions(d.raceOptions || [])
     } catch {
       toast.error('Could not load the team.')
     }
@@ -205,6 +209,24 @@ export default function AssignmentPanel() {
                 </button>
               )}
             </div>}
+
+            {t.key === 'standard' && (
+              <RaceRouting
+                users={users}
+                rules={raceRules}
+                options={raceOptions}
+                busy={busy}
+                onSave={async (rules) => {
+                  const d = await post('race-rules', { action: 'race-rules', rules })
+                  if (d) { setRaceRules(d.raceRules); toast.success('Saved. New orders for these races go straight to their person.') }
+                  return !!d
+                }}
+                onApply={async (race) => {
+                  const d = await post(`apply-${race}`, { action: 'apply-race-rule', race })
+                  if (d) { toast.success(d.moved ? `Moved ${d.moved} open ${race} order${d.moved === 1 ? '' : 's'}` : `Every open ${race} order is already theirs`); load() }
+                }}
+              />
+            )}
           </div>
         )
       })}
@@ -275,6 +297,64 @@ function AddHelp({ users, today, busy, onAdd, onCancel }: {
         <button className={btnSecondary} onClick={onCancel}>Cancel</button>
       </div>
       {!users.length && <p className="text-xs text-amber-700">Nobody else is on the team yet. Invite them from People first.</p>}
+    </div>
+  )
+}
+
+/**
+ * Standard orders only: every order for a race goes to one person, ahead of
+ * the regular and any help. "Move open orders" hands them what is already
+ * waiting for that race.
+ */
+function RaceRouting({ users, rules, options, busy, onSave, onApply }: {
+  users: User[]
+  rules: { race: string; userId: string }[]
+  options: { race: string; open: number }[]
+  busy: string | null
+  onSave: (rules: { race: string; userId: string }[]) => Promise<boolean>
+  onApply: (race: string) => void
+}) {
+  const [race, setRace] = useState('')
+  const [userId, setUserId] = useState(users[0]?.id || '')
+  const name = (id: string) => { const u = users.find(x => x.id === id); return u ? `${u.firstName} ${u.lastName}` : 'Someone (inactive)' }
+  const openFor = (r: string) => options.find(o => o.race.toLowerCase() === r.toLowerCase())?.open || 0
+  const taken = new Set(rules.map(r => r.race.toLowerCase()))
+
+  return (
+    <div className="border-t border-border-gray px-3 py-2.5 space-y-2">
+      <div className="text-xs font-semibold text-off-black">Route races to a person</div>
+      <p className="text-[11px] text-off-black/50">Every order for the race goes to them, ahead of the regular and any help. Everything else is split as above.</p>
+      {rules.map(r => (
+        <div key={r.race} className="flex items-center justify-between gap-3 bg-white border border-border-gray rounded-md px-3 py-2">
+          <div className="text-xs">
+            <span className="font-medium text-off-black">{r.race}</span>
+            <span className="text-off-black/55"> → {name(r.userId)}</span>
+            <span className="text-off-black/40"> · {openFor(r.race)} open</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button className={btnSecondary} disabled={busy === `apply-${r.race}`} onClick={() => onApply(r.race)} title="Give them every open order for this race">
+              {busy === `apply-${r.race}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Shuffle className="w-3 h-3" />} Move open orders
+            </button>
+            <button className={btnGhost} onClick={() => onSave(rules.filter(x => x.race !== r.race))}><X className="w-3 h-3" /> Remove</button>
+          </div>
+        </div>
+      ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <input list="race-route-options" value={race} onChange={e => setRace(e.target.value)} placeholder="Race, e.g. Chicago Marathon" className={`${inputBase} flex-1 min-w-[12rem]`} />
+        <datalist id="race-route-options">
+          {options.filter(o => !taken.has(o.race.toLowerCase())).map(o => <option key={o.race} value={o.race}>{o.open} open</option>)}
+        </datalist>
+        <select value={userId} onChange={e => setUserId(e.target.value)} className={`${inputBase} w-40`}>
+          {users.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+        </select>
+        <button
+          className={btnSecondary}
+          disabled={!race.trim() || !userId || busy === 'race-rules'}
+          onClick={async () => { if (await onSave([...rules, { race: race.trim(), userId }])) setRace('') }}
+        >
+          <Plus className="w-3 h-3" /> Route
+        </button>
+      </div>
     </div>
   )
 }

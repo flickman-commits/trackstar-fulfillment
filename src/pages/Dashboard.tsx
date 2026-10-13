@@ -4604,7 +4604,15 @@ Thank you!`
                     )}
                     {(selectedOrder.trackstarOrderType === 'standard' || selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner' || !selectedOrder.trackstarOrderType) && team.length > 0 && (
                       <span className="ml-1">
-                        <AssigneePicker team={team} value={selectedOrder.assigneeId || null} meId={myId} onChange={id => assignOrder(selectedOrder.id, id)} />
+                        <AssigneePicker
+                          team={team}
+                          value={selectedOrder.assigneeId || null}
+                          meId={myId}
+                          onChange={id => assignOrder(selectedOrder.id, id)}
+                          // Custom orders are handed out by the Head of Design (or an admin).
+                          readOnly={selectedOrder.trackstarOrderType === 'custom' && !can('orders.assign_custom')}
+                          readOnlyReason="Custom orders are assigned by the Head of Design"
+                        />
                       </span>
                     )}
                   </div>
