@@ -1,11 +1,29 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, Check, ArrowRight } from 'lucide-react'
+import SiteFooter from '@/components/SiteFooter'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
-// Public creator-program landing page. Single CTA → mints a fresh invite
+// Public creator-program landing page. Single CTA -> mints a fresh invite
 // token and drops the applicant straight into the onboarding wizard.
+//
+// Styled to match charity.trackstar.art (the Charity Bib Finder), which uses
+// the storefront's design system (trackstar-art assets/trackstar-system.css):
+// Helvetica at -0.04em, purple #4600D6, a slim white header with the wordmark
+// and a divider, a big centered hero, warm gray rounded panels, 8px controls.
+const TS = {
+  purple: '#4600D6',
+  purpleHover: '#3A00B0',
+  ink: '#1E1E1E',
+  gray: '#F6F5F2',
+  muted: '#666666',
+  border: '#E0E0E0',
+  font: "Helvetica, 'Helvetica Neue', Arial, sans-serif",
+}
+const WORDMARK = 'https://www.trackstar.art/cdn/shop/files/Trackstar_Logo_Cropped.png'
+const STORE = 'https://www.trackstar.art/collections/marathons?utm_source=creator-program&utm_medium=referral'
+
 export default function CreatorApply() {
   const navigate = useNavigate()
   const [isStarting, setIsStarting] = useState(false)
@@ -33,151 +51,121 @@ export default function CreatorApply() {
     }
   }
 
+  const applyButton = (block = false) => (
+    <button
+      onClick={handleApply}
+      disabled={isStarting}
+      className={`inline-flex items-center justify-center gap-2 font-bold text-white transition-colors disabled:opacity-60 ${block ? 'w-full sm:w-auto' : ''}`}
+      style={{ minHeight: 56, padding: '16px 28px', fontSize: 16, borderRadius: 8, letterSpacing: '-0.04em', backgroundColor: TS.purple }}
+      onMouseEnter={e => { e.currentTarget.style.backgroundColor = TS.purpleHover }}
+      onMouseLeave={e => { e.currentTarget.style.backgroundColor = TS.purple }}
+    >
+      {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+      Apply Now
+      {!isStarting && <ArrowRight className="w-4 h-4" />}
+    </button>
+  )
+
   return (
-    <div className="min-h-screen bg-[#F0F0F0]">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-[#F0F0F0]/90 backdrop-blur border-b border-border-gray/60">
-        <div className="max-w-5xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
-          <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8" />
-          <button
-            onClick={handleApply}
-            disabled={isStarting}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#4F2DD4] text-white text-sm font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {isStarting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-            Apply
-          </button>
+    <div className="min-h-screen bg-white text-black" style={{ fontFamily: TS.font, letterSpacing: '-0.02em' }}>
+      {/* Slim header: wordmark, a divider, the page's name. Same as the finder. */}
+      <header className="sticky top-0 z-20 bg-white" style={{ borderBottom: `1px solid ${TS.border}` }}>
+        <div className="mx-auto flex items-center gap-4 px-4 md:px-6" style={{ maxWidth: 1120, minHeight: 60 }}>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <a href={STORE}><img src={WORDMARK} alt="Trackstar" className="w-[100px] md:w-[124px] h-auto" /></a>
+            <span className="font-bold text-sm md:text-[19px] whitespace-nowrap pl-2.5" style={{ borderLeft: `1px solid ${TS.border}` }}>Creator Program</span>
+          </div>
+          <nav className="ml-auto">
+            <button onClick={handleApply} disabled={isStarting} className="font-medium text-[15px] hover:underline underline-offset-4" style={{ color: TS.purple }}>
+              Apply
+            </button>
+          </nav>
         </div>
       </header>
 
-      {/* Hero — 2-col grid on desktop. Mobile: UGC fan on top, then text.
-          Desktop: text left, UGC scattered to the right. */}
-      <section className="max-w-6xl mx-auto px-4 md:px-8 pt-8 md:pt-16 lg:pt-20 pb-10 md:pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center">
-
-          {/* UGC visuals — order 1 on mobile (above), order 2 on desktop (right).
-              Same magician's-fan layout at every breakpoint; just sizes up on
-              wider screens so it fills the right column nicely on desktop. */}
-          <div className="order-1 lg:order-2">
-            <div className="relative mx-auto h-64 md:h-80 lg:h-96" style={{ maxWidth: '520px' }}>
-              {/* Nat — fanned left, behind */}
-              <img
-                src="/Nat_UGC.png"
-                alt="Nat with her Trackstar print"
-                className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 lg:w-52 lg:h-72 object-cover shadow-lg"
-                style={{ borderRadius: '5px', transform: 'translateX(-110%) rotate(-12deg)', zIndex: 10 }}
-              />
-              {/* Sophie — fanned right, behind */}
-              <img
-                src="/Sophie_UGC.png"
-                alt="Sophie with her Trackstar print"
-                className="absolute top-2 md:top-4 left-1/2 w-36 h-52 md:w-44 md:h-64 lg:w-52 lg:h-72 object-cover shadow-lg"
-                style={{ borderRadius: '5px', transform: 'translateX(10%) rotate(12deg)', zIndex: 10 }}
-              />
-              {/* Tim — centerpiece, on top, straight */}
-              <img
-                src="/Tim_UGC_1.jpg"
-                alt="Tim with his Trackstar print"
-                className="absolute top-0 left-1/2 w-36 h-52 md:w-44 md:h-64 lg:w-52 lg:h-72 object-cover shadow-xl"
-                style={{ borderRadius: '5px', transform: 'translateX(-50%)', zIndex: 20 }}
-              />
-            </div>
-          </div>
-
-          {/* Text content — order 2 on mobile, order 1 on desktop.
-              Centered on mobile, left-aligned on desktop. */}
-          <div className="order-2 lg:order-1 text-center lg:text-left">
-            <span className="inline-flex items-center px-3 py-1 mb-5 text-[11px] font-semibold tracking-wider uppercase bg-[#4F2DD4]/10 text-[#4F2DD4] rounded-full">
-              Creator Program
-            </span>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-off-black leading-[1.05] tracking-tight mb-6">
+      <main>
+        {/* Hero: big, centered, one action. */}
+        <section className="text-center px-4 md:px-6 pt-20 md:pt-32 pb-10 md:pb-14">
+          <div className="mx-auto" style={{ maxWidth: 1120 }}>
+            <h1 className="font-bold mx-auto" style={{ fontSize: 'clamp(44px, 7vw, 80px)', lineHeight: 0.98, letterSpacing: '-0.05em', maxWidth: '20ch', textWrap: 'balance' }}>
               Get a free Trackstar print in exchange for 3 videos.
             </h1>
-            <button
-              onClick={handleApply}
-              disabled={isStarting}
-              className="inline-flex items-center gap-2 mt-2 px-6 py-3.5 bg-[#4F2DD4] text-white text-base font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Apply Now
-              {!isStarting && <ArrowRight className="w-4 h-4" />}
-            </button>
-            {error && (
-              <p className="mt-4 text-sm text-red-600">{error}</p>
-            )}
+            <p className="mx-auto mt-4" style={{ color: TS.muted, fontSize: 'clamp(18px, 2.2vw, 24px)', lineHeight: 1.35, maxWidth: '46ch' }}>
+              A personalized poster of the race you ran, free. You make three short videos with it.
+            </p>
+            <div className="mt-8 flex justify-center">{applyButton(true)}</div>
+            {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
           </div>
+        </section>
 
-        </div>
-      </section>
+        {/* The prints, in creators' hands. */}
+        <section className="px-4 md:px-6 pb-16 md:pb-24">
+          <div className="relative mx-auto h-72 md:h-96" style={{ maxWidth: 560 }}>
+            {[
+              { src: '/Nat_UGC.png', alt: 'Nat with her Trackstar print', t: 'translateX(-110%) rotate(-10deg)', z: 10, top: 'top-4' },
+              { src: '/Sophie_UGC.png', alt: 'Sophie with her Trackstar print', t: 'translateX(10%) rotate(10deg)', z: 10, top: 'top-4' },
+              { src: '/Tim_UGC_1.jpg', alt: 'Tim with his Trackstar print', t: 'translateX(-50%)', z: 20, top: 'top-0' },
+            ].map(p => (
+              <img
+                key={p.src}
+                src={p.src}
+                alt={p.alt}
+                className={`absolute ${p.top} left-1/2 w-40 h-56 md:w-52 md:h-72 object-cover`}
+                style={{ borderRadius: 8, transform: p.t, zIndex: p.z, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}
+              />
+            ))}
+          </div>
+        </section>
 
-      {/* What you get / What we ask — paired sections, matched formatting.
-          2-col grid on desktop, stacked on mobile. Both use the same card
-          shell + a single checkmark bullet, so they read as siblings. */}
-      <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-6">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What you get</h2>
-            <div className="bg-white border border-border-gray rounded-md p-5 md:p-6">
-              <Bullet><strong>A personalized Trackstar race print</strong> customized with your name, bib, finish time, and the course you ran.</Bullet>
+        {/* Prints for content: a gray panel, like the finder's alternating sections. */}
+        <section className="mx-2 md:mx-4 rounded-[18px] md:rounded-[24px] px-4 md:px-6 py-12 md:py-20" style={{ backgroundColor: TS.gray }}>
+          <div className="mx-auto" style={{ maxWidth: 1120 }}>
+            <h2 className="text-center font-bold" style={{ fontSize: 'clamp(36px, 5vw, 52px)', lineHeight: 1.05, letterSpacing: '-0.04em' }}>Free Race Prints 🤝 Content</h2>
+            <div className="mt-8 md:mt-10 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+              <Card eyebrow="What you get">
+                <Bullet><strong>A personalized Trackstar race print</strong> customized with your name, bib, finish time, and the course you ran.</Bullet>
+              </Card>
+              <Card eyebrow="What we ask">
+                <Bullet><strong>3 short-form videos</strong> (TikTok or Reels) within 7 days of receiving your print.</Bullet>
+              </Card>
             </div>
           </div>
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">What we ask</h2>
-            <div className="bg-white border border-border-gray rounded-md p-5 md:p-6">
-              <Bullet><strong>3 short-form videos</strong> (TikTok or Reels) within 7 days of receiving your print.</Bullet>
+        </section>
+
+        {/* How it works */}
+        <section className="px-4 md:px-6 py-12 md:py-20">
+          <div className="mx-auto" style={{ maxWidth: 1120 }}>
+            <h2 className="text-center font-bold" style={{ fontSize: 'clamp(36px, 5vw, 52px)', lineHeight: 1.05, letterSpacing: '-0.04em' }}>How it works</h2>
+            <div className="mt-8 md:mt-10 grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+              <Step n={1} title="Apply">Tell us why you're a good fit, which race you ran, and your address.</Step>
+              <Step n={2} title="Approve">If it's a good fit, we'll approve!</Step>
+              <Step n={3} title="Film Content">We'll give a full brief on how to do it.</Step>
             </div>
+            <div className="mt-10 md:mt-14 flex justify-center">{applyButton(true)}</div>
+            {error && <p className="mt-4 text-center text-sm text-red-600">{error}</p>}
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* How it works */}
-      <section className="max-w-5xl mx-auto px-4 md:px-8 pb-10 md:pb-14">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-off-black/50 mb-4 md:mb-6">How it works</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-          <Step n={1} title="Apply">Tell us why you're a good fit, which race you ran, and your address.</Step>
-          <Step n={2} title="Approve">If it's a good fit, we'll approve!</Step>
-          <Step n={3} title="Film Content">We'll give a full brief on how to do it.</Step>
-        </div>
-      </section>
+      {/* The real trackstar.art footer. */}
+      <SiteFooter />
+    </div>
+  )
+}
 
-      {/* Bottom CTA — bare Apply Now button. No heading, no subhead;
-          just a second swing at conversion after the visitor's read
-          through everything. */}
-      <section className="max-w-5xl mx-auto px-4 md:px-8 pb-16 md:pb-24 text-center">
-        <button
-          onClick={handleApply}
-          disabled={isStarting}
-          className="inline-flex items-center gap-2 px-6 py-3.5 bg-[#4F2DD4] text-white text-base font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Apply Now
-          {!isStarting && <ArrowRight className="w-4 h-4" />}
-        </button>
-        {error && (
-          <p className="mt-4 text-sm text-red-600">{error}</p>
-        )}
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border-gray/60 py-6">
-        <div className="max-w-5xl mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between gap-2 text-xs text-off-black/50">
-          <div className="flex items-center gap-2">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-5" />
-            <span>© Trackstar</span>
-          </div>
-          <div>
-            Questions? Email <a href="mailto:matt@trackstar.art" className="text-[#4F2DD4] hover:underline">matt@trackstar.art</a>
-          </div>
-        </div>
-      </footer>
+function Card({ eyebrow, children }: { eyebrow: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-lg p-6 md:p-8" style={{ border: `1px solid ${TS.border}` }}>
+      <div className="text-xs font-bold uppercase mb-4" style={{ color: TS.purple, letterSpacing: '0.04em' }}>{eyebrow}</div>
+      {children}
     </div>
   )
 }
 
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3 text-base text-off-black/80 leading-relaxed">
-      <Check className="w-5 h-5 mt-0.5 text-[#4F2DD4] shrink-0" />
+    <div className="flex items-start gap-3 text-base md:text-lg leading-snug">
+      <Check className="w-5 h-5 mt-0.5 shrink-0" style={{ color: TS.purple }} />
       <span>{children}</span>
     </div>
   )
@@ -185,10 +173,10 @@ function Bullet({ children }: { children: React.ReactNode }) {
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-border-gray rounded-md p-5">
-      <div className="text-[11px] font-semibold text-[#4F2DD4] mb-2">Step {n}</div>
-      <div className="text-base font-semibold text-off-black mb-1.5">{title}</div>
-      <div className="text-sm text-off-black/60 leading-relaxed">{children}</div>
+    <div className="rounded-lg p-6 md:p-8" style={{ backgroundColor: TS.gray }}>
+      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white mb-4" style={{ backgroundColor: TS.purple }}>{n}</div>
+      <div className="text-xl font-bold mb-1.5" style={{ letterSpacing: '-0.04em' }}>{title}</div>
+      <div className="text-base leading-snug" style={{ color: TS.muted }}>{children}</div>
     </div>
   )
 }

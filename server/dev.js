@@ -22,6 +22,7 @@ app.use((req, res, next) => {
 // Map each API route to its Vercel handler
 const routes = [
   { method: 'get',  path: '/api/orders',                    handler: '../api/orders/index.js' },
+  { method: 'post', path: '/api/orders/cancel-creator-sample', handler: '../api/orders/cancel-creator-sample.js' },
   { method: 'post', path: '/api/orders/photo',               handler: '../api/orders/photo.js' },
   { method: 'post', path: '/api/orders/rush',                handler: '../api/orders/rush.js' },
   { method: 'get',  path: '/api/surveys',                    handler: '../api/surveys/index.js' },

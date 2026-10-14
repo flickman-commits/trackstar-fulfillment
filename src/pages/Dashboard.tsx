@@ -2370,6 +2370,23 @@ export default function Dashboard() {
     } catch (e) { setToast({ message: e instanceof Error ? e.message : 'Could not remove', type: 'error' }) }
   }
 
+  // Admin: cancel a creator's free sample. The order leaves the queue and the
+  // creator goes back to pending, to approve again later or decline.
+  const cancelCreatorSample = async (order: Order) => {
+    if (!confirm(`Cancel the creator sample for ${order.effectiveRunnerName || order.runnerName || 'this creator'}? The order is removed and the creator goes back to pending.`)) return
+    try {
+      const res = await apiFetch('/api/orders/cancel-creator-sample', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: order.id }) })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || 'Could not cancel the sample')
+      setOrders(prev => prev.filter(o => o.id !== order.id))
+      setSelectedOrder(null)
+      setToast({ message: 'Creator sample cancelled', type: 'success' })
+      loadTeam()
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : 'Could not cancel the sample', type: 'error' })
+    }
+  }
+
   const assignOrder = useCallback(async (orderId: string, assigneeId: string | null) => {
     const name = assigneeId ? (team.find(u => u.id === assigneeId)?.firstName ?? null) : null
     const before = orders.find(o => o.id === orderId)
@@ -5623,6 +5640,15 @@ Thank you!`
                           🎁 Creator
                         </span>
                         <span className="text-xs text-emerald-800 font-medium">Free sample for the Creator Program - do not charge.</span>
+                        {isAdmin && selectedOrder.status !== 'completed' && (
+                          <button
+                            onClick={() => cancelCreatorSample(selectedOrder)}
+                            className="ml-auto text-xs font-medium text-red-600/80 hover:text-red-700 underline underline-offset-2"
+                            title="Admin: remove this sample from the queue; the creator goes back to pending"
+                          >
+                            Cancel sample
+                          </button>
+                        )}
                       </div>
                       {/* Print — surface frame type alongside size since creator
                           samples are manual orders. For regular orders Artelo
