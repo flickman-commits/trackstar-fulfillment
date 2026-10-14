@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Linkify from '@/components/Linkify'
 import { Upload, Copy, Loader2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw, MessageSquare, ExternalLink, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
@@ -533,7 +534,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
               <div key={m.id} className="flex" style={{ justifyContent: isDesigner ? 'flex-end' : 'flex-start' }}>
                 <div className={`max-w-[85%] px-2.5 py-1.5 rounded-lg ${isDesigner ? 'bg-dark-fill text-white' : 'bg-purple-50 text-off-black border border-purple-200'}`}>
                   <p className="text-[9px] font-semibold opacity-60 mb-0.5">{isDesigner ? 'Dan' : 'Customer'}</p>
-                  <p className="text-xs whitespace-pre-wrap leading-snug">{m.body}</p>
+                  <p className="text-xs whitespace-pre-wrap leading-snug"><Linkify text={m.body} /></p>
                 </div>
               </div>
             )

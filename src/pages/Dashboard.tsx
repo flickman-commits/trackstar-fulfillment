@@ -15,6 +15,7 @@ import { setTeamColors } from '@/lib/teamColors'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
+import Linkify from '@/components/Linkify'
 import type { Capability } from '@/lib/roles'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
 import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
@@ -2820,7 +2821,7 @@ Thank you!`
                                 <img src={comment.imageUrl} alt="Attachment" className="max-h-32 rounded-md mb-1.5 border border-amber-200 hover:opacity-90" />
                               </a>
                             )}
-                            {comment.text && <p className="text-body-sm text-amber-900 whitespace-pre-wrap">{comment.text}</p>}
+                            {comment.text && <p className="text-body-sm text-amber-900 whitespace-pre-wrap"><Linkify text={comment.text} /></p>}
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-[11px] text-amber-700/70">
                                 {comment.authorName ? `${comment.authorName} · ` : ''}
@@ -4609,11 +4610,6 @@ Thank you!`
                         ? (selectedOrder.partnerName || selectedOrder.raceName || 'Partner')
                         : `Order ${selectedOrder.displayOrderNumber}`}
                     </h3>
-                    {selectedOrder.trackstarOrderType === 'custom' && (
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">
-                        custom
-                      </span>
-                    )}
                     {selectedOrder.trackstarOrderType === 'race_partner' && (
                       <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs font-medium rounded">
                         partner
@@ -4960,7 +4956,7 @@ Thank you!`
                                       <img src={comment.imageUrl} alt="Attachment" className="max-h-32 rounded-md mb-1.5 border border-border-gray hover:opacity-90" />
                                     </a>
                                   )}
-                                  {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
+                                  {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap"><Linkify text={comment.text} /></p>}
                                   <div className="flex items-center justify-between mt-1.5">
                                     <span className="text-xs text-off-black/40">
                                       {comment.authorName ? `${comment.authorName} · ` : ''}
@@ -5066,20 +5062,20 @@ Thank you!`
                         // size nobody misreads: the artboard size is what the
                         // designer builds to.
                         <div className="flex flex-wrap items-center gap-1.5">
-                          {selectedOrder.productSize && (
+                          {!isProductionStage && selectedOrder.productSize && (
                             <span className="inline-flex items-center px-2.5 py-1 bg-white border border-border-gray rounded text-sm font-semibold text-off-black" title="Artboard size">
                               {selectedOrder.productSize}
                             </span>
                           )}
-                          {selectedOrder.photoPath && (
+                          {!isProductionStage && selectedOrder.photoPath && (
                             <span className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-[#4600D6]/10 text-[#4600D6] border-[#4600D6]/25">
                               Photo on print
                             </span>
                           )}
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 bg-white border rounded text-sm ${isDueDateUrgent(selectedOrder.dueDate) ? 'border-red-200 text-red-600 font-medium' : 'border-border-gray text-off-black/70'}`}>
+                          {!isProductionStage && <span className={`inline-flex items-center gap-1 px-2.5 py-1 bg-white border rounded text-sm ${isDueDateUrgent(selectedOrder.dueDate) ? 'border-red-200 text-red-600 font-medium' : 'border-border-gray text-off-black/70'}`}>
                             <span>⏳</span>
                             <span>Due {formatDueDate(selectedOrder.dueDate)}</span>
-                          </span>
+                          </span>}
                           {selectedOrder.orderPlacedAt && (
                             <span
                               className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-border-gray rounded text-sm text-off-black/60"
@@ -5089,12 +5085,36 @@ Thank you!`
                               <span>Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}</span>
                             </span>
                           )}
+                          {/* Once sent, the dates that matter: ordered, and sent to production. */}
+                          {isProductionStage && selectedOrder.completedAt && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded border text-sm bg-emerald-50 text-emerald-700 border-emerald-200"
+                              title={`Sent to production ${new Date(selectedOrder.completedAt).toLocaleString('en-US', { timeZone: TZ })}`}
+                            >
+                              <span>🟢</span>
+                              <span>Sent {formatOrderPlacedAt(selectedOrder.completedAt)}</span>
+                            </span>
+                          )}
                           {selectedOrder.isRushOrder && (
                             <span className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-amber-50 text-amber-800 border-amber-200">⚡ Rush (4-day)</span>
                           )}
+                          {(selectedOrder.shopifyAdminUrl || selectedOrder.arteloUrl) && (
+                            <span className="ml-auto inline-flex items-center gap-1.5">
+                              {selectedOrder.shopifyAdminUrl && (
+                                <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className={platformPill} title="Open this order in Shopify">
+                                  <img src="/shopify-icon.png" alt="" className="w-3.5 h-3.5" /> Shopify <ArrowUpRight className="w-3 h-3 opacity-50" />
+                                </a>
+                              )}
+                              {selectedOrder.arteloUrl && (
+                                <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className={platformPill} title="Open this order in Artelo">
+                                  <img src="/artelo-icon.png" alt="" className="w-3.5 h-3.5 rounded-[3px]" /> Artelo <ArrowUpRight className="w-3 h-3 opacity-50" />
+                                </a>
+                              )}
+                            </span>
+                          )}
                           {/* Admin only: cut the line by hand. Defaults to 4 days
                               from purchase, like a paid rush; any date can be set. */}
-                          {isAdmin && !selectedOrder.isRushOrder && rushEditing !== selectedOrder.id && (
+                          {isAdmin && !isProductionStage && !selectedOrder.isRushOrder && rushEditing !== selectedOrder.id && (
                             <button
                               onClick={() => setRushEditing(selectedOrder.id)}
                               className="inline-flex items-center px-2.5 py-1 rounded border border-dashed border-amber-300 text-sm font-medium text-amber-800 hover:bg-amber-50"
@@ -5258,6 +5278,7 @@ Thank you!`
                       )}
 
                       {/* Design Info — always visible, Dan needs filename at every stage */}
+                        {!(isProductionStage && selectedOrder.trackstarOrderType === 'custom') && (
                         <CollapsibleSection title={selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Info' : 'Design Info'} defaultOpen={ds === 'not_started' || ds === 'in_progress'}>
                           <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                             {selectedOrder.trackstarOrderType === 'race_partner' ? (
@@ -5300,6 +5321,7 @@ Thank you!`
                             </div>
                           )}
                         </CollapsibleSection>
+                        )}
 
                       {/* Notes — only if present, hide at production */}
                       {selectedOrder.notes && !isProductionStage && (
@@ -5370,7 +5392,7 @@ Thank you!`
                                       <img src={comment.imageUrl} alt="Attachment" className="max-h-48 rounded-md mb-2 border border-border-gray hover:opacity-90 cursor-pointer" />
                                     </a>
                                   )}
-                                  {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
+                                  {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap"><Linkify text={comment.text} /></p>}
                                   <div className="flex items-center justify-between mt-2">
                                     <span className="text-xs text-off-black/40">
                                       {comment.authorName ? `${comment.authorName} · ` : ''}
@@ -5393,7 +5415,7 @@ Thank you!`
                       {/* Emergency delay notice — custom orders only. Sits above
                           the close row so Dan can find it but it's not the
                           primary action. */}
-                      {selectedOrder.trackstarOrderType === 'custom' && selectedOrder.customerEmail && (
+                      {selectedOrder.trackstarOrderType === 'custom' && selectedOrder.customerEmail && !isProductionStage && (
                         <div className="pt-1">
                           <button
                             onClick={openDelayDialog}
@@ -6046,7 +6068,7 @@ Thank you!`
                                   <img src={comment.imageUrl} alt="Attachment" className="max-h-32 rounded-md mb-1.5 border border-border-gray hover:opacity-90" />
                                 </a>
                               )}
-                              {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap">{comment.text}</p>}
+                              {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap"><Linkify text={comment.text} /></p>}
                               <div className="flex items-center justify-between mt-1.5">
                                 <span className="text-xs text-off-black/40">
                                   {comment.authorName ? `${comment.authorName} · ` : ''}
