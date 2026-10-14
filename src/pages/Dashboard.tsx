@@ -1143,6 +1143,10 @@ export default function Dashboard() {
   const [newRaceValues, setNewRaceValues] = useState({ raceName: '', year: new Date().getFullYear().toString(), raceDate: '', location: '' })
   // Tab switcher: standard vs custom order view
   const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner' | 'bulk'>('standard')
+  // Standard orders are "done" when the file is uploaded to Artelo, so that is
+  // what they say. The stored status is still 'completed'.
+  const doneLabel = activeView === 'standard' ? 'Uploaded to Artelo' : 'Completed'
+  const doneHeading = activeView === 'standard' ? 'Uploaded to Artelo' : 'Completed Orders'
   const [bulkCount, setBulkCount] = useState<number | null>(null)
   // "New Partner" modal state
   const [showNewRacePartner, setShowNewRacePartner] = useState(false)
@@ -1686,7 +1690,7 @@ export default function Dashboard() {
         throw new Error(body.message || 'Failed to mark as completed')
       }
 
-      setToast({ message: 'Order marked as completed!', type: 'success' })
+      setToast({ message: activeView === 'standard' ? 'Marked as uploaded to Artelo!' : 'Order marked as completed!', type: 'success' })
       // Optimiztically reflect the new status without closing the modal
       setSelectedOrder(prev => prev && prev.orderNumber === orderNumber ? { ...prev, status: 'completed' } : prev)
       setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, status: 'completed' } : o))
@@ -3068,7 +3072,7 @@ Thank you!`
                     {searchQuery && filteredCompletedOrders.length > 0 && (
                       <>
                         <div className="px-4 py-2.5 bg-subtle-gray/50">
-                          <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
+                          <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">{doneHeading}</span>
                         </div>
                         {filteredCompletedOrders.map((order) => {
                           const itemCount = getOrderItemCount(order.parentOrderNumber)
@@ -3185,7 +3189,7 @@ Thank you!`
                     {searchQuery && filteredCompletedOrders.length > 0 && (
                       <>
                         <div className="px-4 py-2.5 bg-subtle-gray/50">
-                          <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
+                          <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">{doneHeading}</span>
                         </div>
                         {filteredCompletedOrders.map((order) => {
                           const designConfig = DESIGN_STATUS_CONFIG[order.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.sent_to_production
@@ -3320,7 +3324,7 @@ Thank you!`
                         <>
                           <tr className="bg-subtle-gray/50">
                             <td colSpan={6} className="px-6 py-3">
-                              <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
+                              <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">{doneHeading}</span>
                             </td>
                           </tr>
                           {filteredCompletedOrders.map((order, index) => {
@@ -3345,7 +3349,7 @@ Thank you!`
                                   </div>
                                 </td>
                                 <td className="px-3 py-4 text-center">
-                                  <HoverTip text="Completed" align="center"><span className="text-lg cursor-help">✅</span></HoverTip>
+                                  <HoverTip text={doneLabel} align="center"><span className="text-lg cursor-help">✅</span></HoverTip>
                                 </td>
                                 <td className="px-3 py-4">
                                   <div className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</div>
@@ -3520,7 +3524,7 @@ Thank you!`
                         <>
                           <tr className="bg-subtle-gray/50">
                             <td colSpan={7} className="px-6 py-3">
-                              <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">Completed Orders</span>
+                              <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">{doneHeading}</span>
                             </td>
                           </tr>
                           {filteredCompletedOrders.map((order, index) => {
@@ -3602,7 +3606,7 @@ Thank you!`
                   onClick={() => setShowCompleted(true)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-border-gray rounded-full shadow-sm text-sm text-off-black/70 hover:bg-subtle-gray transition-colors"
                 >
-                  <span>{showCompleted ? 'Close Completed Orders' : 'View Completed Orders'}</span>
+                  <span>{showCompleted ? `Close ${doneHeading}` : `View ${doneHeading}`}</span>
                   <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-off-black/5 text-off-black/60">
                     {completedOrders.length}
                   </span>
@@ -3624,7 +3628,7 @@ Thank you!`
           >
             <div className="bg-white rounded-none md:rounded-lg max-w-4xl w-full h-[90vh] md:h-auto md:max-h-[80vh] overflow-hidden shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-4 border-b border-border-gray">
-                <h2 className="text-base md:text-lg font-semibold text-off-black">Completed Orders</h2>
+                <h2 className="text-base md:text-lg font-semibold text-off-black">{activeView === 'standard' ? 'Uploaded to Artelo' : 'Completed Orders'}</h2>
                 <button
                   onClick={() => setShowCompleted(false)}
                   className="text-off-black/40 hover:text-off-black text-2xl leading-none transition-colors"
@@ -3727,7 +3731,7 @@ Thank you!`
                           <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                         </td>
                         <td className="px-3 py-4 text-center">
-                          <HoverTip text="Completed" align="center"><span className="text-lg cursor-help">✅</span></HoverTip>
+                          <HoverTip text={doneLabel} align="center"><span className="text-lg cursor-help">✅</span></HoverTip>
                         </td>
                         <td className="px-3 py-4 text-sm text-off-black">
                           {order.runnerName}
@@ -6563,7 +6567,7 @@ Thank you!`
                         onClick={() => markAsCompleted(selectedOrder.orderNumber)}
                         className="flex-1 px-5 py-3 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium"
                       >
-                        Mark as Completed
+                        {selectedOrder.trackstarOrderType === 'standard' ? 'Mark as Uploaded to Artelo' : 'Mark as Completed'}
                       </button>
                     )}
                     {/* Re-open — only for already-completed orders. Sends the

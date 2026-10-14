@@ -11,7 +11,10 @@ export type Teammate = { id: string; firstName: string; lastName: string }
 // people on the same color (Creed and Dan were both orange), so colors are
 // handed out in order over the whole team instead: sorted by id, so everyone
 // keeps their color across pages and sessions until the team changes.
-const COLORS = ['#E5735A', '#5B8DEF', '#4CC38A', '#E8A23B', '#8B6CEF', '#D6618C', '#3BB4C1', '#94A23B', '#C46BD8', '#5A6B7B']
+// Ordered so the first five, today's team, are as far apart as possible:
+// orange, blue, green, amber, dark slate. Purple sat next to blue and read as
+// the same person at a glance.
+const COLORS = ['#E5735A', '#3B82F6', '#22A06B', '#E8A23B', '#334155', '#D6457A', '#14B8A6', '#8B5CF6', '#94A23B', '#A16207']
 const teamColors = new Map<string, string>()
 
 /** Call with the full team whenever it loads, so each person gets their own color. */
