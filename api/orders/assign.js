@@ -59,6 +59,23 @@ export default async function handler(req, res) {
           until: r.shiftId ? shifts.find(x => x.id === r.shiftId)?.until || null : null,
           ...(isAdmin ? { share: Math.round((r.weight / weightSum) * 100), open: open[t][r.userId] || 0 } : {}),
         }))
+        // Race routing (standard): people who get every order for some races
+        // are on the team too, even when they are not the regular or on a shift.
+        if (t === 'standard') {
+          const rules = await getRaceRules()
+          const byUser = new Map()
+          for (const r of rules) {
+            if (!ids.includes(r.userId)) continue
+            if (!byUser.has(r.userId)) byUser.set(r.userId, [])
+            byUser.get(r.userId).push(r.race)
+          }
+          for (const [userId, races] of byUser) {
+            const existing = queues[t].find(q => q.userId === userId)
+            if (existing) { existing.races = races; continue }
+            const routedOpen = isAdmin ? (open[t][userId] ?? (await openCounts(t, [userId]))[userId] ?? 0) : undefined
+            queues[t].push({ userId, regular: false, until: null, races, ...(isAdmin ? { open: routedOpen } : {}) })
+          }
+        }
       }
       const base = { users, defaults: await getAssignmentDefaults({ force: true }), queues, me: actor.id || null }
       if (!isAdmin) return res.status(200).json(base)

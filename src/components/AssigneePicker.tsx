@@ -1,35 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, UserRound } from 'lucide-react'
+import { colorFor, setTeamColors } from '@/lib/teamColors'
 
 /**
  * Who has this order, as a person rather than a dropdown: an initial in a
  * colored circle and a full name. Click to hand it to someone else.
  */
 export type Teammate = { id: string; firstName: string; lastName: string }
-
-// One color per person, never shared. A hash into a short palette put two
-// people on the same color (Creed and Dan were both orange), so colors are
-// handed out in order over the whole team instead: sorted by id, so everyone
-// keeps their color across pages and sessions until the team changes.
-// Ordered so the first five, today's team, are as far apart as possible:
-// orange, blue, green, amber, dark slate. Purple sat next to blue and read as
-// the same person at a glance.
-const COLORS = ['#E5735A', '#3B82F6', '#22A06B', '#E8A23B', '#334155', '#D6457A', '#14B8A6', '#8B5CF6', '#94A23B', '#A16207']
-const teamColors = new Map<string, string>()
-
-/** Call with the full team whenever it loads, so each person gets their own color. */
-export function setTeamColors(team: { id: string }[]) {
-  teamColors.clear()
-  ;[...team].sort((a, b) => a.id.localeCompare(b.id)).forEach((u, i) => teamColors.set(u.id, COLORS[i % COLORS.length]))
-}
-
-function colorFor(id: string) {
-  const known = teamColors.get(id)
-  if (known) return known
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
-  return COLORS[h % COLORS.length]
-}
 
 export function Avatar({ user, size = 24 }: { user: Teammate; size?: number }) {
   return (
@@ -112,9 +89,15 @@ export default function AssigneePicker({ team, value, meId, onChange, readOnly =
  * anyone helping on a shift (with their last day). Admins also see each
  * person's share and open count. Set in Settings > Admin > Order Assignment.
  */
-export type QueueMember = { userId: string; regular: boolean; until: string | null; share?: number; open?: number }
+export type QueueMember = { userId: string; regular: boolean; until: string | null; share?: number; open?: number; races?: string[] }
 
-export function QueuePill({ people, team }: { people?: QueueMember[]; team: Teammate[] }) {
+export function QueuePill({ people, team, selected, onSelect }: {
+  people?: QueueMember[]
+  team: Teammate[]
+  /** Admin: the teammate whose orders are showing; clicking a chip toggles it. */
+  selected?: string
+  onSelect?: (userId: string) => void
+}) {
   const shown = (people || []).map(p => ({ ...p, user: team.find(u => u.id === p.userId) })).filter(p => p.user)
   if (!shown.length) return null
   const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
@@ -123,18 +106,24 @@ export function QueuePill({ people, team }: { people?: QueueMember[]; team: Team
       <span className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Current Team</span>
       <div className="flex items-center gap-1.5">
         {shown.map(p => {
+          const shareable = shown.filter(x => x.share != null).length > 1
           const facts = [
-            shown.length > 1 && p.share != null ? `${p.share}%` : null,
+            shareable && p.share != null ? `${p.share}%` : null,
             p.open != null ? `${p.open} order${p.open === 1 ? '' : 's'}` : null,
           ].filter(Boolean).join(' · ')
           return (
             <span
               key={p.userId}
-              className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border border-border-gray bg-white text-xs"
-              title={p.until ? `Helping until ${day(p.until)}` : 'Regular'}
+              onClick={onSelect ? () => onSelect(p.userId) : undefined}
+              className={`inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border text-xs ${selected === p.userId ? 'border-off-black bg-off-black/5' : 'border-border-gray bg-white'} ${onSelect ? 'cursor-pointer hover:border-off-black/40' : ''}`}
+              title={[
+                p.races?.length ? `All ${p.races.join(' and ')} orders` : null,
+                p.until ? `Helping until ${day(p.until)}` : p.regular ? 'Regular: everything else' : null,
+              ].filter(Boolean).join(' · ')}
             >
               <Avatar user={p.user!} size={20} />
               <span className="font-medium text-off-black">{p.user!.firstName}</span>
+              {p.races?.length ? <span className="text-off-black/60">{p.races.map(r => r.replace(/ Marathon$/, '')).join(', ')}</span> : null}
               {facts && <span className="text-off-black/45">{facts}</span>}
             </span>
           )

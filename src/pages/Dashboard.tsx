@@ -10,7 +10,8 @@ import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/componen
 import ApiKeysPanel from '@/components/ApiKeysPanel'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
 import AssignmentPanel from '@/components/AssignmentPanel'
-import AssigneePicker, { Avatar, QueuePill, type QueueMember, setTeamColors } from '@/components/AssigneePicker'
+import AssigneePicker, { Avatar, QueuePill, type QueueMember } from '@/components/AssigneePicker'
+import { setTeamColors } from '@/lib/teamColors'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
@@ -909,6 +910,8 @@ export default function Dashboard() {
   // Who new orders of each type go to today (regular, plus any help on a shift).
   const [queues, setQueues] = useState<Record<string, QueueMember[]>>({})
   const [scope, setScope] = useState<'mine' | 'all' | null>(null)
+  // Admin: show one teammate's orders ('none' = unassigned). Standard and custom.
+  const [personFilter, setPersonFilter] = useState<string>('')
   const loadTeam = useCallback(() => {
     apiFetch('/api/orders/assign').then(r => r.ok ? r.json() : null).then(d => { if (d?.users) { setTeamColors(d.users); setTeam(d.users) } if (d?.queues) setQueues(d.queues) }).catch(() => {})
   }, [])
@@ -2007,12 +2010,12 @@ export default function Dashboard() {
     // while someone is looking: a background tab polling all day was most of
     // our Supabase egress. Coming back to the tab refreshes right away.
     const poll = setInterval(() => {
-      if (document.visibilityState === 'visible') fetchOrders()
+      if (document.visibilityState === 'visible') { fetchOrders(); loadTeam() }
     }, 60_000)
-    const onVisible = () => { if (document.visibilityState === 'visible') fetchOrders() }
+    const onVisible = () => { if (document.visibilityState === 'visible') { fetchOrders(); loadTeam() } }
     document.addEventListener('visibilitychange', onVisible)
     return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
-  }, [fetchOrders])
+  }, [fetchOrders, loadTeam])
 
   // Fetch race shorthands from scraper configs + user overrides (once on mount).
   // Reusable so the Race Database modal can refetch after a user edits an override.
@@ -2378,16 +2381,18 @@ export default function Dashboard() {
       const res = await apiFetch('/api/orders/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, assigneeId }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not reassign')
       setToast({ message: name ? `Assigned to ${name}` : 'Unassigned', type: 'success' })
+      loadTeam()
     } catch (e) {
       apply(before?.assigneeId ?? null, before?.assigneeName ?? null)
       setToast({ message: e instanceof Error ? e.message : 'Could not reassign', type: 'error' })
     }
-  }, [orders, team])
+  }, [orders, team, loadTeam])
 
   const ordersToFulfill = useMemo(() => {
     // Guard: ensure orders match the active view type to prevent cross-contamination
     const typeFiltered = orders.filter(o => (o.trackstarOrderType || 'standard') === activeView)
       .filter(o => effectiveScope === 'all' || o.assigneeId === myId)
+      .filter(o => !personFilter || !scoped || (personFilter === 'none' ? !o.assigneeId : o.assigneeId === personFilter))
     if (activeView === 'custom' || activeView === 'race_partner') {
       // Design-driven views: show all non-done items, sorted by most recent first for race_partner
       // (custom uses due date; race_partner has no due date so we fall back to createdAt)
@@ -2421,7 +2426,7 @@ export default function Dashboard() {
       const dateB = new Date(b.orderPlacedAt || b.shopifyCreatedAt || b.createdAt).getTime()
       return dateB - dateA
     })
-  }, [orders, activeView, effectiveScope, myId])
+  }, [orders, activeView, effectiveScope, myId, personFilter, scoped])
 
   const completedOrders = useMemo(() => {
     // Guard: ensure orders match the active view type
@@ -2843,6 +2848,22 @@ Thank you!`
             className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
           />
         </div>
+        {/* Admin: one teammate's orders. Clicking a person in Current Team does the same. */}
+        {isAdmin && scoped && (
+          <div className="relative md:w-48">
+            <select
+              value={personFilter}
+              onChange={(e) => setPersonFilter(e.target.value)}
+              className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2.5 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 cursor-pointer ${personFilter ? 'bg-dark-fill text-white border-dark-fill' : 'bg-subtle-gray border-border-gray text-off-black'}`}
+              title="Show one teammate's orders"
+            >
+              <option value="" className="bg-white text-off-black">Everyone's orders</option>
+              {team.map(u => <option key={u.id} value={u.id} className="bg-white text-off-black">{u.firstName}'s orders</option>)}
+              <option value="none" className="bg-white text-off-black">Unassigned</option>
+            </select>
+            <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${personFilter ? 'text-white' : 'text-off-black/40'}`} />
+          </div>
+        )}
         {activeView === 'standard' && (
         <div className="relative md:w-64">
           <select
@@ -2972,7 +2993,7 @@ Thank you!`
                 is the right control when the options do not fit side by side. */}
             <div className="hidden md:block relative">
             {/* Floats above the switcher so the header keeps its height. */}
-            <div className="absolute bottom-full right-0 mb-2.5"><QueuePill people={queues[activeView]} team={team} /></div>
+            <div className="absolute bottom-full right-0 mb-2.5"><QueuePill people={queues[activeView]} team={team} selected={personFilter} onSelect={isAdmin && scoped ? (id) => setPersonFilter(f => f === id ? '' : id) : undefined} /></div>
             <div className={`inline-flex ${segmentGroup}`}>
               {([
                 ['standard', 'Standard'],
