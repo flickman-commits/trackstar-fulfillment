@@ -42,6 +42,10 @@
       "destination": "/api/public/survey-preview?token=:token"
     },
     {
+      "source": "/apply",
+      "destination": "/api/public/creator-preview"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

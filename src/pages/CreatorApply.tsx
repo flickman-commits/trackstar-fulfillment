@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, Check, ArrowRight } from 'lucide-react'
 import SiteFooter from '@/components/SiteFooter'
@@ -28,6 +28,7 @@ export default function CreatorApply() {
   const navigate = useNavigate()
   const [isStarting, setIsStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useEffect(() => { document.title = 'Trackstar Creator Program' }, [])
 
   const handleApply = async () => {
     setIsStarting(true)
@@ -120,7 +121,7 @@ export default function CreatorApply() {
         {/* Prints for content: a gray panel, like the finder's alternating sections. */}
         <section className="mx-2 md:mx-4 rounded-[18px] md:rounded-[24px] px-4 md:px-6 py-12 md:py-20" style={{ backgroundColor: TS.gray }}>
           <div className="mx-auto" style={{ maxWidth: 1120 }}>
-            <h2 className="text-center font-bold" style={{ fontSize: 'clamp(36px, 5vw, 52px)', lineHeight: 1.05, letterSpacing: '-0.04em' }}>Free Race Prints 🤝 Content</h2>
+            <h2 className="text-center font-bold" style={{ fontSize: 'clamp(36px, 5vw, 52px)', lineHeight: 1.05, letterSpacing: '-0.04em' }}>Trackstar Prints 🤝 Content</h2>
             <div className="mt-8 md:mt-10 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <Card eyebrow="What you get">
                 <Bullet><strong>A personalized Trackstar race print</strong> customized with your name, bib, finish time, and the course you ran.</Bullet>
