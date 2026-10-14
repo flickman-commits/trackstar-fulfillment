@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
+import { ToastDot } from '@/components/BrandToaster'
+import { toastCard, toastStyle } from '@/lib/ui'
 import { Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
@@ -266,11 +268,8 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
   }, [onClose])
 
   return (
-    <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50 ${
-      type === 'success' ? 'bg-green-600 text-white' :
-      type === 'error' ? 'bg-red-600 text-white' :
-      'bg-blue-600 text-white'
-    }`}>
+    <div className={`fixed bottom-4 right-4 z-50 ${toastCard}`} style={toastStyle} role="status">
+      <ToastDot type={type} />
       {message}
     </div>
   )

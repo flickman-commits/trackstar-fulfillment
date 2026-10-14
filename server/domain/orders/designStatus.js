@@ -14,7 +14,9 @@ import { ensureApprovalToken } from '../../../api/_lib/approvalToken.js'
 
 export const DESIGN_STATUSES = ['not_started', 'in_progress', 'awaiting_review', 'in_revision', 'approved_by_customer', 'final_pdf_uploaded', 'sent_to_production']
 
-export async function setDesignStatus(existing, designStatus) {
+// completedById: the person making the change, credited on the payout counter
+// when this sends it to production. Falls back to the assignee (system calls).
+export async function setDesignStatus(existing, designStatus, completedById = null) {
   if (!DESIGN_STATUSES.includes(designStatus)) throw new Error(`Invalid designStatus. Must be one of: ${DESIGN_STATUSES.join(', ')}`)
   if (existing.trackstarOrderType !== 'custom' && existing.trackstarOrderType !== 'race_partner') {
     throw new Error('Design status can only be updated for custom or race partner orders')
@@ -24,10 +26,16 @@ export async function setDesignStatus(existing, designStatus) {
   if (designStatus === 'sent_to_production') {
     updateData.status = 'completed'
     updateData.researchedAt = new Date()
+    if (existing.designStatus !== 'sent_to_production') {
+      updateData.designCompletedAt = updateData.researchedAt
+      updateData.designCompletedById = completedById || existing.assigneeId || null
+    }
   }
   if (existing.designStatus === 'sent_to_production' && designStatus !== 'sent_to_production') {
     updateData.status = 'pending'
     updateData.researchedAt = null
+    updateData.designCompletedAt = null
+    updateData.designCompletedById = null
   }
   if (existing.designStatus === 'approved_by_customer' && designStatus === 'in_revision') {
     await prisma.proof.updateMany({ where: { orderId: existing.id, status: 'approved' }, data: { status: 'revision_requested' } })

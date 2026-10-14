@@ -6,6 +6,7 @@
 
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { getCanonicalRaceName } from '../../server/scrapers/index.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -190,13 +191,25 @@ export default async function handler(req, res) {
             possibleMatches: null,
           }
         })
-      } else if (raceId) {
+      } else {
         // No research row yet (never researched, or no scraper). Create one so
-        // the hand-entered values have somewhere to live.
+        // the hand-entered values have somewhere to live. The panel has no
+        // raceId to send in that case, so find the order's race (the same
+        // way research does) instead of dropping the edit.
+        let rid = raceId
+        if (!rid) {
+          const name = existingOrder.raceNameOverride ?? existingOrder.raceName
+          const year = existingOrder.yearOverride ?? existingOrder.raceYear
+          const canonical = getCanonicalRaceName(name) || name
+          const race = await prisma.race.findUnique({ where: { raceName_year: { raceName: name, year } } })
+            || (canonical !== name && await prisma.race.findUnique({ where: { raceName_year: { raceName: canonical, year } } }))
+            || await prisma.race.create({ data: { raceName: canonical, year, raceDate: null, eventTypes: ['Marathon'] } })
+          rid = race.id
+        }
         await prisma.runnerResearch.create({
           data: {
             orderId: existingOrder.id,
-            raceId,
+            raceId: rid,
             runnerName: updateData.runnerNameOverride || existingOrder.runnerNameOverride || existingOrder.runnerName,
             ...researchData,
             researchStatus: 'found',
@@ -204,15 +217,11 @@ export default async function handler(req, res) {
             researchNotes: 'Manually entered in the dashboard.',
           }
         })
-      } else {
-        console.warn(`[API /orders/update] ${orderNumber}: no research row and no raceId, skipped bib/time/pace`)
       }
 
       // A hand-entered result makes the order fulfillable.
-      if (latest || raceId) {
-        updateData.status = 'ready'
-        updateData.researchedAt = new Date()
-      }
+      updateData.status = 'ready'
+      updateData.researchedAt = new Date()
     }
 
     // Update the order

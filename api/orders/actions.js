@@ -249,7 +249,7 @@ export default async function handler(req, res) {
       case 'reopen':
         return await handleReopen(body, res, actor)
       case 'design-status':
-        return await handleDesignStatus(body, res)
+        return await handleDesignStatus(body, res, actor)
       case 'notify-custom-delay':
         return await handleNotifyCustomDelay(body, res)
       case 'message-customer':
@@ -554,7 +554,7 @@ async function handleReopen({ orderNumber }, res, actor) {
 
 // --- design-status ---
 // The rules live in server/domain/orders/designStatus.js, shared with the MCP server.
-async function handleDesignStatus({ orderNumber, designStatus }, res) {
+async function handleDesignStatus({ orderNumber, designStatus }, res, actor) {
   if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
   if (!designStatus || !DESIGN_STATUSES.includes(designStatus)) {
     return res.status(400).json({ error: `Invalid designStatus. Must be one of: ${DESIGN_STATUSES.join(', ')}` })
@@ -564,7 +564,7 @@ async function handleDesignStatus({ orderNumber, designStatus }, res) {
   if (existing.trackstarOrderType !== 'custom' && existing.trackstarOrderType !== 'race_partner') {
     return res.status(400).json({ error: 'Design status can only be updated for custom or race partner orders' })
   }
-  const order = await setDesignStatus(existing, designStatus)
+  const order = await setDesignStatus(existing, designStatus, actor?.id || null)
   console.log(`[actions/design-status] Order ${orderNumber} design status → ${designStatus}`)
   return res.status(200).json({ success: true, order })
 }

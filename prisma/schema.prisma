@@ -127,6 +127,12 @@ model Order {
   // (SystemConfig "assignment_defaults"), changeable by anyone on the team.
   assigneeId       String?
   assignee         User?      @relation("OrderAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  // Custom design payouts: who moved this order to Sent to Production, and
+  // when. Cleared if it is reopened. Older rows have neither; the counter
+  // falls back to researchedAt and the assignee for those.
+  designCompletedAt   DateTime?
+  designCompletedById String?
+  designCompletedBy   User?    @relation("DesignCompletedBy", fields: [designCompletedById], references: [id], onDelete: SetNull)
   bulkOrderId      String?
   bulkOrder        BulkOrder? @relation(fields: [bulkOrderId], references: [id], onDelete: Cascade)
   shippingAddress  Json?      // { line1, line2, city, state, zip, country }
@@ -718,6 +724,7 @@ model User {
 
   comments     OrderComment[]
   assignedOrders Order[]  @relation("OrderAssignee")
+  completedDesigns Order[] @relation("DesignCompletedBy")
   assignedBulkOrders BulkOrder[] @relation("BulkAssignee")
   editBatches  ProductEditBatch[]
   auditEvents  AuditEvent[]

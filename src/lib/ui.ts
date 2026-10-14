@@ -133,3 +133,7 @@ export const textLink = 'inline-flex items-center gap-1 text-xs text-blue-600 ho
 /** "View Completed Orders" footer pill and its count. */
 export const footerPill = 'inline-flex items-center gap-2 px-4 py-2 bg-white border border-border-gray rounded-full shadow-sm text-sm text-off-black/70 hover:bg-subtle-gray transition-colors'
 export const footerPillCount = 'px-2 py-0.5 text-xs font-medium rounded-full bg-off-black/5 text-off-black/60'
+
+/** Toast card, shared by sonner and the dashboard's Toast (see BrandToaster). */
+export const toastCard = 'flex items-center gap-2.5 bg-white border border-border-gray rounded-lg shadow-[0_6px_24px_rgba(0,0,0,0.10)] px-4 py-3 text-sm font-medium text-off-black'
+export const toastStyle = { fontFamily: "Inter, system-ui, -apple-system, sans-serif", letterSpacing: '-0.01em' }

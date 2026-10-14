@@ -69,6 +69,7 @@ const routes = [
   { method: 'get',    path: '/api/admin/audit',            handler: '../api/admin/audit.js' },
   // Storefront stats panel (Shopify-derived)
   { method: 'get',    path: '/api/admin/stats',            handler: '../api/admin/stats.js' },
+  { method: 'get',    path: '/api/admin/custom-counter',   handler: '../api/admin/custom-counter.js' },
   { method: 'get',    path: '/api/admin/roles',            handler: '../api/admin/roles.js' },
   { method: 'put',    path: '/api/admin/roles',            handler: '../api/admin/roles.js' },
   // Nightly health sweep (cron runs it; admins can pull the JSON any time)

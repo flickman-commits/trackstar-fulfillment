@@ -97,10 +97,10 @@ export const designTools = [
     scope: 'write',
     readOnly: false,
     input: { orderNumber: z.string().max(40), status: z.enum(DESIGN_STATUSES) },
-    async handler({ orderNumber, status }) {
+    async handler({ orderNumber, status }, { principal }) {
       const rows = (await findOrdersByNumber(orderNumber)).filter(o => ['custom', 'race_partner'].includes(o.trackstarOrderType))
       if (!rows.length) throw new ToolError(`No custom or partner order matching "${orderNumber}".`)
-      for (const o of rows) await setDesignStatus(o, status)
+      for (const o of rows) await setDesignStatus(o, status, principal?.user?.id || null)
       const n = displayNumber(rows[0])
       return { summary: `${n} design status set to ${LABEL[status]}`, orderNumber: n, designStatus: status, items: rows.length }
     },

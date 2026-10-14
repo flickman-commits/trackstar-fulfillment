@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AppShell from '@/components/AppShell'
-import { Toaster } from 'sonner'
+import BrandToaster from '@/components/BrandToaster'
 import { useEffect, useState, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import Dashboard from '@/pages/Dashboard'
@@ -9,6 +9,7 @@ import BulkIntake from '@/pages/BulkIntake'
 import RunnerClaim from '@/pages/RunnerClaim'
 import SurveyVote from './pages/SurveyVote'
 import DesignSurveys from './pages/DesignSurveys'
+import CustomCounter from './pages/CustomCounter'
 import CreatorsHome from '@/pages/CreatorsHome'
 import BriefsAdmin from '@/pages/BriefsAdmin'
 import CreatorPortal from '@/pages/CreatorPortal'
@@ -163,12 +164,11 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<CreatorApply />} />
-            {/* The page lives on creator.trackstar.art now. */}
-          <Route path="/apply" element={<RedirectToCreatorHost />} />
+            <Route path="/apply" element={<Navigate to="/" replace />} />
             <Route path="/creator/:token" element={<CreatorPortal />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          <Toaster position="bottom-center" toastOptions={{ className: '!bg-dark-fill !text-white !rounded-md' }} />
+          <BrandToaster />
         </BrowserRouter>
       </ErrorBoundary>
     )
@@ -201,10 +201,7 @@ export default function App() {
             {/* Anything else on this host is not a page we publish here. */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          <Toaster
-            position="bottom-center"
-            toastOptions={{ className: '!bg-dark-fill !text-white !rounded-md' }}
-          />
+          <BrandToaster />
         </BrowserRouter>
       </ErrorBoundary>
     )
@@ -223,7 +220,8 @@ export default function App() {
           {/* Design Survey: the community votes on new designs from a story link. */}
           <Route path="/vote/:token" element={<SurveyVote />} />
           <Route path="/creator/:token" element={<CreatorPortal />} />
-          <Route path="/apply" element={<CreatorApply />} />
+          {/* The page lives on creator.trackstar.art now. */}
+          <Route path="/apply" element={<RedirectToCreatorHost />} />
           {/* The page lives on monopoly.trackstar.art now. */}
           <Route path="/monopoly" element={<RedirectToMonopolyHost />} />
 
@@ -236,6 +234,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/surveys" element={<DesignSurveys />} />
+                <Route path="/custom-counter" element={<RequireCap cap="settings.admin"><CustomCounter /></RequireCap>} />
                 {/* Admin view: the creator programme, the bulk product editor
                     and the brief admin all change things outside the day to day
                     fulfillment work. */}
@@ -259,12 +258,7 @@ export default function App() {
             </SignInGate>
           } />
         </Routes>
-        <Toaster
-          position="bottom-center"
-          toastOptions={{
-            className: "!bg-dark-fill !text-white !rounded-md"
-          }}
-        />
+        <BrandToaster />
       </BrowserRouter>
     </ErrorBoundary>
   )
