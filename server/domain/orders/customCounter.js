@@ -5,6 +5,9 @@
 import prisma from '../../db.js'
 
 const TZ = 'America/New_York'
+// Payout per finished custom, in cents, by role. Head of Design (Dan) $50,
+// junior designers $25. Anyone else (admins) is counted but not paid.
+const RATE_CENTS = { head_designer: 5000, designer: 2500, staff: 2500 }
 const monthOf = d => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit' }).format(d).slice(0, 7)
 
 export async function customCounter(month) {
@@ -27,7 +30,7 @@ export async function customCounter(month) {
       shopifyOrderData: true,
     },
   })
-  const users = await prisma.user.findMany({ select: { id: true, firstName: true, lastName: true } })
+  const users = await prisma.user.findMany({ select: { id: true, firstName: true, lastName: true, role: true } })
   const byId = new Map(users.map(u => [u.id, u]))
   const groups = new Map()
   for (const o of rows) {
@@ -36,7 +39,7 @@ export async function customCounter(month) {
     const who = o.designCompletedById || o.assigneeId || null
     if (!groups.has(who)) {
       const u = who ? byId.get(who) : null
-      groups.set(who, { userId: who, name: u ? `${u.firstName} ${u.lastName}`.trim() : 'Unattributed', orders: [] })
+      groups.set(who, { userId: who, name: u ? `${u.firstName} ${u.lastName}`.trim() : 'Unattributed', rateCents: (u && RATE_CENTS[u.role]) || 0, orders: [] })
     }
     const sd = o.shopifyOrderData
     const name = sd && typeof sd === 'object' && 'name' in sd ? String(sd.name) : `#${o.parentOrderNumber}`
@@ -47,7 +50,7 @@ export async function customCounter(month) {
     })
   }
   const designers = [...groups.values()]
-    .map(g => ({ ...g, count: g.orders.length, orders: g.orders.sort((a, b) => a.completedAt.localeCompare(b.completedAt)) }))
+    .map(g => ({ ...g, count: g.orders.length, payoutCents: g.orders.length * g.rateCents, orders: g.orders.sort((a, b) => a.completedAt.localeCompare(b.completedAt)) }))
     .sort((a, b) => (a.userId ? 0 : 1) - (b.userId ? 0 : 1) || b.count - a.count)
-  return { month, total: designers.reduce((n, d) => n + d.count, 0), designers }
+  return { month, total: designers.reduce((n, d) => n + d.count, 0), payoutCents: designers.reduce((n, d) => n + d.payoutCents, 0), designers }
 }

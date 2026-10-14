@@ -10,8 +10,10 @@ import { btnSecondary, sectionCount } from '@/lib/ui'
  */
 
 type Row = { id: string; display: string; item: number; runnerName: string; race: string; customerName: string | null; rush: boolean; completedAt: string; estimated: boolean }
-type Designer = { userId: string | null; name: string; count: number; orders: Row[] }
-type Data = { month: string; total: number; designers: Designer[] }
+type Designer = { userId: string | null; name: string; count: number; rateCents: number; payoutCents: number; orders: Row[] }
+type Data = { month: string; total: number; payoutCents: number; designers: Designer[] }
+
+const usd = (cents: number) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 
 const thisMonth = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7)
 const shift = (month: string, by: number) => {
@@ -60,11 +62,13 @@ export default function CustomCounter() {
               <div className="bg-white border border-border-gray rounded-lg p-4">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Total</div>
                 <div className="text-3xl font-bold text-off-black mt-1">{data.total}</div>
+                <div className="text-sm font-semibold text-green-700 mt-0.5">{usd(data.payoutCents)}</div>
               </div>
               {data.designers.map(d => (
                 <div key={d.userId || 'none'} className="bg-white border border-border-gray rounded-lg p-4">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 truncate">{d.name}</div>
                   <div className="text-3xl font-bold text-off-black mt-1">{d.count}</div>
+                  <div className="text-sm font-semibold text-green-700 mt-0.5">{d.rateCents ? `${usd(d.payoutCents)} · ${usd(d.rateCents)} each` : 'Not paid per custom'}</div>
                 </div>
               ))}
             </div>
@@ -78,6 +82,7 @@ export default function CustomCounter() {
                     {d.userId && <Avatar user={{ id: d.userId, firstName: d.name, lastName: '' }} size={24} />}
                     <span className="font-semibold text-off-black">{d.name}</span>
                     <span className={sectionCount}>{d.count}</span>
+                    {d.rateCents > 0 && <span className="ml-auto text-sm font-semibold text-green-700">{d.count} × {usd(d.rateCents)} = {usd(d.payoutCents)}</span>}
                   </div>
                   <table className="w-full text-sm">
                     <thead className="text-[11px] font-semibold uppercase tracking-wider text-off-black/45">
