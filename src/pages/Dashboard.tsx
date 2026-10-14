@@ -928,6 +928,20 @@ export default function Dashboard() {
   const visibleItems = visibleNav.flatMap((g) => g.items)
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  // Cmd+K (Ctrl+K elsewhere) jumps to the order search from anywhere on the page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSelectedOrder(null)
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const [raceFilter, setRaceFilter] = useState('')  // empty = show all races
   const [showCompleted, setShowCompleted] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -2859,8 +2873,9 @@ Thank you!`
         <div className="relative flex-1">
           <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
           <input
+            ref={searchInputRef}
             type="text"
-            placeholder="Search by order #, runner, bib, race or customer email..."
+            placeholder="Search by order #, runner, bib, race or customer email... (⌘K)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
