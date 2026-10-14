@@ -89,7 +89,7 @@ export default function AssigneePicker({ team, value, meId, onChange, readOnly =
  * anyone helping on a shift (with their last day). Admins also see each
  * person's share and open count. Set in Settings > Admin > Order Assignment.
  */
-export type QueueMember = { userId: string; regular: boolean; until: string | null; share?: number; open?: number; races?: string[] }
+export type QueueMember = { userId: string; regular: boolean; until: string | null; share?: number; open?: number; races?: string[]; holding?: boolean }
 
 export function QueuePill({ people, team, selected, onSelect }: {
   people?: QueueMember[]
@@ -106,9 +106,11 @@ export function QueuePill({ people, team, selected, onSelect }: {
       <span className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Current Team</span>
       <div className="flex items-center gap-1.5">
         {shown.map(p => {
-          const shareable = shown.filter(x => x.share != null).length > 1
+          // Each person's share of the open queue, so the split reads at a glance
+          // and the chips add up to 100%. (Admins only: counts are theirs.)
+          const totalOpen = shown.reduce((n, x) => n + (x.open || 0), 0)
           const facts = [
-            shareable && p.share != null ? `${p.share}%` : null,
+            shown.length > 1 && totalOpen > 0 && p.open != null ? `${Math.round(((p.open || 0) / totalOpen) * 100)}%` : null,
             p.open != null ? `${p.open} order${p.open === 1 ? '' : 's'}` : null,
           ].filter(Boolean).join(' · ')
           return (
@@ -118,7 +120,7 @@ export function QueuePill({ people, team, selected, onSelect }: {
               className={`inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border text-xs ${selected === p.userId ? 'border-off-black bg-off-black/5' : 'border-border-gray bg-white'} ${onSelect ? 'cursor-pointer hover:border-off-black/40' : ''}`}
               title={[
                 p.races?.length ? `All ${p.races.join(' and ')} orders` : null,
-                p.until ? `Helping until ${day(p.until)}` : p.regular ? 'Regular: everything else' : null,
+                p.until ? `Helping until ${day(p.until)}` : p.regular ? 'Regular: everything else' : p.holding ? 'Assigned by hand (not getting new orders)' : null,
               ].filter(Boolean).join(' · ')}
             >
               <Avatar user={p.user!} size={20} />

@@ -50,7 +50,9 @@ export default async function handler(req, res) {
       const open = {}
       const queues = {}
       for (const t of ASSIGNABLE_TYPES) {
-        if (isAdmin) open[t] = await openCounts(t, ids)
+        // Counted for everyone so people holding orders by hand appear below;
+        // the numbers themselves only go to admins.
+        open[t] = await openCounts(t, ids)
         const roster = await rosterFor(t)
         const weightSum = roster.reduce((a, r) => a + r.weight, 0) || 1
         queues[t] = roster.map(r => ({
@@ -72,11 +74,22 @@ export default async function handler(req, res) {
           for (const [userId, races] of byUser) {
             const existing = queues[t].find(q => q.userId === userId)
             if (existing) { existing.races = races; continue }
-            const routedOpen = isAdmin ? (open[t][userId] ?? (await openCounts(t, [userId]))[userId] ?? 0) : undefined
+            const routedOpen = open[t][userId] || 0
             queues[t].push({ userId, regular: false, until: null, races, ...(isAdmin ? { open: routedOpen } : {}) })
           }
         }
       }
+      // Anyone else still holding open orders of a type (handed to them by
+      // hand, or left from a shift) is on that team too, so the chips add up
+      // to the queue.
+      for (const t of ASSIGNABLE_TYPES) {
+        for (const userId of ids) {
+          if ((open[t][userId] || 0) > 0 && !queues[t].some(q => q.userId === userId)) {
+            queues[t].push({ userId, regular: false, until: null, holding: true, ...(isAdmin ? { open: open[t][userId] } : {}) })
+          }
+        }
+      }
+      if (!isAdmin) for (const t of ASSIGNABLE_TYPES) for (const q of queues[t]) { delete q.open; delete q.share }
       const base = { users, defaults: await getAssignmentDefaults({ force: true }), queues, me: actor.id || null }
       if (!isAdmin) return res.status(200).json(base)
       // Races with open standard orders, busiest first, for the race routing picker.
