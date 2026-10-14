@@ -6,12 +6,16 @@
 import { isCronRequest } from '../_lib/auth.js'
 import { processOrders } from '../../server/processOrders.js'
 import { runLockedImport } from '../../server/lib/importStamp.js'
+import { syncShopifyBulkOrders } from '../../server/domain/bulk/shopifyBulk.js'
 
 export default async function handler(req, res) {
   if (!isCronRequest(req)) return res.status(401).json({ error: 'Unauthorized' })
   try {
     const out = await runLockedImport(() => processOrders({ runResearch: false, verbose: false }))
     if (out.imported) console.log(`[orders.auto-import] imported ${out.imported}, updated ${out.updated || 0}`)
+    // Bulk runs paid through Shopify: link or create their runs, mark paid.
+    const bulk = await syncShopifyBulkOrders().catch(err => { console.error('[orders.auto-import] bulk sync failed:', err.message); return null })
+    if (bulk && (bulk.created || bulk.linked || bulk.paid)) console.log(`[orders.auto-import] bulk: ${bulk.created} created, ${bulk.linked} linked, ${bulk.paid} paid`)
     return res.status(200).json({ imported: out.imported || 0, updated: out.updated || 0, skipped: out.skipped || 0, lastImportedAt: out.lastImportedAt || null })
   } catch (error) {
     console.error('[API /orders/auto-import]', error)

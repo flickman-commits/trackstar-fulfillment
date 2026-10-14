@@ -24,6 +24,7 @@ import { incrementCustomersServed, syncCustomersServedToShopify, getCountedOrder
 import { isExpeditedShipping, getShippingMethod } from './lib/shipping.js'
 import { fetchWithTimeout } from './lib/fetchWithTimeout.js'
 import { buildShopifyMatchMap, buildEtsyMatchMap, isRushAddonLineItem, isRemovedLineItem, normalizeShopifyLines } from './lib/lineItemMatching.js'
+import { isBulkShopifyOrder } from './domain/bulk/shopifyBulk.js'
 import { assigneeForNewOrder, isAutoAssignee, endExpiredShifts } from './domain/orders/assignment.js'
 
 // Artelo API configuration
@@ -879,6 +880,17 @@ export async function processOrders(options = {}) {
               log(`[processOrders] Deferring line item ${lineItemIndex} on order ${order.orderId} (Shopify order did not load, will retry next run)`)
               results.skipped++
               orderResult.action = 'deferred'
+              results.orders.push(orderResult)
+              continue
+            }
+
+            // A bulk run paid through Shopify (a draft order tagged "bulk") is
+            // not a print order. It belongs to the Bulk tab, where
+            // syncShopifyBulkOrders links it to its run; never a standard row.
+            if (!existing && isShopify && shopifyData?.shopifyOrderData && isBulkShopifyOrder(shopifyData.shopifyOrderData)) {
+              log(`[processOrders] Skipping line item ${lineItemIndex} on order ${order.orderId} (Shopify order tagged bulk: handled in the Bulk tab)`)
+              results.skipped++
+              orderResult.action = 'skipped'
               results.orders.push(orderResult)
               continue
             }

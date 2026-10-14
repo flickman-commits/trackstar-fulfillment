@@ -49,6 +49,9 @@ export interface BulkOrder {
   frameType: string
   productSize: string
   stripeInvoiceUrl: string | null
+  shopifyOrderId?: string | null
+  shopifyOrderName?: string | null
+  shopifyOrderUrl?: string | null
   paidAt: string | null
   productionFileUrl: string | null
   previewImageUrl: string | null
@@ -204,7 +207,12 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
                         </span>
                       ) : <span className="text-off-black/40">No race date</span>}
                     </td>
-                    <td className="px-3 py-3">{b.paidAt ? <Chip tone="green">Paid</Chip> : <Chip tone="amber">Unpaid</Chip>}</td>
+                    <td className="px-3 py-3">
+                      <span className="inline-flex items-center gap-1.5">
+                        {b.paidAt ? <Chip tone="green">Paid</Chip> : <Chip tone="amber">Unpaid</Chip>}
+                        {b.shopifyOrderName && <span className="text-[11px] text-off-black/45">{b.shopifyOrderName}</span>}
+                      </span>
+                    </td>
                     <td className="px-3 py-3">{(() => {
                       const u = team.find(t => t.id === b.assigneeId)
                       return u
@@ -750,6 +758,16 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners, team, meId }: { 
                 <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </div>
             </div>
+            {/* Billed through Shopify: the paid order, or how to tag the draft so it links here. */}
+            {b.shopifyOrderName ? (
+              <a href={b.shopifyOrderUrl || undefined} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-off-black/55 hover:text-off-black">
+                <img src="/shopify-icon.png" alt="" className="w-3 h-3" /> Shopify order {b.shopifyOrderName}
+              </a>
+            ) : (
+              <p className="mt-1.5 text-[11px] text-off-black/50 leading-snug">
+                Billing in Shopify? Tag the draft order <span className="font-mono text-off-black/80">bulk</span> with this partner as the customer or company, and it marks itself paid here.
+              </p>
+            )}
           </div>
         </div>
 

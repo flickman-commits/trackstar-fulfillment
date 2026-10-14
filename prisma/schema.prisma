@@ -224,8 +224,12 @@ model BulkOrder {
   quantity          Int       @default(0) // What was invoiced; the runner count may differ
   frameType         String    @default("Natural Premium Oak") // Artelo framing value
   productSize       String    @default("12x18")
-  stripeInvoiceUrl  String?
+  stripeInvoiceUrl  String?   // The invoice/payment link sent to the partner (Stripe before, Shopify draft invoice now)
   paidAt            DateTime?
+  // The Shopify order that paid for this run: a draft order tagged "bulk"
+  // (plus this run's number, e.g. "BULK-0003", to link one made here first).
+  shopifyOrderId    String?   @unique
+  shopifyOrderName  String?   // "#4412"
   productionFileUrl String?   // Google Drive link to the co-branded Illustrator file
   previewImageUrl   String?   // What the finished print should look like
   raceDate          DateTime?

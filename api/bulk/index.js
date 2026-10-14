@@ -16,6 +16,8 @@
  *     new-intake-link { id }                 rotate the partner's intake token
  *     delete      { id }                     admins only; removes the runners too
  */
+import { syncShopifyBulkOrders } from '../../server/domain/bulk/shopifyBulk.js'
+import { shopifyAdminUrl } from '../../server/lib/links.js'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireAdminRole } from '../_lib/users.js'
@@ -60,6 +62,7 @@ async function loadOne(id) {
   const ready = await readiness(bulk, runners)
   return {
     ...bulk,
+    shopifyOrderUrl: shopifyAdminUrl(bulk.shopifyOrderId),
     runners: runners.map(shapeRunner),
     readiness: ready,
     progress: progressOf(runners),
@@ -80,6 +83,8 @@ function progressOf(runners) {
 
 const EDITABLE = ['partnerName', 'raceName', 'raceYear', 'quantity', 'frameType', 'productSize', 'stripeInvoiceUrl', 'productionFileUrl', 'previewImageUrl', 'raceDate', 'dueDate', 'status', 'intakeNote', 'notes', 'partnerOrderId', 'assigneeId']
 
+let lastBulkSync = 0
+
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
   const actor = requireAdmin(req, res)
@@ -93,6 +98,12 @@ export default async function handler(req, res) {
         if (!one) return res.status(404).json({ error: 'Bulk order not found' })
         return res.status(200).json({ bulkOrder: one })
       }
+      // Pick up bulk runs paid in Shopify since the last import, at most once a
+      // minute per instance; a Shopify hiccup never blocks the list.
+      if (Date.now() - lastBulkSync > 60_000) {
+        lastBulkSync = Date.now()
+        await syncShopifyBulkOrders().catch(err => console.warn('[API /bulk] Shopify bulk sync failed:', err.message))
+      }
       // One round trip for the list and one for every runner, then group in
       // memory. A query per order is what exhausts the pool on a busy morning.
       const list = await prisma.bulkOrder.findMany({ orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }] })
@@ -101,7 +112,7 @@ export default async function handler(req, res) {
         : []
       const byBulk = new Map()
       for (const r of all) { if (!byBulk.has(r.bulkOrderId)) byBulk.set(r.bulkOrderId, []); byBulk.get(r.bulkOrderId).push(r) }
-      return res.status(200).json({ bulkOrders: list.map(b => ({ ...b, progress: progressOf(byBulk.get(b.id) || []) })) })
+      return res.status(200).json({ bulkOrders: list.map(b => ({ ...b, shopifyOrderUrl: shopifyAdminUrl(b.shopifyOrderId), progress: progressOf(byBulk.get(b.id) || []) })) })
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
