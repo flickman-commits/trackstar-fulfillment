@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   }
   html = injectMeta(html, {
     title: 'Trackstar Creator Program',
-    description: 'Get a free Trackstar print of the race you ran in exchange for 3 short videos.',
+    description: 'A personalized Trackstar print of the race you ran, in exchange for 3 short videos.',
     image: `${proto}://${host}/og-creator-program.jpg`,
   })
   res.setHeader('Content-Type', 'text/html; charset=utf-8')

@@ -89,10 +89,10 @@ export default function CreatorApply() {
         <section className="text-center px-4 md:px-6 pt-20 md:pt-32 pb-10 md:pb-14">
           <div className="mx-auto" style={{ maxWidth: 1120 }}>
             <h1 className="font-bold mx-auto" style={{ fontSize: 'clamp(44px, 7vw, 80px)', lineHeight: 0.98, letterSpacing: '-0.05em', maxWidth: '20ch', textWrap: 'balance' }}>
-              Get a free Trackstar print in exchange for 3 videos.
+              Get a Trackstar print in exchange for creating 3 videos.
             </h1>
             <p className="mx-auto mt-4" style={{ color: TS.muted, fontSize: 'clamp(18px, 2.2vw, 24px)', lineHeight: 1.35, maxWidth: '46ch' }}>
-              A personalized poster of the race you ran, free. You make three short videos with it.
+              Your name, bib, finish time and course, on a print made for your wall. In exchange for 3 short videos.
             </p>
             <div className="mt-8 flex justify-center">{applyButton(true)}</div>
             {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
