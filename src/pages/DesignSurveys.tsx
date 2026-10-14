@@ -53,11 +53,11 @@ export default function DesignSurveys() {
       <div className={`${pageColumn} max-w-6xl overflow-y-auto`}>
         <div className={pageHeader}>
           <div className="flex flex-col gap-3">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className={pageLogo} />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className={`${pageLogo} self-start object-contain`} />
             <h1 className={pageTitle}>Design Survey</h1>
             <p className="text-sm text-off-black/55 -mt-1">Let the community vote on new designs. Share the link on a story.</p>
           </div>
-          {!openId && <button onClick={() => setCreating(true)} className={btnPrimary}><Plus className="w-4 h-4" /> New survey</button>}
+          {!openId && <button onClick={() => setCreating(true)} className={`${btnPrimary} whitespace-nowrap shrink-0`}><Plus className="w-4 h-4" /> New survey</button>}
         </div>
 
         {creating && !openId && (
