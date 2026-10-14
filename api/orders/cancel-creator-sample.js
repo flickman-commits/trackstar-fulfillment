@@ -29,8 +29,16 @@ export default async function handler(req, res) {
     if (order.status === 'completed') return res.status(409).json({ error: 'This sample was already uploaded to Artelo. Cancel it there instead.' })
 
     const creator = await prisma.creator.findUnique({ where: { sampleOrderId: order.id }, select: { id: true, name: true } })
+    // A creator with an earlier sample keeps it as their current one; with
+    // none left they go back to pending.
+    const previous = creator
+      ? await prisma.order.findFirst({
+          where: { source: 'creator_sample', id: { not: order.id }, arteloOrderData: { path: ['creatorId'], equals: creator.id } },
+          orderBy: { createdAt: 'desc' }, select: { id: true },
+        })
+      : null
     await prisma.$transaction([
-      ...(creator ? [prisma.creator.update({ where: { id: creator.id }, data: { sampleOrderId: null, status: 'pending' } })] : []),
+      ...(creator ? [prisma.creator.update({ where: { id: creator.id }, data: previous ? { sampleOrderId: previous.id } : { sampleOrderId: null, status: 'pending' } })] : []),
       prisma.runnerResearch.deleteMany({ where: { orderId: order.id } }),
       prisma.order.delete({ where: { id: order.id } }),
     ])

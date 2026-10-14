@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send, Mail, Music2, Pencil, ChevronDown } from 'lucide-react'
+import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send, Mail, Music2, Pencil, ChevronDown, Search } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
 type CreatorStatus = 'invited' | 'applied' | 'active' | 'paused' | 'denied'
@@ -172,6 +172,7 @@ export default function CreatorsHome() {
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [decliningId, setDecliningId] = useState<string | null>(null)
   const [showDenied, setShowDenied] = useState(false)
+  const [query, setQuery] = useState('')
 
   const loadAll = useCallback(async () => {
     try {
@@ -201,16 +202,20 @@ export default function CreatorsHome() {
 
   // Creators that submitted the public application but haven't been approved
   // yet. They show in the Creators Applied queue above the main list.
-  const pendingSampleRequests = creators.filter(c =>
+  // Search across name, email, Instagram, race and sample order number.
+  const q = query.trim().toLowerCase().replace(/^@/, '')
+  const matches = (c: Creator) => !q || [c.name, c.email, c.instagramHandle, c.raceName, c.sampleOrder?.orderNumber]
+    .some(v => String(v || '').toLowerCase().includes(q))
+  const pendingSampleRequests = creators.filter(matches).filter(c =>
     c.status === 'applied' && !c.sampleOrder
   )
-  const otherCreators = creators.filter(c =>
+  const otherCreators = creators.filter(matches).filter(c =>
     !(c.status === 'applied' && !c.sampleOrder) &&
     // Denied creators stay in the DB (can be un-denied from the drawer) but
     // are hidden from the table.
     c.status !== 'denied'
   )
-  const deniedCreators = creators.filter(c => c.status === 'denied')
+  const deniedCreators = creators.filter(matches).filter(c => c.status === 'denied')
 
   const handleDeclineSample = async (creator: Creator) => {
     if (!confirm(`Decline sample request from ${creator.name || 'this creator'}? They'll be marked denied and hidden from the list - no fulfillment order will be created. You can un-deny them later from "Show denied".`)) return
@@ -323,6 +328,20 @@ export default function CreatorsHome() {
                 placeholder={metrics.samples.costIsPlaceholder}
               />
             </div>
+
+            {/* Search the whole program: applied, active and denied. */}
+            <div className="mt-6 relative">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-off-black/40" />
+              <input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search creators by name, email, Instagram, race or order #..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10"
+              />
+            </div>
+            {q && !pendingSampleRequests.length && !otherCreators.length && !deniedCreators.length && (
+              <p className="mt-4 text-sm text-off-black/50">No creators match "{query}".</p>
+            )}
 
             {/* Creators Applied — applicants awaiting Matt's approval */}
             {pendingSampleRequests.length > 0 && (
@@ -496,7 +515,7 @@ export default function CreatorsHome() {
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDenied ? '' : '-rotate-90'}`} />
                   {showDenied ? 'Hide' : 'Show'} denied ({deniedCreators.length})
                 </button>
-                {showDenied && (
+                {(showDenied || q) && (
                   <div className="mt-3 bg-white border border-border-gray rounded-md shadow-sm divide-y divide-border-gray">
                     {deniedCreators.map(c => (
                       <button
@@ -1060,6 +1079,9 @@ function CreatorDrawer({
             </EditableCard>
             )}
 
+            {/* Another print for this creator: a second race, a reshoot, a replacement. */}
+            {creator.sampleOrder && <AnotherSample creator={creator} onDone={() => onSaved(creator)} />}
+
             {showShipping && (
             <EditableCard
               title="Shipping"
@@ -1375,3 +1397,62 @@ function NumberField({ label, value, onChange, suffix }: {
 // Inline tracking-number editor in the creator drawer. Saving a non-empty
 // number sets `shippedAt` server-side and lights up the "Shipped" stage in
 // the creator portal. Clearing the number reverts to "Approved".
+
+/**
+ * Admin: send this creator another sample. Prefilled from their current one;
+ * goes into the Standard queue as CREATOR-XXXXXX-2 (and up), to the address
+ * on file. Server: api/creators/sample.js.
+ */
+function AnotherSample({ creator, onDone }: { creator: Creator; onDone: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [f, setF] = useState({
+    raceName: creator.raceName || '',
+    raceYear: creator.raceYear ? String(creator.raceYear) : String(new Date().getFullYear()),
+    bibNumber: creator.bibNumber || '',
+    finishTime: creator.finishTime || '',
+    productSize: creator.productSize || '',
+    frameType: creator.frameType || '',
+  })
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(v => ({ ...v, [k]: e.target.value }))
+  const submit = async () => {
+    setBusy(true); setErr(null)
+    try {
+      const res = await apiFetch('/api/creators/sample', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ creatorId: creator.id, ...f, raceYear: Number(f.raceYear) }) })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || 'Could not create the sample')
+      setOpen(false)
+      onDone()
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not create the sample') } finally { setBusy(false) }
+  }
+  const field = 'w-full px-2.5 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-off-black/10'
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium border border-dashed border-border-gray rounded-md text-off-black/70 hover:bg-subtle-gray">
+        <Plus className="w-3.5 h-3.5" /> Send another sample
+      </button>
+    )
+  }
+  return (
+    <div className="border border-border-gray rounded-md p-3 space-y-2.5 bg-white">
+      <div className="text-xs font-semibold text-off-black uppercase tracking-wider">Another sample</div>
+      <div className="grid grid-cols-2 gap-2">
+        <input value={f.raceName} onChange={set('raceName')} placeholder="Race" className={field} />
+        <input value={f.raceYear} onChange={set('raceYear')} placeholder="Year" inputMode="numeric" className={field} />
+        <input value={f.bibNumber} onChange={set('bibNumber')} placeholder="Bib #" className={field} />
+        <input value={f.finishTime} onChange={set('finishTime')} placeholder="Finish time" className={field} />
+        <input value={f.productSize} onChange={set('productSize')} placeholder="Size, e.g. 12x18" className={field} />
+        <input value={f.frameType} onChange={set('frameType')} placeholder="Frame" className={field} />
+      </div>
+      <p className="text-[11px] text-off-black/50">Goes into the Standard queue for Eli, shipped to the address on file.</p>
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      <div className="flex gap-2">
+        <button onClick={submit} disabled={busy || !f.raceName.trim() || !f.raceYear} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-dark-fill text-white rounded-md disabled:opacity-50">
+          {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Create sample
+        </button>
+        <button onClick={() => setOpen(false)} className="px-3 py-2 text-sm text-off-black/60">Cancel</button>
+      </div>
+    </div>
+  )
+}

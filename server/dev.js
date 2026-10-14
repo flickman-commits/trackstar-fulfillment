@@ -23,6 +23,7 @@ app.use((req, res, next) => {
 const routes = [
   { method: 'get',  path: '/api/orders',                    handler: '../api/orders/index.js' },
   { method: 'post', path: '/api/orders/cancel-creator-sample', handler: '../api/orders/cancel-creator-sample.js' },
+  { method: 'post', path: '/api/creators/sample',             handler: '../api/creators/sample.js' },
   { method: 'post', path: '/api/orders/photo',               handler: '../api/orders/photo.js' },
   { method: 'post', path: '/api/orders/rush',                handler: '../api/orders/rush.js' },
   { method: 'get',  path: '/api/surveys',                    handler: '../api/surveys/index.js' },
