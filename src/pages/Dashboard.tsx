@@ -21,8 +21,8 @@ import { useAuth } from '@/lib/auth'
 import Linkify from '@/components/Linkify'
 import type { Capability } from '@/lib/roles'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
-import OrderTags, { raceNotRunYet, HoverTip } from '@/components/OrderTags'
-import { staleBeforeRace } from '@/lib/raceStatus'
+import OrderTags, { HoverTip } from '@/components/OrderTags'
+import { raceNotRunYet, showsRaceNotRun } from '@/lib/raceStatus'
 
 /** Collapsible section with header + chevron toggle */
 function CollapsibleSection({ title, defaultOpen = true, children, badge }: {
@@ -2721,13 +2721,11 @@ Thank you!`
     if (order.lookupOutcome === 'auto_match' || order.lookupOutcome === 'picked_from_list') return { icon: '✅', label: 'Verified at checkout' }
     if (order.lookupOutcome === 'edited_by_customer' || order.lookupOutcome?.startsWith('manual_')) return { icon: '✍️', label: 'Customer-entered' }
     if (order.status === 'ready') return { icon: '✅', label: 'Ready' }
+    if (showsRaceNotRun(order)) return { icon: '🗓️', label: 'Race has not happened yet' }
     if (order.researchStatus === 'found') return { icon: '✅', label: 'Researched' }
     if (order.researchStatus === 'no_scraper') return { icon: '🚧', label: 'No scraper for this race' }
     // 🛠️ not 🗓️: a calendar here was indistinguishable from the 📅 used for a
     // missing year, and this is a dev gap rather than a date problem.
-    if (order.researchStatus === 'race_not_run' || (staleBeforeRace(order.researchStatus) && raceNotRunYet(order))) {
-      return { icon: '🗓️', label: 'Race has not happened yet' }
-    }
     if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Year not configured' }
     if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site unreachable, retry' }
     if (order.researchStatus === 'time_unavailable') return { icon: '⏱', label: 'Runner matched, time needs manual entry' }
@@ -5733,7 +5731,7 @@ Thank you!`
                           const isConfigGap = (status === 'no_scraper' || status === 'year_not_configured') && !raceNotRunYet(selectedOrder)
                         // A future race is not a problem, just a wait, so it
                         // reads calm rather than amber.
-                        const notRun = status === 'race_not_run' || (staleBeforeRace(status) && raceNotRunYet(selectedOrder))
+                        const notRun = showsRaceNotRun(selectedOrder)
                         const boxClasses = notRun
                           ? 'bg-blue-50 border border-blue-200 rounded-md p-4'
                           : isConfigGap

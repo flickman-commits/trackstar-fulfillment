@@ -1,6 +1,6 @@
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { hasScraperForRace } from '../../server/scrapers/index.js'
+import { hasScraperForRace, getCanonicalRaceName } from '../../server/scrapers/index.js'
 import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
 import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
 import { getProductInfo, loadProductCatalog } from '../../server/lib/productCatalog.js'
@@ -273,16 +273,26 @@ export default async function handler(req, res) {
     // once here rather than per order.
     const productCatalog = await loadProductCatalog()
 
+    // Race rows by name and year, so an order that has not been researched
+    // yet still gets its race date (and weather). Without this the page could
+    // not tell a future race from a missing result, and new orders for a race
+    // not yet run read "Needs research" until research happened to run.
+    const raceRows = await prisma.race.findMany()
+    const raceByKey = new Map(raceRows.map(r => [`${r.raceName}|${r.year}`, r]))
+    const raceFor = (name, year) => {
+      if (!name || !year) return null
+      return raceByKey.get(`${name}|${year}`) || raceByKey.get(`${getCanonicalRaceName(name) || name}|${year}`) || null
+    }
+
     // Transform orders to include flattened research data
     const transformedOrders = orders.map(order => {
       // Get the best research record: prefer 'found', then most recent
       const foundResearch = order.runnerResearch?.find(r => r.researchStatus === 'found')
       const research = foundResearch || order.runnerResearch?.[0]
-      const race = research?.race
-
       // Compute effective values (override if present, else original)
       const effectiveRaceYear = order.yearOverride ?? order.raceYear
       const effectiveRaceName = order.raceNameOverride ?? order.raceName
+      const race = research?.race || raceFor(effectiveRaceName, effectiveRaceYear)
       const effectiveRunnerName = order.runnerNameOverride ?? order.runnerName
 
       // Check if any overrides are present

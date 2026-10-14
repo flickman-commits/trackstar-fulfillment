@@ -1,5 +1,5 @@
+import { showsRaceNotRun } from '@/lib/raceStatus'
 import type { ReactNode } from 'react'
-import { staleBeforeRace } from '@/lib/raceStatus'
 
 /**
  * One shared tag vocabulary for orders.
@@ -130,19 +130,11 @@ const TRUST_TAGS: Record<string, { label: string; sublabel?: string; tone: TagTo
   },
 }
 
-/** True when the race is still in the future, so no results can exist yet. */
-export function raceNotRunYet(o: TaggableOrder): boolean {
-  if (!o.raceDateIso) return false
-  const d = new Date(`${o.raceDateIso}T23:59:59Z`)
-  return !isNaN(d.valueOf()) && d.getTime() > Date.now()
-}
-
-
 /** Research outcomes from our own scrapers. */
 function researchTag(o: TaggableOrder): OrderTag | null {
   // A future race has no results to find. This also rescues orders that were
   // researched before we checked for it and got stamped "not found".
-  if (o.researchStatus === 'race_not_run' || ((!o.researchStatus || staleBeforeRace(o.researchStatus)) && raceNotRunYet(o))) {
+  if (showsRaceNotRun(o)) {
     return { key: 'race-not-run', label: 'Race not run yet', tone: 'blue',
       title: 'This race has not happened yet, so there are no results to look up. Come back after race day.' }
   }
@@ -215,7 +207,11 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   if (research) tags.push(research)
 
   // Data provenance. One tag, three possible trust levels.
-  const trust = o.lookupOutcome ? TRUST_TAGS[o.lookupOutcome] : null
+  // Instant Lookup finds nothing for a race that has not happened; that is
+  // not a "Needs research" problem, the race-not-run tag already says why.
+  const notRun = showsRaceNotRun(o)
+  const lookupTrust = o.lookupOutcome ? TRUST_TAGS[o.lookupOutcome] : null
+  const trust = notRun && lookupTrust?.tone === 'amber' ? null : lookupTrust
   if (trust) {
     tags.push({ key: 'trust', ...trust })
   } else if (o.researchSource === 'customer_verified') {
@@ -244,7 +240,7 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   // AND we genuinely have nothing, otherwise a customer-verified order would
   // read "Verified" and "Ready to research" at the same time.
   const hasResult = !!(o.bibNumber || o.officialTime || o.officialPace || o.hadNoTime)
-  if (o.status === 'pending' && !o.researchStatus && !hasResult) {
+  if (o.status === 'pending' && !o.researchStatus && !hasResult && !notRun) {
     if (o.hasScraperAvailable && (o.effectiveRaceYear || o.raceYear)) {
       tags.push({ key: 'ready', label: 'Ready to research', tone: 'gray',
         title: 'We have a scraper for this race and year. Run research on this order.' })
