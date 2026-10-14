@@ -9,7 +9,6 @@ import BulkIntake from '@/pages/BulkIntake'
 import RunnerClaim from '@/pages/RunnerClaim'
 import SurveyVote from './pages/SurveyVote'
 import DesignSurveys from './pages/DesignSurveys'
-import CustomCounter from './pages/CustomCounter'
 import CreatorsHome from '@/pages/CreatorsHome'
 import BriefsAdmin from '@/pages/BriefsAdmin'
 import CreatorPortal from '@/pages/CreatorPortal'
@@ -100,7 +99,7 @@ const CREATOR_ORIGIN = 'https://creator.trackstar.art'
 function RedirectToCreatorHost() {
   const onProduction = window.location.hostname.endsWith('trackstar.art')
   useEffect(() => {
-    if (onProduction) window.location.replace(`${CREATOR_ORIGIN}/${window.location.search}`)
+    if (onProduction) window.location.replace(`${CREATOR_ORIGIN}/apply${window.location.search}`)
   }, [onProduction])
   return onProduction ? null : <CreatorApply />
 }
@@ -164,7 +163,8 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<CreatorApply />} />
-            <Route path="/apply" element={<Navigate to="/" replace />} />
+            {/* Vercel redirects / to /apply here, so link previews get the creator card. */}
+            <Route path="/apply" element={<CreatorApply />} />
             <Route path="/creator/:token" element={<CreatorPortal />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -234,7 +234,6 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/surveys" element={<DesignSurveys />} />
-                <Route path="/custom-counter" element={<RequireCap cap="settings.admin"><CustomCounter /></RequireCap>} />
                 {/* Admin view: the creator programme, the bulk product editor
                     and the brief admin all change things outside the day to day
                     fulfillment work. */}

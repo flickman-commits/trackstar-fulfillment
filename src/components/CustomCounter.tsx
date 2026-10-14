@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, Zap } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Avatar } from '@/components/AssigneePicker'
-import { btnSecondary, pageShell, pageColumn, pageHeader, pageTitle, pageLogo, sectionCount } from '@/lib/ui'
+import { btnSecondary, sectionCount } from '@/lib/ui'
 
 /**
  * Admin only: custom designs each designer sent to production in a month,
@@ -27,7 +27,6 @@ export default function CustomCounter() {
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => { document.title = 'Custom Counter' }, [])
   useEffect(() => {
     let live = true
     setData(null); setError(null)
@@ -41,14 +40,10 @@ export default function CustomCounter() {
   const atNow = month >= thisMonth()
 
   return (
-    <div className={pageShell}>
-      <div className={`${pageColumn} max-w-5xl overflow-y-auto pb-10`}>
-        <div className={pageHeader}>
-          <div className="flex flex-col gap-3">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className={pageLogo} />
-            <h1 className={pageTitle}>Custom Counter</h1>
-            <p className="text-sm text-off-black/55 -mt-1">Custom designs each designer sent to production, by month. For payouts.</p>
-          </div>
+    <div>
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <p className="text-sm text-off-black/55">Customs each designer sent to production, by month.</p>
           <div className="flex items-center gap-2">
             <button onClick={() => setMonth(m => shift(m, -1))} className={btnSecondary} aria-label="Previous month"><ChevronLeft className="w-4 h-4" /></button>
             <span className="min-w-[140px] text-center font-semibold text-off-black">{label(month)}</span>

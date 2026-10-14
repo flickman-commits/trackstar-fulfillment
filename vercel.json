@@ -28,6 +28,14 @@
       "maxDuration": 300
     }
   },
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "creator.trackstar.art" }],
+      "destination": "/apply",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -43,11 +51,6 @@
     },
     {
       "source": "/apply",
-      "destination": "/api/public/creator-preview"
-    },
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "creator.trackstar.art" }],
       "destination": "/api/public/creator-preview"
     },
     {

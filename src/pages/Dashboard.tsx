@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
+import CustomCounter from '@/components/CustomCounter'
 import { ToastDot } from '@/components/BrandToaster'
 import { toastCard, toastStyle } from '@/lib/ui'
-import { Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound } from 'lucide-react'
+import { Hash, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
@@ -845,7 +846,7 @@ const REVIEW_PRODUCTS: { name: string; link: string }[] = [
   { name: 'Twin Cities Marathon', link: 'https://yotpo.com/go/A3v2ZhPB' },
 ]
 
-type SettingsPanel = 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'roles' | 'apikeys' | 'assignments' | 'activity' | 'diagnostics' | 'maintenance'
+type SettingsPanel = 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'roles' | 'apikeys' | 'assignments' | 'activity' | 'counter' | 'diagnostics' | 'maintenance'
 
 /**
  * Settings navigation. Grouped rather than a flat list because the panels do
@@ -894,6 +895,7 @@ const SETTINGS_NAV: {
       { id: 'roles', label: 'Roles', blurb: 'What each role can see and use', icon: ShieldCheck },
       { id: 'apikeys', label: 'API Keys', blurb: 'Keys for Claude and other integrations', icon: KeyRound },
       { id: 'assignments', label: 'Order Assignment', blurb: 'Who new orders go to, and extra help for busy stretches', icon: UserCog },
+      { id: 'counter', label: 'Custom Counter', blurb: 'Customs each designer finished, by month, for payouts', icon: Hash },
       { id: 'activity', label: 'Activity Log', blurb: 'Who did what, and when', icon: ScrollText },
       { id: 'diagnostics', label: 'Diagnostics', blurb: 'Test connections and run a full health check', icon: FlaskConical },
       { id: 'maintenance', label: 'Maintenance', blurb: 'Cache and research resets - destructive', icon: Settings },
@@ -3885,6 +3887,7 @@ Thank you!`
                   {settingsPanel === 'apikeys' && isAdmin && <ApiKeysPanel />}
                   {settingsPanel === 'assignments' && isAdmin && <AssignmentPanel />}
                   {settingsPanel === 'activity' && isAdmin && <ActivityPanel />}
+                  {settingsPanel === 'counter' && isAdmin && <CustomCounter />}
 
                   {settingsPanel === 'reviews' && can('settings.reviews') && (
                     <div>

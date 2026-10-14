@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send, FileText, ListOrdered, Braces, Vote, Hash } from 'lucide-react'
+import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send, FileText, ListOrdered, Braces, Vote } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Capability } from '@/lib/roles'
 
@@ -298,8 +298,6 @@ function railItems(can: (c: Capability) => boolean): Item[] {
     // Creators is admin-only, same as the route behind it. Sales is for anyone
     // on the Attio workspace; the API says no to everyone else.
     ...(can('creators') ? [{ id: 'creators', label: 'Creators', icon: Users, to: '/creators', title: 'The creator programme' } as Item] : []),
-    // Payout counts are admin only; the API checks the role again.
-    ...(can('settings.admin') ? [{ id: 'counter', label: 'Counter', icon: Hash, to: '/custom-counter', title: 'Custom designs finished per designer, by month' } as Item] : []),
     ...(can('sales') ? [{ id: 'sales', label: 'Sales', icon: Send, to: '/sales', title: 'Outreach: the emails to send today, read from Attio' } as Item] : []),
   ]
 }
