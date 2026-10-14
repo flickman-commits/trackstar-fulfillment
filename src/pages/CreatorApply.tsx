@@ -85,36 +85,36 @@ export default function CreatorApply() {
       </header>
 
       <main>
-        {/* Hero: big, centered, one action. */}
-        <section className="text-center px-4 md:px-6 pt-20 md:pt-32 pb-10 md:pb-14">
-          <div className="mx-auto" style={{ maxWidth: 1120 }}>
-            <h1 className="font-bold mx-auto" style={{ fontSize: 'clamp(44px, 7vw, 80px)', lineHeight: 0.98, letterSpacing: '-0.05em', maxWidth: '20ch', textWrap: 'balance' }}>
-              Get a Trackstar print in exchange for creating 3 videos.
-            </h1>
-            <p className="mx-auto mt-4" style={{ color: TS.muted, fontSize: 'clamp(18px, 2.2vw, 24px)', lineHeight: 1.35, maxWidth: '46ch' }}>
-              Your name, bib, finish time and course, on a print made for your wall. In exchange for 3 short videos.
-            </p>
-            <div className="mt-8 flex justify-center">{applyButton(true)}</div>
-            {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-          </div>
-        </section>
+        {/* Hero: text and the action on the left, the prints in creators'
+            hands on the right. Stacked and centered on a phone. */}
+        <section className="px-4 md:px-6 pt-14 md:pt-24 lg:pt-28 pb-16 md:pb-24">
+          <div className="mx-auto grid grid-cols-1 lg:grid-cols-2 items-center gap-12 lg:gap-10" style={{ maxWidth: 1120 }}>
+            <div className="text-center lg:text-left">
+              <h1 className="font-bold mx-auto lg:mx-0" style={{ fontSize: 'clamp(44px, 5.6vw, 72px)', lineHeight: 0.98, letterSpacing: '-0.05em', maxWidth: '16ch', textWrap: 'balance' }}>
+                Get a Trackstar print in exchange for creating 3 videos.
+              </h1>
+              <p className="mx-auto lg:mx-0 mt-4" style={{ color: TS.muted, fontSize: 'clamp(18px, 2vw, 22px)', lineHeight: 1.35, maxWidth: '40ch' }}>
+                Your name, bib, finish time and course, on a print made for your wall. In exchange for 3 short videos.
+              </p>
+              <div className="mt-8 flex justify-center lg:justify-start">{applyButton(true)}</div>
+              {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+            </div>
 
-        {/* The prints, in creators' hands. */}
-        <section className="px-4 md:px-6 pb-16 md:pb-24">
-          <div className="relative mx-auto h-72 md:h-96" style={{ maxWidth: 560 }}>
-            {[
-              { src: '/Nat_UGC.png', alt: 'Nat with her Trackstar print', t: 'translateX(-110%) rotate(-10deg)', z: 10, top: 'top-4' },
-              { src: '/Sophie_UGC.png', alt: 'Sophie with her Trackstar print', t: 'translateX(10%) rotate(10deg)', z: 10, top: 'top-4' },
-              { src: '/Tim_UGC_1.jpg', alt: 'Tim with his Trackstar print', t: 'translateX(-50%)', z: 20, top: 'top-0' },
-            ].map(p => (
-              <img
-                key={p.src}
-                src={p.src}
-                alt={p.alt}
-                className={`absolute ${p.top} left-1/2 w-40 h-56 md:w-52 md:h-72 object-cover`}
-                style={{ borderRadius: 8, transform: p.t, zIndex: p.z, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}
-              />
-            ))}
+            <div className="relative mx-auto w-full h-72 md:h-96" style={{ maxWidth: 520 }}>
+              {[
+                { src: '/Nat_UGC.png', alt: 'Nat with her Trackstar print', t: 'translateX(-110%) rotate(-10deg)', z: 10, top: 'top-4' },
+                { src: '/Sophie_UGC.png', alt: 'Sophie with her Trackstar print', t: 'translateX(10%) rotate(10deg)', z: 10, top: 'top-4' },
+                { src: '/Tim_UGC_1.jpg', alt: 'Tim with his Trackstar print', t: 'translateX(-50%)', z: 20, top: 'top-0' },
+              ].map(p => (
+                <img
+                  key={p.src}
+                  src={p.src}
+                  alt={p.alt}
+                  className={`absolute ${p.top} left-1/2 w-40 h-56 md:w-52 md:h-72 object-cover`}
+                  style={{ borderRadius: 8, transform: p.t, zIndex: p.z, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}
+                />
+              ))}
+            </div>
           </div>
         </section>
 

@@ -85,6 +85,26 @@ function isMonopolyHost(): boolean {
 const MONOPOLY_ORIGIN = 'https://monopoly.trackstar.art'
 
 /**
+ * creator.trackstar.art: the Creator Program on its own address. The landing
+ * page answers at "/" and the onboarding/portal links (/creator/<token>) work
+ * there too; nothing else is routed on that host. Old fast.trackstar.art/apply
+ * links redirect here (production only, like Monopoly).
+ */
+function isCreatorHost(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.location.hostname.split('.')[0] === 'creator'
+}
+const CREATOR_ORIGIN = 'https://creator.trackstar.art'
+
+function RedirectToCreatorHost() {
+  const onProduction = window.location.hostname.endsWith('trackstar.art')
+  useEffect(() => {
+    if (onProduction) window.location.replace(`${CREATOR_ORIGIN}/${window.location.search}`)
+  }, [onProduction])
+  return onProduction ? null : <CreatorApply />
+}
+
+/**
  * Sends an old /monopoly link to the subdomain that now owns the page.
  *
  * A hard redirect rather than a removed route, because links to
@@ -137,6 +157,22 @@ function SalesKeepAlive() {
 }
 
 export default function App() {
+  if (isCreatorHost()) {
+    return (
+      <ErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<CreatorApply />} />
+            {/* The page lives on creator.trackstar.art now. */}
+          <Route path="/apply" element={<RedirectToCreatorHost />} />
+            <Route path="/creator/:token" element={<CreatorPortal />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          <Toaster position="bottom-center" toastOptions={{ className: '!bg-dark-fill !text-white !rounded-md' }} />
+        </BrowserRouter>
+      </ErrorBoundary>
+    )
+  }
   if (isMonopolyHost()) {
     return (
       <ErrorBoundary>

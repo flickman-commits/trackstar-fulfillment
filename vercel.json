@@ -46,6 +46,11 @@
       "destination": "/api/public/creator-preview"
     },
     {
+      "source": "/",
+      "has": [{ "type": "host", "value": "creator.trackstar.art" }],
+      "destination": "/api/public/creator-preview"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
