@@ -134,3 +134,61 @@ export function QueuePill({ people, team, selected, onSelect }: {
     </div>
   )
 }
+
+/**
+ * "Team Member" filter above the order lists: whose orders are showing, as a
+ * name with its avatar. '' is everyone, 'none' is unassigned.
+ */
+export function PersonFilter({ team, value, meId, onChange }: {
+  team: Teammate[]
+  value: string
+  meId?: string | null
+  onChange: (v: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  setTeamColors(team)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
+  }, [open])
+  const current = team.find(u => u.id === value) || null
+  const pick = (v: string) => { setOpen(false); onChange(v) }
+  const row = 'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-subtle-gray'
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 pl-3 md:pl-4 pr-9 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm text-off-black text-left focus:outline-none focus:ring-2 focus:ring-off-black/10"
+      >
+        {current ? <><Avatar user={current} size={20} /><span className="truncate">{current.firstName} {current.lastName}</span></>
+          : <span className="truncate">{value === 'none' ? 'Unassigned' : 'Everyone'}</span>}
+        <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-off-black/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 min-w-[200px] bg-white border border-border-gray rounded-lg shadow-lg py-1">
+          {team.map(u => (
+            <button key={u.id} type="button" onClick={() => pick(u.id)} className={row}>
+              <Avatar user={u} size={22} />
+              <span className="flex-1 truncate">{u.firstName} {u.lastName}{u.id === meId ? <span className="text-off-black/40"> (me)</span> : null}</span>
+              {u.id === value && <Check className="w-4 h-4 text-off-black/50" />}
+            </button>
+          ))}
+          <div className="border-t border-border-gray my-1" />
+          <button type="button" onClick={() => pick('')} className={row}>
+            <span className="flex-1">Everyone</span>{!value && <Check className="w-4 h-4 text-off-black/50" />}
+          </button>
+          <button type="button" onClick={() => pick('none')} className={row}>
+            <span className="w-[22px] h-[22px] rounded-full border border-dashed border-off-black/25" />
+            <span className="flex-1">Unassigned</span>{value === 'none' && <Check className="w-4 h-4 text-off-black/50" />}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}

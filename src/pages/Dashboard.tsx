@@ -13,7 +13,7 @@ import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/componen
 import ApiKeysPanel from '@/components/ApiKeysPanel'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
 import AssignmentPanel from '@/components/AssignmentPanel'
-import AssigneePicker, { Avatar, QueuePill, type QueueMember } from '@/components/AssigneePicker'
+import AssigneePicker, { Avatar, QueuePill, PersonFilter, type QueueMember } from '@/components/AssigneePicker'
 import { setTeamColors } from '@/lib/teamColors'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams } from 'react-router-dom'
@@ -911,9 +911,9 @@ export default function Dashboard() {
   const [team, setTeam] = useState<{ id: string; firstName: string; lastName: string }[]>([])
   // Who new orders of each type go to today (regular, plus any help on a shift).
   const [queues, setQueues] = useState<Record<string, QueueMember[]>>({})
-  const [scope, setScope] = useState<'mine' | 'all' | null>(null)
-  // Admin: show one teammate's orders ('none' = unassigned). Standard and custom.
-  const [personFilter, setPersonFilter] = useState<string>('')
+  // Whose orders show in standard and custom: a teammate's id, '' for
+  // everyone, 'none' for unassigned. Starts on the signed-in person's own.
+  const [personFilter, setPersonFilter] = useState<string | null>(null)
   const loadTeam = useCallback(() => {
     apiFetch('/api/orders/assign').then(r => r.ok ? r.json() : null).then(d => { if (d?.users) { setTeamColors(d.users); setTeam(d.users) } if (d?.queues) setQueues(d.queues) }).catch(() => {})
   }, [])
@@ -2331,10 +2331,12 @@ export default function Dashboard() {
   // Mine only applies to the two queues people actually work: standard and custom.
   const scoped = activeView === 'standard' || activeView === 'custom'
   const myId = currentUser?.id || null
-  const hasMine = useMemo(() => Boolean(myId) && orders.some(o => o.assigneeId === myId && o.status !== 'completed'), [orders, myId])
-  // First load decides the default; after that it is the person's choice.
-  useEffect(() => { if (scope === null && orders.length > 0) setScope(hasMine ? 'mine' : 'all') }, [scope, orders.length, hasMine])
-  const effectiveScope: 'mine' | 'all' = scoped && scope === 'mine' ? 'mine' : 'all'
+  useEffect(() => { if (personFilter === null && myId) setPersonFilter(myId) }, [personFilter, myId])
+  const person = personFilter || ''
+  // One rule for every list on the page (open, completed, search results), so
+  // picking a person can never show someone else's orders.
+  const byPerson = useCallback((o: Order) =>
+    !scoped || !person || (person === 'none' ? !o.assigneeId : o.assigneeId === person), [scoped, person])
 
   /** Reassign one order. Optimistic, rolled back if the server refuses. */
   // The Assignee column in the desktop tables: avatar and first name.
@@ -2410,8 +2412,7 @@ export default function Dashboard() {
   const ordersToFulfill = useMemo(() => {
     // Guard: ensure orders match the active view type to prevent cross-contamination
     const typeFiltered = orders.filter(o => (o.trackstarOrderType || 'standard') === activeView)
-      .filter(o => effectiveScope === 'all' || o.assigneeId === myId)
-      .filter(o => !personFilter || !scoped || (personFilter === 'none' ? !o.assigneeId : o.assigneeId === personFilter))
+      .filter(byPerson)
     if (activeView === 'custom' || activeView === 'race_partner') {
       // Design-driven views: show all non-done items, sorted by most recent first for race_partner
       // (custom uses due date; race_partner has no due date so we fall back to createdAt)
@@ -2445,11 +2446,11 @@ export default function Dashboard() {
       const dateB = new Date(b.orderPlacedAt || b.shopifyCreatedAt || b.createdAt).getTime()
       return dateB - dateA
     })
-  }, [orders, activeView, effectiveScope, myId, personFilter, scoped])
+  }, [orders, activeView, byPerson])
 
   const completedOrders = useMemo(() => {
     // Guard: ensure orders match the active view type
-    const typeFiltered = orders.filter(o => (o.trackstarOrderType || 'standard') === activeView)
+    const typeFiltered = orders.filter(o => (o.trackstarOrderType || 'standard') === activeView).filter(byPerson)
     if (activeView === 'race_partner') {
       return typeFiltered.filter(o => o.designStatus === 'sent_to_production' || o.designStatus === 'approved_by_customer')
     }
@@ -2457,7 +2458,7 @@ export default function Dashboard() {
       return typeFiltered.filter(o => o.designStatus === 'sent_to_production')
     }
     return typeFiltered.filter(o => o.status === 'completed')
-  }, [orders, activeView])
+  }, [orders, activeView, byPerson])
 
   const matchesSearch = useCallback((o: Order, query: string) =>
     o.orderNumber.toLowerCase().includes(query) ||
@@ -2856,7 +2857,7 @@ Thank you!`
   // On mobile they stack; on md+ the race select sits beside search.
   const toolbar = (
     <div className="p-3 md:p-4 border-b border-border-gray flex-shrink-0">
-      <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+      <div className="flex flex-col md:flex-row md:items-end gap-2 md:gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
           <input
@@ -2867,24 +2868,17 @@ Thank you!`
             className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
           />
         </div>
-        {/* Admin: one teammate's orders. Clicking a person in Current Team does the same. */}
-        {isAdmin && scoped && (
-          <div className="relative md:w-48">
-            <select
-              value={personFilter}
-              onChange={(e) => setPersonFilter(e.target.value)}
-              className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2.5 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 cursor-pointer ${personFilter ? 'bg-dark-fill text-white border-dark-fill' : 'bg-subtle-gray border-border-gray text-off-black'}`}
-              title="Show one teammate's orders"
-            >
-              <option value="" className="bg-white text-off-black">Everyone's orders</option>
-              {team.map(u => <option key={u.id} value={u.id} className="bg-white text-off-black">{u.firstName}'s orders</option>)}
-              <option value="none" className="bg-white text-off-black">Unassigned</option>
-            </select>
-            <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${personFilter ? 'text-white' : 'text-off-black/40'}`} />
+        {/* Whose orders. Clicking a person in Current Team does the same. */}
+        {scoped && (
+          <div className="md:w-52">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Team Member</div>
+            <PersonFilter team={team} value={person} meId={myId} onChange={setPersonFilter} />
           </div>
         )}
         {activeView === 'standard' && (
-        <div className="relative md:w-64">
+        <div className="md:w-64">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Race</div>
+          <div className="relative">
           <select
             value={raceFilter}
             onChange={(e) => setRaceFilter(e.target.value)}
@@ -2900,6 +2894,7 @@ Thank you!`
             ))}
           </select>
           <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${raceFilter ? 'text-white' : 'text-off-black/40'}`} />
+          </div>
         </div>
         )}
         {/* Bulk-research trigger — adapts label to the active filter.
@@ -3012,7 +3007,7 @@ Thank you!`
                 is the right control when the options do not fit side by side. */}
             <div className="hidden md:block relative">
             {/* Floats above the switcher so the header keeps its height. */}
-            <div className="absolute bottom-full right-0 mb-2.5"><QueuePill people={queues[activeView]} team={team} selected={personFilter} onSelect={isAdmin && scoped ? (id) => setPersonFilter(f => f === id ? '' : id) : undefined} /></div>
+            <div className="absolute bottom-full right-0 mb-2.5"><QueuePill people={queues[activeView]} team={team} selected={person} onSelect={scoped ? (id) => setPersonFilter(f => f === id ? '' : id) : undefined} /></div>
             <div className={`inline-flex ${segmentGroup}`}>
               {([
                 ['standard', 'Standard'],
@@ -3084,7 +3079,7 @@ Thank you!`
                               {(order.notes || (order.commentCount ?? 0) > 0) && (
                                 <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                               )}
-                              {effectiveScope === 'all' && order.assigneeName && (
+                              {!person && order.assigneeName && (
                                 <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
                               )}
                             </div>
@@ -3182,7 +3177,7 @@ Thank you!`
                               {(order.notes || (order.commentCount ?? 0) > 0) && (
                                 <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                               )}
-                              {effectiveScope === 'all' && order.assigneeName && (
+                              {!person && order.assigneeName && (
                                 <span className="inline-flex items-center gap-1 text-[11px] text-off-black/60 whitespace-nowrap" title="Assigned to">{(() => { const u = team.find(t => t.id === order.assigneeId); return u ? <Avatar user={u} size={16} /> : null })()}{order.assigneeName}</span>
                               )}
                             </div>
@@ -3297,10 +3292,6 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-52">
                           <div className="flex items-center gap-2 leading-none">
                             Assignee
-                            <span className="inline-flex items-center gap-0.5 -my-1 normal-case tracking-normal font-medium text-[11px]">
-                              <button onClick={() => setScope('all')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'all' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Everyone's orders">All</button>
-                              <button onClick={() => setScope('mine')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'mine' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Orders assigned to you">Mine</button>
-                            </span>
                           </div>
                         </th>
                         <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Tags</th>
@@ -3483,10 +3474,6 @@ Thank you!`
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-52">
                           <div className="flex items-center gap-2 leading-none">
                             Assignee
-                            <span className="inline-flex items-center gap-0.5 -my-1 normal-case tracking-normal font-medium text-[11px]">
-                              <button onClick={() => setScope('all')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'all' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Everyone's orders">All</button>
-                              <button onClick={() => setScope('mine')} className={`px-1.5 py-0.5 rounded ${effectiveScope === 'mine' ? 'bg-off-black/10 text-off-black' : 'text-off-black/40 hover:text-off-black/70'}`} title="Orders assigned to you">Mine</button>
-                            </span>
                           </div>
                         </th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell">Runner</th>
