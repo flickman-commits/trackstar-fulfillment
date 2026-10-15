@@ -912,7 +912,7 @@ export default function Dashboard() {
   // Who new orders of each type go to today (regular, plus any help on a shift).
   const [queues, setQueues] = useState<Record<string, QueueMember[]>>({})
   // Whose orders show in standard and custom: a teammate's id, '' for
-  // everyone, 'none' for unassigned. Starts on the signed-in person's own.
+  // everyone, 'none' for unassigned.
   const [personFilter, setPersonFilter] = useState<string | null>(null)
   const loadTeam = useCallback(() => {
     apiFetch('/api/orders/assign').then(r => r.ok ? r.json() : null).then(d => { if (d?.users) { setTeamColors(d.users); setTeam(d.users) } if (d?.queues) setQueues(d.queues) }).catch(() => {})
@@ -2345,7 +2345,8 @@ export default function Dashboard() {
   // Mine only applies to the two queues people actually work: standard and custom.
   const scoped = activeView === 'standard' || activeView === 'custom'
   const myId = currentUser?.id || null
-  useEffect(() => { if (personFilter === null && myId) setPersonFilter(myId) }, [personFilter, myId])
+  // Admins start on everyone; everyone else starts on their own orders.
+  useEffect(() => { if (personFilter === null && myId) setPersonFilter(isAdmin ? '' : myId) }, [personFilter, myId, isAdmin])
   const person = personFilter || ''
   // One rule for every list on the page (open, completed, search results), so
   // picking a person can never show someone else's orders.
