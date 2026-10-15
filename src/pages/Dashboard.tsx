@@ -2892,6 +2892,16 @@ Thank you!`
             placeholder="Search by order #, runner, bib, race or customer email... (⌘K)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter on an exact order number opens that order, from any view.
+              if (e.key !== 'Enter') return
+              const q = searchQuery.trim().replace(/^#/, '').toLowerCase()
+              if (!q) return
+              const hit = orders
+                .filter(o => [o.displayOrderNumber, o.parentOrderNumber, o.orderNumber].some(v => String(v || '').replace(/^#/, '').toLowerCase() === q))
+                .sort((a, b) => (a.lineItemIndex || 0) - (b.lineItemIndex || 0))[0]
+              if (hit) { e.preventDefault(); setSelectedOrder(hit); searchInputRef.current?.blur() }
+            }}
             className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
           />
         </div>
