@@ -11,6 +11,7 @@ import { runLockedImport } from '../../server/lib/importStamp.js'
 import { syncShopifyBulkOrders } from '../../server/domain/bulk/shopifyBulk.js'
 import { applyCustomerResults } from '../../server/domain/research/customerResults.js'
 import { autoQueueRenders } from '../../server/domain/render/jobs.js'
+import { deliverPending } from '../../server/domain/render/deliver.js'
 
 export default async function handler(req, res) {
   if (!isCronRequest(req)) return res.status(401).json({ error: 'Unauthorized' })
@@ -22,6 +23,9 @@ export default async function handler(req, res) {
     // Orders that have everything get their print rendered without anyone clicking.
     const renders = await autoQueueRenders().catch(err => { console.error('[orders.auto-import] auto renders failed:', err.message); return null })
     if (renders?.queued) console.log(`[orders.auto-import] renders queued: ${renders.queued}`)
+    // Approved prints that have not reached the Drive Orders folder yet.
+    const sent = await deliverPending().catch(err => { console.error('[orders.auto-import] deliveries failed:', err.message); return null })
+    if (sent && (sent.delivered || sent.failed)) console.log(`[orders.auto-import] prints saved to Drive: ${sent.delivered}, failed: ${sent.failed}`)
     // Bulk runs paid through Shopify: link or create their runs, mark paid.
     const bulk = await syncShopifyBulkOrders().catch(err => { console.error('[orders.auto-import] bulk sync failed:', err.message); return null })
     if (bulk && (bulk.created || bulk.linked || bulk.paid)) console.log(`[orders.auto-import] bulk: ${bulk.created} created, ${bulk.linked} linked, ${bulk.paid} paid`)

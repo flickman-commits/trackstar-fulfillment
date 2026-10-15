@@ -59,3 +59,11 @@ export async function deliverApproved(job) {
     return prisma.renderJob.update({ where: { id: job.id }, data: { deliveryError: String(msg).slice(0, 500) } })
   }
 }
+
+/** Approved renders that have not reached Drive yet, retried on every auto-import. */
+export async function deliverPending({ limit = 20 } = {}) {
+  const jobs = await prisma.renderJob.findMany({ where: { status: 'done', review: 'approved', deliveredAt: null }, orderBy: { reviewedAt: 'asc' }, take: limit })
+  let delivered = 0, failed = 0
+  for (const job of jobs) { const out = await deliverApproved(job); if (out.deliveredAt) delivered++; else failed++ }
+  return { delivered, failed }
+}
