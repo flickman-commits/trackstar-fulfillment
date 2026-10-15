@@ -11,7 +11,7 @@ import { btnPrimary, btnSecondary, btnGhost, inputBase } from '@/lib/ui'
  */
 
 type Job = {
-  id: string; version: number; status: 'queued' | 'rendering' | 'done' | 'failed'
+  id: string; version: number; status: 'queued' | 'rendering' | 'done' | 'failed'; requestedBy: 'admin' | 'system' | 'customer'
   spec: { file: string; name: string; bib: string; time: string | null; pace: string | null; date: string; condition: string; temp: string; size: string; noTime: boolean; photoPath: string | null }
   notes: string | null; error: string | null; createdAt: string; finishedAt: string | null
   review: 'pending' | 'approved' | 'rejected'; reviewNote: string | null; reviewer: string | null; reviewedAt: string | null
@@ -83,7 +83,7 @@ export default function DesignPanel({ orderId, onPreview, canManage = true }: {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Design</span>
-          {job && <span className="text-[10px] text-off-black/40">v{job.version}</span>}
+          {job && <span className="text-[10px] text-off-black/40">v{job.version}{job.requestedBy === 'system' ? ' · auto' : ''}</span>}
           {job?.review === 'approved' && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-100 text-green-800 text-[11px] font-semibold"><Check className="w-3 h-3" /> Approved{job.reviewer ? ` by ${job.reviewer}` : ''}</span>}
           {job?.review === 'rejected' && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-100 text-red-800 text-[11px] font-semibold"><X className="w-3 h-3" /> Rejected</span>}
           {/* Whether a Mac with Illustrator is checked in right now. */}

@@ -147,3 +147,37 @@ export async function reviewJob({ jobId, decision, note, reviewerId }) {
   return prisma.renderJob.update({ where: { id: job.id }, data: { review: decision, reviewNote: note ? String(note).slice(0, 2000) : null, reviewedById: reviewerId || null, reviewedAt: new Date() } })
 }
 
+
+/**
+ * Queue renders for open orders that have everything and no render yet.
+ * Runs on every auto-import, so a print is usually waiting for review by
+ * the time anyone looks at the order. Only orders a worker online right now
+ * can render are queued (createJob refuses the rest), so an order that comes
+ * in while every Mac is asleep is picked up on a later run. A person still
+ * approves every render.
+ */
+export async function autoQueueRenders({ limit = 25 } = {}) {
+  const templates = await availableTemplates()
+  if (!templates.length) return { queued: 0, skipped: 0, reason: 'no render worker online' }
+  const candidates = await prisma.order.findMany({
+    where: {
+      trackstarOrderType: 'standard',
+      status: { notIn: ['completed', 'flagged'] },
+      raceName: { in: templates },
+      renderJobs: { none: {} },
+      createdAt: { gte: new Date(Date.now() - 60 * 86400000) },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: limit * 4,
+    select: { id: true, orderNumber: true },
+  })
+  let queued = 0, skipped = 0
+  for (const o of candidates) {
+    if (queued >= limit) break
+    const { ok } = await checkOrder(o.id)
+    if (!ok) { skipped++; continue }
+    await createJob({ orderId: o.id, requestedBy: 'system' })
+    queued++
+  }
+  return { queued, skipped }
+}
