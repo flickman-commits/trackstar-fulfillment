@@ -6557,10 +6557,10 @@ Thank you!`
                     </div>
                   </div>
 
-                  {/* Automated print. Admins create and review; everyone sees an approved one. See DesignPanel. */}
+                  {/* Automated print. People with orders.render create and review; everyone sees an approved one. See DesignPanel. */}
                   {selectedOrder.trackstarOrderType === 'standard' && (
                     <div className="hidden md:block">
-                      <DesignPanel orderId={selectedOrder.id} onPreview={onDesignPreview} canManage={isAdmin} />
+                      <DesignPanel orderId={selectedOrder.id} onPreview={onDesignPreview} canManage={can('orders.render')} />
                     </div>
                   )}
 

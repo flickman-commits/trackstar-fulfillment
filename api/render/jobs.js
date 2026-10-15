@@ -1,7 +1,7 @@
 /**
  * Automated print renders, for the order panel. Anyone signed in can read
- * (the team sees an approved print); creating and reviewing are admin only
- * while trust is being built.
+ * (the team sees an approved print); creating and reviewing need the
+ * orders.render capability (admins, and fulfillment by default).
  *
  *   GET  ?orderId=                 can this order be rendered, the latest job, signed file links
  *   POST { action: 'create', orderId }                     queue a render
@@ -11,7 +11,7 @@
  * talks to api/render/worker.js.
  */
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { requireAdminOnly, recordAudit, loadActiveUser } from '../_lib/users.js'
+import { requireCapability, recordAudit, loadActiveUser } from '../_lib/users.js'
 import { checkOrder, createJob, latestJob, signedFiles, reviewJob, onlineWorkers } from '../../server/domain/render/jobs.js'
 import { deliverApproved } from '../../server/domain/render/deliver.js'
 
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-    const user = await requireAdminOnly(req, res)
+    const user = await requireCapability(req, res, 'orders.render')
     if (!user) return
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
 
