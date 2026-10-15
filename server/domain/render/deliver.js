@@ -13,12 +13,26 @@ import { signedFiles } from './jobs.js'
 
 const ORDERS_FOLDER_ID = () => process.env.RENDER_ORDERS_FOLDER_ID || '1hvHh3F9Wdo8cpLPziSbIC1SUHe6Tq1OI'
 
-async function drive() {
-  const personal = await driveClientForAnyone().catch(() => null)
-  if (personal) return personal
+function serviceDrive() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-  if (!email || !rawKey) throw new Error('No Google connection with Drive access')
+  if (!email || !rawKey) return null
   return google.drive({ version: 'v3', auth: new google.auth.JWT({ email, key: rawKey.replace(/\\n/g, '\n'), scopes: ['https://www.googleapis.com/auth/drive'] }) })
+}
+
+/**
+ * Every Drive client worth trying, in order: a person's connection (whoever
+ * connected Gmail with Drive access), then the service account. A person's
+ * token can expire or be revoked (Google answers "invalid_grant"), and that
+ * must not stop prints reaching the folder when the service account can.
+ */
+async function driveClients() {
+  const out = []
+  const personal = await driveClientForAnyone().catch(() => null)
+  if (personal) out.push({ name: 'the connected Google account', client: personal })
+  const svc = serviceDrive()
+  if (svc) out.push({ name: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, client: svc })
+  if (!out.length) throw new Error('No Google connection with Drive access')
+  return out
 }
 
 const escapeQ = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
@@ -33,28 +47,32 @@ export async function deliverApproved(job) {
     if (!res.ok) throw new Error(`Could not read the PDF (${res.status})`)
     const buf = Buffer.from(await res.arrayBuffer())
 
-    const d = await drive()
     const folder = ORDERS_FOLDER_ID()
     const base = String(job.spec?.file || job.orderId)
-    let name = `${base}.pdf`
-    const { data } = await d.files.list({ q: `'${folder}' in parents and name contains '${escapeQ(base)}' and trashed = false`, fields: 'files(name)', pageSize: 100, supportsAllDrives: true, includeItemsFromAllDrives: true })
-    const taken = new Set((data.files || []).map(f => f.name))
-    for (let n = 2; taken.has(name); n++) name = `${base} (${n}).pdf`
-
-    const created = await d.files.create({
-      requestBody: { name, parents: [folder] },
-      media: { mimeType: 'application/pdf', body: Readable.from(buf) },
-      fields: 'id, webViewLink',
-      supportsAllDrives: true,
-    })
+    let created = null, lastError = null
+    for (const { name: who, client: d } of await driveClients()) {
+      try {
+        let name = `${base}.pdf`
+        const { data } = await d.files.list({ q: `'${folder}' in parents and name contains '${escapeQ(base)}' and trashed = false`, fields: 'files(name)', pageSize: 100, supportsAllDrives: true, includeItemsFromAllDrives: true })
+        const taken = new Set((data.files || []).map(f => f.name))
+        for (let n = 2; taken.has(name); n++) name = `${base} (${n}).pdf`
+        created = await d.files.create({
+          requestBody: { name, parents: [folder] },
+          media: { mimeType: 'application/pdf', body: Readable.from(buf) },
+          fields: 'id, webViewLink, name',
+          supportsAllDrives: true,
+        })
+        break
+      } catch (e) {
+        lastError = new Error(`${who}: ${/not found/i.test(e.message) ? 'cannot see the Orders folder (share it as Editor)' : /invalid_grant/i.test(e.message) ? 'its Google connection has expired (reconnect Gmail in Settings)' : e.message}`)
+      }
+    }
+    if (!created) throw lastError
     const link = created.data.webViewLink || `https://drive.google.com/file/d/${created.data.id}/view`
-    console.log(`[render.deliver] Saved ${name} to the Orders folder (${created.data.id})`)
+    console.log(`[render.deliver] Saved ${created.data.name} to the Orders folder (${created.data.id})`)
     return prisma.renderJob.update({ where: { id: job.id }, data: { deliveredAt: new Date(), deliveredPath: link, deliveryError: null } })
   } catch (error) {
-    // A 404 on the folder means the connected Google account cannot see it.
-    const msg = /not found/i.test(error.message)
-      ? `The Orders folder is not shared with the Google account the tool uses (Settings > Sales > Gmail${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? `, or ${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL}` : ''}). Share it as Editor.`
-      : error.message
+    const msg = error.message
     console.error('[render.deliver]', msg)
     return prisma.renderJob.update({ where: { id: job.id }, data: { deliveryError: String(msg).slice(0, 500) } })
   }
