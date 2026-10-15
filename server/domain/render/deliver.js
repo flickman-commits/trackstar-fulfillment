@@ -40,6 +40,10 @@ const escapeQ = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 /** Upload the job's PDF to the Orders folder. Records the link on the job, or the error. */
 export async function deliverApproved(job) {
   if (job.deliveredAt) return job
+  // Only the newest approved version of an order goes to the folder. An older
+  // approved version that was re-rendered and approved again is superseded.
+  const newer = await prisma.renderJob.findFirst({ where: { orderId: job.orderId, review: 'approved', version: { gt: job.version } }, select: { version: true } })
+  if (newer) return prisma.renderJob.update({ where: { id: job.id }, data: { deliveryError: `Superseded by v${newer.version}` } })
   try {
     const { pdfUrl } = await signedFiles(job)
     if (!pdfUrl) throw new Error('No PDF on this render')
