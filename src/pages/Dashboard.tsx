@@ -2738,7 +2738,7 @@ Thank you!`
     if (order.status === 'missing_year') return { icon: '📅', label: 'Missing Year' }
     // Customer confirmed an official-results match in the Instant Lookup widget
     // — trusted, no scrape needed. Shown ahead of the generic ready/found labels.
-    if (order.researchSource === 'customer_verified') return { icon: '🟣', label: 'Customer-verified' }
+    if (order.researchSource === 'customer_verified') return { icon: '☑️', label: 'Customer-verified' }
     // Their own numbers, never matched against official results. Distinct icon
     // so it does not read as a confirmed match at a glance.
     if (order.researchSource === 'customer_supplied') return { icon: '✍️', label: 'Customer-entered' }
