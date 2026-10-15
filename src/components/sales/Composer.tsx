@@ -5,6 +5,7 @@ import { MotionTag } from './Queue'
 import { salesApi, type LibraryTemplate, type OutreachTemplate, type TemplateFill, type TemplateMotion } from '@/lib/salesApi'
 import { toast } from 'sonner'
 import { menuFor } from '@/lib/salesTemplates'
+import { TIPS, wordCount, isThreadReply, subjectWords, isBestDay, pastFollowUps } from '@/lib/coldEmailTips'
 import { whenLabel } from '@/lib/salesDates'
 
 /** The saved templates and their fill values, loaded once by the page. */
@@ -169,6 +170,11 @@ export default function Composer({
                 {!adhoc && <span className="px-2 py-0.5 rounded bg-off-black/10 text-off-black/60 font-medium">
                   Touch {draft.touchNumber}
                 </span>}
+                {!adhoc && pastFollowUps(draft.touchNumber) && (
+                  <span className="px-2 py-0.5 rounded bg-amber-50 border border-amber-100 text-amber-800 font-medium" title={`Cold email works best with ${TIPS.maxFollowUps} follow-ups at most`}>
+                    Past {TIPS.maxFollowUps} follow-ups: consider stopping here
+                  </span>
+                )}
               </>
             )}
             {!adhoc && deal.lastSentAt && (
@@ -199,7 +205,10 @@ export default function Composer({
           {/* Labels sit above their field so the text gets the pane's full width.
               Subject and body text both start 8px in, so they line up. */}
           <div className="px-6 pt-3 pb-2.5 border-b border-border-gray flex-shrink-0">
-            <span className={`${cardLabel} block px-2 mb-0.5`}>Subject</span>
+            <span className="flex items-center justify-between px-2 mb-0.5">
+              <span className={cardLabel}>Subject</span>
+              <SubjectHint subject={current.subject} />
+            </span>
             <input value={current.subject} onChange={e => onChange({ ...current, subject: e.target.value })} onBlur={onCheck} className={`${inputBase} w-full border-transparent bg-transparent px-[7px] font-medium focus:bg-white focus:border-border-gray`} />
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
@@ -216,6 +225,7 @@ export default function Composer({
             </div>
           )}
 
+          <EmailHints body={current.body} />
           <div className="px-8 pb-2 text-xs">
             {checking ? (
               <span className="inline-flex items-center gap-1.5 text-off-black/45"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking the house rules…</span>
@@ -753,6 +763,37 @@ export function RichBox({ value, onChange, onBlur, placeholder, minHeight, boxRe
   )
 }
 
+/** Subject length, with the cold email nudges. Quiet for a reply on the thread. */
+function SubjectHint({ subject }: { subject: string }) {
+  if (isThreadReply(subject)) return null
+  const chars = subject.trim().length
+  const words = subjectWords(subject)
+  const long = chars > TIPS.maxSubjectChars
+  const tip = long
+    ? `Under ${TIPS.maxSubjectChars} characters opens best; one word opens best of all`
+    : words === 1 ? 'One word: the best open rate' : `One-word subjects get the best open rate`
+  return (
+    <span className={`text-[10px] ${long ? 'text-amber-700' : 'text-off-black/35'}`} title={tip}>
+      {chars} / {TIPS.maxSubjectChars}{long ? ` · ${tip}` : words === 1 ? ' · one word' : ''}
+    </span>
+  )
+}
+
+/** Body length and send day, as suggestions under the email. */
+function EmailHints({ body }: { body: string }) {
+  const words = wordCount(body)
+  const long = words > TIPS.maxWords
+  const goodDay = isBestDay()
+  return (
+    <div className="px-8 pb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+      <span className={long ? 'text-amber-700' : 'text-off-black/40'} title={`Emails under ${TIPS.maxWords} words got a ${TIPS.replyRate} reply rate`}>
+        {words} words{long ? ` · under ${TIPS.maxWords} got a ${TIPS.replyRate} reply rate` : ''}
+      </span>
+      {!goodDay && <span className="text-amber-700" title="Cold email gets the best replies on Tuesday and Wednesday">Tuesday or Wednesday sends best · use Send later</span>}
+    </div>
+  )
+}
+
 /** Where a P.S. starts: a paragraph that opens with "P.S.", as composeHtml splits it on send. */
 const PS_START = /(^|\n[ \t]*\n)(?=[ \t]*p\.?s\.?[\s:.-])/i
 const IS_PS = /^\s*p\.?s\.?[\s:.-]/i
@@ -831,7 +872,16 @@ function presets(now = new Date()) {
   out.push({ label: next.getDay() === 1 ? 'Monday morning' : 'Tomorrow morning', at: at915(next) })
   const monday = new Date(now); monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7 || 7))
   if (!out.some(p => p.at.getTime() === at915(monday).getTime())) out.push({ label: 'Monday morning', at: at915(monday) })
-  return out
+  // Tuesday and Wednesday get the best replies, so offer the next of each.
+  for (const [day, name] of [[2, 'Tuesday'], [3, 'Wednesday']] as const) {
+    const d = new Date(now); d.setDate(d.getDate() + ((day - d.getDay() + 7) % 7))
+    if (at915(d).getTime() <= now.getTime() + 60_000) d.setDate(d.getDate() + 7)
+    const at = at915(d)
+    const existing = out.find(p => p.at.getTime() === at.getTime())
+    if (existing) existing.label = `${existing.label} (${name}, best day)`
+    else out.push({ label: `${name} morning (best day)`, at })
+  }
+  return out.sort((a, b) => a.at.getTime() - b.at.getTime())
 }
 
 /** "2026-09-28T09:15" for a datetime-local input, in local time. */

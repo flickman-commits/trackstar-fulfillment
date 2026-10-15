@@ -9,6 +9,7 @@ import {
 import { salesApi, type CustomVariable, type LibraryTemplate, type SequencePipeline, type SequenceStep, type TemplateMotion, type TemplateNote, type Workspace } from '@/lib/salesApi'
 import { BodyEditor } from '@/components/sales/Composer'
 import type { Asset } from '@/types/sales'
+import { TIPS, wordCount, isThreadReply } from '@/lib/coldEmailTips'
 import { useDocumentHead } from '@/lib/useDocumentHead'
 import { useAuth } from '@/lib/auth'
 
@@ -189,7 +190,14 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
             </div>
             <div><label className={fieldLabel}>When to use it</label><input value={draft.useFor || ''} onChange={e => setDraft({ ...draft, useFor: e.target.value })} placeholder="Cold first touch for gift guide editors" className={`${inputBase} w-full`} /></div>
             <div>
-              <label className={fieldLabel}>Subject</label>
+              <div className="flex items-center justify-between">
+                <label className={fieldLabel}>Subject</label>
+                {draft.subject?.trim() && !isThreadReply(draft.subject) && (
+                  <span className={`text-[10px] mb-1 ${draft.subject.trim().length > TIPS.maxSubjectChars ? 'text-amber-700' : 'text-off-black/40'}`}>
+                    {draft.subject.trim().length} / {TIPS.maxSubjectChars}{draft.subject.trim().length > TIPS.maxSubjectChars ? ` · under ${TIPS.maxSubjectChars} characters opens best` : ''}
+                  </span>
+                )}
+              </div>
               <input
                 ref={subjectRef} value={draft.subject || ''} placeholder="Leave empty to reply on the same thread"
                 onChange={e => setDraft({ ...draft, subject: e.target.value })}
@@ -200,7 +208,10 @@ function Templates({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className={`${fieldLabel} mb-0`}>Body</label>
+                <span className="flex items-center gap-2">
+                  <label className={`${fieldLabel} mb-0`}>Body</label>
+                  {(() => { const n = wordCount(draft.body || ''); return <span className={`text-[10px] ${n > TIPS.maxWords ? 'text-amber-700' : 'text-off-black/40'}`}>{n} words{n > TIPS.maxWords ? ` · under ${TIPS.maxWords} got a ${TIPS.replyRate} reply rate` : ''}</span> })()}
+                </span>
                 <div className="relative">
                   <button onMouseDown={e => e.preventDefault()} onClick={() => setVarsOpen(o => !o)} className={btnGhost}><Braces className="w-3.5 h-3.5" /> Insert variable</button>
                   {varsOpen && (
@@ -418,6 +429,11 @@ function Sequences({ ws, reload }: { ws: Workspace; reload: () => Promise<void> 
           {steps.length} {steps.length === 1 ? 'email' : 'emails'} over {totalDays} days. Each step starts from a template; you still write the first line and send it yourself.
           {pipeline === 'RACE' ? ' Corporate deals use this sequence too.' : ''}
         </p>
+        {steps.length > TIPS.maxFollowUps + 1 && (
+          <div className="-mt-3 mb-5 rounded-md border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            {steps.length - 1} follow-ups. Cold email has done best with {TIPS.maxFollowUps} at most; consider ending this sequence at step {TIPS.maxFollowUps + 1}.
+          </div>
+        )}
 
         <ol className="space-y-0">
           {steps.map((s, i) => {
