@@ -946,6 +946,17 @@ export default function Dashboard() {
   const [raceFilter, setRaceFilter] = useState('')  // empty = show all races
   const [showCompleted, setShowCompleted] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  // The finished automated render for the open order, shown beside the details for a quick eye check.
+  const [designPreview, setDesignPreview] = useState<{ orderId: string; url: string } | null>(null)
+  const onDesignPreview = useCallback((url: string | null) => {
+    setDesignPreview(prev => {
+      const id = selectedOrderIdRef.current
+      if (!id || !url) return null
+      return prev?.orderId === id && prev.url === url ? prev : { orderId: id, url }
+    })
+  }, [])
+  const selectedOrderIdRef = useRef<string | null>(null)
+  useEffect(() => { selectedOrderIdRef.current = selectedOrder?.id ?? null; setDesignPreview(null) }, [selectedOrder?.id])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
@@ -6144,8 +6155,15 @@ Thank you!`
                       </div>
                     </div>
                     {/* Runner and race side by side on desktop. Stacks on
-                        narrow screens. Same data, half the vertical space. */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        narrow screens. Same data, half the vertical space.
+                        With a finished render, the print sits to their left
+                        so name, bib, time and weather can be checked at a glance. */}
+                    <div className={`grid grid-cols-1 gap-3 ${designPreview?.orderId === selectedOrder.id ? 'md:grid-cols-[auto,1fr,1fr]' : 'md:grid-cols-2'}`}>
+                      {designPreview?.orderId === selectedOrder.id && (
+                        <a href={designPreview.url} target="_blank" rel="noopener noreferrer" className="block self-start rounded-md border border-border-gray bg-white overflow-hidden" title="Open the preview full size">
+                          <img src={designPreview.url} alt="Rendered print" className="h-[300px] w-auto block" />
+                        </a>
+                      )}
                       <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
                           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Runner</span>
@@ -6532,7 +6550,7 @@ Thank you!`
                   {/* Automated print, admin only while it earns trust. See DesignPanel. */}
                   {isAdmin && selectedOrder.trackstarOrderType === 'standard' && (
                     <div className="hidden md:block">
-                      <DesignPanel orderId={selectedOrder.id} />
+                      <DesignPanel orderId={selectedOrder.id} onPreview={onDesignPreview} />
                     </div>
                   )}
 

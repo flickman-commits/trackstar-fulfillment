@@ -26,7 +26,11 @@ async function post(body: Record<string, unknown>) {
   return data
 }
 
-export default function DesignPanel({ orderId }: { orderId: string }) {
+export default function DesignPanel({ orderId, onPreview }: {
+  orderId: string
+  /** The finished render's preview URL (or null), so the order panel can show it beside the details. */
+  onPreview?: (url: string | null) => void
+}) {
   const [state, setState] = useState<State | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -42,6 +46,8 @@ export default function DesignPanel({ orderId }: { orderId: string }) {
   }, [orderId])
 
   useEffect(() => { setState(null); load() }, [load])
+  const doneUrl = state?.job?.status === 'done' ? state.job.previewUrl : null
+  useEffect(() => { onPreview?.(doneUrl) }, [doneUrl, onPreview])
 
   // While a render is in flight, ask again every few seconds.
   const inFlight = state?.job && (state.job.status === 'queued' || state.job.status === 'rendering')
