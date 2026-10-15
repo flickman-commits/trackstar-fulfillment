@@ -20,7 +20,7 @@ export const SPEC_SELECT = {
   raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true,
   runnerName: true, runnerNameOverride: true, productSize: true, hadNoTime: true,
   photoPath: true, shopifyOrderData: true,
-  runnerResearch: { orderBy: { id: 'desc' }, select: { researchStatus: true, bibNumber: true, officialTime: true, officialPace: true, race: { select: { raceDate: true, weatherCondition: true, weatherTemp: true } } } },
+  runnerResearch: { orderBy: { id: 'desc' }, select: { researchStatus: true, bibNumber: true, officialTime: true, officialPace: true, eventType: true, race: { select: { raceDate: true, weatherCondition: true, weatherTemp: true } } } },
 }
 
 /**
@@ -48,6 +48,7 @@ export function buildSpec(order, templates = [], raceRow = null) {
   const bib = research?.bibNumber || null
   const time = formatTime(research?.officialTime)
   const pace = formatPace(research?.officialPace)
+  if (research?.eventType && !/^marathon$/i.test(research.eventType.trim())) reasons.push(`${research.eventType} prints are not automated yet (only the marathon template is mapped)`)
   if (!bib) reasons.push('No bib number yet')
   if (!order.hadNoTime && (!time || !pace)) reasons.push('No finish time and pace yet')
 

@@ -74,6 +74,11 @@ export default function DesignPanel({ orderId }: { orderId: string }) {
           {job && <span className="text-[10px] text-off-black/40">v{job.version}</span>}
           {job?.review === 'approved' && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-100 text-green-800 text-[11px] font-semibold"><Check className="w-3 h-3" /> Approved{job.reviewer ? ` by ${job.reviewer}` : ''}</span>}
           {job?.review === 'rejected' && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-100 text-red-800 text-[11px] font-semibold"><X className="w-3 h-3" /> Rejected</span>}
+          {/* Whether a Mac with Illustrator is checked in right now. */}
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-off-black/55" title={offline ? 'No render worker has checked in for a minute and a half' : `Online: ${state.workersOnline.join(', ')}`}>
+            <span className={`w-2 h-2 rounded-full ${offline ? 'bg-red-500' : 'bg-green-500'}`} aria-hidden />
+            {offline ? 'Renderer offline' : state.workersOnline.join(', ')}
+          </span>
         </div>
         {(!job || job.status === 'failed' || job.status === 'done') && (
           <button onClick={create} disabled={busy || !state.eligible} className={job ? btnGhost : btnPrimary} title={state.eligible ? 'Fill the race template with this order and render the print' : state.reasons.join('. ')}>
@@ -84,7 +89,7 @@ export default function DesignPanel({ orderId }: { orderId: string }) {
       </div>
 
       {!job && !state.eligible && (
-        <p className="text-xs text-off-black/55">{offline ? 'No render worker is online.' : `Not ready: ${state.reasons.join('. ')}.`}</p>
+        <p className="text-xs text-off-black/55">{offline ? 'Start the render worker on a Mac with Illustrator to create designs.' : `Not ready: ${state.reasons.join('. ')}.`}</p>
       )}
 
       {job && (job.status === 'queued' || job.status === 'rendering') && (

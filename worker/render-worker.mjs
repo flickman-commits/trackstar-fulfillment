@@ -68,9 +68,16 @@ async function api(action, body) {
   return data
 }
 
+/** A template entry is a path, or { file, artboard } for a file with more than one colorway. */
+function templateFor(race) {
+  const t = templates[race]
+  if (!t) return null
+  return typeof t === 'string' ? { file: t, artboard: null } : { file: t.file, artboard: t.artboard || null }
+}
+
 /** Races whose production file is actually present on this machine right now. */
 function availableTemplates() {
-  return Object.entries(templates).filter(([, rel]) => fs.existsSync(path.join(RACES_DIR, rel))).map(([race]) => race)
+  return Object.keys(templates).filter(race => fs.existsSync(path.join(RACES_DIR, templateFor(race).file)))
 }
 
 async function heartbeat() {
@@ -102,9 +109,9 @@ async function upload(url, file, contentType) {
 
 async function render(job) {
   const { spec } = job
-  const rel = templates[spec.race]
-  if (!rel) throw new Error(`No template for ${spec.race}`)
-  const src = path.join(RACES_DIR, rel)
+  const tpl = templateFor(spec.race)
+  if (!tpl) throw new Error(`No template for ${spec.race}`)
+  const src = path.join(RACES_DIR, tpl.file)
   const dir = path.join(WORK, job.id)
   fs.rmSync(dir, { recursive: true, force: true })
   fs.mkdirSync(dir, { recursive: true })
@@ -117,7 +124,7 @@ async function render(job) {
   if (job.photoUrl) { photo = path.join(dir, 'photo' + (path.extname(spec.photoPath || '') || '.jpg')); await download(job.photoUrl, photo) }
 
   const out = path.join(dir, spec.file)
-  const current = { template, out, preset: PRESET, spec: { ...spec, photo } }
+  const current = { template, out, preset: PRESET, artboard: tpl.artboard, spec: { ...spec, photo } }
   fs.writeFileSync(path.join(HERE, 'illustrator', 'current.json'), JSON.stringify(current))
   fs.rmSync(path.join(HERE, 'illustrator', 'result.json'), { force: true })
 

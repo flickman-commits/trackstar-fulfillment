@@ -1,4 +1,9 @@
 {
-  "_comment": "Race name as the fulfillment tool knows it -> production file, relative to the Races folder (RACES_DIR). Only races listed here can be rendered. A template must follow the Chicago layout: artboards named by size, a PERSONALIZE LAYER with the six placeholders, a PHOTO LAYER, a GUIDES layer.",
-  "Chicago Marathon": "Chicago Marathon/Illustrator Files/Chicago_Production.ai"
+  "_comment": "Race name as the fulfillment tool knows it -> production file, relative to the Races folder (RACES_DIR). A plain string is the file; an object adds 'artboard', a word the artboard's name must contain when the file holds more than one colorway. Only races listed here can be rendered.",
+  "Chicago Marathon": { "file": "Chicago Marathon/Illustrator Files/Chicago_Production_retired 261010.ai", "artboard": "Red" },
+  "NYC Marathon": "New York City Marathon/Illustrator Files/New York City Marathon_Production.ai",
+  "Twin Cities Marathon": "Twin Cities Marathon/Illustrator Files/Twin Cities Marathon_Production.ai",
+  "Berlin Marathon": "Berlin Marathon/Illustrator Files/Berlin Marathon_Production.ai",
+  "San Francisco Marathon": "SF Marathon/Illustrator Files/San Francisco Marathon_Production.ai",
+  "Boston Marathon": "Boston Marathon/Illustrator Files/Boston_Production.ai"
 }

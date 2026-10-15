@@ -49,3 +49,4 @@ public/Marathon Monopoly*.jpeg
 worker/.env
 worker/illustrator/current.json
 worker/illustrator/result.json
+worker/local-out/
