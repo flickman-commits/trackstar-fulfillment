@@ -1,0 +1,50 @@
+# Render worker
+
+Turns the fulfillment tool's render jobs into print files, using Illustrator
+on the Mac it runs on. The tool queues a job when someone clicks Create Design
+on an order; this script picks it up, fills the race's production template,
+and uploads the PDF and a preview for review.
+
+## What it needs
+
+- A Mac with Adobe Illustrator installed. It can be open in the background.
+- The Google Drive folder `3_Trackstar/Product/Races` synced to this Mac.
+- Node 18 or newer.
+- `worker/.env`, copied from `worker/.env.example`, with an API key from
+  Settings > Admin > API Keys (scope: write).
+
+## Running it
+
+```bash
+node worker/render-worker.mjs
+```
+
+Leave the terminal open. The first time, macOS asks whether the terminal may
+control Illustrator; allow it. The tool shows "Renderer offline" on the Design
+panel whenever no worker has checked in for a minute and a half.
+
+## What it does, per job
+
+1. Copies the race's production file (`worker/templates.json` says which) to
+   a scratch folder. The live file is never opened.
+2. Writes the order's details next to `illustrator/render.jsx` and runs the
+   script through AppleScript.
+3. The script fills the six fields for the order's size, widens the name box
+   to the margin guide if the name is long, places the customer's photo (or
+   hides the photo layer), hides time and pace on a no-time order, and
+   exports with the `TRACKSTAR DEFAULT` preset and 1/4" bleed.
+4. Uploads the PDF and preview to the private `production-files` bucket and
+   marks the job done.
+
+Nothing in the Races folder is ever written, moved or deleted.
+
+## Adding a race
+
+Add a line to `worker/templates.json` mapping the race's name as the tool
+knows it to its production file. The template has to follow the Chicago
+layout: artboards named with their size (8x10, 12x18, 16x24), a `PERSONALIZE
+LAYER` with the six placeholder frames (Runner Name, BIB # HERE, a time, a
+pace with "/ mi", a date like 10.11.26, and a weather line with a degree
+sign), a `PHOTO LAYER` with a clipped square per size, and a `GUIDES` layer.
+The script names the frames itself from the placeholders. Render a couple of
+past orders and compare them with the designer's files before relying on it.

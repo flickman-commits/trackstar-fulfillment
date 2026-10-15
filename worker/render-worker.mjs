@@ -136,7 +136,11 @@ async function render(job) {
 
 async function main() {
   log(`Render worker "${NAME}" (${WORKER_ID}) -> ${URL_BASE}`)
-  let list = await heartbeat()
+  // The tool may be mid-deploy or the Mac may be offline; keep trying rather than exiting.
+  let list
+  for (;;) {
+    try { list = await heartbeat(); break } catch (e) { log(`Cannot reach the tool yet (${e.message}); retrying`); await sleep(15000) }
+  }
   log(`Templates on this machine: ${list.length ? list.join(', ') : 'none'}`)
   let lastBeat = Date.now()
   for (;;) {
