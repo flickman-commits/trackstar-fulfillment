@@ -13,6 +13,7 @@ import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/componen
 import ApiKeysPanel from '@/components/ApiKeysPanel'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
 import DesignPanel from '@/components/DesignPanel'
+import StatusLegend from '@/components/StatusLegend'
 import AssignmentPanel from '@/components/AssignmentPanel'
 import AssigneePicker, { Avatar, QueuePill, PersonFilter, type QueueMember } from '@/components/AssigneePicker'
 import { setTeamColors } from '@/lib/teamColors'
@@ -3313,7 +3314,7 @@ Thank you!`
                       <tr>
                         <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-28">Src</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Order #</th>
-                        <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20">Status</th>
+                        <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20"><span className="inline-flex items-center">Status<StatusLegend /></span></th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Details</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-52">
                           <div className="flex items-center gap-2 leading-none">
@@ -3760,7 +3761,7 @@ Thank you!`
                     <tr>
                       <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-12">Src</th>
                       <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Order #</th>
-                      <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20">Status</th>
+                      <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20"><span className="inline-flex items-center">Status<StatusLegend /></span></th>
                       <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Runner</th>
                       <th className="text-left px-3 pr-6 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Race</th>
                     </tr>
@@ -6547,10 +6548,10 @@ Thank you!`
                     </div>
                   </div>
 
-                  {/* Automated print, admin only while it earns trust. See DesignPanel. */}
-                  {isAdmin && selectedOrder.trackstarOrderType === 'standard' && (
+                  {/* Automated print. Admins create and review; everyone sees an approved one. See DesignPanel. */}
+                  {selectedOrder.trackstarOrderType === 'standard' && (
                     <div className="hidden md:block">
-                      <DesignPanel orderId={selectedOrder.id} onPreview={onDesignPreview} />
+                      <DesignPanel orderId={selectedOrder.id} onPreview={onDesignPreview} canManage={isAdmin} />
                     </div>
                   )}
 

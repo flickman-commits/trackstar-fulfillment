@@ -1,6 +1,7 @@
 /**
- * Automated print renders, for the order panel. Admin only while trust is
- * being built.
+ * Automated print renders, for the order panel. Anyone signed in can read
+ * (the team sees an approved print); creating and reviewing are admin only
+ * while trust is being built.
  *
  *   GET  ?orderId=                 can this order be rendered, the latest job, signed file links
  *   POST { action: 'create', orderId }                     queue a render
@@ -9,17 +10,18 @@
  * The rendering itself happens on a Mac with Illustrator (worker/), which
  * talks to api/render/worker.js.
  */
-import { setCors } from '../_lib/auth.js'
-import { requireAdminOnly, recordAudit } from '../_lib/users.js'
+import { setCors, requireAdmin } from '../_lib/auth.js'
+import { requireAdminOnly, recordAudit, loadActiveUser } from '../_lib/users.js'
 import { checkOrder, createJob, latestJob, signedFiles, reviewJob, onlineWorkers } from '../../server/domain/render/jobs.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  const user = await requireAdminOnly(req, res)
-  if (!user) return
 
   try {
     if (req.method === 'GET') {
+      const actor = requireAdmin(req, res)
+      if (!actor) return
+      if (!(await loadActiveUser(actor))) return res.status(401).json({ error: 'Your account is no longer active. Sign in again.' })
       const orderId = String(req.query?.orderId || '')
       if (!orderId) return res.status(400).json({ error: 'orderId is required' })
       const [{ ok, reasons }, job, workers] = await Promise.all([checkOrder(orderId), latestJob(orderId), onlineWorkers()])
@@ -28,6 +30,8 @@ export default async function handler(req, res) {
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+    const user = await requireAdminOnly(req, res)
+    if (!user) return
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
 
     if (body.action === 'create') {

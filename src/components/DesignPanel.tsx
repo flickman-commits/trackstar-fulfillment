@@ -26,8 +26,10 @@ async function post(body: Record<string, unknown>) {
   return data
 }
 
-export default function DesignPanel({ orderId, onPreview }: {
+export default function DesignPanel({ orderId, onPreview, canManage = true }: {
   orderId: string
+  /** Admins create and review renders. Others only see one that was approved. */
+  canManage?: boolean
   /** The finished render's preview URL (or null), so the order panel can show it beside the details. */
   onPreview?: (url: string | null) => void
 }) {
@@ -71,6 +73,7 @@ export default function DesignPanel({ orderId, onPreview }: {
   if (!state) return null
   const job = state.job
   const offline = state.workersOnline.length === 0
+  if (!canManage && job?.review !== 'approved') return null
 
   return (
     <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-3">
@@ -86,7 +89,7 @@ export default function DesignPanel({ orderId, onPreview }: {
             {offline ? 'Renderer offline' : state.workersOnline.join(', ')}
           </span>
         </div>
-        {(!job || job.status === 'failed' || job.status === 'done') && (
+        {canManage && (!job || job.status === 'failed' || job.status === 'done') && (
           <button onClick={create} disabled={busy || !state.eligible} className={job ? btnGhost : btnPrimary} title={state.eligible ? 'Fill the race template with this order and render the print' : state.reasons.join('. ')}>
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : job ? <RefreshCw className="w-3.5 h-3.5" /> : <Sparkles className="w-4 h-4" />}
             {job ? 'Re-render' : 'Create Design'}
@@ -94,7 +97,7 @@ export default function DesignPanel({ orderId, onPreview }: {
         )}
       </div>
 
-      {!job && !state.eligible && (
+      {canManage && !job && !state.eligible && (
         <p className="text-xs text-off-black/55">{offline ? 'Start the render worker on a Mac with Illustrator to create designs.' : `Not ready: ${state.reasons.join('. ')}.`}</p>
       )}
 
@@ -125,13 +128,13 @@ export default function DesignPanel({ orderId, onPreview }: {
             </div>
           </div>
 
-          {job.review === 'pending' && !rejecting && (
+          {canManage && job.review === 'pending' && !rejecting && (
             <div className="flex gap-2">
               <button onClick={() => review('approved')} disabled={busy} className={btnPrimary}><Check className="w-4 h-4" /> Approve</button>
               <button onClick={() => setRejecting(true)} disabled={busy} className={btnSecondary}><X className="w-4 h-4" /> Reject</button>
             </div>
           )}
-          {job.review === 'pending' && rejecting && (
+          {canManage && job.review === 'pending' && rejecting && (
             <div className="space-y-2">
               <input value={note} onChange={e => setNote(e.target.value)} placeholder="What is wrong with it?" className={inputBase} autoFocus />
               <div className="flex gap-2">
