@@ -13,6 +13,7 @@
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireAdminOnly, recordAudit, loadActiveUser } from '../_lib/users.js'
 import { checkOrder, createJob, latestJob, signedFiles, reviewJob, onlineWorkers } from '../../server/domain/render/jobs.js'
+import { deliverApproved } from '../../server/domain/render/deliver.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -24,7 +25,9 @@ export default async function handler(req, res) {
       if (!(await loadActiveUser(actor))) return res.status(401).json({ error: 'Your account is no longer active. Sign in again.' })
       const orderId = String(req.query?.orderId || '')
       if (!orderId) return res.status(400).json({ error: 'orderId is required' })
-      const [{ ok, reasons }, job, workers] = await Promise.all([checkOrder(orderId), latestJob(orderId), onlineWorkers()])
+      let [{ ok, reasons }, job, workers] = await Promise.all([checkOrder(orderId), latestJob(orderId), onlineWorkers()])
+      // An approved render that did not reach Drive (a hiccup at approval time) is retried on sight.
+      if (job && job.review === 'approved' && !job.deliveredAt) job = { ...job, ...(await deliverApproved(job)) }
       const files = job ? await signedFiles(job) : { pdfUrl: null, previewUrl: null }
       return res.status(200).json({ eligible: ok, reasons, job: job ? present(job, files) : null, workersOnline: workers.map(w => w.name) })
     }
@@ -41,7 +44,8 @@ export default async function handler(req, res) {
     }
 
     if (body.action === 'review') {
-      const job = await reviewJob({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, reviewerId: user.id })
+      let job = await reviewJob({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, reviewerId: user.id })
+      if (job.review === 'approved') job = await deliverApproved(job)
       await recordAudit({ action: `render.${job.review}`, summary: `${job.review === 'approved' ? 'Approved' : 'Rejected'} the render of ${job.spec?.file || job.orderId} (v${job.version})${job.reviewNote ? `: ${job.reviewNote}` : ''}`, detail: { jobId: job.id, orderId: job.orderId }, actor: user })
       const files = await signedFiles(job)
       return res.status(200).json({ job: present(job, files) })
@@ -58,7 +62,7 @@ function present(job, files) {
   return {
     id: job.id, orderId: job.orderId, version: job.version, status: job.status, requestedBy: job.requestedBy,
     spec: job.spec, notes: job.notes, error: job.error, createdAt: job.createdAt, finishedAt: job.finishedAt,
-    review: job.review, reviewNote: job.reviewNote, reviewedAt: job.reviewedAt,
+    review: job.review, reviewNote: job.reviewNote, reviewedAt: job.reviewedAt, deliveredAt: job.deliveredAt, deliveredPath: job.deliveredPath, deliveryError: job.deliveryError,
     reviewer: job.reviewer ? `${job.reviewer.firstName} ${job.reviewer.lastName}`.trim() : null,
     ...files,
   }

@@ -146,3 +146,4 @@ export async function reviewJob({ jobId, decision, note, reviewerId }) {
   if (decision === 'rejected' && !String(note || '').trim()) throw new Error('Say what is wrong, so the designer knows')
   return prisma.renderJob.update({ where: { id: job.id }, data: { review: decision, reviewNote: note ? String(note).slice(0, 2000) : null, reviewedById: reviewerId || null, reviewedAt: new Date() } })
 }
+

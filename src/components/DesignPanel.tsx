@@ -15,6 +15,7 @@ type Job = {
   spec: { file: string; name: string; bib: string; time: string | null; pace: string | null; date: string; condition: string; temp: string; size: string; noTime: boolean; photoPath: string | null }
   notes: string | null; error: string | null; createdAt: string; finishedAt: string | null
   review: 'pending' | 'approved' | 'rejected'; reviewNote: string | null; reviewer: string | null; reviewedAt: string | null
+  deliveredAt: string | null; deliveredPath: string | null; deliveryError: string | null
   pdfUrl: string | null; previewUrl: string | null
 }
 type State = { eligible: boolean; reasons: string[]; job: Job | null; workersOnline: string[] }
@@ -126,6 +127,9 @@ export default function DesignPanel({ orderId, onPreview, canManage = true }: {
               <div>{job.spec.date} · {job.spec.condition} {job.spec.temp} · {job.spec.size}{job.spec.photoPath ? ' · photo' : ''}</div>
               {job.notes && <div className="text-amber-700">{job.notes}</div>}
               {job.reviewNote && <div className="text-red-700">Rejected: {job.reviewNote}</div>}
+              {job.review === 'approved' && (job.deliveredAt
+                ? <a href={job.deliveredPath || '#'} target="_blank" rel="noopener noreferrer" className="block text-green-700 hover:underline underline-offset-2">Saved to the Drive Orders folder ↗</a>
+                : <div className="text-red-700">Not saved to Drive: {job.deliveryError || 'retrying'}</div>)}
               {job.pdfUrl && <a href={job.pdfUrl} className="inline-flex items-center gap-1 text-[#4600D6] hover:underline underline-offset-2 pt-1"><Download className="w-3.5 h-3.5" /> Download PDF</a>}
             </div>
           </div>

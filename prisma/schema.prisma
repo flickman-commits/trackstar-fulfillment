@@ -968,6 +968,11 @@ model RenderJob {
   reviewedById  String?
   reviewer      User?     @relation("RenderReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   reviewedAt    DateTime?
+  // An approved render is uploaded to the shop's Drive Orders folder, the
+  // same place a designer saves by hand (server/domain/render/deliver.js).
+  deliveredAt   DateTime?
+  deliveredPath String?   // the Drive link
+  deliveryError String?
   createdAt     DateTime  @default(now())
 
   @@index([orderId, createdAt])

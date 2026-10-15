@@ -2720,6 +2720,14 @@ export default function Dashboard() {
   const getOrderItemCount = useCallback((parentOrderNumber: string) => {
     return orders.filter(o => o.parentOrderNumber === parentOrderNumber).length
   }, [orders])
+  // Which print this is among the order's prints. lineItemIndex is the position
+  // on the Shopify order, where photo and rush add-ons also take a slot, so
+  // a two-print order can have prints at index 1 and 3. The label counts prints.
+  const getOrderItemPosition = useCallback((order: Order) => {
+    const prints = orders.filter(o => o.parentOrderNumber === order.parentOrderNumber).sort((a, b) => a.lineItemIndex - b.lineItemIndex)
+    const i = prints.findIndex(o => o.id === order.id)
+    return i >= 0 ? i + 1 : order.lineItemIndex + 1
+  }, [orders])
 
   const handleCopyEmail = (order: Order) => {
     const emailText = `Hi,
@@ -3093,7 +3101,7 @@ Thank you!`
                               <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                               {itemCount > 1 && (
                                 <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
-                                  {order.lineItemIndex + 1}/{itemCount}
+                                  {getOrderItemPosition(order)}/{itemCount}
                                 </span>
                               )}
                             </div>
@@ -3146,7 +3154,7 @@ Thank you!`
                                   <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                   {itemCount > 1 && (
                                     <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
-                                      {order.lineItemIndex + 1}/{itemCount}
+                                      {getOrderItemPosition(order)}/{itemCount}
                                     </span>
                                   )}
                                 </div>
@@ -3192,7 +3200,7 @@ Thank you!`
                                   <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                   {itemCount > 1 && (
                                     <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
-                                      {order.lineItemIndex + 1}/{itemCount}
+                                      {getOrderItemPosition(order)}/{itemCount}
                                     </span>
                                   )}
                                 </>
@@ -3267,7 +3275,7 @@ Thank you!`
                                   <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                   {itemCount > 1 && (
                                     <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
-                                      {order.lineItemIndex + 1}/{itemCount}
+                                      {getOrderItemPosition(order)}/{itemCount}
                                     </span>
                                   )}
                                 </div>
@@ -3338,7 +3346,7 @@ Thank you!`
                                 <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                 {itemCount > 1 && (
                                   <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
-                                    Item {order.lineItemIndex + 1} of {itemCount}
+                                    Item {getOrderItemPosition(order)} of {itemCount}
                                   </span>
                                 )}
                               </div>
@@ -3397,7 +3405,7 @@ Thank you!`
                                     <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                     {itemCount > 1 && (
                                       <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
-                                        Item {order.lineItemIndex + 1} of {itemCount}
+                                        Item {getOrderItemPosition(order)} of {itemCount}
                                       </span>
                                     )}
                                   </div>
@@ -3532,7 +3540,7 @@ Thank you!`
                                 <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                 {itemCount > 1 && (
                                   <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
-                                    Item {order.lineItemIndex + 1} of {itemCount}
+                                    Item {getOrderItemPosition(order)} of {itemCount}
                                   </span>
                                 )}
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
@@ -3605,7 +3613,7 @@ Thank you!`
                                     <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                     {itemCount > 1 && (
                                       <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/60 text-[10px] font-medium rounded whitespace-nowrap">
-                                        Item {order.lineItemIndex + 1} of {itemCount}
+                                        Item {getOrderItemPosition(order)} of {itemCount}
                                       </span>
                                     )}
                                   </div>
@@ -5717,7 +5725,7 @@ Thank you!`
                         prints={orders
                           .filter(o => o.parentOrderNumber === selectedOrder.parentOrderNumber && o.trackstarOrderType === 'standard')
                           .sort((a, b) => a.lineItemIndex - b.lineItemIndex)
-                          .map(o => ({ id: o.id, label: `${o.displayOrderNumber}${getOrderItemCount(o.parentOrderNumber) > 1 ? ` item ${o.lineItemIndex + 1}` : ''}: ${o.effectiveRunnerName || o.runnerName || 'runner'}`, hasPhoto: !!o.photoPath }))}
+                          .map(o => ({ id: o.id, label: `${o.displayOrderNumber}${getOrderItemCount(o.parentOrderNumber) > 1 ? ` item ${getOrderItemPosition(o)}` : ''}: ${o.effectiveRunnerName || o.runnerName || 'runner'}`, hasPhoto: !!o.photoPath }))}
                         onDone={({ charged, chargeError }) => {
                           fetchOrders()
                           setToast(chargeError
