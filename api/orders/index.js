@@ -8,62 +8,14 @@ import { isRushAddonLineItem, isRemovedLineItem } from '../../server/lib/lineIte
 import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
 import { shopifyAdminUrl, arteloOrderUrl } from '../../server/lib/links.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
+import { formatRaceDate, formatTemp, formatTime, formatPace } from '../../server/lib/printFormat.js'
 
 
 /**
  * Format date as MM.DD.YY (e.g., "12.02.18")
  */
-/**
- * A race date is a CALENDAR DAY, not an instant, so read it in UTC.
- *
- * Local getters were rendering 138 of the 166 stored races a day early. Most
- * rows are written as UTC midnight, and anywhere west of Greenwich that is the
- * previous evening: New York City Marathon 2026 is stored 2026-11-01 and was
- * printing as 10.31, which is Halloween rather than race day. The date goes on
- * the poster, so the off-by-one was reaching customers.
- *
- * UTC is right for both write styles in the database. Rows written as UTC
- * midnight read back as the intended day, and rows written as local midnight
- * (resolveRaceDate's new Date(y, m-1, d), which is 04:00Z in New York) still
- * land on the same UTC day. It also matches raceDateIso below, which has
- * always used toISOString - the panel and its own edit field were disagreeing
- * about what day the race was.
- */
-function formatRaceDate(date) {
-  if (!date) return null
-  const d = new Date(date)
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(d.getUTCDate()).padStart(2, '0')
-  const year = String(d.getUTCFullYear()).slice(-2)
-  return `${month}.${day}.${year}`
-}
 
-/**
- * Format temperature with degree symbol (e.g., "39°")
- */
-function formatTemp(temp) {
-  if (!temp) return null
-  // If already has degree symbol, return as is
-  if (temp.includes('°')) return temp
-  // Add degree symbol
-  return `${temp}°`
-}
 
-/**
- * Format time - removes leading zero from hours (04:14:45 -> 4:14:45)
- */
-/**
- * Customer-entered time and pace are free text on custom orders, so only pass
- * through values that actually look like a duration ("3:48:29", "8:43").
- * Anything else is a note to a human, not a number for a poster.
- */
-function looksLikeTime(v) {
-  return typeof v === 'string' && /^\s*\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*$/.test(v)
-}
-
-function pickCustomerValue(v) {
-  return looksLikeTime(v) ? v.trim() : null
-}
 
 /**
  * Just the keys of the raw order payloads this list reads, including what
@@ -155,41 +107,7 @@ function extractDiscountCodes(order) {
     }))
 }
 
-function formatTime(time) {
-  if (!time) return null
-  // Round up milliseconds to nearest second (4:37:44.935 -> 4:37:45)
-  let cleaned = time
-  const msMatch = cleaned.match(/^(.+)\.(\d+)$/)
-  if (msMatch) {
-    const ms = parseInt(msMatch[2].padEnd(3, '0').slice(0, 3))
-    cleaned = msMatch[1]
-    if (ms >= 500) {
-      // Add 1 second and handle carry
-      const parts = cleaned.split(':').map(Number)
-      parts[parts.length - 1] += 1
-      for (let i = parts.length - 1; i > 0; i--) {
-        if (parts[i] >= 60) { parts[i] -= 60; parts[i - 1] += 1 }
-      }
-      cleaned = parts.map((p, i) => i === 0 ? String(p) : String(p).padStart(2, '0')).join(':')
-    }
-  }
-  // Remove leading zero from hours (04:14:45 -> 4:14:45)
-  return cleaned.replace(/^0(\d):/, '$1:')
-}
 
-/**
- * Format pace - removes leading zero and any suffix (09:43 / mi -> 9:43)
- */
-function formatPace(pace) {
-  if (!pace) return null
-  // Remove pace suffixes (e.g. "9:43 / mi" -> "9:43", "10:36 min/mile" -> "10:36")
-  let cleaned = pace.replace(/\s*\/\s*mi$/i, '').replace(/\s*min\/mile$/i, '')
-  // Remove "/M" suffix from MyChipTime (e.g. "10:04/M" -> "10:04")
-  cleaned = cleaned.replace(/\/M$/i, '')
-  // Remove leading zero if present (09:43 -> 9:43)
-  cleaned = cleaned.replace(/^0/, '').trim()
-  return cleaned
-}
 
 const AUSTIN_EVENT_IDS = {
   2026: { marathon: '17035', halfMarathon: '17034' }
@@ -315,27 +233,14 @@ export default async function handler(req, res) {
         hasOverrides,
         // Alert flags for runner name field
         timeFromName,
-        // Runner research data (Tier 2) - formatted for display.
-        // Defense-in-depth: when no research bib exists, fall back to the
-        // customer-confirmed bib from the Instant Lookup widget. Protects
-        // against verified orders where Phase 1 never ran (e.g. older code path).
-        // Discount codes used at checkout. See extractDiscountCodes.
+        // The runner's result, from the research record only. A result the
+        // customer verified or typed at checkout is a research record too
+        // (source customer_verified / customer_supplied), written at import,
+        // so there is nothing to fall back to and nothing to merge.
         discountCodes: extractDiscountCodes(order),
-        bibNumber: research?.bibNumber || order.customerBib || null,
-        // Same defense-in-depth as the bib above. The Instant Lookup widget
-        // already captured a time and pace the shopper confirmed, so showing
-        // "Pending research" for those while displaying their bib was telling
-        // Eli we had nothing when we had the numbers all along. That gap is
-        // permanent for a race with no scraper, where research will never fill
-        // it in.
-        //
-        // Guarded by looksLikeTime because customerFinishTime is free text on
-        // custom orders and really does arrive as things like
-        // "N/A - Review Design Info", which must not be rendered as a finish
-        // time. Provenance is not lost: the order's tags already say whether
-        // this was a verified auto match or something the customer typed.
-        officialTime: formatTime(research?.officialTime || pickCustomerValue(order.customerFinishTime)),
-        officialPace: formatPace(research?.officialPace || pickCustomerValue(order.customerPace)),
+        bibNumber: research?.bibNumber || null,
+        officialTime: formatTime(research?.officialTime),
+        officialPace: formatPace(research?.officialPace),
         eventType: research?.eventType || null,
         researchStatus: research?.researchStatus || null,
         // How the result was obtained: "scraper" | "customer_verified". Drives

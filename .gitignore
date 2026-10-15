@@ -44,3 +44,8 @@ public/Marathon Monopoly*.jpeg
 
 # Claude Code worktrees are scratch checkouts, never source
 .claude/worktrees/
+
+# Render worker settings (holds an API key)
+worker/.env
+worker/illustrator/current.json
+worker/illustrator/result.json

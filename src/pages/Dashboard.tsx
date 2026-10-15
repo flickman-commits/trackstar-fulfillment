@@ -12,6 +12,7 @@ import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import ApiKeysPanel from '@/components/ApiKeysPanel'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
+import DesignPanel from '@/components/DesignPanel'
 import AssignmentPanel from '@/components/AssignmentPanel'
 import AssigneePicker, { Avatar, QueuePill, PersonFilter, type QueueMember } from '@/components/AssigneePicker'
 import { setTeamColors } from '@/lib/teamColors'
@@ -6527,6 +6528,13 @@ Thank you!`
                       <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
                     </div>
                   </div>
+
+                  {/* Automated print, admin only while it earns trust. See DesignPanel. */}
+                  {isAdmin && selectedOrder.trackstarOrderType === 'standard' && (
+                    <div className="hidden md:block">
+                      <DesignPanel orderId={selectedOrder.id} />
+                    </div>
+                  )}
 
                   {/* Comments. The composer is a lot of furniture for an order
                       with nothing to say, so it stays collapsed behind a link

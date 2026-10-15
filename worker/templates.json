@@ -1,0 +1,4 @@
+{
+  "_comment": "Race name as the fulfillment tool knows it -> production file, relative to the Races folder (RACES_DIR). Only races listed here can be rendered. A template must follow the Chicago layout: artboards named by size, a PERSONALIZE LAYER with the six placeholders, a PHOTO LAYER, a GUIDES layer.",
+  "Chicago Marathon": "Chicago Marathon/Illustrator Files/Chicago_Production.ai"
+}

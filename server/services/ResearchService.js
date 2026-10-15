@@ -245,9 +245,11 @@ export class ResearchService {
       runnerResearch = await prisma.runnerResearch.create({ data: researchData })
     }
 
+    // A shipped order keeps its status; the record is still worth having so
+    // it reads the same as every other order.
     await prisma.order.update({
       where: { id: order.id },
-      data: { status: 'ready', researchedAt: new Date() }
+      data: order.status === 'completed' ? { researchedAt: order.researchedAt || new Date() } : { status: 'ready', researchedAt: new Date() }
     })
 
     console.log(`[ResearchService] Applied ${verified ? 'customer-verified' : 'customer-supplied'} result for ${orderNumber} (bib ${researchData.bibNumber}, ${researchData.officialTime})`)

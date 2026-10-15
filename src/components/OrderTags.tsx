@@ -206,20 +206,18 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   const research = researchTag(o)
   if (research) tags.push(research)
 
-  // Data provenance. One tag, three possible trust levels.
-  // Instant Lookup finds nothing for a race that has not happened; that is
-  // not a "Needs research" problem, the race-not-run tag already says why.
+  // Data provenance. One tag. The research record says where the result came
+  // from; the lookup outcome only adds how the customer got there. Once a
+  // result exists, Instant Lookup's "Needs research" is history, not a tag.
   const notRun = showsRaceNotRun(o)
+  const hasResult = !!(o.bibNumber || o.officialTime || o.officialPace || o.hadNoTime)
   const lookupTrust = o.lookupOutcome ? TRUST_TAGS[o.lookupOutcome] : null
-  const trust = notRun && lookupTrust?.tone === 'amber' ? null : lookupTrust
-  if (trust) {
-    tags.push({ key: 'trust', ...trust })
-  } else if (o.researchSource === 'customer_verified') {
-    tags.push({ key: 'trust', label: 'Verified', sublabel: 'by customer', tone: 'green',
-      title: 'The customer confirmed an official-results match before checkout.' })
+  if (o.researchSource === 'customer_verified') {
+    tags.push({ key: 'trust', ...(lookupTrust?.tone === 'green' ? lookupTrust : { label: 'Verified', sublabel: 'by customer', tone: 'green' as const, title: 'The customer confirmed an official-results match before checkout.' }) })
   } else if (o.researchSource === 'customer_supplied') {
-    tags.push({ key: 'trust', label: 'Customer entered', tone: 'blue',
-      title: 'The customer typed these numbers at checkout. They were never matched against official results - print them as given.' })
+    tags.push({ key: 'trust', ...(lookupTrust?.tone === 'blue' ? lookupTrust : { label: 'Customer entered', tone: 'blue' as const, title: 'The customer typed these numbers at checkout. They were never matched against official results - print them as given.' }) })
+  } else if (!hasResult && lookupTrust && !(notRun && lookupTrust.tone === 'amber')) {
+    tags.push({ key: 'trust', ...lookupTrust })
   }
 
   // Customer choices about what prints.
@@ -239,7 +237,6 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   // Neutral "what happens next" context. Only when research has not been tried
   // AND we genuinely have nothing, otherwise a customer-verified order would
   // read "Verified" and "Ready to research" at the same time.
-  const hasResult = !!(o.bibNumber || o.officialTime || o.officialPace || o.hadNoTime)
   if (o.status === 'pending' && !o.researchStatus && !hasResult && !notRun) {
     if (o.hasScraperAvailable && (o.effectiveRaceYear || o.raceYear)) {
       tags.push({ key: 'ready', label: 'Ready to research', tone: 'gray',

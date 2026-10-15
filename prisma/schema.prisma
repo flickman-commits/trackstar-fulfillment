@@ -135,6 +135,7 @@ model Order {
   designCompletedBy   User?    @relation("DesignCompletedBy", fields: [designCompletedById], references: [id], onDelete: SetNull)
   bulkOrderId      String?
   bulkOrder        BulkOrder? @relation(fields: [bulkOrderId], references: [id], onDelete: Cascade)
+  renderJobs       RenderJob[]
   shippingAddress  Json?      // { line1, line2, city, state, zip, country }
   productionFileUrl String?   // Public URL of the finished print file, for the Artelo sheet
 
@@ -726,6 +727,8 @@ model User {
   comments     OrderComment[]
   assignedOrders Order[]  @relation("OrderAssignee")
   completedDesigns Order[] @relation("DesignCompletedBy")
+  renderRequests   RenderJob[] @relation("RenderRequestedBy")
+  renderReviews    RenderJob[] @relation("RenderReviewedBy")
   assignedBulkOrders BulkOrder[] @relation("BulkAssignee")
   editBatches  ProductEditBatch[]
   auditEvents  AuditEvent[]
@@ -926,4 +929,57 @@ model SurveyVote {
 
   @@unique([surveyId, voterId])
   @@index([optionId])
+}
+
+/**
+ * Automated print rendering. A job asks a render worker (a script on a Mac
+ * with Illustrator, worker/render-worker.mjs) to fill the race's production
+ * template with one order's details and export the print file. The worker
+ * polls for queued jobs, so the tool never needs to reach the Mac.
+ *
+ * Files land in the private "production-files" bucket as
+ * renders/<orderId>/v<version>.pdf and .png. Nothing is overwritten; a
+ * re-render is a new version. A person reviews every render before it goes
+ * anywhere (review: pending | approved | rejected).
+ */
+model RenderJob {
+  id            String    @id @default(cuid())
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  version       Int       @default(1)
+  // queued | rendering | done | failed
+  status        String    @default("queued")
+  // admin | system | customer: who asked, so customer-facing proofs can share this later
+  requestedBy   String    @default("admin")
+  requestedById String?
+  requester     User?     @relation("RenderRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  // The exact values the worker rendered, kept so a review compares against what was sent
+  spec          Json
+  workerId      String?
+  claimedAt     DateTime?
+  finishedAt    DateTime?
+  pdfPath       String?
+  previewPath   String?
+  notes         String?   // what the worker did beyond the plain fill, e.g. "name shrunk 1 step"
+  error         String?
+  // pending | approved | rejected
+  review        String    @default("pending")
+  reviewNote    String?
+  reviewedById  String?
+  reviewer      User?     @relation("RenderReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+}
+
+/** A render worker that has checked in. Online means seen in the last minute. */
+model RenderWorker {
+  id         String   @id
+  name       String
+  // Race names (the tool's canonical names) this worker has a template for
+  templates  Json
+  lastSeenAt DateTime
+  createdAt  DateTime @default(now())
 }
