@@ -5965,7 +5965,7 @@ Thank you!`
                                 style={{ background: 'rgba(70,0,214,0.10)', color: '#4600D6', border: '1px solid rgba(70,0,214,0.25)' }}
                                 title="The customer confirmed an official-results match in the Instant Lookup widget before checkout - no scrape needed."
                               >
-                                🟣 Confirmed by customer
+                                ☑️ Confirmed by customer
                               </span>
                             )}
                           </div>
