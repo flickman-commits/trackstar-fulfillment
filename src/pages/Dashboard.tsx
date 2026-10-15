@@ -81,6 +81,7 @@ interface Order {
   researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'time_unavailable' | 'race_not_run' | null
   // How the result was obtained: scraper vs. customer-confirmed in the widget
   researchSource?: 'scraper' | 'customer_verified' | 'customer_supplied' | null
+  eventTypeSource?: 'research' | 'customer' | 'product' | null
   // Detailed Instant Lookup widget outcome — how the shopper arrived at their
   // result. See server schema Order.lookupOutcome for the enum.
   lookupOutcome?:
@@ -378,6 +379,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     // what the API returns — these drive the "Customer-verified" badge and
     // the outcome chip, which is why neither had ever appeared.
     researchSource: order.researchSource as Order['researchSource'],
+    eventTypeSource: order.eventTypeSource as Order['eventTypeSource'],
     lookupVerified: order.lookupVerified as boolean | null | undefined,
     lookupOutcome: order.lookupOutcome as Order['lookupOutcome'],
     // Personalization photo — drives the photo chip, View Photo and the
@@ -6357,6 +6359,11 @@ Thank you!`
                                       </span>
                                     )}
                                     <span className={`text-body-sm font-medium ${isMarathon ? 'text-off-black' : 'text-warning-amber'}`}>{selectedOrder.eventType}</span>
+                                    {selectedOrder.eventTypeSource && selectedOrder.eventTypeSource !== 'research' && (
+                                      <span className="text-[11px] text-off-black/40" title={selectedOrder.eventTypeSource === 'customer' ? 'What the customer chose at checkout. Research confirms it.' : 'From the product name. Research confirms which event the runner actually ran.'}>
+                                        {selectedOrder.eventTypeSource === 'customer' ? 'per customer' : 'per product'}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               )

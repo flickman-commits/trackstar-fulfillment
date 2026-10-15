@@ -9,6 +9,7 @@ import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
 import { shopifyAdminUrl, arteloOrderUrl } from '../../server/lib/links.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 import { formatRaceDate, formatTemp, formatTime, formatPace } from '../../server/lib/printFormat.js'
+import { resolveEvent } from '../../server/lib/raceEvent.js'
 
 
 /**
@@ -241,7 +242,8 @@ export default async function handler(req, res) {
         bibNumber: research?.bibNumber || null,
         officialTime: formatTime(research?.officialTime),
         officialPace: formatPace(research?.officialPace),
-        eventType: research?.eventType || null,
+        // The event: confirmed by research, or assumed from the customer or the product until then.
+        ...resolveEvent(research, order, effectiveRaceName),
         researchStatus: research?.researchStatus || null,
         // How the result was obtained: "scraper" | "customer_verified". Drives
         // the dashboard's "Customer-verified" vs "Researched" badge.
