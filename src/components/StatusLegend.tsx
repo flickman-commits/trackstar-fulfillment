@@ -5,17 +5,14 @@ import { HelpCircle } from 'lucide-react'
  * header, one short line per icon. Mirrors getStatusDisplay in Dashboard.tsx.
  */
 const ROWS: [string, string][] = [
-  ['✅', 'Ready'],
-  ['☑️', 'Customer verified at checkout'],
-  ['✍️', 'Customer typed their numbers'],
-  ['🔍', 'Ready to research'],
+  ['✅', 'Ready, result on file'],
+  ['🔍', 'Needs research'],
   ['🕵️', 'Not found, look up by hand'],
-  ['❓', 'Multiple matches, pick one'],
+  ['❓', 'Pick a match'],
   ['⏱', 'Time needs manual entry'],
-  ['🗓️', 'Race not run yet'],
   ['🌐', 'Timing site down, retry'],
-  ['🚧', 'No scraper for this race'],
-  ['🛠️', 'Year not configured'],
+  ['🗓️', 'Race not run yet'],
+  ['🛠️', 'Needs a scraper'],
   ['⚠️', 'Flagged'],
   ['📅', 'Missing year'],
 ]

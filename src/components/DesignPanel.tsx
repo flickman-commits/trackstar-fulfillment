@@ -75,8 +75,10 @@ export default function DesignPanel({ orderId, onPreview, canManage = true }: {
   const offline = state.workersOnline.length === 0
   if (!canManage && job?.review !== 'approved') return null
 
+  // Greyed out until the order has everything a render needs. Hover for what is missing.
+  const dimmed = !job && !state.eligible
   return (
-    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-3">
+    <div className={`bg-subtle-gray border border-border-gray rounded-md p-3 space-y-3 ${dimmed ? 'opacity-50' : ''}`} title={dimmed ? state.reasons.join('. ') : undefined}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Design</span>
@@ -98,7 +100,7 @@ export default function DesignPanel({ orderId, onPreview, canManage = true }: {
       </div>
 
       {canManage && !job && !state.eligible && (
-        <p className="text-xs text-off-black/55">{offline ? 'Start the render worker on a Mac with Illustrator to create designs.' : `Not ready: ${state.reasons.join('. ')}.`}</p>
+        <p className="text-xs text-off-black/55">{offline ? 'Renderer offline.' : `Waiting on: ${state.reasons.join('. ')}.`}</p>
       )}
 
       {job && (job.status === 'queued' || job.status === 'rendering') && (

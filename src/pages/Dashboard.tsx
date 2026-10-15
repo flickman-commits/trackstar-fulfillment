@@ -2733,38 +2733,22 @@ Thank you!`
   }
 
   // Get status icon and color for table
+  // The Status column: where this order is on the way to having a result.
+  // One icon, chosen by what happens next. Where a result came from (our
+  // research, the customer at checkout) is the Tags column's job.
   const getStatusDisplay = (order: Order) => {
     if (order.status === 'flagged') return { icon: '⚠️', label: 'Flagged' }
-    if (order.status === 'missing_year') return { icon: '📅', label: 'Missing Year' }
-    // Customer confirmed an official-results match in the Instant Lookup widget
-    // — trusted, no scrape needed. Shown ahead of the generic ready/found labels.
-    if (order.researchSource === 'customer_verified') return { icon: '☑️', label: 'Customer-verified' }
-    // Their own numbers, never matched against official results. Distinct icon
-    // so it does not read as a confirmed match at a glance.
-    if (order.researchSource === 'customer_supplied') return { icon: '✍️', label: 'Customer-entered' }
-    // Instant Lookup at checkout: the customer's result was matched against
-    // official results (auto match, or they picked their row from a list).
-    // That is as good as our own research, so it reads as done, the same as
-    // the "Verified" tag beside it. Typed-in numbers get the pen instead.
-    if (order.lookupOutcome === 'auto_match' || order.lookupOutcome === 'picked_from_list') return { icon: '✅', label: 'Verified at checkout' }
-    if (order.lookupOutcome === 'edited_by_customer' || order.lookupOutcome?.startsWith('manual_')) return { icon: '✍️', label: 'Customer-entered' }
-    if (order.status === 'ready') return { icon: '✅', label: 'Ready' }
-    if (showsRaceNotRun(order)) return { icon: '🗓️', label: 'Race has not happened yet' }
-    if (order.researchStatus === 'found') return { icon: '✅', label: 'Researched' }
-    if (order.researchStatus === 'no_scraper') return { icon: '🚧', label: 'No scraper for this race' }
-    // 🛠️ not 🗓️: a calendar here was indistinguishable from the 📅 used for a
-    // missing year, and this is a dev gap rather than a date problem.
-    if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Year not configured' }
-    if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site unreachable, retry' }
-    if (order.researchStatus === 'time_unavailable') return { icon: '⏱', label: 'Runner matched, time needs manual entry' }
-    if (order.researchStatus === 'ambiguous') return { icon: '❓', label: 'Multiple matches' }
-    // A future race is a wait, not a failure.
-    // 🕵️ rather than ❌ or 🔎. A cross reads as "cancelled, ignore this", and the
-    // second magnifying glass was a mirror image of the one below. Not found
-    // means someone has to go dig, so the icon should point at the work.
-    if (order.researchStatus === 'not_found') return { icon: '🕵️', label: 'Not found, needs a manual lookup' }
-    if (order.hasScraperAvailable) return { icon: '🔍', label: 'Ready to research' }
-    return { icon: '⏳', label: 'Pending' }
+    if (order.status === 'missing_year') return { icon: '📅', label: 'Missing year' }
+    const hasResult = !!(order.bibNumber || order.officialTime)
+    if (hasResult || order.status === 'ready') return { icon: '✅', label: 'Ready: result on file' }
+    if (showsRaceNotRun(order)) return { icon: '🗓️', label: 'Race not run yet' }
+    if (order.researchStatus === 'ambiguous') return { icon: '❓', label: 'Pick a match' }
+    if (order.researchStatus === 'time_unavailable') return { icon: '⏱', label: 'Runner found, time needs manual entry' }
+    if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site down, retry' }
+    if (order.researchStatus === 'not_found') return { icon: '🕵️', label: 'Not found, look up by hand' }
+    if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Needs a scraper: this year is not wired up' }
+    if (order.researchStatus === 'no_scraper' || !order.hasScraperAvailable) return { icon: '🛠️', label: 'Needs a scraper: research by hand' }
+    return { icon: '🔍', label: 'Needs research' }
   }
 
   // Generate race shorthand for filename

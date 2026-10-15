@@ -111,52 +111,6 @@ const TRUST_TAGS: Record<string, { label: string; sublabel?: string; tone: TagTo
     label: 'Customer edited', tone: 'blue',
     title: 'Instant Lookup found a result and the customer changed the time, pace or bib on the review screen. These are their numbers, not the official ones - print them as given.',
   },
-  // No data at all. A human has to look it up.
-  async_no_match: {
-    label: 'Needs research', sublabel: 'no match found', tone: 'amber',
-    title: 'Instant Lookup found nothing and the customer asked us to research it. This order has no runner data.',
-  },
-  async_timeout: {
-    label: 'Needs research', sublabel: 'lookup timed out', tone: 'amber',
-    title: 'Instant Lookup timed out and the customer asked us to research it. This order has no runner data.',
-  },
-  async_lookup_error: {
-    label: 'Needs research', sublabel: 'lookup errored', tone: 'amber',
-    title: 'Instant Lookup errored and the customer asked us to research it. This order has no runner data.',
-  },
-  no_lookup_available: {
-    label: 'Needs research', sublabel: 'no lookup for this race', tone: 'amber',
-    title: 'This race has no Instant Lookup configured, so nothing was searched. Name and year are customer-supplied. Time, pace and bib still need research.',
-  },
-}
-
-/** Research outcomes from our own scrapers. */
-function researchTag(o: TaggableOrder): OrderTag | null {
-  // A future race has no results to find. This also rescues orders that were
-  // researched before we checked for it and got stamped "not found".
-  if (showsRaceNotRun(o)) {
-    return { key: 'race-not-run', label: 'Race not run yet', tone: 'blue',
-      title: 'This race has not happened yet, so there are no results to look up. Come back after race day.' }
-  }
-  switch (o.researchStatus) {
-    case 'not_found':
-      return { key: 'not-found', label: 'Not found', sublabel: 'manual lookup', tone: 'amber',
-        title: 'The runner was not found in the race results. Verify the name and year, then retry.' }
-    case 'ambiguous':
-      return { key: 'ambiguous', label: 'Multiple matches', sublabel: 'pick one', tone: 'amber',
-        title: 'Several runners share this name. Open the order and accept the right match.' }
-    case 'upstream_error':
-      return { key: 'upstream', label: 'Timing site down', sublabel: 'retry', tone: 'amber',
-        title: 'The timing site was slow or unreachable. Nothing is wrong with this order, just retry in a few minutes.' }
-    case 'year_not_configured':
-      return { key: 'year-not-configured', label: 'Year not configured', sublabel: 'needs dev', tone: 'red',
-        title: 'The scraper exists but this year is not wired up yet. A developer needs to add the event IDs.' }
-    case 'no_scraper':
-      return { key: 'no-scraper', label: 'No scraper', sublabel: 'needs dev', tone: 'red',
-        title: 'We have no scraper for this race yet. A developer needs to add one, or research it by hand.' }
-    default:
-      return null
-  }
 }
 
 /**
@@ -203,21 +157,16 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
       title: o.flagReason || 'This order has been flagged for review.' })
   }
 
-  const research = researchTag(o)
-  if (research) tags.push(research)
-
-  // Data provenance. One tag. The research record says where the result came
-  // from; the lookup outcome only adds how the customer got there. Once a
-  // result exists, Instant Lookup's "Needs research" is history, not a tag.
-  const notRun = showsRaceNotRun(o)
-  const hasResult = !!(o.bibNumber || o.officialTime || o.officialPace || o.hadNoTime)
+  // Where the numbers came from, when the customer supplied them. One tag.
+  // "Verified" means they confirmed an official-results match at checkout;
+  // "Customer typed" or "Customer edited" means print their numbers as given.
+  // Research progress (needs research, not found, retry) is the Status
+  // column's job, not a tag, so it is never said twice.
   const lookupTrust = o.lookupOutcome ? TRUST_TAGS[o.lookupOutcome] : null
   if (o.researchSource === 'customer_verified') {
     tags.push({ key: 'trust', ...(lookupTrust?.tone === 'green' ? lookupTrust : { label: 'Verified', sublabel: 'by customer', tone: 'green' as const, title: 'The customer confirmed an official-results match before checkout.' }) })
   } else if (o.researchSource === 'customer_supplied') {
-    tags.push({ key: 'trust', ...(lookupTrust?.tone === 'blue' ? lookupTrust : { label: 'Customer entered', tone: 'blue' as const, title: 'The customer typed these numbers at checkout. They were never matched against official results - print them as given.' }) })
-  } else if (!hasResult && lookupTrust && !(notRun && lookupTrust.tone === 'amber')) {
-    tags.push({ key: 'trust', ...lookupTrust })
+    tags.push({ key: 'trust', ...(lookupTrust?.tone === 'blue' ? lookupTrust : { label: 'Customer typed', tone: 'blue' as const, title: 'The customer typed these numbers at checkout. They were never matched against official results. Print them as given.' }) })
   }
 
   // Customer choices about what prints.
@@ -234,26 +183,10 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
       title: 'Someone overrode the runner name, race or year on this order.' })
   }
 
-  // Neutral "what happens next" context. Only when research has not been tried
-  // AND we genuinely have nothing, otherwise a customer-verified order would
-  // read "Verified" and "Ready to research" at the same time.
-  if (o.status === 'pending' && !o.researchStatus && !hasResult && !notRun) {
-    if (o.hasScraperAvailable && (o.effectiveRaceYear || o.raceYear)) {
-      tags.push({ key: 'ready', label: 'Ready to research', tone: 'gray',
-        title: 'We have a scraper for this race and year. Run research on this order.' })
-    } else if (!o.hasScraperAvailable) {
-      tags.push({ key: 'manual', label: 'Research by hand', tone: 'gray',
-        title: 'No auto-research for this race. Look up the bib, time and pace manually.' })
-    }
-  }
-
-  // A race that has not happened has one thing to say: wait. "Needs research"
-  // (from the customer's checkout lookup, which found nothing because there
-  // was nothing yet), "Year missing" and the rest are all noise until race
-  // day, so only the wait, the photo and the priority flags stay. Everything
-  // comes back on its own once the date passes.
-  const shown = research?.key === 'race-not-run'
-    ? tags.filter(t => ['race-not-run', 'photo', 'expedited', 'big-spender'].includes(t.key))
+  // A race that has not happened has one thing to say: wait. Only the photo
+  // and priority flags matter until race day; the Status column says the rest.
+  const shown = showsRaceNotRun(o)
+    ? tags.filter(t => ['photo', 'photo-unpaid', 'expedited', 'big-spender'].includes(t.key))
     : tags
 
   return shown.sort((a, b) =>
