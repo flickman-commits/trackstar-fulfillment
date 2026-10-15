@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "worker": "node worker/render-worker.mjs",
     "dev": "concurrently -n api,vite -c blue,green \"npm run dev:api\" \"npm run dev:vite\"",
     "dev:api": "node --env-file=.env.local server/dev.js",
     "dev:vite": "vite",
