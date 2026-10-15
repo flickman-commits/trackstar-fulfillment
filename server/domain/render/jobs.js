@@ -156,16 +156,22 @@ export async function reviewJob({ jobId, decision, note, reviewerId }) {
  * in while every Mac is asleep is picked up on a later run. A person still
  * approves every render.
  */
+export const AUTO_SINCE_KEY = 'render_auto_since'
+
 export async function autoQueueRenders({ limit = 25 } = {}) {
   const templates = await availableTemplates()
   if (!templates.length) return { queued: 0, skipped: 0, reason: 'no render worker online' }
+  // Only orders placed after the switch was turned on. The backlog is rendered
+  // on purpose, later, once the automatic renders have earned trust.
+  const since = await prisma.systemConfig.findUnique({ where: { key: AUTO_SINCE_KEY } })
+  const from = since?.value ? new Date(since.value) : new Date()
   const candidates = await prisma.order.findMany({
     where: {
       trackstarOrderType: 'standard',
       status: { notIn: ['completed', 'flagged'] },
       raceName: { in: templates },
       renderJobs: { none: {} },
-      createdAt: { gte: new Date(Date.now() - 60 * 86400000) },
+      createdAt: { gte: from },
     },
     orderBy: { createdAt: 'asc' },
     take: limit * 4,
