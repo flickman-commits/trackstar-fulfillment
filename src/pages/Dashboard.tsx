@@ -830,8 +830,9 @@ export default function Dashboard() {
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setSelectedOrder(null)
-        searchInputRef.current?.focus()
-        searchInputRef.current?.select()
+        setShowCompleted(false)
+        // From an open order the search box is not on screen yet; focus once the table is back.
+        setTimeout(() => { searchInputRef.current?.focus(); searchInputRef.current?.select() }, 0)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -5609,7 +5610,7 @@ Thank you!`
                   )}
                   </aside>
 
-                  <div className="md:col-start-1 md:row-start-1 min-w-0 space-y-4">
+                  <div className="md:col-start-1 md:row-start-1 min-w-0 flex flex-col gap-4">
                   {/* A comment on a standard order is somebody flagging
                       something about this print, usually a spelling the
                       results site got wrong. It used to sit under the fold
@@ -5695,7 +5696,7 @@ Thank you!`
                       Anything that needs a decision, or gives context Eli has
                       to act on, lives here directly under the tags. Ordered by
                       urgency. The bottom of the modal is reference data only. */}
-                  <div className="hidden md:block space-y-3 mb-3">
+                  <div className="hidden md:block space-y-3 empty:!hidden">
                     {photoError && (
                       <p className="text-[11px] text-red-600">Photo: {photoError}</p>
                     )}
