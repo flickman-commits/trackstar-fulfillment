@@ -1,76 +1,22 @@
 # Scripts
 
-This directory contains utility and one-off data-fix scripts for the Trackstar fulfillment tool.
+Utilities that run against the database from a terminal. All of them read
+`.env.local`, which points at production, so a write here is live. Scripts
+that change data are dry-run by default and take `--apply`.
 
-## Austin Marathon Results
+| Script | What it does |
+|---|---|
+| `lint-scrapers.js` | Static checks on every race scraper config. Part of `npm run build`. |
+| `verify-scraper-chip-times.js` | Runs every scraper against a known finisher and checks chip time, not gun time. `npm run test:scrapers`. |
+| `verify-config.mjs` | Prints the active race configs and their event ids. |
+| `verify-race-dates.mjs` | Lists race years whose date is computed or unsourced. |
+| `apply-customer-results.mjs` | Records Instant Lookup results as research records for orders that have none. The import does this on its own; this is the by-hand run. |
+| `import-races-from-csv.mjs` | Loads race rows from a CSV. |
+| `explore-scraper.mjs` | Fetches a timing page the way a scraper would, for debugging. |
+| `mark-order-rush.mjs` | Flags an order as rush. |
+| `seed-fake-order.mjs` | Creates a fake order for local testing. |
+| `setup-photo-bucket.mjs` | Creates the private Supabase bucket for customer photos. |
+| `check-storage.mjs` | Reports what is in the storage buckets. |
 
-Script to fetch race results from the Austin Marathon and Half Marathon.
-
-### Usage
-
-#### Search by Name
-
-```bash
-node scripts/austin-marathon-results.js <firstName> <lastName> [eventType]
-```
-
-#### Search by Bib Number
-
-```bash
-node scripts/austin-marathon-results.js --bib <bibNumber> [eventType]
-```
-
-### Event Types
-
-- `marathon` - Full marathon (default)
-- `halfMarathon` - Half marathon
-
-### Examples
-
-```bash
-# Search for a marathon runner by name
-node scripts/austin-marathon-results.js John Smith
-
-# Search for a half marathon runner by name
-node scripts/austin-marathon-results.js Jane Doe halfMarathon
-
-# Search by bib number in marathon
-node scripts/austin-marathon-results.js --bib 12345
-
-# Search by bib number in half marathon
-node scripts/austin-marathon-results.js --bib 12345 halfMarathon
-```
-
-### Output
-
-The script returns the following information:
-- Overall Place
-- Gun Time
-- Chip Time
-- Bib Number
-- First Name
-- Last Name
-- City
-- State
-- Division
-- Class Position (Age Group Placement)
-
-### Programmatic Usage
-
-You can also import the functions in other modules:
-
-```javascript
-import { searchRunner, searchByBib, EVENTS } from './scripts/austin-marathon-results.js';
-
-// Search by name
-const result = await searchRunner('John', 'Smith', 'marathon');
-
-// Search by bib
-const result = await searchByBib('12345', 'halfMarathon');
-```
-
-## Other Scripts
-
-### test-vimeo.js
-
-Tests Vimeo API integration for video management.
+One-off data fixes (the 2025 and 2026 Boston, Etsy and line-item repairs)
+were removed in October 2026 once they had run; their commits are the record.

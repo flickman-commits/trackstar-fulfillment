@@ -26,14 +26,14 @@ function WorkerDot({ d }: { d: Design }) {
 /** Sits where the order's preview goes: the finished print, or its status and a Create Design button. */
 export function DesignCard({ d }: { d: Design }) {
   const [lightbox, setLightbox] = useState(false)
-  if (d.reserved && !d.state) return <div className="w-[347px] h-[520px] self-start rounded-md border border-border-gray bg-subtle-gray animate-pulse" />
+  if (d.reserved && !d.state) return <div className="w-full md:w-[347px] aspect-[2/3] md:aspect-auto md:h-[520px] self-start rounded-md border border-border-gray bg-subtle-gray animate-pulse" />
   if (!d.visible || !d.state) return null
   const { job, state } = d
 
   if (job?.status === 'done' && job.previewUrl) {
     return (
       <>
-        <button onClick={() => setLightbox(true)} className="relative self-start w-[347px] h-[520px] rounded-md border border-border-gray bg-subtle-gray overflow-hidden" title="Open larger">
+        <button onClick={() => setLightbox(true)} className="relative self-start w-full md:w-[347px] aspect-[2/3] md:aspect-auto md:h-[520px] rounded-md border border-border-gray bg-subtle-gray overflow-hidden" title="Open larger">
           <img src={job.previewUrl} alt={`Render of ${job.spec.file}`} className="w-full h-full object-contain block" />
           {job.review !== 'pending' && (
             <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold ${job.review === 'approved' ? 'bg-green-100 text-green-800' : job.review === 'closed' ? 'bg-off-black/10 text-off-black/70' : 'bg-red-100 text-red-800'}`}>
@@ -53,7 +53,7 @@ export function DesignCard({ d }: { d: Design }) {
 
   const inFlight = job && (job.status === 'queued' || job.status === 'rendering')
   return (
-    <div className="w-[347px] h-[520px] self-start rounded-md border border-dashed border-border-gray bg-subtle-gray flex flex-col items-center justify-center gap-3 p-4 text-center">
+    <div className="w-full md:w-[347px] aspect-[2/3] md:aspect-auto md:h-[520px] self-start rounded-md border border-dashed border-border-gray bg-subtle-gray flex flex-col items-center justify-center gap-3 p-4 text-center">
       <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Design</span>
       {inFlight ? (
         <div className="flex flex-col items-center gap-2 text-sm text-off-black/70">
@@ -95,7 +95,7 @@ export function DesignReview({ d }: { d: Design }) {
     )
   }
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <button onClick={() => d.review('approved')} disabled={d.busy} className="inline-flex items-center justify-center gap-2 py-4 rounded-md bg-green-600 text-white text-base font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors">
         {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} Approve & Upload to Orders
       </button>

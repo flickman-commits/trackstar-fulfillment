@@ -2789,12 +2789,12 @@ Thank you!`
         {activeView === 'standard' && (
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Queue</div>
-          <div className="inline-flex rounded-md border border-border-gray bg-subtle-gray p-0.5">
-            {([['', 'All', ordersToFulfill.length], ['review', 'Review', stageCounts.review], ['action', 'Needs action', stageCounts.action], ['waiting', 'Waiting', stageCounts.waiting]] as const).map(([key, label, n]) => (
+          <div className="flex md:inline-flex w-full md:w-auto rounded-md border border-border-gray bg-subtle-gray p-0.5">
+            {([['', 'All', ordersToFulfill.length], ['review', 'Review', stageCounts.review], ['action', 'Action', stageCounts.action], ['waiting', 'Waiting', stageCounts.waiting]] as const).map(([key, label, n]) => (
               <button
                 key={key || 'all'}
                 onClick={() => setStageFilter(key)}
-                className={`px-3 py-2 md:py-2.5 rounded text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${stageFilter === key ? 'bg-white text-off-black shadow-sm' : 'text-off-black/55 hover:text-off-black'}`}
+                className={`flex-1 md:flex-none px-2 md:px-3 py-2 md:py-2.5 rounded text-xs md:text-sm font-medium whitespace-nowrap transition-colors inline-flex items-center justify-center gap-1 md:gap-1.5 ${stageFilter === key ? 'bg-white text-off-black shadow-sm' : 'text-off-black/55 hover:text-off-black'}`}
               >
                 {label}
                 <span className={`text-[11px] tabular-nums ${stageFilter === key ? 'text-off-black/50' : 'text-off-black/35'}`}>{n}</span>
@@ -4459,7 +4459,7 @@ Thank you!`
                         : selectedOrder.status === 'completed' ? '✅'
                         : getStatusDisplay(selectedOrder).icon}
                     </span>
-                    <h3 className="text-heading-md text-off-black">
+                    <h3 className="text-heading-md text-off-black whitespace-nowrap">
                       {selectedOrder.trackstarOrderType === 'race_partner'
                         ? (selectedOrder.partnerName || selectedOrder.raceName || 'Partner')
                         : `Order ${selectedOrder.displayOrderNumber}`}
@@ -4536,321 +4536,6 @@ Thank you!`
                   {/* ========== CUSTOM / RACE PARTNER DETAIL VIEW ========== */}
                   {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner') ? (
                     <>
-                      {/* === MOBILE COMPACT SUMMARY (Custom) === */}
-                      <div className="md:hidden space-y-3">
-                        {/* Stage Progress Indicator (Mobile) */}
-                        {(() => {
-                          const mds = selectedOrder.designStatus as DesignStatus
-                          const mDesigning = ['not_started', 'in_progress'].includes(mds)
-                          const mProof = ['awaiting_review', 'in_revision', 'approved_by_customer'].includes(mds)
-                          const mProd = ['final_pdf_uploaded', 'sent_to_production'].includes(mds)
-                          const mSteps = [
-                            { label: 'Design', active: mDesigning || mProof || mProd },
-                            { label: 'Review', active: ['awaiting_review', 'in_revision', 'approved_by_customer'].includes(mds) || mProd },
-                            { label: 'Approved', active: mds === 'approved_by_customer' || mProd },
-                            { label: 'Production', active: mProd },
-                          ]
-                          return (
-                            <div className="flex items-center gap-1 px-1">
-                              {mSteps.map((step, i) => (
-                                <div key={step.label} className="flex items-center gap-1 flex-1">
-                                  <div className={`flex items-center gap-1.5 ${i < mSteps.length - 1 ? 'flex-1' : ''}`}>
-                                    <div className={`w-2 h-2 rounded-full shrink-0 ${step.active ? 'bg-dark-fill' : 'bg-off-black/15'}`} />
-                                    <span className={`text-[10px] font-medium whitespace-nowrap ${step.active ? 'text-off-black' : 'text-off-black/30'}`}>
-                                      {step.label}
-                                    </span>
-                                  </div>
-                                  {i < mSteps.length - 1 && (
-                                    <div className={`flex-1 h-px ${step.active && mSteps[i + 1].active ? 'bg-off-black/30' : 'bg-off-black/10'}`} />
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )
-                        })()}
-
-                        {/* Design Status Dropdown */}
-                        <div className="relative">
-                          <select
-                            value={DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] ? selectedOrder.designStatus : 'not_started'}
-                            onChange={(e) => updateDesignStatus(selectedOrder.orderNumber, e.target.value as DesignStatus)}
-                            className={`w-full appearance-none px-4 py-3 pr-8 rounded-md text-sm font-medium border transition-colors cursor-pointer ${
-                              (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).bgColor
-                            } ${
-                              (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).color
-                            } border-border-gray focus:outline-none focus:ring-2 focus:ring-off-black/20`}
-                          >
-                            {selectableDesignStatuses(selectedOrder.trackstarOrderType, selectedOrder.designStatus).map(status => (
-                              <option key={status} value={status}>
-                                {DESIGN_STATUS_CONFIG[status].icon} {designLabel(status, selectedOrder.trackstarOrderType)}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                            <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </div>
-
-                        {/* Order details card */}
-                        <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
-                          {selectedOrder.trackstarOrderType === 'race_partner' ? (
-                            <>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Partner</span>
-                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.partnerName || selectedOrder.raceName}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Year</span>
-                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.raceYear || 'N/A'}</span>
-                              </div>
-                              {selectedOrder.partnerContactName && (
-                                <div className="flex justify-between items-center">
-                                  <span className="text-body-sm text-off-black/60">Contact</span>
-                                  <span className="text-body-sm font-medium text-off-black">{selectedOrder.partnerContactName}</span>
-                                </div>
-                              )}
-                              {selectedOrder.customerEmail && (
-                                <div className="flex justify-between items-center">
-                                  <span className="text-body-sm text-off-black/60">Email</span>
-                                  <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Runner</span>
-                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Race</span>
-                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Year</span>
-                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A'}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Due Date</span>
-                                <span className={`text-body-sm font-medium ${isDueDateUrgent(selectedOrder.dueDate) ? 'text-red-600' : 'text-off-black'}`}>
-                                  {formatDueDate(selectedOrder.dueDate)}
-                                </span>
-                              </div>
-                              {selectedOrder.bibNumberCustomer && (
-                                <div className="flex justify-between items-center">
-                                  <span className="text-body-sm text-off-black/60">Bib</span>
-                                  <span className="text-body-sm font-medium text-off-black">{selectedOrder.bibNumberCustomer}</span>
-                                </div>
-                              )}
-                              {selectedOrder.timeCustomer && (
-                                <div className="flex justify-between items-center">
-                                  <span className="text-body-sm text-off-black/60">Time</span>
-                                  <span className="text-body-sm font-medium text-off-black">{selectedOrder.timeCustomer}</span>
-                                </div>
-                              )}
-                              {selectedOrder.isGift && (
-                                <div className="flex justify-between items-center">
-                                  <span className="text-body-sm text-off-black/60">Gift Order</span>
-                                  <span className="text-body-sm font-medium text-pink-600">🎁 Yes</span>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-
-                        {/* Delay-notice banner (Mobile) */}
-                        {selectedOrder.delayNoticeSentAt && (
-                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
-                            <span className="text-base leading-none">⏰</span>
-                            <div className="flex-1 text-xs">
-                              <p className="font-medium text-amber-900">
-                                Pushed due date {selectedOrder.delayNoticeDaysLate ?? '?'} day{selectedOrder.delayNoticeDaysLate === 1 ? '' : 's'} - email sent
-                              </p>
-                              <p className="text-amber-700/80 mt-0.5">
-                                Customer notified {new Date(selectedOrder.delayNoticeSentAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        {selectedOrder.creativeDirection && (
-                          <div>
-                            <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">Creative Direction</h4>
-                            <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
-                              <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Customer Feedback Banner (Mobile) */}
-                        {selectedOrder.designStatus === 'in_revision' && latestFeedback && (
-                          <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
-                            <p className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mb-1">Customer Feedback</p>
-                            <p className="text-body-sm text-orange-800 whitespace-pre-wrap">{latestFeedback}</p>
-                          </div>
-                        )}
-
-                        {selectedOrder.designStatus === 'awaiting_review' && (() => {
-                          const daysSinceSent = selectedOrder.proofSentAt
-                            ? Math.floor((Date.now() - new Date(selectedOrder.proofSentAt).getTime()) / (1000 * 60 * 60 * 24))
-                            : null
-                          const needsFollowUp = daysSinceSent !== null && daysSinceSent >= 3
-                          const daysText = daysSinceSent !== null
-                            ? `${daysSinceSent} day${daysSinceSent !== 1 ? 's' : ''} ago`
-                            : ''
-                          return needsFollowUp ? (
-                            <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">🔔</span>
-                                <div className="flex-1">
-                                  <p className="text-xs font-medium text-red-800">No response in {daysSinceSent} day{daysSinceSent !== 1 ? 's' : ''}</p>
-                                  <p className="text-[10px] text-red-600">Proofs were sent {daysText}.</p>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => sendFollowUp(selectedOrder.id)}
-                                disabled={isSendingFollowUp}
-                                className="w-full mt-2 px-3 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                              >
-                                {isSendingFollowUp ? (
-                                  <><Loader2 className="w-3 h-3 animate-spin" /> Sending...</>
-                                ) : (
-                                  <><Send className="w-3 h-3" /> Send Follow Up</>
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
-                              <span className="text-lg">⏳</span>
-                              <div>
-                                <p className="text-xs font-medium text-amber-800">Waiting for customer response</p>
-                                <p className="text-[10px] text-amber-600">Proofs sent {daysText || 'today'}. You'll get a Slack notification when they respond.</p>
-                              </div>
-                            </div>
-                          )
-                        })()}
-
-                        {/* Post-Approval Checklist (Mobile) */}
-                        {(selectedOrder.designStatus === 'approved_by_customer' || selectedOrder.designStatus === 'final_pdf_uploaded') && (
-                          <PostApprovalChecklist
-                            orderId={selectedOrder.id}
-                            orderNumber={selectedOrder.orderNumber}
-                            displayOrderNumber={selectedOrder.displayOrderNumber}
-                            designStatus={selectedOrder.designStatus}
-                            onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
-                            isPartner={selectedOrder.trackstarOrderType === 'race_partner'}
-                            partnerName={selectedOrder.raceName}
-                          />
-                        )}
-
-                        {/* Proofs & Approval (Mobile) */}
-                        <div>
-                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">Proofs & Approval</h4>
-                          <ProofManager
-                            orderId={selectedOrder.id}
-                            orderNumber={selectedOrder.orderNumber}
-                            displayOrderNumber={selectedOrder.displayOrderNumber}
-                            designStatus={selectedOrder.designStatus}
-                            customerEmail={selectedOrder.customerEmail}
-                            onDesignStatusChange={(s) => updateDesignStatus(selectedOrder.orderNumber, s as DesignStatus)}
-                            onLatestFeedback={setLatestFeedback}
-                            disableEmail={selectedOrder.trackstarOrderType === 'race_partner'}
-                            allowGroups={selectedOrder.trackstarOrderType === 'race_partner'}
-                          />
-                        </div>
-
-                        {/* Comments (Mobile) */}
-                        <div>
-                          <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">
-                            Comments {orderComments.length > 0 && `(${orderComments.length})`}
-                          </h4>
-                          <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-2">
-                            <textarea
-                              value={newCommentText}
-                              onChange={(e) => setNewCommentText(e.target.value)}
-                              onPaste={handleCommentPaste}
-                              placeholder="Add a comment or paste an image..."
-                              className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
-                              rows={2}
-                            />
-                            {commentImagePreview && (
-                              <div className="relative inline-block">
-                                <img src={commentImagePreview} alt="Preview" className="max-h-24 rounded-md border border-border-gray" />
-                                <button onClick={clearCommentImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600">
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2">
-                              <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
-                                <ImagePlus className="w-3 h-3 inline mr-1" />
-                                Image
-                                <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
-                              </label>
-                              <span className="text-xs text-off-black/40 flex-1">or paste</span>
-                              <button
-                                onClick={submitComment}
-                                disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
-                                className="px-4 py-1.5 text-xs bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
-                              >
-                                {isSubmittingComment ? 'Adding...' : 'Add'}
-                              </button>
-                            </div>
-                          </div>
-                          {isLoadingComments ? (
-                            <div className="text-center py-3"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
-                          ) : orderComments.length === 0 ? (
-                            <p className="text-xs text-off-black/40 text-center py-2">No comments yet</p>
-                          ) : (
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                              {orderComments.map(comment => (
-                                <div key={comment.id} className="bg-white border border-border-gray rounded-md p-2.5">
-                                  {comment.imageUrl && (
-                                    <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
-                                      <img src={comment.imageUrl} alt="Attachment" className="max-h-32 rounded-md mb-1.5 border border-border-gray hover:opacity-90" />
-                                    </a>
-                                  )}
-                                  {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap"><Linkify text={comment.text} /></p>}
-                                  <div className="flex items-center justify-between mt-1.5">
-                                    <span className="text-xs text-off-black/40">
-                                      {comment.authorName ? `${comment.authorName} · ` : ''}
-                                {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                                    </span>
-                                    <button onClick={() => deleteComment(comment.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Emergency delay notice — custom orders only.
-                            Tucked away as a tertiary action so Dan doesn't reach
-                            for it unless it's actually warranted. */}
-                        {selectedOrder.trackstarOrderType === 'custom' && selectedOrder.customerEmail && (
-                          <div className="pt-1">
-                            <button
-                              onClick={openDelayDialog}
-                              className="w-full px-3 py-2 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 rounded-md transition-colors text-xs font-medium inline-flex items-center justify-center gap-1.5"
-                            >
-                              <span>⏰</span>
-                              Notify Customer of Delay
-                            </button>
-                          </div>
-                        )}
-
-                        <div className="pt-1">
-                          <button
-                            onClick={closeModal}
-                            className="w-full px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
-                          >
-                            Close
-                          </button>
-                        </div>
-                      </div>
-
                       {/* === DESKTOP FULL DETAIL VIEW (Custom) === */}
                       {(() => {
                         // Stage-based collapse logic
@@ -4868,7 +4553,7 @@ Thank you!`
                         ]
 
                         return (
-                      <div className="hidden md:block space-y-4">
+                      <div className="space-y-4">
                       {/* Stage Progress Indicator */}
                       <div className="flex items-center gap-1 px-1">
                         {progressSteps.map((step, i) => (
@@ -5302,7 +4987,7 @@ Thank you!`
                       </div>
                       </div>
                         )
-                      })()}{/* end hidden md:block wrapper (Custom) */}
+                      })()}{/* end custom detail */}
                     </>
                   ) : (
                     <>
@@ -5452,7 +5137,7 @@ Thank you!`
 
                   {/* Smaller things you can do to an order. More will land here. */}
                   {selectedOrder.trackstarOrderType === 'standard' && (
-                    <div className="hidden md:block">
+                    <div>
                       <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Actions</h4>
                       <div className="flex flex-col items-stretch gap-1.5">
                         {!showCommentBox && (
@@ -5624,7 +5309,7 @@ Thank you!`
                       Anything that needs a decision, or gives context Eli has
                       to act on, lives here directly under the tags. Ordered by
                       urgency. The bottom of the modal is reference data only. */}
-                  <div className="hidden md:block space-y-3 empty:!hidden">
+                  <div className="space-y-3 empty:!hidden">
                     {photoError && (
                       <p className="text-[11px] text-red-600">Photo: {photoError}</p>
                     )}
@@ -5828,238 +5513,18 @@ Thank you!`
                     )}
                   </div>
 
-                  {/* === MOBILE COMPACT SUMMARY === */}
-                  <div className="md:hidden space-y-3">
-                    {/* Key details card */}
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-body-sm text-off-black/60">Runner</span>
-                        <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRunnerName || selectedOrder.runnerName}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-body-sm text-off-black/60">Race</span>
-                        <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceName || selectedOrder.raceName}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-body-sm text-off-black/60">Year</span>
-                        <span className="text-body-sm font-medium text-off-black">{selectedOrder.effectiveRaceYear || selectedOrder.raceYear || <span className="text-warning-amber">Missing</span>}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-body-sm text-off-black/60">Size</span>
-                        <span className="text-body-sm font-medium text-off-black">{selectedOrder.productSize}</span>
-                      </div>
-                    </div>
-
-                    {/* Research section — button, loading state, or results */}
-                    {selectedOrder.hasScraperAvailable &&
-                     (selectedOrder.effectiveRaceYear || selectedOrder.raceYear) &&
-                     selectedOrder.status !== 'completed' ? (
-                      selectedOrder.researchStatus === 'found' || selectedOrder.bibNumber || selectedOrder.officialTime || selectedOrder.officialPace ? (
-                        /* Results found — show with success styling */
-                        <div className="bg-green-50 border border-green-200 rounded-md p-4 space-y-3 animate-[fadeIn_0.4s_ease-out]">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-green-600 text-sm">✓</span>
-                            <h4 className="text-xs font-semibold text-green-700 uppercase tracking-tight">
-                              {selectedOrder.researchSource === 'customer_verified'
-                                ? 'Customer-Verified Result'
-                                : selectedOrder.researchSource === 'customer_supplied'
-                                  ? 'Entered by the Customer'
-                                  : 'Research Results'}
-                            </h4>
-                            {selectedOrder.researchSource === 'customer_supplied' && (
-                              <span
-                                className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold bg-blue-100 text-blue-700 border border-blue-300"
-                                title="These are the customer's own numbers, typed or edited at checkout. They were never matched against official results, so print exactly what is here and do not go looking for a better answer."
-                              >
-                                ✍️ Customer's own numbers
-                              </span>
-                            )}
-                            {selectedOrder.researchSource === 'customer_verified' && (
-                              <span
-                                className="text-[10px] px-2 py-0.5 rounded uppercase tracking-tight font-semibold"
-                                style={{ background: 'rgba(70,0,214,0.10)', color: '#4600D6', border: '1px solid rgba(70,0,214,0.25)' }}
-                                title="The customer confirmed an official-results match in the Instant Lookup widget before checkout - no scrape needed."
-                              >
-                                ☑️ Confirmed by customer
-                              </span>
-                            )}
-                          </div>
-                          {selectedOrder.bibNumber && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-green-800/60">Bib</span>
-                              <span className="text-body-sm font-medium text-green-900">{selectedOrder.bibNumber}</span>
-                            </div>
-                          )}
-                          {/* hadNoTime wins over any research result — it's the
-                              customer's "no time on poster" opt-in. */}
-                          {selectedOrder.hadNoTime ? (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-green-800/60">Time</span>
-                              <span className="text-xs px-2 py-0.5 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">No Time</span>
-                            </div>
-                          ) : selectedOrder.officialTime ? (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-green-800/60">Time</span>
-                              <span className="text-body-sm font-medium text-green-900">{selectedOrder.officialTime}</span>
-                            </div>
-                          ) : selectedOrder.timeFromName ? (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-green-800/60">Time</span>
-                              <span className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded">⏱ {selectedOrder.timeFromName}</span>
-                            </div>
-                          ) : null}
-                          {selectedOrder.hadNoTime ? (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-green-800/60">Pace</span>
-                              <span className="text-xs px-2 py-0.5 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">No Pace</span>
-                            </div>
-                          ) : selectedOrder.officialPace && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-body-sm text-green-800/60">Pace</span>
-                              <span className="text-body-sm font-medium text-green-900">{selectedOrder.officialPace}</span>
-                            </div>
-                          )}
-                        </div>
-                      ) : isResearching ? (
-                        /* Researching — inline loading state */
-                        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                          <div className="flex items-center justify-center gap-3">
-                            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                            <span className="text-sm font-medium text-blue-700">Researching runner...</span>
-                          </div>
-                          <div className="mt-3 space-y-2">
-                            <div className="h-3 bg-blue-100 rounded animate-pulse" />
-                            <div className="h-3 bg-blue-100 rounded animate-pulse w-2/3" />
-                          </div>
-                        </div>
-                      ) : (
-                        /* Ready to research — show button */
-                        <button
-                          onClick={() => researchOrder(selectedOrder.orderNumber)}
-                          className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
-                        >
-                          <FlaskConical className="w-4 h-4" />
-                          Research Runner
-                        </button>
-                      )
-                    ) : (selectedOrder.bibNumber || selectedOrder.officialTime || selectedOrder.officialPace) ? (
-                      /* Results exist but no scraper (e.g. manually entered) */
-                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
-                        <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Race Results</h4>
-                        {selectedOrder.bibNumber && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Bib</span>
-                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.bibNumber}</span>
-                          </div>
-                        )}
-                        {selectedOrder.officialTime && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Time</span>
-                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.officialTime}</span>
-                          </div>
-                        )}
-                        {selectedOrder.officialPace && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-body-sm text-off-black/60">Pace</span>
-                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.officialPace}</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-
-                    {/* Flag reason */}
-                    {selectedOrder.status === 'flagged' && selectedOrder.flagReason && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
-                        <p className="text-xs text-amber-800">{selectedOrder.flagReason}</p>
-                      </div>
-                    )}
-
-                    {/* Comments (Mobile) */}
-                    <div>
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight mb-1.5">
-                        Comments {orderComments.length > 0 && `(${orderComments.length})`}
-                      </h4>
-                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-2">
-                        <textarea
-                          value={newCommentText}
-                          onChange={(e) => setNewCommentText(e.target.value)}
-                          onPaste={handleCommentPaste}
-                          placeholder="Add a comment or paste an image..."
-                          className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
-                          rows={2}
-                        />
-                        {commentImagePreview && (
-                          <div className="relative inline-block">
-                            <img src={commentImagePreview} alt="Preview" className="max-h-24 rounded-md border border-border-gray" />
-                            <button onClick={clearCommentImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600">
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
-                            <ImagePlus className="w-3 h-3 inline mr-1" />
-                            Image
-                            <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
-                          </label>
-                          <span className="text-xs text-off-black/40 flex-1">or paste</span>
-                          <button
-                            onClick={submitComment}
-                            disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
-                            className="px-4 py-1.5 text-xs bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
-                          >
-                            {isSubmittingComment ? 'Adding...' : 'Add'}
-                          </button>
-                        </div>
-                      </div>
-                      {isLoadingComments ? (
-                        <div className="text-center py-3"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
-                      ) : orderComments.length === 0 ? (
-                        <p className="text-xs text-off-black/40 text-center py-2">No comments yet</p>
-                      ) : (
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                          {orderComments.map(comment => (
-                            <div key={comment.id} className="bg-white border border-border-gray rounded-md p-2.5">
-                              {comment.imageUrl && (
-                                <a href={comment.imageUrl} target="_blank" rel="noopener noreferrer">
-                                  <img src={comment.imageUrl} alt="Attachment" className="max-h-32 rounded-md mb-1.5 border border-border-gray hover:opacity-90" />
-                                </a>
-                              )}
-                              {comment.text && <p className="text-body-sm text-off-black whitespace-pre-wrap"><Linkify text={comment.text} /></p>}
-                              <div className="flex items-center justify-between mt-1.5">
-                                <span className="text-xs text-off-black/40">
-                                  {comment.authorName ? `${comment.authorName} · ` : ''}
-                                {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                                </span>
-                                <button onClick={() => deleteComment(comment.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Close button */}
-                    <button
-                      onClick={closeModal}
-                      className="w-full px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
-                    >
-                      Close
-                    </button>
-                  </div>
-
                   {/* === DESKTOP FULL DETAIL VIEW === */}
                   {/* Race, year, size, ordered date and the Edit pencil all moved
                       into the Product Details card above. */}
 
                   {/* Runner Details — copy-pasteable name + research data, top of stack */}
-                  <div className="hidden md:block">
+                  <div>
                     {/* Runner and race side by side on desktop. Stacks on
                         narrow screens. Same data, half the vertical space.
                         With a finished render, the print sits to their left
                         so name, bib, time and weather can be checked at a glance. */}
                     <div className={`grid grid-cols-1 gap-3 ${design.reserved ? 'md:grid-cols-[auto,minmax(0,1fr)]' : 'md:grid-cols-2'}`}>
-                      {design.reserved && <div className="hidden md:flex"><DesignCard d={design} /></div>}
+                      {design.reserved && <div className="flex"><DesignCard d={design} /></div>}
                       <div className={design.reserved ? 'flex flex-col gap-3 min-w-0' : 'contents'}>
                       <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
@@ -6446,28 +5911,27 @@ Thank you!`
                     </div>
                   )}
 
-                  {/* Race Info, Research, Notes — desktop only */}
-                  <div className="hidden md:block space-y-5">
+                  {/* Review, filename, comments */}
+                  <div className="space-y-5">
 
                   {/* Filename. One value, so it gets one row rather than a
                       section header wrapping a card wrapping a label. */}
                   {/* Reviewing the automated print is the main action here, so it is big. */}
-                  <div className="hidden md:block space-y-2">
+                  <div className="space-y-2">
                     <DesignDetails d={design} />
                     <DesignReview d={design} />
                   </div>
 
-                  <div className="hidden md:block">
+                  <div>
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                       <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
                     </div>
                   </div>
 
-                  </div>{/* end hidden md:block wrapper */}
+                  </div>
 
-                  {/* The "Research by hand" tag covers the no-scraper case now,
-                      so the old duplicate warning box is gone. */}
-                  <div className="hidden md:block">
+                  {/* Main action */}
+                  <div>
 
                   {/* Actions */}
                   <div className="flex gap-3 pt-3">
