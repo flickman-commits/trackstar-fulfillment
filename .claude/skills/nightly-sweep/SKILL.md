@@ -77,9 +77,20 @@ partial sweep is not a clean one.
    what each attempt did: `year_not_configured` means step 4, and `error` or
    `no_results` on a year we have sold means the scraper is broken there, so go to
    the repair loop rather than retrying capture.
-6. **Race dates** — `race_dates` for computed years, pinned under the date rules
+6. **Print data** (`print_data`) — race years with open orders that automated
+   prints are waiting on. `race_data_blockers` lists each with its blockers:
+   no date, a date with no source on file, no location, or no weather. For each
+   year that has already run, find a source naming the actual day (the same bar
+   as pinning below: never a rule like "third Sunday"), then `verify_race_date`
+   with the link, a one-sentence `evidence` quote, and `location` ("City, ST")
+   if the race has none. The tool computes the weather itself and returns it;
+   a `weatherError` goes in the report. A year that has not run yet is not a
+   blocker to fix, it is waiting. A year you cannot source goes in `needsMatt`
+   with what you searched. Never change a date marked as printed without a
+   `reason` naming the source that proves the old one wrong.
+7. **Race dates** — `race_dates` for computed years, pinned under the date rules
    below. The date backlog cleared in September 2026; this is now maintenance.
-7. **Upcoming races** (`race_not_ready`) — the sweep checks every race with a
+8. **Upcoming races** (`race_not_ready`) — the sweep checks every race with a
    pinned date in the next eight weeks and flags what is missing: this year's
    event id, or a scraper that fails or is untested on last year's results.
    Matt sees these on the "Coming up" line of his report, soonest first.

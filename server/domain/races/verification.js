@@ -12,10 +12,12 @@
  *
  * Once a print made from a race year has been approved, the year is locked:
  * changing its date or weather needs a reason, is written to the Activity
- * Log, and flags every open render made with the old values.
+ * Log. Renders made with the old values are not flagged: by the time a
+ * value changes, those prints have almost always gone out.
  */
 import prisma from '../../db.js'
 import { recordAudit } from '../../../api/_lib/users.js'
+import { WeatherService } from '../../services/WeatherService.js'
 
 export const VERIFIED_SOURCES = ['config', 'manual', 'researched']
 
@@ -75,46 +77,51 @@ export async function setRaceDate({ raceId, date, source = 'manual', sourceUrl, 
   const updated = await prisma.race.update({ where: { id: race.id }, data })
 
   if (changed) {
-    const stale = await markRendersStale(race.id, `Race date changed from ${race.raceDate ? race.raceDate.toISOString().slice(0, 10) : 'none'} to ${d.toISOString().slice(0, 10)}`)
     await recordAudit({
       action: 'race.date',
-      summary: `${race.raceName} ${race.year}: date ${race.raceDate ? race.raceDate.toISOString().slice(0, 10) : 'none'} -> ${d.toISOString().slice(0, 10)} (${source}${reason ? `; ${reason}` : ''})${stale ? `; ${stale} render${stale === 1 ? '' : 's'} flagged` : ''}`,
-      detail: { raceId: race.id, sourceUrl: url, evidence, reason, staleRenders: stale, printed: Boolean(race.firstPrintedAt) },
+      summary: `${race.raceName} ${race.year}: date ${race.raceDate ? race.raceDate.toISOString().slice(0, 10) : 'none'} -> ${d.toISOString().slice(0, 10)} (${source}${reason ? `; ${reason}` : ''})`,
+      detail: { raceId: race.id, sourceUrl: url, evidence, reason, printed: Boolean(race.firstPrintedAt) },
       actor: actor || { id: null, email: String(by || 'system'), name: String(by || 'system') },
     })
   }
   return updated
 }
 
-/** Weather was recomputed. Same lock rule: after a print, a change needs a reason and flags renders. */
+/** Weather was recomputed. Same lock rule: after a print, a change needs a reason. */
 export async function noteWeatherChange({ raceId, before, after, by, reason, actor = null }) {
   const race = await prisma.race.findUnique({ where: { id: Number(raceId) } })
   if (!race) return 0
   const same = before?.weatherTemp === after?.weatherTemp && before?.weatherCondition === after?.weatherCondition
   if (same) return 0
   if (race.firstPrintedAt && !String(reason || '').trim()) throw new Error(`${race.raceName} ${race.year} has already been printed with ${before?.weatherCondition} ${before?.weatherTemp}. Changing the weather needs a reason.`)
-  const stale = await markRendersStale(race.id, `Weather changed from ${before?.weatherCondition || '-'} ${before?.weatherTemp || '-'} to ${after?.weatherCondition} ${after?.weatherTemp}`)
   await recordAudit({
     action: 'race.weather',
-    summary: `${race.raceName} ${race.year}: weather ${before?.weatherCondition || '-'} ${before?.weatherTemp || '-'} -> ${after?.weatherCondition} ${after?.weatherTemp}${reason ? ` (${reason})` : ''}${stale ? `; ${stale} render${stale === 1 ? '' : 's'} flagged` : ''}`,
-    detail: { raceId: race.id, before, after, reason, staleRenders: stale, printed: Boolean(race.firstPrintedAt) },
+    summary: `${race.raceName} ${race.year}: weather ${before?.weatherCondition || '-'} ${before?.weatherTemp || '-'} -> ${after?.weatherCondition} ${after?.weatherTemp}${reason ? ` (${reason})` : ''}`,
+    detail: { raceId: race.id, before, after, reason, printed: Boolean(race.firstPrintedAt) },
     actor: actor || { id: null, email: String(by || 'system'), name: String(by || 'system') },
   })
-  return stale
+  return 1
 }
 
-/** Every open render of an open order of this race year is now stale. Returns how many. */
-export async function markRendersStale(raceId, reason) {
-  const orders = await prisma.order.findMany({
-    where: { status: { not: 'completed' }, runnerResearch: { some: { raceId: Number(raceId) } } },
-    select: { id: true },
+/**
+ * Compute weather for a race year from its verified date and location: the
+ * average of 7am to 1pm local, with the hourly breakdown kept so anyone can
+ * see how the number was reached. Respects the print lock.
+ */
+export async function computeRaceWeather(raceId, { by = 'system', reason, actor = null } = {}) {
+  const race = await prisma.race.findUnique({ where: { id: Number(raceId) } })
+  if (!race) throw new Error('Race not found')
+  if (!dateVerified(race)) throw new Error('Verify the date before computing weather')
+  if (!race.location) throw new Error('The race needs a location before weather can be computed')
+  const result = await new WeatherService().calculateRaceWeather(race.raceDate.toISOString().slice(0, 10), race.location)
+  if (!result?.temp || !result?.condition) throw new Error(result?.error || 'Could not compute weather for that date and place')
+  const before = { weatherTemp: race.weatherTemp, weatherCondition: race.weatherCondition }
+  const after = { weatherTemp: result.temp, weatherCondition: result.condition }
+  if (before.weatherTemp) await noteWeatherChange({ raceId: race.id, before, after, by, reason, actor })
+  return prisma.race.update({
+    where: { id: race.id },
+    data: { ...after, weatherFetchedAt: new Date(), weatherDetails: JSON.stringify(result.breakdown) },
   })
-  if (!orders.length) return 0
-  const r = await prisma.renderJob.updateMany({
-    where: { orderId: { in: orders.map(o => o.id) }, status: 'done', staleReason: null },
-    data: { staleReason: String(reason).slice(0, 300) },
-  })
-  return r.count
 }
 
 /** A print made from this race year was approved: lock the year. */

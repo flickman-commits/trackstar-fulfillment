@@ -7,7 +7,7 @@ import prisma from '../../../../api/_lib/prisma.js'
 import { buildCatalogCoverage, coveredYears } from '../../../lib/scraperHealth.js'
 import { getSupportedRaces, getVerifiedRaceDates, getRaceConfigSummaries } from '../../../scrapers/index.js'
 import { NIGHTLY_REPORT_KEY } from '../../nightlySweep.js'
-import { verificationOverview, setRaceDate } from '../../../domain/races/verification.js'
+import { verificationOverview, setRaceDate, computeRaceWeather } from '../../../domain/races/verification.js'
 
 export const opsTools = [
   {
@@ -110,7 +110,7 @@ export const opsTools = [
   {
     name: 'verify_race_date',
     title: 'Verify a race date',
-    description: 'Record a race year\'s date with the evidence it was confirmed against: the official site, the results page, or a race-day report. Never a date worked out from a pattern. Changing a date that has already been printed needs a reason and flags the open renders made with the old date.',
+    description: 'Record a race year\'s date with the evidence it was confirmed against: the official site, the results page, or a race-day report. Never a date worked out from a pattern. Also sets the location if the race has none and computes the weather for the date. Changing a date that has already been printed needs a reason.',
     scope: 'write',
     readOnly: false,
     input: {
@@ -125,7 +125,10 @@ export const opsTools = [
       const by = principal?.user ? principal.user.id : (principal?.name || 'nightly')
       const race = await setRaceDate({ raceId, date, source: 'researched', sourceUrl, evidence, by, reason, actor: principal?.user || null })
       if (location && !race.location) await prisma.race.update({ where: { id: race.id }, data: { location: String(location).slice(0, 80) } })
-      return { summary: `Verified ${race.raceName} ${race.year} as ${date} (${sourceUrl})`, raceId: race.id, date, source: 'researched' }
+      let weather = null, weatherError = null
+      try { const w = await computeRaceWeather(race.id, { by, reason, actor: principal?.user || null }); weather = `${w.weatherCondition} ${w.weatherTemp}` }
+      catch (e) { weatherError = e.message }
+      return { summary: `Verified ${race.raceName} ${race.year} as ${date} (${sourceUrl})${weather ? `; weather ${weather}` : ''}`, raceId: race.id, date, source: 'researched', weather, weatherError }
     },
   },
 ]

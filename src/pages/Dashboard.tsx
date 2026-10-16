@@ -3,7 +3,7 @@ import CustomCounter from '@/components/CustomCounter'
 import RenderTemplatesPanel from '@/components/RenderTemplatesPanel'
 import { ToastDot } from '@/components/BrandToaster'
 import { toastCard, toastStyle } from '@/lib/ui'
-import { Hash, Sparkles, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound } from 'lucide-react'
+import { Hash, Sparkles, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronRight, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
@@ -13,7 +13,8 @@ import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import ApiKeysPanel from '@/components/ApiKeysPanel'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
-import DesignPanel from '@/components/DesignPanel'
+import { DesignCard, DesignReview, DesignDetails } from '@/components/DesignPanel'
+import { useDesign } from '@/lib/useDesign'
 import StatusLegend from '@/components/StatusLegend'
 import AssignmentPanel from '@/components/AssignmentPanel'
 import AssigneePicker, { Avatar, QueuePill, PersonFilter, type QueueMember } from '@/components/AssigneePicker'
@@ -952,17 +953,6 @@ export default function Dashboard() {
   const [raceFilter, setRaceFilter] = useState('')  // empty = show all races
   const [showCompleted, setShowCompleted] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  // The finished automated render for the open order, shown beside the details for a quick eye check.
-  const [designPreview, setDesignPreview] = useState<{ orderId: string; url: string } | null>(null)
-  const onDesignPreview = useCallback((url: string | null) => {
-    setDesignPreview(prev => {
-      const id = selectedOrderIdRef.current
-      if (!id || !url) return null
-      return prev?.orderId === id && prev.url === url ? prev : { orderId: id, url }
-    })
-  }, [])
-  const selectedOrderIdRef = useRef<string | null>(null)
-  useEffect(() => { selectedOrderIdRef.current = selectedOrder?.id ?? null; setDesignPreview(null) }, [selectedOrder?.id])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
@@ -2033,11 +2023,20 @@ export default function Dashboard() {
   }
 
   // Close modal and reset edit state
-  const closeModal = () => {
+  // The open order's automated print (standard orders only). See DesignPanel.
+  const design = useDesign(selectedOrder?.trackstarOrderType === 'standard' ? selectedOrder.id : null, can('orders.render'))
+  // Standard and custom orders open in place of the table rather than in a popup.
+  const inlineDetail = !!selectedOrder && (activeView === 'standard' || activeView === 'custom') && !showCompleted
+
+  // The inline order view scrolls on its own; each order starts at the top.
+  const detailScrollRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => { detailScrollRef.current?.scrollTo(0, 0) }, [selectedOrder?.id])
+
+  const closeModal = useCallback(() => {
     setSelectedOrder(null)
     setIsEditing(false)
     setEditValues({ runnerNameOverride: '', bibNumber: '', officialTime: '', officialPace: '' })
-  }
+  }, [])
 
   // Fetch orders on mount and when view changes
   // Only show full loading spinner on initial load; show subtle refresh indicator on view switch.
@@ -2702,7 +2701,10 @@ export default function Dashboard() {
       if (isEditing) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       // j = up (previous), k = down (next) — matches the on-screen chips.
-      if (e.key === 'j' || e.key === 'J') {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeModal()
+      } else if (e.key === 'j' || e.key === 'J') {
         e.preventDefault()
         navigateOrder('prev')
       } else if (e.key === 'k' || e.key === 'K') {
@@ -2712,7 +2714,7 @@ export default function Dashboard() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedOrder, isEditing, navigateOrder])
+  }, [selectedOrder, isEditing, navigateOrder, closeModal])
 
   // 1-4 switch views, in the order the toggle shows them. Only when no
   // order is open and nobody is typing.
@@ -3000,8 +3002,8 @@ Thank you!`
 
         </div>
 
-        {/* Orders to Personalize Section */}
-        {!isLoading && (
+        {/* Orders to Personalize Section. Hidden while an order is open in its place. */}
+        {!isLoading && !inlineDetail && (
         <section className="flex-1 flex flex-col min-h-0 pb-4">
           {/* Section Header */}
           <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
@@ -3672,7 +3674,7 @@ Thank you!`
         )}
 
         {/* Bottom bar: Completed Orders Toggle + Settings */}
-        {!isLoading && (
+        {!isLoading && !inlineDetail && (
           <div className="flex-shrink-0 py-3 md:py-4 mt-2 mb-4 md:mb-8 border-t border-border-gray/50">
             <div className="flex items-center justify-center gap-3">
               {completedOrders.length > 0 && (
@@ -4662,21 +4664,30 @@ Thank you!`
           </div>
         )}
 
+        {/* Standard and custom orders open in the table's place (inlineDetail);
+            partners, bulk and completed orders still open as a popup. */}
         {selectedOrder && (
           <div
-            className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
+            ref={detailScrollRef}
+            className={inlineDetail ? 'flex-1 min-h-0 overflow-y-auto pb-8' : 'fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50'}
             onClick={(e) => {
               // Close modal when clicking on backdrop (not modal content)
-              if (e.target === e.currentTarget && !isEditing) {
+              if (!inlineDetail && e.target === e.currentTarget && !isEditing) {
                 closeModal()
               }
             }}
           >
-            <div className={`bg-white rounded-none md:rounded-md max-w-[45rem] w-full max-h-[90vh] overflow-y-auto shadow-xl`} onClick={(e) => e.stopPropagation()}>
+            <div className={inlineDetail ? 'bg-white border border-border-gray rounded-md w-full' : 'bg-white rounded-none md:rounded-md max-w-[45rem] w-full max-h-[90vh] overflow-y-auto shadow-xl'} onClick={(e) => e.stopPropagation()}>
               <div className="p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
+                    {inlineDetail && (
+                      <button onClick={closeModal} title="Back to orders (Esc)" className="inline-flex items-center gap-1 -ml-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors">
+                        <ChevronLeft className="w-4 h-4" />
+                        <span className="text-sm">Orders</span>
+                      </button>
+                    )}
                     <span className="text-xl">
                       {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner')
                         ? (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).icon
@@ -4744,12 +4755,14 @@ Thank you!`
                         </span>
                       </>
                     )}
-                    <button
-                      onClick={closeModal}
-                      className="text-off-black/40 hover:text-off-black text-2xl leading-none transition-colors px-1"
-                    >
-                      ×
-                    </button>
+                    {!inlineDetail && (
+                      <button
+                        onClick={closeModal}
+                        className="text-off-black/40 hover:text-off-black text-2xl leading-none transition-colors px-1"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -6204,12 +6217,8 @@ Thank you!`
                         narrow screens. Same data, half the vertical space.
                         With a finished render, the print sits to their left
                         so name, bib, time and weather can be checked at a glance. */}
-                    <div className={`grid grid-cols-1 gap-3 ${designPreview?.orderId === selectedOrder.id ? 'md:grid-cols-[auto,1fr,1fr]' : 'md:grid-cols-2'}`}>
-                      {designPreview?.orderId === selectedOrder.id && (
-                        <a href={designPreview.url} target="_blank" rel="noopener noreferrer" className="block self-start rounded-md border border-border-gray bg-white overflow-hidden" title="Open the preview full size">
-                          <img src={designPreview.url} alt="Rendered print" className="h-[300px] w-auto block" />
-                        </a>
-                      )}
+                    <div className={`grid grid-cols-1 gap-3 ${design.visible ? 'md:grid-cols-[auto,1fr,1fr]' : 'md:grid-cols-2'}`}>
+                      {design.visible && <div className="hidden md:flex"><DesignCard d={design} /></div>}
                       <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
                           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Runner</span>
@@ -6592,18 +6601,15 @@ Thank you!`
 
                   {/* Filename. One value, so it gets one row rather than a
                       section header wrapping a card wrapping a label. */}
-                  <div className="hidden md:block">
+                  {/* Reviewing the automated print is the main action here, so it is big. */}
+                  <div className="hidden md:block"><DesignReview d={design} /></div>
+
+                  <div className="hidden md:block space-y-2">
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                       <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
                     </div>
+                    <DesignDetails d={design} />
                   </div>
-
-                  {/* Automated print. People with orders.render create and review; everyone sees an approved one. See DesignPanel. */}
-                  {selectedOrder.trackstarOrderType === 'standard' && (
-                    <div className="hidden md:block">
-                      <DesignPanel orderId={selectedOrder.id} onPreview={onDesignPreview} canManage={can('orders.render')} />
-                    </div>
-                  )}
 
                   {/* Comments. The composer is a lot of furniture for an order
                       with nothing to say, so it stays collapsed behind a link
@@ -6743,7 +6749,7 @@ Thank you!`
                         </button>
                       </>
                     )}
-                    {!isEditing && (
+                    {!isEditing && !inlineDetail && (
                       <button
                         onClick={closeModal}
                         className="px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors"
