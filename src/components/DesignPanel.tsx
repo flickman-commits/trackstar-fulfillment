@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2, Sparkles, Download, Check, X, RefreshCw, ArrowUpRight } from 'lucide-react'
 import type { Design } from '@/lib/useDesign'
 import { btnPrimary, btnGhost, inputBase } from '@/lib/ui'
@@ -79,16 +79,34 @@ export function DesignCard({ d }: { d: Design }) {
 }
 
 /** Approve and Reject, large: reviewing the print is the main thing this view is for. */
-export function DesignReview({ d, arteloOrderUrl = null }: { d: Design; arteloOrderUrl?: string | null }) {
+// Remembered per render in this browser, so Mark as complete is still there
+// after looking at another order. Storage can be unavailable; then it is per visit.
+const attachKey = (jobId: string) => `trackstar:attach-opened:${jobId}`
+function readOpened(jobId: string) { try { return localStorage.getItem(attachKey(jobId)) === '1' } catch { return false } }
+function writeOpened(jobId: string) { try { localStorage.setItem(attachKey(jobId), '1') } catch { /* per visit only */ } }
+
+export function DesignReview({ d, arteloOrderUrl = null, onComplete }: { d: Design; arteloOrderUrl?: string | null; onComplete?: () => void }) {
   const [rejecting, setRejecting] = useState(false)
   const [note, setNote] = useState('')
   const job = d.job
-  // Approved, and the order is still open: the next step is attaching the file in Artelo.
+  const [opened, setOpened] = useState(false)
+  useEffect(() => { setOpened(job ? readOpened(job.id) : false) }, [job?.id])  // eslint-disable-line react-hooks/exhaustive-deps
+  // Approved, and the order is still open: attach the file in Artelo. Mark as
+  // complete appears beside it only once Attach has been clicked, and Attach
+  // stays, because a click is not proof the attaching got done.
   if (d.visible && job?.status === 'done' && job.review === 'approved' && arteloOrderUrl) {
     return (
-      <a href={arteloOrderUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-4 rounded-md bg-[#4600D6] text-white text-base font-semibold hover:opacity-90 transition-opacity">
-        <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> Attach in Artelo <ArrowUpRight className="w-4 h-4 opacity-70" />
-      </a>
+      <div className={`grid gap-3 ${opened && onComplete ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+        <a href={arteloOrderUrl} target="_blank" rel="noopener noreferrer" onClick={() => { writeOpened(job.id); setOpened(true) }}
+          className={`flex items-center justify-center gap-2 py-4 rounded-md text-base font-semibold transition-opacity ${opened ? 'bg-white border-2 border-[#4600D6]/30 text-[#4600D6] hover:bg-[#4600D6]/[0.04]' : 'bg-[#4600D6] text-white hover:opacity-90'}`}>
+          <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> Attach in Artelo <ArrowUpRight className="w-4 h-4 opacity-70" />
+        </a>
+        {opened && onComplete && (
+          <button onClick={onComplete} className="inline-flex items-center justify-center gap-2 py-4 rounded-md bg-green-600 text-white text-base font-semibold hover:bg-green-700 transition-colors">
+            <Check className="w-5 h-5" /> Mark as complete
+          </button>
+        )}
+      </div>
     )
   }
   if (!d.visible || !d.canManage || job?.status !== 'done' || job.review !== 'pending') return null

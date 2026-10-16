@@ -5307,7 +5307,7 @@ Thank you!`
                       Once approved, the same spot sends you to Artelo to attach the file. */}
                   <div className="space-y-2">
                     <DesignDetails d={design} />
-                    <DesignReview d={design} arteloOrderUrl={selectedOrder.status !== 'completed' ? selectedOrder.arteloUrl : null} />
+                    <DesignReview d={design} arteloOrderUrl={selectedOrder.status !== 'completed' ? selectedOrder.arteloUrl : null} onComplete={() => markAsCompleted(selectedOrder.orderNumber)} />
                   </div>
 
                   <div>
@@ -5325,7 +5325,7 @@ Thank you!`
                     <div className="rounded-md border border-[#4600D6]/30 bg-[#4600D6]/[0.04] px-3 py-2.5 text-[13px] leading-snug text-off-black">
                       <span className="font-semibold text-[#4600D6] mr-1.5">Attach in Artelo.</span>
                       The approved print is in the Artelo library under Orders as <span className="font-mono">{generateFilename(selectedOrder)}</span>.
-                      {selectedOrder.arteloUrl && <> <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className="text-[#4600D6] underline underline-offset-2">Open the Artelo order ↗</a>, attach it to the item,</>} then mark the order done below.
+                      Attach it to the item in the Artelo order, then mark the order complete.
                     </div>
                   )}
 
@@ -5339,6 +5339,7 @@ Thank you!`
                         also shows, both share the row 50/50. */}
                     {selectedOrder.status !== 'completed' &&
                      selectedOrder.status !== 'flagged' &&
+                     !(selectedOrder.pipeline?.stage === 'attach' && selectedOrder.arteloUrl) &&
                      !isEditing && (
                       <button
                         onClick={() => markAsCompleted(selectedOrder.orderNumber)}
