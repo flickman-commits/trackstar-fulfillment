@@ -44,7 +44,10 @@ const RACES_DIR = process.env.RACES_DIR || ''
 const NAME = process.env.WORKER_NAME || os.hostname()
 const WORKER_ID = `${os.hostname()}-${NAME}`.replace(/[^A-Za-z0-9_.-]+/g, '-').slice(0, 80)
 const PRESET = process.env.PDF_PRESET || 'TRACKSTAR DEFAULT'
+// Asking for work is a server call each time (Vercel bills it). Fast while
+// there is work, backing off to a minute when the queue is empty.
 const POLL_MS = 5000
+const IDLE_POLL_MAX_MS = 60000
 const HEARTBEAT_MS = 30000
 const ILLUSTRATOR_TIMEOUT_MS = 180000
 const CHECK_TIMEOUT_MS = 600000
@@ -191,12 +194,13 @@ async function main() {
     try { list = await heartbeat(); break } catch (e) { log(`Cannot reach the tool yet (${e.message}); retrying`); await sleep(15000) }
   }
   log(`Renderable on this machine: ${list.length ? list.join(', ') : 'none'}`)
-  let lastBeat = Date.now()
+  let lastBeat = Date.now(), idle = POLL_MS
   for (;;) {
     try {
       if (Date.now() - lastBeat > HEARTBEAT_MS) { list = await heartbeat(); lastBeat = Date.now() }
       const { job } = await api('claim', {})
-      if (!job) { await sleep(POLL_MS); continue }
+      if (!job) { await sleep(idle); idle = Math.min(idle * 2, IDLE_POLL_MAX_MS); continue }
+      idle = POLL_MS
       log(`Job ${job.id}: ${job.spec.file} (${job.spec.size}${job.spec.photoPath ? ', photo' : ''}${job.spec.noTime ? ', no time' : ''})`)
       try {
         const { notes, output } = await render(job)
