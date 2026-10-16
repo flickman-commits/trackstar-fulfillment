@@ -5,14 +5,15 @@
  * verified or typed in Instant Lookup is recorded as the order's research
  * record right away, so it reads the same everywhere (customerResults.js).
  * Then the orders this run brought in are researched (autoResearch.js), so
- * every order is researched once, as it arrives, without anyone clicking.
+ * every order is researched once, as it arrives, without anyone clicking,
+ * and orders placed before their race are researched once it is two days past.
  */
 import { isCronRequest } from '../_lib/auth.js'
 import { processOrders } from '../../server/processOrders.js'
 import { runLockedImport } from '../../server/lib/importStamp.js'
 import { syncShopifyBulkOrders } from '../../server/domain/bulk/shopifyBulk.js'
 import { applyCustomerResults } from '../../server/domain/research/customerResults.js'
-import { autoResearchNew } from '../../server/domain/research/autoResearch.js'
+import { autoResearchNew, autoResearchAfterRace } from '../../server/domain/research/autoResearch.js'
 import { autoQueueRenders } from '../../server/domain/render/jobs.js'
 import { deliverPending } from '../../server/domain/render/deliver.js'
 import { refreshUnpaidPhotoOrders } from '../../server/domain/orders/photoRefresh.js'
@@ -27,6 +28,9 @@ export default async function handler(req, res) {
     if (applied?.found) console.log(`[orders.auto-import] customer results: ${applied.applied} recorded, ${applied.failed} failed`)
     const researched = await autoResearchNew({ since: started }).catch(err => { console.error('[orders.auto-import] auto research failed:', err.message); return null })
     if (researched?.researched || researched?.failed) console.log(`[orders.auto-import] researched ${researched.researched} (${researched.found} found), ${researched.failed} errors: ${researched.orders.join(', ')}`)
+    // Orders that came in before their race, now that results should be posted.
+    const caughtUp = await autoResearchAfterRace({ limit: 10 }).catch(err => { console.error('[orders.auto-import] post-race research failed:', err.message); return null })
+    if (caughtUp?.researched || caughtUp?.failed) console.log(`[orders.auto-import] post-race research ${caughtUp.researched} (${caughtUp.found} found), ${caughtUp.failed} errors: ${caughtUp.orders.join(', ')}`)
     // Prints waiting on a photo payment: re-read those orders from Shopify so a payment shows.
     const photos = await refreshUnpaidPhotoOrders().catch(err => { console.error('[orders.auto-import] photo refresh failed:', err.message); return null })
     if (photos?.updated) console.log(`[orders.auto-import] photo payments refreshed: ${photos.updated} of ${photos.checked} checked`)
