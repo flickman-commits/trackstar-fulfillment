@@ -14,12 +14,29 @@ import { unpaidPhotoRows } from '../orders/photoPayment.js'
 
 export const SIZES = ['8x10', '12x18', '16x24']
 
+/**
+ * Which design a print uses. The World Majors edition is a different design
+ * sold as its own product ("Personalized Chicago World Major Race Poster"),
+ * rendered from its own template, so it is its own template key:
+ * "Chicago Marathon / World Majors". Everything else is the race's standard print.
+ */
+export function editionOf(order) {
+  const items = Array.isArray(order.shopifyOrderData?.line_items) ? order.shopifyOrderData.line_items : []
+  const li = items[order.lineItemIndex] || null
+  const title = String(li?.title || li?.name || '')
+  return /world\s*major/i.test(title) ? 'World Majors' : null
+}
+
+export function templateKey(raceName, edition) {
+  return edition ? `${raceName} / ${edition}` : raceName
+}
+
 /** The order fields buildSpec reads. Use this select so callers cannot forget one. */
 export const SPEC_SELECT = {
   id: true, orderNumber: true, parentOrderNumber: true, lineItemIndex: true, trackstarOrderType: true, status: true,
   raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true,
   runnerName: true, runnerNameOverride: true, productSize: true, hadNoTime: true,
-  photoPath: true, photoAddedManually: true, shopifyOrderData: true,
+  photoPath: true, photoAddedManually: true, shopifyOrderData: true, lineItemIndex: true,
   runnerResearch: { orderBy: { id: 'desc' }, select: { researchStatus: true, bibNumber: true, officialTime: true, officialPace: true, eventType: true, race: { select: { raceDate: true, weatherCondition: true, weatherTemp: true } } } },
 }
 
@@ -39,7 +56,9 @@ export function buildSpec(order, templates = [], raceRow = null) {
 
   if (order.trackstarOrderType !== 'standard') reasons.push('Only standard race prints are rendered')
   if (!SIZES.includes(order.productSize)) reasons.push(`No artboard for size "${order.productSize}"`)
-  if (!templates.includes(raceName)) reasons.push(`No prepared template for ${raceName}`)
+  const edition = editionOf(order)
+  const template = templateKey(raceName, edition)
+  if (!templates.includes(template)) reasons.push(`No prepared template for ${template}`)
   if (!name) reasons.push('No runner name')
 
   const research = order.runnerResearch?.find(r => r.researchStatus === 'found') || order.runnerResearch?.[0]
@@ -72,6 +91,8 @@ export function buildSpec(order, templates = [], raceRow = null) {
       orderNumber: order.orderNumber,
       displayNumber: displayNumber(order),
       race: raceName,
+      edition,
+      template,
       raceYear,
       size: order.productSize,
       name,
@@ -84,7 +105,7 @@ export function buildSpec(order, templates = [], raceRow = null) {
       temp,
       photoPath: order.photoPath || null,
       // The filename convention the shop uses: 4551_Chicago_Bogard
-      file: `${displayNumber(order)}${order.lineItemIndex ? `-${order.lineItemIndex + 1}` : ''}_${shortRace(raceName)}_${lastName(name)}`,
+      file: `${displayNumber(order)}${order.lineItemIndex ? `-${order.lineItemIndex + 1}` : ''}_${shortRace(raceName)}${edition ? '_WM' : ''}_${lastName(name)}`,
     },
   }
 }

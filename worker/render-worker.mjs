@@ -109,8 +109,8 @@ async function upload(url, file, contentType) {
 
 async function render(job) {
   const { spec } = job
-  const tpl = templateFor(spec.race)
-  if (!tpl) throw new Error(`No template for ${spec.race}`)
+  const tpl = templateFor(spec.template || spec.race)
+  if (!tpl) throw new Error(`No template for ${spec.template || spec.race}`)
   const src = path.join(RACES_DIR, tpl.file)
   const dir = path.join(WORK, job.id)
   fs.rmSync(dir, { recursive: true, force: true })

@@ -85,7 +85,7 @@ export async function claimNext(workerId) {
   const templates = Array.isArray(worker?.templates) ? worker.templates.map(String) : []
   const candidates = await prisma.renderJob.findMany({ where: { status: 'queued' }, orderBy: { createdAt: 'asc' }, take: 20 })
   for (const job of candidates) {
-    if (!templates.includes(String(job.spec?.race))) continue
+    if (!templates.includes(String(job.spec?.template || job.spec?.race))) continue
     const claimed = await prisma.renderJob.updateMany({ where: { id: job.id, status: 'queued' }, data: { status: 'rendering', workerId: String(workerId), claimedAt: new Date() } })
     if (claimed.count === 1) return prisma.renderJob.findUnique({ where: { id: job.id } })
   }
@@ -169,7 +169,7 @@ export async function autoQueueRenders({ limit = 25 } = {}) {
     where: {
       trackstarOrderType: 'standard',
       status: { notIn: ['completed', 'flagged'] },
-      raceName: { in: templates },
+      raceName: { in: [...new Set(templates.map(t => t.split(' / ')[0]))] },
       renderJobs: { none: {} },
       createdAt: { gte: from },
     },

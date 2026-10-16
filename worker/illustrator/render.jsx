@@ -37,6 +37,8 @@ function kindOf(contents) {
   if (/^\d{1,2}:\d{2}:\d{2}$/.test(s)) return 'time';
   if (/\d{1,2}:\d{2}\s*\/\s*mi/i.test(s)) return 'pace';
   if (/^\d{1,2}\.\d{2}\.\d{2}$/.test(s)) return 'date';
+  if (/^(19|20)\d{2}$/.test(s)) return 'year';
+  if (/\d\s*\u00B0\s*[NSEW]\b/i.test(s)) return null;   // coordinates on the artwork, not weather
   if (/\u00B0/.test(s)) return 'weather';
   if (/^\d{1,6}$/.test(s) || /\bBIB\b/i.test(s)) return 'bib';
   if (/^[A-Za-z][A-Za-z .'\-]*$/.test(s) && s.length <= 60) return 'name';
@@ -99,8 +101,10 @@ try {
       frames[kind] = tf;
     }
   }
+  // Every design has a name, a bib and a time. Pace, date, weather and year
+  // depend on the design (World Majors has the year and none of the others).
   var missing = [];
-  var need = ['name', 'bib', 'time', 'pace', 'date', 'weather'];
+  var need = ['name', 'bib', 'time'];
   for (var n = 0; n < need.length; n++) if (!frames[need[n]]) missing.push(need[n]);
   if (missing.length) throw new Error('Could not find the ' + missing.join(', ') + ' frame' + (missing.length > 1 ? 's' : '') + ' on the ' + spec.size + ' artboard');
   if (dupes.length) throw new Error('More than one ' + dupes.join(', ') + ' frame on the ' + spec.size + ' artboard');
@@ -146,7 +150,7 @@ try {
       }
     }
   } catch (e) {}
-  if (margin === null) margin = frames.weather.geometricBounds[0];
+  if (margin === null) margin = (frames.weather || frames.date || frames.bib).geometricBounds[0];
 
   stage = 'name';
   // Name: widen the box leftward to the margin first, so a long name is not clipped.
@@ -168,22 +172,27 @@ try {
 
   stage = 'fields';
   frames.bib.contents = String(spec.bib);
-  frames.date.contents = spec.date;
+  if (frames.date) frames.date.contents = spec.date;
+  if (frames.year) frames.year.contents = String(spec.raceYear);
 
   // Weather keeps the frame's own break between condition and temperature ("Sunny" / "63°",
   // or "Cloudy " / "45°" where the designer left a space before the break).
-  var w = String(frames.weather.contents), wb = w.indexOf(BREAK);
-  var wSep = wb >= 0 ? w.substring(0, wb).replace(/^\S.*?(\s*)$/, '$1') + BREAK : ' ';
-  frames.weather.contents = spec.condition + wSep + String(spec.temp).replace(/F$/, '');
+  if (frames.weather) {
+    var w = String(frames.weather.contents), wb = w.indexOf(BREAK);
+    var wSep = wb >= 0 ? w.substring(0, wb).replace(/^\S.*?(\s*)$/, '$1') + BREAK : ' ';
+    frames.weather.contents = spec.condition + wSep + String(spec.temp).replace(/F$/, '');
+  }
 
   if (spec.noTime) {
-    frames.time.hidden = true; frames.pace.hidden = true; notes.push('no time');
+    frames.time.hidden = true; if (frames.pace) frames.pace.hidden = true; notes.push('no time');
   } else {
     frames.time.contents = spec.time;
-    // Pace keeps whatever follows the number in this template: " / mi" on one line or a break then "/ mi".
-    var pc = String(frames.pace.contents), tail = pc.replace(/^\s*\d{1,2}:\d{2}/, '');
-    if (!/\/\s*mi/i.test(tail)) tail = ' / mi';
-    frames.pace.contents = spec.pace + tail;
+    if (frames.pace) {
+      // Pace keeps whatever follows the number in this template: " / mi" on one line or a break then "/ mi".
+      var pc = String(frames.pace.contents), tail = pc.replace(/^\s*\d{1,2}:\d{2}/, '');
+      if (!/\/\s*mi/i.test(tail)) tail = ' / mi';
+      frames.pace.contents = spec.pace + tail;
+    }
   }
 
   stage = 'photo';
@@ -192,7 +201,7 @@ try {
   // Photo: a clipped group (square clipping path over a placeholder) per size on PHOTO LAYER.
   // The customer cropped it 1:1, so it goes in at the clipping path's exact bounds.
   if (spec.photo) {
-    if (!photoLayer) throw new Error('Template has no PHOTO LAYER');
+    if (!photoLayer) throw new Error('This design has no photo window, but the order has a photo');
     stage = 'photo 1'; photoLayer.visible = true; photoLayer.locked = false;
     stage = 'photo 2'; var group = null;
     for (var g = 0; g < photoLayer.groupItems.length; g++) if (inside(photoLayer.groupItems[g].geometricBounds, ab)) group = photoLayer.groupItems[g];
