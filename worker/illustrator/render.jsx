@@ -43,12 +43,13 @@ function kindOf(contents) {
   return null;
 }
 
-var doc = null;
+var doc = null, stage = 'start';
 try {
   var job = readJson(new File(HERE + '/current.json'));
   var spec = job.spec;
   doc = app.open(new File(job.template));
 
+  stage = 'artboard';
   // The artboard: right size, and the colorway word if the file has more than one.
   var abIndex = -1;
   for (var a = 0; a < doc.artboards.length; a++) {
@@ -60,6 +61,7 @@ try {
   if (abIndex < 0) throw new Error('No artboard for size ' + spec.size + (job.artboard ? ' (' + job.artboard + ')' : ''));
   var ab = doc.artboards[abIndex].artboardRect;
 
+  stage = 'frames';
   // Every text frame on this artboard that looks like a personalization field, whatever layer it is on.
   // The race title and START/FINISH labels never match: titles contain the race name on locked assets
   // in a size far larger than any field, and labels are all caps; both are excluded by size and case.
@@ -106,18 +108,31 @@ try {
   var notes = [];
   if (hiddenLeftovers) notes.push(hiddenLeftovers + ' leftover text frame' + (hiddenLeftovers > 1 ? 's' : '') + ' hidden');
 
-  // Leftover images from a past order, anywhere but the locked artwork.
-  var photoLayer = null; try { photoLayer = doc.layers.getByName('PHOTO LAYER'); } catch (e) {}
+  stage = 'leftovers';
+  // Leftover images from a past order: a customer photo left inside the photo
+  // window, or anywhere else outside the locked artwork. Document-wide, so an
+  // image nested in a clipping group is found too; a leftover inside the
+  // window would sit on top of the new photo and print another customer.
   var removed = 0;
-  for (var l2 = 0; l2 < doc.layers.length; l2++) {
-    var L2 = doc.layers[l2];
-    if (L2.name == 'LOCKED ASSETS' || L2.name == 'GUIDES') continue;
-    var wasLocked2 = L2.locked; if (wasLocked2) L2.locked = false;
-    for (var p = L2.placedItems.length - 1; p >= 0; p--) { L2.placedItems[p].remove(); removed++; }
-    for (var r = L2.rasterItems.length - 1; r >= 0; r--) { L2.rasterItems[r].remove(); removed++; }
+  function layerNameOf(item) { var p = item; while (p && p.typename != 'Layer') p = p.parent; while (p && p.parent && p.parent.typename == 'Layer') p = p.parent; return p ? p.name : ''; }
+  function strip(coll) {
+    for (var i = coll.length - 1; i >= 0; i--) {
+      var it = coll[i], ln = layerNameOf(it);
+      if (ln == 'LOCKED ASSETS' || ln == 'GUIDES') continue;
+      // A photo left in the photo window is replaced below, after the new one is
+      // in: taking it out first leaves a one-item clipping group that Illustrator
+      // releases, and the window with it.
+      if (ln == 'PHOTO LAYER') continue;
+      try { var L3 = doc.layers.getByName(ln); if (L3.locked) L3.locked = false; } catch (e) {}
+      try { if (it.parent && it.parent.typename == 'GroupItem' && it.parent.locked) it.parent.locked = false; } catch (e) {}
+      try { it.remove(); removed++; } catch (e) {}
+    }
   }
+  strip(doc.placedItems);
+  strip(doc.rasterItems);
   if (removed) notes.push(removed + ' leftover image' + (removed > 1 ? 's' : '') + ' removed');
 
+  stage = 'margin';
   // The left margin is the designer's own guide: the leftmost vertical guide on this artboard.
   var margin = null;
   try {
@@ -133,6 +148,7 @@ try {
   } catch (e) {}
   if (margin === null) margin = frames.weather.geometricBounds[0];
 
+  stage = 'name';
   // Name: widen the box leftward to the margin first, so a long name is not clipped.
   var nameFrame = frames.name;
   if (nameFrame.kind == TextType.AREATEXT) {
@@ -150,6 +166,7 @@ try {
     if (tries) notes.push('name shrunk ' + tries + ' step' + (tries == 1 ? '' : 's'));
   }
 
+  stage = 'fields';
   frames.bib.contents = String(spec.bib);
   frames.date.contents = spec.date;
 
@@ -169,30 +186,46 @@ try {
     frames.pace.contents = spec.pace + tail;
   }
 
+  stage = 'photo';
+  // Fresh handle: layer references taken before items were removed can go stale.
+  photoLayer = null; try { photoLayer = doc.layers.getByName('PHOTO LAYER'); } catch (e) {}
   // Photo: a clipped group (square clipping path over a placeholder) per size on PHOTO LAYER.
   // The customer cropped it 1:1, so it goes in at the clipping path's exact bounds.
   if (spec.photo) {
     if (!photoLayer) throw new Error('Template has no PHOTO LAYER');
-    photoLayer.visible = true; photoLayer.locked = false;
-    var group = null;
+    stage = 'photo 1'; photoLayer.visible = true; photoLayer.locked = false;
+    stage = 'photo 2'; var group = null;
     for (var g = 0; g < photoLayer.groupItems.length; g++) if (inside(photoLayer.groupItems[g].geometricBounds, ab)) group = photoLayer.groupItems[g];
     if (!group) throw new Error('No photo group on the ' + spec.size + ' artboard');
-    var clip = null;
+    stage = 'photo 3'; var clip = null;
     for (var q = 0; q < group.pathItems.length; q++) { if (group.pathItems[q].clipping) clip = group.pathItems[q]; else group.pathItems[q].hidden = true; }
     if (!clip) throw new Error('No clipping path in the photo group');
-    var cb = clip.geometricBounds;
-    doc.activeLayer = photoLayer; group.locked = false; group.hidden = false;
-    var img = group.placedItems.add();
-    img.file = new File(spec.photo);
-    img.width = cb[2] - cb[0]; img.height = cb[1] - cb[3];
-    img.position = [cb[0], cb[1]];
-    img.move(group, ElementPlacement.PLACEATEND);
-    img.embed();
-    notes.push('photo placed');
+    stage = 'photo 4'; var cb = clip.geometricBounds;
+    stage = 'photo 5'; doc.activeLayer = photoLayer; group.locked = false; group.hidden = false;
+    stage = 'photo 6'; var img = group.placedItems.add();
+    stage = 'photo 7'; img.file = new File(spec.photo);
+    stage = 'photo 8'; img.width = cb[2] - cb[0]; img.height = cb[1] - cb[3];
+    stage = 'photo 9'; img.position = [cb[0], cb[1]];
+    stage = 'photo 10'; img.move(group, ElementPlacement.PLACEATEND);
+    // Anything else in the window is a past order's photo: out before the new one is embedded.
+    // (Embedding turns the placed item into a raster and retires the old reference.)
+    stage = 'photo 11'; var old = 0;
+    // Everything else in the window is a past order's photo. The new item is the
+    // one linked to our file; a placed item with no file, or another file, goes.
+    for (var ri = group.rasterItems.length - 1; ri >= 0; ri--) { group.rasterItems[ri].remove(); old++; }
+    for (var pi2 = group.placedItems.length - 1; pi2 >= 0; pi2--) {
+      var ours = false;
+      try { ours = group.placedItems[pi2].file.fsName == img.file.fsName; } catch (e) { ours = false; }
+      if (!ours) { group.placedItems[pi2].remove(); old++; }
+    }
+    if (old) notes.push(old + ' old photo' + (old > 1 ? 's' : '') + ' removed');
+    stage = 'photo 12'; img.embed();
+    stage = 'photo 13'; notes.push('photo placed');
   } else if (photoLayer) {
-    photoLayer.visible = false;
+    stage = 'photo 14'; photoLayer.visible = false;
   }
 
+  stage = 'export';
   doc.artboards.setActiveArtboardIndex(abIndex);
   var pdf = new PDFSaveOptions();
   pdf.pDFPreset = job.preset || 'TRACKSTAR DEFAULT';
@@ -211,5 +244,5 @@ try {
   writeResult({ ok: true, notes: notes.join('; ') });
 } catch (err) {
   try { if (doc) doc.close(SaveOptions.DONOTSAVECHANGES); } catch (e2) {}
-  writeResult({ ok: false, error: String(err.message || err) });
+  writeResult({ ok: false, error: '[' + stage + '] ' + String(err.message || err) });
 }
