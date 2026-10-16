@@ -2025,8 +2025,8 @@ export default function Dashboard() {
   // Close modal and reset edit state
   // The open order's automated print (standard orders only). See DesignPanel.
   const design = useDesign(selectedOrder?.trackstarOrderType === 'standard' ? selectedOrder.id : null, can('orders.render'))
-  // Standard and custom orders open in place of the table rather than in a popup.
-  const inlineDetail = !!selectedOrder && (activeView === 'standard' || activeView === 'custom') && !showCompleted
+  // Orders open in place of the table rather than in a popup.
+  const inlineDetail = !!selectedOrder && !showCompleted
 
   // The inline order view scrolls on its own; each order starts at the top.
   const detailScrollRef = useRef<HTMLDivElement | null>(null)
@@ -4664,8 +4664,8 @@ Thank you!`
           </div>
         )}
 
-        {/* Standard and custom orders open in the table's place (inlineDetail);
-            partners, bulk and completed orders still open as a popup. */}
+        {/* Orders open in the table's place (inlineDetail); one opened from
+            the completed list still opens as a popup over it. */}
         {selectedOrder && (
           <div
             ref={detailScrollRef}
@@ -6602,13 +6602,15 @@ Thank you!`
                   {/* Filename. One value, so it gets one row rather than a
                       section header wrapping a card wrapping a label. */}
                   {/* Reviewing the automated print is the main action here, so it is big. */}
-                  <div className="hidden md:block"><DesignReview d={design} /></div>
-
                   <div className="hidden md:block space-y-2">
+                    <DesignDetails d={design} />
+                    <DesignReview d={design} />
+                  </div>
+
+                  <div className="hidden md:block">
                     <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                       <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
                     </div>
-                    <DesignDetails d={design} />
                   </div>
 
                   {/* Comments. The composer is a lot of furniture for an order
