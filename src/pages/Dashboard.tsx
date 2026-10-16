@@ -1028,10 +1028,9 @@ export default function Dashboard() {
   // Race database state
   // Tab switcher: standard vs custom order view
   const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner' | 'bulk'>('standard')
-  // Standard orders are "done" when the file is uploaded to Artelo, so that is
-  // what they say. The stored status is still 'completed'.
-  const doneLabel = activeView === 'standard' ? 'Uploaded to Artelo' : 'Completed'
-  const doneHeading = activeView === 'standard' ? 'Uploaded to Artelo' : 'Completed Orders'
+  // Uploading to Artelo sends the print to production, so done is just Completed.
+  const doneLabel = 'Completed'
+  const doneHeading = 'Completed Orders'
   const [bulkCount, setBulkCount] = useState<number | null>(null)
   // "New Partner" modal state
   const [showNewRacePartner, setShowNewRacePartner] = useState(false)
@@ -1369,7 +1368,7 @@ export default function Dashboard() {
         throw new Error(body.message || 'Failed to mark as completed')
       }
 
-      setToast({ message: activeView === 'standard' ? 'Marked as uploaded to Artelo!' : 'Order marked as completed!', type: 'success' })
+      setToast({ message: 'Order marked as completed!', type: 'success' })
       // Optimiztically reflect the new status without closing the modal
       setSelectedOrder(prev => prev && prev.orderNumber === orderNumber ? { ...prev, status: 'completed' } : prev)
       setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, status: 'completed' } : o))
@@ -3059,7 +3058,7 @@ Thank you!`
                                   </div>
                                 </td>
                                 <td className="px-3 py-4 text-center">
-                                  <HoverTip text={doneLabel} align="center"><span className="text-lg cursor-help">✅</span></HoverTip>
+                                  <span className="inline-flex items-center gap-1.5 text-xs text-off-black/60 whitespace-nowrap"><span className="w-2 h-2 rounded-full bg-green-500" />{doneLabel}</span>
                                 </td>
                                 <td className="px-3 py-4">
                                   <div className="text-sm text-off-black">{order.effectiveRunnerName || order.runnerName || 'Unknown Runner'}</div>
@@ -3334,7 +3333,7 @@ Thank you!`
           >
             <div className="bg-white rounded-none md:rounded-lg max-w-4xl w-full h-[90vh] md:h-auto md:max-h-[80vh] overflow-hidden shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-4 border-b border-border-gray">
-                <h2 className="text-base md:text-lg font-semibold text-off-black">{activeView === 'standard' ? 'Uploaded to Artelo' : 'Completed Orders'}</h2>
+                <h2 className="text-base md:text-lg font-semibold text-off-black">Completed Orders</h2>
                 <button
                   onClick={() => setShowCompleted(false)}
                   className="text-off-black/40 hover:text-off-black text-2xl leading-none transition-colors"
@@ -3437,7 +3436,7 @@ Thank you!`
                           <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                         </td>
                         <td className="px-3 py-4 text-center">
-                          <HoverTip text={doneLabel} align="center"><span className="text-lg cursor-help">✅</span></HoverTip>
+                          <span className="inline-flex items-center gap-1.5 text-xs text-off-black/60 whitespace-nowrap"><span className="w-2 h-2 rounded-full bg-green-500" />{doneLabel}</span>
                         </td>
                         <td className="px-3 py-4 text-sm text-off-black">
                           {order.runnerName}
@@ -5337,7 +5336,7 @@ Thank you!`
                         onClick={() => markAsCompleted(selectedOrder.orderNumber)}
                         className={`flex-1 px-5 py-3 rounded-md hover:opacity-90 transition-opacity font-medium text-white ${selectedOrder.pipeline?.stage === 'attach' ? 'bg-[#4600D6]' : 'bg-dark-fill'}`}
                       >
-                        {selectedOrder.pipeline?.stage === 'attach' ? 'Attached in Artelo, mark done' : selectedOrder.trackstarOrderType === 'standard' ? 'Mark as Uploaded to Artelo' : 'Mark as Completed'}
+                        {selectedOrder.pipeline?.stage === 'attach' ? 'Attached in Artelo, mark done' : 'Mark as Completed'}
                       </button>
                     )}
                     {/* Re-open — only for already-completed orders. Sends the

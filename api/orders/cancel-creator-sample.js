@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     })
     if (!order) return res.status(404).json({ error: 'Order not found' })
     if (order.source !== 'creator_sample') return res.status(400).json({ error: 'Only creator samples can be cancelled here' })
-    if (order.status === 'completed') return res.status(409).json({ error: 'This sample was already uploaded to Artelo. Cancel it there instead.' })
+    if (order.status === 'completed') return res.status(409).json({ error: 'This sample is already completed and sent to Artelo. Cancel it there instead.' })
 
     const creator = await prisma.creator.findUnique({ where: { sampleOrderId: order.id }, select: { id: true, name: true } })
     // A creator with an earlier sample keeps it as their current one; with
