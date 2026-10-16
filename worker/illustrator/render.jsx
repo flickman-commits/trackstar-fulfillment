@@ -137,8 +137,8 @@ try {
   if (removed) notes.push(removed + ' leftover image' + (removed > 1 ? 's' : '') + ' removed');
 
   stage = 'margin';
-  // The left margin is the designer's own guide: the leftmost vertical guide on this artboard.
-  var margin = null;
+  // The designer's margins are the GUIDES layer: the leftmost and rightmost vertical guides on this artboard.
+  var marginL = null, marginR = null;
   try {
     var guides = doc.layers.getByName('GUIDES');
     for (var gi = 0; gi < guides.groupItems.length; gi++) {
@@ -146,18 +146,31 @@ try {
       if (!inside(grp.geometricBounds, ab)) continue;
       for (var pi = 0; pi < grp.pathItems.length; pi++) {
         var pb = grp.pathItems[pi].geometricBounds;
-        if (Math.abs(pb[0] - pb[2]) < 1 && (margin === null || pb[0] < margin)) margin = pb[0];
+        if (Math.abs(pb[0] - pb[2]) < 1) {
+          if (marginL === null || pb[0] < marginL) marginL = pb[0];
+          if (marginR === null || pb[0] > marginR) marginR = pb[0];
+        }
       }
     }
   } catch (e) {}
-  if (margin === null) margin = (frames.weather || frames.date || frames.bib).geometricBounds[0];
 
   stage = 'name';
-  // Name: widen the box leftward to the margin first, so a long name is not clipped.
+  // Name: a long name must not be clipped, and the name must not move. The box
+  // grows away from its anchored edge, which depends on how the text is aligned:
+  // right-aligned text (the standard prints) grows leftward to the left margin,
+  // left-aligned text (World Majors) grows rightward to the right margin,
+  // centered text is not widened at all. If it still does not fit, the size
+  // steps down. Afterwards the anchored edge is checked and a moved name fails
+  // the render rather than printing in the wrong place.
   var nameFrame = frames.name;
+  var before = nameFrame.geometricBounds;
+  var just = null; try { just = nameFrame.textRange.paragraphAttributes.justification; } catch (e) {}
+  var anchorRight = (just == Justification.RIGHT || just == Justification.FULLJUSTIFYLASTLINERIGHT);
+  var anchorLeft = (just == Justification.LEFT || just == Justification.FULLJUSTIFYLASTLINELEFT || just == Justification.FULLJUSTIFY);
   if (nameFrame.kind == TextType.AREATEXT) {
-    var tp = nameFrame.textPath, grow = tp.left - margin;
-    if (grow > 0) { tp.width = tp.width + grow; tp.left = margin; }
+    var tp = nameFrame.textPath;
+    if (anchorRight && marginL !== null && tp.left > marginL) { tp.width = tp.width + (tp.left - marginL); tp.left = marginL; }
+    else if (anchorLeft && marginR !== null && tp.left + tp.width < marginR) { tp.width = marginR - tp.left; }
   }
   nameFrame.contents = spec.name;
   if (nameFrame.kind == TextType.AREATEXT) {
@@ -168,6 +181,11 @@ try {
       nameFrame.textRange.characterAttributes.size = nameFrame.textRange.characterAttributes.size - orig * 0.05; tries++;
     }
     if (tries) notes.push('name shrunk ' + tries + ' step' + (tries == 1 ? '' : 's'));
+    var after = nameFrame.geometricBounds;
+    if (anchorRight && Math.abs(after[2] - before[2]) > 0.5) throw new Error('The name moved: its right edge shifted ' + Math.round(after[2] - before[2]) + 'pt');
+    if (anchorLeft && Math.abs(after[0] - before[0]) > 0.5) throw new Error('The name moved: its left edge shifted ' + Math.round(after[0] - before[0]) + 'pt');
+    if (!anchorLeft && !anchorRight && Math.abs((after[0] + after[2]) - (before[0] + before[2])) > 1) throw new Error('The name moved: its center shifted');
+    if (Math.abs(after[1] - before[1]) > 0.5) throw new Error('The name moved vertically by ' + Math.round(after[1] - before[1]) + 'pt');
   }
 
   stage = 'fields';
