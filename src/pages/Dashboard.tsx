@@ -4430,7 +4430,7 @@ Thank you!`
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product Details</div>
+                          <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Order Details</div>
                         </div>
                         {/* Race leads as the headline, year rides beside it. */}
                         <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 min-w-0">
