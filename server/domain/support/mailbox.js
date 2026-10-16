@@ -269,7 +269,7 @@ export function parseMessage(msg, mailbox) {
   collectParts(msg.payload, parts)
   const from = parseAddress(h.from)
   const labels = msg.labelIds || []
-  const direction = from.email === mailbox || labels.includes('SENT') ? 'out' : 'in'
+  const direction = isOurs(from.email, mailbox) || labels.includes('SENT') ? 'out' : 'in'
   const bodyText = (parts.text || htmlToText(parts.html)).replace(/\r/g, '').trim()
   return {
     gmailMessageId: msg.id,
@@ -290,6 +290,19 @@ export function parseMessage(msg, mailbox) {
   }
 }
 
+/**
+ * Whether an address is one of ours: the mailbox itself, or anyone on its
+ * domain. Matt writes to customers from matt@trackstar.art with fast@ in
+ * the thread, and those are our replies, not a customer called Matt.
+ */
+export function isOurs(email, mailbox = mailboxEmail()) {
+  const e = String(email || '').toLowerCase()
+  if (!e) return false
+  if (e === mailbox) return true
+  const domain = mailbox.split('@')[1]
+  return Boolean(domain) && e.endsWith(`@${domain}`)
+}
+
 /** A thread's subject without the Re: / Fwd: pile-up. */
 function cleanSubject(s) {
   return String(s || '').replace(/^\s*((re|fwd?|fw)\s*:\s*)+/i, '').trim()
@@ -298,7 +311,7 @@ function cleanSubject(s) {
 /** The other party on a message: the sender when inbound, the first recipient that is not us when outbound. */
 function counterpart(m, mailbox) {
   if (m.direction === 'in') return { email: m.fromEmail, name: m.fromName }
-  const to = m.toEmails.split(',').map(s => s.trim()).filter(e => e && e !== mailbox)
+  const to = m.toEmails.split(',').map(s => s.trim()).filter(e => e && !isOurs(e, mailbox))
   return { email: to[0] || '', name: '' }
 }
 
