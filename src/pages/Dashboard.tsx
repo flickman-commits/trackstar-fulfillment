@@ -2624,7 +2624,7 @@ Thank you!`
     <div className="h-[calc(100dvh-92px-env(safe-area-inset-bottom))] md:h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
       <div className="max-w-[1800px] mx-auto px-4 md:px-6 lg:px-8 w-full flex flex-col h-full">
         {/* Header - Compact bar on mobile, full greeting on desktop */}
-        <div className="pt-4 md:pt-5 pb-3 flex items-center justify-between gap-3 md:gap-6 flex-shrink-0">
+        <div className={`pt-4 md:pt-5 pb-3 items-center justify-between gap-3 md:gap-6 flex-shrink-0 ${inlineDetail ? 'hidden md:flex' : 'flex'}`}>
           {/* Left side: logo, greeting, and summary */}
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <div className="flex items-center gap-2.5">
@@ -2652,7 +2652,7 @@ Thank you!`
         {!isLoading && (
         <section className={inlineDetail ? 'flex-shrink-0 flex flex-col' : 'flex-1 flex flex-col min-h-0 pb-4'}>
           {/* Section Header */}
-          <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
+          <div className={`items-center justify-between mb-3 md:mb-4 flex-shrink-0 ${inlineDetail ? 'hidden md:flex' : 'flex'}`}>
             <div>
             <div className="flex items-center gap-3 md:gap-6">
               <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
@@ -3839,7 +3839,7 @@ Thank you!`
         {selectedOrder && (
           <div
             ref={detailScrollRef}
-            className={inlineDetail ? 'flex-1 min-h-0 overflow-y-auto pb-8' : 'fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50'}
+            className={inlineDetail ? 'flex-1 min-h-0 overflow-y-auto pb-36 md:pb-8' : 'fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50'}
             onClick={(e) => {
               // Close modal when clicking on backdrop (not modal content)
               if (!inlineDetail && e.target === e.currentTarget && !isEditing) {
@@ -3849,27 +3849,31 @@ Thank you!`
           >
             <div className={inlineDetail ? 'bg-white border border-border-gray rounded-md w-full' : 'bg-white rounded-none md:rounded-md max-w-[45rem] w-full max-h-[90vh] overflow-y-auto shadow-xl'} onClick={(e) => e.stopPropagation()}>
               <div className="p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
+                {/* Header. On a phone it stays pinned while the order scrolls under it. */}
+                <div className="sticky top-0 z-30 -mx-4 -mt-4 px-4 pt-3 pb-2.5 mb-4 bg-white/95 backdrop-blur border-b border-border-gray rounded-t-md md:static md:m-0 md:mb-6 md:p-0 md:bg-transparent md:backdrop-blur-none md:border-0 flex items-center justify-between">
+                  <div className="flex items-center gap-2 md:gap-3 min-w-0">
                     {inlineDetail && (
                       <button onClick={closeModal} title="Back to orders (Esc)" className="inline-flex items-center gap-1 -ml-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors">
-                        <ChevronLeft className="w-4 h-4" />
-                        <span className="text-sm">Orders</span>
+                        <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
+                        <span className="text-sm hidden md:inline">Orders</span>
                       </button>
                     )}
                     {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner')
                       ? <span className="text-xl">{(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).icon}</span>
                       : (() => { const d = getStatusDisplay(selectedOrder); return (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-border-gray bg-white text-xs text-off-black/70" title={selectedOrder.pipeline?.fix || d.label}>
+                          <span className="order-last md:order-none shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-border-gray bg-white text-[11px] md:text-xs text-off-black/70 whitespace-nowrap" title={selectedOrder.pipeline?.fix || d.label}>
                             <span className={`w-2 h-2 rounded-full ${d.dot || 'bg-off-black/25'}`} />{d.label}
                           </span>
                         ) })()}
-                    <h3 className="text-heading-md text-off-black whitespace-nowrap">
-                      {selectedOrder.trackstarOrderType === 'race_partner'
-                        ? (selectedOrder.partnerName || selectedOrder.raceName || 'Partner')
-                        : `Order ${selectedOrder.displayOrderNumber}`}
-                    </h3>
+                    <div className="min-w-0">
+                      <h3 className="text-lg md:text-heading-md text-off-black whitespace-nowrap leading-tight">
+                        {selectedOrder.trackstarOrderType === 'race_partner'
+                          ? (selectedOrder.partnerName || selectedOrder.raceName || 'Partner')
+                          : `Order ${selectedOrder.displayOrderNumber}`}
+                      </h3>
+                      {/* When it was ordered, pinned with the number on a phone. */}
+                      {selectedOrder.trackstarOrderType === 'standard' && (() => { const age = orderAge(selectedOrder); return <div className={`md:hidden text-[11px] leading-tight ${age.cls}`}>{age.label}</div> })()}
+                    </div>
                     {selectedOrder.trackstarOrderType === 'race_partner' && (
                       <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs font-medium rounded">
                         partner
@@ -3884,7 +3888,7 @@ Thank you!`
                       <HoverTip text="Has notes or comments"><MessageSquareText className="w-4 h-4 text-amber-500 cursor-help" /></HoverTip>
                     )}
                     {(selectedOrder.trackstarOrderType === 'standard' || selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner' || !selectedOrder.trackstarOrderType) && team.length > 0 && (
-                      <span className="ml-1">
+                      <span className="ml-1 hidden md:inline">
                         <AssigneePicker
                           team={team}
                           value={selectedOrder.assigneeId || null}
@@ -3897,7 +3901,7 @@ Thank you!`
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="hidden md:flex items-center gap-1">
                     {/* j/k navigation — only shown when the open order is in the
                         current visible queue (filteredOrders). Buttons reflect
                         the keyboard shortcuts so the affordance is discoverable. */}
@@ -4403,8 +4407,8 @@ Thank you!`
                       column, sized so the print can be checked against what the
                       customer entered. The sidebar holds the product, its links,
                       every tag, and the order's smaller actions. */}
-                  <div className="md:grid md:grid-cols-[minmax(0,1fr)_340px] md:gap-6 md:items-start">
-                  <aside className="md:col-start-2 md:row-start-1 md:sticky md:top-0 space-y-4 mb-4 md:mb-0">
+                  <div className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_340px] md:gap-6 md:items-start">
+                  <aside className="order-2 md:order-none md:col-start-2 md:row-start-1 md:sticky md:top-0 space-y-4 mt-6 md:mt-0">
                   {/* Product details. The thumbnail is keyed off the stable
                       Shopify product_id so Eli can tell near-identical designs
                       apart at a glance (Chicago World Majors vs Chicago Race).
@@ -4633,7 +4637,7 @@ Thank you!`
                   )}
                   </aside>
 
-                  <div className="md:col-start-1 md:row-start-1 min-w-0 flex flex-col gap-4">
+                  <div className="order-1 md:order-none md:col-start-1 md:row-start-1 min-w-0 flex flex-col gap-4">
                   {/* A comment on a standard order is somebody flagging
                       something about this print, usually a spelling the
                       results site got wrong. It used to sit under the fold
@@ -5274,9 +5278,33 @@ Thank you!`
                       {design.reserved && photoCard}
                       </div>
                       {/* The print sits to the right of the details it was made from. */}
-                      {design.reserved && <div className="flex"><DesignCard d={design} /></div>}
+                      {design.reserved && <div className="flex order-first md:order-none"><DesignCard d={design} /></div>}
                     </div>
                   </div>
+
+                  {/* Phone: the review buttons and previous/next order live in a bar
+                      above the bottom menu, under the thumb, at every scroll position. */}
+                  {inlineDetail && (
+                    <div className="md:hidden fixed inset-x-0 z-40 px-3" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 92px)' }}>
+                      <div className="flex items-stretch gap-2 rounded-xl border border-border-gray bg-white/95 backdrop-blur p-2 shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+                        <button onClick={() => navigateOrder('prev')} disabled={currentOrderIndex <= 0} aria-label="Previous order" className="shrink-0 w-11 rounded-md border border-border-gray text-off-black/60 disabled:opacity-30 inline-flex items-center justify-center">
+                          <ChevronUp className="w-5 h-5" />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          {(design.job?.status === 'done' && (design.job.review === 'pending' || design.job.review === 'approved')) ? (
+                            <DesignReview compact d={design} arteloOrderUrl={selectedOrder.status !== 'completed' ? selectedOrder.arteloUrl : null} onComplete={() => markAsCompleted(selectedOrder.orderNumber)} />
+                          ) : (
+                            <div className="h-full flex items-center justify-center text-[13px] text-off-black/55 text-center px-1">
+                              {selectedOrder.pipeline?.reason || getStatusDisplay(selectedOrder).label}
+                            </div>
+                          )}
+                        </div>
+                        <button onClick={() => navigateOrder('next')} disabled={currentOrderIndex < 0 || currentOrderIndex >= navigableOrders.length - 1} aria-label="Next order" className="shrink-0 w-11 rounded-md border border-border-gray text-off-black/60 disabled:opacity-30 inline-flex items-center justify-center">
+                          <ChevronDownIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Weather calculator micro-modal */}
                   {showWeatherCalc && (
@@ -5332,7 +5360,7 @@ Thank you!`
                       Once approved, the same spot sends you to Artelo to attach the file. */}
                   <div className="space-y-2">
                     <DesignDetails d={design} />
-                    <DesignReview d={design} arteloOrderUrl={selectedOrder.status !== 'completed' ? selectedOrder.arteloUrl : null} onComplete={() => markAsCompleted(selectedOrder.orderNumber)} />
+                    <div className="hidden md:block"><DesignReview d={design} arteloOrderUrl={selectedOrder.status !== 'completed' ? selectedOrder.arteloUrl : null} onComplete={() => markAsCompleted(selectedOrder.orderNumber)} /></div>
                   </div>
 
                   <div>

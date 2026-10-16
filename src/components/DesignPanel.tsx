@@ -85,7 +85,9 @@ const attachKey = (jobId: string) => `trackstar:attach-opened:${jobId}`
 function readOpened(jobId: string) { try { return localStorage.getItem(attachKey(jobId)) === '1' } catch { return false } }
 function writeOpened(jobId: string) { try { localStorage.setItem(attachKey(jobId), '1') } catch { /* per visit only */ } }
 
-export function DesignReview({ d, arteloOrderUrl = null, onComplete }: { d: Design; arteloOrderUrl?: string | null; onComplete?: () => void }) {
+export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = false }: { d: Design; arteloOrderUrl?: string | null; onComplete?: () => void; compact?: boolean }) {
+  // compact: the phone's bottom bar, shorter buttons in the same order.
+  const pad = compact ? 'py-3 text-[15px]' : 'py-4 text-base'
   const [rejecting, setRejecting] = useState(false)
   const [note, setNote] = useState('')
   const job = d.job
@@ -96,14 +98,14 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete }: { d: Desi
   // stays, because a click is not proof the attaching got done.
   if (d.visible && job?.status === 'done' && job.review === 'approved' && arteloOrderUrl) {
     return (
-      <div className={`grid gap-3 ${opened && onComplete ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+      <div className={`grid gap-3 ${opened && onComplete ? (compact ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2') : 'grid-cols-1'}`}>
         <a href={arteloOrderUrl} target="_blank" rel="noopener noreferrer" onClick={() => { writeOpened(job.id); setOpened(true) }}
-          className={`flex items-center justify-center gap-2 py-4 rounded-md text-base font-semibold transition-opacity ${opened ? 'bg-white border-2 border-[#4600D6]/30 text-[#4600D6] hover:bg-[#4600D6]/[0.04]' : 'bg-[#4600D6] text-white hover:opacity-90'}`}>
-          <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> Attach in Artelo <ArrowUpRight className="w-4 h-4 opacity-70" />
+          className={`flex items-center justify-center gap-2 ${pad} rounded-md font-semibold transition-opacity ${opened ? 'bg-white border-2 border-[#4600D6]/30 text-[#4600D6] hover:bg-[#4600D6]/[0.04]' : 'bg-[#4600D6] text-white hover:opacity-90'}`}>
+          <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> {compact && opened ? 'Attach' : 'Attach in Artelo'} <ArrowUpRight className="w-4 h-4 opacity-70" />
         </a>
         {opened && onComplete && (
-          <button onClick={onComplete} className="inline-flex items-center justify-center gap-2 py-4 rounded-md bg-green-600 text-white text-base font-semibold hover:bg-green-700 transition-colors">
-            <Check className="w-5 h-5" /> Mark as complete
+          <button onClick={onComplete} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors`}>
+            <Check className="w-5 h-5" /> {compact ? 'Complete' : 'Mark as complete'}
           </button>
         )}
       </div>
@@ -112,22 +114,28 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete }: { d: Desi
   if (!d.visible || !d.canManage || job?.status !== 'done' || job.review !== 'pending') return null
   if (rejecting) {
     return (
-      <div className="flex gap-2">
+      <div className={compact ? 'grid grid-cols-[1fr,auto] gap-2' : 'flex gap-2'}>
         <input value={note} onChange={e => setNote(e.target.value)} placeholder="What is wrong with it?" className={`${inputBase} flex-1`} autoFocus
           onKeyDown={e => { if (e.key === 'Enter' && note.trim()) d.review('rejected', note).then(ok => { if (ok) { setRejecting(false); setNote('') } }) }} />
-        <button onClick={() => d.review('rejected', note).then(ok => { if (ok) { setRejecting(false); setNote('') } })} disabled={d.busy || !note.trim()} className="px-5 py-3 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-40">Reject with note</button>
-        <button onClick={() => { setRejecting(false); setNote('') }} className={btnGhost}>Cancel</button>
+        <button onClick={() => d.review('rejected', note).then(ok => { if (ok) { setRejecting(false); setNote('') } })} disabled={d.busy || !note.trim()} className="px-5 py-3 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-40">{compact ? 'Reject' : 'Reject with note'}</button>
+        <button onClick={() => { setRejecting(false); setNote('') }} className={`${btnGhost} ${compact ? 'col-span-2 justify-center' : ''}`}>Cancel</button>
       </div>
     )
   }
+  const approve = (
+    <button key="a" onClick={() => d.review('approved')} disabled={d.busy} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors`}>
+      {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} {compact ? 'Approve' : 'Approve & Upload to Orders'}
+    </button>
+  )
+  const reject = (
+    <button key="r" onClick={() => setRejecting(true)} disabled={d.busy} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-white border-2 border-red-200 text-red-700 font-semibold hover:bg-red-50 disabled:opacity-50 transition-colors`}>
+      <X className="w-5 h-5" /> Reject
+    </button>
+  )
+  // On a phone Approve is the wide button on the right, under the thumb.
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <button onClick={() => d.review('approved')} disabled={d.busy} className="inline-flex items-center justify-center gap-2 py-4 rounded-md bg-green-600 text-white text-base font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors">
-        {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} Approve & Upload to Orders
-      </button>
-      <button onClick={() => setRejecting(true)} disabled={d.busy} className="inline-flex items-center justify-center gap-2 py-4 rounded-md bg-white border-2 border-red-200 text-red-700 text-base font-semibold hover:bg-red-50 disabled:opacity-50 transition-colors">
-        <X className="w-5 h-5" /> Reject
-      </button>
+    <div className={`grid gap-3 ${compact ? 'grid-cols-[1fr,2fr]' : 'grid-cols-1 sm:grid-cols-2'}`}>
+      {compact ? [reject, approve] : [approve, reject]}
     </div>
   )
 }
