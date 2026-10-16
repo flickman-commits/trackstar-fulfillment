@@ -2044,7 +2044,8 @@ export default function Dashboard() {
     }
     const days = Math.floor((Date.now() - since) / 86_400_000)
     const placedBeforeRace = since !== new Date(o.orderPlacedAt || o.shopifyCreatedAt || o.createdAt).getTime()
-    const label = (days === 0 ? 'Today' : days === 1 ? '1 day ago' : `${days} days ago`) + (placedBeforeRace ? ' (race day)' : '')
+    const ago = days === 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`
+    const label = placedBeforeRace ? `Race was ${ago}` : `Ordered ${ago}`
     const cls = days > 5 ? 'text-red-600 font-semibold' : days >= 3 ? 'text-orange-600 font-medium' : 'text-off-black/45'
     return { days, label, cls }
   }
