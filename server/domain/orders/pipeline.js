@@ -48,9 +48,9 @@ export function pipelineFor({ order, research, race, render, hasScraper, templat
   // A design waiting for review comes first: it is the one thing the tool wants from a person.
   if (render?.status === 'done' && render.review === 'pending') return stage('review', 'Ready for review')
   if (render?.status === 'queued' || render?.status === 'rendering') return stage('waiting', workerOnline ? 'Rendering' : 'Waiting for the renderer', { fix: workerOnline ? 'Illustrator is making the print.' : 'No render worker is online. The print renders when one checks in.' })
-  if (render?.status === 'failed') return stage('action', 'Render failed', { kind: 'render', fix: `The render failed: ${render.error || 'unknown error'}. Fix the cause and render again.` })
+  if (render?.status === 'failed') return stage('action', 'Render failed', { kind: 'render', fix: `The render failed: ${render.error || 'unknown error'}. Fix the cause; it renders again on its own once the order's data changes, or use Re-render.` })
   if (render?.status === 'done' && render.review === 'approved') return stage('waiting', 'Approved', { fix: 'The design was approved. The order completes on the next import.' })
-  if (render?.status === 'done' && render.review === 'rejected') return stage('action', 'Design rejected', { kind: 'data', fix: `The design was rejected: ${render.reviewNote || 'no note'}. Fix the data, then render again.` })
+  if (render?.status === 'done' && render.review === 'rejected') return stage('action', 'Design rejected', { kind: 'data', fix: `The design was rejected: ${render.reviewNote || 'no note'}. Fix the data; a new design renders on the next import.` })
 
   // Race and setup problems: things only a person (or a developer) can change.
   if (!raceName) return stage('action', 'Unknown race', { kind: 'setup', fix: 'The tool could not tell which race this is. Set the race on the order.' })

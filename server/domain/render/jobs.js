@@ -204,5 +204,37 @@ export async function autoQueueRenders({ limit = 25 } = {}) {
     await createJob({ orderId: o.id, requestedBy: 'system' })
     queued++
   }
-  return { queued, skipped }
+  const again = await rerenderChanged({ limit })
+  return { queued, skipped, rerendered: again.queued }
+}
+
+// What a print is made from. Two specs that agree on these would print the same.
+const PRINTED = ['template', 'size', 'name', 'bib', 'time', 'pace', 'noTime', 'date', 'condition', 'temp', 'photoPath']
+export function printedDiffers(a, b) {
+  return PRINTED.some(k => (a?.[k] ?? null) !== (b?.[k] ?? null))
+}
+
+/**
+ * A rejected or failed design renders again on its own once the data it was
+ * made from has changed (a corrected name, a new time, a fixed race date),
+ * and not before: the same data would only make the same print. This is the
+ * path back from Reject, so the reviewer fixes the order and the next
+ * import brings a new design to review.
+ */
+export async function rerenderChanged({ limit = 10 } = {}) {
+  const rows = await prisma.order.findMany({
+    where: { trackstarOrderType: 'standard', status: { notIn: ['completed', 'flagged'] }, renderJobs: { some: {} } },
+    select: { id: true, renderJobs: { orderBy: { version: 'desc' }, take: 1, select: { status: true, review: true, spec: true } } },
+  })
+  let queued = 0
+  for (const o of rows) {
+    if (queued >= limit) break
+    const last = o.renderJobs[0]
+    if (!last || !(last.status === 'failed' || (last.status === 'done' && last.review === 'rejected'))) continue
+    const { ok, spec } = await checkOrder(o.id).catch(() => ({ ok: false }))
+    if (!ok || !printedDiffers(spec, last.spec)) continue
+    await createJob({ orderId: o.id, requestedBy: 'system' })
+    queued++
+  }
+  return { queued }
 }
