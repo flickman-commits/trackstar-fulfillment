@@ -147,18 +147,32 @@ function Tags({ tags, suggestions, onChange }: { tags: string[]; suggestions: st
 export function MailboxCard({ status, isAdmin, onChanged }: { status: MailboxStatus | null; isAdmin: boolean; onChanged: () => void }) {
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
+  const [waiting, setWaiting] = useState(false)
   if (!status) return null
   const runBackfill = async () => {
     setImporting(true)
+    let quotaHits = 0
     try {
-      for (let i = 0; i < 200; i++) {
-        const out = await supportApi.backfill()
-        setProgress(out.total)
-        if (out.done) { toast.success(`History imported: ${out.total} messages`); break }
+      for (let i = 0; i < 400; i++) {
+        try {
+          const out = await supportApi.backfill()
+          setProgress(out.total)
+          setWaiting(false)
+          quotaHits = 0
+          if (out.done) { toast.success(`History imported: ${out.total} messages`); break }
+        } catch (e) {
+          // Gmail's per-minute quota: wait it out and carry on, a few times, before giving up.
+          if (/rate limiting|quota/i.test((e as Error).message) && quotaHits++ < 6) {
+            setWaiting(true)
+            await new Promise(r => setTimeout(r, 65_000))
+            continue
+          }
+          throw e
+        }
       }
       onChanged()
     } catch (e) { toast.error((e as Error).message) }
-    finally { setImporting(false) }
+    finally { setImporting(false); setWaiting(false) }
   }
   return (
     <Section title="Mailbox" open={!status.connected || !status.backfill.done}>
@@ -172,7 +186,7 @@ export function MailboxCard({ status, isAdmin, onChanged }: { status: MailboxSta
           <div className="pt-1">
             <button onClick={runBackfill} disabled={importing} className={btnSecondary}>
               {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
-              {importing ? `Importing… ${progress ?? status.backfill.count}` : status.backfill.inProgress ? `Continue history import (${status.backfill.count} so far)` : 'Import mailbox history'}
+              {importing ? (waiting ? `Waiting for Gmail's quota… ${progress ?? status.backfill.count} so far` : `Importing… ${progress ?? status.backfill.count}`) : status.backfill.inProgress ? `Continue history import (${status.backfill.count} so far)` : 'Import mailbox history'}
             </button>
             <p className="mt-1 text-off-black/45">Reads every past thread once so the inbox has its history. Safe to run again.</p>
           </div>

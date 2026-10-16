@@ -140,8 +140,40 @@ async function client() {
   return google.gmail({ version: 'v1', auth })
 }
 
+/**
+ * Gmail's per-user quota is a per-minute budget, and a burst of reads
+ * (the history import, or Refresh pressed twice) can spend it. Google says
+ * so with a 429, or a 403 naming the quota. Wait and try again, longer each
+ * time, for about a minute in all; past that the caller's error stands.
+ */
+function isQuotaError(err) {
+  const text = `${err?.message || ''} ${JSON.stringify(err?.response?.data?.error || '')}`
+  return err?.code === 429 || /quota|rateLimitExceeded|userRateLimitExceeded|Too Many Requests/i.test(text)
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+export async function withRetry(fn, { tries = 5, label = 'gmail' } = {}) {
+  let wait = 3000
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (!isQuotaError(err) || attempt >= tries) throw err
+      const retryAfter = Number(err?.response?.headers?.['retry-after']) * 1000
+      const ms = Math.min(retryAfter || wait, 30_000)
+      console.warn(`[support] ${label}: Gmail quota, waiting ${Math.round(ms / 1000)}s (try ${attempt} of ${tries})`)
+      await sleep(ms)
+      wait *= 2
+    }
+  }
+}
+
 /** A revoked grant is forgotten so the page offers Connect again, with the usual advice. */
 async function onGmailError(err) {
+  if (isQuotaError(err)) {
+    throw new Error('Gmail is rate limiting us for a minute. The import picks up where it left off; press it again shortly, or just wait, it retries on its own.')
+  }
   if (!isRevokedToken(err)) throw err
   await delConfig(KEY_REFRESH)
   throw new Error(
@@ -386,7 +418,7 @@ async function importIds(gmail, ids, opts) {
     while (queue.length) {
       const id = queue.shift()
       try {
-        const res = await gmail.users.messages.get({ userId: 'me', id, format: 'full' })
+        const res = await withRetry(() => gmail.users.messages.get({ userId: 'me', id, format: 'full' }), { label: `message ${id}` })
         const parsed = parseMessage(res.data, mailbox)
         if (await importMessage(parsed, { ...opts, mailbox })) imported++
       } catch (err) {
@@ -395,7 +427,8 @@ async function importIds(gmail, ids, opts) {
       }
     }
   }
-  await Promise.all(Array.from({ length: 6 }, worker))
+  // Three at a time: six tripped Gmail's per-minute quota on the first real import.
+  await Promise.all(Array.from({ length: 3 }, worker))
   return { imported, failed }
 }
 
@@ -403,7 +436,7 @@ async function importIds(gmail, ids, opts) {
  * One chunk of the one-time import. Call until `done`. Progress is kept in
  * SystemConfig so a run that hits the function limit picks up where it left.
  */
-export async function backfill({ pages = 3, pageSize = 100 } = {}) {
+export async function backfill({ pages = 2, pageSize = 100 } = {}) {
   const gmail = await client().catch(err => { throw err })
   if ((await getConfig(KEY_BACKFILL_DONE)) === 'true') {
     return { done: true, imported: 0, total: Number(await getConfig(KEY_BACKFILL_COUNT) || 0) }
@@ -413,7 +446,7 @@ export async function backfill({ pages = 3, pageSize = 100 } = {}) {
   let done = false
   try {
     for (let i = 0; i < pages; i++) {
-      const res = await gmail.users.messages.list({ userId: 'me', q: MAIL_QUERY, maxResults: pageSize, pageToken })
+      const res = await withRetry(() => gmail.users.messages.list({ userId: 'me', q: MAIL_QUERY, maxResults: pageSize, pageToken }), { label: 'backfill list' })
       const ids = (res.data.messages || []).map(m => m.id)
       const out = await importIds(gmail, ids, { backfill: true })
       imported += out.imported
@@ -456,9 +489,9 @@ export async function sync() {
   let mode = 'history'
   try {
     do {
-      const res = await gmail.users.history.list({
+      const res = await withRetry(() => gmail.users.history.list({
         userId: 'me', startHistoryId, historyTypes: ['messageAdded'], maxResults: 500, pageToken,
-      })
+      }), { label: 'history' })
       for (const h of res.data.history || []) {
         for (const a of h.messagesAdded || []) {
           const labels = a.message?.labelIds || []
@@ -472,7 +505,7 @@ export async function sync() {
     if (err?.code !== 404) await onGmailError(err)
     // Too old. Read the last three days the plain way and start over from now.
     mode = 'fallback'
-    const res = await gmail.users.messages.list({ userId: 'me', q: `${MAIL_QUERY} newer_than:3d`, maxResults: 200 })
+    const res = await withRetry(() => gmail.users.messages.list({ userId: 'me', q: `${MAIL_QUERY} newer_than:3d`, maxResults: 200 }), { label: 'fallback list' })
     for (const m of res.data.messages || []) ids.add(m.id)
   }
 

@@ -13,6 +13,7 @@ import prisma from '../../db.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { approvalUrl, shopifyAdminUrl } from '../../lib/links.js'
 import { stripQuoted } from './mailbox.js'
+import { can } from '../../../api/_lib/roles.js'
 import { replyWindow } from './instagram.js'
 
 export const STATUSES = ['open', 'waiting', 'escalated', 'closed']
@@ -119,8 +120,12 @@ function row(t, readAt) {
   }
 }
 
+/** Who can work the inbox: active people whose role includes Support (admins always). */
 export async function team() {
-  return prisma.user.findMany({ where: { isActive: true }, orderBy: { firstName: 'asc' }, select: TEAM_SELECT })
+  const users = await prisma.user.findMany({ where: { isActive: true }, orderBy: { firstName: 'asc' }, select: { ...TEAM_SELECT, role: true } })
+  const out = []
+  for (const u of users) if (await can(u.role, 'support')) out.push({ id: u.id, firstName: u.firstName, lastName: u.lastName })
+  return out
 }
 
 /** One thread: messages, notes and events, the customer's orders and other threads. */
