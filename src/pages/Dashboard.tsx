@@ -2028,6 +2028,27 @@ export default function Dashboard() {
     return getDaysDiff(dateStr) <= 3
   }
 
+  // How long an order has been workable: since it was placed, or since race
+  // day for an order placed before its race. Gray up to 2 days, orange 3 to 5,
+  // red after 5. An order whose race has not happened yet has no age.
+  const workableSince = (o: Order) => {
+    const placed = new Date(o.orderPlacedAt || o.shopifyCreatedAt || o.createdAt).getTime()
+    const race = o.raceDateIso ? new Date(`${o.raceDateIso}T12:00:00Z`).getTime() : 0
+    return Math.max(placed, race)
+  }
+  const orderAge = (o: Order) => {
+    const since = workableSince(o)
+    if (since > Date.now()) {
+      const d = new Date(since)
+      return { days: -1, label: `Race ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`, cls: 'text-off-black/35' }
+    }
+    const days = Math.floor((Date.now() - since) / 86_400_000)
+    const placedBeforeRace = since !== new Date(o.orderPlacedAt || o.shopifyCreatedAt || o.createdAt).getTime()
+    const label = (days === 0 ? 'Today' : days === 1 ? '1 day ago' : `${days} days ago`) + (placedBeforeRace ? ' (race day)' : '')
+    const cls = days > 5 ? 'text-red-600 font-semibold' : days >= 3 ? 'text-orange-600 font-medium' : 'text-off-black/45'
+    return { days, label, cls }
+  }
+
   // Format an order's placed-at timestamp as "May 3 (9 days ago)" / "today" / "yesterday"
   const formatOrderPlacedAt = (dateStr?: string | null): string | null => {
     if (!dateStr) return null
@@ -2148,21 +2169,18 @@ export default function Dashboard() {
         return Number(b.isRushOrder || false) - Number(a.isRushOrder || false)
       })
     }
-    // Standard view: filter by status; expedited orders pinned to top, then newest Shopify order first
+    // Standard view: filter by status; expedited orders pinned to top, then oldest order first,
+    // so the queue is worked in the order customers placed them.
     const fulfillOrders = typeFiltered.filter(o =>
       o.status === 'flagged' || o.status === 'ready' || o.status === 'pending' || o.status === 'missing_year'
     )
     return fulfillOrders.sort((a, b) => {
-      // Priority pinning: expedited shipping > big spender > newest first.
-      // Expedited beats big spender because the customer paid extra for speed
-      // (hard deadline). Big spender is a soft priority (do these next).
+      // Expedited shipping is pinned on top (the customer paid for speed);
+      // everything else by how long it has been workable, longest first.
+      // Orders for races not yet run sink to the bottom, soonest race first.
       if (a.isExpedited && !b.isExpedited) return -1
       if (!a.isExpedited && b.isExpedited) return 1
-      if (a.isBigSpender && !b.isBigSpender) return -1
-      if (!a.isBigSpender && b.isBigSpender) return 1
-      const dateA = new Date(a.orderPlacedAt || a.shopifyCreatedAt || a.createdAt).getTime()
-      const dateB = new Date(b.orderPlacedAt || b.shopifyCreatedAt || b.createdAt).getTime()
-      return dateB - dateA
+      return workableSince(a) - workableSince(b)
     })
   }, [orders, activeView, byPerson])
 
@@ -2744,6 +2762,7 @@ Thank you!`
                                   {getOrderItemPosition(order)}/{itemCount}
                                 </span>
                               )}
+                              {(() => { const age = orderAge(order); return <span className={`text-[11px] whitespace-nowrap ${age.cls}`}>{age.label}</span> })()}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               <HoverTip text={statusDisplay.label} align="center">
@@ -2994,6 +3013,7 @@ Thank you!`
                                   </span>
                                 )}
                               </div>
+                              {(() => { const age = orderAge(order); return <div className={`mt-0.5 text-[11px] ${age.cls}`}>{age.label}</div> })()}
                             </td>
                             <td className="px-3 py-4 text-center">
                               <div className="flex items-center justify-center gap-1">
