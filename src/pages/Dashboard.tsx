@@ -4731,7 +4731,7 @@ Thank you!`
                         )}
                       </div>
                     )}
-                    {photoCard}
+                    {!design.reserved && photoCard}
                     {/* Customer's own numbers. Loud, because the whole point is
                         that nobody goes looking for a "better" answer: we
                         deliberately skip the scrape for these orders, so
@@ -4933,8 +4933,7 @@ Thank you!`
                         narrow screens. Same data, half the vertical space.
                         With a finished render, the print sits to their left
                         so name, bib, time and weather can be checked at a glance. */}
-                    <div className={`grid grid-cols-1 gap-3 ${design.reserved ? 'md:grid-cols-[auto,minmax(0,1fr)]' : 'md:grid-cols-2'}`}>
-                      {design.reserved && <div className="flex"><DesignCard d={design} /></div>}
+                    <div className={`grid grid-cols-1 gap-3 ${design.reserved ? 'md:grid-cols-[minmax(0,1fr),auto]' : 'md:grid-cols-2'}`}>
                       <div className={design.reserved ? 'flex flex-col gap-3 min-w-0' : 'contents'}>
                       <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
@@ -5270,7 +5269,11 @@ Thank you!`
                           )}
                         </div>
                       </div>
+                      {/* The customer photo sits under the runner and race details, beside the print it went into. */}
+                      {design.reserved && photoCard}
                       </div>
+                      {/* The print sits to the right of the details it was made from. */}
+                      {design.reserved && <div className="flex"><DesignCard d={design} /></div>}
                     </div>
                   </div>
 
