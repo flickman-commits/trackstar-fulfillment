@@ -1,8 +1,13 @@
 /**
- * The inbox as the page reads it: the queue, one thread, and what we know
- * about the person writing in. Nothing here talks to Gmail; the mirror does
- * (mailbox.js). The order context comes from our own orders table and, for
- * what it cannot know, from Shopify: fulfillment, tracking, what was paid.
+ * The inbox as the page reads it: the views, one conversation, and what we
+ * know about the person writing in. Nothing here talks to Gmail; the mirror
+ * does (mailbox.js). The order context comes from our own orders table and,
+ * for what it cannot know, from Shopify: fulfillment, tracking, what was paid.
+ *
+ * The views are Intercom's: Your inbox (assigned to you), Mentions (a note
+ * named you), Unassigned, All open, then Waiting, Escalated, Snoozed and
+ * Closed, and one per teammate. Unread is per person: bold until you have
+ * opened the thread since the customer last wrote.
  */
 import prisma from '../../db.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
@@ -10,19 +15,34 @@ import { approvalUrl, shopifyAdminUrl } from '../../lib/links.js'
 import { stripQuoted } from './mailbox.js'
 
 export const STATUSES = ['open', 'waiting', 'escalated', 'closed']
-export const VIEWS = ['open', 'mine', 'waiting', 'escalated', 'closed', 'all']
+export const SORTS = ['waiting', 'newest', 'oldest', 'priority']
+
+/** The playbook's scenarios, offered when tagging. Free text is fine too. */
+export const TAG_SUGGESTIONS = [
+  'Where is my order', 'Damaged print', 'Broken frame', 'Wrong personalization', 'Race not available',
+  'Refund', 'Product question', 'Custom print', 'Race organizer', 'Pre-race order', 'Order change',
+  'Pre-race motivation', 'Happy customer', 'Missing detail', 'Wrong frame', 'Discount not applied',
+  'Note from owner', 'Cart trouble', 'Add-on', 'Address change', 'We messed up', 'Results changed',
+  'Preview request', 'Unsure of results', 'Press', 'Spam',
+]
 
 const TEAM_SELECT = { id: true, firstName: true, lastName: true }
+const notSnoozed = () => ({ OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }] })
+const OPENISH = { status: { in: ['open', 'waiting', 'escalated'] } }
 
-function viewWhere(view, userId) {
-  const now = new Date()
+/** The where clause for a view. `teammate:<id>` is that person's open work. */
+export function viewWhere(view, userId) {
+  if (view.startsWith('teammate:')) return { assigneeId: view.slice('teammate:'.length), ...OPENISH }
   switch (view) {
-    case 'open': return { status: 'open', OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }] }
-    case 'mine': return { assigneeId: userId, status: { not: 'closed' } }
+    case 'inbox': return { assigneeId: userId, ...OPENISH }
+    case 'mentions': return { ...OPENISH, notes: { some: { kind: 'note', mentions: { has: userId } } } }
+    case 'unassigned': return { assigneeId: null, status: 'open', ...notSnoozed() }
+    case 'all': return { status: 'open', ...notSnoozed() }
     case 'waiting': return { status: 'waiting' }
     case 'escalated': return { status: 'escalated' }
+    case 'snoozed': return { status: 'open', snoozedUntil: { gt: new Date() } }
     case 'closed': return { status: 'closed' }
-    default: return {}
+    default: return { status: 'open', ...notSnoozed() }
   }
 }
 
@@ -35,37 +55,46 @@ function searchWhere(q) {
       { customerEmail: { contains: s, mode: 'insensitive' } },
       { customerName: { contains: s, mode: 'insensitive' } },
       { snippet: { contains: s, mode: 'insensitive' } },
+      { tags: { has: s } },
     ],
   }
 }
 
-/**
- * The queue. Open threads come oldest-unanswered first, because same-day
- * reply is the first habit; every other view is newest first.
- */
-export async function listThreads({ view = 'open', userId, q = '', limit = 150 } = {}) {
-  const v = VIEWS.includes(view) ? view : 'open'
-  const where = { AND: [viewWhere(v, userId), searchWhere(q)] }
-  const [threads, open, mine, waiting, escalated, snoozed] = await Promise.all([
-    prisma.supportThread.findMany({
-      where,
-      orderBy: v === 'open' ? [{ lastInboundAt: 'asc' }, { lastMessageAt: 'asc' }] : [{ lastMessageAt: 'desc' }],
-      take: limit,
-      include: { assignee: { select: TEAM_SELECT } },
-    }),
-    prisma.supportThread.count({ where: viewWhere('open') }),
-    prisma.supportThread.count({ where: viewWhere('mine', userId) }),
-    prisma.supportThread.count({ where: viewWhere('waiting') }),
-    prisma.supportThread.count({ where: viewWhere('escalated') }),
-    prisma.supportThread.count({ where: { status: 'open', snoozedUntil: { gt: new Date() } } }),
-  ])
-  return {
-    threads: threads.map(row),
-    counts: { open, mine, waiting, escalated, snoozed },
+function orderBy(sort) {
+  switch (sort) {
+    case 'newest': return [{ lastMessageAt: 'desc' }]
+    case 'oldest': return [{ lastMessageAt: 'asc' }]
+    case 'priority': return [{ priority: 'desc' }, { lastInboundAt: 'asc' }, { lastMessageAt: 'asc' }]
+    default: return [{ lastInboundAt: 'asc' }, { lastMessageAt: 'asc' }] // waiting longest first
   }
 }
 
-function row(t) {
+export async function listThreads({ view = 'all', userId, q = '', sort = 'waiting', limit = 150 } = {}) {
+  const where = { AND: [viewWhere(view, userId), searchWhere(q)] }
+  const [threads, inbox, mentions, unassigned, all, waiting, escalated, snoozed, perAssignee] = await Promise.all([
+    prisma.supportThread.findMany({ where, orderBy: orderBy(SORTS.includes(sort) ? sort : 'waiting'), take: limit, include: { assignee: { select: TEAM_SELECT } } }),
+    prisma.supportThread.count({ where: viewWhere('inbox', userId) }),
+    prisma.supportThread.count({ where: viewWhere('mentions', userId) }),
+    prisma.supportThread.count({ where: viewWhere('unassigned') }),
+    prisma.supportThread.count({ where: viewWhere('all') }),
+    prisma.supportThread.count({ where: viewWhere('waiting') }),
+    prisma.supportThread.count({ where: viewWhere('escalated') }),
+    prisma.supportThread.count({ where: viewWhere('snoozed') }),
+    prisma.supportThread.groupBy({ by: ['assigneeId'], where: OPENISH, _count: { _all: true } }),
+  ])
+  const reads = userId && threads.length
+    ? await prisma.supportRead.findMany({ where: { userId, threadId: { in: threads.map(t => t.id) } } })
+    : []
+  const readAt = new Map(reads.map(r => [r.threadId, r.readAt]))
+  const byAssignee = {}
+  for (const g of perAssignee) if (g.assigneeId) byAssignee[g.assigneeId] = g._count._all
+  return {
+    threads: threads.map(t => row(t, readAt.get(t.id))),
+    counts: { inbox, mentions, unassigned, all, waiting, escalated, snoozed, byAssignee },
+  }
+}
+
+function row(t, readAt) {
   return {
     id: t.id,
     subject: t.subject,
@@ -74,12 +103,15 @@ function row(t) {
     status: t.status,
     snoozedUntil: t.snoozedUntil,
     assignee: t.assignee || null,
+    priority: t.priority,
+    tags: t.tags || [],
     snippet: t.snippet,
     messageCount: t.messageCount,
     lastMessageAt: t.lastMessageAt,
     lastInboundAt: t.lastInboundAt,
     lastOutboundAt: t.lastOutboundAt,
     backfilled: t.backfilled,
+    unread: Boolean(t.lastInboundAt) && (!readAt || new Date(t.lastInboundAt) > new Date(readAt)),
   }
 }
 
@@ -87,27 +119,33 @@ export async function team() {
   return prisma.user.findMany({ where: { isActive: true }, orderBy: { firstName: 'asc' }, select: TEAM_SELECT })
 }
 
-/** One thread with its messages, and the customer's orders and past threads beside it. */
-export async function getThread(id) {
+/** One thread: messages, notes and events, the customer's orders and other threads. */
+export async function getThread(id, { userId } = {}) {
   const t = await prisma.supportThread.findUnique({
     where: { id },
     include: {
       assignee: { select: TEAM_SELECT },
       messages: { orderBy: { sentAt: 'asc' }, include: { sentBy: { select: TEAM_SELECT } } },
+      notes: { orderBy: { createdAt: 'asc' }, include: { author: { select: TEAM_SELECT } } },
+      reads: userId ? { where: { userId } } : false,
     },
   })
   if (!t) return null
-  const [context, pastThreads] = await Promise.all([
+  const [context, pastThreads, customerSince, customerCount] = await Promise.all([
     customerContext(t.customerEmail),
     t.customerEmail ? prisma.supportThread.findMany({
       where: { customerEmail: t.customerEmail, id: { not: t.id } },
       orderBy: { lastMessageAt: 'desc' }, take: 6,
       select: { id: true, subject: true, status: true, lastMessageAt: true, messageCount: true },
     }) : [],
+    t.customerEmail ? prisma.supportThread.aggregate({ where: { customerEmail: t.customerEmail }, _min: { createdAt: true } }) : null,
+    t.customerEmail ? prisma.supportThread.count({ where: { customerEmail: t.customerEmail } }) : 0,
   ])
+  const readAt = userId ? t.reads?.[0]?.readAt : null
   return {
-    ...row(t),
+    ...row(t, readAt),
     gmailThreadId: t.gmailThreadId,
+    createdAt: t.createdAt,
     messages: t.messages.map(m => {
       const text = stripQuoted(m.bodyText)
       return {
@@ -126,33 +164,110 @@ export async function getThread(id) {
         sentBy: m.sentBy || null,
       }
     }),
+    notes: t.notes.map(noteRow),
+    customer: {
+      email: t.customerEmail,
+      name: t.customerName,
+      firstSeen: customerSince?._min?.createdAt || t.createdAt,
+      conversations: customerCount,
+    },
     context,
     pastThreads,
   }
 }
 
+function noteRow(n) {
+  return { id: n.id, kind: n.kind, body: n.body, author: n.author || null, authorName: n.authorName, mentions: n.mentions || [], createdAt: n.createdAt }
+}
+
 // ---------------------------------------------------------------------------
-// Changing a thread
+// Changing a thread. Each change leaves an event in the timeline.
 // ---------------------------------------------------------------------------
 
-export async function setStatus(id, status) {
+function actorName(actor) {
+  return [actor?.firstName, actor?.lastName].filter(Boolean).join(' ') || 'Someone'
+}
+
+async function event(threadId, body, actor) {
+  return prisma.supportNote.create({ data: { threadId, kind: 'event', body, authorId: actor?.id || null, authorName: actorName(actor) } })
+}
+
+const withAssignee = { include: { assignee: { select: TEAM_SELECT } } }
+
+export async function setStatus(id, status, actor) {
   if (!STATUSES.includes(status)) throw new Error(`Unknown status: ${status}`)
-  return prisma.supportThread.update({ where: { id }, data: { status, snoozedUntil: null }, include: { assignee: { select: TEAM_SELECT } } }).then(row)
-}
-
-export async function assign(id, assigneeId) {
-  if (assigneeId) {
-    const u = await prisma.user.findUnique({ where: { id: assigneeId }, select: { isActive: true } })
-    if (!u?.isActive) throw new Error('That teammate is not active')
+  const before = await prisma.supportThread.findUnique({ where: { id }, select: { status: true } })
+  const t = await prisma.supportThread.update({ where: { id }, data: { status, snoozedUntil: null }, ...withAssignee })
+  if (before?.status !== status) {
+    const verb = status === 'closed' ? 'closed this' : status === 'open' && before?.status === 'closed' ? 'reopened this'
+      : status === 'escalated' ? 'escalated this' : status === 'waiting' ? 'marked this waiting on the customer' : 'reopened this'
+    await event(id, `${actorName(actor)} ${verb}`, actor)
   }
-  return prisma.supportThread.update({ where: { id }, data: { assigneeId: assigneeId || null }, include: { assignee: { select: TEAM_SELECT } } }).then(row)
+  return row(t)
 }
 
-/** Hide an open thread until a time; it comes back on its own, or sooner if the customer writes. */
-export async function snooze(id, until) {
+export async function assign(id, assigneeId, actor) {
+  let who = null
+  if (assigneeId) {
+    who = await prisma.user.findUnique({ where: { id: assigneeId }, select: { ...TEAM_SELECT, isActive: true } })
+    if (!who?.isActive) throw new Error('That teammate is not active')
+  }
+  const t = await prisma.supportThread.update({ where: { id }, data: { assigneeId: assigneeId || null }, ...withAssignee })
+  const target = !who ? 'unassigned this' : who.id === actor?.id ? 'took this' : `assigned this to ${who.firstName}`
+  await event(id, `${actorName(actor)} ${target}`, actor)
+  return row(t)
+}
+
+export async function snooze(id, until, actor) {
   const d = until ? new Date(until) : null
   if (d && Number.isNaN(d.getTime())) throw new Error('Bad snooze time')
-  return prisma.supportThread.update({ where: { id }, data: { snoozedUntil: d, status: 'open' }, include: { assignee: { select: TEAM_SELECT } } }).then(row)
+  const t = await prisma.supportThread.update({ where: { id }, data: { snoozedUntil: d, status: 'open' }, ...withAssignee })
+  await event(id, d ? `${actorName(actor)} snoozed this until ${d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : `${actorName(actor)} unsnoozed this`, actor)
+  return row(t)
+}
+
+export async function setPriority(id, priority, actor) {
+  const t = await prisma.supportThread.update({ where: { id }, data: { priority: Boolean(priority) }, ...withAssignee })
+  await event(id, `${actorName(actor)} ${priority ? 'marked this priority' : 'removed priority'}`, actor)
+  return row(t)
+}
+
+export async function setTags(id, tags) {
+  const clean = [...new Set((Array.isArray(tags) ? tags : []).map(s => String(s).trim()).filter(Boolean))].slice(0, 12)
+  const t = await prisma.supportThread.update({ where: { id }, data: { tags: clean }, ...withAssignee })
+  return row(t)
+}
+
+/** An internal note. Mentions are teammate ids the client resolved from @names; only active ones are kept. */
+export async function addNote(id, { body, mentions = [] }, actor) {
+  const text = String(body || '').trim()
+  if (!text) throw new Error('Write something first')
+  const ids = [...new Set(mentions.map(String))]
+  const valid = ids.length ? await prisma.user.findMany({ where: { id: { in: ids }, isActive: true }, select: { id: true } }) : []
+  const n = await prisma.supportNote.create({
+    data: { threadId: id, kind: 'note', body: text, authorId: actor?.id || null, authorName: actorName(actor), mentions: valid.map(u => u.id) },
+    include: { author: { select: TEAM_SELECT } },
+  })
+  return noteRow(n)
+}
+
+export async function deleteNote(noteId, actor) {
+  const n = await prisma.supportNote.findUnique({ where: { id: noteId } })
+  if (!n || n.kind !== 'note') throw new Error('No such note')
+  if (n.authorId !== actor?.id && actor?.role !== 'admin') throw new Error('Only the author or an admin can delete a note')
+  await prisma.supportNote.delete({ where: { id: noteId } })
+  return { id: noteId }
+}
+
+/** This person has seen the thread as it stands now. */
+export async function markRead(id, userId) {
+  if (!userId) return
+  await prisma.supportRead.upsert({ where: { threadId_userId: { threadId: id, userId } }, update: { readAt: new Date() }, create: { threadId: id, userId } })
+}
+
+export async function markUnread(id, userId) {
+  if (!userId) return
+  await prisma.supportRead.deleteMany({ where: { threadId: id, userId } })
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +290,6 @@ const ORDERS_BY_EMAIL = `
   }
 `
 
-/** What a line item was personalised with, from its properties. */
 function lineProps(li) {
   const out = {}
   for (const a of li.customAttributes || []) {
@@ -190,7 +304,6 @@ function shipToLine(a) {
   return [a.name, a.address1, a.address2, [a.city, a.provinceCode, a.zip].filter(Boolean).join(' '), a.countryCodeV2].filter(Boolean).join(', ')
 }
 
-/** Our row for a line item, as the pane shows it. */
 function itemRow(o) {
   return {
     orderId: o.id,
@@ -219,10 +332,9 @@ function itemRow(o) {
 
 /**
  * Everything about this customer's orders, in one shape: Shopify's view of
- * each order (paid, fulfilled, tracking, what they typed at checkout) with
- * our rows for its line items beside it, then any of our rows Shopify did
- * not return (Etsy, or an email that differs). Shopify being down costs the
- * live half, never the page.
+ * each order with our rows for its line items beside it, then any of our
+ * rows Shopify did not return (Etsy, or an email that differs). Shopify
+ * being down costs the live half, never the page.
  */
 export async function customerContext(email) {
   const e = String(email || '').trim().toLowerCase()

@@ -61,6 +61,9 @@
     "api/support/gmail-callback.js": {
       "maxDuration": 60
     },
+    "api/support/macros.js": {
+      "maxDuration": 60
+    },
     "api/orders/actions.js": {
       "maxDuration": 300
     },

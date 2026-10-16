@@ -3,7 +3,7 @@
  * shapes, so the Support screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { BackfillResult, InboxPayload, InboxView, MailboxStatus, SyncResult, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
+import type { BackfillResult, InboxPayload, InboxSort, InboxView, Macro, MailboxStatus, Note, SyncResult, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -22,6 +22,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+const act = <T,>(id: string, action: string, extra: Record<string, unknown> = {}) => post<T>('/api/support/thread', { id, action, ...extra })
 
 export const supportApi = {
   status: () => request<MailboxStatus>('/api/support/gmail?action=status'),
@@ -29,10 +30,19 @@ export const supportApi = {
   disconnect: () => post<{ success: boolean }>('/api/support/gmail', { action: 'disconnect' }),
   sync: () => post<SyncResult>('/api/support/sync', {}),
   backfill: () => post<BackfillResult>('/api/support/backfill', {}),
-  inbox: (view: InboxView, q = '') => request<InboxPayload>(`/api/support/threads?view=${view}&q=${encodeURIComponent(q)}`),
+  inbox: (view: InboxView, sort: InboxSort, q = '') => request<InboxPayload>(`/api/support/threads?view=${encodeURIComponent(view)}&sort=${sort}&q=${encodeURIComponent(q)}`),
   thread: (id: string) => request<ThreadDetail>(`/api/support/thread?id=${encodeURIComponent(id)}`),
-  assign: (id: string, assigneeId: string | null) => post<ThreadRow>('/api/support/thread', { id, action: 'assign', assigneeId }),
-  setStatus: (id: string, status: ThreadStatus) => post<ThreadRow>('/api/support/thread', { id, action: 'status', status }),
-  snooze: (id: string, until: string | null) => post<ThreadRow>('/api/support/thread', { id, action: 'snooze', until }),
-  reply: (id: string, text: string) => post<ThreadDetail>('/api/support/reply', { id, text }),
+  assign: (id: string, assigneeId: string | null) => act<ThreadRow>(id, 'assign', { assigneeId }),
+  setStatus: (id: string, status: ThreadStatus) => act<ThreadRow>(id, 'status', { status }),
+  snooze: (id: string, until: string | null) => act<ThreadRow>(id, 'snooze', { until }),
+  setPriority: (id: string, priority: boolean) => act<ThreadRow>(id, 'priority', { priority }),
+  setTags: (id: string, tags: string[]) => act<ThreadRow>(id, 'tags', { tags }),
+  addNote: (id: string, body: string, mentions: string[]) => act<Note>(id, 'note', { body, mentions }),
+  deleteNote: (id: string, noteId: string) => act<{ id: string }>(id, 'deleteNote', { noteId }),
+  markUnread: (id: string) => act<{ ok: boolean }>(id, 'unread'),
+  reply: (id: string, text: string, close = false) => post<ThreadDetail>('/api/support/reply', { id, text, close }),
+  macros: () => request<{ macros: Macro[] }>('/api/support/macros'),
+  saveMacro: (m: { id?: string; name: string; body: string }) => post<Macro>('/api/support/macros', { action: 'save', ...m }),
+  deleteMacro: (id: string) => post<{ id: string }>('/api/support/macros', { action: 'delete', id }),
+  useMacro: (id: string) => post<{ ok: boolean }>('/api/support/macros', { action: 'use', id }),
 }

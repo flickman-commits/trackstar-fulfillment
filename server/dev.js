@@ -133,6 +133,8 @@ const routes = [
   { method: 'get',    path: '/api/support/thread',         handler: '../api/support/thread.js' },
   { method: 'post',   path: '/api/support/thread',         handler: '../api/support/thread.js' },
   { method: 'post',   path: '/api/support/reply',          handler: '../api/support/reply.js' },
+  { method: 'get',    path: '/api/support/macros',         handler: '../api/support/macros.js' },
+  { method: 'post',   path: '/api/support/macros',         handler: '../api/support/macros.js' },
 ]
 
 // Load all handlers and register routes

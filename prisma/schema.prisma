@@ -746,6 +746,9 @@ model User {
   apiKeys      ApiKey[]
   supportThreads   SupportThread[]   @relation("SupportAssignee")
   supportReplies   SupportMessage[]  @relation("SupportSentBy")
+  supportNotes     SupportNote[]     @relation("SupportNoteAuthor")
+  supportReads     SupportRead[]
+  supportMacros    SupportMacro[]    @relation("SupportMacroAuthor")
 
   @@index([email])
 }
@@ -1076,6 +1079,10 @@ model SupportThread {
   snoozedUntil    DateTime?
   assigneeId      String?
   assignee        User?     @relation("SupportAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  // Starred, the way Intercom marks a priority conversation. A person sets it.
+  priority        Boolean   @default(false)
+  // Free-form labels; the playbook's scenario names are offered as suggestions.
+  tags            String[]  @default([])
   // The newest message's first line, for the list.
   snippet         String    @default("")
   messageCount    Int       @default(0)
@@ -1089,6 +1096,8 @@ model SupportThread {
   updatedAt       DateTime  @updatedAt
 
   messages        SupportMessage[]
+  notes           SupportNote[]
+  reads           SupportRead[]
 
   @@index([status, lastMessageAt])
   @@index([assigneeId, status])
@@ -1125,4 +1134,54 @@ model SupportMessage {
 
   @@index([threadId, sentAt])
   @@index([sentAt])
+}
+
+// What the team says to each other on a thread, and what happened to it.
+// A note is internal, never sent, and can @mention teammates (their ids in
+// `mentions`), which is what the Mentions view lists. An event is the
+// system's line in the same timeline: assigned, closed, snoozed, starred.
+// Later, Claude's draft and investigation land here as a note too.
+model SupportNote {
+  id         String   @id @default(cuid())
+  threadId   String
+  thread     SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  kind       String   @default("note") // note | event
+  body       String
+  authorId   String?
+  author     User?    @relation("SupportNoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  authorName String   @default("")
+  mentions   String[] @default([])
+  createdAt  DateTime @default(now())
+
+  @@index([threadId, createdAt])
+  @@index([mentions])
+}
+
+// When each person last opened a thread, so the list can show unread the
+// way a mail client does: bold until you have seen the newest message.
+model SupportRead {
+  threadId String
+  thread   SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt   DateTime      @default(now())
+
+  @@id([threadId, userId])
+  @@index([userId])
+}
+
+// Saved replies, Intercom's "macros". The playbook's templates are seeded in
+// once; after that the team edits them here. {{first_name}} and {{rep}} are
+// filled when one is inserted; anything in [brackets] is left for the rep.
+model SupportMacro {
+  id          String   @id @default(cuid())
+  name        String
+  body        String
+  createdById String?
+  createdBy   User?    @relation("SupportMacroAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  uses        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
 }

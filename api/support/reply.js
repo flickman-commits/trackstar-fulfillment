@@ -1,5 +1,5 @@
 /**
- * POST /api/support/reply { id, text }
+ * POST /api/support/reply { id, text, close? }
  *
  * Send a reply on a thread, from the support mailbox, as this person. The
  * only place support mail leaves the app, and only ever reached by a person
@@ -12,7 +12,7 @@ import { requireCapability, recordAudit } from '../_lib/users.js'
 import prisma from '../_lib/prisma.js'
 import { textToHtml } from '../../server/domain/sales/gmail.js'
 import { sendReply } from '../../server/domain/support/mailbox.js'
-import { getThread } from '../../server/domain/support/threads.js'
+import { getThread, setStatus } from '../../server/domain/support/threads.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -32,7 +32,9 @@ export default async function handler(req, res) {
 
     const sent = await sendReply({ userId: user.id, thread, html: textToHtml(text), text })
     await recordAudit({ action: 'support.reply', summary: `Replied to ${thread.customerEmail} on "${thread.subject}"`, detail: { threadId: id, gmailMessageId: sent?.gmailMessageId || null, chars: text.length }, actor: user })
-    const fresh = await getThread(id)
+    // Send and close: Intercom's one-click for a conversation that is done.
+    if (body.close) await setStatus(id, 'closed', user)
+    const fresh = await getThread(id, { userId: user.id })
     return res.status(200).json(fresh)
   } catch (error) {
     console.error('[API /support/reply]', error)
