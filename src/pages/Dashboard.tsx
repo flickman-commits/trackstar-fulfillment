@@ -2175,11 +2175,16 @@ export default function Dashboard() {
       o.status === 'flagged' || o.status === 'ready' || o.status === 'pending' || o.status === 'missing_year'
     )
     return fulfillOrders.sort((a, b) => {
-      // Expedited shipping is pinned on top (the customer paid for speed);
-      // everything else by how long it has been workable, longest first.
-      // Orders for races not yet run sink to the bottom, soonest race first.
+      // Expedited shipping first (the customer paid for speed), then big
+      // spenders whose race has happened, then everything by how long it has
+      // been workable, longest first. Orders for races not yet run sink to the
+      // bottom, soonest race first.
       if (a.isExpedited && !b.isExpedited) return -1
       if (!a.isExpedited && b.isExpedited) return 1
+      const now = Date.now()
+      const bigA = !!a.isBigSpender && workableSince(a) <= now, bigB = !!b.isBigSpender && workableSince(b) <= now
+      if (bigA && !bigB) return -1
+      if (!bigA && bigB) return 1
       return workableSince(a) - workableSince(b)
     })
   }, [orders, activeView, byPerson])
