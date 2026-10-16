@@ -983,6 +983,11 @@ model RenderJob {
   // same place a designer saves by hand (server/domain/render/deliver.js).
   deliveredAt   DateTime?
   deliveredPath String?   // the Drive link
+  // The same PDF in the Artelo image library (server/domain/render/artelo.js)
+  arteloUploadId   String?
+  arteloUrl        String?
+  arteloUploadedAt DateTime?
+  arteloError      String?
   deliveryError String?
   // Set when the race's date or weather changed after this render was made: it needs re-rendering.
   staleReason   String?

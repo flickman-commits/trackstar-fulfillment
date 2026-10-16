@@ -16,6 +16,7 @@ import { applyCustomerResults } from '../../server/domain/research/customerResul
 import { autoResearchNew, autoResearchAfterRace } from '../../server/domain/research/autoResearch.js'
 import { autoQueueRenders } from '../../server/domain/render/jobs.js'
 import { deliverPending } from '../../server/domain/render/deliver.js'
+import { uploadPending } from '../../server/domain/render/artelo.js'
 import { refreshUnpaidPhotoOrders } from '../../server/domain/orders/photoRefresh.js'
 
 export default async function handler(req, res) {
@@ -40,6 +41,8 @@ export default async function handler(req, res) {
     // Approved prints that have not reached the Drive Orders folder yet.
     const sent = await deliverPending().catch(err => { console.error('[orders.auto-import] deliveries failed:', err.message); return null })
     if (sent && (sent.delivered || sent.failed)) console.log(`[orders.auto-import] prints saved to Drive: ${sent.delivered}, failed: ${sent.failed}`)
+    const lib = await uploadPending().catch(err => { console.error('[orders.auto-import] Artelo uploads failed:', err.message); return null })
+    if (lib && (lib.uploaded || lib.failed)) console.log(`[orders.auto-import] prints in the Artelo library: ${lib.uploaded}, failed: ${lib.failed}`)
     // Bulk runs paid through Shopify: link or create their runs, mark paid.
     const bulk = await syncShopifyBulkOrders().catch(err => { console.error('[orders.auto-import] bulk sync failed:', err.message); return null })
     if (bulk && (bulk.created || bulk.linked || bulk.paid)) console.log(`[orders.auto-import] bulk: ${bulk.created} created, ${bulk.linked} linked, ${bulk.paid} paid`)

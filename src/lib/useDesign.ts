@@ -7,8 +7,9 @@ export type Job = {
   id: string; version: number; status: 'queued' | 'rendering' | 'done' | 'failed'; requestedBy: 'admin' | 'system' | 'customer'
   spec: { file: string; name: string; bib: string; time: string | null; pace: string | null; date: string; condition: string; temp: string; size: string; noTime: boolean; photoPath: string | null; dateSource?: string | null; dateSourceUrl?: string | null; template?: string | null }
   notes: string | null; error: string | null; createdAt: string; finishedAt: string | null
-  review: 'pending' | 'approved' | 'rejected'; reviewNote: string | null; reviewer: string | null; reviewedAt: string | null
+  review: 'pending' | 'approved' | 'rejected' | 'closed'; reviewNote: string | null; reviewer: string | null; reviewedAt: string | null
   deliveredAt: string | null; deliveredPath: string | null; deliveryError: string | null
+  arteloUploadedAt: string | null; arteloUrl: string | null; arteloError: string | null
   output: { trimIn: string | null; bleedIn: { left: number; right: number; top: number; bottom: number } | null; color: 'CMYK' | 'RGB' | 'mixed' | null } | null
   pdfUrl: string | null; previewUrl: string | null
 }

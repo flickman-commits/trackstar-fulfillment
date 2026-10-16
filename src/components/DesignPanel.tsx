@@ -36,9 +36,9 @@ export function DesignCard({ d }: { d: Design }) {
         <button onClick={() => setLightbox(true)} className="relative self-start w-[347px] h-[520px] rounded-md border border-border-gray bg-subtle-gray overflow-hidden" title="Open larger">
           <img src={job.previewUrl} alt={`Render of ${job.spec.file}`} className="w-full h-full object-contain block" />
           {job.review !== 'pending' && (
-            <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold ${job.review === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold ${job.review === 'approved' ? 'bg-green-100 text-green-800' : job.review === 'closed' ? 'bg-off-black/10 text-off-black/70' : 'bg-red-100 text-red-800'}`}>
               {job.review === 'approved' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-              {job.review === 'approved' ? 'Approved' : 'Rejected'}
+              {job.review === 'approved' ? 'Approved' : job.review === 'closed' ? 'Closed' : 'Rejected'}
             </span>
           )}
         </button>
@@ -166,11 +166,14 @@ export function DesignDetails({ d }: { d: Design }) {
             {job.deliveredAt
               ? <a href={job.deliveredPath || '#'} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline">In Orders folder ↗</a>
               : <span className="text-red-700">Not in Drive: {job.deliveryError || 'retrying'}</span>}
+            {job.arteloUploadedAt
+              ? <a href={job.arteloUrl || '#'} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline">In Artelo library ↗</a>
+              : <span className="text-red-700">Not in Artelo: {job.arteloError || 'retrying'}</span>}
           </span>
         )}
       </div>
       {job.notes && <div className="text-amber-700">{job.notes}</div>}
-      {job.reviewNote && <div className="text-red-700">Rejected: {job.reviewNote}</div>}
+      {job.reviewNote && <div className={job.review === 'closed' ? 'text-off-black/60' : 'text-red-700'}>{job.review === 'closed' ? 'Closed' : 'Rejected'}: {job.reviewNote}</div>}
       {d.err && <div className="text-red-600">{d.err}</div>}
     </div>
   )

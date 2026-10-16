@@ -13,6 +13,8 @@
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireCapability, recordAudit, loadActiveUser } from '../_lib/users.js'
 import { checkOrder, createJob, latestJob, signedFiles, reviewJob, onlineWorkers } from '../../server/domain/render/jobs.js'
+import { uploadApprovedToArtelo } from '../../server/domain/render/artelo.js'
+import { completeOrder } from '../../server/domain/orders/complete.js'
 import { deliverApproved } from '../../server/domain/render/deliver.js'
 import { markRacePrinted } from '../../server/domain/races/verification.js'
 
@@ -29,6 +31,7 @@ export default async function handler(req, res) {
       let [{ ok, reasons }, job, workers] = await Promise.all([checkOrder(orderId), latestJob(orderId), onlineWorkers()])
       // An approved render that did not reach Drive (a hiccup at approval time) is retried on sight.
       if (job && job.review === 'approved' && !job.deliveredAt) job = { ...job, ...(await deliverApproved(job)) }
+      if (job && job.review === 'approved' && !job.arteloUploadedAt) job = { ...job, ...(await uploadApprovedToArtelo(job)) }
       const files = job ? await signedFiles(job) : { pdfUrl: null, previewUrl: null }
       return res.status(200).json({ eligible: ok, reasons, job: job ? present(job, files) : null, workersOnline: workers.map(w => w.name) })
     }
@@ -49,6 +52,10 @@ export default async function handler(req, res) {
       if (job.review === 'approved') {
         if (job.spec?.raceId) await markRacePrinted(job.spec.raceId)
         job = await deliverApproved(job)
+        job = await uploadApprovedToArtelo(job)
+        // Approving the print is completing the order. A failed copy to Drive
+        // or Artelo is retried by the import; it does not hold the order.
+        await completeOrder({ orderId: job.orderId, actor: user, via: 'approve', renderJobId: job.id }).catch(e => console.error('[API /render/jobs] complete after approve:', e.message))
       }
       await recordAudit({ action: `render.${job.review}`, summary: `${job.review === 'approved' ? 'Approved' : 'Rejected'} the render of ${job.spec?.file || job.orderId} (v${job.version})${job.reviewNote ? `: ${job.reviewNote}` : ''}`, detail: { jobId: job.id, orderId: job.orderId }, actor: user })
       const files = await signedFiles(job)
@@ -66,7 +73,7 @@ function present(job, files) {
   return {
     id: job.id, orderId: job.orderId, version: job.version, status: job.status, requestedBy: job.requestedBy,
     spec: job.spec, notes: job.notes, error: job.error, createdAt: job.createdAt, finishedAt: job.finishedAt,
-    review: job.review, reviewNote: job.reviewNote, reviewedAt: job.reviewedAt, deliveredAt: job.deliveredAt, deliveredPath: job.deliveredPath, deliveryError: job.deliveryError, output: job.output || null,
+    review: job.review, reviewNote: job.reviewNote, reviewedAt: job.reviewedAt, deliveredAt: job.deliveredAt, deliveredPath: job.deliveredPath, deliveryError: job.deliveryError, arteloUploadedAt: job.arteloUploadedAt, arteloUrl: job.arteloUrl, arteloError: job.arteloError, output: job.output || null,
     reviewer: job.reviewer ? `${job.reviewer.firstName} ${job.reviewer.lastName}`.trim() : null,
     ...files,
   }

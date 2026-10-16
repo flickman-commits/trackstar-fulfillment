@@ -2,19 +2,14 @@ import { HelpCircle } from 'lucide-react'
 
 /**
  * What the icon in the Status column means. A hover key off the column
- * header, one short line per icon. Mirrors getStatusDisplay in Dashboard.tsx.
+ * header, one short line per stage (server/domain/orders/pipeline.js).
  */
 const ROWS: [string, string][] = [
-  ['✅', 'Ready, result on file'],
-  ['🔍', 'Needs research'],
-  ['🕵️', 'Not found, look up by hand'],
-  ['❓', 'Pick a match'],
-  ['⏱', 'Time needs manual entry'],
-  ['🌐', 'Timing site down, retry'],
-  ['🗓️', 'Race not run yet'],
-  ['🛠️', 'Needs a scraper'],
-  ['⚠️', 'Flagged'],
-  ['📅', 'Missing year'],
+  ['🖼️', 'Ready for review: approve or reject the design'],
+  ['⚠️', 'Needs action: the script is stuck, the label says why'],
+  ['🔍', 'Needs research: the lookup has not run yet'],
+  ['⏳', 'Waiting: race day, results, a worker or a payment'],
+  ['✅', 'Done'],
 ]
 
 export default function StatusLegend() {

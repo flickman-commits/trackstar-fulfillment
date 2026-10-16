@@ -130,6 +130,8 @@ interface Order {
   raceId?: number | null
   // Scraper availability
   hasScraperAvailable?: boolean
+  // One status from everything the server knows (server/domain/orders/pipeline.js).
+  pipeline?: { stage: 'review' | 'action' | 'needs_research' | 'waiting' | 'done'; reason: string; kind?: 'data' | 'setup' | 'render'; fix?: string }
   // Override fields
   yearOverride?: number | null
   raceNameOverride?: string | null
@@ -332,6 +334,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     raceId: order.raceId as number | null | undefined,
     // Scraper
     hasScraperAvailable: order.hasScraperAvailable as boolean | undefined,
+    pipeline: order.pipeline as Order['pipeline'],
     // Override fields
     yearOverride: order.yearOverride as number | null | undefined,
     raceNameOverride: order.raceNameOverride as string | null | undefined,
@@ -846,6 +849,8 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const [raceFilter, setRaceFilter] = useState('')  // empty = show all races
+  // Standard orders: the queue to work. '' is everything open.
+  const [stageFilter, setStageFilter] = useState<'' | 'review' | 'action' | 'waiting'>('')
   const [showCompleted, setShowCompleted] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -973,6 +978,9 @@ export default function Dashboard() {
   // Photo orders get an explicit sign-off. The photo is the one element a
   // normal proof does not show, and a print that ships without it is a
   // reprint and a refund. Shared by the standard and custom views.
+  // The open order's automated print (standard orders only). See DesignPanel.
+  const design = useDesign(selectedOrder?.trackstarOrderType === 'standard' ? selectedOrder.id : null, can('orders.render'))
+
   const photoCard = selectedOrder?.photoPath ? (
       <div
         className={`rounded-md border p-3 ${
@@ -993,6 +1001,9 @@ export default function Dashboard() {
                 ? `Confirmed ${new Date(selectedOrder.photoPlacedAt).toLocaleString()}`
                 : 'Place this photo on the print before completing this order.'}
             </p>
+            {design.job?.status === 'done' ? (
+              <p className="mt-2 text-xs font-semibold text-[#4600D6]">The render placed this photo. Check it on the design, then approve.</p>
+            ) : (
             <label className={`mt-2 inline-flex items-center gap-2 cursor-pointer select-none ${photoConfirming ? 'opacity-50' : ''}`}>
               <input
                 type="checkbox"
@@ -1005,6 +1016,7 @@ export default function Dashboard() {
                 {photoConfirming ? 'Saving...' : 'Photo placed on artwork'}
               </span>
             </label>
+            )}
           </div>
 
           {/* Photo sits on the right with its download directly beneath. */}
@@ -1908,8 +1920,6 @@ export default function Dashboard() {
   }
 
   // Close modal and reset edit state
-  // The open order's automated print (standard orders only). See DesignPanel.
-  const design = useDesign(selectedOrder?.trackstarOrderType === 'standard' ? selectedOrder.id : null, can('orders.render'))
   // Orders open in place of the table rather than in a popup.
   const inlineDetail = !!selectedOrder && !showCompleted
 
@@ -2424,15 +2434,31 @@ export default function Dashboard() {
   // new view, which would otherwise leave the queue mysteriously empty.
   useEffect(() => { setRaceFilter('') }, [activeView])
 
+  // How many open standard orders sit in each stage, for the queue chips.
+  const stageCounts = useMemo(() => {
+    const c = { review: 0, action: 0, waiting: 0 }
+    if (activeView !== 'standard') return c
+    for (const o of ordersToFulfill) {
+      const s = o.pipeline?.stage
+      if (s === 'review') c.review++
+      else if (s === 'action') c.action++
+      else if (s === 'waiting' || s === 'needs_research') c.waiting++
+    }
+    return c
+  }, [ordersToFulfill, activeView])
+
   const filteredOrders = useMemo(() => {
     let base = ordersToFulfill
     if (raceFilter && activeView === 'standard') {
       base = base.filter(o => (o.effectiveRaceName || o.raceName) === raceFilter)
     }
+    if (stageFilter && activeView === 'standard') {
+      base = base.filter(o => stageFilter === 'waiting' ? (o.pipeline?.stage === 'waiting' || o.pipeline?.stage === 'needs_research') : o.pipeline?.stage === stageFilter)
+    }
     if (!searchQuery) return base
     const query = searchQuery.trim().toLowerCase()
     return base.filter(o => matchesSearch(o, query))
-  }, [ordersToFulfill, raceFilter, searchQuery, matchesSearch, activeView])
+  }, [ordersToFulfill, raceFilter, stageFilter, searchQuery, matchesSearch, activeView])
 
   const filteredCompletedOrders = useMemo(() => {
     let base = completedOrders
@@ -2573,6 +2599,12 @@ Thank you!`
   // One icon, chosen by what happens next. Where a result came from (our
   // research, the customer at checkout) is the Tags column's job.
   const getStatusDisplay = (order: Order) => {
+    // The server's one status, when it has one (standard orders).
+    const p = order.pipeline
+    if (p) {
+      const icon = p.stage === 'review' ? '🖼️' : p.stage === 'action' ? '⚠️' : p.stage === 'done' ? '✅' : p.stage === 'needs_research' ? '🔍' : '⏳'
+      return { icon, label: p.reason, stage: p.stage }
+    }
     if (order.status === 'flagged') return { icon: '⚠️', label: 'Flagged' }
     if (order.status === 'missing_year') return { icon: '📅', label: 'Missing year' }
     const hasResult = !!(order.bibNumber || order.officialTime)
@@ -2751,6 +2783,23 @@ Thank you!`
             ))}
           </select>
           <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${raceFilter ? 'text-white' : 'text-off-black/40'}`} />
+          </div>
+        </div>
+        )}
+        {activeView === 'standard' && (
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Queue</div>
+          <div className="inline-flex rounded-md border border-border-gray bg-subtle-gray p-0.5">
+            {([['', 'All', ordersToFulfill.length], ['review', 'Review', stageCounts.review], ['action', 'Needs action', stageCounts.action], ['waiting', 'Waiting', stageCounts.waiting]] as const).map(([key, label, n]) => (
+              <button
+                key={key || 'all'}
+                onClick={() => setStageFilter(key)}
+                className={`px-3 py-2 md:py-2.5 rounded text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${stageFilter === key ? 'bg-white text-off-black shadow-sm' : 'text-off-black/55 hover:text-off-black'}`}
+              >
+                {label}
+                <span className={`text-[11px] tabular-nums ${stageFilter === key ? 'text-off-black/50' : 'text-off-black/35'}`}>{n}</span>
+              </button>
+            ))}
           </div>
         </div>
         )}
@@ -3129,7 +3178,7 @@ Thank you!`
                       <tr>
                         <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-28">Src</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Order #</th>
-                        <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-20"><span className="inline-flex items-center">Status<StatusLegend /></span></th>
+                        <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-32"><span className="inline-flex items-center">Status<StatusLegend /></span></th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Details</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-52">
                           <div className="flex items-center gap-2 leading-none">
@@ -3164,8 +3213,11 @@ Thank you!`
                             </td>
                             <td className="px-3 py-4 text-center">
                               <div className="flex items-center justify-center gap-1">
-                                <HoverTip text={statusDisplay.label} align="center">
-                                  <span className="text-lg cursor-help">{statusDisplay.icon}</span>
+                                <HoverTip text={order.pipeline?.fix || statusDisplay.label} align="center">
+                                  <span className="inline-flex flex-col items-center cursor-help">
+                                    <span className="text-lg leading-none">{statusDisplay.icon}</span>
+                                    <span className={`mt-1 text-[10px] leading-tight whitespace-nowrap ${order.pipeline?.stage === 'action' ? 'text-red-700 font-medium' : order.pipeline?.stage === 'review' ? 'text-green-700 font-medium' : 'text-off-black/50'}`}>{statusDisplay.label}</span>
+                                  </span>
                                 </HoverTip>
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
@@ -5740,6 +5792,14 @@ Thank you!`
                             ))}
                           </div>
                         )}
+                      </div>
+                    )}
+                    {/* The pipeline's own word on what is stuck, for the cases the
+                        research notice above does not cover (a missing production
+                        file, race data, a rejected or failed render). */}
+                    {selectedOrder.pipeline?.stage === 'action' && (selectedOrder.pipeline.kind !== 'data' || selectedOrder.pipeline.reason === 'Design rejected') && selectedOrder.pipeline.fix && (
+                      <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                        <p className="text-[13px] leading-snug text-red-800"><span className="font-semibold text-red-700 mr-1.5">{selectedOrder.pipeline.reason}.</span>{selectedOrder.pipeline.fix}</p>
                       </div>
                     )}
                     {/* Missing year. The tag says it, this says what to do. */}

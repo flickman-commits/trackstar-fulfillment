@@ -27,6 +27,7 @@
 
 import crypto from 'crypto'
 import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
+import { completeOrder, CompleteError } from '../../server/domain/orders/complete.js'
 import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
@@ -439,49 +440,14 @@ async function handleClearResearch({ raceName }, res) {
  */
 async function handleComplete({ orderNumber }, res, actor) {
   if (!orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
-
-  const existing = await prisma.order.findFirst({ where: { orderNumber } })
-  if (!existing) return res.status(404).json({ error: 'Order not found' })
-
-  // A photo order that ships without the photo is a reprint and a refund, and
-  // it is invisible on a normal proof. Refuse to complete until someone has
-  // actually confirmed the photo is on the artwork.
-  if (existing.photoPath && !existing.photoPlacedAt) {
-    return res.status(409).json({
-      error: 'photo_not_confirmed',
-      message: 'This print includes a customer photo. Confirm the photo is placed before completing the order.',
-    })
+  try {
+    const { order } = await completeOrder({ orderNumber, actor, via: 'manual' })
+    console.log(`[actions/complete] Order ${orderNumber} marked as completed`)
+    return res.status(200).json({ success: true, order })
+  } catch (e) {
+    if (e instanceof CompleteError) return res.status(e.code === 'not_found' ? 404 : 409).json({ error: e.code, message: e.message })
+    throw e
   }
-
-  // A photo added after purchase is printed only once the customer has paid
-  // for it (photoPayment.js).
-  if (existing.photoAddedManually) {
-    const siblings = await prisma.order.findMany({ where: { parentOrderNumber: existing.parentOrderNumber }, select: { id: true, photoPath: true, photoAddedManually: true } })
-    if (unpaidPhotoRows(siblings, existing.shopifyOrderData).has(existing.id)) {
-      return res.status(409).json({ error: 'photo_not_paid', message: 'The customer has not paid for the photo yet. Wait for the Shopify order to read paid before completing.' })
-    }
-  }
-
-  const order = await prisma.order.update({
-    where: { id: existing.id },
-    data: { status: 'completed', researchedAt: new Date() }
-  })
-
-  console.log(`[actions/complete] Order ${orderNumber} marked as completed`)
-
-  await recordAudit({
-    action: 'order.complete',
-    summary: `Completed ${describeOrder(existing)}`,
-    detail: {
-      orderNumber,
-      orderType: existing.trackstarOrderType,
-      runnerName: existing.runnerName,
-      raceName: existing.raceName,
-    },
-    actor,
-  })
-
-  return res.status(200).json({ success: true, order })
 }
 
 // --- photo-placed ---

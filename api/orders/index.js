@@ -11,6 +11,8 @@ import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 import { formatRaceDate, formatTemp, formatTime, formatPace } from '../../server/lib/printFormat.js'
 import { resolveEvent } from '../../server/lib/raceEvent.js'
 import { dateVerified } from '../../server/domain/races/verification.js'
+import { pipelineFor } from '../../server/domain/orders/pipeline.js'
+import { onlineWorkers, noTimeGaps } from '../../server/domain/render/templates.js'
 
 
 /**
@@ -174,6 +176,8 @@ export default async function handler(req, res) {
         },
         _count: { select: { comments: true, proofs: true } },
         assignee: { select: { id: true, firstName: true, lastName: true } },
+        // The newest render, for the pipeline status.
+        renderJobs: { orderBy: { version: 'desc' }, take: 1, select: { status: true, review: true, error: true, reviewNote: true } },
       },
       // The raw Shopify, Etsy and Artelo payloads are about 20MB across all
       // orders and the list reads a handful of keys from them. Pulling them
@@ -199,6 +203,14 @@ export default async function handler(req, res) {
     // not yet run read "Needs research" until research happened to run.
     const raceRows = await prisma.race.findMany()
     const raceByKey = new Map(raceRows.map(r => [`${r.raceName}|${r.year}`, r]))
+    // What the render pipeline can do right now, for the pipeline status.
+    const [okTemplates, gaps, workers] = await Promise.all([
+      prisma.printTemplate.findMany({ where: { enabled: true, lastCheckOk: true }, select: { key: true } }),
+      noTimeGaps(),
+      onlineWorkers(),
+    ])
+    const templateKeys = new Set(okTemplates.map(t => t.key))
+    const workerOnline = workers.length > 0
     const raceFor = (name, year) => {
       if (!name || !year) return null
       return raceByKey.get(`${name}|${year}`) || raceByKey.get(`${getCanonicalRaceName(name) || name}|${year}`) || null
@@ -408,6 +420,16 @@ export default async function handler(req, res) {
       for (const id of unpaidPhotoRows(rows, rows[0].shopifyOrderData)) unpaid.add(id)
     }
     for (const o of transformedOrders) o.photoUnpaid = unpaid.has(o.id)
+
+    // One status per order, from everything above (server/domain/orders/pipeline.js).
+    const byId = new Map(orders.map(o => [o.id, o]))
+    for (const t of transformedOrders) {
+      const o = byId.get(t.id)
+      if (!o || o.trackstarOrderType !== 'standard') continue
+      const research = o.runnerResearch?.find(r => r.researchStatus === 'found') || o.runnerResearch?.[0] || null
+      const race = research?.race || raceFor(o.raceNameOverride ?? o.raceName, o.yearOverride ?? o.raceYear)
+      t.pipeline = pipelineFor({ order: o, research, race, render: o.renderJobs?.[0] || null, hasScraper: t.hasScraperAvailable, templates: templateKeys, noTimeGaps: gaps, photoUnpaid: t.photoUnpaid, workerOnline })
+    }
 
     return res.status(200).json({ orders: transformedOrders })
   } catch (error) {
