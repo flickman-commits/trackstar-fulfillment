@@ -4933,9 +4933,10 @@ Thank you!`
                         narrow screens. Same data, half the vertical space.
                         With a finished render, the print sits to their left
                         so name, bib, time and weather can be checked at a glance. */}
+                    {/* The values are big: this panel is for checking what the customer entered against the print. */}
                     <div className={`grid grid-cols-1 gap-3 ${design.reserved ? 'md:grid-cols-[minmax(0,1fr),auto]' : 'md:grid-cols-2'}`}>
                       <div className={design.reserved ? 'flex flex-col gap-3 min-w-0' : 'contents'}>
-                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 [&_span.font-medium:not(.rounded)]:!text-[19px] [&_span.font-medium:not(.rounded)]:!font-semibold [&_span.font-medium:not(.rounded)]:!leading-tight">
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
                           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Runner</span>
                           {/* Edits in place, the same way the Race card does. */}
@@ -5069,7 +5070,7 @@ Thank you!`
                           )}
                         </div>
                       </div>
-                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 [&_span.font-medium:not(.rounded)]:!text-[19px] [&_span.font-medium:not(.rounded)]:!font-semibold [&_span.font-medium:not(.rounded)]:!leading-tight">
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
                           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Race</span>
                           <div className="flex items-center gap-3">
