@@ -40,7 +40,7 @@ const copies = new Map()
 function templateFor(key) {
   const t = templates[key]
   if (!t) return null
-  const tpl = typeof t === 'string' ? { file: t, artboard: null } : t
+  const tpl = typeof t === 'string' ? { file: t } : t
   if (!copies.has(key)) { const to = path.join(WORK, `${copies.size}.ai`); fs.copyFileSync(path.join(RACES_DIR, tpl.file), to); copies.set(key, to) }
   return { ...tpl, copy: copies.get(key) }
 }
@@ -74,7 +74,7 @@ for (const n of numbers) {
     fs.writeFileSync(photo, Buffer.from(await data.arrayBuffer()))
   }
   const out = path.join(OUT, spec.file)
-  fs.writeFileSync(path.join(HERE, 'illustrator', 'current.json'), JSON.stringify({ template: tpl.copy, out, preset: process.env.PDF_PRESET || 'TRACKSTAR DEFAULT', artboard: tpl.artboard, spec: { ...spec, photo } }))
+  fs.writeFileSync(path.join(HERE, 'illustrator', 'current.json'), JSON.stringify({ template: tpl.copy, out, preset: process.env.PDF_PRESET || 'TRACKSTAR DEFAULT', artboard: tpl.artboard || null, artboardExclude: tpl.artboardExclude || null, photoArtboard: tpl.photoArtboard || null, spec: { ...spec, photo } }))
   fs.rmSync(path.join(HERE, 'illustrator', 'result.json'), { force: true })
   try { execFileSync('osascript', ['-e', `tell application "Adobe Illustrator" to do javascript file "${path.join(HERE, 'illustrator', 'render.jsx')}"`], { timeout: 180000 }) } catch (e) { console.log(`${n}: Illustrator did not finish (${e.message})`); continue }
   const result = JSON.parse(fs.readFileSync(path.join(HERE, 'illustrator', 'result.json'), 'utf8'))

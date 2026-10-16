@@ -15,6 +15,7 @@
 // two end up on the wrong layer. So frames are recognised by what kind of text they
 // hold, on any layer of the artboard, and leftover images are removed first.
 #target illustrator
+#include "lib.jsx"
 
 var HERE = new File($.fileName).parent;
 var RESULT = new File(HERE + '/result.json');
@@ -26,25 +27,6 @@ function writeResult(obj) {
   for (var k in obj) parts.push('"' + k + '":' + (typeof obj[k] == 'string' ? '"' + obj[k].replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ') + '"' : obj[k]));
   RESULT.encoding = 'UTF-8'; RESULT.open('w'); RESULT.write('{' + parts.join(',') + '}'); RESULT.close();
 }
-function trim(s) { return String(s).replace(/^\s+|\s+$/g, ''); }
-function sizeKey(name) { var m = /(\d+)\s*x\s*(\d+)/i.exec(name); return m ? m[1] + 'x' + m[2] : null; }
-function inside(bounds, rect) { var cx = (bounds[0] + bounds[2]) / 2, cy = (bounds[1] + bounds[3]) / 2; return cx >= rect[0] && cx <= rect[2] && cy <= rect[1] && cy >= rect[3]; }
-var BREAK = '\u0003'; // Illustrator's forced line break
-
-// What kind of personalization a frame holds, from its current text (placeholder or a past order).
-function kindOf(contents) {
-  var s = trim(String(contents).replace(/\u0003/g, ' '));
-  if (/^\d{1,2}:\d{2}:\d{2}$/.test(s)) return 'time';
-  if (/\d{1,2}:\d{2}\s*\/\s*mi/i.test(s)) return 'pace';
-  if (/^\d{1,2}\.\d{2}\.\d{2}$/.test(s)) return 'date';
-  if (/^(19|20)\d{2}$/.test(s)) return 'year';
-  if (/\d\s*\u00B0\s*[NSEW]\b/i.test(s)) return null;   // coordinates on the artwork, not weather
-  if (/\u00B0/.test(s)) return 'weather';
-  if (/^\d{1,6}$/.test(s) || /\bBIB\b/i.test(s)) return 'bib';
-  if (/^[A-Za-z][A-Za-z .'\-]*$/.test(s) && s.length <= 60) return 'name';
-  return null;
-}
-
 var doc = null, stage = 'start';
 try {
   var job = readJson(new File(HERE + '/current.json'));
@@ -52,57 +34,17 @@ try {
   doc = app.open(new File(job.template));
 
   stage = 'artboard';
-  // The artboard: right size, and the colorway word if the file has more than one.
-  var abIndex = -1;
-  for (var a = 0; a < doc.artboards.length; a++) {
-    var abName = doc.artboards[a].name;
-    if (sizeKey(abName) != spec.size) continue;
-    if (job.artboard && abName.toLowerCase().indexOf(String(job.artboard).toLowerCase()) < 0) continue;
-    abIndex = a;
-  }
-  if (abIndex < 0) throw new Error('No artboard for size ' + spec.size + (job.artboard ? ' (' + job.artboard + ')' : ''));
+  var abIndex = pickArtboard(doc, spec.size, { artboard: job.artboard, artboardExclude: job.artboardExclude, photoArtboard: job.photoArtboard }, !!spec.photo);
+  if (abIndex < 0) throw new Error('No artboard for size ' + spec.size + (spec.photo && job.photoArtboard ? ' with a photo window' : ''));
   var ab = doc.artboards[abIndex].artboardRect;
 
   stage = 'frames';
-  // Every text frame on this artboard that looks like a personalization field, whatever layer it is on.
-  // The race title and START/FINISH labels never match: titles contain the race name on locked assets
-  // in a size far larger than any field, and labels are all caps; both are excluded by size and case.
-  // A placeholder ("Runner Name", "BIB # HERE") wins over a past order's value when a field
-  // appears twice; the loser is hidden, because a leftover name or bib must never print.
-  function isPlaceholder(kind, text) {
-    var t = trim(String(text));
-    if (kind == 'name') return /name/i.test(t);
-    if (kind == 'bib') return /BIB/i.test(t);
-    return false;
-  }
-  var frames = {}, dupes = [], hiddenLeftovers = 0;
-  for (var l = 0; l < doc.layers.length; l++) {
-    var L = doc.layers[l];
-    if (L.name == 'GUIDES') continue;
-    var wasLocked = L.locked; if (wasLocked) L.locked = false;
-    for (var t = 0; t < L.textFrames.length; t++) {
-      var tf = L.textFrames[t];
-      if (!inside(tf.geometricBounds, ab)) continue;
-      var kind = kindOf(tf.contents);
-      if (!kind) continue;
-      if (kind == 'name') {
-        var txt = trim(String(tf.contents).replace(/\u0003/g, ' '));
-        // Not a name: an all-caps label (START, FINISH), or the race title ("Chicago", "Boston", "New York City Marathon").
-        if (/^[A-Z\s]+$/.test(txt) || /marathon|half|miler|ultra/i.test(txt)) continue;
-        if (spec.race && txt.length >= 4 && String(spec.race).toLowerCase().indexOf(txt.toLowerCase()) >= 0) continue;
-      }
-      if (frames[kind]) {
-        var keepNew = isPlaceholder(kind, tf.contents) && !isPlaceholder(kind, frames[kind].contents);
-        var keepOld = isPlaceholder(kind, frames[kind].contents) && !isPlaceholder(kind, tf.contents);
-        if (keepNew) { frames[kind].hidden = true; frames[kind] = tf; hiddenLeftovers++; continue; }
-        if (keepOld) { tf.hidden = true; hiddenLeftovers++; continue; }
-        dupes.push(kind); continue;
-      }
-      frames[kind] = tf;
-    }
-  }
-  // Every design has a name, a bib and a time. Pace, date, weather and year
-  // depend on the design (World Majors has the year and none of the others).
+  // Every text frame on this artboard that looks like a personalization field, whatever layer it is on
+  // (lib.jsx collectFrames). A placeholder beats a past order's value; the loser is hidden, because a
+  // leftover name or bib must never print.
+  var got = collectFrames(doc, ab, spec.race);
+  var frames = got.frames, dupes = got.dupes, hiddenLeftovers = got.leftovers.length;
+  for (var hl = 0; hl < got.leftovers.length; hl++) got.leftovers[hl].hidden = true;
   var missing = [];
   var need = ['name', 'bib', 'time'];
   for (var n = 0; n < need.length; n++) if (!frames[need[n]]) missing.push(need[n]);
@@ -137,22 +79,7 @@ try {
   if (removed) notes.push(removed + ' leftover image' + (removed > 1 ? 's' : '') + ' removed');
 
   stage = 'margin';
-  // The designer's margins are the GUIDES layer: the leftmost and rightmost vertical guides on this artboard.
-  var marginL = null, marginR = null;
-  try {
-    var guides = doc.layers.getByName('GUIDES');
-    for (var gi = 0; gi < guides.groupItems.length; gi++) {
-      var grp = guides.groupItems[gi];
-      if (!inside(grp.geometricBounds, ab)) continue;
-      for (var pi = 0; pi < grp.pathItems.length; pi++) {
-        var pb = grp.pathItems[pi].geometricBounds;
-        if (Math.abs(pb[0] - pb[2]) < 1) {
-          if (marginL === null || pb[0] < marginL) marginL = pb[0];
-          if (marginR === null || pb[0] > marginR) marginR = pb[0];
-        }
-      }
-    }
-  } catch (e) {}
+  var margins = marginsOf(doc, ab), marginL = margins.left, marginR = margins.right;
 
   stage = 'name';
   // Name: a long name must not be clipped, and the name must not move. The box
@@ -164,9 +91,7 @@ try {
   // the render rather than printing in the wrong place.
   var nameFrame = frames.name;
   var before = nameFrame.geometricBounds;
-  var just = null; try { just = nameFrame.textRange.paragraphAttributes.justification; } catch (e) {}
-  var anchorRight = (just == Justification.RIGHT || just == Justification.FULLJUSTIFYLASTLINERIGHT);
-  var anchorLeft = (just == Justification.LEFT || just == Justification.FULLJUSTIFYLASTLINELEFT || just == Justification.FULLJUSTIFY);
+  var align = alignmentOf(nameFrame), anchorRight = align == 'right', anchorLeft = align == 'left';
   if (nameFrame.kind == TextType.AREATEXT) {
     var tp = nameFrame.textPath;
     if (anchorRight && marginL !== null && tp.left > marginL) { tp.width = tp.width + (tp.left - marginL); tp.left = marginL; }
@@ -214,31 +139,25 @@ try {
   }
 
   stage = 'photo';
-  // Fresh handle: layer references taken before items were removed can go stale.
-  photoLayer = null; try { photoLayer = doc.layers.getByName('PHOTO LAYER'); } catch (e) {}
-  // Photo: a clipped group (square clipping path over a placeholder) per size on PHOTO LAYER.
-  // The customer cropped it 1:1, so it goes in at the clipping path's exact bounds.
+  // Photo: the clipped square window on PHOTO LAYER (lib.jsx photoWindowOf). The customer cropped
+  // the photo 1:1, so it goes in at the clipping path's exact bounds; anything else in the window is
+  // a past order's photo and goes. No photo on the order: the whole layer is hidden.
+  var photoLayer = null; try { photoLayer = doc.layers.getByName('PHOTO LAYER'); } catch (e) {}
   if (spec.photo) {
     if (!photoLayer) throw new Error('This design has no photo window, but the order has a photo');
-    stage = 'photo 1'; photoLayer.visible = true; photoLayer.locked = false;
-    stage = 'photo 2'; var group = null;
-    for (var g = 0; g < photoLayer.groupItems.length; g++) if (inside(photoLayer.groupItems[g].geometricBounds, ab)) group = photoLayer.groupItems[g];
-    if (!group) throw new Error('No photo group on the ' + spec.size + ' artboard');
-    stage = 'photo 3'; var clip = null;
-    for (var q = 0; q < group.pathItems.length; q++) { if (group.pathItems[q].clipping) clip = group.pathItems[q]; else group.pathItems[q].hidden = true; }
-    if (!clip) throw new Error('No clipping path in the photo group');
-    stage = 'photo 4'; var cb = clip.geometricBounds;
-    stage = 'photo 5'; doc.activeLayer = photoLayer; group.locked = false; group.hidden = false;
-    stage = 'photo 6'; var img = group.placedItems.add();
-    stage = 'photo 7'; img.file = new File(spec.photo);
-    stage = 'photo 8'; img.width = cb[2] - cb[0]; img.height = cb[1] - cb[3];
-    stage = 'photo 9'; img.position = [cb[0], cb[1]];
-    stage = 'photo 10'; img.move(group, ElementPlacement.PLACEATEND);
-    // Anything else in the window is a past order's photo: out before the new one is embedded.
-    // (Embedding turns the placed item into a raster and retires the old reference.)
-    stage = 'photo 11'; var old = 0;
-    // Everything else in the window is a past order's photo. The new item is the
-    // one linked to our file; a placed item with no file, or another file, goes.
+    photoLayer.visible = true; photoLayer.locked = false;
+    var pw = photoWindowOf(doc, ab);
+    if (!pw) throw new Error('No photo window on the ' + spec.size + ' artboard');
+    var group = pw.group, clip = pw.clip;
+    for (var q2 = 0; q2 < group.pathItems.length; q2++) if (!group.pathItems[q2].clipping) group.pathItems[q2].hidden = true;
+    var cb = clip.geometricBounds;
+    doc.activeLayer = photoLayer; group.locked = false; group.hidden = false;
+    var img = group.placedItems.add();
+    img.file = new File(spec.photo);
+    img.width = cb[2] - cb[0]; img.height = cb[1] - cb[3];
+    img.position = [cb[0], cb[1]];
+    img.move(group, ElementPlacement.PLACEATEND);
+    var old = 0;
     for (var ri = group.rasterItems.length - 1; ri >= 0; ri--) { group.rasterItems[ri].remove(); old++; }
     for (var pi2 = group.placedItems.length - 1; pi2 >= 0; pi2--) {
       var ours = false;
@@ -246,10 +165,10 @@ try {
       if (!ours) { group.placedItems[pi2].remove(); old++; }
     }
     if (old) notes.push(old + ' old photo' + (old > 1 ? 's' : '') + ' removed');
-    stage = 'photo 12'; img.embed();
-    stage = 'photo 13'; notes.push('photo placed');
+    img.embed();
+    notes.push('photo placed');
   } else if (photoLayer) {
-    stage = 'photo 14'; photoLayer.visible = false;
+    photoLayer.visible = false;
   }
 
   stage = 'export';

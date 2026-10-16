@@ -72,7 +72,7 @@ async function api(action, body) {
 function templateFor(race) {
   const t = templates[race]
   if (!t) return null
-  return typeof t === 'string' ? { file: t, artboard: null } : { file: t.file, artboard: t.artboard || null }
+  return typeof t === 'string' ? { file: t, artboard: null, artboardExclude: null, photoArtboard: null } : { file: t.file, artboard: t.artboard || null, artboardExclude: t.artboardExclude || null, photoArtboard: t.photoArtboard || null }
 }
 
 /** Races whose production file is actually present on this machine right now. */
@@ -124,7 +124,7 @@ async function render(job) {
   if (job.photoUrl) { photo = path.join(dir, 'photo' + (path.extname(spec.photoPath || '') || '.jpg')); await download(job.photoUrl, photo) }
 
   const out = path.join(dir, spec.file)
-  const current = { template, out, preset: PRESET, artboard: tpl.artboard, spec: { ...spec, photo } }
+  const current = { template, out, preset: PRESET, artboard: tpl.artboard, artboardExclude: tpl.artboardExclude, photoArtboard: tpl.photoArtboard, spec: { ...spec, photo } }
   fs.writeFileSync(path.join(HERE, 'illustrator', 'current.json'), JSON.stringify(current))
   fs.rmSync(path.join(HERE, 'illustrator', 'result.json'), { force: true })
 

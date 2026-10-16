@@ -1,5 +1,5 @@
 {
-  "_comment": "Race name as the fulfillment tool knows it -> production file, relative to the Races folder (RACES_DIR). A plain string is the file; an object adds 'artboard', a word the artboard's name must contain when the file holds more than one colorway. Only races listed here can be rendered. A key like 'Chicago Marathon / World Majors' is that race's World Majors edition (its own product and design).",
+  "_comment": "Race name as the fulfillment tool knows it -> production file, relative to the Races folder (RACES_DIR). A plain string is the file; an object adds rules for picking the artboard: 'artboard' (a word its name must contain, for a file with two colorways), 'artboardExclude' (a word it must not contain, e.g. 'copy'), 'photoArtboard' (a word marking the variant with a photo window, used for orders with a photo). A key like 'Chicago Marathon / World Majors' is that race's World Majors edition. Only races listed here can be rendered; run worker/check-template.mjs before adding one.",
   "Chicago Marathon": {
     "file": "Chicago Marathon/Illustrator Files/Chicago_Production_retired 261010.ai",
     "artboard": "Red"
@@ -9,5 +9,32 @@
   "Berlin Marathon": "Berlin Marathon/Illustrator Files/Berlin Marathon_Production.ai",
   "San Francisco Marathon": "SF Marathon/Illustrator Files/San Francisco Marathon_Production.ai",
   "Boston Marathon": "Boston Marathon/Illustrator Files/Boston_Production.ai",
-  "Chicago Marathon / World Majors": "World Majors/Chicago World Major/Illustrator Files/CHI Marathon_Production.ai"
+  "Chicago Marathon / World Majors": "World Majors/Chicago World Major/Illustrator Files/CHI Marathon_Production.ai",
+  "Jersey City Marathon": "Jersey City Marathon/Illustrator Files/Jersey City Marathon_Production.ai",
+  "Eugene Marathon": {
+    "file": "Eugene Marathon/Illustrator Files/Eugene Marathon_Production.ai",
+    "photoArtboard": "copy"
+  },
+  "Pittsburgh Marathon": "Pittsburgh Marathon/Illustrator Files/Pittsburgh Marathon_Production.ai",
+  "Buffalo Marathon": "Buffalo Marathon/Illustrator Files/Buffalo Marathon_Production.ai",
+  "Illinois Marathon": "Illinois Marathon/Illustrator Files/Illinois Marathon_Production.ai",
+  "Grandma's Marathon": "Grandma's Marathon/Illustrator Files/Grandma's Marathon_Production.ai",
+  "Orange County Marathon": "Orange County Marathon/Illustrator Files/Orange County Marathon_Production.ai",
+  "Sydney Marathon": "Sydney Marathon/Illustrator Files/Sydney Marathon_Production.ai",
+  "Marine Corps Marathon": "Marine Corps Marathon/Illustrator Files/Marine Corps Marathon_Production.ai",
+  "London Marathon": "London Marathon/Illustrator Files/London Marathon_Production.ai",
+  "Missoula Marathon": "Missoula Marathon/Illustrator Files/Missoula Marathon_Production.ai",
+  "Philadelphia Marathon": "Philadelphia Marathon/Illustrator Files/Philadelphia Marathon_Production.ai",
+  "Los Angeles Marathon": "Los Angeles Marathon/Illustrator Files/Los Angeles Marathon_Production.ai",
+  "Denver Colfax Marathon": "Denver Colfax Marathon/Illustrator Files/Denver Colfax Marathon_Production.ai",
+  "Tokyo Marathon": "Tokyo Marathon/Illustrator Files/Tokyo Marathon_Production.ai",
+  "Honolulu Marathon": "Honolulu Marathon/Illustrator Files/Honolulu Marathon_Production.ai",
+  "Detroit Marathon": "Detroit Marathon/Illustrator Files/Detroit Marathon_Production.ai",
+  "Newport Marathon": "Newport Marathon/Illustrator Files/Newport Marathon_Production.ai",
+  "Boston Marathon / World Majors": "World Majors/Boston World Major/Illustrator Files/BOS Marathon_Production.ai",
+  "NYC Marathon / World Majors": "World Majors/New York City World Major/Illustrator Files/NYC Marathon_Production.ai",
+  "Berlin Marathon / World Majors": "World Majors/Berlin World Major/Illustrator Files/BER Marathon_Production.ai",
+  "London Marathon / World Majors": "World Majors/London World Major/Illustrator Files/LDN Marathon_Production.ai",
+  "Sydney Marathon / World Majors": "World Majors/Sydney World Major/Illustrator Files/SYD Marathon_Production.ai",
+  "Tokyo Marathon / World Majors": "World Majors/Tokyo World Major/Illustrator Files/TKY Marathon_Production.ai"
 }
