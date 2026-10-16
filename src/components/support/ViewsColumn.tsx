@@ -49,7 +49,7 @@ export default function ViewsColumn({ view, counts, team, me, onView, onMacros }
     { id: 'closed', label: 'Closed', icon: Archive },
   ]
   return (
-    <nav className="hidden lg:flex w-[210px] xl:w-[230px] shrink-0 flex-col border-r border-border-gray bg-subtle-gray/60 min-h-0 overflow-y-auto">
+    <nav className="hidden lg:flex w-[180px] xl:w-[200px] shrink-0 flex-col border-r border-border-gray bg-subtle-gray/60 min-h-0 overflow-y-auto">
       <div className="px-2 pt-3 pb-1 space-y-0.5">
         {top.map(r => <ViewRow key={r.id} row={r} active={view === r.id} onClick={() => onView(r.id)} />)}
       </div>

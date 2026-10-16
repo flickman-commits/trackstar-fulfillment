@@ -314,7 +314,7 @@ export default function Details({ thread, team, tagSuggestions, unassignedCount,
 }) {
   const ig = thread?.channel === 'instagram'
   return (
-    <aside className="w-full lg:w-[300px] xl:w-[330px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
+    <aside className="w-full lg:w-[280px] xl:w-[310px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
       {thread && (
         <>
           <Section title="Customer">

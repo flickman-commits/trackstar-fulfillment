@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Archive, ChevronDown, Clock, Loader2, Paperclip, RotateCcw, Send, Star, StickyNote, Trash2, Zap, X, Search } from 'lucide-react'
+import { AlertTriangle, Archive, ChevronDown, Clock, Loader2, MailOpen, Paperclip, RotateCcw, Send, Star, StickyNote, Trash2, Zap, X, Search } from 'lucide-react'
 import { btnGhost, btnPrimary, btnSecondary } from '@/lib/ui'
 import { when } from '@/lib/supportDates'
 import { fillMacro } from '@/lib/supportStatus'
@@ -181,7 +181,7 @@ function MacroMenu({ macros, onPick, onClose }: { macros: Macro[]; onPick: (m: M
   )
 }
 
-export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onReply, onNote, onDeleteNote, onUseMacro, replyRef, noteRef }: {
+export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onUseMacro, replyRef, noteRef }: {
   thread: ThreadDetail
   /** The Instagram account replies go out as, without the @. */
   expectedHandle?: string
@@ -194,6 +194,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   onStatus: (s: ThreadStatus) => void
   onSnooze: (until: string | null) => void
   onPriority: (p: boolean) => void
+  onMarkUnread: () => void
   onReply: (text: string, close: boolean) => Promise<boolean>
   onNote: (body: string, mentions: string[]) => Promise<boolean>
   onDeleteNote: (noteId: string) => void
@@ -313,6 +314,9 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
         <div className="flex items-center gap-1.5 flex-wrap">
           <button onClick={() => onPriority(!thread.priority)} disabled={busy} className={`${btnGhost} px-2`} title={thread.priority ? 'Remove priority (p)' : 'Mark priority (p)'}>
             <Star className={`w-4 h-4 ${thread.priority ? 'text-amber-500 fill-amber-500' : 'text-off-black/40'}`} />
+          </button>
+          <button onClick={onMarkUnread} disabled={busy} className={`${btnGhost} px-2`} title="Mark unread (u)">
+            <MailOpen className="w-4 h-4 text-off-black/40" />
           </button>
           <AssigneePicker team={team} value={thread.assignee?.id || null} meId={me.id} onChange={onAssign} />
           {snoozed && <span className="text-[11px] text-off-black/50 inline-flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(thread.snoozedUntil as string).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>}

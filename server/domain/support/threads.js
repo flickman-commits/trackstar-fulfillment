@@ -363,12 +363,19 @@ export async function customerContext(email) {
     take: 60,
     include: { approvalToken: { select: { token: true } }, assignee: { select: TEAM_SELECT } },
   })
-  const byNumber = new Map()
+  // Our Shopify rows carry Shopify's numeric order id as parentOrderNumber
+  // and the number a person reads (#4517) inside shopifyOrderData.name, so
+  // a Shopify order is matched by its id first and its name second.
+  const byKey = new Map()
+  const keyOf = o => String(o.shopifyOrderData?.id || o.parentOrderNumber)
+  const nameOf = o => String(o.shopifyOrderData?.name || o.parentOrderNumber).replace(/^#/, '')
   for (const o of ours) {
-    const key = String(o.parentOrderNumber)
-    if (!byNumber.has(key)) byNumber.set(key, [])
-    byNumber.get(key).push(o)
+    const key = keyOf(o)
+    if (!byKey.has(key)) byKey.set(key, [])
+    byKey.get(key).push(o)
   }
+  const byName = new Map()
+  for (const [, rows] of byKey) byName.set(nameOf(rows[0]), rows)
 
   let shopify = []
   let shopifyError = null
@@ -386,8 +393,8 @@ export async function customerContext(email) {
   const seen = new Set()
   for (const s of shopify) {
     const number = String(s.name || '').replace(/^#/, '')
-    seen.add(number)
-    const rows = byNumber.get(number) || []
+    const rows = byKey.get(String(s.legacyResourceId)) || byName.get(number) || []
+    if (rows.length) seen.add(keyOf(rows[0]))
     orders.push({
       number,
       source: 'shopify',
@@ -406,11 +413,11 @@ export async function customerContext(email) {
       imported: rows.length > 0,
     })
   }
-  for (const [number, rows] of byNumber) {
-    if (seen.has(number)) continue
+  for (const [key, rows] of byKey) {
+    if (seen.has(key)) continue
     const first = rows[0]
     orders.push({
-      number,
+      number: nameOf(first),
       source: first.source,
       shopifyOrderId: first.source === 'shopify' ? first.shopifyOrderData?.id || null : null,
       adminUrl: first.source === 'shopify' ? shopifyAdminUrl(first.shopifyOrderData?.id) : null,

@@ -237,8 +237,8 @@ export default function Support() {
             <h1 className="text-2xl md:text-[28px] font-bold text-off-black leading-none">Support</h1>
             {loading && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
           </div>
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <div className="relative w-[200px] md:w-[280px]">
+          <div className="flex-1 flex items-center justify-end gap-2 md:gap-3 min-w-0">
+            <div className="relative flex-1 max-w-[760px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
               <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search conversations" className="w-full pl-9 pr-8 py-2 bg-white border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30" />
               {query && <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-off-black/40 hover:text-off-black"><X className="w-3.5 h-3.5" /></button>}
@@ -271,7 +271,7 @@ export default function Support() {
             {thread && me ? (
               <Conversation
                 key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros} expectedHandle={instagram?.expectedHandle}
-                onAssign={assign} onStatus={setStatusOf} onSnooze={snooze} onPriority={setPriority}
+                onAssign={assign} onStatus={setStatusOf} onSnooze={snooze} onPriority={setPriority} onMarkUnread={markUnread}
                 onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
                 replyRef={replyRef} noteRef={noteRef}
               />

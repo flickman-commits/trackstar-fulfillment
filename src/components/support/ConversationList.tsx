@@ -85,7 +85,7 @@ export default function ConversationList({ title, threads, selectedId, onSelect,
   onSort: (s: InboxSort) => void
 }) {
   return (
-    <div className="w-full lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-border-gray min-h-0 max-h-[42vh] lg:max-h-none">
+    <div className="w-full lg:w-[290px] xl:w-[320px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-border-gray min-h-0 max-h-[42vh] lg:max-h-none">
       <div className="px-4 py-2.5 border-b border-border-gray flex items-center justify-between gap-2 shrink-0">
         <span className="text-sm font-semibold text-off-black truncate">{title}<span className="ml-1.5 text-off-black/40 font-normal tabular-nums">{threads.length}</span></span>
         <label className="relative inline-flex items-center text-[11px] text-off-black/55 hover:text-off-black cursor-pointer">
