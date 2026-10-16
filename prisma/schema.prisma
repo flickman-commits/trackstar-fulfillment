@@ -983,8 +983,43 @@ model RenderJob {
 model RenderWorker {
   id         String   @id
   name       String
-  // Race names (the tool's canonical names) this worker has a template for
+  // Template keys this worker can render right now (file present, check passed)
   templates  Json
+  // Per template key: { present, mtime } as the worker last saw the file on its disk
+  files      Json?
   lastSeenAt DateTime
   createdAt  DateTime @default(now())
+}
+
+/**
+ * A production file the renderer fills: one per race design, keyed by the
+ * race's name as the tool knows it, plus " / <edition>" for an alternate
+ * design sold as its own product (World Majors). Races span years, so this
+ * hangs off the race name, not a Race row. The file path is relative to the
+ * shop's Drive Races folder, which every worker has synced.
+ *
+ * A template is usable only when enabled, its last check passed, and a
+ * worker that is online has the file. Workers run the check themselves
+ * whenever the file changes (worker/illustrator/check.jsx) and report here.
+ */
+model PrintTemplate {
+  id              String    @id @default(cuid())
+  key             String    @unique
+  raceName        String
+  edition         String?
+  file            String
+  // { artboard, artboardExclude, photoArtboard }: how to pick the artboard, see worker/README.md
+  rules           Json?
+  enabled         Boolean   @default(true)
+  notes           String?
+  lastCheckAt     DateTime?
+  lastCheckOk     Boolean?
+  // The checker's findings: { problems: [], warnings: [], sizes: { "12x18": {...} } }
+  lastCheckReport Json?
+  lastCheckMtime  String?   // the file's modification time the check was run against
+  lastCheckWorker String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([raceName])
 }

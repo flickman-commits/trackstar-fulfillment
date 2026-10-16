@@ -10,7 +10,8 @@
  * worker/local-out/<race>/. If the designer's file for the order is in the
  * Drive orders folder, it compares the text of the two PDFs field by field.
  *
- * Needs worker/.env (RACES_DIR) and the repo's .env.local (DATABASE_URL,
+ * Templates come from the tool's table (Settings > Admin > Designs). Needs
+ * worker/.env (RACES_DIR) and the repo's .env.local (DATABASE_URL,
  * SUPABASE_*). Reads the database; writes nothing to it.
  */
 import 'dotenv/config'
@@ -29,7 +30,7 @@ for (const line of fs.existsSync(path.join(HERE, '.env')) ? fs.readFileSync(path
 }
 const RACES_DIR = process.env.RACES_DIR
 const ORDERS_DIR = path.join(path.dirname(RACES_DIR), 'Orders')
-const templates = JSON.parse(fs.readFileSync(path.join(HERE, 'templates.json'), 'utf8'))
+const templates = Object.fromEntries((await prisma.printTemplate.findMany()).map(t => [t.key, { file: t.file, ...(t.rules || {}) }]))
 const [race, ...numbers] = process.argv.slice(2)
 if (!race || !numbers.length) { console.error('Usage: node worker/render-local.mjs "<race name>" <order number> ...'); process.exit(1) }
 const OUT = path.join(HERE, 'local-out', race.replace(/[^A-Za-z0-9]+/g, '_'))

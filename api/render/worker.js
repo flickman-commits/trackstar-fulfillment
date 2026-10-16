@@ -4,8 +4,10 @@
  * Authenticates with an API key (Authorization: Bearer ...) that has the
  * write or repair scope. Every call is a POST with an action:
  *
- *   heartbeat  { workerId, name, templates }  I am here; these races I can render
- *   claim      { workerId }                   give me the next job, with upload slots
+ *   templates  { workerId }                   the enabled templates: key, file, rules, last check
+ *   heartbeat  { workerId, name, templates, files }  I am here; files I have and keys I can render
+ *   check      { workerId, key, mtime, ok, report }  I checked this template's file
+ *   claim      { workerId }                   give me the next job, with upload slots and its template
  *   complete   { workerId, jobId, notes }     files are uploaded
  *   fail       { workerId, jobId, error }     could not render
  *
@@ -16,6 +18,7 @@ import { setCors } from '../_lib/auth.js'
 import { resolveApiKey } from '../_lib/apiKeys.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
 import { heartbeat, claimNext, uploadSlots, completeJob, failJob } from '../../server/domain/render/jobs.js'
+import { templatesForWorker, recordCheck } from '../../server/domain/render/templates.js'
 
 function bearer(h) {
   const m = /^Bearer\s+(.+)$/i.exec(String(h || ''))
@@ -41,15 +44,22 @@ export default async function handler(req, res) {
     if (!workerId) return res.status(400).json({ error: 'workerId is required' })
 
     switch (body.action) {
+      case 'templates': {
+        return res.status(200).json({ templates: await templatesForWorker() })
+      }
       case 'heartbeat': {
-        const w = await heartbeat({ workerId, name: body.name, templates: body.templates })
+        const w = await heartbeat({ workerId, name: body.name, templates: body.templates, files: body.files })
         return res.status(200).json({ ok: true, worker: w.name, templates: w.templates.length })
+      }
+      case 'check': {
+        const t = await recordCheck({ key: body.key, mtime: body.mtime, ok: body.ok, report: body.report, workerId })
+        return res.status(200).json({ ok: true, key: t.key, passed: t.lastCheckOk })
       }
       case 'claim': {
         const job = await claimNext(workerId)
         if (!job) return res.status(200).json({ job: null })
         const slots = await uploadSlots(job)
-        return res.status(200).json({ job: { id: job.id, version: job.version, spec: job.spec, ...slots } })
+        return res.status(200).json({ job: { id: job.id, version: job.version, spec: job.spec, template: job.template, ...slots } })
       }
       case 'complete': {
         const job = await completeJob({ jobId: body.jobId, workerId, notes: body.notes })

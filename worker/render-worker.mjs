@@ -3,14 +3,21 @@
  * Render worker. Runs on a Mac with Illustrator open and turns the tool's
  * render jobs into print files.
  *
- *   node worker/render-worker.mjs
+ *   node worker/render-worker.mjs      (or: npm run worker)
  *
  * Every few seconds it asks the fulfillment tool for a job. For each one it
  * copies the race's production file to a scratch folder (the live file is
  * never opened), writes the order's details next to the Illustrator script,
  * runs the script through AppleScript, uploads the PDF and preview straight
- * to storage, and reports back. Every 30 seconds it checks in with the races
- * it has templates for, which is how the tool knows what it can render.
+ * to storage, and reports back.
+ *
+ * The list of templates (which production file renders which race) comes
+ * from the tool, not from this machine. Every 30 seconds the worker checks
+ * in with which of those files it has on disk and when each was last
+ * modified. A file that changed since it was last checked is run through
+ * the template check (illustrator/check.jsx) and the verdict is sent back,
+ * so a template that a designer broke stops being rendered on its own, and
+ * one they fixed comes back without anyone touching the tool.
  *
  * Settings come from worker/.env (see worker/.env.example):
  *   FULFILLMENT_URL   https://fast.trackstar.art or http://localhost:3001
@@ -25,6 +32,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { evaluateCheck } from './lib/evaluateCheck.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 loadEnv(path.join(HERE, '.env'))
@@ -38,15 +46,14 @@ const PRESET = process.env.PDF_PRESET || 'TRACKSTAR DEFAULT'
 const POLL_MS = 5000
 const HEARTBEAT_MS = 30000
 const ILLUSTRATOR_TIMEOUT_MS = 180000
+const CHECK_TIMEOUT_MS = 600000
 const SCRIPT = path.join(HERE, 'illustrator', 'render.jsx')
+const CHECK_SCRIPT = path.join(HERE, 'illustrator', 'check.jsx')
 const WORK = path.join(os.tmpdir(), 'trackstar-render')
 
 if (!URL_BASE || !KEY || !RACES_DIR) { console.error('Set FULFILLMENT_URL, RENDER_API_KEY and RACES_DIR in worker/.env'); process.exit(1) }
 if (!fs.existsSync(RACES_DIR)) { console.error(`RACES_DIR does not exist: ${RACES_DIR}`); process.exit(1) }
 fs.mkdirSync(WORK, { recursive: true })
-
-const templates = JSON.parse(fs.readFileSync(path.join(HERE, 'templates.json'), 'utf8'))
-delete templates._comment
 
 function loadEnv(file) {
   if (!fs.existsSync(file)) return
@@ -68,32 +75,63 @@ async function api(action, body) {
   return data
 }
 
-/** A template entry is a path, or { file, artboard } for a file with more than one colorway. */
-function templateFor(race) {
-  const t = templates[race]
-  if (!t) return null
-  return typeof t === 'string' ? { file: t, artboard: null, artboardExclude: null, photoArtboard: null } : { file: t.file, artboard: t.artboard || null, artboardExclude: t.artboardExclude || null, photoArtboard: t.photoArtboard || null }
+/** What is on this disk for each template the tool knows about. */
+function fileState(templates) {
+  const files = {}
+  for (const t of templates) {
+    const p = path.join(RACES_DIR, t.file)
+    try { const st = fs.statSync(p); files[t.key] = { present: true, mtime: st.mtime.toISOString() } }
+    catch { files[t.key] = { present: false, mtime: null } }
+  }
+  return files
 }
 
-/** Races whose production file is actually present on this machine right now. */
-function availableTemplates() {
-  return Object.keys(templates).filter(race => fs.existsSync(path.join(RACES_DIR, templateFor(race).file)))
-}
-
-async function heartbeat() {
-  const list = availableTemplates()
-  await api('heartbeat', { name: NAME, templates: list })
-  return list
-}
-
-function runIllustrator() {
+function runIllustrator(script, timeout) {
   return new Promise((resolve, reject) => {
-    const osa = `tell application "Adobe Illustrator" to do javascript file "${SCRIPT}"`
-    execFile('osascript', ['-e', osa], { timeout: ILLUSTRATOR_TIMEOUT_MS }, (err, _stdout, stderr) => {
+    const osa = `tell application "Adobe Illustrator" to do javascript file "${script}"`
+    execFile('osascript', ['-e', osa], { timeout }, (err, _stdout, stderr) => {
       if (err) return reject(new Error(err.killed ? 'Illustrator did not finish in time' : (stderr || err.message).trim()))
       resolve()
     })
   })
+}
+
+/**
+ * Check every template whose file changed since it was last checked, in one
+ * Illustrator run, and report each verdict.
+ */
+async function checkChanged(templates, files) {
+  const due = templates.filter(t => files[t.key]?.present && files[t.key].mtime !== t.lastCheckMtime)
+  if (!due.length) return
+  const dir = path.join(WORK, 'check')
+  fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true })
+  const input = due.map((t, i) => {
+    const copy = path.join(dir, `${i}.ai`)
+    fs.copyFileSync(path.join(RACES_DIR, t.file), copy)
+    return { key: t.key, path: copy, race: t.key.split(' / ')[0], artboard: t.rules?.artboard || null, artboardExclude: t.rules?.artboardExclude || null, photoArtboard: t.rules?.photoArtboard || null }
+  })
+  log(`Checking ${due.length} template${due.length > 1 ? 's' : ''}: ${due.map(t => t.key).join(', ')}`)
+  fs.writeFileSync(path.join(HERE, 'illustrator', 'check-input.json'), JSON.stringify({ files: input }))
+  fs.rmSync(path.join(HERE, 'illustrator', 'check-result.json'), { force: true })
+  await runIllustrator(CHECK_SCRIPT, CHECK_TIMEOUT_MS)
+  const results = JSON.parse(fs.readFileSync(path.join(HERE, 'illustrator', 'check-result.json'), 'utf8'))
+  for (const t of due) {
+    const verdict = evaluateCheck(results.find(r => r.key === t.key))
+    await api('check', { key: t.key, mtime: files[t.key].mtime, ok: verdict.ok, report: verdict })
+    t.lastCheckMtime = files[t.key].mtime; t.lastCheckOk = verdict.ok
+    log(`  ${verdict.ok ? 'ok  ' : 'FAIL'} ${t.key}${verdict.problems.length ? ': ' + verdict.problems.join('; ') : ''}`)
+  }
+  fs.rmSync(dir, { recursive: true, force: true })
+}
+
+/** Fetch templates, check what changed, tell the tool what this machine can render. */
+async function heartbeat() {
+  const { templates } = await api('templates', {})
+  const files = fileState(templates)
+  try { await checkChanged(templates, files) } catch (e) { log(`Template check failed: ${e.message}`) }
+  const renderable = templates.filter(t => files[t.key]?.present && t.lastCheckOk).map(t => t.key)
+  await api('heartbeat', { name: NAME, templates: renderable, files })
+  return renderable
 }
 
 async function download(url, to) {
@@ -108,8 +146,7 @@ async function upload(url, file, contentType) {
 }
 
 async function render(job) {
-  const { spec } = job
-  const tpl = templateFor(spec.template || spec.race)
+  const { spec, template: tpl } = job
   if (!tpl) throw new Error(`No template for ${spec.template || spec.race}`)
   const src = path.join(RACES_DIR, tpl.file)
   const dir = path.join(WORK, job.id)
@@ -124,11 +161,12 @@ async function render(job) {
   if (job.photoUrl) { photo = path.join(dir, 'photo' + (path.extname(spec.photoPath || '') || '.jpg')); await download(job.photoUrl, photo) }
 
   const out = path.join(dir, spec.file)
-  const current = { template, out, preset: PRESET, artboard: tpl.artboard, artboardExclude: tpl.artboardExclude, photoArtboard: tpl.photoArtboard, spec: { ...spec, photo } }
+  const rules = tpl.rules || {}
+  const current = { template, out, preset: PRESET, artboard: rules.artboard || null, artboardExclude: rules.artboardExclude || null, photoArtboard: rules.photoArtboard || null, spec: { ...spec, photo } }
   fs.writeFileSync(path.join(HERE, 'illustrator', 'current.json'), JSON.stringify(current))
   fs.rmSync(path.join(HERE, 'illustrator', 'result.json'), { force: true })
 
-  await runIllustrator()
+  await runIllustrator(SCRIPT, ILLUSTRATOR_TIMEOUT_MS)
   const resultFile = path.join(HERE, 'illustrator', 'result.json')
   if (!fs.existsSync(resultFile)) throw new Error('Illustrator ran but wrote no result')
   const result = JSON.parse(fs.readFileSync(resultFile, 'utf8'))
@@ -148,7 +186,7 @@ async function main() {
   for (;;) {
     try { list = await heartbeat(); break } catch (e) { log(`Cannot reach the tool yet (${e.message}); retrying`); await sleep(15000) }
   }
-  log(`Templates on this machine: ${list.length ? list.join(', ') : 'none'}`)
+  log(`Renderable on this machine: ${list.length ? list.join(', ') : 'none'}`)
   let lastBeat = Date.now()
   for (;;) {
     try {

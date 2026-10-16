@@ -40,11 +40,24 @@ Nothing in the Races folder is ever written, moved or deleted.
 
 ## Adding a race
 
-Add a line to `worker/templates.json` mapping the race's name as the tool
-knows it to its production file. The template has to follow the Chicago
+Add it in the tool: Settings > Admin > Designs, with the production file's
+path relative to the Races folder. The next time a worker checks in it runs
+the template check on the file and the panel shows whether it passed. A
+template that fails is not rendered. (`worker/templates.json` is only the
+seed the table was first filled from.) The template has to follow the Chicago
 layout: artboards named with their size (8x10, 12x18, 16x24), a `PERSONALIZE
 LAYER` with the six placeholder frames (Runner Name, BIB # HERE, a time, a
 pace with "/ mi", a date like 10.11.26, and a weather line with a degree
 sign), a `PHOTO LAYER` with a clipped square per size, and a `GUIDES` layer.
-The script names the frames itself from the placeholders. Render a couple of
-past orders and compare them with the designer's files before relying on it.
+The script finds the frames itself from what they hold. Render a couple of
+past orders with `node worker/render-local.mjs "<race>" <order numbers>`
+and compare them with the designer's files before relying on it.
+
+## Checking a file by hand
+
+```bash
+node worker/check-template.mjs "Sydney Marathon"
+node worker/check-template.mjs --file "Austin Marathon/Illustrator Files/Austin Marathon_Production.ai" --race "Austin Marathon"
+```
+
+Stop the worker first; both talk to the same Illustrator.

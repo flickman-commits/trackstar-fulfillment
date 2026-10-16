@@ -9,6 +9,7 @@
 import { createClient } from '@supabase/supabase-js'
 import prisma from '../../db.js'
 import { buildSpec, SPEC_SELECT } from './spec.js'
+import { availableTemplateKeys, onlineWorkers as onlineWorkersList } from './templates.js'
 import { getCanonicalRaceName } from '../../scrapers/index.js'
 
 export const BUCKET = 'production-files'
@@ -20,26 +21,20 @@ function storage() {
 }
 
 /** Workers seen in the last minute and a half. */
-export async function onlineWorkers() {
-  return prisma.renderWorker.findMany({ where: { lastSeenAt: { gte: new Date(Date.now() - ONLINE_MS) } }, orderBy: { name: 'asc' } })
-}
+export async function onlineWorkers() { return onlineWorkersList() }
 
-/** Races any online worker can render. */
-export async function availableTemplates() {
-  const workers = await onlineWorkers()
-  const set = new Set()
-  for (const w of workers) for (const t of (Array.isArray(w.templates) ? w.templates : [])) set.add(String(t))
-  return [...set]
-}
+/** Template keys any online worker can render (enabled, check passed, file present). */
+export async function availableTemplates() { return availableTemplateKeys() }
 
-export async function heartbeat({ workerId, name, templates }) {
+export async function heartbeat({ workerId, name, templates, files }) {
   const id = String(workerId || '').slice(0, 80)
   if (!id) throw new Error('workerId is required')
   const list = (Array.isArray(templates) ? templates : []).map(String).slice(0, 500)
+  const fileMap = files && typeof files === 'object' ? files : undefined
   return prisma.renderWorker.upsert({
     where: { id },
-    update: { name: String(name || id).slice(0, 80), templates: list, lastSeenAt: new Date() },
-    create: { id, name: String(name || id).slice(0, 80), templates: list, lastSeenAt: new Date() },
+    update: { name: String(name || id).slice(0, 80), templates: list, ...(fileMap ? { files: fileMap } : {}), lastSeenAt: new Date() },
+    create: { id, name: String(name || id).slice(0, 80), templates: list, files: fileMap || {}, lastSeenAt: new Date() },
   })
 }
 
@@ -83,11 +78,16 @@ export async function claimNext(workerId) {
   await prisma.renderJob.updateMany({ where: { status: 'rendering', claimedAt: { lt: stale } }, data: { status: 'queued', workerId: null, claimedAt: null } })
   const worker = await prisma.renderWorker.findUnique({ where: { id: String(workerId) } })
   const templates = Array.isArray(worker?.templates) ? worker.templates.map(String) : []
+  // The job carries the template rules it should render with, resolved here from the table.
   const candidates = await prisma.renderJob.findMany({ where: { status: 'queued' }, orderBy: { createdAt: 'asc' }, take: 20 })
   for (const job of candidates) {
     if (!templates.includes(String(job.spec?.template || job.spec?.race))) continue
     const claimed = await prisma.renderJob.updateMany({ where: { id: job.id, status: 'queued' }, data: { status: 'rendering', workerId: String(workerId), claimedAt: new Date() } })
-    if (claimed.count === 1) return prisma.renderJob.findUnique({ where: { id: job.id } })
+    if (claimed.count === 1) {
+      const t = await prisma.printTemplate.findUnique({ where: { key: String(job.spec?.template || job.spec?.race) } })
+      const fresh = await prisma.renderJob.findUnique({ where: { id: job.id } })
+      return { ...fresh, template: t ? { key: t.key, file: t.file, rules: t.rules || {} } : null }
+    }
   }
   return null
 }

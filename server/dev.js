@@ -28,6 +28,8 @@ const routes = [
   { method: 'get',  path: '/api/render/jobs',                handler: '../api/render/jobs.js' },
   { method: 'post', path: '/api/render/jobs',                handler: '../api/render/jobs.js' },
   { method: 'post', path: '/api/render/worker',              handler: '../api/render/worker.js' },
+  { method: 'get',  path: '/api/render/templates',           handler: '../api/render/templates.js' },
+  { method: 'post', path: '/api/render/templates',           handler: '../api/render/templates.js' },
   { method: 'post', path: '/api/orders/rush',                handler: '../api/orders/rush.js' },
   { method: 'get',  path: '/api/surveys',                    handler: '../api/surveys/index.js' },
   { method: 'post', path: '/api/surveys',                    handler: '../api/surveys/index.js' },
