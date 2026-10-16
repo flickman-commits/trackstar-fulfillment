@@ -21,6 +21,10 @@
     {
       "path": "/api/orders/auto-import",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/support/sync",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {
@@ -35,6 +39,27 @@
     },
     "api/sales/**/*.js": {
       "maxDuration": 300
+    },
+    "api/support/sync.js": {
+      "maxDuration": 300
+    },
+    "api/support/backfill.js": {
+      "maxDuration": 300
+    },
+    "api/support/reply.js": {
+      "maxDuration": 60
+    },
+    "api/support/thread.js": {
+      "maxDuration": 60
+    },
+    "api/support/threads.js": {
+      "maxDuration": 60
+    },
+    "api/support/gmail.js": {
+      "maxDuration": 60
+    },
+    "api/support/gmail-callback.js": {
+      "maxDuration": 60
     },
     "api/orders/actions.js": {
       "maxDuration": 300

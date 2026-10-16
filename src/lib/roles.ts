@@ -5,27 +5,29 @@
  * DEFAULT_CAPS here is only the fallback for a session that has not loaded
  * it yet.
  */
-export type Role = 'admin' | 'sales' | 'fulfillment' | 'head_designer' | 'designer'
+export type Role = 'admin' | 'sales' | 'fulfillment' | 'support' | 'head_designer' | 'designer'
 
 export type Capability =
-  | 'sales' | 'creators' | 'orders.assign_custom' | 'orders.render'
+  | 'sales' | 'support' | 'creators' | 'orders.assign_custom' | 'orders.render'
   | 'tools.discounts' | 'tools.pace' | 'tools.weather' | 'tools.surveys'
   | 'settings.pricing' | 'settings.reviews' | 'settings.stats' | 'settings.data' | 'settings.admin'
 
 export type Caps = '*' | Capability[]
 
-export const ROLES: Role[] = ['admin', 'sales', 'fulfillment', 'head_designer', 'designer']
+export const ROLES: Role[] = ['admin', 'sales', 'fulfillment', 'support', 'head_designer', 'designer']
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Admin',
   sales: 'Sales & Marketing',
   fulfillment: 'Fulfillment',
+  support: 'Customer Support',
   head_designer: 'Head of Design',
   designer: 'Junior Designer',
 }
 
 export const CAPABILITY_LABEL: Partial<Record<Capability, string>> = {
   sales: 'Sales',
+  support: 'Support',
   creators: 'Creators',
   'orders.assign_custom': 'Assign customs',
   'orders.render': 'Automated designs',
@@ -41,7 +43,8 @@ export const CAPABILITY_LABEL: Partial<Record<Capability, string>> = {
 const DEFAULT_CAPS: Record<Role, Caps> = {
   admin: '*',
   sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.pricing', 'settings.reviews', 'settings.stats'],
-  fulfillment: ['creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  fulfillment: ['support', 'creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  support: ['support', 'tools.discounts', 'tools.pace', 'tools.weather'],
   head_designer: ['orders.assign_custom', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
   designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
 }

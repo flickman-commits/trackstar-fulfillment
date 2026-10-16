@@ -744,6 +744,8 @@ model User {
   editBatches  ProductEditBatch[]
   auditEvents  AuditEvent[]
   apiKeys      ApiKey[]
+  supportThreads   SupportThread[]   @relation("SupportAssignee")
+  supportReplies   SupportMessage[]  @relation("SupportSentBy")
 
   @@index([email])
 }
@@ -1042,4 +1044,85 @@ model PrintTemplate {
   updatedAt       DateTime  @updatedAt
 
   @@index([raceName])
+}
+
+// -----------------------------------------------------------------------------
+// Support: the shared inbox for fast@trackstar.art
+// -----------------------------------------------------------------------------
+// Gmail is the system of record for the mail itself, the way Attio is for
+// deals. These tables are the mirror the page reads from, so a rep never
+// waits on Gmail to list the inbox, plus the machinery Gmail has no idea of:
+// who has the thread, whether it is waiting on the customer, when it was
+// snoozed to. A thread is one Gmail thread; a message is one Gmail message,
+// stored once by its Gmail id so a re-sync cannot duplicate it.
+//
+// Status, and who moves it:
+//   open      the customer is waiting on us. Set by the sync when an inbound
+//             message arrives, on a new thread or a thread in any other state.
+//   waiting   we are waiting on the customer. Set by the sync when a message
+//             goes out from the mailbox, whether sent from here or in Gmail.
+//   escalated a person pulled Matt in. Only a person sets it; a reply does
+//             not clear it, an inbound message does not either.
+//   closed    done. A person closes it; a new inbound message reopens it.
+model SupportThread {
+  id              String    @id @default(cuid())
+  gmailThreadId   String    @unique
+  subject         String    @default("")
+  // The other party: the address that is not the mailbox. One per thread;
+  // a thread with several correspondents keeps the first.
+  customerEmail   String    @default("")
+  customerName    String    @default("")
+  status          String    @default("open")
+  snoozedUntil    DateTime?
+  assigneeId      String?
+  assignee        User?     @relation("SupportAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  // The newest message's first line, for the list.
+  snippet         String    @default("")
+  messageCount    Int       @default(0)
+  lastMessageAt   DateTime  @default(now())
+  lastInboundAt   DateTime?
+  lastOutboundAt  DateTime?
+  // Set by the backfill for threads that were already over when the mirror
+  // was built, so a report can tell history from live work.
+  backfilled      Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  messages        SupportMessage[]
+
+  @@index([status, lastMessageAt])
+  @@index([assigneeId, status])
+  @@index([customerEmail])
+  @@index([lastMessageAt])
+}
+
+model SupportMessage {
+  id              String    @id @default(cuid())
+  threadId        String
+  thread          SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  gmailMessageId  String    @unique
+  // The RFC 822 Message-ID and the one it answers, so a reply from here can
+  // thread correctly in the customer's mail client, not only in Gmail.
+  rfcMessageId    String?
+  inReplyTo       String?
+  // "in" from the customer, "out" from the mailbox.
+  direction       String
+  fromEmail       String    @default("")
+  fromName        String    @default("")
+  toEmails        String    @default("")
+  ccEmails        String    @default("")
+  subject         String    @default("")
+  bodyText        String    @default("")
+  bodyHtml        String?
+  // [{ filename, mimeType, size, attachmentId }]. The bytes stay in Gmail.
+  attachments     Json?
+  sentAt          DateTime
+  // Who pressed Send here. Null for inbound mail, for anything sent in Gmail
+  // itself, and for everything the backfill found.
+  sentById        String?
+  sentBy          User?     @relation("SupportSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+
+  @@index([threadId, sentAt])
+  @@index([sentAt])
 }

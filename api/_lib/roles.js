@@ -4,6 +4,8 @@
  *   admin        Matt. Everything, always, including Settings > Data and Admin.
  *   sales        Sales & Marketing.
  *   fulfillment  Fulfillment.
+ *   support      Customer Support: the shared inbox, and the tools a reply
+ *                needs (discount codes, pace, weather).
  *   head_designer  Head of Design (Dan): also assigns custom orders.
  *   designer     Junior Designer. The id stays "designer" so existing people
  *                keep their role; only the label changed.
@@ -21,12 +23,13 @@
  */
 import prisma from './prisma.js'
 
-export const ROLES = ['admin', 'sales', 'fulfillment', 'head_designer', 'designer']
+export const ROLES = ['admin', 'sales', 'fulfillment', 'support', 'head_designer', 'designer']
 
 export const ROLE_LABEL = {
   admin: 'Admin',
   sales: 'Sales & Marketing',
   fulfillment: 'Fulfillment',
+  support: 'Customer Support',
   head_designer: 'Head of Design',
   designer: 'Junior Designer',
 }
@@ -34,6 +37,7 @@ export const ROLE_LABEL = {
 /** What an admin can hand out, in the order the Roles panel shows them. */
 export const CAPABILITIES = [
   { id: 'sales', group: 'Pages', label: 'Sales' },
+  { id: 'support', group: 'Pages', label: 'Support' },
   { id: 'creators', group: 'Pages', label: 'Creators' },
   { id: 'orders.assign_custom', group: 'Orders', label: 'Assign custom orders' },
   { id: 'orders.render', group: 'Orders', label: 'Create and approve automated designs' },
@@ -50,7 +54,8 @@ const EDITABLE_ROLES = ROLES.filter(r => r !== 'admin')
 
 export const DEFAULT_CAPS = {
   sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.pricing', 'settings.reviews', 'settings.stats'],
-  fulfillment: ['creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  fulfillment: ['support', 'creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  support: ['support', 'tools.discounts', 'tools.pace', 'tools.weather'],
   head_designer: ['orders.assign_custom', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
   designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
 }

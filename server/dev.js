@@ -123,6 +123,16 @@ const routes = [
   { method: 'get',    path: '/api/sales/send-due',         handler: '../api/sales/send-due.js' },
   { method: 'post',   path: '/api/sales/today',            handler: '../api/sales/today.js' },
   { method: 'post',   path: '/api/sales/gmail',            handler: '../api/sales/gmail.js' },
+  { method: 'get',    path: '/api/support/gmail',          handler: '../api/support/gmail.js' },
+  { method: 'post',   path: '/api/support/gmail',          handler: '../api/support/gmail.js' },
+  { method: 'get',    path: '/api/support/gmail-callback', handler: '../api/support/gmail-callback.js' },
+  { method: 'get',    path: '/api/support/sync',           handler: '../api/support/sync.js' },
+  { method: 'post',   path: '/api/support/sync',           handler: '../api/support/sync.js' },
+  { method: 'post',   path: '/api/support/backfill',       handler: '../api/support/backfill.js' },
+  { method: 'get',    path: '/api/support/threads',        handler: '../api/support/threads.js' },
+  { method: 'get',    path: '/api/support/thread',         handler: '../api/support/thread.js' },
+  { method: 'post',   path: '/api/support/thread',         handler: '../api/support/thread.js' },
+  { method: 'post',   path: '/api/support/reply',          handler: '../api/support/reply.js' },
 ]
 
 // Load all handlers and register routes

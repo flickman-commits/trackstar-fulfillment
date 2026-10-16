@@ -66,7 +66,8 @@ export function isGmailConfigured() {
   return Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET)
 }
 
-function oauthClient(redirectUri) {
+/** Shared with the support mailbox (server/domain/support/mailbox.js). */
+export function oauthClient(redirectUri) {
   if (!isGmailConfigured()) throw new Error('Gmail is not configured: set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET')
   return new google.auth.OAuth2(
     process.env.GOOGLE_OAUTH_CLIENT_ID,
@@ -206,7 +207,7 @@ async function gmailClient(userId) {
  * days. Forget the dead token so the UI offers Connect again rather than
  * showing a broken button, and say what to do about it.
  */
-function isRevokedToken(err) {
+export function isRevokedToken(err) {
   const text = `${err?.message || ''} ${err?.response?.data?.error || ''}`
   return /invalid_grant|invalid_token|unauthorized_client/i.test(text)
 }
@@ -340,7 +341,7 @@ export function buildMime({ to, subject, html, inReplyTo, attachment, attachment
  * built as a string with every binary part already base64'd inside it, so
  * latin1 round-trips it byte for byte; utf8 would re-encode the high bytes.
  */
-function base64url(s) {
+export function base64url(s) {
   return Buffer.from(s, 'latin1').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 

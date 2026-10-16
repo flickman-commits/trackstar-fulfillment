@@ -18,6 +18,7 @@ import MonopolyModel from '@/pages/MonopolyModel'
 import ProductsBulkEdit from '@/pages/ProductsBulkEdit'
 import Sales from '@/pages/Sales'
 import SalesWorkspace from '@/pages/SalesWorkspace'
+import Support from '@/pages/Support'
 import { SignInGate, RequireAdmin, RequireCap, useAuth } from '@/lib/auth'
 
 interface ErrorBoundaryProps {
@@ -250,6 +251,8 @@ export default function App() {
                 <Route path="/sales/sequences" element={<RequireCap cap="sales"><SalesWorkspace /></RequireCap>} />
                 <Route path="/sales/variables" element={<RequireCap cap="sales"><SalesWorkspace /></RequireCap>} />
                 <Route path="/send" element={null} />
+                {/* Support: the shared inbox for fast@trackstar.art. */}
+                <Route path="/support" element={<RequireCap cap="support"><Support /></RequireCap>} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>
               <SalesKeepAlive />
