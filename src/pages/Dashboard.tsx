@@ -5360,7 +5360,8 @@ Thank you!`
                         also shows, both share the row 50/50. */}
                     {selectedOrder.status !== 'completed' &&
                      selectedOrder.status !== 'flagged' &&
-                     !(selectedOrder.pipeline?.stage === 'attach' && selectedOrder.arteloUrl) &&
+                     // An approved design has its own Mark as complete beside Attach in Artelo.
+                     !((selectedOrder.pipeline?.stage === 'attach' || (design.job?.status === 'done' && design.job.review === 'approved')) && selectedOrder.arteloUrl) &&
                      !isEditing && (
                       <button
                         onClick={() => markAsCompleted(selectedOrder.orderNumber)}
