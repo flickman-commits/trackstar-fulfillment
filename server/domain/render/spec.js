@@ -19,7 +19,7 @@ export const SPEC_SELECT = {
   id: true, orderNumber: true, parentOrderNumber: true, lineItemIndex: true, trackstarOrderType: true, status: true,
   raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true,
   runnerName: true, runnerNameOverride: true, productSize: true, hadNoTime: true,
-  photoPath: true, shopifyOrderData: true,
+  photoPath: true, photoAddedManually: true, shopifyOrderData: true,
   runnerResearch: { orderBy: { id: 'desc' }, select: { researchStatus: true, bibNumber: true, officialTime: true, officialPace: true, eventType: true, race: { select: { raceDate: true, weatherCondition: true, weatherTemp: true } } } },
 }
 
@@ -60,7 +60,7 @@ export function buildSpec(order, templates = [], raceRow = null) {
 
   if (order.photoPath && order.shopifyOrderData) {
     const unpaid = unpaidPhotoRows([order], order.shopifyOrderData)
-    if (unpaid.length) reasons.push('Photo add-on is not paid yet')
+    if (unpaid.size) reasons.push('Photo add-on is not paid yet')
   }
 
   if (reasons.length) return { ok: false, reasons, spec: null }

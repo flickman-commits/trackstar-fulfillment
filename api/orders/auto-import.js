@@ -12,6 +12,7 @@ import { syncShopifyBulkOrders } from '../../server/domain/bulk/shopifyBulk.js'
 import { applyCustomerResults } from '../../server/domain/research/customerResults.js'
 import { autoQueueRenders } from '../../server/domain/render/jobs.js'
 import { deliverPending } from '../../server/domain/render/deliver.js'
+import { refreshUnpaidPhotoOrders } from '../../server/domain/orders/photoRefresh.js'
 
 export default async function handler(req, res) {
   if (!isCronRequest(req)) return res.status(401).json({ error: 'Unauthorized' })
@@ -20,6 +21,9 @@ export default async function handler(req, res) {
     if (out.imported) console.log(`[orders.auto-import] imported ${out.imported}, updated ${out.updated || 0}`)
     const applied = await applyCustomerResults({ limit: 100 }).catch(err => { console.error('[orders.auto-import] customer results failed:', err.message); return null })
     if (applied?.found) console.log(`[orders.auto-import] customer results: ${applied.applied} recorded, ${applied.failed} failed`)
+    // Prints waiting on a photo payment: re-read those orders from Shopify so a payment shows.
+    const photos = await refreshUnpaidPhotoOrders().catch(err => { console.error('[orders.auto-import] photo refresh failed:', err.message); return null })
+    if (photos?.updated) console.log(`[orders.auto-import] photo payments refreshed: ${photos.updated} of ${photos.checked} checked`)
     // Orders that have everything get their print rendered without anyone clicking.
     const renders = await autoQueueRenders().catch(err => { console.error('[orders.auto-import] auto renders failed:', err.message); return null })
     if (renders?.queued) console.log(`[orders.auto-import] renders queued: ${renders.queued}`)
