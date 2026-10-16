@@ -6,6 +6,7 @@
  *
  * Five stages, in the order a person cares about them:
  *   review          a design is waiting for a yes or no
+ *   attach          approved and in the Artelo library; a person attaches it to the Artelo order item, then marks done
  *   action          the script is stuck and a person has to do something (reason says what)
  *   needs_research  no result yet and nothing stops the lookup (brief; the import does it)
  *   waiting         nothing to do until something outside happens (race day, results, a worker, a payment)
@@ -49,7 +50,7 @@ export function pipelineFor({ order, research, race, render, hasScraper, templat
   if (render?.status === 'done' && render.review === 'pending') return stage('review', 'Ready for review')
   if (render?.status === 'queued' || render?.status === 'rendering') return stage('waiting', workerOnline ? 'Rendering' : 'Waiting for the renderer', { fix: workerOnline ? 'Illustrator is making the print.' : 'No render worker is online. The print renders when one checks in.' })
   if (render?.status === 'failed') return stage('action', 'Render failed', { kind: 'render', fix: `The render failed: ${render.error || 'unknown error'}. Fix the cause; it renders again on its own once the order's data changes, or use Re-render.` })
-  if (render?.status === 'done' && render.review === 'approved') return stage('waiting', 'Approved', { fix: 'The design was approved. The order completes on the next import.' })
+  if (render?.status === 'done' && render.review === 'approved') return stage('attach', 'Attach in Artelo', { fix: 'The print is approved and in the Artelo library (Orders folder). Open the Artelo order, attach the file to the item, then mark the order done here.' })
   if (render?.status === 'done' && render.review === 'rejected') return stage('action', 'Design rejected', { kind: 'data', fix: `The design was rejected: ${render.reviewNote || 'no note'}. Fix the data; a new design renders on the next import.` })
 
   // Race and setup problems: things only a person (or a developer) can change.

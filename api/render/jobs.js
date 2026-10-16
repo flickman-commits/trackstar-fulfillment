@@ -13,8 +13,8 @@
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireCapability, recordAudit, loadActiveUser } from '../_lib/users.js'
 import { checkOrder, createJob, latestJob, signedFiles, reviewJob, onlineWorkers } from '../../server/domain/render/jobs.js'
+import prisma from '../_lib/prisma.js'
 import { uploadApprovedToArtelo } from '../../server/domain/render/artelo.js'
-import { completeOrder } from '../../server/domain/orders/complete.js'
 import { deliverApproved } from '../../server/domain/render/deliver.js'
 import { markRacePrinted } from '../../server/domain/races/verification.js'
 
@@ -53,9 +53,11 @@ export default async function handler(req, res) {
         if (job.spec?.raceId) await markRacePrinted(job.spec.raceId)
         job = await deliverApproved(job)
         job = await uploadApprovedToArtelo(job)
-        // Approving the print is completing the order. A failed copy to Drive
-        // or Artelo is retried by the import; it does not hold the order.
-        await completeOrder({ orderId: job.orderId, actor: user, via: 'approve', renderJobId: job.id }).catch(e => console.error('[API /render/jobs] complete after approve:', e.message))
+        // The order is not done yet: the file still has to be attached to the
+        // item in Artelo by hand (no API for that). The order moves to the
+        // Attach stage and is completed from there. Other renders of the
+        // order still waiting for review are moot now.
+        await prisma.renderJob.updateMany({ where: { orderId: job.orderId, review: 'pending', id: { not: job.id } }, data: { review: 'closed', reviewNote: 'Another version was approved', reviewedAt: new Date() } })
       }
       await recordAudit({ action: `render.${job.review}`, summary: `${job.review === 'approved' ? 'Approved' : 'Rejected'} the render of ${job.spec?.file || job.orderId} (v${job.version})${job.reviewNote ? `: ${job.reviewNote}` : ''}`, detail: { jobId: job.id, orderId: job.orderId }, actor: user })
       const files = await signedFiles(job)

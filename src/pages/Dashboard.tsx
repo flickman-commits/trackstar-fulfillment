@@ -132,7 +132,7 @@ interface Order {
   // Scraper availability
   hasScraperAvailable?: boolean
   // One status from everything the server knows (server/domain/orders/pipeline.js).
-  pipeline?: { stage: 'review' | 'action' | 'needs_research' | 'waiting' | 'done'; reason: string; kind?: 'data' | 'setup' | 'render'; fix?: string }
+  pipeline?: { stage: 'review' | 'attach' | 'action' | 'needs_research' | 'waiting' | 'done'; reason: string; kind?: 'data' | 'setup' | 'render'; fix?: string }
   // Override fields
   yearOverride?: number | null
   raceNameOverride?: string | null
@@ -814,7 +814,7 @@ export default function Dashboard() {
   }, [])
   const [raceFilter, setRaceFilter] = useState('')  // empty = show all races
   // Standard orders: the queue to work. '' is everything open.
-  const [stageFilter, setStageFilter] = useState<'' | 'review' | 'action' | 'waiting'>('')
+  const [stageFilter, setStageFilter] = useState<'' | 'review' | 'attach' | 'action' | 'waiting'>('')
   const [showCompleted, setShowCompleted] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -2205,11 +2205,12 @@ export default function Dashboard() {
 
   // How many open standard orders sit in each stage, for the queue chips.
   const stageCounts = useMemo(() => {
-    const c = { review: 0, action: 0, waiting: 0 }
+    const c = { review: 0, attach: 0, action: 0, waiting: 0 }
     if (activeView !== 'standard') return c
     for (const o of ordersToFulfill) {
       const s = o.pipeline?.stage
       if (s === 'review') c.review++
+      else if (s === 'attach') c.attach++
       else if (s === 'action') c.action++
       else if (s === 'waiting' || s === 'needs_research') c.waiting++
     }
@@ -2371,8 +2372,9 @@ Thank you!`
     // The server's one status, when it has one (standard orders).
     const p = order.pipeline
     if (p) {
-      const icon = p.stage === 'review' ? '🖼️' : p.stage === 'action' ? '⚠️' : p.stage === 'done' ? '✅' : p.stage === 'needs_research' ? '🔍' : '⏳'
-      return { icon, label: p.reason, stage: p.stage }
+      // A small colored dot, not an emoji: green = review, purple = attach, red = action, gray = waiting.
+      const dot = p.stage === 'review' ? 'bg-green-500' : p.stage === 'attach' ? 'bg-[#4600D6]' : p.stage === 'action' ? 'bg-red-500' : p.stage === 'done' ? 'bg-green-500' : 'bg-off-black/25'
+      return { icon: '', dot, label: p.reason, stage: p.stage }
     }
     if (order.status === 'flagged') return { icon: '⚠️', label: 'Flagged' }
     if (order.status === 'missing_year') return { icon: '📅', label: 'Missing year' }
@@ -2559,7 +2561,7 @@ Thank you!`
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Queue</div>
           <div className="flex md:inline-flex w-full md:w-auto rounded-md border border-border-gray bg-subtle-gray p-0.5">
-            {([['', 'All', ordersToFulfill.length], ['review', 'Review', stageCounts.review], ['action', 'Action', stageCounts.action], ['waiting', 'Waiting', stageCounts.waiting]] as const).map(([key, label, n]) => (
+            {([['', 'All', ordersToFulfill.length], ['review', 'Review', stageCounts.review], ['attach', 'Attach', stageCounts.attach], ['action', 'Action', stageCounts.action], ['waiting', 'Waiting', stageCounts.waiting]] as const).map(([key, label, n]) => (
               <button
                 key={key || 'all'}
                 onClick={() => setStageFilter(key)}
@@ -2735,7 +2737,11 @@ Thank you!`
                               )}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
-                              <HoverTip text={statusDisplay.label} align="center"><span className="text-base cursor-help">{statusDisplay.icon}</span></HoverTip>
+                              <HoverTip text={statusDisplay.label} align="center">
+                                {statusDisplay.dot
+                                  ? <span className="inline-flex items-center gap-1.5 text-[11px] text-off-black/60 cursor-help"><span className={`w-2 h-2 rounded-full ${statusDisplay.dot}`} />{statusDisplay.label}</span>
+                                  : <span className="text-base cursor-help">{statusDisplay.icon}</span>}
+                              </HoverTip>
                               {(order.notes || (order.commentCount ?? 0) > 0) && (
                                 <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                               )}
@@ -2947,7 +2953,7 @@ Thank you!`
                       <tr>
                         <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-28">Src</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Order #</th>
-                        <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-32"><span className="inline-flex items-center">Status<StatusLegend /></span></th>
+                        <th className="text-center px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider"><span className="inline-flex items-center">Status<StatusLegend /></span></th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-1/4">Details</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-52">
                           <div className="flex items-center gap-2 leading-none">
@@ -2983,9 +2989,9 @@ Thank you!`
                             <td className="px-3 py-4 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <HoverTip text={order.pipeline?.fix || statusDisplay.label} align="center">
-                                  <span className="inline-flex flex-col items-center cursor-help">
-                                    <span className="text-lg leading-none">{statusDisplay.icon}</span>
-                                    <span className={`mt-1 text-[10px] leading-tight whitespace-nowrap ${order.pipeline?.stage === 'action' ? 'text-red-700 font-medium' : order.pipeline?.stage === 'review' ? 'text-green-700 font-medium' : 'text-off-black/50'}`}>{statusDisplay.label}</span>
+                                  <span className="inline-flex items-center gap-1.5 cursor-help whitespace-nowrap">
+                                    {statusDisplay.dot ? <span className={`w-2 h-2 rounded-full shrink-0 ${statusDisplay.dot}`} /> : <span className="text-base leading-none">{statusDisplay.icon}</span>}
+                                    <span className={`text-xs ${order.pipeline?.stage === 'action' ? 'text-red-700 font-medium' : order.pipeline?.stage === 'review' ? 'text-green-700 font-medium' : order.pipeline?.stage === 'attach' ? 'text-[#4600D6] font-medium' : 'text-off-black/60'}`}>{statusDisplay.label}</span>
                                   </span>
                                 </HoverTip>
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
@@ -3817,12 +3823,13 @@ Thank you!`
                         <span className="text-sm">Orders</span>
                       </button>
                     )}
-                    <span className="text-xl">
-                      {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner')
-                        ? (DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).icon
-                        : selectedOrder.status === 'completed' ? '✅'
-                        : getStatusDisplay(selectedOrder).icon}
-                    </span>
+                    {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner')
+                      ? <span className="text-xl">{(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).icon}</span>
+                      : (() => { const d = getStatusDisplay(selectedOrder); return (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-border-gray bg-white text-xs text-off-black/70" title={selectedOrder.pipeline?.fix || d.label}>
+                            <span className={`w-2 h-2 rounded-full ${d.dot || 'bg-off-black/25'}`} />{d.label}
+                          </span>
+                        ) })()}
                     <h3 className="text-heading-md text-off-black whitespace-nowrap">
                       {selectedOrder.trackstarOrderType === 'race_partner'
                         ? (selectedOrder.partnerName || selectedOrder.raceName || 'Partner')
@@ -4894,7 +4901,7 @@ Thank you!`
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
                           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Runner</span>
                           {/* Edits in place, the same way the Race card does. */}
-                          {!isEditing && selectedOrder.status !== 'completed' && (
+                          {!isEditing && (
                             <button
                               onClick={() => startEditing(selectedOrder)}
                               className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
@@ -5296,6 +5303,14 @@ Thank you!`
 
                   {/* Main action */}
                   <div>
+                  {/* The one step the tool cannot do: attaching the file to the item in Artelo. */}
+                  {selectedOrder.pipeline?.stage === 'attach' && (
+                    <div className="rounded-md border border-[#4600D6]/30 bg-[#4600D6]/[0.04] px-3 py-2.5 text-[13px] leading-snug text-off-black">
+                      <span className="font-semibold text-[#4600D6] mr-1.5">Attach in Artelo.</span>
+                      The approved print is in the Artelo library under Orders as <span className="font-mono">{generateFilename(selectedOrder)}</span>.
+                      {selectedOrder.arteloUrl && <> <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className="text-[#4600D6] underline underline-offset-2">Open the Artelo order ↗</a>, attach it to the item,</>} then mark the order done below.
+                    </div>
+                  )}
 
                   {/* Actions */}
                   <div className="flex gap-3 pt-3">
@@ -5310,9 +5325,9 @@ Thank you!`
                      !isEditing && (
                       <button
                         onClick={() => markAsCompleted(selectedOrder.orderNumber)}
-                        className="flex-1 px-5 py-3 bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity font-medium"
+                        className={`flex-1 px-5 py-3 rounded-md hover:opacity-90 transition-opacity font-medium text-white ${selectedOrder.pipeline?.stage === 'attach' ? 'bg-[#4600D6]' : 'bg-dark-fill'}`}
                       >
-                        {selectedOrder.trackstarOrderType === 'standard' ? 'Mark as Uploaded to Artelo' : 'Mark as Completed'}
+                        {selectedOrder.pipeline?.stage === 'attach' ? 'Attached in Artelo, mark done' : selectedOrder.trackstarOrderType === 'standard' ? 'Mark as Uploaded to Artelo' : 'Mark as Completed'}
                       </button>
                     )}
                     {/* Re-open — only for already-completed orders. Sends the
