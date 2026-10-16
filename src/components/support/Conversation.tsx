@@ -4,7 +4,7 @@ import { btnGhost, btnPrimary, btnSecondary } from '@/lib/ui'
 import { when } from '@/lib/supportDates'
 import { fillMacro } from '@/lib/supportStatus'
 import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
-import { CustomerAvatar } from './ConversationList'
+import { ChannelMark, CustomerAvatar } from './ConversationList'
 import type { Macro, Message, Note, Teammate, ThreadDetail, ThreadStatus } from '@/types/support'
 
 /**
@@ -16,16 +16,21 @@ import type { Macro, Message, Note, Teammate, ThreadDetail, ThreadStatus } from 
  * events that happened to the thread. A composer with two tabs: Reply goes
  * out as fast@, Note stays here. Macros drop a saved reply in; Send and
  * close does both in one go. Everything has a key.
+ *
+ * An Instagram thread uses the same timeline and the same two tabs; the
+ * reply goes out as a DM from @trackstar_art, starts empty (DMs are short,
+ * no greeting or sign-off), and is held when Meta's 24-hour window after
+ * the customer's last message has closed.
  */
 type Item = { at: string; kind: 'message'; m: Message } | { at: string; kind: 'note'; n: Note }
 
 function Bubble({ m }: { m: Message }) {
   const [showQuoted, setShowQuoted] = useState(false)
   const out = m.direction === 'out'
-  const who = out ? (m.sentBy ? `${m.sentBy.firstName} from Trackstar` : (m.fromName || 'Trackstar')) : (m.fromName || m.fromEmail)
+  const who = out ? (m.sentBy ? `${m.sentBy.firstName} from Trackstar` : (m.fromName || 'Trackstar')) : (m.fromName || m.fromEmail || 'Instagram user')
   return (
     <div className={`flex items-end gap-2 ${out ? 'justify-end' : 'justify-start'}`}>
-      {!out && <CustomerAvatar name={m.fromName} email={m.fromEmail} size={26} />}
+      {!out && <CustomerAvatar name={m.fromName} email={m.fromEmail || m.fromName} size={26} />}
       <div className={`max-w-[88%] md:max-w-[72%] rounded-2xl px-4 py-3 ${out ? 'bg-dark-fill text-white rounded-br-md' : 'bg-subtle-gray border border-border-gray text-off-black rounded-bl-md'}`}>
         <div className={`flex items-baseline justify-between gap-4 mb-1 text-[11px] ${out ? 'text-white/55' : 'text-off-black/50'}`}>
           <span className="font-medium truncate">{who}</span>
@@ -34,7 +39,11 @@ function Bubble({ m }: { m: Message }) {
         <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.text || <span className={out ? 'text-white/50' : 'text-off-black/40'}>(no text)</span>}</div>
         {m.attachments.length > 0 && (
           <div className={`mt-2 flex flex-wrap gap-1.5 text-[11px] ${out ? 'text-white/70' : 'text-off-black/60'}`}>
-            {m.attachments.map(a => (
+            {m.attachments.map(a => a.url ? (
+              <a key={a.attachmentId} href={a.url} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border hover:underline ${out ? 'border-white/20' : 'border-border-gray bg-white'}`} title="Open in a new tab (Meta's link expires after a while)">
+                <Paperclip className="w-3 h-3" />{a.filename}
+              </a>
+            ) : (
               <span key={a.attachmentId} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${out ? 'border-white/20' : 'border-border-gray bg-white'}`} title={`${a.mimeType} · ${Math.round(a.size / 1024)} KB`}>
                 <Paperclip className="w-3 h-3" />{a.filename}
               </span>
@@ -95,14 +104,21 @@ function NoteCard({ n, team, meId, isAdmin, onDelete }: { n: Note; team: Teammat
   )
 }
 
-/** The reply, as the playbook opens and closes one, with the rest to write. */
+/** The reply, as the playbook opens and closes one, with the rest to write. A DM starts empty. */
 function starter(thread: ThreadDetail, me: Teammate) {
+  if (thread.channel === 'instagram') return ''
   const first = (thread.customerName || '').trim().split(/\s+/)[0] || ''
   return `Hey${first ? ` ${first}` : ''},\n\n\n\nThanks,\n${me.firstName} from Trackstar`
 }
 /** True when nothing has been written between the greeting and the sign-off. */
 function isBlank(text: string) {
   return text.replace(/^Hey[^\n]*,\n/, '').replace(/\n+Thanks,\n[^\n]*$/, '').trim().length === 0
+}
+/** The first name a macro greets: the display name's first word, never an @handle. */
+function firstNameOf(thread: ThreadDetail) {
+  const n = (thread.customerName || '').trim()
+  if (!n || n.startsWith('@')) return ''
+  return n.split(/\s+/)[0]
 }
 
 const SNOOZES: { label: string; until: () => Date }[] = [
@@ -165,8 +181,10 @@ function MacroMenu({ macros, onPick, onClose }: { macros: Macro[]; onPick: (m: M
   )
 }
 
-export default function Conversation({ thread, team, me, isAdmin, busy, macros, onAssign, onStatus, onSnooze, onPriority, onReply, onNote, onDeleteNote, onUseMacro, replyRef, noteRef }: {
+export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onReply, onNote, onDeleteNote, onUseMacro, replyRef, noteRef }: {
   thread: ThreadDetail
+  /** The Instagram account replies go out as, without the @. */
+  expectedHandle?: string
   team: Teammate[]
   me: Teammate
   isAdmin: boolean
@@ -206,12 +224,17 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     return items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
   }, [thread.messages, thread.notes])
 
+  const ig = thread.channel === 'instagram'
   const wrote = !isBlank(text)
   const hasEmDash = /—/.test(text)
   const snoozed = thread.snoozedUntil && new Date(thread.snoozedUntil) > new Date()
+  // Meta's rule for a DM. The server says the same thing again on Send; this is so nobody types a reply that cannot go.
+  const window = ig ? thread.replyWindow : null
+  const windowClosed = Boolean(window && !window.open)
+  const canSend = wrote && !sending && !hasEmDash && !busy && !windowClosed
 
   const send = async (closeAfter = false) => {
-    if (!wrote || sending || hasEmDash) return
+    if (!canSend) return
     setSending(true)
     try { if (await onReply(text.trim(), closeAfter)) setText(starter(thread, me)) }
     finally { setSending(false) }
@@ -253,9 +276,14 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
 
   const insertMacro = (m: Macro) => {
     macro.setOpen(false)
-    const body = fillMacro(m.body, { firstName: (thread.customerName || '').trim().split(/\s+/)[0] || '', rep: me.firstName })
+    const body = fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName })
     const el = replyRef.current
-    if (isBlank(text)) {
+    if (ig) {
+      // No greeting or sign-off to slot between: at the caret, or after what is there.
+      if (!text.trim()) setText(body)
+      else if (el) { const s = el.selectionStart, e = el.selectionEnd; setText(text.slice(0, s) + body + text.slice(e)) }
+      else setText(text + '\n' + body)
+    } else if (isBlank(text)) {
       // Drop it between the greeting and the sign-off.
       const greet = text.match(/^Hey[^\n]*,\n/)?.[0] || ''
       const sign = text.match(/\n+Thanks,\n[^\n]*$/)?.[0] || ''
@@ -272,10 +300,15 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white">
       {/* Header */}
       <div className="px-5 py-3 border-b border-border-gray flex flex-wrap items-center gap-x-3 gap-y-2 shrink-0">
-        <CustomerAvatar name={thread.customerName} email={thread.customerEmail} size={34} />
+        <CustomerAvatar name={thread.customerName} email={thread.customerEmail || thread.igUsername} size={34} />
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold text-off-black truncate leading-tight">{thread.customerName || thread.customerEmail || 'Unknown sender'}</div>
-          <div className="text-xs text-off-black/55 truncate">{thread.subject || '(no subject)'}</div>
+          <div className="text-[15px] font-semibold text-off-black truncate leading-tight">{thread.customerName || (ig && thread.igUsername ? `@${thread.igUsername}` : '') || thread.customerEmail || 'Unknown sender'}</div>
+          <div className="text-xs text-off-black/55 truncate inline-flex items-center gap-1.5 max-w-full">
+            <ChannelMark channel={thread.channel} />
+            {ig ? (
+              thread.igUsername ? <a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="truncate hover:text-off-black hover:underline">@{thread.igUsername} · Instagram</a> : <span>Instagram DM</span>
+            ) : <span className="truncate">{thread.subject || '(no subject)'}</span>}
+          </div>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <button onClick={() => onPriority(!thread.priority)} disabled={busy} className={`${btnGhost} px-2`} title={thread.priority ? 'Remove priority (p)' : 'Mark priority (p)'}>
@@ -318,12 +351,23 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
         <div className="px-4 pt-2 flex items-center gap-1 text-[13px]">
           <button onClick={() => { setMode('reply'); requestAnimationFrame(() => replyRef.current?.focus()) }} className={`px-3 py-1.5 rounded-t-md border-b-2 ${mode === 'reply' ? 'border-dark-fill text-off-black font-semibold' : 'border-transparent text-off-black/50 hover:text-off-black'}`}>Reply</button>
           <button data-note-tab onClick={() => { setMode('note'); requestAnimationFrame(() => noteRef.current?.focus()) }} className={`px-3 py-1.5 rounded-t-md border-b-2 inline-flex items-center gap-1.5 ${mode === 'note' ? 'border-amber-500 text-amber-900 font-semibold' : 'border-transparent text-off-black/50 hover:text-off-black'}`}><StickyNote className="w-3.5 h-3.5" />Note</button>
-          <span className="ml-auto text-[11px] text-off-black/40">{mode === 'reply' ? `to ${thread.customerEmail}` : 'Only the team sees notes. @ to mention someone.'}</span>
+          <span className="ml-auto text-[11px] text-off-black/40 truncate">{mode === 'reply' ? (ig ? `Reply as @${expectedHandle} to ${thread.igUsername ? `@${thread.igUsername}` : 'them'} on Instagram` : `to ${thread.customerEmail}`) : 'Only the team sees notes. @ to mention someone.'}</span>
         </div>
+        {mode === 'reply' && window && (window.mode === 'closed' || window.mode === 'none' || window.mode === 'human_agent') && (
+          <div className={`mx-4 mt-2 rounded-md border px-3 py-2 text-xs inline-flex items-start gap-2 ${windowClosed ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-border-gray bg-subtle-gray text-off-black/70'}`}>
+            <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>
+              {window.reason}
+              {windowClosed && window.closesAt && window.mode === 'closed' && <> It closed {when(window.closesAt)}.</>}
+              {windowClosed && <> You can still leave a note for the team.</>}
+            </span>
+          </div>
+        )}
         {mode === 'reply' ? (
           <div className="px-4 pb-3">
             <textarea
-              ref={replyRef} value={text} onChange={e => setText(e.target.value)} rows={7} disabled={sending}
+              ref={replyRef} value={text} onChange={e => setText(e.target.value)} rows={ig ? 4 : 7} disabled={sending || windowClosed}
+              placeholder={ig ? (windowClosed ? 'Replies are held until they write again' : 'Write the DM. Keep it short, like a text.') : undefined}
               onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(e.shiftKey) } }}
               className="w-full px-3 py-2.5 text-sm bg-white border border-border-gray rounded-md focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 resize-y leading-relaxed"
             />
@@ -333,10 +377,11 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
                 {macro.open && <MacroMenu macros={macros} onPick={insertMacro} onClose={() => macro.setOpen(false)} />}
               </div>
               {hasEmDash && <span className="text-[11px] text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" />No em dashes in anything a customer sees</span>}
+              {ig && window?.open && window.mode === 'standard' && window.closesAt && <span className="text-[11px] text-off-black/45 inline-flex items-center gap-1" title="Instagram allows a reply within 24 hours of their last message"><Clock className="w-3 h-3" />Window closes {when(window.closesAt)}</span>}
               <span className="flex-1" />
               <span className="text-[11px] text-off-black/40 hidden md:inline">⌘↵ send · ⌘⇧↵ send and close</span>
-              <button onClick={() => send(true)} disabled={!wrote || sending || hasEmDash || busy} className={btnSecondary}>Send and close</button>
-              <button onClick={() => send(false)} disabled={!wrote || sending || hasEmDash || busy} className={btnPrimary}>
+              <button onClick={() => send(true)} disabled={!canSend} className={btnSecondary}>Send and close</button>
+              <button onClick={() => send(false)} disabled={!canSend} className={btnPrimary}>
                 {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send
               </button>
             </div>

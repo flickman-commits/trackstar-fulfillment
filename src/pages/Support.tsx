@@ -6,7 +6,7 @@ import { btnGhost, btnSecondary, pageShell } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { useAuth } from '@/lib/auth'
 import { useDocumentHead } from '@/lib/useDocumentHead'
-import type { InboxPayload, InboxSort, InboxView, Macro, MailboxStatus, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
+import type { InboxPayload, InboxSort, InboxView, InstagramStatus, Macro, MailboxStatus, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
 import ViewsColumn from '@/components/support/ViewsColumn'
 import ConversationList from '@/components/support/ConversationList'
 import Conversation from '@/components/support/Conversation'
@@ -22,8 +22,10 @@ import MacrosModal from '@/components/support/MacrosModal'
  * view, the conversation with its reply and note composer, and the details
  * of the customer and their orders. Gmail is the system of record; this
  * page reads a mirror of it and sends replies back through it as fast@.
- * Assignment, status, priority, tags, snooze and notes live here and
- * nowhere else. Every action has a key; press ? for the list.
+ * Instagram DMs to @trackstar_art arrive in the same list by webhook and
+ * are answered from the same composer, as the account. Assignment, status,
+ * priority, tags, snooze and notes live here and nowhere else. Every action
+ * has a key; press ? for the list.
  */
 const VIEW_TITLE: Record<string, string> = {
   inbox: 'Your inbox', mentions: 'Mentions', unassigned: 'Unassigned', all: 'All open',
@@ -60,6 +62,7 @@ export default function Support() {
   const [inboxError, setInboxError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<MailboxStatus | null>(null)
+  const [instagram, setInstagram] = useState<InstagramStatus | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [thread, setThread] = useState<ThreadDetail | null>(null)
   const [threadLoading, setThreadLoading] = useState(false)
@@ -73,18 +76,25 @@ export default function Support() {
 
   useEffect(() => { try { localStorage.setItem('support.view', view); localStorage.setItem('support.sort', sort) } catch { /* private mode */ } }, [view, sort])
 
-  // Back from Google's consent screen.
+  // Back from Google's consent screen, or from Instagram's login.
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const g = params.get('gmail')
-    if (!g) return
+    const i = params.get('instagram')
+    if (!g && !i) return
     if (g === 'connected') toast.success(`Mailbox connected as ${params.get('account') || 'the support account'}`)
     else if (g === 'denied') toast.error('Mailbox connection was cancelled')
-    else toast.error(`Mailbox connection failed: ${params.get('reason') || 'unknown error'}`)
+    else if (g) toast.error(`Mailbox connection failed: ${params.get('reason') || 'unknown error'}`)
+    if (i === 'connected') toast.success(`Instagram connected as ${params.get('account') || 'the Trackstar account'}`)
+    else if (i === 'denied') toast.error('Instagram connection was cancelled')
+    else if (i) toast.error(`Instagram connection failed: ${params.get('reason') || 'unknown error'}`)
     navigate('/support', { replace: true })
   }, [location.search, navigate])
 
-  const loadStatus = useCallback(() => { supportApi.status().then(setStatus).catch(() => setStatus(null)) }, [])
+  const loadStatus = useCallback(() => {
+    supportApi.status().then(setStatus).catch(() => setStatus(null))
+    supportApi.instagramStatus().then(setInstagram).catch(() => setInstagram(null))
+  }, [])
   const loadMacros = useCallback(() => { supportApi.macros().then(r => setMacros(r.macros)).catch(() => {}) }, [])
   const loadInbox = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
@@ -147,7 +157,8 @@ export default function Support() {
     try {
       const fresh = await supportApi.reply(thread.id, text, close)
       setThread(fresh)
-      toast.success(close ? `Sent to ${fresh.customerEmail} and closed` : `Sent to ${fresh.customerEmail}`)
+      const to = fresh.channel === 'instagram' ? `@${fresh.igUsername || 'them'} on Instagram` : fresh.customerEmail
+      toast.success(close ? `Sent to ${to} and closed` : `Sent to ${to}`)
       loadInbox(true)
       return true
     } catch (e) { toast.error((e as Error).message); return false }
@@ -259,7 +270,7 @@ export default function Support() {
             <ConversationList title={title} threads={threads} selectedId={selectedId} onSelect={openThread} loading={loading && !inbox} emptyLabel={empty} sort={sort} onSort={setSort} />
             {thread && me ? (
               <Conversation
-                key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros}
+                key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros} expectedHandle={instagram?.expectedHandle}
                 onAssign={assign} onStatus={setStatusOf} onSnooze={snooze} onPriority={setPriority}
                 onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
                 replyRef={replyRef} noteRef={noteRef}
@@ -278,7 +289,7 @@ export default function Support() {
             <Details
               thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread}
               onAssign={assign} onPriority={setPriority} onTags={setTags}
-              status={status} isAdmin={isAdmin} onMailboxChanged={() => { loadStatus(); loadInbox(true) }}
+              status={status} instagram={instagram} isAdmin={isAdmin} onMailboxChanged={() => { loadStatus(); loadInbox(true) }}
             />
           </div>
         </section>

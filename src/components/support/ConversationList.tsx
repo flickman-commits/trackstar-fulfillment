@@ -1,4 +1,4 @@
-import { ChevronDown, Loader2, Mail, Moon, Star } from 'lucide-react'
+import { ChevronDown, Instagram, Loader2, Mail, Moon, Star } from 'lucide-react'
 import { ago, waitingFor } from '@/lib/supportDates'
 import { customerColor, initials } from '@/lib/supportStatus'
 import { Avatar } from '@/components/AssigneePicker'
@@ -25,8 +25,16 @@ export function CustomerAvatar({ name, email, size = 32 }: { name: string; email
 
 const SORT_LABEL: Record<InboxSort, string> = { waiting: 'Waiting longest', newest: 'Newest', oldest: 'Oldest', priority: 'Priority first' }
 
+/** The channel's mark: nothing for email, the Instagram glyph for a DM. */
+export function ChannelMark({ channel, className = 'w-3 h-3' }: { channel: ThreadRow['channel']; className?: string }) {
+  if (channel !== 'instagram') return null
+  return <Instagram className={`${className} shrink-0 text-pink-600`} aria-label="Instagram DM" />
+}
+
 function Row({ t, active, onClick }: { t: ThreadRow; active: boolean; onClick: () => void }) {
-  const who = t.customerName || t.customerEmail || 'Unknown sender'
+  const ig = t.channel === 'instagram'
+  const who = t.customerName || (ig && t.igUsername ? `@${t.igUsername}` : '') || t.customerEmail || 'Unknown sender'
+  const line = ig ? (t.igUsername ? `@${t.igUsername} · Instagram` : 'Instagram DM') : (t.subject || '(no subject)')
   const wait = t.status === 'open' ? waitingFor(t.lastInboundAt, t.lastOutboundAt) : null
   const snoozed = t.snoozedUntil && new Date(t.snoozedUntil) > new Date()
   const bold = t.unread && t.status !== 'closed'
@@ -36,16 +44,17 @@ function Row({ t, active, onClick }: { t: ThreadRow; active: boolean; onClick: (
       className={`w-full text-left flex items-start gap-3 px-4 py-3 border-b border-border-gray/80 transition-colors ${active ? 'bg-off-black/[0.05]' : 'hover:bg-subtle-gray'}`}
     >
       <div className="relative shrink-0 mt-0.5">
-        <CustomerAvatar name={t.customerName} email={t.customerEmail} />
+        <CustomerAvatar name={t.customerName} email={t.customerEmail || t.igUsername} />
         {bold && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white" aria-label="Unread" />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
+          <ChannelMark channel={t.channel} />
           <span className={`text-[13px] truncate ${bold ? 'font-semibold text-off-black' : 'font-medium text-off-black/85'}`}>{who}</span>
           {t.priority && <Star className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />}
           <span className="ml-auto shrink-0 text-[11px] text-off-black/40 tabular-nums">{ago(t.lastMessageAt)}</span>
         </div>
-        <div className={`text-[13px] truncate ${bold ? 'text-off-black' : 'text-off-black/70'}`}>{t.subject || '(no subject)'}</div>
+        <div className={`text-[13px] truncate ${bold ? 'text-off-black' : 'text-off-black/70'}`}>{line}</div>
         <div className="mt-0.5 flex items-center gap-2 min-w-0">
           <span className="text-xs text-off-black/50 truncate flex-1">{t.snippet || ' '}</span>
           <span className="shrink-0 inline-flex items-center gap-1.5 text-[11px] text-off-black/45">

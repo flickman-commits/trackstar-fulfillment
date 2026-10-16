@@ -3,7 +3,7 @@
  * shapes, so the Support screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { BackfillResult, InboxPayload, InboxSort, InboxView, Macro, MailboxStatus, Note, SyncResult, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
+import type { BackfillResult, InboxPayload, InboxSort, InboxView, InstagramBackfillResult, InstagramStatus, Macro, MailboxStatus, Note, SyncResult, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -30,6 +30,12 @@ export const supportApi = {
   disconnect: () => post<{ success: boolean }>('/api/support/gmail', { action: 'disconnect' }),
   sync: () => post<SyncResult>('/api/support/sync', {}),
   backfill: () => post<BackfillResult>('/api/support/backfill', {}),
+  // Instagram: the @trackstar_art connection. DMs arrive by webhook; there is no sync to call.
+  instagramStatus: () => request<InstagramStatus>('/api/support/instagram?action=status'),
+  instagramConnectUrl: `${API_BASE}/api/support/instagram?action=connect`,
+  instagramToken: (accessToken: string) => post<{ success: boolean; username: string }>('/api/support/instagram', { action: 'token', accessToken }),
+  instagramBackfill: () => post<InstagramBackfillResult>('/api/support/instagram', { action: 'backfill' }),
+  instagramDisconnect: () => post<{ success: boolean }>('/api/support/instagram', { action: 'disconnect' }),
   inbox: (view: InboxView, sort: InboxSort, q = '') => request<InboxPayload>(`/api/support/threads?view=${encodeURIComponent(view)}&sort=${sort}&q=${encodeURIComponent(q)}`),
   thread: (id: string) => request<ThreadDetail>(`/api/support/thread?id=${encodeURIComponent(id)}`),
   assign: (id: string, assigneeId: string | null) => act<ThreadRow>(id, 'assign', { assigneeId }),

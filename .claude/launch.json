@@ -42,6 +42,15 @@
         "VITE_PORT=3100 API_PORT=3101 npm run dev"
       ],
       "port": 3100
+    },
+    {
+      "name": "dev-alt2",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "VITE_PORT=3200 API_PORT=3201 npm run dev"
+      ],
+      "port": 3200
     }
   ]
 }

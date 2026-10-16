@@ -16,7 +16,8 @@ const app = express()
 app.use((req, res, next) => {
   const ct = req.headers['content-type'] || ''
   if (ct.includes('multipart/form-data')) return next()
-  express.json({ limit: '10mb' })(req, res, next)
+  // Keep the bytes: the Instagram webhook checks Meta's signature over the raw body.
+  express.json({ limit: '10mb', verify: (r, _res, buf) => { r.rawBody = buf } })(req, res, next)
 })
 
 // Map each API route to its Vercel handler
@@ -135,6 +136,12 @@ const routes = [
   { method: 'post',   path: '/api/support/reply',          handler: '../api/support/reply.js' },
   { method: 'get',    path: '/api/support/macros',         handler: '../api/support/macros.js' },
   { method: 'post',   path: '/api/support/macros',         handler: '../api/support/macros.js' },
+  // Support, Instagram channel: the connection, Meta's webhook.
+  { method: 'get',    path: '/api/support/instagram',          handler: '../api/support/instagram.js' },
+  { method: 'post',   path: '/api/support/instagram',          handler: '../api/support/instagram.js' },
+  { method: 'get',    path: '/api/support/instagram-callback', handler: '../api/support/instagram-callback.js' },
+  { method: 'get',    path: '/api/support/instagram-webhook',  handler: '../api/support/instagram-webhook.js' },
+  { method: 'post',   path: '/api/support/instagram-webhook',  handler: '../api/support/instagram-webhook.js' },
 ]
 
 // Load all handlers and register routes

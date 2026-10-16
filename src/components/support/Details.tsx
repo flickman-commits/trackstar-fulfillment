@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { ChevronDown, ExternalLink, Loader2, Package, Truck, AlertCircle, Database, Mail, X, Plus } from 'lucide-react'
+import { ChevronDown, ExternalLink, Loader2, Package, Truck, AlertCircle, Database, Mail, X, Plus, Instagram, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnSecondary, chip, chipTone, textLink } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { ago, day } from '@/lib/supportDates'
 import { STATUS_LABEL, STATUS_TONE } from '@/lib/supportStatus'
 import { Avatar } from '@/components/AssigneePicker'
-import type { CustomerOrder, MailboxStatus, OrderItem, Teammate, ThreadDetail } from '@/types/support'
+import type { CustomerOrder, InstagramStatus, MailboxStatus, OrderItem, Teammate, ThreadDetail } from '@/types/support'
 
 /**
  * The details panel, Intercom's right column: collapsible sections for the
@@ -190,7 +190,65 @@ export function MailboxCard({ status, isAdmin, onChanged }: { status: MailboxSta
   )
 }
 
-export default function Details({ thread, team, tagSuggestions, onOpenThread, onAssign, onPriority, onTags, status, isAdmin, onMailboxChanged }: {
+/**
+ * Instagram, for an admin: connect @trackstar_art (sign in, or paste the
+ * long-lived token from the Meta dashboard), pull the recent conversations
+ * once, see whether the webhook is set and when a DM last arrived.
+ */
+export function InstagramCard({ status, isAdmin, onChanged }: { status: InstagramStatus | null; isAdmin: boolean; onChanged: () => void }) {
+  const [pasting, setPasting] = useState(false)
+  const [token, setToken] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (!status) return null
+  const run = async (fn: () => Promise<string | void>) => {
+    setBusy(true)
+    try { const msg = await fn(); if (msg) toast.success(msg); onChanged() }
+    catch (e) { toast.error((e as Error).message) }
+    finally { setBusy(false) }
+  }
+  const saveToken = () => run(async () => { const out = await supportApi.instagramToken(token.trim()); setToken(''); setPasting(false); return `Connected as @${out.username}` })
+  const backfill = () => run(async () => { const out = await supportApi.instagramBackfill(); return `Imported ${out.imported} DM${out.imported === 1 ? '' : 's'} from ${out.conversations} conversation${out.conversations === 1 ? '' : 's'}` })
+  const disconnect = () => { if (window.confirm(`Disconnect @${status.username}? DMs stop arriving until an admin connects again.`)) run(async () => { await supportApi.instagramDisconnect(); return 'Instagram disconnected' }) }
+  return (
+    <Section title="Instagram" open={!status.connected}>
+      <div className="text-xs space-y-1.5">
+        <div className="flex items-center gap-2">
+          <Instagram className="w-3.5 h-3.5 text-pink-600" />
+          {status.connected ? <span className="text-off-black">@{status.username}</span> : <span className="text-amber-700">Not connected{status.configured ? '' : ' (Meta app not set)'}</span>}
+        </div>
+        {status.connected && (
+          <div className="text-off-black/50">
+            Last DM {status.lastImportedAt ? ago(status.lastImportedAt) + ' ago' : 'none yet'} · arrives by webhook{status.webhookConfigured ? '' : ' (verify token not set)'}
+            {status.humanAgent ? ' · 7-day replies' : ' · 24-hour replies'}
+          </div>
+        )}
+        {status.connected && status.tokenExpiresAt && <div className="text-off-black/50">Token renews itself; good until {day(status.tokenExpiresAt)}</div>}
+        {isAdmin && status.configured && (
+          <div className="pt-1 flex flex-wrap items-center gap-1.5">
+            {!status.connected && <a href={supportApi.instagramConnectUrl} className={btnSecondary}><Instagram className="w-3.5 h-3.5" />Connect @{status.expectedHandle}</a>}
+            {!status.connected && <button onClick={() => setPasting(v => !v)} className={btnSecondary}><KeyRound className="w-3.5 h-3.5" />Paste a token</button>}
+            {status.connected && <button onClick={backfill} disabled={busy} className={btnSecondary}>{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}Import recent DMs</button>}
+            {status.connected && <button onClick={disconnect} disabled={busy} className={btnSecondary}>Disconnect</button>}
+          </div>
+        )}
+        {isAdmin && status.configured && !status.connected && pasting && (
+          <div className="pt-1 space-y-1">
+            <input value={token} onChange={e => setToken(e.target.value)} placeholder="Long-lived access token from Meta's dashboard" className="w-full px-2 py-1 text-[11px] border border-border-gray rounded focus:outline-none focus:ring-1 focus:ring-off-black/20" />
+            <div className="flex items-center gap-1.5">
+              <button onClick={saveToken} disabled={busy || !token.trim()} className={btnSecondary}>{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}Save token</button>
+              <span className="text-off-black/45">Instagram &gt; API setup with Instagram login &gt; Generate token, signed in as @{status.expectedHandle}.</span>
+            </div>
+          </div>
+        )}
+        {!status.connected && isAdmin && status.configured && !pasting && <p className="text-off-black/45">Sign in to Instagram as the Trackstar account. Any other account is refused.</p>}
+        {!status.connected && isAdmin && !status.configured && <p className="text-off-black/45">Set INSTAGRAM_APP_ID and INSTAGRAM_APP_SECRET from the Meta app first (see .env.example).</p>}
+        {!status.connected && !isAdmin && <div className="text-off-black/50">Ask an admin to connect it.</div>}
+      </div>
+    </Section>
+  )
+}
+
+export default function Details({ thread, team, tagSuggestions, onOpenThread, onAssign, onPriority, onTags, status, instagram, isAdmin, onMailboxChanged }: {
   thread: ThreadDetail | null
   team: Teammate[]
   tagSuggestions: string[]
@@ -199,16 +257,27 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
   onPriority: (p: boolean) => void
   onTags: (tags: string[]) => void
   status: MailboxStatus | null
+  instagram: InstagramStatus | null
   isAdmin: boolean
   onMailboxChanged: () => void
 }) {
+  const ig = thread?.channel === 'instagram'
   return (
     <aside className="w-full lg:w-[300px] xl:w-[330px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
       {thread && (
         <>
           <Section title="Customer">
             <Attr label="Name">{thread.customer.name || <span className="text-off-black/40">Unknown</span>}</Attr>
-            <Attr label="Email"><a href={`mailto:${thread.customer.email}`} className="text-blue-600 hover:text-blue-700 break-all">{thread.customer.email}</a></Attr>
+            {ig && (
+              <Attr label="Instagram">
+                {thread.customer.instagram
+                  ? <a href={`https://instagram.com/${thread.customer.instagram}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 break-all inline-flex items-center gap-1">@{thread.customer.instagram}<ExternalLink className="w-3 h-3" /></a>
+                  : <span className="text-off-black/40">Handle not shared by Meta</span>}
+              </Attr>
+            )}
+            {thread.customer.email
+              ? <Attr label="Email"><a href={`mailto:${thread.customer.email}`} className="text-blue-600 hover:text-blue-700 break-all">{thread.customer.email}</a></Attr>
+              : ig ? <Attr label="Email"><span className="text-off-black/40">None. Ask for the email on their order.</span></Attr> : null}
             <Attr label="First seen">{day(thread.customer.firstSeen)}</Attr>
             <Attr label="Conversations">{thread.customer.conversations}</Attr>
           </Section>
@@ -232,7 +301,7 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
           <Section title="Orders" count={thread.context.orders.length}>
             {thread.context.shopifyError && <div className="text-xs text-amber-700 inline-flex items-start gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />Shopify did not answer; showing what we have on file.</div>}
             {thread.context.orders.length === 0
-              ? <div className="text-xs text-off-black/50 inline-flex items-center gap-1.5"><Package className="w-3.5 h-3.5" />No orders under {thread.customerEmail || 'this address'}.</div>
+              ? <div className="text-xs text-off-black/50 inline-flex items-start gap-1.5"><Package className="w-3.5 h-3.5 shrink-0 mt-0.5" />{ig ? 'A DM comes without an email, so no orders are matched. Ask for their order number or the email they ordered with.' : `No orders under ${thread.customerEmail || 'this address'}.`}</div>
               : thread.context.orders.map(o => <OrderCard key={`${o.source}-${o.number}`} o={o} />)}
           </Section>
           {thread.pastThreads.length > 0 && (
@@ -251,6 +320,7 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
         </>
       )}
       {(isAdmin || !status?.connected) && <MailboxCard status={status} isAdmin={isAdmin} onChanged={onMailboxChanged} />}
+      {(isAdmin || !instagram?.connected) && <InstagramCard status={instagram} isAdmin={isAdmin} onChanged={onMailboxChanged} />}
     </aside>
   )
 }

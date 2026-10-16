@@ -147,13 +147,15 @@ Each one ships on its own and is useful without the next.
 
 **Phase 1b, the Intercom shape.** Built 2026-10-16. The page now follows Intercom's inbox: a views column (Your inbox, Mentions, Unassigned, All open, the parked states, one row per teammate with their open count), the conversation list with avatars, unread dots and waiting time, the conversation with internal notes and @mentions in the timeline alongside the events (assigned, closed, snoozed), a Reply or Note composer with macros and Send and close, a details panel with collapsible Customer, Conversation (assignee, priority, tags), Orders and Other conversations sections, and keyboard shortcuts (press ?). Macros are seeded from the playbook's templates and edited in the app. In Phase 2 Claude's draft and investigation land in the timeline as a note, which is exactly where Daniela's team reads theirs.
 
+**Phase 1c, Instagram DMs.** Built 2026-10-16. DMs to @trackstar_art are a second channel in the same inbox: Meta's webhook delivers each DM to `/api/support/instagram-webhook` and it becomes a conversation with the same notes, assignment, status, macros and details panel; the composer replies as the account, starts empty (no greeting or sign-off), and holds the reply when Meta's 24-hour window after the customer's last message has closed (7 days once the Human Agent permission is approved). One thread per customer, keyed by their Instagram-scoped id. Still to do by hand: the Meta app, in `docs/support-instagram-setup.md`.
+
 **Phase 2, investigation and drafts.** Playbook sync from Notion, scenario classification of the backfilled history, the investigate pipeline, drafts on every new inbound, Redraft. Measure the Daniela number: what share of drafts go out unedited. Expect to spend a couple of weeks correcting drafts and editing the playbook; that is the feeding period she described.
 
 **Phase 3, one-click actions.** The action table above, with guardrails and audit. Escalation posts to Slack with a link to the thread.
 
 **Phase 4, MCP and the feedback loop.** The support tools on `/api/mcp`. A weekly summary of where reps changed the draft, grouped by scenario, as suggested playbook edits. Metrics: first-response time, volume by scenario, drafts accepted, per rep.
 
-**Later, if wanted.** pgvector similarity over past replies. Gmail push. Instagram DMs and Etsy messages into the same queue. Auto-send for the lowest-risk scenario (the standard "note from owner" thank-you) once the unedited rate earns it. All of it stays provider-agnostic through `server/lib/llm.js`, so it moves to our own GPUs with the rest.
+**Later, if wanted.** pgvector similarity over past replies. Gmail push. Etsy messages into the same queue. Auto-send for the lowest-risk scenario (the standard "note from owner" thank-you) once the unedited rate earns it. All of it stays provider-agnostic through `server/lib/llm.js`, so it moves to our own GPUs with the rest.
 
 ## Open questions and risks
 

@@ -1069,7 +1069,16 @@ model PrintTemplate {
 //   closed    done. A person closes it; a new inbound message reopens it.
 model SupportThread {
   id              String    @id @default(cuid())
-  gmailThreadId   String    @unique
+  // "email" is a Gmail thread in fast@; "instagram" is a DM conversation with
+  // one customer. One of the ids below is set, by channel.
+  channel         String    @default("email")
+  gmailThreadId   String?   @unique
+  // Instagram: the customer's Instagram-scoped id (one thread per customer,
+  // reopened when they write again), the conversation id once the API has
+  // told us, and the handle to reply to and show.
+  igUserId        String?   @unique
+  igConversationId String?  @unique
+  igUsername      String    @default("")
   subject         String    @default("")
   // The other party: the address that is not the mailbox. One per thread;
   // a thread with several correspondents keeps the first.
@@ -1103,13 +1112,17 @@ model SupportThread {
   @@index([assigneeId, status])
   @@index([customerEmail])
   @@index([lastMessageAt])
+  @@index([channel, status])
 }
 
 model SupportMessage {
   id              String    @id @default(cuid())
   threadId        String
   thread          SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  gmailMessageId  String    @unique
+  // Same as the thread's. The message is stored once, by the channel's own id.
+  channel         String    @default("email")
+  gmailMessageId  String?   @unique
+  igMessageId     String?   @unique
   // The RFC 822 Message-ID and the one it answers, so a reply from here can
   // thread correctly in the customer's mail client, not only in Gmail.
   rfcMessageId    String?

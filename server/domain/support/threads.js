@@ -13,6 +13,7 @@ import prisma from '../../db.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { approvalUrl, shopifyAdminUrl } from '../../lib/links.js'
 import { stripQuoted } from './mailbox.js'
+import { replyWindow } from './instagram.js'
 
 export const STATUSES = ['open', 'waiting', 'escalated', 'closed']
 export const SORTS = ['waiting', 'newest', 'oldest', 'priority']
@@ -55,6 +56,7 @@ function searchWhere(q) {
       { customerEmail: { contains: s, mode: 'insensitive' } },
       { customerName: { contains: s, mode: 'insensitive' } },
       { snippet: { contains: s, mode: 'insensitive' } },
+      { igUsername: { contains: s.replace(/^@/, ''), mode: 'insensitive' } },
       { tags: { has: s } },
     ],
   }
@@ -97,6 +99,8 @@ export async function listThreads({ view = 'all', userId, q = '', sort = 'waitin
 function row(t, readAt) {
   return {
     id: t.id,
+    channel: t.channel || 'email',
+    igUsername: t.igUsername || '',
     subject: t.subject,
     customerEmail: t.customerEmail,
     customerName: t.customerName,
@@ -142,18 +146,24 @@ export async function getThread(id, { userId } = {}) {
     t.customerEmail ? prisma.supportThread.count({ where: { customerEmail: t.customerEmail } }) : 0,
   ])
   const readAt = userId ? t.reads?.[0]?.readAt : null
+  const instagram = t.channel === 'instagram'
   return {
     ...row(t, readAt),
     gmailThreadId: t.gmailThreadId,
     createdAt: t.createdAt,
+    // Meta's rule: a DM may be answered within 24 hours of the customer's last message. Null for email.
+    replyWindow: instagram ? replyWindow(t) : null,
     messages: t.messages.map(m => {
-      const text = stripQuoted(m.bodyText)
+      const text = instagram ? m.bodyText : stripQuoted(m.bodyText)
       return {
         id: m.id,
+        channel: m.channel || 'email',
         gmailMessageId: m.gmailMessageId,
+        igMessageId: m.igMessageId,
         direction: m.direction,
         fromEmail: m.fromEmail,
-        fromName: m.fromName,
+        // A DM stored before Meta told us who they are keeps saying "Instagram user"; show what we know now.
+        fromName: instagram && m.direction === 'in' ? (t.customerName || (t.igUsername ? `@${t.igUsername}` : m.fromName)) : m.fromName,
         toEmails: m.toEmails,
         ccEmails: m.ccEmails,
         subject: m.subject,
@@ -168,8 +178,10 @@ export async function getThread(id, { userId } = {}) {
     customer: {
       email: t.customerEmail,
       name: t.customerName,
+      instagram: t.igUsername || null,
       firstSeen: customerSince?._min?.createdAt || t.createdAt,
-      conversations: customerCount,
+      // An Instagram customer has one conversation, this one, for as long as the thread lives.
+      conversations: t.customerEmail ? customerCount : 1,
     },
     context,
     pastThreads,

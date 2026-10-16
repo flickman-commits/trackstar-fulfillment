@@ -121,7 +121,7 @@ export async function status() {
   const [email, done, count, page] = await Promise.all([
     getConfig(KEY_EMAIL), getConfig(KEY_BACKFILL_DONE), getConfig(KEY_BACKFILL_COUNT), getConfig(KEY_BACKFILL_PAGE),
   ])
-  const lastSync = await prisma.supportMessage.aggregate({ _max: { createdAt: true } })
+  const lastSync = await prisma.supportMessage.aggregate({ where: { channel: 'email' }, _max: { createdAt: true } })
   return {
     configured,
     connected: Boolean(refresh),
@@ -285,6 +285,7 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
   if (!thread) {
     thread = await prisma.supportThread.create({
       data: {
+        channel: 'email',
         gmailThreadId: parsed.gmailThreadId,
         subject: cleanSubject(parsed.subject),
         customerEmail: who.email,
@@ -298,6 +299,7 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
 
   const row = {
     threadId: thread.id,
+    channel: 'email',
     rfcMessageId: parsed.rfcMessageId,
     inReplyTo: parsed.inReplyTo,
     direction: parsed.direction,
@@ -317,7 +319,7 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
     update: sentById ? { ...row, sentById } : row,
   })
 
-  await refreshThread(thread, parsed, { backfill, mailbox: mb })
+  await refreshThread(thread, message, { backfill, mailbox: mb })
   return message
 }
 
@@ -325,12 +327,14 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
  * Recompute what the list shows from the thread's messages, and move the
  * status when the message just stored is the newest one. Aggregating rather
  * than incrementing means the backfill, which reads newest first, lands on
- * the same answer as the sync, which reads oldest first.
+ * the same answer as the sync, which reads oldest first. Shared with the
+ * Instagram channel (instagram.js), which stores rows of the same shape:
+ * `stored` is the SupportMessage row just written, whatever channel.
  */
-async function refreshThread(thread, justStored, { backfill, mailbox }) {
+export async function refreshThread(thread, stored, { backfill = false, mailbox = '' } = {}) {
   const [agg, newest, oldest, lastIn, lastOut] = await Promise.all([
     prisma.supportMessage.aggregate({ where: { threadId: thread.id }, _count: { _all: true }, _max: { sentAt: true } }),
-    prisma.supportMessage.findFirst({ where: { threadId: thread.id }, orderBy: { sentAt: 'desc' }, select: { direction: true, bodyText: true, sentAt: true, gmailMessageId: true } }),
+    prisma.supportMessage.findFirst({ where: { threadId: thread.id }, orderBy: { sentAt: 'desc' }, select: { id: true, direction: true, bodyText: true, sentAt: true } }),
     prisma.supportMessage.findFirst({ where: { threadId: thread.id }, orderBy: { sentAt: 'asc' }, select: { subject: true, direction: true, fromEmail: true, fromName: true, toEmails: true } }),
     prisma.supportMessage.findFirst({ where: { threadId: thread.id, direction: 'in' }, orderBy: { sentAt: 'desc' }, select: { sentAt: true } }),
     prisma.supportMessage.findFirst({ where: { threadId: thread.id, direction: 'out' }, orderBy: { sentAt: 'desc' }, select: { sentAt: true } }),
@@ -353,12 +357,12 @@ async function refreshThread(thread, justStored, { backfill, mailbox }) {
 
   // Status moves only on the newest message, and only on the sync's rules:
   // in -> open (unless escalated), out -> waiting (only from open).
-  const isNewest = newest && newest.gmailMessageId === justStored.gmailMessageId
-  const isNewer = isNewest && (!thread.lastMessageAt || justStored.sentAt >= thread.lastMessageAt)
+  const isNewest = newest && newest.id === stored.id
+  const isNewer = isNewest && (!thread.lastMessageAt || new Date(stored.sentAt) >= new Date(thread.lastMessageAt))
   if (isNewer) {
-    if (justStored.direction === 'in' && thread.status !== 'escalated' && thread.status !== 'open') data.status = 'open'
-    if (justStored.direction === 'out' && thread.status === 'open') data.status = 'waiting'
-    if (justStored.direction === 'in' && thread.snoozedUntil) data.snoozedUntil = null
+    if (stored.direction === 'in' && thread.status !== 'escalated' && thread.status !== 'open') data.status = 'open'
+    if (stored.direction === 'out' && thread.status === 'open') data.status = 'waiting'
+    if (stored.direction === 'in' && thread.snoozedUntil) data.snoozedUntil = null
   }
   if (backfill) {
     const ageDays = (Date.now() - new Date(data.lastMessageAt).getTime()) / 86400000

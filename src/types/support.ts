@@ -4,11 +4,16 @@ export type ThreadStatus = 'open' | 'waiting' | 'escalated' | 'closed'
 /** A built-in view, or `teammate:<id>`. */
 export type InboxView = 'inbox' | 'mentions' | 'unassigned' | 'all' | 'waiting' | 'escalated' | 'snoozed' | 'closed' | `teammate:${string}`
 export type InboxSort = 'waiting' | 'newest' | 'oldest' | 'priority'
+/** Where the conversation happens: the fast@ mailbox, or a DM to @trackstar_art. */
+export type Channel = 'email' | 'instagram'
 
 export interface Teammate { id: string; firstName: string; lastName: string }
 
 export interface ThreadRow {
   id: string
+  channel: Channel
+  /** The customer's Instagram handle, without the @. Empty for email. */
+  igUsername: string
   subject: string
   customerEmail: string
   customerName: string
@@ -41,11 +46,13 @@ export interface InboxPayload {
   me: Teammate & { role: string }
 }
 
-export interface Attachment { filename: string; mimeType: string; size: number; attachmentId: string }
+export interface Attachment { filename: string; mimeType: string; size: number; attachmentId: string; url?: string | null }
 
 export interface Message {
   id: string
-  gmailMessageId: string
+  channel: Channel
+  gmailMessageId: string | null
+  igMessageId: string | null
   direction: 'in' | 'out'
   fromEmail: string
   fromName: string
@@ -116,12 +123,22 @@ export interface CustomerOrder {
 
 export interface PastThread { id: string; subject: string; status: ThreadStatus; lastMessageAt: string; messageCount: number }
 
+/** Meta's rule for a DM: a reply may go out within 24 hours of the customer's last message (7 days with the human-agent permission). */
+export interface ReplyWindow {
+  open: boolean
+  mode: 'standard' | 'human_agent' | 'closed' | 'none'
+  closesAt: string | null
+  reason: string | null
+}
+
 export interface ThreadDetail extends ThreadRow {
-  gmailThreadId: string
+  gmailThreadId: string | null
   createdAt: string
   messages: Message[]
   notes: Note[]
-  customer: { email: string; name: string; firstSeen: string; conversations: number }
+  /** Set on an Instagram thread; null for email, which has no window. */
+  replyWindow: ReplyWindow | null
+  customer: { email: string; name: string; instagram: string | null; firstSeen: string; conversations: number }
   context: { orders: CustomerOrder[]; shopifyError: string | null }
   pastThreads: PastThread[]
 }
@@ -136,6 +153,19 @@ export interface MailboxStatus {
   backfill: { done: boolean; count: number; inProgress: boolean }
   lastImportedAt: string | null
 }
+
+export interface InstagramStatus {
+  configured: boolean
+  connected: boolean
+  username: string | null
+  accountId: string | null
+  expectedHandle: string
+  tokenExpiresAt: string | null
+  humanAgent: boolean
+  webhookConfigured: boolean
+  lastImportedAt: string | null
+}
+export interface InstagramBackfillResult { conversations: number; seen: number; imported: number; failed: number }
 
 export interface SyncResult { imported?: number; failed?: number; mode?: string; seen?: number; skipped?: string }
 export interface BackfillResult { done: boolean; imported: number; total: number }

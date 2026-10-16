@@ -64,6 +64,15 @@
     "api/support/macros.js": {
       "maxDuration": 60
     },
+    "api/support/instagram.js": {
+      "maxDuration": 300
+    },
+    "api/support/instagram-callback.js": {
+      "maxDuration": 60
+    },
+    "api/support/instagram-webhook.js": {
+      "maxDuration": 60
+    },
     "api/orders/actions.js": {
       "maxDuration": 300
     },
