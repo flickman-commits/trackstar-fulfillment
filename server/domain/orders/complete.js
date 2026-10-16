@@ -4,8 +4,8 @@
  * order), and for anything else that finishes an order, so the rules live
  * once.
  *
- * A photo order completes only when the photo is on the artwork: a render
- * placed it itself, otherwise a person has ticked the box. A photo added
+ * A photo order completes only when the photo is on the artwork: an approved
+ * render placed it (the approval is the check), otherwise a person ticks the box. A photo added
  * after purchase must be paid for first (photoPayment.js). Completing an
  * order closes any render still waiting for review, so the review queue
  * never holds work that is already done.
@@ -39,10 +39,14 @@ export async function completeOrder({ orderId, orderNumber, actor = null, via = 
   if (!existing) throw new CompleteError('not_found', 'Order not found')
   if (existing.status === 'completed') return { order: existing, already: true }
 
-  // The render placed the photo and a person approved the result; that is the confirmation.
-  const photoByRender = via === 'approve' && existing.photoPath
-  if (existing.photoPath && !existing.photoPlacedAt && !photoByRender) {
-    throw new CompleteError('photo_not_confirmed', 'This print includes a customer photo. Confirm the photo is placed before completing the order.')
+  // The photo gate is for designs made by hand. When the script made the
+  // design, it placed the photo and a person approved the result with the
+  // photo on it: that approval is the confirmation, so no checkbox.
+  let photoByRender = false
+  if (existing.photoPath && !existing.photoPlacedAt) {
+    const approved = await prisma.renderJob.findFirst({ where: { orderId: existing.id, review: 'approved', status: 'done' }, orderBy: { version: 'desc' }, select: { spec: true } })
+    photoByRender = via === 'approve' || (approved?.spec?.photoPath && approved.spec.photoPath === existing.photoPath)
+    if (!photoByRender) throw new CompleteError('photo_not_confirmed', 'This print includes a customer photo and was not made by the script. Confirm the photo is placed before completing the order.')
   }
   if (existing.photoAddedManually) {
     const siblings = await prisma.order.findMany({ where: { parentOrderNumber: existing.parentOrderNumber }, select: { id: true, photoPath: true, photoAddedManually: true } })

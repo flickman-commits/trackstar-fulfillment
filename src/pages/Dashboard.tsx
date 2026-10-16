@@ -945,29 +945,32 @@ export default function Dashboard() {
   // The open order's automated print (standard orders only). See DesignPanel.
   const design = useDesign(selectedOrder?.trackstarOrderType === 'standard' ? selectedOrder.id : null, can('orders.render'))
 
+  // The script places the photo itself; an approved render of this photo is the confirmation.
+  const photoByRender = !!(selectedOrder?.photoPath && design.job?.status === 'done' && design.job.spec.photoPath === selectedOrder.photoPath)
+  const photoPlaced = !!selectedOrder?.photoPlacedAt || photoByRender
   const photoCard = selectedOrder?.photoPath ? (
       <div
         className={`rounded-md border p-3 ${
-          selectedOrder.photoPlacedAt
+          photoPlaced
             ? 'bg-green-50 border-green-300'
             : 'bg-[#4600D6]/5 border-[#4600D6]/40'
         }`}
       >
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <p className={`text-xs font-semibold ${selectedOrder.photoPlacedAt ? 'text-green-800' : 'text-[#4600D6]'}`}>
-              {selectedOrder.photoPlacedAt
+            <p className={`text-xs font-semibold ${photoPlaced ? 'text-green-800' : 'text-[#4600D6]'}`}>
+              {photoByRender ? 'Customer photo, placed by the script'
+                : selectedOrder.photoPlacedAt
                 ? 'Photo confirmed on artwork'
                 : 'This print includes a customer photo'}
             </p>
-            <p className={`text-[11px] mt-0.5 ${selectedOrder.photoPlacedAt ? 'text-green-700' : 'text-[#4600D6]/80'}`}>
-              {selectedOrder.photoPlacedAt
+            <p className={`text-[11px] mt-0.5 ${photoPlaced ? 'text-green-700' : 'text-[#4600D6]/80'}`}>
+              {photoByRender ? 'Check it on the design. Approving the design confirms it.'
+                : selectedOrder.photoPlacedAt
                 ? `Confirmed ${new Date(selectedOrder.photoPlacedAt).toLocaleString()}`
                 : 'Place this photo on the print before completing this order.'}
             </p>
-            {design.job?.status === 'done' ? (
-              <p className="mt-2 text-xs font-semibold text-[#4600D6]">The render placed this photo. Check it on the design, then approve.</p>
-            ) : (
+            {photoByRender ? null : (
             <label className={`mt-2 inline-flex items-center gap-2 cursor-pointer select-none ${photoConfirming ? 'opacity-50' : ''}`}>
               <input
                 type="checkbox"
