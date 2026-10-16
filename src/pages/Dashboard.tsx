@@ -5123,9 +5123,16 @@ Thank you!`
                             <CopyableField label="Date" value={selectedOrder.raceDate} aside={
                               <span className="inline-flex items-center gap-1.5 text-[11px]">
                                 {selectedOrder.raceDateVerified && <span className="px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-700 border border-green-200" title="Confirmed against a source on file">Verified</span>}
-                                {selectedOrder.raceDateSourceUrl
-                                  ? <a href={selectedOrder.raceDateSourceUrl} target="_blank" rel="noopener noreferrer" title={selectedOrder.raceDateEvidence || selectedOrder.raceDateSourceUrl} className="text-off-black/50 underline decoration-dotted underline-offset-2 hover:text-off-black">source</a>
-                                  : selectedOrder.raceDateEvidence && <span title={selectedOrder.raceDateEvidence} className="text-off-black/50 underline decoration-dotted underline-offset-2 cursor-help">source</span>}
+                                {(() => {
+                                  // A saved link, else the first site the citation names, else show the citation itself.
+                                  const ev = selectedOrder.raceDateEvidence || ''
+                                  const site = /\b((?:[a-z0-9-]+\.)+(?:com|org|net|de|jp|uk|au|io|us|co|run|events))\b/i.exec(ev)?.[1]
+                                  const href = selectedOrder.raceDateSourceUrl || (site ? `https://${site}` : null)
+                                  const cls = 'text-off-black/50 underline decoration-dotted underline-offset-2 hover:text-off-black cursor-pointer'
+                                  if (href) return <a href={href} target="_blank" rel="noopener noreferrer" title={ev || href} className={cls}>source</a>
+                                  if (ev) return <button type="button" onClick={() => setToast({ message: `Date source: ${ev}`, type: 'info' })} title={ev} className={cls}>source</button>
+                                  return null
+                                })()}
                               </span>
                             } />
                           ) : selectedOrder.raceId ? (
@@ -5287,10 +5294,11 @@ Thank you!`
 
                   {/* Filename. One value, so it gets one row rather than a
                       section header wrapping a card wrapping a label. */}
-                  {/* Reviewing the automated print is the main action here, so it is big. */}
+                  {/* Reviewing the automated print is the main action here, so it is big.
+                      Once approved, the same spot sends you to Artelo to attach the file. */}
                   <div className="space-y-2">
                     <DesignDetails d={design} />
-                    <DesignReview d={design} />
+                    <DesignReview d={design} arteloOrderUrl={selectedOrder.status !== 'completed' ? selectedOrder.arteloUrl : null} />
                   </div>
 
                   <div>

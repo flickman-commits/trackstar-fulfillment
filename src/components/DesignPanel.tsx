@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2, Sparkles, Download, Check, X, RefreshCw } from 'lucide-react'
+import { Loader2, Sparkles, Download, Check, X, RefreshCw, ArrowUpRight } from 'lucide-react'
 import type { Design } from '@/lib/useDesign'
 import { btnPrimary, btnGhost, inputBase } from '@/lib/ui'
 
@@ -79,10 +79,18 @@ export function DesignCard({ d }: { d: Design }) {
 }
 
 /** Approve and Reject, large: reviewing the print is the main thing this view is for. */
-export function DesignReview({ d }: { d: Design }) {
+export function DesignReview({ d, arteloOrderUrl = null }: { d: Design; arteloOrderUrl?: string | null }) {
   const [rejecting, setRejecting] = useState(false)
   const [note, setNote] = useState('')
   const job = d.job
+  // Approved, and the order is still open: the next step is attaching the file in Artelo.
+  if (d.visible && job?.status === 'done' && job.review === 'approved' && arteloOrderUrl) {
+    return (
+      <a href={arteloOrderUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-4 rounded-md bg-[#4600D6] text-white text-base font-semibold hover:opacity-90 transition-opacity">
+        <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> Attach in Artelo <ArrowUpRight className="w-4 h-4 opacity-70" />
+      </a>
+    )
+  }
   if (!d.visible || !d.canManage || job?.status !== 'done' || job.review !== 'pending') return null
   if (rejecting) {
     return (
