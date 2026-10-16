@@ -17,6 +17,7 @@ import { DesignCard, DesignReview, DesignDetails } from '@/components/DesignPane
 import { useDesign } from '@/lib/useDesign'
 import StatusLegend from '@/components/StatusLegend'
 import RaceDatabasePanel from '@/components/RaceDatabasePanel'
+import SourceLinks from '@/components/SourceLinks'
 import AssignmentPanel from '@/components/AssignmentPanel'
 import AssigneePicker, { Avatar, QueuePill, PersonFilter, type QueueMember } from '@/components/AssigneePicker'
 import { setTeamColors } from '@/lib/teamColors'
@@ -5132,16 +5133,7 @@ Thank you!`
                             <CopyableField label="Date" value={selectedOrder.raceDate} aside={
                               <span className="inline-flex items-center gap-1.5 text-[11px]">
                                 {selectedOrder.raceDateVerified && <span className="px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-700 border border-green-200" title="Confirmed against a source on file">Verified</span>}
-                                {(() => {
-                                  // A saved link, else the first site the citation names, else show the citation itself.
-                                  const ev = selectedOrder.raceDateEvidence || ''
-                                  const site = /\b((?:[a-z0-9-]+\.)+(?:com|org|net|de|jp|uk|au|io|us|co|run|events))\b/i.exec(ev)?.[1]
-                                  const href = selectedOrder.raceDateSourceUrl || (site ? `https://${site}` : null)
-                                  const cls = 'text-off-black/50 underline decoration-dotted underline-offset-2 hover:text-off-black cursor-pointer'
-                                  if (href) return <a href={href} target="_blank" rel="noopener noreferrer" title={ev || href} className={cls}>source</a>
-                                  if (ev) return <button type="button" onClick={() => setToast({ message: `Date source: ${ev}`, type: 'info' })} title={ev} className={cls}>source</button>
-                                  return null
-                                })()}
+                                <SourceLinks url={selectedOrder.raceDateSourceUrl} evidence={selectedOrder.raceDateEvidence} />
                               </span>
                             } />
                           ) : selectedOrder.raceId ? (

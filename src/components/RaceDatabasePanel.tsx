@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Search, Pencil, Check, X, Loader2, ChevronRight, ChevronDown as ChevronDownIcon } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+import SourceLinks from '@/components/SourceLinks'
 import { btnPrimary, inputBase } from '@/lib/ui'
 
 /**
@@ -635,8 +636,7 @@ export default function RaceDatabasePanel({ raceShorthands, raceShorthandOverrid
                                     <span className="flex items-center gap-1.5 shrink-0">
                                       {new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })}
                                       <DateSourceBadge source={race.raceDateSource} />
-                                      {race.raceDateSourceUrl && <a href={race.raceDateSourceUrl} target="_blank" rel="noreferrer" title={race.raceDateEvidence || race.raceDateSourceUrl} className="text-blue-600 hover:underline">source</a>}
-                                      {!race.raceDateSourceUrl && race.raceDateEvidence && <span title={race.raceDateEvidence} className="cursor-help underline decoration-dotted">source</span>}
+                                      <SourceLinks url={race.raceDateSourceUrl} evidence={race.raceDateEvidence} />
                                       {race.firstPrintedAt && <span title="A print with this date has been approved. Changing it needs a reason." className="cursor-help">🔒</span>}
                                     </span>
                                   )}
