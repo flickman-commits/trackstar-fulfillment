@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import AppSidebar, { MobileToolBar } from '@/components/AppSidebar'
@@ -28,6 +28,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [railPanel, setRailPanel] = useState<null | 'discounts' | 'pace'>(null)
+  // Cmd+D (Ctrl+D elsewhere) opens the Discounts tool from anywhere in the app.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        setRailPanel(p => (p === 'discounts' ? null : 'discounts'))
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const path = location.pathname
   const settingsOpen = new URLSearchParams(location.search).get('settings') === '1'
