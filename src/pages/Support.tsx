@@ -287,7 +287,7 @@ export default function Support() {
               </div>
             )}
             <Details
-              thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread}
+              thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} unassignedCount={inbox?.counts.unassigned || 0} onOpenThread={openThread}
               onAssign={assign} onPriority={setPriority} onTags={setTags}
               status={status} instagram={instagram} isAdmin={isAdmin} onMailboxChanged={() => { loadStatus(); loadInbox(true) }}
             />

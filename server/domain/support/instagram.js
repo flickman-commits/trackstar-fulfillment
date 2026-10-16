@@ -34,6 +34,7 @@
 import prisma from '../../db.js'
 import { originFor } from '../sales/gmail.js'
 import { refreshThread } from './mailbox.js'
+import { defaultAssigneeId } from './routing.js'
 
 const GRAPH = 'https://graph.instagram.com'
 const SCOPES = ['instagram_business_basic', 'instagram_business_manage_messages']
@@ -343,6 +344,7 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
         status: parsed.direction === 'in' ? 'open' : 'waiting',
         lastMessageAt: parsed.sentAt,
         backfilled: backfill,
+        assigneeId: backfill ? null : await defaultAssigneeId(),
       },
     })
   } else {

@@ -138,6 +138,8 @@ const routes = [
   { method: 'post',   path: '/api/support/macros',         handler: '../api/support/macros.js' },
   // Support, Instagram channel: the connection, Meta's webhook.
   { method: 'get',    path: '/api/support/instagram',          handler: '../api/support/instagram.js' },
+  { method: 'get',    path: '/api/support/settings',           handler: '../api/support/settings.js' },
+  { method: 'post',   path: '/api/support/settings',           handler: '../api/support/settings.js' },
   { method: 'post',   path: '/api/support/instagram',          handler: '../api/support/instagram.js' },
   { method: 'get',    path: '/api/support/instagram-callback', handler: '../api/support/instagram-callback.js' },
   { method: 'get',    path: '/api/support/instagram-webhook',  handler: '../api/support/instagram-webhook.js' },

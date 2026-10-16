@@ -64,6 +64,9 @@
     "api/support/macros.js": {
       "maxDuration": 60
     },
+    "api/support/settings.js": {
+      "maxDuration": 60
+    },
     "api/support/instagram.js": {
       "maxDuration": 300
     },

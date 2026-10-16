@@ -34,6 +34,7 @@
 import { google } from 'googleapis'
 import prisma from '../../db.js'
 import { oauthClient, originFor, isRevokedToken, buildMime, base64url, newMessageId } from '../sales/gmail.js'
+import { defaultAssigneeId } from './routing.js'
 
 const SCOPE_MODIFY = 'https://www.googleapis.com/auth/gmail.modify'
 const SCOPES = [SCOPE_MODIFY]
@@ -325,6 +326,8 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
         status: parsed.direction === 'in' ? 'open' : 'waiting',
         lastMessageAt: parsed.sentAt,
         backfilled: backfill,
+        // New conversations go to the person set under Routing; history goes to nobody.
+        assigneeId: backfill ? null : await defaultAssigneeId(),
       },
     })
   }
