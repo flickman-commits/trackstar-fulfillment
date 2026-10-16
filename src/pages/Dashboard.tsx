@@ -2751,14 +2751,14 @@ Thank you!`
   // usually a spelling fix on a standard order, or a reference photo and
   // instructions on a custom one.
   const commentsCallout = () => orderComments.length > 0 ? (
-                    <div className="bg-amber-50 border border-amber-300 rounded-md p-3 mb-3">
-                      <div className="flex items-center gap-1.5 mb-2">
+                    <div className="bg-amber-50 border border-amber-300 rounded-md px-3 py-2">
+                      <div className="flex items-center gap-1.5 mb-1">
                         <MessageSquareText className="w-3.5 h-3.5 text-amber-700" />
                         <span className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider">
                           {orderComments.length === 1 ? 'Note on this order' : `${orderComments.length} notes on this order`}
                         </span>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {orderComments.map(comment => (
                           <div key={comment.id}>
                             {comment.imageUrl && (
@@ -2766,8 +2766,8 @@ Thank you!`
                                 <img src={comment.imageUrl} alt="Attachment" className="max-h-32 rounded-md mb-1.5 border border-amber-200 hover:opacity-90" />
                               </a>
                             )}
-                            {comment.text && <p className="text-body-sm text-amber-900 whitespace-pre-wrap"><Linkify text={comment.text} /></p>}
-                            <div className="flex items-center justify-between gap-2">
+                            {comment.text && <p className="text-[13px] leading-snug text-amber-900 whitespace-pre-wrap"><Linkify text={comment.text} /></p>}
+                            <div className="flex items-center justify-between gap-2 mt-0.5">
                               <span className="text-[11px] text-amber-700/70">
                                 {comment.authorName ? `${comment.authorName} · ` : ''}
                                 {new Date(comment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
@@ -5575,11 +5575,63 @@ Thank you!`
                   </div>
 
                   {/* Smaller things you can do to an order. More will land here. */}
-                  {isAdmin && selectedOrder.trackstarOrderType === 'standard' && (
+                  {selectedOrder.trackstarOrderType === 'standard' && (
                     <div className="hidden md:block">
                       <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Actions</h4>
                       <div className="flex flex-col items-stretch gap-1.5">
-                        {selectedOrder.photoPath ? (
+                        {!showCommentBox && (
+                          <button onClick={() => setShowCommentBox(true)} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2">
+                            <Plus className="w-3.5 h-3.5" /> Add comment
+                          </button>
+                        )}
+                        {/* Run the lookup again after the name or year was corrected,
+                            a missing year was configured, or the timing site was down. */}
+                        {selectedOrder.hasScraperAvailable && (selectedOrder.effectiveRaceYear || selectedOrder.raceYear) && selectedOrder.status !== 'completed' && !isEditing && (
+                          <button onClick={() => researchOrder(selectedOrder.orderNumber)} disabled={isResearching} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2 disabled:opacity-50">
+                            {isResearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
+                            {isResearching ? 'Researching…' : selectedOrder.researchStatus === 'found' ? 'Re-run research' : 'Research runner'}
+                          </button>
+                        )}
+                    {showCommentBox && (
+                    <div className="w-full bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
+                      <textarea
+                        value={newCommentText}
+                        onChange={(e) => setNewCommentText(e.target.value)}
+                        onPaste={handleCommentPaste}
+                        placeholder="Add a comment or paste an image..."
+                        className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
+                        rows={2}
+                      />
+                      {commentImagePreview && (
+                        <div className="relative inline-block">
+                          <img src={commentImagePreview} alt="Upload preview" className="max-h-32 rounded-md border border-border-gray" />
+                          <button
+                            onClick={clearCommentImage}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
+                          <ImagePlus className="w-3 h-3 inline mr-1" />
+                          Image
+                          <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
+                        </label>
+                        <span className="text-xs text-off-black/40 flex-1">or paste</span>
+                        <button onClick={() => { setShowCommentBox(false); setNewCommentText(''); clearCommentImage() }} className="px-2 py-1.5 text-xs text-off-black/50 hover:text-off-black">Cancel</button>
+                        <button
+                          onClick={submitComment}
+                          disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
+                          className="px-4 py-1.5 text-xs bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                        >
+                          {isSubmittingComment ? 'Adding...' : 'Add'}
+                        </button>
+                      </div>
+                    </div>
+                    )}
+                        {!isAdmin ? null : selectedOrder.photoPath ? (
                           <AddPhotoPanel
                             replace
                             key={`replace-${selectedOrder.id}`}
@@ -5741,10 +5793,10 @@ Thank you!`
                         // reads calm rather than amber.
                         const notRun = showsRaceNotRun(selectedOrder)
                         const boxClasses = notRun
-                          ? 'bg-blue-50 border border-blue-200 rounded-md p-4'
+                          ? 'bg-blue-50 border border-blue-200 rounded-md px-3 py-2'
                           : isConfigGap
-                            ? 'bg-red-50 border border-red-200 rounded-md p-4'
-                            : 'bg-amber-50 border border-amber-200 rounded-md p-4'
+                            ? 'bg-red-50 border border-red-200 rounded-md px-3 py-2'
+                            : 'bg-amber-50 border border-amber-200 rounded-md px-3 py-2'
                         const textPrimary = notRun ? 'text-blue-900' : isConfigGap ? 'text-red-800' : 'text-amber-800'
                         const headingColor = notRun ? 'text-blue-800' : isConfigGap ? 'text-red-700' : 'text-amber-700'
 
@@ -5811,10 +5863,10 @@ Thank you!`
 
                         return (
                           <div className={boxClasses} title={selectedOrder.researchNotes || undefined}>
-                            {heading && (
-                              <h4 className={`text-xs font-semibold ${headingColor} uppercase tracking-tight mb-1.5`}>{heading}</h4>
-                            )}
-                            <p className={`text-body-sm ${textPrimary}`}>{fix}</p>
+                            <p className={`text-[13px] leading-snug ${textPrimary}`}>
+                              {heading && <span className={`font-semibold ${headingColor} mr-1.5`}>{heading}.</span>}
+                              {fix}
+                            </p>
                             {/* The runner's own result page, straight from the
                                 timing site's search listing. We cannot read it -
                                 that is the whole reason this box exists - but a
@@ -6520,73 +6572,6 @@ Thank you!`
                     </div>
                   </div>
 
-                  {/* Comments. The composer is a lot of furniture for an order
-                      with nothing to say, so it stays collapsed behind a link
-                      until it is wanted. */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">
-                        Comments {orderComments.length > 0 && `(${orderComments.length})`}
-                      </h4>
-                      {!showCommentBox && (
-                        <button
-                          onClick={() => setShowCommentBox(true)}
-                          className="text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                          + Add comment
-                        </button>
-                      )}
-                    </div>
-                    {showCommentBox && (
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2 mb-3">
-                      <textarea
-                        value={newCommentText}
-                        onChange={(e) => setNewCommentText(e.target.value)}
-                        onPaste={handleCommentPaste}
-                        placeholder="Add a comment or paste an image..."
-                        className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
-                        rows={2}
-                      />
-                      {commentImagePreview && (
-                        <div className="relative inline-block">
-                          <img src={commentImagePreview} alt="Upload preview" className="max-h-32 rounded-md border border-border-gray" />
-                          <button
-                            onClick={clearCommentImage}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
-                          <ImagePlus className="w-3 h-3 inline mr-1" />
-                          Image
-                          <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
-                        </label>
-                        <span className="text-xs text-off-black/40 flex-1">or paste</span>
-                        <button
-                          onClick={submitComment}
-                          disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
-                          className="px-4 py-1.5 text-xs bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
-                        >
-                          {isSubmittingComment ? 'Adding...' : 'Add'}
-                        </button>
-                      </div>
-                    </div>
-                    )}
-                    {isLoadingComments ? (
-                      <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
-                    ) : orderComments.length === 0 ? null : (
-                      // The comments themselves are in the amber callout at the
-                      // top, where they get read. Repeating them here was just
-                      // the same paragraph twice.
-                      <p className="text-xs text-off-black/40">
-                        {orderComments.length === 1 ? 'The note is' : `All ${orderComments.length} notes are`} at the top of this order.
-                      </p>
-                    )}
-                  </div>
-
                   </div>{/* end hidden md:block wrapper */}
 
                   {/* The "Research by hand" tag covers the no-scraper case now,
@@ -6595,29 +6580,6 @@ Thank you!`
 
                   {/* Actions */}
                   <div className="flex gap-3 pt-3">
-                    {/* Research button — always available while the order is in
-                        flight (not completed) and has a scraper + year, so the
-                        user can re-research after fixing a misspelled runner
-                        name or correcting the race year. Label adapts. */}
-                    {selectedOrder.hasScraperAvailable &&
-                     (selectedOrder.effectiveRaceYear || selectedOrder.raceYear) &&
-                     selectedOrder.status !== 'completed' &&
-                     !isEditing && (
-                      <button
-                        onClick={() => researchOrder(selectedOrder.orderNumber)}
-                        disabled={isResearching}
-                        className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isResearching ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <FlaskConical className="w-4 h-4" />
-                        )}
-                        {isResearching
-                          ? 'Researching...'
-                          : selectedOrder.researchStatus === 'found' ? 'Re-research Runner' : 'Research Runner'}
-                      </button>
-                    )}
                     {/* Mark as Completed is always available (except for already-
                         completed / flagged orders, which have their own actions).
                         Sometimes we fulfill without running research on this tool,
