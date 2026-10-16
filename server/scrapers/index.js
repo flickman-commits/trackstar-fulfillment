@@ -509,6 +509,13 @@ export function getSupportedRaces() {
  * deliberately returns the computed date because callers there want "when is
  * this race", not "do we actually know".
  */
+/** The citation behind each pinned date, by race and year: where the config author confirmed it. */
+export function getRaceDateCitations() {
+  const out = {}
+  for (const config of ALL_CONFIGS) out[config.raceName] = config.raceDateSources ? { ...config.raceDateSources } : {}
+  return out
+}
+
 export function getVerifiedRaceDates() {
   const out = {}
   for (const config of ALL_CONFIGS) {

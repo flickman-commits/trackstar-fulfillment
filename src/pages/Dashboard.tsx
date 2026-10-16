@@ -598,11 +598,12 @@ function PartnerInfoFields({
  * is broken - it is unconfirmed, which is a different thing.
  */
 function DateSourceBadge({ source }: { source: string | null }) {
-  const verified = source === 'manual' || source === 'config' || source === 'scraped'
+  const verified = source === 'manual' || source === 'config' || source === 'scraped' || source === 'researched'
   const why = verified
     ? { manual: 'Entered by hand after checking the results site',
         config: 'Pinned in the race config against a verified source',
-        scraped: 'Read off the results page' }[source as 'manual' | 'config' | 'scraped']
+        scraped: 'Read off the results page',
+        researched: 'Found and linked by the nightly research' }[source as 'manual' | 'config' | 'scraped' | 'researched']
     : 'Left over from the old computed date rules. Nobody has confirmed it.'
   return (
     <span
@@ -1170,10 +1171,10 @@ export default function Dashboard() {
   // Store possible matches per order for ambiguous results (not persisted to DB)
   const [possibleMatchesMap, setPossibleMatchesMap] = useState<Record<string, Array<{ name: string; bib: string; time: string; pace?: string; city?: string; state?: string; eventType?: string; resultsUrl?: string }>>>({})
   // Race database state
-  const [races, setRaces] = useState<{ id: number; raceName: string; year: number; raceDate: string | null; raceDateSource: string | null; location: string | null; weatherCondition: string | null; weatherTemp: string | null; weatherFetchedAt: string | null; _count?: { runnerResearch: number } }[]>([])
+  const [races, setRaces] = useState<{ id: number; raceName: string; year: number; raceDate: string | null; raceDateSource: string | null; raceDateSourceUrl?: string | null; raceDateEvidence?: string | null; firstPrintedAt?: string | null; location: string | null; weatherCondition: string | null; weatherTemp: string | null; weatherFetchedAt: string | null; _count?: { runnerResearch: number } }[]>([])
   const [isLoadingRaces, setIsLoadingRaces] = useState(false)
   const [editingRaceId, setEditingRaceId] = useState<number | null>(null)
-  const [raceEditValues, setRaceEditValues] = useState({ raceDate: '', location: '', weatherCondition: '', weatherTemp: '' })
+  const [raceEditValues, setRaceEditValues] = useState({ raceDate: '', location: '', weatherCondition: '', weatherTemp: '', sourceUrl: '', reason: '' })
   const [isSavingRace, setIsSavingRace] = useState(false)
   const [showAddRace, setShowAddRace] = useState(false)
   const [newRaceValues, setNewRaceValues] = useState({ raceName: '', year: new Date().getFullYear().toString(), raceDate: '', location: '' })
@@ -1455,7 +1456,9 @@ export default function Dashboard() {
       raceDate: dateStr,
       location: race.location || '',
       weatherCondition: race.weatherCondition ? race.weatherCondition.charAt(0).toUpperCase() + race.weatherCondition.slice(1) : '',
-      weatherTemp: race.weatherTemp || ''
+      weatherTemp: race.weatherTemp || '',
+      sourceUrl: race.raceDateSourceUrl || '',
+      reason: ''
     })
     setEditingRaceId(race.id)
   }
@@ -1474,10 +1477,16 @@ export default function Dashboard() {
             location: raceEditValues.location || undefined,
             weatherCondition: raceEditValues.weatherCondition || undefined,
             weatherTemp: raceEditValues.weatherTemp || undefined,
+            sourceUrl: raceEditValues.sourceUrl || undefined,
+            reason: raceEditValues.reason || undefined,
           }
         })
       })
-      if (!response.ok) throw new Error('Failed to update race')
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        setToast({ message: err.error || 'Failed to update race', type: 'error' })
+        return
+      }
       const result = await response.json()
 
       // Auto-fetch weather if date + location set but no manual weather
@@ -1938,10 +1947,15 @@ export default function Dashboard() {
           raceId: order.raceId,
           raceDate: weatherEditValues.raceDate || null,
           weatherTemp: weatherEditValues.weatherTemp || null,
-          weatherCondition: weatherEditValues.weatherCondition || null
+          weatherCondition: weatherEditValues.weatherCondition || null,
+          raceDateSourceUrl: window.prompt('Link where this date is confirmed (results page or race site). Leave blank if the date did not change.') || undefined
         })
       })
-      if (!response.ok) throw new Error('Failed to save race data')
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        setToast({ message: err.error || 'Failed to save race data', type: 'error' })
+        return
+      }
       setToast({ message: 'Race data updated!', type: 'success' })
       setIsEditingWeather(false)
       await fetchOrders()
@@ -3962,7 +3976,7 @@ Thank you!`
                           is the only place the size of that job is visible. */}
                       {races.length > 0 && (() => {
                         const unverified = races.filter(
-                          r => !['manual', 'config', 'scraped'].includes(r.raceDateSource || '')
+                          r => !['manual', 'config', 'scraped', 'researched'].includes(r.raceDateSource || '')
                         ).length
                         return (
                           <span className="text-xs text-off-black/50">
@@ -4292,6 +4306,27 @@ Thank you!`
                                       className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
                                     />
                                   </div>
+                                  <div className="col-span-2">
+                                    <label className="text-[11px] text-off-black/50 block mb-1">Date source (link where the date is confirmed)</label>
+                                    <input
+                                      type="url"
+                                      value={raceEditValues.sourceUrl}
+                                      onChange={(e) => setRaceEditValues(prev => ({ ...prev, sourceUrl: e.target.value }))}
+                                      placeholder="https://..."
+                                      className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                                    />
+                                  </div>
+                                  {race.firstPrintedAt && (
+                                    <div className="col-span-2">
+                                      <label className="text-[11px] text-off-black/50 block mb-1">Already printed. Reason for the change</label>
+                                      <input
+                                        type="text"
+                                        value={raceEditValues.reason}
+                                        onChange={(e) => setRaceEditValues(prev => ({ ...prev, reason: e.target.value }))}
+                                        className="w-full px-3 py-1.5 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20"
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             ) : (
@@ -4302,6 +4337,9 @@ Thank you!`
                                     <span className="flex items-center gap-1.5 shrink-0">
                                       {new Date(race.raceDate).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })}
                                       <DateSourceBadge source={race.raceDateSource} />
+                                      {race.raceDateSourceUrl && <a href={race.raceDateSourceUrl} target="_blank" rel="noreferrer" title={race.raceDateEvidence || race.raceDateSourceUrl} className="text-blue-600 hover:underline">source</a>}
+                                      {!race.raceDateSourceUrl && race.raceDateEvidence && <span title={race.raceDateEvidence} className="cursor-help underline decoration-dotted">evidence</span>}
+                                      {race.firstPrintedAt && <span title="A print with this date has been approved. Changing it needs a reason." className="cursor-help">🔒</span>}
                                     </span>
                                   )}
                                   {race.location && <span className="truncate">{race.location}</span>}

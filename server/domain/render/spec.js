@@ -11,6 +11,7 @@
  */
 import { formatRaceDate, formatTemp, formatTime, formatPace, formatCondition } from '../../lib/printFormat.js'
 import { unpaidPhotoRows } from '../orders/photoPayment.js'
+import { printBlockers } from '../races/verification.js'
 
 export const SIZES = ['8x10', '12x18', '16x24']
 
@@ -37,7 +38,7 @@ export const SPEC_SELECT = {
   raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true,
   runnerName: true, runnerNameOverride: true, productSize: true, hadNoTime: true,
   photoPath: true, photoAddedManually: true, shopifyOrderData: true, lineItemIndex: true,
-  runnerResearch: { orderBy: { id: 'desc' }, select: { researchStatus: true, bibNumber: true, officialTime: true, officialPace: true, eventType: true, race: { select: { raceDate: true, weatherCondition: true, weatherTemp: true } } } },
+  runnerResearch: { orderBy: { id: 'desc' }, select: { researchStatus: true, bibNumber: true, officialTime: true, officialPace: true, eventType: true, race: { select: { id: true, raceDate: true, raceDateSource: true, raceDateSourceUrl: true, raceDateEvidence: true, raceDateVerifiedAt: true, weatherCondition: true, weatherTemp: true, weatherFetchedAt: true, firstPrintedAt: true } } } },
 }
 
 /**
@@ -74,8 +75,8 @@ export function buildSpec(order, templates = [], raceRow = null) {
   const date = formatRaceDate(race?.raceDate)
   const condition = formatCondition(race?.weatherCondition)
   const temp = formatTemp(race?.weatherTemp)
-  if (!date) reasons.push('Race has no verified date')
-  if (!condition || !temp) reasons.push('Race has no weather yet')
+  // Hard gate: a date prints only with evidence on file, and weather only when computed for that date.
+  for (const b of printBlockers(race)) reasons.push(b)
 
   if (order.photoPath && order.shopifyOrderData) {
     const unpaid = unpaidPhotoRows([order], order.shopifyOrderData)
@@ -104,6 +105,10 @@ export function buildSpec(order, templates = [], raceRow = null) {
       condition,
       temp,
       photoPath: order.photoPath || null,
+      raceId: race?.id || null,
+      // Carried on the render so the review shows what the print was made from.
+      dateSource: race?.raceDateSource || null,
+      dateSourceUrl: race?.raceDateSourceUrl || null,
       // The filename convention the shop uses: 4551_Chicago_Bogard
       file: `${displayNumber(order)}${order.lineItemIndex ? `-${order.lineItemIndex + 1}` : ''}_${shortRace(raceName)}${edition ? '_WM' : ''}_${lastName(name)}`,
     },

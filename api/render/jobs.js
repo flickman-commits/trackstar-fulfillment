@@ -14,6 +14,7 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireCapability, recordAudit, loadActiveUser } from '../_lib/users.js'
 import { checkOrder, createJob, latestJob, signedFiles, reviewJob, onlineWorkers } from '../../server/domain/render/jobs.js'
 import { deliverApproved } from '../../server/domain/render/deliver.js'
+import { markRacePrinted } from '../../server/domain/races/verification.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -45,7 +46,10 @@ export default async function handler(req, res) {
 
     if (body.action === 'review') {
       let job = await reviewJob({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, reviewerId: user.id })
-      if (job.review === 'approved') job = await deliverApproved(job)
+      if (job.review === 'approved') {
+        if (job.spec?.raceId) await markRacePrinted(job.spec.raceId)
+        job = await deliverApproved(job)
+      }
       await recordAudit({ action: `render.${job.review}`, summary: `${job.review === 'approved' ? 'Approved' : 'Rejected'} the render of ${job.spec?.file || job.orderId} (v${job.version})${job.reviewNote ? `: ${job.reviewNote}` : ''}`, detail: { jobId: job.id, orderId: job.orderId }, actor: user })
       const files = await signedFiles(job)
       return res.status(200).json({ job: present(job, files) })
@@ -62,7 +66,7 @@ function present(job, files) {
   return {
     id: job.id, orderId: job.orderId, version: job.version, status: job.status, requestedBy: job.requestedBy,
     spec: job.spec, notes: job.notes, error: job.error, createdAt: job.createdAt, finishedAt: job.finishedAt,
-    review: job.review, reviewNote: job.reviewNote, reviewedAt: job.reviewedAt, deliveredAt: job.deliveredAt, deliveredPath: job.deliveredPath, deliveryError: job.deliveryError,
+    review: job.review, reviewNote: job.reviewNote, reviewedAt: job.reviewedAt, deliveredAt: job.deliveredAt, deliveredPath: job.deliveredPath, deliveryError: job.deliveryError, staleReason: job.staleReason,
     reviewer: job.reviewer ? `${job.reviewer.firstName} ${job.reviewer.lastName}`.trim() : null,
     ...files,
   }

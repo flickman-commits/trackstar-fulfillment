@@ -49,42 +49,50 @@ export class WeatherService {
    */
   async geocodeLocation(location) {
     try {
-      // Clean up location - Open-Meteo works better with city names
-      // Examples: "New York, NY" -> works, "Kiawah Island, SC" -> works
+      // "Burlington, VT" has to land in Vermont, not Ontario. The state (or
+      // country) in the location picks among same-named places; without one,
+      // the first result wins as before.
       const cleanLocation = this.cleanLocationString(location)
-
-      const url = `${this.geocodingBaseUrl}/search?name=${encodeURIComponent(cleanLocation)}&count=1&language=en&format=json`
-
-      console.log(`[WeatherService] Geocoding: ${cleanLocation}`)
-
+      const region = this.regionOf(location)
+      const url = `${this.geocodingBaseUrl}/search?name=${encodeURIComponent(cleanLocation)}&count=10&language=en&format=json`
+      console.log(`[WeatherService] Geocoding: ${cleanLocation}${region ? ` (${region.label})` : ''}`)
       const response = await fetchWithTimeout(url)
       const data = await response.json()
-
       if (!data.results || data.results.length === 0) {
         console.log(`[WeatherService] No geocoding results for: ${cleanLocation}`)
         return null
       }
-
-      const result = data.results[0]
-      console.log(`[WeatherService] Geocoded to: ${result.name}, ${result.admin1 || ''} (${result.latitude}, ${result.longitude})`)
-
-      return {
-        lat: result.latitude,
-        lon: result.longitude,
-        name: result.name
+      let result = data.results[0]
+      if (region) {
+        const match = data.results.find(r => (region.country ? r.country_code === region.country : true) && (region.admin1 ? String(r.admin1 || '').toLowerCase() === region.admin1.toLowerCase() : true))
+          || (region.country ? data.results.find(r => r.country_code === region.country) : null)
+        if (match) result = match
+        else console.warn(`[WeatherService] No result in ${region.label} for "${cleanLocation}"; using ${result.name}, ${result.admin1 || ''}, ${result.country_code}`)
       }
-
+      console.log(`[WeatherService] Geocoded to: ${result.name}, ${result.admin1 || ''}, ${result.country_code} (${result.latitude}, ${result.longitude})`)
+      return { lat: result.latitude, lon: result.longitude, name: [result.name, result.admin1, result.country_code].filter(Boolean).join(', ') }
     } catch (error) {
       console.error(`[WeatherService] Geocoding error:`, error.message)
       return null
     }
   }
 
-  /**
-   * Clean location string for better geocoding results
-   * @param {string} location - Raw location string
-   * @returns {string} Cleaned location
-   */
+  /** The state or country named after the comma: { country, admin1, label } or null. */
+  regionOf(location) {
+    const m = /,\s*([A-Za-z .]{2,})\s*$/.exec(String(location || ''))
+    if (!m) return null
+    const part = m[1].trim()
+    const states = { AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming', DC: 'District of Columbia' }
+    const abbr = part.toUpperCase()
+    if (states[abbr]) return { country: 'US', admin1: states[abbr], label: states[abbr] }
+    const byName = Object.values(states).find(n => n.toLowerCase() === part.toLowerCase())
+    if (byName) return { country: 'US', admin1: byName, label: byName }
+    const countries = { usa: 'US', 'united states': 'US', uk: 'GB', 'united kingdom': 'GB', england: 'GB', germany: 'DE', japan: 'JP', australia: 'AU', canada: 'CA', france: 'FR', spain: 'ES', italy: 'IT', netherlands: 'NL', ireland: 'IE', ecuador: 'EC', mexico: 'MX' }
+    const cc = countries[part.toLowerCase()]
+    if (cc) return { country: cc, admin1: null, label: part }
+    return { country: null, admin1: part, label: part }
+  }
+
   cleanLocationString(location) {
     if (!location) return ''
 

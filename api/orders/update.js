@@ -7,6 +7,7 @@
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { getCanonicalRaceName } from '../../server/scrapers/index.js'
+import { setRaceDate, noteWeatherChange } from '../../server/domain/races/verification.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -29,31 +30,32 @@ export default async function handler(req, res) {
 
     // Race-specific operations (no orderNumber required)
     if (raceAction === 'update' && raceId) {
+      const before = await prisma.race.findUnique({ where: { id: raceId } })
+      if (!before) return res.status(404).json({ error: 'Race not found' })
+      // A date is written only with its evidence, through the one path that
+      // checks the print lock and flags renders (verification.js).
+      if (raceData?.raceDate) {
+        const same = before.raceDate && before.raceDate.toISOString().slice(0, 10) === String(raceData.raceDate).slice(0, 10)
+        if (!same || raceData.sourceUrl) {
+          try {
+            await setRaceDate({ raceId, date: raceData.raceDate, source: 'manual', sourceUrl: raceData.sourceUrl, evidence: raceData.evidence, by: actor?.id || actor?.email || 'manual', reason: raceData.reason, actor })
+          } catch (e) { return res.status(400).json({ error: e.message }) }
+        }
+      }
       const updateFields = {}
-      if (raceData?.raceDate !== undefined) {
-        updateFields.raceDate = raceData.raceDate ? new Date(raceData.raceDate) : undefined
-        // A typed date is a settled one. Nobody enters a race date on a hunch -
-        // they look it up on the results site first - so this outranks the
-        // config and stops the nightly sweep asking about the year again.
-        if (raceData.raceDate) updateFields.raceDateSource = 'manual'
-      }
-      if (raceData?.location !== undefined) {
-        updateFields.location = raceData.location || null
-      }
-      if (raceData?.weatherCondition !== undefined) {
-        updateFields.weatherCondition = raceData.weatherCondition ? raceData.weatherCondition.toLowerCase() : null
-      }
-      if (raceData?.weatherTemp !== undefined) {
-        updateFields.weatherTemp = raceData.weatherTemp || null
-      }
-      if (Object.keys(updateFields).length > 0) {
+      if (raceData?.location !== undefined) updateFields.location = raceData.location || null
+      if (raceData?.weatherCondition !== undefined) updateFields.weatherCondition = raceData.weatherCondition ? raceData.weatherCondition.toLowerCase() : null
+      if (raceData?.weatherTemp !== undefined) updateFields.weatherTemp = raceData.weatherTemp || null
+      const weatherTouched = updateFields.weatherCondition !== undefined || updateFields.weatherTemp !== undefined
+      if (weatherTouched) {
         updateFields.weatherFetchedAt = new Date()
+        updateFields.weatherDetails = JSON.stringify({ method: 'Entered by hand', by: actor?.email || 'manual', at: new Date().toISOString() })
+        try {
+          await noteWeatherChange({ raceId, before: { weatherTemp: before.weatherTemp, weatherCondition: before.weatherCondition }, after: { weatherTemp: updateFields.weatherTemp ?? before.weatherTemp, weatherCondition: updateFields.weatherCondition ?? before.weatherCondition }, by: actor?.email || 'manual', reason: raceData?.reason, actor })
+        } catch (e) { return res.status(400).json({ error: e.message }) }
       }
-      const updated = await prisma.race.update({
-        where: { id: raceId },
-        data: updateFields
-      })
-      console.log(`[API /orders/update] Race ${raceId} updated directly:`, updateFields)
+      const updated = Object.keys(updateFields).length ? await prisma.race.update({ where: { id: raceId }, data: updateFields }) : await prisma.race.findUnique({ where: { id: raceId } })
+      console.log(`[API /orders/update] Race ${raceId} updated:`, { ...updateFields, date: raceData?.raceDate })
       return res.status(200).json({ success: true, race: updated })
     }
 
@@ -144,25 +146,27 @@ export default async function handler(req, res) {
     // Edits made from inside the order detail panel write through to the Race
     // table so every order for that race picks up the corrected value.
     if (raceId && (weatherTemp !== undefined || weatherCondition !== undefined || raceDate !== undefined)) {
+      const before = await prisma.race.findUnique({ where: { id: raceId } })
+      if (raceDate) {
+        const same = before?.raceDate && before.raceDate.toISOString().slice(0, 10) === String(raceDate).slice(0, 10)
+        if (!same || req.body.raceDateSourceUrl) {
+          try {
+            await setRaceDate({ raceId, date: raceDate, source: 'manual', sourceUrl: req.body.raceDateSourceUrl, evidence: req.body.raceDateEvidence, by: actor?.id || actor?.email || 'manual', reason: req.body.reason, actor })
+          } catch (e) { return res.status(400).json({ error: e.message }) }
+        }
+      }
       const raceUpdate = {}
-      if (weatherTemp !== undefined) {
-        raceUpdate.weatherTemp = weatherTemp || null
+      if (weatherTemp !== undefined) raceUpdate.weatherTemp = weatherTemp || null
+      if (weatherCondition !== undefined) raceUpdate.weatherCondition = weatherCondition ? weatherCondition.toLowerCase() : null
+      if (Object.keys(raceUpdate).length) {
+        raceUpdate.weatherFetchedAt = new Date()
+        raceUpdate.weatherDetails = JSON.stringify({ method: 'Entered by hand', by: actor?.email || 'manual', at: new Date().toISOString() })
+        try {
+          await noteWeatherChange({ raceId, before: { weatherTemp: before?.weatherTemp, weatherCondition: before?.weatherCondition }, after: { weatherTemp: raceUpdate.weatherTemp ?? before?.weatherTemp, weatherCondition: raceUpdate.weatherCondition ?? before?.weatherCondition }, by: actor?.email || 'manual', reason: req.body.reason, actor })
+        } catch (e) { return res.status(400).json({ error: e.message }) }
+        await prisma.race.update({ where: { id: raceId }, data: raceUpdate })
       }
-      if (weatherCondition !== undefined) {
-        raceUpdate.weatherCondition = weatherCondition ? weatherCondition.toLowerCase() : null
-      }
-      if (raceDate !== undefined) {
-        raceUpdate.raceDate = raceDate ? new Date(raceDate) : null
-        // Same for the inline Race card editor in the order panel.
-        if (raceDate) raceUpdate.raceDateSource = 'manual'
-      }
-      raceUpdate.weatherFetchedAt = new Date()
-
-      await prisma.race.update({
-        where: { id: raceId },
-        data: raceUpdate
-      })
-      console.log(`[API /orders/update] Race ${raceId} updated:`, raceUpdate)
+      console.log(`[API /orders/update] Race ${raceId} updated:`, { ...raceUpdate, date: raceDate })
     }
 
     // Manual corrections to bib / time / pace. These live on RunnerResearch,

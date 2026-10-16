@@ -12,10 +12,10 @@ import { btnPrimary, btnSecondary, btnGhost, inputBase } from '@/lib/ui'
 
 type Job = {
   id: string; version: number; status: 'queued' | 'rendering' | 'done' | 'failed'; requestedBy: 'admin' | 'system' | 'customer'
-  spec: { file: string; name: string; bib: string; time: string | null; pace: string | null; date: string; condition: string; temp: string; size: string; noTime: boolean; photoPath: string | null }
+  spec: { file: string; name: string; bib: string; time: string | null; pace: string | null; date: string; condition: string; temp: string; size: string; noTime: boolean; photoPath: string | null; dateSource?: string | null; dateSourceUrl?: string | null }
   notes: string | null; error: string | null; createdAt: string; finishedAt: string | null
   review: 'pending' | 'approved' | 'rejected'; reviewNote: string | null; reviewer: string | null; reviewedAt: string | null
-  deliveredAt: string | null; deliveredPath: string | null; deliveryError: string | null
+  deliveredAt: string | null; deliveredPath: string | null; deliveryError: string | null; staleReason: string | null
   pdfUrl: string | null; previewUrl: string | null
 }
 type State = { eligible: boolean; reasons: string[]; job: Job | null; workersOnline: string[] }
@@ -124,7 +124,11 @@ export default function DesignPanel({ orderId, onPreview, canManage = true }: {
             <div className="flex-1 min-w-0 text-xs text-off-black/70 space-y-1">
               <div className="font-mono text-off-black">{job.spec.file}.pdf</div>
               <div>{job.spec.name} · {job.spec.bib} · {job.spec.noTime ? 'no time' : `${job.spec.time} · ${job.spec.pace} / mi`}</div>
-              <div>{job.spec.date} · {job.spec.condition} {job.spec.temp} · {job.spec.size}{job.spec.photoPath ? ' · photo' : ''}</div>
+              <div>
+                {job.spec.date} · {job.spec.condition} {job.spec.temp} · {job.spec.size}{job.spec.photoPath ? ' · photo' : ''}
+                {job.spec.dateSourceUrl && <a href={job.spec.dateSourceUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-[#4600D6] hover:underline" title={`Date verified (${job.spec.dateSource})`}>date source ↗</a>}
+              </div>
+              {job.staleReason && <div className="text-red-700 font-semibold">Re-render needed: {job.staleReason}</div>}
               {job.notes && <div className="text-amber-700">{job.notes}</div>}
               {job.reviewNote && <div className="text-red-700">Rejected: {job.reviewNote}</div>}
               {job.review === 'approved' && (job.deliveredAt

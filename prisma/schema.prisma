@@ -165,6 +165,17 @@ model Race {
   // predate this column, which may still hold a value from the old computed
   // rules - those are the ones the sweep should keep asking about.
   raceDateSource   String?
+  // The evidence: where the date was confirmed (a results page, the official
+  // site, a race-day report) and what it said. A date prints only when it has
+  // this. Set by a person in the tool, the config sync, or the nightly routine.
+  raceDateSourceUrl   String?
+  raceDateEvidence    String?
+  raceDateVerifiedAt  DateTime?
+  raceDateVerifiedBy  String?   // user id, "config", "nightly", or a script name
+  // Set the first time a print made from this race year is approved. After
+  // that the date and weather are locked: a change needs a reason, is logged,
+  // and flags every open render made with the old values.
+  firstPrintedAt   DateTime?
   eventTypes       Json      // Array like ["Marathon", "Half Marathon"]
   resultsUrl       String?
   resultsSiteType  String?
@@ -973,6 +984,8 @@ model RenderJob {
   deliveredAt   DateTime?
   deliveredPath String?   // the Drive link
   deliveryError String?
+  // Set when the race's date or weather changed after this render was made: it needs re-rendering.
+  staleReason   String?
   createdAt     DateTime  @default(now())
 
   @@index([orderId, createdAt])

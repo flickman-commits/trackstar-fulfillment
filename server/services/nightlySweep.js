@@ -29,6 +29,7 @@ import { repairPlan } from '../lib/scraperRepair.js'
 import { syncProductCatalog } from './shopifyProducts.js'
 import { getRaceConfigSummaries, getSupportedRaces, getVerifiedRaceDates, getScraperForRace } from '../scrapers/index.js'
 import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
+import { verificationOverview } from '../domain/races/verification.js'
 
 /** Run a check so that a thrown error becomes a reported fact, not a gap. */
 async function check(name, fn) {
@@ -240,6 +241,33 @@ async function upcomingRaceCheck() {
 /* ────────────────────────────────────────────────────────────────────────
    3. Race dates
    ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Race years with open orders whose date or weather is not fit to print. The
+ * automated renderer waits on these, so each one is a print nobody is making.
+ * The routine fixes dates itself with verify_race_date (with a source) and
+ * reports what it could not settle.
+ */
+async function printDataCheck() {
+  const { races, missingRaceRows } = await verificationOverview()
+  const findings = []
+  for (const r of races.filter(x => x.openOrders > 0 && x.blockers.length).sort((a, b) => b.openOrders - a.openOrders)) {
+    const future = r.blockers.length === 1 && r.blockers[0] === 'Race has not happened yet'
+    if (future) continue
+    findings.push({
+      severity: r.openOrders >= 5 ? 'high' : 'medium',
+      kind: 'print_data_blocked',
+      subject: `${r.raceName} ${r.year}`,
+      detail: `${r.openOrders} open order${r.openOrders === 1 ? '' : 's'} cannot be rendered: ${r.blockers.join('; ')}.`,
+      action: 'tier1_fixable',
+      raceId: r.id,
+    })
+  }
+  for (const m of missingRaceRows) {
+    findings.push({ severity: 'medium', kind: 'print_data_blocked', subject: `${m.raceName} ${m.year}`, detail: `${m.openOrders} open order${m.openOrders === 1 ? '' : 's'} and no race row at all: no date, no weather.`, action: 'tier1_fixable' })
+  }
+  return findings
+}
 
 async function raceDateCheck() {
   const years = coveredYears()
@@ -764,6 +792,7 @@ export async function runNightlySweep({ persistBaseline = true } = {}) {
     await check('scrapers', scraperCheck),
     await check('upcoming', upcomingRaceCheck),
     await check('race_dates', raceDateCheck),
+    await check('print_data', printDataCheck),
     await check('orders', orderCheck),
     await check('commerce', commerceCheck),
     await check('alerted_failures', alertedFailureCheck),

@@ -7,6 +7,7 @@ import prisma from '../../../../api/_lib/prisma.js'
 import { buildCatalogCoverage, coveredYears } from '../../../lib/scraperHealth.js'
 import { getSupportedRaces, getVerifiedRaceDates, getRaceConfigSummaries } from '../../../scrapers/index.js'
 import { NIGHTLY_REPORT_KEY } from '../../nightlySweep.js'
+import { verificationOverview, setRaceDate } from '../../../domain/races/verification.js'
 
 export const opsTools = [
   {
@@ -90,4 +91,42 @@ export const opsTools = [
       }
     },
   },
+  {
+    name: 'race_data_blockers',
+    title: 'Race data blockers',
+    description: 'Race years with open orders whose date or weather is not fit to print: no date, a date with no source on file, no location, or weather not yet computed. Automated prints wait on these. Fix dates with verify_race_date.',
+    scope: 'read',
+    readOnly: true,
+    input: {},
+    async handler() {
+      const { races, missingRaceRows } = await verificationOverview()
+      const blocked = races.filter(r => r.openOrders > 0 && r.blockers.length).sort((a, b) => b.openOrders - a.openOrders)
+      return {
+        blocked: blocked.map(r => ({ raceId: r.id, race: r.raceName, year: r.year, openOrders: r.openOrders, date: r.raceDate ? r.raceDate.toISOString().slice(0, 10) : null, dateSource: r.raceDateSource, location: r.location, blockers: r.blockers })),
+        noRaceRow: missingRaceRows,
+      }
+    },
+  },
+  {
+    name: 'verify_race_date',
+    title: 'Verify a race date',
+    description: 'Record a race year\'s date with the evidence it was confirmed against: the official site, the results page, or a race-day report. Never a date worked out from a pattern. Changing a date that has already been printed needs a reason and flags the open renders made with the old date.',
+    scope: 'write',
+    readOnly: false,
+    input: {
+      raceId: z.number().int().describe('The Race row id, from race_data_blockers'),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('YYYY-MM-DD, the day the event named by the race was run'),
+      sourceUrl: z.string().url().describe('Where it was confirmed'),
+      evidence: z.string().min(5).max(500).describe('What the source says, in a sentence'),
+      location: z.string().max(80).optional().describe('City, ST for the weather, if the race has none'),
+      reason: z.string().max(300).optional().describe('Required when changing a date that has already been printed'),
+    },
+    async handler({ raceId, date, sourceUrl, evidence, location, reason }, { principal }) {
+      const by = principal?.user ? principal.user.id : (principal?.name || 'nightly')
+      const race = await setRaceDate({ raceId, date, source: 'researched', sourceUrl, evidence, by, reason, actor: principal?.user || null })
+      if (location && !race.location) await prisma.race.update({ where: { id: race.id }, data: { location: String(location).slice(0, 80) } })
+      return { summary: `Verified ${race.raceName} ${race.year} as ${date} (${sourceUrl})`, raceId: race.id, date, source: 'researched' }
+    },
+  },
 ]
+
