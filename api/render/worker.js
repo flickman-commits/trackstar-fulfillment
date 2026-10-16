@@ -62,7 +62,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ job: { id: job.id, version: job.version, spec: job.spec, template: job.template, ...slots } })
       }
       case 'complete': {
-        const job = await completeJob({ jobId: body.jobId, workerId, notes: body.notes })
+        const job = await completeJob({ jobId: body.jobId, workerId, notes: body.notes, output: body.output })
         return res.status(200).json({ ok: true, jobId: job.id })
       }
       case 'fail': {

@@ -114,6 +114,40 @@ function collectFrames(doc, ab, raceName) {
   return { frames: frames, leftovers: leftovers, dupes: dupes };
 }
 
+// No-time orders. Hiding time and pace is only safe when nothing sits to the right of pace in
+// its row; otherwise the row is left with a hole where pace was. Nothing here moves text: a
+// design that needs the row re-spaced carries a hidden "NO TIME" layer the designer laid out,
+// with its own frames for whatever changes (weather, date...), and the render swaps to it.
+function paceInRow(frames) {
+  var p = frames.pace; if (!p) return false;
+  var pb = p.geometricBounds;
+  for (var k in frames) {
+    if (k == 'pace' || k == 'time' || k == 'name') continue;
+    var b = frames[k].geometricBounds;
+    var overlap = Math.min(pb[1], b[1]) - Math.max(pb[3], b[3]);
+    if (overlap > 0 && b[0] > pb[0] + 1) return true;
+  }
+  return false;
+}
+
+// The designer's no-time version of this artboard's details: a layer named "NO TIME" (hidden on
+// the normal print), holding frames for the fields it re-lays out. Returns { layer, frames } or null.
+function noTimeFrames(doc, ab) {
+  var layer = null;
+  for (var i = 0; i < doc.layers.length; i++) if (/^\s*no\s*time\s*$/i.test(doc.layers[i].name)) layer = doc.layers[i];
+  if (!layer) return null;
+  var frames = {}, n = 0;
+  for (var t = 0; t < doc.textFrames.length; t++) {
+    var tf = doc.textFrames[t];
+    var L = layerOf(tf); if (!L || L.name != layer.name) continue;
+    if (!inside(tf.geometricBounds, ab)) continue;
+    var kind = kindOf(tf.contents);
+    if (!kind || kind == 'name' || kind == 'time' || kind == 'pace') continue;
+    frames[kind] = tf; n++;
+  }
+  return n ? { layer: layer, frames: frames } : null;
+}
+
 // Which artboard renders this order: the right size, then the template's rules
 // (templates.json): artboard = a word the name must contain (a colorway),
 // artboardExclude = a word it must not ("copy"), photoArtboard = a word that

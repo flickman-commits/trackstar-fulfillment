@@ -9,7 +9,7 @@
 import { createClient } from '@supabase/supabase-js'
 import prisma from '../../db.js'
 import { buildSpec, SPEC_SELECT } from './spec.js'
-import { availableTemplateKeys, onlineWorkers as onlineWorkersList } from './templates.js'
+import { availableTemplateKeys, noTimeGaps, onlineWorkers as onlineWorkersList } from './templates.js'
 import { getCanonicalRaceName } from '../../scrapers/index.js'
 
 export const BUCKET = 'production-files'
@@ -43,7 +43,7 @@ export async function checkOrder(orderId) {
   const order = await prisma.order.findUnique({ where: { id: String(orderId) }, select: SPEC_SELECT })
   if (!order) throw new Error('Order not found')
   const templates = await availableTemplates()
-  const result = buildSpec(order, templates, await raceRowFor(order))
+  const result = buildSpec(order, templates, await raceRowFor(order), await noTimeGaps())
   if (!result.ok && !templates.length) result.reasons.unshift('No render worker is online')
   return { order, ...result }
 }
@@ -114,11 +114,30 @@ export async function uploadSlots(job) {
   return { pdfUploadUrl: pdf.data.signedUrl, previewUploadUrl: preview.data.signedUrl, pdfPath: paths.pdf, previewPath: paths.preview, photoUrl }
 }
 
-export async function completeJob({ jobId, workerId, notes }) {
+/** What is wrong with the PDF the worker measured, in plain words. Empty when it is print ready. */
+export function outputProblems(output, size) {
+  if (!output) return []
+  const out = []
+  if (output.trimIn && size && output.trimIn !== size) out.push(`trim is ${output.trimIn}, not ${size}`)
+  const b = output.bleedIn
+  if (b && [b.left, b.right, b.top, b.bottom].some(v => Math.abs(v - 0.25) > 0.01)) out.push('bleed is not 0.25" on every side')
+  if (output.color && output.color !== 'CMYK') out.push(`color is ${output.color}, not CMYK`)
+  return out
+}
+
+export async function completeJob({ jobId, workerId, notes, output }) {
   const job = await prisma.renderJob.findUnique({ where: { id: String(jobId) } })
   if (!job || job.workerId !== String(workerId) || job.status !== 'rendering') throw new Error('That job is not yours to complete')
   const paths = pathsFor(job)
-  return prisma.renderJob.update({ where: { id: job.id }, data: { status: 'done', finishedAt: new Date(), pdfPath: paths.pdf, previewPath: paths.preview, notes: notes ? String(notes).slice(0, 2000) : null } })
+  const measured = output && typeof output === 'object' ? {
+    trimIn: output.trimIn ? String(output.trimIn).slice(0, 20) : null,
+    bleedIn: output.bleedIn && typeof output.bleedIn === 'object' ? { left: Number(output.bleedIn.left), right: Number(output.bleedIn.right), top: Number(output.bleedIn.top), bottom: Number(output.bleedIn.bottom) } : null,
+    color: ['CMYK', 'RGB', 'mixed'].includes(output.color) ? output.color : null,
+  } : null
+  // A print that is not print ready says so where the reviewer reads it.
+  const problems = outputProblems(measured, job.spec?.size)
+  const allNotes = [notes, problems.length ? `Check the PDF: ${problems.join('; ')}` : null].filter(Boolean).join('; ')
+  return prisma.renderJob.update({ where: { id: job.id }, data: { status: 'done', finishedAt: new Date(), pdfPath: paths.pdf, previewPath: paths.preview, notes: allNotes ? allNotes.slice(0, 2000) : null, output: measured ?? undefined } })
 }
 
 export async function failJob({ jobId, workerId, error }) {

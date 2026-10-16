@@ -53,6 +53,19 @@ The script finds the frames itself from what they hold. Render a couple of
 past orders with `node worker/render-local.mjs "<race>" <order numbers>`
 and compare them with the designer's files before relying on it.
 
+## No-time orders
+
+A no-time order hides the time and the pace. That is clean when pace is the
+last detail in its row (the standard going forward: put pace on the far
+right). On a design where weather or the date sits to the right of pace,
+hiding pace would leave a hole, and the script never moves text to close it.
+Instead the designer adds a layer named `NO TIME`, hidden, holding a copy of
+just the frames that change (weather, date) placed where they go on a no-time
+print, one set per artboard. On a no-time order the script hides the normal
+copies, shows that layer, and fills it. Until a file has the layer, the
+template check marks that size "needs NO TIME layout" and no-time orders for
+it are held with that reason instead of rendering.
+
 ## Checking a file by hand
 
 ```bash

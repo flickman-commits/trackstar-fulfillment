@@ -33,6 +33,7 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { evaluateCheck } from './lib/evaluateCheck.mjs'
+import { inspectPdf } from './lib/inspectPdf.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 loadEnv(path.join(HERE, '.env'))
@@ -173,10 +174,13 @@ async function render(job) {
   if (!result.ok) throw new Error(result.error || 'Illustrator reported a failure')
   if (!fs.existsSync(out + '.pdf') || !fs.existsSync(out + '.png')) throw new Error('Illustrator finished but the files are missing')
 
+  // Measure the PDF itself: trim, bleed on each side, CMYK or not.
+  let output = null
+  try { output = inspectPdf(out + '.pdf') } catch (e) { log(`  could not inspect the PDF: ${e.message}`) }
   await upload(job.pdfUploadUrl, out + '.pdf', 'application/pdf')
   await upload(job.previewUploadUrl, out + '.png', 'image/png')
   fs.rmSync(dir, { recursive: true, force: true })
-  return result.notes || ''
+  return { notes: result.notes || '', output }
 }
 
 async function main() {
@@ -195,9 +199,9 @@ async function main() {
       if (!job) { await sleep(POLL_MS); continue }
       log(`Job ${job.id}: ${job.spec.file} (${job.spec.size}${job.spec.photoPath ? ', photo' : ''}${job.spec.noTime ? ', no time' : ''})`)
       try {
-        const notes = await render(job)
-        await api('complete', { jobId: job.id, notes })
-        log(`  done${notes ? `: ${notes}` : ''}`)
+        const { notes, output } = await render(job)
+        await api('complete', { jobId: job.id, notes, output })
+        log(`  done${notes ? `: ${notes}` : ''}${output ? ` [${output.trimIn}, bleed ${output.bleedIn?.left}", ${output.color}]` : ''}`)
       } catch (e) {
         log(`  FAILED: ${e.message}`)
         await api('fail', { jobId: job.id, error: e.message }).catch(err => log(`  (could not report failure: ${err.message})`))

@@ -44,12 +44,13 @@ export const SPEC_SELECT = {
 /**
  * @param order  an order loaded with SPEC_SELECT
  * @param templates  race names some online worker has a template for
+ * @param noTimeGaps  "template|size" pairs that cannot print a no-time order yet (templates.js noTimeGaps)
  * @param raceRow  the Race row for this order's race and year, for orders that were never
  *                 researched (Instant Lookup verified them at checkout) and so have no
  *                 research record to reach the race through
  * @returns {{ ok: boolean, reasons: string[], spec: object|null }}
  */
-export function buildSpec(order, templates = [], raceRow = null) {
+export function buildSpec(order, templates = [], raceRow = null, noTimeGaps = new Set()) {
   const reasons = []
   const raceName = order.raceNameOverride ?? order.raceName
   const raceYear = order.yearOverride ?? order.raceYear
@@ -71,6 +72,7 @@ export function buildSpec(order, templates = [], raceRow = null) {
   if (research?.eventType && !/^marathon$/i.test(research.eventType.trim())) reasons.push(`${research.eventType} prints are not automated yet (only the marathon template is mapped)`)
   if (!bib) reasons.push('No bib number yet')
   if (!order.hadNoTime && (!time || !pace)) reasons.push('No finish time and pace yet')
+  if (order.hadNoTime && noTimeGaps.has(`${template}|${order.productSize}`)) reasons.push(`This ${order.productSize} design has details to the right of pace, so a no-time print needs a NO TIME layer in the file first`)
 
   const date = formatRaceDate(race?.raceDate)
   const condition = formatCondition(race?.weatherCondition)

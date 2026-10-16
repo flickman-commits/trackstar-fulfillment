@@ -28,7 +28,11 @@ export function evaluateCheck(r) {
     const photoWindow = b.photoWindow?.present ? (photoBoards.length ? 'variant' : true) : (photoBoards.length === 1 ? 'variant' : false)
     if (b.photoWindow?.present && b.photoWindow.holdsImage) warnings.push(`${size}: photo window still holds a photo (replaced at render time)`)
     if (!photoWindow) warnings.push(`${size}: no photo window; an order with a photo cannot be rendered on this design`)
+    // How a no-time order prints on this size (lib.jsx paceInRow / noTimeFrames).
+    const noTime = b.noTimeLayout?.length ? 'NO TIME layout' : b.paceInRow ? 'needs NO TIME layout' : 'hides cleanly'
+    if (noTime === 'needs NO TIME layout') warnings.push(`${size}: details sit to the right of pace, so a no-time order cannot print until the file has a NO TIME layer`)
     sizes[size] = {
+      noTime,
       artboard: b.name,
       fields: have,
       nameAlign: fields.name?.align || null,

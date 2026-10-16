@@ -48,6 +48,18 @@ export async function availableTemplateKeys() {
   return [...out]
 }
 
+/**
+ * "key|size" for each template size where a no-time order cannot print yet:
+ * details sit to the right of pace and the file has no NO TIME layer
+ * (worker/lib/evaluateCheck.mjs).
+ */
+export async function noTimeGaps() {
+  const rows = await prisma.printTemplate.findMany({ where: { enabled: true, lastCheckOk: true }, select: { key: true, lastCheckReport: true } })
+  const out = new Set()
+  for (const r of rows) for (const [size, v] of Object.entries(r.lastCheckReport?.sizes || {})) if (v?.noTime === 'needs NO TIME layout') out.add(`${r.key}|${size}`)
+  return out
+}
+
 export async function upsertTemplate({ key, raceName, edition, file, rules, enabled, notes }) {
   const k = String(key || templateKey(raceName, edition)).trim()
   if (!k) throw new Error('A template needs a race')

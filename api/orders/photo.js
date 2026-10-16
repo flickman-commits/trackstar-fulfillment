@@ -6,6 +6,9 @@
  *                                             personalization-photos bucket
  *   { action: 'attach', orderIds, path }      set the photo on those prints
  *   { action: 'remove', orderId }             take a hand-attached photo off
+ *   { action: 'replace', orderId, path }      swap the photo on a print that has one
+ *                                             (the customer emailed a different one);
+ *                                             never bills, keeps how it was paid for
  *
  * With charge: true (Shopify orders) it also edits the Shopify order to add
  * one Photo Add-On per print, and Shopify emails the customer a link to pay
@@ -45,6 +48,23 @@ export default async function handler(req, res) {
       const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path)
       if (error) return res.status(500).json({ error: `Could not start the upload: ${error.message}` })
       return res.status(200).json({ path, uploadUrl: data.signedUrl })
+    }
+
+    if (body.action === 'replace') {
+      const path = String(body.path || '')
+      if (!/^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\.[a-z]+$/.test(path)) return res.status(400).json({ error: 'Not an uploaded photo path' })
+      const o = await prisma.order.findUnique({ where: { id: String(body.orderId || '') }, select: { id: true, orderNumber: true, photoPath: true } })
+      if (!o) return res.status(404).json({ error: 'Order not found' })
+      if (!o.photoPath) return res.status(400).json({ error: 'This print has no photo to replace. Add one instead.' })
+      // The new photo has to be placed again, and any design made with the old one is out of date.
+      await prisma.order.update({ where: { id: o.id }, data: { photoPath: path, photoPlacedAt: null } })
+      await recordAudit({
+        action: 'order.photo-replaced',
+        summary: `Replaced the customer photo on ${o.orderNumber}`,
+        detail: { orderId: o.id, from: o.photoPath, to: path },
+        actor: admin,
+      })
+      return res.status(200).json({ ok: true, photoPath: path })
     }
 
     if (body.action === 'attach') {

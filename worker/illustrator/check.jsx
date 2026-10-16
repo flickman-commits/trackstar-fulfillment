@@ -45,6 +45,10 @@ for (var i = 0; i < input.files.length; i++) {
         b.push('"leftoverText":[' + lo.join(',') + ']');
         var du = []; for (var y = 0; y < got.dupes.length; y++) du.push(q(got.dupes[y]));
         b.push('"ambiguous":[' + du.join(',') + ']');
+        b.push('"paceInRow":' + paceInRow(got.frames));
+        var ntf = noTimeFrames(doc, ab), ntk = [];
+        if (ntf) for (var nk in ntf.frames) ntk.push(q(nk));
+        b.push('"noTimeLayout":[' + ntk.join(',') + ']');
         var m = marginsOf(doc, ab);
         b.push('"margins":{"left":' + (m.left === null ? 'null' : r1(m.left - ab[0])) + ',"right":' + (m.right === null ? 'null' : r1(ab[2] - m.right)) + '}');
         var pw = photoWindowOf(doc, ab);

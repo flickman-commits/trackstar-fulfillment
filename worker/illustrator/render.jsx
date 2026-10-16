@@ -120,14 +120,34 @@ try {
 
   // Weather keeps the frame's own break between condition and temperature ("Sunny" / "63°",
   // or "Cloudy " / "45°" where the designer left a space before the break).
-  if (frames.weather) {
-    var w = String(frames.weather.contents), wb = w.indexOf(BREAK);
+  function fillWeather(fr) {
+    var w = String(fr.contents), wb = w.indexOf(BREAK);
     var wSep = wb >= 0 ? w.substring(0, wb).replace(/^\S.*?(\s*)$/, '$1') + BREAK : ' ';
-    frames.weather.contents = spec.condition + wSep + String(spec.temp).replace(/F$/, '');
+    fr.contents = spec.condition + wSep + String(spec.temp).replace(/F$/, '');
   }
+  if (frames.weather) fillWeather(frames.weather);
 
   if (spec.noTime) {
-    frames.time.hidden = true; if (frames.pace) frames.pace.hidden = true; notes.push('no time');
+    // Never shift text to close the gap. Either pace is last in its row and hides cleanly, or the
+    // designer's NO TIME layer replaces the row (lib.jsx noTimeFrames), or the render stops.
+    var nt = noTimeFrames(doc, ab);
+    if (nt) {
+      if (nt.layer.locked) nt.layer.locked = false;
+      nt.layer.visible = true;
+      for (var nk in nt.frames) {
+        if (frames[nk]) frames[nk].hidden = true;
+        if (nk == 'weather') fillWeather(nt.frames[nk]);
+        else if (nk == 'date') nt.frames[nk].contents = spec.date;
+        else if (nk == 'year') nt.frames[nk].contents = String(spec.raceYear);
+        else if (nk == 'bib') nt.frames[nk].contents = String(spec.bib);
+      }
+      notes.push('no time (NO TIME layout)');
+    } else if (paceInRow(frames)) {
+      throw new Error('No-time order, and this design has details to the right of pace. Hiding pace would leave a gap and the script will not move text. Add a NO TIME layer to the template (see worker/README.md).');
+    } else {
+      notes.push('no time');
+    }
+    frames.time.hidden = true; if (frames.pace) frames.pace.hidden = true;
   } else {
     frames.time.contents = spec.time;
     if (frames.pace) {

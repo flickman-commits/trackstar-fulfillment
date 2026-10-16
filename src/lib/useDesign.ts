@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch } from '@/lib/api'
 
 /** State for the open order's automated print. Read by the pieces in components/DesignPanel.tsx. */
@@ -9,6 +9,7 @@ export type Job = {
   notes: string | null; error: string | null; createdAt: string; finishedAt: string | null
   review: 'pending' | 'approved' | 'rejected'; reviewNote: string | null; reviewer: string | null; reviewedAt: string | null
   deliveredAt: string | null; deliveredPath: string | null; deliveryError: string | null
+  output: { trimIn: string | null; bleedIn: { left: number; right: number; top: number; bottom: number } | null; color: 'CMYK' | 'RGB' | 'mixed' | null } | null
   pdfUrl: string | null; previewUrl: string | null
 }
 type State = { eligible: boolean; reasons: string[]; job: Job | null; workersOnline: string[] }
@@ -28,11 +29,17 @@ export function useDesign(orderId: string | null, canManage: boolean) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  // The order on screen. J/K can move on before a request for the last
+  // order comes back; that answer must not land on the new order.
+  const current = useRef(orderId)
+  current.current = orderId
   const load = useCallback(async () => {
     if (!orderId) return
     try {
       const res = await apiFetch(`/api/render/jobs?orderId=${encodeURIComponent(orderId)}`)
-      if (res.ok) setState(await res.json())
+      if (!res.ok) return
+      const data = await res.json()
+      if (current.current === orderId) setState(data)
     } catch { /* leave what we have */ }
   }, [orderId])
 
@@ -60,6 +67,8 @@ export function useDesign(orderId: string | null, canManage: boolean) {
   const job = state?.job || null
   // People without orders.render only ever see an approved print.
   const visible = Boolean(orderId && state && (canManage || job?.review === 'approved'))
-  return { state, job, busy, err, create, review, canManage, visible, offline: !state || state.workersOnline.length === 0 }
+  // Room is held for the design from the moment the order opens, so the layout does not jump when it loads.
+  const reserved = Boolean(orderId && (canManage || job?.review === 'approved'))
+  return { state, job, busy, err, create, review, canManage, visible, reserved, offline: !state || state.workersOnline.length === 0 }
 }
 

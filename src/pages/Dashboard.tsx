@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import CustomCounter from '@/components/CustomCounter'
 import RenderTemplatesPanel from '@/components/RenderTemplatesPanel'
 import { ToastDot } from '@/components/BrandToaster'
@@ -632,119 +632,6 @@ function StaticField({ label, value, flag }: { label: string; value: string; fla
   )
 }
 
-/**
- * "Can I trust these numbers?" reference, parked next to the runner data.
- *
- * Every outcome is listed, because someone reading a code off an order wants to
- * find that exact code. What is kept short is each MEANING: a few words, laid
- * out as a table, so the list scans instead of reading like prose.
- *
- * Click, not hover: read rather than glanced at, and a hover card cannot be
- * opened on a touchscreen.
- */
-function LookupLegend() {
-  const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
-
-  const CHECKED: [string, string][] = [
-    ['auto_match', 'one match, they confirmed it'],
-    ['picked_from_list', 'several matches, they picked theirs'],
-  ]
-  const TYPED: [string, string][] = [
-    ['manual_user_choice', 'chose to type instead of searching'],
-    ['manual_no_match', 'search found nothing'],
-    ['manual_lookup_error', 'timing site was down'],
-    ['manual_timeout', 'timing site was too slow'],
-    ['manual_rate_limited', 'hit our lookup limit'],
-    ['edited_by_customer', 'had a result, then hand-edited it'],
-    ['no_lookup_available', 'no scraper for this race, only name and year are theirs'],
-  ]
-  const RESEARCH: [string, string][] = [
-    ['async_no_match', 'nothing found'],
-    ['async_timeout', 'lookup timed out'],
-    ['async_lookup_error', 'lookup errored'],
-  ]
-
-  const Group = ({ label, rows }: { label: string; rows: [string, string][] }) => (
-    <div className="mb-3.5">
-      <p className="text-xs font-semibold text-off-black/40 uppercase tracking-wider mb-1">{label}</p>
-      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 items-baseline">
-        {rows.map(([code, meaning]) => (
-          <Fragment key={code}>
-            <code className="text-[13px] font-mono text-off-black/85 whitespace-nowrap">{code}</code>
-            <span className="text-sm text-off-black/60 leading-snug">{meaning}</span>
-          </Fragment>
-        ))}
-      </div>
-    </div>
-  )
-
-  return (
-    <div className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        aria-expanded={open}
-        className="text-xs text-blue-600 hover:text-blue-700 transition-colors"
-        title="What the lookup codes on this order mean"
-      >
-        Lookup Codes
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setOpen(false)} />
-          {/* Centerd and FIXED, not anchored to the button. The order modal is
-              max-h-[90vh] overflow-y-auto, so an absolutely positioned panel
-              gets clipped the moment it opens below the fold on a long order. */}
-          <div
-            className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] max-w-[92vw] max-h-[85vh] overflow-y-auto rounded-md border border-border-gray bg-white p-5 shadow-xl text-left"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Lookup codes"
-          >
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <h5 className="text-base font-semibold text-off-black">Lookup Codes</h5>
-              <button type="button" onClick={() => setOpen(false)} className="text-off-black/40 hover:text-off-black leading-none text-xl" aria-label="Close">&times;</button>
-            </div>
-
-            <div className="space-y-2.5 mb-5">
-              <div className="rounded border border-green-200 bg-green-50 p-3">
-                <p className="text-sm font-semibold text-green-800">verified: true &rarr; use it</p>
-                <p className="text-sm text-green-800/75 leading-snug mt-1">
-                  Confirmed against official race results. The numbers came from the timing company.
-                </p>
-              </div>
-              <div className="rounded border border-amber-300 bg-amber-50 p-3">
-                <p className="text-sm font-semibold text-amber-900">verified: false &rarr; check it</p>
-                <p className="text-sm text-amber-900/75 leading-snug mt-1">
-                  They typed it themselves. A blank Event is the quick tell.
-                </p>
-              </div>
-            </div>
-
-            <Group label="Checked against official results" rows={CHECKED} />
-            <Group label="Typed by the customer" rows={TYPED} />
-            <Group label="Nothing submitted, needs research" rows={RESEARCH} />
-
-            <div className="rounded border border-border-gray bg-subtle-gray p-3">
-              <p className="text-sm text-off-black/75 leading-snug">
-                <span className="font-semibold text-off-black">Numbers disagree with the results site?</span>{' '}
-                Email the customer to confirm before printing.
-              </p>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
 
 // Pending field for data not yet available
 function PendingField({ label }: { label: string }) {
@@ -2979,21 +2866,21 @@ Thank you!`
     <div className="h-[calc(100dvh-92px)] md:h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
       <div className="max-w-[1800px] mx-auto px-4 md:px-6 lg:px-8 w-full flex flex-col h-full">
         {/* Header - Compact bar on mobile, full greeting on desktop */}
-        <div className="pt-4 md:pt-8 lg:pt-10 pb-3 md:pb-6 flex items-center md:items-end justify-between gap-3 md:gap-6 flex-shrink-0">
+        <div className="pt-4 md:pt-5 pb-3 flex items-center justify-between gap-3 md:gap-6 flex-shrink-0">
           {/* Left side: logo, greeting, and summary */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
             <div className="flex items-center gap-2.5">
               <img
                 src="/trackstar-stars-transparent.png"
                 alt="Trackstar"
-                className="h-8 md:h-11"
+                className="h-8 md:h-[34px]"
               />
               <span className="md:hidden px-2 py-0.5 bg-off-black/10 text-off-black/60 text-xs font-medium rounded">
                 {ordersToFulfill.length} orders
               </span>
             </div>
             <div className="hidden md:block">
-              <h1 className="text-3xl md:text-4xl lg:text-[40px] font-bold text-off-black mb-1">
+              <h1 className="text-[29px] font-bold text-off-black">
                 {getGreeting()}, {greetingName(currentUser)}
               </h1>
 
@@ -3002,9 +2889,10 @@ Thank you!`
 
         </div>
 
-        {/* Orders to Personalize Section. Hidden while an order is open in its place. */}
-        {!isLoading && !inlineDetail && (
-        <section className="flex-1 flex flex-col min-h-0 pb-4">
+        {/* Orders to Personalize Section. While an order is open, its header
+            stays and the order takes the table's place (inlineDetail). */}
+        {!isLoading && (
+        <section className={inlineDetail ? 'flex-shrink-0 flex flex-col' : 'flex-1 flex flex-col min-h-0 pb-4'}>
           {/* Section Header */}
           <div className="flex items-center justify-between mb-3 md:mb-4 flex-shrink-0">
             <div>
@@ -3066,7 +2954,7 @@ Thank you!`
               ] as const).map(([key, label], i) => (
                 <button
                   key={key}
-                  onClick={() => { setActiveView(key); setSearchQuery('') }}
+                  onClick={() => { closeModal(); setActiveView(key); setSearchQuery('') }}
                   className={`${segment(activeView === key, 'md')} inline-flex items-center gap-2`}
                   title={`${label} (${i + 1})`}
                 >
@@ -3080,7 +2968,7 @@ Thank you!`
 
           {/* Bulk is its own screen: a table of runs, not a list of orders. The
               runner rows are still orders, so the modal below opens them. */}
-          {activeView === 'bulk' ? (
+          {inlineDetail ? null : activeView === 'bulk' ? (
             <BulkView
               onOpenRunner={(orderNumber) => { const o = orders.find(x => x.orderNumber === orderNumber); if (o) setSelectedOrder(o); else fetchOrders().then(() => { const oo = orders.find(x => x.orderNumber === orderNumber); if (oo) setSelectedOrder(oo) }) }}
               refreshRunners={() => { fetchOrders() }}
@@ -5543,50 +5431,42 @@ Thank you!`
                     <>
                   {/* ========== STANDARD ORDER DETAIL VIEW ========== */}
 
+                  {/* Order view: the print and the runner's details take the main
+                      column, sized so the print can be checked against what the
+                      customer entered. The sidebar holds the product, its links,
+                      every tag, and the order's smaller actions. */}
+                  <div className="md:grid md:grid-cols-[minmax(0,1fr)_340px] md:gap-6 md:items-start">
+                  <aside className="md:col-start-2 md:row-start-1 md:sticky md:top-0 space-y-4 mb-4 md:mb-0">
                   {/* Product details. The thumbnail is keyed off the stable
                       Shopify product_id so Eli can tell near-identical designs
                       apart at a glance (Chicago World Majors vs Chicago Race).
                       The ID drives the lookup but is not worth showing.
                       Race, year, size, the photo add-on and the order date are
                       all product facts, so they all live in this one card. */}
-                  <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-3">
+                  <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                     <div className="flex items-start gap-3">
                       {selectedOrder.productInfo?.heroImageUrl ? (
                         <a
                           href={selectedOrder.productInfo.heroImageUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-shrink-0 block w-16 h-16 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90 transition-opacity"
+                          className="flex-shrink-0 block w-20 h-20 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90 transition-opacity"
                           title="Click to view full size"
                         >
                           <img src={selectedOrder.productInfo.heroImageUrl} alt={selectedOrder.productInfo.label || 'Product'} className="w-full h-full object-cover" />
                         </a>
                       ) : (
-                        <div className="flex-shrink-0 w-16 h-16 rounded border border-border-gray bg-white flex items-center justify-center text-2xl text-off-black/30">
+                        <div className="flex-shrink-0 w-20 h-20 rounded border border-border-gray bg-white flex items-center justify-center text-2xl text-off-black/30">
                           📄
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Product Details</div>
-                          {(selectedOrder.shopifyAdminUrl || selectedOrder.arteloUrl) && (
-                            <div className="flex items-center gap-1.5">
-                              {selectedOrder.shopifyAdminUrl && (
-                                <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className={platformPill} title="Open this order in Shopify">
-                                  <img src="/shopify-icon.png" alt="" className="w-3.5 h-3.5" /> Shopify <ArrowUpRight className="w-3 h-3 opacity-50" />
-                                </a>
-                              )}
-                              {selectedOrder.arteloUrl && (
-                                <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className={platformPill} title="Open this order in Artelo">
-                                  <img src="/artelo-icon.png" alt="" className="w-3.5 h-3.5 rounded-[3px]" /> Artelo <ArrowUpRight className="w-3 h-3 opacity-50" />
-                                </a>
-                              )}
-                            </div>
-                          )}
                         </div>
                         {/* Race leads as the headline, year rides beside it. */}
-                        <div className="flex items-baseline gap-2 min-w-0">
-                          <h3 className="text-lg font-bold text-off-black truncate leading-tight">
+                        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 min-w-0">
+                          <h3 className="text-lg font-bold text-off-black leading-tight">
                             {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Unknown Race'}
                           </h3>
                           <span className={`flex-none inline-flex items-center px-2 py-0.5 border rounded text-xs font-semibold ${
@@ -5651,7 +5531,7 @@ Thank you!`
                             {(selectedOrder.discountCodes || []).map((d) => (
                               <span
                                 key={d.code}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-semibold bg-amber-100 text-amber-800 border-amber-300"
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium bg-yellow-50 text-yellow-900/70 border-yellow-200"
                                 title={
                                   d.amount
                                     ? `${d.code} - ${d.type === 'percentage' ? 'percentage' : d.type === 'shipping' ? 'shipping' : 'fixed amount'} discount, $${d.amount} off`
@@ -5667,12 +5547,69 @@ Thank you!`
                     </div>
                   </div>
 
-                  {/* ── TAG STRIP ──────────────────────────────────────────
-                      Same vocabulary as the dashboard table. Anything that
-                      needs more than a word or two gets its own block below;
-                      everything else lives here and nowhere else. */}
-                  <OrderTags order={selectedOrder} size="md" className="mb-3" exclude={['photo']} />
+                  {(selectedOrder.shopifyAdminUrl || selectedOrder.arteloUrl || selectedOrder.resultsUrl) && (
+                    <div className="flex flex-col gap-2">
+                      {selectedOrder.shopifyAdminUrl && (
+                        <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Shopify">
+                          <img src="/shopify-icon.png" alt="" className="w-5 h-5" /> Open in Shopify <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
+                        </a>
+                      )}
+                      {selectedOrder.arteloUrl && (
+                        <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Artelo">
+                          <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> Open in Artelo <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
+                        </a>
+                      )}
+                      {selectedOrder.resultsUrl && (
+                        <a href={selectedOrder.resultsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="The runner's result on the timing site">
+                          <span className="w-5 h-5 inline-flex items-center justify-center text-base leading-none">🏁</span> View Results <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
+                        </a>
+                      )}
+                    </div>
+                  )}
 
+                  {/* Every tag for the order, in one place. */}
+                  <div>
+                    <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Tags</h4>
+                  <OrderTags order={selectedOrder} size="md" exclude={['photo']} />
+                  </div>
+
+                  {/* Smaller things you can do to an order. More will land here. */}
+                  {isAdmin && selectedOrder.trackstarOrderType === 'standard' && (
+                    <div className="hidden md:block">
+                      <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Actions</h4>
+                      <div className="flex flex-col items-stretch gap-1.5">
+                        {selectedOrder.photoPath ? (
+                          <AddPhotoPanel
+                            replace
+                            key={`replace-${selectedOrder.id}`}
+                            currentId={selectedOrder.id}
+                            isShopify={selectedOrder.source === 'shopify'}
+                            prints={[]}
+                            onDone={() => { fetchOrders(); setToast({ message: 'Photo replaced. Place it on the artwork again.', type: 'success' }) }}
+                          />
+                        ) : (
+                          <AddPhotoPanel
+                            key={selectedOrder.id}
+                            currentId={selectedOrder.id}
+                            isShopify={selectedOrder.source === 'shopify'}
+                            prints={orders
+                              .filter(o => o.parentOrderNumber === selectedOrder.parentOrderNumber && o.trackstarOrderType === 'standard')
+                              .sort((a, b) => a.lineItemIndex - b.lineItemIndex)
+                              .map(o => ({ id: o.id, label: `${o.displayOrderNumber}${getOrderItemCount(o.parentOrderNumber) > 1 ? ` item ${getOrderItemPosition(o)}` : ''}: ${o.effectiveRunnerName || o.runnerName || 'runner'}`, hasPhoto: !!o.photoPath }))}
+                            onDone={({ charged, chargeError }) => {
+                              fetchOrders()
+                              setToast(chargeError
+                                ? { message: chargeError, type: 'error' }
+                                : { message: charged ? 'Photo added. Shopify is emailing the customer to pay for it.' : 'Photo added.', type: 'success' })
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  </aside>
+
+                  <div className="md:col-start-1 md:row-start-1 min-w-0 space-y-4">
                   {/* A comment on a standard order is somebody flagging
                       something about this print, usually a spelling the
                       results site got wrong. It used to sit under the fold
@@ -5771,23 +5708,6 @@ Thank you!`
                       </div>
                     )}
                     {photoCard}
-                    {isAdmin && selectedOrder.trackstarOrderType === 'standard' && (
-                      <AddPhotoPanel
-                        key={selectedOrder.id}
-                        currentId={selectedOrder.id}
-                        isShopify={selectedOrder.source === 'shopify'}
-                        prints={orders
-                          .filter(o => o.parentOrderNumber === selectedOrder.parentOrderNumber && o.trackstarOrderType === 'standard')
-                          .sort((a, b) => a.lineItemIndex - b.lineItemIndex)
-                          .map(o => ({ id: o.id, label: `${o.displayOrderNumber}${getOrderItemCount(o.parentOrderNumber) > 1 ? ` item ${getOrderItemPosition(o)}` : ''}: ${o.effectiveRunnerName || o.runnerName || 'runner'}`, hasPhoto: !!o.photoPath }))}
-                        onDone={({ charged, chargeError }) => {
-                          fetchOrders()
-                          setToast(chargeError
-                            ? { message: chargeError, type: 'error' }
-                            : { message: charged ? 'Photo added. Shopify is emailing the customer to pay for it.' : 'Photo added.', type: 'success' })
-                        }}
-                      />
-                    )}
                     {/* Customer's own numbers. Loud, because the whole point is
                         that nobody goes looking for a "better" answer: we
                         deliberately skip the scrape for these orders, so
@@ -6197,28 +6117,13 @@ Thank you!`
 
                   {/* Runner Details — copy-pasteable name + research data, top of stack */}
                   <div className="hidden md:block">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-semibold text-off-black/50 uppercase tracking-tight">Details</h4>
-                      <div className="flex items-center gap-3">
-                        <LookupLegend />
-                        {selectedOrder.resultsUrl && (
-                          <a
-                            href={selectedOrder.resultsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                          >
-                            View Results ↗
-                          </a>
-                        )}
-                      </div>
-                    </div>
                     {/* Runner and race side by side on desktop. Stacks on
                         narrow screens. Same data, half the vertical space.
                         With a finished render, the print sits to their left
                         so name, bib, time and weather can be checked at a glance. */}
-                    <div className={`grid grid-cols-1 gap-3 ${design.visible ? 'md:grid-cols-[auto,1fr,1fr]' : 'md:grid-cols-2'}`}>
-                      {design.visible && <div className="hidden md:flex"><DesignCard d={design} /></div>}
+                    <div className={`grid grid-cols-1 gap-3 ${design.reserved ? 'md:grid-cols-[auto,minmax(0,1fr)]' : 'md:grid-cols-2'}`}>
+                      {design.reserved && <div className="hidden md:flex"><DesignCard d={design} /></div>}
+                      <div className={design.reserved ? 'flex flex-col gap-3 min-w-0' : 'contents'}>
                       <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
                           <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Runner</span>
@@ -6548,6 +6453,7 @@ Thank you!`
                           )}
                         </div>
                       </div>
+                      </div>
                     </div>
                   </div>
 
@@ -6761,6 +6667,8 @@ Thank you!`
                     )}
                   </div>
                   </div>{/* end hidden md:block wrapper */}
+                  </div>
+                  </div>
                     </>
                   )}
                 </div>

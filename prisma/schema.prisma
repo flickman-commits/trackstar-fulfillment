@@ -986,6 +986,8 @@ model RenderJob {
   deliveryError String?
   // Set when the race's date or weather changed after this render was made: it needs re-rendering.
   staleReason   String?
+  // What the worker measured in the PDF it made: { trimIn, bleedIn: {left,right,top,bottom}, color } (worker/lib/inspectPdf.mjs)
+  output        Json?
   createdAt     DateTime  @default(now())
 
   @@index([orderId, createdAt])

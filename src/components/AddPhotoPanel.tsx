@@ -21,11 +21,13 @@ async function post(body: Record<string, unknown>) {
 }
 
 export default function AddPhotoPanel({
-  prints, currentId, isShopify, onDone,
+  prints, currentId, isShopify, onDone, replace = false,
 }: {
   prints: Print[]
   currentId: string
   isShopify: boolean
+  /** Swap this print's existing photo for another one the customer sent. Never bills. */
+  replace?: boolean
   onDone: (result: { charged: boolean; chargeError: string | null }) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -48,6 +50,12 @@ export default function AddPhotoPanel({
       const slot = await post({ action: 'upload-url', filename: file.name })
       const put = await fetch(slot.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }, body: file })
       if (!put.ok) throw new Error('The photo did not upload')
+      if (replace) {
+        await post({ action: 'replace', orderId: currentId, path: slot.path })
+        setOpen(false); choose(null)
+        onDone({ charged: false, chargeError: null })
+        return
+      }
       const out = await post({ action: 'attach', orderIds: [...picked], path: slot.path, charge })
       setOpen(false); choose(null)
       onDone({ charged: !!out.charged, chargeError: out.chargeError || null })
@@ -59,7 +67,7 @@ export default function AddPhotoPanel({
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2">
-        <ImagePlus className="w-3.5 h-3.5" /> Add a customer photo
+        <ImagePlus className="w-3.5 h-3.5" /> {replace ? 'Replace the customer photo' : 'Add a customer photo'}
       </button>
     )
   }
@@ -68,7 +76,7 @@ export default function AddPhotoPanel({
   return (
     <div className="rounded-md border border-[#4600D6]/30 bg-[#4600D6]/[0.04] p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-[#4600D6]">Add a customer photo</span>
+        <span className="text-sm font-semibold text-[#4600D6]">{replace ? 'Replace the customer photo' : 'Add a customer photo'}</span>
         <button onClick={() => setOpen(false)} className="text-off-black/40 hover:text-off-black" aria-label="Close"><X className="w-4 h-4" /></button>
       </div>
 
@@ -77,6 +85,9 @@ export default function AddPhotoPanel({
           {preview ? <img src={preview} alt="" className="w-full h-full object-cover" /> : <ImagePlus className="w-5 h-5 text-[#4600D6]/60" />}
           <input type="file" accept="image/*" className="hidden" onChange={e => choose(e.target.files?.[0] || null)} />
         </label>
+        {replace ? (
+          <p className="flex-1 text-xs text-off-black/60">The new photo replaces the one on this print. Nothing is billed. It has to be placed on the artwork again, and a design made with the old photo needs a re-render.</p>
+        ) : (
         <div className="flex-1 min-w-0 space-y-1">
           <div className="text-xs font-semibold text-off-black/60">Put it on</div>
           {prints.map(p => (
@@ -86,9 +97,10 @@ export default function AddPhotoPanel({
             </label>
           ))}
         </div>
+        )}
       </div>
 
-      {isShopify && (
+      {isShopify && !replace && (
         <label className="flex items-start gap-2 text-sm text-off-black">
           <input type="checkbox" className="mt-0.5" checked={charge} onChange={e => setCharge(e.target.checked)} />
           <span>
@@ -96,11 +108,11 @@ export default function AddPhotoPanel({
           </span>
         </label>
       )}
-      <p className="text-[11px] text-off-black/50">The photo shows as not paid until the order reads paid in Shopify, and those prints cannot be completed before then.</p>
+      {!replace && <p className="text-[11px] text-off-black/50">The photo shows as not paid until the order reads paid in Shopify, and those prints cannot be completed before then.</p>}
       {err && <p className="text-sm text-red-600">{err}</p>}
       <div className="flex gap-2">
         <button onClick={submit} disabled={!file || !count || busy} className={btnPrimary}>
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : `Add photo${charge && isShopify ? ' and bill' : ''}`}
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : replace ? 'Replace photo' : `Add photo${charge && isShopify ? ' and bill' : ''}`}
         </button>
         <button onClick={() => setOpen(false)} className={btnGhost}>Cancel</button>
       </div>

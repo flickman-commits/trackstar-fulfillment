@@ -26,14 +26,15 @@ function WorkerDot({ d }: { d: Design }) {
 /** Sits where the order's preview goes: the finished print, or its status and a Create Design button. */
 export function DesignCard({ d }: { d: Design }) {
   const [lightbox, setLightbox] = useState(false)
+  if (d.reserved && !d.state) return <div className="w-[347px] h-[520px] self-start rounded-md border border-border-gray bg-subtle-gray animate-pulse" />
   if (!d.visible || !d.state) return null
   const { job, state } = d
 
   if (job?.status === 'done' && job.previewUrl) {
     return (
       <>
-        <button onClick={() => setLightbox(true)} className="relative self-start rounded-md border border-border-gray bg-white overflow-hidden" title="Open larger">
-          <img src={job.previewUrl} alt={`Render of ${job.spec.file}`} className="h-[300px] w-auto block" />
+        <button onClick={() => setLightbox(true)} className="relative self-start w-[347px] h-[520px] rounded-md border border-border-gray bg-subtle-gray overflow-hidden" title="Open larger">
+          <img src={job.previewUrl} alt={`Render of ${job.spec.file}`} className="w-full h-full object-contain block" />
           {job.review !== 'pending' && (
             <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold ${job.review === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
               {job.review === 'approved' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
@@ -52,7 +53,7 @@ export function DesignCard({ d }: { d: Design }) {
 
   const inFlight = job && (job.status === 'queued' || job.status === 'rendering')
   return (
-    <div className="w-[220px] h-[300px] self-start rounded-md border border-dashed border-border-gray bg-subtle-gray flex flex-col items-center justify-center gap-3 p-4 text-center">
+    <div className="w-[347px] h-[520px] self-start rounded-md border border-dashed border-border-gray bg-subtle-gray flex flex-col items-center justify-center gap-3 p-4 text-center">
       <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Design</span>
       {inFlight ? (
         <div className="flex flex-col items-center gap-2 text-sm text-off-black/70">
@@ -96,7 +97,7 @@ export function DesignReview({ d }: { d: Design }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <button onClick={() => d.review('approved')} disabled={d.busy} className="inline-flex items-center justify-center gap-2 py-4 rounded-md bg-green-600 text-white text-base font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors">
-        {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} Approve
+        {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} Approve & Upload to Orders
       </button>
       <button onClick={() => setRejecting(true)} disabled={d.busy} className="inline-flex items-center justify-center gap-2 py-4 rounded-md bg-white border-2 border-red-200 text-red-700 text-base font-semibold hover:bg-red-50 disabled:opacity-50 transition-colors">
         <X className="w-5 h-5" /> Reject
@@ -109,39 +110,68 @@ function fmt(t: string | null) {
   return t ? new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
 }
 
-/** One thin row under the filename: what the print was made from and where it went. */
+function Check2({ ok, label, title }: { ok: boolean | null; label: string; title?: string }) {
+  return (
+    <span title={title} className={`inline-flex items-center gap-1 ${ok === false ? 'text-red-700 font-semibold' : ok ? 'text-green-700' : 'text-off-black/40'}`}>
+      {ok === false ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}{label}
+    </span>
+  )
+}
+
+/**
+ * Above the review buttons: what the print was made from, and what the PDF
+ * measured (trim, bleed, color) so nobody has to open it to trust it.
+ */
 export function DesignDetails({ d }: { d: Design }) {
   const job = d.job
-  if (!d.visible || !job) return null
-  const parts: React.ReactNode[] = [
-    <span key="v">v{job.version}{job.requestedBy === 'system' ? ' (auto)' : ''}</span>,
-    <span key="size">{job.spec.size}</span>,
-  ]
-  if (job.spec.template) parts.push(<span key="t">{job.spec.template}</span>)
-  parts.push(<span key="photo">{job.spec.photoPath ? 'Photo' : 'No photo'}</span>)
-  if (job.spec.noTime) parts.push(<span key="nt">No time</span>)
-  parts.push(<span key="c" title={job.finishedAt ? `Finished ${fmt(job.finishedAt)}` : undefined}>Created {fmt(job.createdAt)}</span>)
-  if (job.spec.dateSourceUrl) parts.push(<a key="ds" href={job.spec.dateSourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline" title={`Date verified (${job.spec.dateSource})`}>Date source ↗</a>)
-  if (job.review === 'approved') parts.push(<span key="a">Approved{job.reviewer ? ` by ${job.reviewer}` : ''} {fmt(job.reviewedAt)}</span>)
-  if (job.review === 'approved') parts.push(job.deliveredAt
-    ? <a key="dr" href={job.deliveredPath || '#'} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline">In Drive ↗</a>
-    : <span key="dr" className="text-red-700">Not in Drive: {job.deliveryError || 'retrying'}</span>)
-  if (job.pdfUrl) parts.push(<a key="pdf" href={job.pdfUrl} className="inline-flex items-center gap-1 text-blue-600 hover:underline"><Download className="w-3 h-3" /> PDF</a>)
+  if (!d.visible || !job || job.status !== 'done') return null
+  const o = job.output
+  const b = o?.bleedIn
+  const bleedOk = b ? [b.left, b.right, b.top, b.bottom].every(v => Math.abs(v - 0.25) <= 0.01) : null
+  const made = [
+    `v${job.version}${job.requestedBy === 'system' ? ' auto' : ''}`,
+    job.spec.template || null,
+    job.spec.photoPath ? 'photo' : 'no photo',
+    job.spec.noTime ? 'no time' : null,
+    `made ${fmt(job.finishedAt || job.createdAt)}`,
+  ].filter(Boolean).join(' · ')
   return (
-    <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-2.5 space-y-1">
-      <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-off-black/60">
-        <span className="text-body-sm text-off-black/60 mr-1">Design Details</span>
-        {parts.map((p, i) => <span key={i} className="inline-flex items-center gap-3">{i > 0 && <span className="text-off-black/20">·</span>}{p}</span>)}
-        <span className="ml-auto"><WorkerDot d={d} /></span>
-        {d.canManage && (job.status === 'done' || job.status === 'failed') && (
-          <button onClick={d.create} disabled={d.busy || !d.state?.eligible} className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 disabled:opacity-40" title={d.state?.eligible ? 'Render this order again' : d.state?.reasons.join('. ')}>
-            <RefreshCw className="w-3 h-3" /> Re-render
-          </button>
+    <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-2.5 space-y-1.5 text-xs">
+      <div className="flex items-center gap-x-4 gap-y-1 flex-wrap">
+        <span className="text-body-sm text-off-black/60">Design Details</span>
+        <span className="text-off-black/55">{made}</span>
+        <span className="ml-auto flex items-center gap-3">
+          {job.spec.dateSourceUrl && <a href={job.spec.dateSourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline" title={`Date verified (${job.spec.dateSource})`}>Date source ↗</a>}
+          {job.pdfUrl && <a href={job.pdfUrl} className="inline-flex items-center gap-1 text-blue-600 hover:underline"><Download className="w-3 h-3" /> PDF</a>}
+          {d.canManage && (
+            <button onClick={d.create} disabled={d.busy || !d.state?.eligible} className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 disabled:opacity-40" title={d.state?.eligible ? 'Render this order again' : d.state?.reasons.join('. ')}>
+              <RefreshCw className="w-3 h-3" /> Re-render
+            </button>
+          )}
+        </span>
+      </div>
+      <div className="flex items-center gap-x-4 gap-y-1 flex-wrap">
+        {o ? (
+          <>
+            <Check2 ok={o.trimIn ? o.trimIn === job.spec.size : null} label={`${o.trimIn || job.spec.size} trim`} title="Measured from the PDF's trim box" />
+            <Check2 ok={bleedOk} label={b ? (bleedOk ? '0.25" bleed all sides' : `bleed ${b.left}/${b.right}/${b.top}/${b.bottom}"`) : 'bleed'} title="Measured from the PDF's bleed box" />
+            <Check2 ok={o.color ? o.color === 'CMYK' : null} label={o.color || 'color'} title="Read from the PDF's color operators and images" />
+          </>
+        ) : (
+          <span className="text-off-black/40">Not measured (made before the PDF check)</span>
+        )}
+        {job.review === 'approved' && (
+          <span className="ml-auto flex items-center gap-3">
+            <span className="text-off-black/55">Approved{job.reviewer ? ` by ${job.reviewer}` : ''} {fmt(job.reviewedAt)}</span>
+            {job.deliveredAt
+              ? <a href={job.deliveredPath || '#'} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline">In Orders folder ↗</a>
+              : <span className="text-red-700">Not in Drive: {job.deliveryError || 'retrying'}</span>}
+          </span>
         )}
       </div>
-      {job.notes && <div className="text-xs text-amber-700">{job.notes}</div>}
-      {job.reviewNote && <div className="text-xs text-red-700">Rejected: {job.reviewNote}</div>}
-      {d.err && <div className="text-xs text-red-600">{d.err}</div>}
+      {job.notes && <div className="text-amber-700">{job.notes}</div>}
+      {job.reviewNote && <div className="text-red-700">Rejected: {job.reviewNote}</div>}
+      {d.err && <div className="text-red-600">{d.err}</div>}
     </div>
   )
 }
