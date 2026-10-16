@@ -2621,7 +2621,7 @@ Thank you!`
   )
 
   return (
-    <div className="h-[calc(100dvh-92px)] md:h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
+    <div className="h-[calc(100dvh-92px-env(safe-area-inset-bottom))] md:h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
       <div className="max-w-[1800px] mx-auto px-4 md:px-6 lg:px-8 w-full flex flex-col h-full">
         {/* Header - Compact bar on mobile, full greeting on desktop */}
         <div className="pt-4 md:pt-5 pb-3 flex items-center justify-between gap-3 md:gap-6 flex-shrink-0">

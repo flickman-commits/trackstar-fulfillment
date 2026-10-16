@@ -64,7 +64,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     // Room for the rail on the left on desktop, and for the bar along the
     // bottom on a phone, so neither covers the page's own content.
-    <div className="md:pl-[92px] pb-[92px] md:pb-0">
+    <div className="md:pl-[92px] pb-[calc(92px+env(safe-area-inset-bottom))] md:pb-0">
       <MobileToolBar
         can={can}
         activeId={activeId}
