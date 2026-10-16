@@ -50,3 +50,5 @@ worker/.env
 worker/illustrator/current.json
 worker/illustrator/result.json
 worker/local-out/
+worker/illustrator/check-input.json
+worker/illustrator/check-result.json
