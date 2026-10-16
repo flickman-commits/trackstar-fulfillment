@@ -4480,7 +4480,11 @@ Thank you!`
                           )}
                           {selectedOrder.orderPlacedAt && (
                             <span
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-border-gray rounded text-xs text-off-black/60"
+                              className={`inline-flex items-center gap-1 px-2 py-1 border rounded text-xs ${(() => {
+                                // Same colors as the table: orange from 3 days workable, red after 5.
+                                const age = orderAge(selectedOrder)
+                                return age.days > 5 ? 'bg-red-50 border-red-200 text-red-700 font-medium' : age.days >= 3 ? 'bg-orange-50 border-orange-200 text-orange-700 font-medium' : 'bg-white border-border-gray text-off-black/60'
+                              })()}`}
                               title={`Ordered on ${new Date(selectedOrder.orderPlacedAt).toLocaleString('en-US', { timeZone: TZ })}`}
                             >
                               <span>📅</span>
