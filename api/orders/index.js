@@ -10,6 +10,7 @@ import { shopifyAdminUrl, arteloOrderUrl } from '../../server/lib/links.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 import { formatRaceDate, formatTemp, formatTime, formatPace } from '../../server/lib/printFormat.js'
 import { resolveEvent } from '../../server/lib/raceEvent.js'
+import { dateVerified } from '../../server/domain/races/verification.js'
 
 
 /**
@@ -270,6 +271,10 @@ export default async function handler(req, res) {
         // order detail panel's Race Data edit mode.
         raceDateIso: race?.raceDate ? new Date(race.raceDate).toISOString().slice(0, 10) : null,
         raceLocation: race?.location || null,
+        // Where the date came from, for the source link and Verified badge beside it.
+        raceDateVerified: race ? dateVerified(race) : false,
+        raceDateSourceUrl: race?.raceDateSourceUrl || null,
+        raceDateEvidence: race?.raceDateEvidence || null,
         resultsUrl: research?.resultsUrl || buildAustinFallbackUrl(research?.runnerName || effectiveRunnerName, effectiveRaceName, effectiveRaceYear, research?.eventType),
         weatherTemp: formatTemp(race?.weatherTemp),
         weatherCondition: race?.weatherCondition ?
