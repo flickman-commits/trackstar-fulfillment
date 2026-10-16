@@ -855,7 +855,7 @@ export function BodyEditor({ body, signature, onChange, onBlur, boxRef, minHeigh
 }
 
 
-/** 9:15 AM on the given day, local time. The sender runs every 5 minutes, so times sit on 5-minute marks. */
+/** 9:15 AM on the given day, local time. The sender runs every 15 minutes, so an email goes out within 15 minutes of its time. */
 function at915(d: Date) { const x = new Date(d); x.setHours(9, 15, 0, 0); return x }
 
 /** Up to the next 5-minute mark, so a custom time is the time it actually goes. */

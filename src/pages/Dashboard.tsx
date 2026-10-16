@@ -1053,11 +1053,17 @@ export default function Dashboard() {
   const [raceShorthandOverrides, setRaceShorthandOverrides] = useState<Record<string, string>>({})
 
   // Fetch orders from database (filtered by activeView type)
+  // Completed standard orders are fetched only while someone is looking at them.
+  const [completedCount, setCompletedCount] = useState<number | null>(null)
+  const includeCompleted = showCompleted || searchQuery.trim().length > 0
   const fetchOrders = useCallback(async () => {
     try {
-      const response = await apiFetch(`/api/orders?type=${activeView}`)
+      // Standard orders: completed ones load only when the completed list or a search needs them.
+      const openOnly = activeView === 'standard' && !includeCompleted
+      const response = await apiFetch(`/api/orders?type=${activeView}${openOnly ? '&scope=open' : ''}`)
       if (!response.ok) throw new Error('Failed to fetch orders')
       const data = await response.json()
+      setCompletedCount(typeof data.completedCount === 'number' ? data.completedCount : null)
 
       // Transform database orders to match our Order interface
       const transformedOrders: Order[] = (data.orders || []).map((order: Record<string, unknown>) => {
@@ -1098,7 +1104,7 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false)
     }
-  }, [activeView])
+  }, [activeView, includeCompleted])
 
   // Order Assignment changed who has what (help added or ended, the order
   // list spread): reload the list and Current Team so nobody has to refresh.
@@ -3300,14 +3306,14 @@ Thank you!`
         {!isLoading && !inlineDetail && (
           <div className="flex-shrink-0 py-3 md:py-4 mt-2 mb-4 md:mb-8 border-t border-border-gray/50">
             <div className="flex items-center justify-center gap-3">
-              {completedOrders.length > 0 && (
+              {(completedOrders.length > 0 || (completedCount ?? 0) > 0) && (
                 <button
                   onClick={() => setShowCompleted(true)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-border-gray rounded-full shadow-sm text-sm text-off-black/70 hover:bg-subtle-gray transition-colors"
                 >
                   <span>{showCompleted ? `Close ${doneHeading}` : `View ${doneHeading}`}</span>
                   <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-off-black/5 text-off-black/60">
-                    {completedOrders.length}
+                    {completedCount ?? completedOrders.length}
                   </span>
                 </button>
               )}

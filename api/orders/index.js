@@ -162,6 +162,15 @@ export default async function handler(req, res) {
       // analytics or list views.
       whereClause.trackstarOrderType = { notIn: ['race_partner', 'bulk'] }
     }
+    // ?scope=open: leave completed orders out. The dashboard refreshes every
+    // minute and only needs them for the completed list and search, so they
+    // load on demand. Most of the table's rows (and cost) were completed orders.
+    const openOnly = req.query.scope === 'open'
+    let completedCount = null
+    if (openOnly) {
+      completedCount = await prisma.order.count({ where: { ...whereClause, status: 'completed' } })
+      whereClause.status = { not: 'completed' }
+    }
 
     // Fetch orders with their research data and race info
     const orders = await prisma.order.findMany({
@@ -431,7 +440,7 @@ export default async function handler(req, res) {
       t.pipeline = pipelineFor({ order: o, research, race, render: o.renderJobs?.[0] || null, hasScraper: t.hasScraperAvailable, templates: templateKeys, noTimeGaps: gaps, photoUnpaid: t.photoUnpaid, workerOnline })
     }
 
-    return res.status(200).json({ orders: transformedOrders })
+    return res.status(200).json({ orders: transformedOrders, ...(openOnly ? { completedCount } : {}) })
   } catch (error) {
     console.error('Error:', error)
     return res.status(500).json({ error: error.message })
