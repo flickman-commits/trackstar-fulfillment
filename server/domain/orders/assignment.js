@@ -241,6 +241,24 @@ export async function assigneeForNewOrder(orderType, raceName = null) {
  * the type nobody has started (no proofs, design not started), newest first,
  * so the regular keeps the front of the line they are working through.
  */
+/**
+ * Hand every open order of a type from one person to another, for when
+ * someone's help ends or they hand their list back. Completed orders keep
+ * whoever did them. Race routing is untouched: new orders for a routed race
+ * still go to its person until the route is changed.
+ */
+export async function moveOpenOrders({ type, fromUserId, toUserId }) {
+  if (!ASSIGNABLE_TYPES.includes(type)) throw new Error('Unknown order type')
+  if (!fromUserId || !toUserId || fromUserId === toUserId) throw new Error('Pick two different people')
+  const to = await prisma.user.findUnique({ where: { id: String(toUserId) }, select: { isActive: true } })
+  if (!to?.isActive) throw new Error('That teammate is not active')
+  const r = await prisma.order.updateMany({
+    where: { trackstarOrderType: type, status: { not: 'completed' }, assigneeId: String(fromUserId) },
+    data: { assigneeId: String(toUserId) },
+  })
+  return { moved: r.count }
+}
+
 export async function spreadQueue(shiftId) {
   const s = (await getShifts()).find(x => x.id === shiftId)
   if (!s || !isShiftOn(s)) throw new Error('That shift is not on today')

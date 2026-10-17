@@ -9,6 +9,7 @@
  *   POST { action:'add-shift', type, userId, weight, from, until }   extra help for some days (admins)
  *   POST { action:'end-shift', id }                end a shift now (admins)
  *   POST { action:'spread', id }                   give a helper their share of the waiting queue (admins)
+ *   POST { action:'move-open', type, fromUserId, toUserId }   hand all of one person's open orders to another (admins)
  *
  * Shifts, the share balance and the hand-back: server/domain/orders/assignment.js.
  *
@@ -22,8 +23,7 @@ import { requireAdminRole, recordAudit, loadActiveUser } from '../_lib/users.js'
 import {
   getAssignmentDefaults, setAssignmentDefaults, ASSIGNABLE_TYPES,
   getShifts, addShift, endShift, spreadQueue, openCounts, businessDate, rosterFor,
-  getRaceRules, setRaceRules, applyRaceRule,
-} from '../../server/domain/orders/assignment.js'
+  getRaceRules, setRaceRules, applyRaceRule, moveOpenOrders } from '../../server/domain/orders/assignment.js'
 import { can } from '../_lib/roles.js'
 import { getCanonicalRaceName } from '../../server/scrapers/index.js'
 
@@ -141,6 +141,16 @@ export default async function handler(req, res) {
       } catch (err) {
         return res.status(400).json({ error: err.message })
       }
+    }
+
+    if (body.action === 'move-open') {
+      const admin = await requireAdminRole(req, res, actor)
+      if (!admin) return
+      try {
+        const out = await moveOpenOrders({ type: String(body.type || ''), fromUserId: body.fromUserId, toUserId: body.toUserId })
+        await recordAudit({ action: 'order.move-open', summary: `Moved ${out.moved} open ${body.type} order(s) from one teammate to another`, detail: { ...body, ...out }, actor: admin })
+        return res.status(200).json(out)
+      } catch (err) { return res.status(400).json({ error: err.message }) }
     }
 
     // Race routing for standard orders (admins): every order for a race to one person.

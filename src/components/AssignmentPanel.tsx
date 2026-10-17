@@ -210,6 +210,15 @@ export default function AssignmentPanel() {
               )}
             </div>}
 
+            <MoveOpen
+              users={users}
+              busy={busy}
+              onMove={async (fromUserId, toUserId) => {
+                const d = await post(`move-${t.key}`, { action: 'move-open', type: t.key, fromUserId, toUserId })
+                if (d) { toast.success(d.moved ? `Moved ${d.moved} open order${d.moved === 1 ? '' : 's'} to ${name(toUserId)}` : 'They had no open orders'); load() }
+              }}
+            />
+
             {t.key === 'standard' && (
               <RaceRouting
                 users={users}
@@ -306,6 +315,30 @@ function AddHelp({ users, today, busy, onAdd, onCancel }: {
  * the regular and any help. "Move open orders" hands them what is already
  * waiting for that race.
  */
+/** Hand all of one person's open orders to someone else, in one go. */
+function MoveOpen({ users, busy, onMove }: { users: User[]; busy: string | null; onMove: (fromUserId: string, toUserId: string) => void }) {
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const label = (u: User) => `${u.firstName} ${u.lastName}`.trim()
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-xs font-semibold text-off-black">Move open orders</span>
+      <select value={from} onChange={e => setFrom(e.target.value)} className={`${inputBase} w-auto`}>
+        <option value="">From…</option>
+        {users.map(u => <option key={u.id} value={u.id}>{label(u)}</option>)}
+      </select>
+      <span className="text-off-black/40">to</span>
+      <select value={to} onChange={e => setTo(e.target.value)} className={`${inputBase} w-auto`}>
+        <option value="">To…</option>
+        {users.filter(u => u.id !== from).map(u => <option key={u.id} value={u.id}>{label(u)}</option>)}
+      </select>
+      <button className={btnSecondary} disabled={!from || !to || from === to || !!busy} onClick={() => { onMove(from, to); setFrom(''); setTo('') }}>
+        <Shuffle className="w-3 h-3" /> Move
+      </button>
+    </div>
+  )
+}
+
 function RaceRouting({ users, rules, options, busy, onSave, onApply }: {
   users: User[]
   rules: { race: string; userId: string }[]
