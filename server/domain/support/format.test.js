@@ -25,3 +25,12 @@ test('paragraphs and lines', () => {
 test('a DM gets plain text', () => {
   assert.equal(replyToPlain('**Shipped!** See [tracking](https://t.co/1) and _thanks_'), 'Shipped! See tracking: https://t.co/1 and thanks')
 })
+
+test('a sent reply reads back from its HTML exactly as it was typed', async () => {
+  const { htmlToText } = await import('./mailbox.js')
+  const typed = "Hey Celeste,\n\nYes, no problem! We'll ship it to\n\n9091 River Rock Dr N\nChanhassen, MN 55317\n\nThanks,\nMatt from Trackstar"
+  assert.equal(htmlToText(replyToHtml(typed)), typed)
+  // Gmail's own markup for the same thing.
+  assert.equal(htmlToText('<div dir="ltr">Hi,<div><br></div><div>Line one</div><div>Line two</div></div>'), 'Hi,\n\nLine one\nLine two')
+  assert.equal(htmlToText('<p>One\nsentence across\nsource lines.</p><p>Two</p>'), 'One sentence across source lines.\nTwo')
+})
