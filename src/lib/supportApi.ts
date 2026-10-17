@@ -24,9 +24,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 const act = <T,>(id: string, action: string, extra: Record<string, unknown> = {}) => post<T>('/api/support/thread', { id, action, ...extra })
 
+/** A Support conversation with an order's customer, as the order view lists it. */
+export interface OrderConversation { id: string; subject: string; status: ThreadStatus; snippet: string; lastMessageAt: string; snoozed: boolean; channel: string; assignee: string | null }
+
 export const supportApi = {
   status: () => request<MailboxStatus>('/api/support/gmail?action=status'),
   // The fulfillment tool's "Email customer": a new conversation about one order.
+  orderConversations: (orderId: string) => request<{ threads: OrderConversation[] }>(`/api/support/compose?orderId=${encodeURIComponent(orderId)}`),
   emailCustomer: (orderId: string, subject: string, text: string) => post<{ threadId: string; to: string; subject: string }>('/api/support/compose', { orderId, subject, text }),
   connectUrl: `${API_BASE}/api/support/gmail?action=connect`,
   disconnect: () => post<{ success: boolean }>('/api/support/gmail', { action: 'disconnect' }),

@@ -136,6 +136,7 @@ const routes = [
   { method: 'post',   path: '/api/support/thread',         handler: '../api/support/thread.js' },
   { method: 'post',   path: '/api/support/reply',          handler: '../api/support/reply.js' },
   { method: 'get',    path: '/api/support/attachment',     handler: '../api/support/attachment.js' },
+  { method: 'get',    path: '/api/support/compose',        handler: '../api/support/compose.js' },
   { method: 'post',   path: '/api/support/compose',        handler: '../api/support/compose.js' },
   { method: 'get',    path: '/api/support/macros',         handler: '../api/support/macros.js' },
   { method: 'post',   path: '/api/support/macros',         handler: '../api/support/macros.js' },

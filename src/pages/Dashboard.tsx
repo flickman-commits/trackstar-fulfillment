@@ -26,6 +26,7 @@ import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import EmailCustomerModal from '@/components/support/EmailCustomerModal'
+import OrderConversations from '@/components/support/OrderConversations'
 import Linkify from '@/components/Linkify'
 import type { Capability } from '@/lib/roles'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
@@ -3952,7 +3953,7 @@ Thank you!`
 
         {emailingOrder && (
           <EmailCustomerModal
-            order={{ id: emailingOrder.id, orderNumber: emailingOrder.orderNumber, customerEmail: emailingOrder.customerEmail, customerName: emailingOrder.customerName, runnerName: emailingOrder.effectiveRunnerName || emailingOrder.runnerName, raceName: emailingOrder.effectiveRaceName || emailingOrder.raceName, raceYear: emailingOrder.effectiveRaceYear || emailingOrder.raceYear }}
+            order={{ id: emailingOrder.id, displayNumber: emailingOrder.displayOrderNumber || emailingOrder.parentOrderNumber, customerEmail: emailingOrder.customerEmail, customerName: emailingOrder.customerName, runnerName: emailingOrder.effectiveRunnerName || emailingOrder.runnerName, raceName: emailingOrder.effectiveRaceName || emailingOrder.raceName, raceYear: emailingOrder.effectiveRaceYear || emailingOrder.raceYear }}
             repName={currentUser?.firstName || ''}
             onClose={() => setEmailingOrder(null)}
           />
@@ -4521,6 +4522,7 @@ Thank you!`
                           Close
                         </button>
                       </div>
+                      <OrderConversations orderId={selectedOrder.id} enabled={!!selectedOrder.customerEmail && can('support')} />
                       </div>
                         )
                       })()}{/* end custom detail */}
@@ -5620,6 +5622,8 @@ Thank you!`
                       </button>
                     )}
                   </div>
+                  {/* The customer's Support conversations that are still going, linked over. */}
+                  <OrderConversations orderId={selectedOrder.id} enabled={!!selectedOrder.customerEmail && can('support')} />
                   </div>{/* end hidden md:block wrapper */}
                   </div>
                   </div>

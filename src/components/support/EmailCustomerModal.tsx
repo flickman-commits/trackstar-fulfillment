@@ -12,7 +12,8 @@ import { btnPrimary, btnSecondary } from '@/lib/ui'
  */
 export interface EmailCustomerOrder {
   id: string
-  orderNumber: string
+  /** The number the customer knows (Shopify's order name), not our row's id. */
+  displayNumber: string
   customerEmail?: string | null
   customerName?: string | null
   runnerName?: string | null
@@ -27,8 +28,6 @@ const ASKS: { label: string; text: string }[] = [
   { label: 'Finish time', text: 'their official finish time (chip time if you have it)' },
   { label: 'Which race', text: 'which race and year this print is for, and the distance they ran' },
 ]
-
-const shopNumber = (n: string) => n.split('-')[0].replace(/^#/, '')
 
 function firstName(name?: string | null) {
   const f = String(name || '').trim().split(/\s+/)[0] || ''
@@ -51,7 +50,7 @@ ${rep} from Trackstar`
 }
 
 export default function EmailCustomerModal({ order, repName, onClose }: { order: EmailCustomerOrder; repName: string; onClose: () => void }) {
-  const [subject, setSubject] = useState(`Trackstar order #${shopNumber(order.orderNumber)} (action required)`)
+  const [subject, setSubject] = useState(`Trackstar Order ${String(order.displayNumber).replace(/^#/, '')} (Action Required)`)
   const [text, setText] = useState(() => template(order, repName || 'The team'))
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState<{ threadId: string; to: string } | null>(null)
