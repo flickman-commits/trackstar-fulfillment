@@ -88,6 +88,12 @@ partial sweep is not a clean one.
    blocker to fix, it is waiting. A year you cannot source goes in `needsMatt`
    with what you searched. Never change a date marked as printed without a
    `reason` naming the source that proves the old one wrong.
+   Also, a few each night: a verified date whose `sourceUrl` is empty (only a
+   written citation) gets its exact page. Find the page the citation names,
+   open it, confirm it states that day for that year, and `verify_race_date`
+   with the same date, that exact URL and a short quote. Never a search link,
+   never a page that only gives the race weekend. If a good page gives a
+   different date, put it in `needsMatt`; do not change the date.
 7. **Race dates** — `race_dates` for computed years, pinned under the date rules
    below. The date backlog cleared in September 2026; this is now maintenance.
 8. **Upcoming races** (`race_not_ready`) — the sweep checks every race with a

@@ -21,7 +21,15 @@ function sourceLinks(url: string | null | undefined, evidence: string | null | u
     out.push({ label, href: url, search: false })
   }
   const ev = String(evidence || '').trim()
-  if (ev && !/^Typed into the tool/i.test(ev)) {
+  // Full addresses written into the citation are exact links; use them as they are.
+  for (const m of ev.matchAll(/https?:\/\/[^\s)\]>,]+/g)) {
+    const href = m[0].replace(/[.;]+$/, '')
+    if (out.some(l => l.href === href)) continue
+    let label = href
+    try { const u = new URL(href); label = u.hostname.replace(/^www\./, '') + (u.pathname.length > 1 ? u.pathname.replace(/\/$/, '') : '') } catch { /* keep */ }
+    out.push({ label: label.length > 60 ? label.slice(0, 57) + '…' : label, href, search: false })
+  }
+  if (ev && !/^Typed into the tool/i.test(ev) && !/https?:\/\//.test(ev)) {
     for (const raw of ev.split(/\s+\+\s+|;\s+|\s+and\s+(?=[A-Z])/)) {
       const part = raw.trim().replace(/[.,]$/, '')
       if (part.length < 3) continue

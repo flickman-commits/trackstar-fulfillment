@@ -56,6 +56,8 @@ export function useDesign(orderId: string | null, canManage: boolean) {
 
   const create = async () => {
     setBusy(true); setErr(null)
+    // Straight to the loading state; the next poll brings the real job.
+    setState(s => s && s.job ? { ...s, job: { ...s.job, status: 'queued', previewUrl: null, pdfUrl: null, review: 'pending', output: null } } : s)
     try { await post({ action: 'create', orderId }); await load() } catch (e) { setErr(e instanceof Error ? e.message : 'Could not start') } finally { setBusy(false) }
   }
   const review = async (decision: 'approved' | 'rejected', note?: string) => {

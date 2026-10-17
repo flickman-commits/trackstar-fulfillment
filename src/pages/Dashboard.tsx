@@ -1479,7 +1479,7 @@ export default function Dashboard() {
     }
     setIsCalculatingWeather(true)
     try {
-      const res = await apiFetch('/api/orders/actions', {
+      const send = (reason?: string) => apiFetch('/api/orders/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1487,9 +1487,18 @@ export default function Dashboard() {
           raceId: order.raceId,
           city: weatherCalcCity.trim(),
           date: weatherCalcDate,
+          reason,
         }),
       })
-      const data = await res.json()
+      let res = await send()
+      let data = await res.json()
+      // A print of this race year was already approved: changing its weather needs a reason.
+      if (res.status === 409 && data.needsReason) {
+        const reason = window.prompt(`${data.error}\n\nWhy is the weather changing?`)
+        if (!reason?.trim()) return
+        res = await send(reason.trim())
+        data = await res.json()
+      }
       if (!res.ok) {
         setToast({ message: data.error || 'Could not calculate weather', type: 'error' })
         return

@@ -28,6 +28,7 @@
 import crypto from 'crypto'
 import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
 import { completeOrder, CompleteError } from '../../server/domain/orders/complete.js'
+import { noteWeatherChange } from '../../server/domain/races/verification.js'
 import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
@@ -258,7 +259,7 @@ export default async function handler(req, res) {
       case 'create-discount':
         return await handleCreateDiscount(body, res)
       case 'calculate-weather':
-        return await handleCalculateWeather(body, res)
+        return await handleCalculateWeather(body, res, actor)
       case 'customers-served-info':
         return await handleCustomersServedInfo(res)
       case 'customers-served-sync':
@@ -879,7 +880,7 @@ async function handleCreateDiscount({ valueType, value, code, expiresInDays, usa
 // Computes race-window weather (avg temp 7am–1pm + dominant condition) for a
 // date + city via Open-Meteo, and — when a raceId is given — saves it to the
 // Race so the poster's weather + the info breakdown persist.
-async function handleCalculateWeather({ raceId, city, date }, res) {
+async function handleCalculateWeather({ raceId, city, date, reason }, res, actor) {
   const cityStr = (city || '').toString().trim()
   const dateStr = (date || '').toString().trim()
   if (!cityStr) return res.status(400).json({ error: 'city is required' })
@@ -900,6 +901,14 @@ async function handleCalculateWeather({ raceId, city, date }, res) {
 
   // Persist to the race (so the poster weather + info breakdown stick).
   if (raceId) {
+    // Logged like every weather change, and refused without a reason once a
+    // print of this race year has been approved (verification.js).
+    const before = await prisma.race.findUnique({ where: { id: parseInt(raceId, 10) }, select: { weatherTemp: true, weatherCondition: true } })
+    try {
+      await noteWeatherChange({ raceId, before, after: { weatherTemp: result.temp, weatherCondition: result.condition }, by: actor?.email || 'calculator', reason: reason || null, actor })
+    } catch (err) {
+      return res.status(409).json({ error: err.message, needsReason: true })
+    }
     try {
       await prisma.race.update({
         where: { id: parseInt(raceId, 10) },

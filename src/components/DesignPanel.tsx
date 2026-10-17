@@ -32,7 +32,7 @@ export function DesignCard({ d }: { d: Design }) {
 
   if (job?.status === 'done' && job.previewUrl) {
     return (
-      <>
+      <div className="self-start w-full md:w-auto flex flex-col items-center gap-2">
         <button onClick={() => setLightbox(true)} className="relative self-start w-full md:w-[347px] aspect-[2/3] md:aspect-auto md:h-[520px] rounded-md border border-border-gray bg-subtle-gray overflow-hidden" title="Open larger">
           <img src={job.previewUrl} alt={`Render of ${job.spec.file}`} className="w-full h-full object-contain block" />
           {job.review !== 'pending' && (
@@ -42,12 +42,18 @@ export function DesignCard({ d }: { d: Design }) {
             </span>
           )}
         </button>
+        {d.canManage && (
+          <button onClick={d.create} disabled={d.busy || !state.eligible} title={state.eligible ? 'Render this order again' : state.reasons.join('. ')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 disabled:opacity-40 transition-colors">
+            {d.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-render
+          </button>
+        )}
         {lightbox && (
           <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-6" onClick={() => setLightbox(false)}>
             <img src={job.previewUrl} alt="" className="max-h-full max-w-full rounded shadow-2xl" />
           </div>
         )}
-      </>
+      </div>
     )
   }
 
@@ -264,7 +270,6 @@ export function DesignDetailsTags({ d }: { d: Design }) {
           : <Tag tone="red" title={job.arteloError || undefined}>Not in Artelo</Tag>)}
         {job.spec.dateSourceUrl && <Tag href={job.spec.dateSourceUrl} title={`Date verified (${job.spec.dateSource})`}>Date source ↗</Tag>}
         {job.pdfUrl && <Tag href={job.pdfUrl}><Download className="w-3 h-3" /> PDF</Tag>}
-        {d.canManage && <Tag onClick={d.state?.eligible && !d.busy ? d.create : undefined} title={d.state?.eligible ? 'Render this order again' : d.state?.reasons.join('. ')}><RefreshCw className="w-3 h-3" /> Re-render</Tag>}
       </div>
       {job.notes && <p className="mt-1.5 text-xs text-amber-700">{job.notes}</p>}
       {job.reviewNote && <p className="mt-1 text-xs text-red-700">{job.review === 'closed' ? 'Closed' : 'Rejected'}: {job.reviewNote}</p>}
