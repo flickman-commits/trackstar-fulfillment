@@ -23,7 +23,11 @@ export const SIZES = ['8x10', '12x18', '16x24']
  */
 export function editionOf(order) {
   const items = Array.isArray(order.shopifyOrderData?.line_items) ? order.shopifyOrderData.line_items : []
-  const li = items[order.lineItemIndex] || null
+  // The row's position is in Artelo's item list; Artelo's item id is the Shopify
+  // line id. Match by id: after an order edit Shopify still lists the removed
+  // line, so its positions no longer line up with Artelo's.
+  const itemId = order.arteloOrderData?.orderItems?.[order.lineItemIndex]?.orderItemId
+  const li = (itemId && items.find(l => String(l.id) === String(itemId))) || items[order.lineItemIndex] || null
   const title = String(li?.title || li?.name || '')
   return /world\s*major/i.test(title) ? 'World Majors' : null
 }
@@ -37,7 +41,7 @@ export const SPEC_SELECT = {
   id: true, orderNumber: true, parentOrderNumber: true, lineItemIndex: true, trackstarOrderType: true, status: true,
   raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true,
   runnerName: true, runnerNameOverride: true, productSize: true, hadNoTime: true,
-  photoPath: true, photoAddedManually: true, shopifyOrderData: true, lineItemIndex: true,
+  photoPath: true, photoAddedManually: true, shopifyOrderData: true, arteloOrderData: true, lineItemIndex: true,
   runnerResearch: { orderBy: { id: 'desc' }, select: { researchStatus: true, bibNumber: true, officialTime: true, officialPace: true, eventType: true, race: { select: { id: true, raceDate: true, raceDateSource: true, raceDateSourceUrl: true, raceDateEvidence: true, raceDateVerifiedAt: true, location: true, weatherCondition: true, weatherTemp: true, weatherFetchedAt: true, weatherConfirmedAt: true, firstPrintedAt: true } } } },
 }
 
