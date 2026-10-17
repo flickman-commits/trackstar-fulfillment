@@ -424,12 +424,27 @@ export async function refreshThread(thread, stored, { backfill = false, mailbox 
 // Getting mail in
 // ---------------------------------------------------------------------------
 
-/** Fetch and store a list of message ids, a few at a time. */
+/** The ids in this list the mirror does not have yet. Re-reading what is stored costs Gmail quota for nothing. */
+export async function missingIds(ids) {
+  const unique = [...new Set(ids)]
+  if (!unique.length) return []
+  const have = await prisma.supportMessage.findMany({ where: { gmailMessageId: { in: unique } }, select: { gmailMessageId: true } })
+  const known = new Set(have.map(m => m.gmailMessageId))
+  return unique.filter(id => !known.has(id))
+}
+
+/**
+ * Fetch and store the messages the mirror is missing, a few at a time.
+ * Returns how many failed: a caller must not move past a list with
+ * failures in it, or those messages are lost for good. That is what
+ * happened on the first import, when Gmail's quota bit and the page was
+ * marked done anyway.
+ */
 async function importIds(gmail, ids, opts) {
   const mailbox = mailboxEmail()
   let imported = 0
   let failed = 0
-  const queue = [...new Set(ids)]
+  const queue = await missingIds(ids)
   const worker = async () => {
     while (queue.length) {
       const id = queue.shift()
@@ -438,7 +453,7 @@ async function importIds(gmail, ids, opts) {
         const parsed = parseMessage(res.data, mailbox)
         if (await importMessage(parsed, { ...opts, mailbox })) imported++
       } catch (err) {
-        // A message deleted between list and get is a 404; anything else is worth a line.
+        // A message deleted between list and get is a 404, gone for good; anything else is retried next time.
         if (err?.code !== 404) { failed++; console.warn(`[support] message ${id} not imported: ${err.message}`) }
       }
     }
@@ -451,14 +466,17 @@ async function importIds(gmail, ids, opts) {
 /**
  * One chunk of the one-time import. Call until `done`. Progress is kept in
  * SystemConfig so a run that hits the function limit picks up where it left.
+ * A page with any failure is not passed: the next call reads it again, and
+ * what is already stored is skipped.
  */
 export async function backfill({ pages = 2, pageSize = 100 } = {}) {
-  const gmail = await client().catch(err => { throw err })
+  const gmail = await client()
   if ((await getConfig(KEY_BACKFILL_DONE)) === 'true') {
-    return { done: true, imported: 0, total: Number(await getConfig(KEY_BACKFILL_COUNT) || 0) }
+    return { done: true, imported: 0, failed: 0, total: Number(await getConfig(KEY_BACKFILL_COUNT) || 0) }
   }
   let pageToken = (await getConfig(KEY_BACKFILL_PAGE)) || undefined
   let imported = 0
+  let failed = 0
   let done = false
   try {
     for (let i = 0; i < pages; i++) {
@@ -466,6 +484,8 @@ export async function backfill({ pages = 2, pageSize = 100 } = {}) {
       const ids = (res.data.messages || []).map(m => m.id)
       const out = await importIds(gmail, ids, { backfill: true })
       imported += out.imported
+      failed += out.failed
+      if (out.failed) break // stay on this page; the next call retries what failed
       pageToken = res.data.nextPageToken || undefined
       if (!pageToken) { done = true; break }
       await setConfig(KEY_BACKFILL_PAGE, pageToken)
@@ -479,54 +499,65 @@ export async function backfill({ pages = 2, pageSize = 100 } = {}) {
     await setConfig(KEY_BACKFILL_DONE, 'true')
     await delConfig(KEY_BACKFILL_PAGE)
   }
-  return { done, imported, total }
+  if (failed) throw new Error(`Gmail is rate limiting us for a minute (${failed} message${failed === 1 ? '' : 's'} waiting). The import picks up where it left off.`)
+  return { done, imported, failed, total }
 }
+
+/** How far back every sync double-checks that nothing was missed. */
+const SWEEP_DAYS = 7
 
 /**
  * Catch up with whatever changed since the last sync. history.list from the
  * saved id is one call when nothing happened. Gmail only keeps history for a
- * week or so; when the id is too old (404) the fallback lists the last few
- * days outright and starts fresh from the profile's current id.
+ * week or so; when the id is too old (404) it starts fresh from now.
+ *
+ * Every run also lists the last week of mail and fetches anything the
+ * mirror does not have: one cheap list call, and it is what heals a message
+ * lost to a quota error or a failed run. The history id only moves forward
+ * when every message was stored, so a failure is retried on the next run.
  */
 export async function sync() {
   const gmail = await client()
   const mailbox = mailboxEmail()
-  let startHistoryId = await getConfig(KEY_HISTORY)
+  const startHistoryId = await getConfig(KEY_HISTORY)
   const profile = await gmail.users.getProfile({ userId: 'me' }).catch(onGmailError)
   const current = profile.data.historyId
 
-  if (!startHistoryId) {
-    await setConfig(KEY_HISTORY, current)
-    return { imported: 0, failed: 0, mode: 'initialised' }
+  const ids = new Set()
+  let mode = startHistoryId ? 'history' : 'initialised'
+  if (startHistoryId) {
+    let pageToken
+    try {
+      do {
+        const res = await withRetry(() => gmail.users.history.list({
+          userId: 'me', startHistoryId, historyTypes: ['messageAdded'], maxResults: 500, pageToken,
+        }), { label: 'history' })
+        for (const h of res.data.history || []) {
+          for (const a of h.messagesAdded || []) {
+            const labels = a.message?.labelIds || []
+            if (labels.includes('DRAFT') || labels.includes('SPAM') || labels.includes('TRASH') || labels.includes('CHAT')) continue
+            ids.add(a.message.id)
+          }
+        }
+        pageToken = res.data.nextPageToken
+      } while (pageToken)
+    } catch (err) {
+      if (err?.code !== 404) await onGmailError(err)
+      mode = 'fallback' // history too old; the sweep below covers the gap
+    }
   }
 
-  const ids = new Set()
-  let pageToken
-  let mode = 'history'
-  try {
-    do {
-      const res = await withRetry(() => gmail.users.history.list({
-        userId: 'me', startHistoryId, historyTypes: ['messageAdded'], maxResults: 500, pageToken,
-      }), { label: 'history' })
-      for (const h of res.data.history || []) {
-        for (const a of h.messagesAdded || []) {
-          const labels = a.message?.labelIds || []
-          if (labels.includes('DRAFT') || labels.includes('SPAM') || labels.includes('TRASH') || labels.includes('CHAT')) continue
-          ids.add(a.message.id)
-        }
-      }
-      pageToken = res.data.nextPageToken
-    } while (pageToken)
-  } catch (err) {
-    if (err?.code !== 404) await onGmailError(err)
-    // Too old. Read the last three days the plain way and start over from now.
-    mode = 'fallback'
-    const res = await withRetry(() => gmail.users.messages.list({ userId: 'me', q: `${MAIL_QUERY} newer_than:3d`, maxResults: 200 }), { label: 'fallback list' })
-    for (const m of res.data.messages || []) ids.add(m.id)
-  }
+  // The sweep: the last week, whatever history said.
+  let sweepToken
+  let swept = 0
+  do {
+    const res = await withRetry(() => gmail.users.messages.list({ userId: 'me', q: `${MAIL_QUERY} newer_than:${SWEEP_DAYS}d`, maxResults: 500, pageToken: sweepToken }), { label: 'sweep list' })
+    for (const m of res.data.messages || []) { ids.add(m.id); swept++ }
+    sweepToken = res.data.nextPageToken
+  } while (sweepToken && swept < 2000)
 
   const out = await importIds(gmail, [...ids], { mailbox })
-  await setConfig(KEY_HISTORY, current)
+  if (!out.failed) await setConfig(KEY_HISTORY, current)
   return { ...out, mode, seen: ids.size }
 }
 

@@ -1,7 +1,6 @@
-import { ChevronDown, Instagram, Loader2, Mail, Moon, Star } from 'lucide-react'
+import { ChevronDown, Instagram, Loader2, Mail, Moon, Star, UserRound } from 'lucide-react'
 import { ago, waitingFor } from '@/lib/supportDates'
 import { customerColor, initials } from '@/lib/supportStatus'
-import { Avatar } from '@/components/AssigneePicker'
 import type { InboxSort, ThreadRow } from '@/types/support'
 
 /**
@@ -60,7 +59,10 @@ function Row({ t, active, onClick }: { t: ThreadRow; active: boolean; onClick: (
           <span className="shrink-0 inline-flex items-center gap-1.5 text-[11px] text-off-black/45">
             {wait && wait !== 'just now' && <span className={/d$/.test(wait) ? 'text-red-600 font-medium' : ''} title="Waiting on us">{wait}</span>}
             {snoozed && <Moon className="w-3 h-3" />}
-            {t.assignee ? <Avatar user={t.assignee} size={16} /> : <span className="w-4 h-4 rounded-full border border-dashed border-off-black/25" title="Unassigned" />}
+            {/* A grey name pill, not a coloured dot: blue dots mean unread. */}
+            {t.assignee
+              ? <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full border border-border-gray bg-white text-[10px] font-medium text-off-black/60 max-w-[72px]" title={`Assigned to ${t.assignee.firstName} ${t.assignee.lastName}`.trim()}><UserRound className="w-2.5 h-2.5 shrink-0" /><span className="truncate">{t.assignee.firstName}</span></span>
+              : <span className="inline-flex items-center px-1.5 py-px rounded-full border border-dashed border-off-black/20 text-[10px] text-off-black/40" title="Nobody has it">Unassigned</span>}
           </span>
         </div>
         {t.tags.length > 0 && (
