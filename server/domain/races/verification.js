@@ -22,7 +22,9 @@ import { WeatherService } from '../../services/WeatherService.js'
 export const VERIFIED_SOURCES = ['config', 'manual', 'researched']
 
 export function dateVerified(race) {
-  if (!race?.raceDate || !VERIFIED_SOURCES.includes(race.raceDateSource) || !race.raceDateVerifiedAt) return false
+  if (!race?.raceDate || !race.raceDateVerifiedAt) return false
+  // A suggested date (scraped off a results page) counts once a person confirms it.
+  if (!VERIFIED_SOURCES.includes(race.raceDateSource) && !race.raceDateConfirmedByPerson) return false
   // A link is the evidence; a config pin's citation (the prose in the scraper config) counts too.
   return Boolean(race.raceDateSourceUrl || race.raceDateEvidence)
 }
@@ -41,7 +43,7 @@ export function printBlockers(race) {
   const out = []
   if (!race) return ['Race not found']
   if (!race.raceDate) out.push('Race has no date')
-  else if (!dateVerified(race)) out.push('Race date is not verified (no source on file)')
+  else if (!dateVerified(race)) out.push(race.raceDateSourceUrl || race.raceDateEvidence ? 'Race date is suggested but not verified yet (confirm it against its sources)' : 'Race date is not verified (no source on file)')
   else if (new Date(race.raceDate).getTime() > Date.now()) out.push('Race has not happened yet')
   if (!race.location) out.push('Race has no location, so weather cannot be computed')
   if (!race.weatherTemp || !race.weatherCondition) { if (race.raceDate && new Date(race.raceDate).getTime() <= Date.now()) out.push('Weather has not been computed') }
@@ -72,6 +74,7 @@ export async function setRaceDate({ raceId, date, source = 'manual', sourceUrl, 
     raceDate: d, raceDateSource: source, raceDateSourceUrl: url || null,
     raceDateEvidence: evidence ? String(evidence).slice(0, 1000) : race.raceDateEvidence,
     raceDateVerifiedAt: new Date(), raceDateVerifiedBy: String(by || 'unknown').slice(0, 80),
+    raceDateConfirmedByPerson: null,
   }
   // A new date makes the old weather wrong. It is recomputed for the new date by the next research run.
   if (changed) Object.assign(data, { weatherTemp: null, weatherCondition: null, weatherDetails: null, weatherFetchedAt: null, weatherConfirmedAt: null, weatherConfirmedBy: null })
@@ -160,6 +163,21 @@ export async function verificationOverview() {
 }
 
 /** A person checked the calculated weather against the breakdown and confirms it for printing. */
+/**
+ * A person checked a suggested race date against its sources and confirms it.
+ * The date and its source stay as they are; only the confirmation is added.
+ */
+export async function confirmRaceDate({ raceId, user }) {
+  const race = await prisma.race.findUnique({ where: { id: Number(raceId) } })
+  if (!race) throw new Error('Race not found')
+  if (!race.raceDate) throw new Error('There is no date to confirm')
+  if (!race.raceDateSourceUrl && !race.raceDateEvidence) throw new Error('There is no source on file to confirm against')
+  const by = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'unknown'
+  const updated = await prisma.race.update({ where: { id: race.id }, data: { raceDateVerifiedAt: new Date(), raceDateVerifiedBy: user?.id || by, raceDateConfirmedByPerson: by } })
+  await recordAudit({ action: 'race.date-confirm', summary: `${race.raceName} ${race.year}: confirmed race date ${race.raceDate.toISOString().slice(0, 10)}`, detail: { raceId: race.id }, actor: user })
+  return updated
+}
+
 export async function confirmWeather({ raceId, user }) {
   const race = await prisma.race.findUnique({ where: { id: Number(raceId) } })
   if (!race) throw new Error('Race not found')

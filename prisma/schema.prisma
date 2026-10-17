@@ -172,6 +172,7 @@ model Race {
   raceDateEvidence    String?
   raceDateVerifiedAt  DateTime?
   raceDateVerifiedBy  String?   // user id, "config", "nightly", or a script name
+  raceDateConfirmedByPerson String? // name of the person who confirmed a suggested (scraped) date; cleared when the date changes
   // Set the first time a print made from this race year is approved. After
   // that the date and weather are locked: a change needs a reason, is logged,
   // and flags every open render made with the old values.

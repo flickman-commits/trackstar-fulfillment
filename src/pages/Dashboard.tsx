@@ -68,6 +68,7 @@ interface Order {
   raceDate?: string
   raceDateIso?: string | null  // ISO YYYY-MM-DD, for the date input in edit mode
   raceDateVerified?: boolean
+  raceDateConfirmedBy?: string | null
   weatherConfirmedAt?: string | null
   weatherConfirmedBy?: string | null
   raceDateSourceUrl?: string | null
@@ -315,6 +316,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     raceDate: order.raceDate as string | undefined,
     raceDateIso: order.raceDateIso as string | null | undefined,
     raceDateVerified: order.raceDateVerified as boolean | undefined,
+    raceDateConfirmedBy: (order.raceDateConfirmedBy as string | null | undefined) ?? null,
     weatherConfirmedAt: order.weatherConfirmedAt as string | null | undefined,
     weatherConfirmedBy: order.weatherConfirmedBy as string | null | undefined,
     raceDateSourceUrl: order.raceDateSourceUrl as string | null | undefined,
@@ -1489,6 +1491,20 @@ export default function Dashboard() {
       setToast({ message: `Weather confirmed for every ${order.effectiveRaceName || order.raceName} ${order.effectiveRaceYear || order.raceYear} order`, type: 'success' })
       fetchOrders()
     } finally { setConfirmingWeather(false) }
+  }
+  // Confirm a suggested race date (read off a results page) against its sources.
+  const [confirmingDate, setConfirmingDate] = useState(false)
+  const confirmRaceDate = async (order: Order) => {
+    if (!order.raceId) return
+    setConfirmingDate(true)
+    try {
+      const res = await apiFetch('/api/races/confirm-weather', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raceId: order.raceId, field: 'date' }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setToast({ message: data.error || 'Could not confirm the date', type: 'error' }); return }
+      setSelectedOrder(prev => prev && prev.raceId === order.raceId ? { ...prev, raceDateVerified: true, raceDateConfirmedBy: data.raceDateConfirmedBy } : prev)
+      setToast({ message: `Race date confirmed for every ${order.effectiveRaceName || order.raceName} ${order.effectiveRaceYear || order.raceYear} order`, type: 'success' })
+      fetchOrders()
+    } finally { setConfirmingDate(false) }
   }
   // Which weather field's info popover is open (order-scoped; null = none).
   const [showWeatherInfo, setShowWeatherInfo] = useState(false)
@@ -5209,7 +5225,17 @@ Thank you!`
                           ) : selectedOrder.raceDate ? (
                             <CopyableField label="Date" value={selectedOrder.raceDate} aside={
                               <span className="inline-flex items-center gap-1.5 text-[11px]">
-                                {selectedOrder.raceDateVerified && <span className="px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-700 border border-green-200" title="Confirmed against a source on file">Verified</span>}
+                                {selectedOrder.raceDateVerified ? (
+                                  <span className="px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-700 border border-green-200" title={selectedOrder.raceDateConfirmedBy ? `Confirmed by ${selectedOrder.raceDateConfirmedBy}` : 'Confirmed against a source on file'}>Confirmed</span>
+                                ) : (selectedOrder.raceDateSourceUrl || selectedOrder.raceDateEvidence) ? (
+                                  <>
+                                    <span className="px-1.5 py-0.5 rounded font-medium bg-amber-50 text-amber-700 border border-amber-200" title="Read off a results page; a person has not checked it against the sources yet. Prints wait for it.">Suggested</span>
+                                    <button type="button" onClick={() => confirmRaceDate(selectedOrder)} disabled={confirmingDate}
+                                      className="px-1.5 py-0.5 rounded font-semibold bg-off-black text-white hover:opacity-90 disabled:opacity-40">
+                                      {confirmingDate ? '…' : 'Confirm'}
+                                    </button>
+                                  </>
+                                ) : null}
                                 <SourceLinks url={selectedOrder.raceDateSourceUrl} evidence={selectedOrder.raceDateEvidence} />
                               </span>
                             } />

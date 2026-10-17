@@ -294,6 +294,7 @@ export default async function handler(req, res) {
         raceLocation: race?.location || null,
         // Where the date came from, for the source link and Verified badge beside it.
         raceDateVerified: race ? dateVerified(race) : false,
+        raceDateConfirmedBy: race?.raceDateConfirmedByPerson || null,
         raceDateSourceUrl: race?.raceDateSourceUrl || null,
         raceDateEvidence: race?.raceDateEvidence || null,
         resultsUrl: research?.resultsUrl || buildAustinFallbackUrl(research?.runnerName || effectiveRunnerName, effectiveRaceName, effectiveRaceYear, research?.eventType),
