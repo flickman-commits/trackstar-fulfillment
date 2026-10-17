@@ -11,7 +11,8 @@
  */
 import prisma from '../../db.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
-import { approvalUrl, shopifyAdminUrl } from '../../lib/links.js'
+import { approvalUrl, shopifyAdminUrl, arteloOrderUrl } from '../../lib/links.js'
+import { getProductInfo, loadProductCatalog } from '../../lib/productCatalog.js'
 import { stripQuoted } from './mailbox.js'
 import { can } from '../../../api/_lib/roles.js'
 import { replyWindow } from './instagram.js'
@@ -299,7 +300,7 @@ const ORDERS_BY_EMAIL = `
         displayFinancialStatus displayFulfillmentStatus
         totalPriceSet { shopMoney { amount currencyCode } }
         discountCodes
-        shippingAddress { name address1 address2 city provinceCode zip countryCodeV2 }
+        shippingAddress { name address1 address2 city provinceCode zip countryCodeV2 phone }
         fulfillments { status createdAt trackingInfo { url number company } }
         lineItems(first: 20) { nodes { title variantTitle quantity customAttributes { key value } } }
       }
@@ -307,21 +308,28 @@ const ORDERS_BY_EMAIL = `
   }
 `
 
-function lineProps(li) {
-  const out = {}
-  for (const a of li.customAttributes || []) {
-    if (!a.key || a.key.startsWith('_')) continue
-    out[a.key] = a.value
-  }
-  return out
-}
-
 function shipToLine(a) {
   if (!a) return ''
-  return [a.name, a.address1, a.address2, [a.city, a.provinceCode, a.zip].filter(Boolean).join(' '), a.countryCodeV2].filter(Boolean).join(', ')
+  return [a.name, a.address1, a.address2, [a.city, a.province, a.zip].filter(Boolean).join(' '), a.country].filter(Boolean).join(', ')
 }
 
-function itemRow(o) {
+/** One address shape for Shopify, Artelo and our own column. */
+function fromShopifyAddress(a) {
+  if (!a) return null
+  return { name: a.name || '', address1: a.address1 || '', address2: a.address2 || '', city: a.city || '', province: a.provinceCode || '', zip: a.zip || '', country: a.countryCodeV2 || '', phone: a.phone || '' }
+}
+function fromArteloAddress(a) {
+  if (!a || !(a.street1 || a.city)) return null
+  return { name: a.name || '', address1: a.street1 || '', address2: a.street2 || '', city: a.city || '', province: a.state || '', zip: a.zipcode || '', country: a.countryCode || '', phone: a.phone || '' }
+}
+function fromOurAddress(a) {
+  if (!a || !(a.line1 || a.address1 || a.city)) return null
+  return { name: a.name || '', address1: a.line1 || a.address1 || '', address2: a.line2 || a.address2 || '', city: a.city || '', province: a.state || a.province || '', zip: a.zip || '', country: a.country || '', phone: a.phone || '' }
+}
+
+/** Our row for a line item, as the panel shows it: what was ordered, where it is, and its picture. */
+function itemRow(o, catalog) {
+  const info = getProductInfo(o, catalog)
   return {
     orderId: o.id,
     orderNumber: o.orderNumber,
@@ -336,14 +344,10 @@ function itemRow(o) {
     frame: o.frameType,
     isRush: o.isRushOrder || o.rushOverride,
     dueDate: o.dueDate,
-    proofSentAt: o.proofSentAt,
     approvalUrl: approvalUrl(o.approvalToken?.token),
-    assignee: o.assignee || null,
-    lookupVerified: o.lookupVerified,
-    customerBib: o.customerBib,
-    customerFinishTime: o.customerFinishTime,
-    tracking: o.trackingNumber ? { number: o.trackingNumber, carrier: o.trackingCarrier } : null,
     hasPhoto: Boolean(o.photoPath),
+    heroImageUrl: info?.heroImageUrl || null,
+    productLabel: info?.label || null,
   }
 }
 
@@ -357,12 +361,15 @@ export async function customerContext(email) {
   const e = String(email || '').trim().toLowerCase()
   if (!e) return { orders: [], shopifyError: null }
 
-  const ours = await prisma.order.findMany({
-    where: { customerEmail: { equals: e, mode: 'insensitive' } },
-    orderBy: [{ createdAt: 'desc' }, { lineItemIndex: 'asc' }],
-    take: 60,
-    include: { approvalToken: { select: { token: true } }, assignee: { select: TEAM_SELECT } },
-  })
+  const [ours, catalog] = await Promise.all([
+    prisma.order.findMany({
+      where: { customerEmail: { equals: e, mode: 'insensitive' } },
+      orderBy: [{ createdAt: 'desc' }, { lineItemIndex: 'asc' }],
+      take: 60,
+      include: { approvalToken: { select: { token: true } } },
+    }),
+    loadProductCatalog().catch(() => null),
+  ])
   // Our Shopify rows carry Shopify's numeric order id as parentOrderNumber
   // and the number a person reads (#4517) inside shopifyOrderData.name, so
   // a Shopify order is matched by its id first and its name second.
@@ -389,12 +396,22 @@ export async function customerContext(email) {
     }
   }
 
+  const fromRows = rows => {
+    const first = rows[0]
+    return {
+      arteloUrl: arteloOrderUrl(first?.arteloOrderData?.id) || null,
+      arteloAddress: fromArteloAddress(first?.arteloOrderData?.customerAddress),
+      items: rows.map(o => itemRow(o, catalog)),
+    }
+  }
+
   const orders = []
   const seen = new Set()
   for (const s of shopify) {
     const number = String(s.name || '').replace(/^#/, '')
     const rows = byKey.get(String(s.legacyResourceId)) || byName.get(number) || []
     if (rows.length) seen.add(keyOf(rows[0]))
+    const shipTo = fromShopifyAddress(s.shippingAddress)
     orders.push({
       number,
       source: 'shopify',
@@ -403,35 +420,35 @@ export async function customerContext(email) {
       createdAt: s.createdAt,
       financialStatus: s.displayFinancialStatus,
       fulfillmentStatus: s.displayFulfillmentStatus,
-      total: s.totalPriceSet?.shopMoney?.amount || null,
-      currency: s.totalPriceSet?.shopMoney?.currencyCode || null,
       discountCodes: s.discountCodes || [],
-      shipTo: shipToLine(s.shippingAddress),
-      tracking: (s.fulfillments || []).flatMap(f => (f.trackingInfo || []).map(t => ({ url: t.url, number: t.number, company: t.company, status: f.status, at: f.createdAt }))),
-      lineItems: (s.lineItems?.nodes || []).map(li => ({ title: li.title, variant: li.variantTitle, quantity: li.quantity, properties: lineProps(li) })),
-      items: rows.map(itemRow),
+      shipTo,
+      shipToLine: shipToLine(shipTo),
+      tracking: (s.fulfillments || []).flatMap(f => (f.trackingInfo || []).map(t => ({ url: t.url, number: t.number, company: t.company, at: f.createdAt }))),
+      // When none of our rows exist yet (not imported), what was bought, from Shopify.
+      lineItems: rows.length ? [] : (s.lineItems?.nodes || []).filter(li => !/add-?on/i.test(li.title)).map(li => ({ title: li.title, variant: li.variantTitle, quantity: li.quantity })),
       imported: rows.length > 0,
+      ...fromRows(rows),
     })
   }
   for (const [key, rows] of byKey) {
     if (seen.has(key)) continue
     const first = rows[0]
+    const shipTo = fromOurAddress(first.shippingAddress) || fromArteloAddress(first.arteloOrderData?.customerAddress)
     orders.push({
       number: nameOf(first),
       source: first.source,
-      shopifyOrderId: first.source === 'shopify' ? first.shopifyOrderData?.id || null : null,
+      shopifyOrderId: first.source === 'shopify' ? String(first.shopifyOrderData?.id || '') || null : null,
       adminUrl: first.source === 'shopify' ? shopifyAdminUrl(first.shopifyOrderData?.id) : null,
-      createdAt: first.createdAt,
+      createdAt: first.shopifyOrderData?.created_at || first.createdAt,
       financialStatus: null,
       fulfillmentStatus: null,
-      total: null,
-      currency: null,
-      discountCodes: [],
-      shipTo: first.shippingAddress ? shipToLine({ ...first.shippingAddress, provinceCode: first.shippingAddress.state, countryCodeV2: first.shippingAddress.country }) : '',
-      tracking: first.trackingNumber ? [{ url: null, number: first.trackingNumber, company: first.trackingCarrier, status: null, at: first.shippedAt }] : [],
+      discountCodes: (first.shopifyOrderData?.discount_codes || []).map(d => d.code).filter(Boolean),
+      shipTo,
+      shipToLine: shipToLine(shipTo),
+      tracking: first.trackingNumber ? [{ url: null, number: first.trackingNumber, company: first.trackingCarrier, at: first.shippedAt }] : [],
       lineItems: [],
-      items: rows.map(itemRow),
       imported: true,
+      ...fromRows(rows),
     })
   }
   orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))

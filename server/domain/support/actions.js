@@ -9,6 +9,7 @@
  *   tagReprint        REPRINT tag and a note on the Shopify order (scenarios 2A, 13)
  *   orderNote         a comment on our order row, for whoever is fulfilling it
  *   fixPersonalization the runner's name or year on our order row, before production (scenario 3)
+ *   shippingAddress   a new ship-to on the Shopify order and our rows (scenario 19); Artelo is changed by hand
  *   slackMatt         the escalation rules: a line in Slack with a link to the thread
  *
  * Refunds, cancellations and order edits are money and stay in Shopify;
@@ -16,7 +17,7 @@
  */
 import prisma from '../../db.js'
 import { shopifyGraphQL, shopifyFetch } from '../../services/shopifyAuth.js'
-import { appBaseUrl } from '../../lib/links.js'
+import { appBaseUrl, arteloOrderUrl } from '../../lib/links.js'
 import { setStatus } from './threads.js'
 
 function actorName(actor) {
@@ -160,6 +161,53 @@ export async function fixPersonalization({ thread, orderId, runnerName, year, ac
   await prisma.orderComment.create({ data: { orderId: o.id, text: `Support changed ${what} (customer asked: ${threadUrl(thread.id)})`, authorId: actor?.id || null, authorName: actorName(actor) } })
   await event(thread.id, `${actorName(actor)} changed #${number}: ${what}`, actor)
   return { number, what }
+}
+
+/**
+ * A new ship-to address (scenario 19, gifts going to the runner instead).
+ *
+ * Shopify's order takes it through the Admin API, and our rows keep it for
+ * the dashboard. Artelo has no endpoint that edits an order (its open API
+ * reads orders and manages uploads only), so the address is handed back
+ * formatted for pasting, with the Artelo order's link, and the thread says
+ * plainly that Artelo still needs it until someone confirms it there.
+ */
+const ADDRESS_FIELDS = ['name', 'address1', 'address2', 'city', 'province', 'zip', 'country', 'phone']
+export function formatAddress(a) {
+  return [a.name, a.address1, a.address2, [a.city, a.province, a.zip].filter(Boolean).join(' '), a.country].filter(Boolean).join('\n')
+}
+export async function shippingAddress({ thread, shopifyOrderId, address, actor }) {
+  const a = {}
+  for (const k of ADDRESS_FIELDS) a[k] = String(address?.[k] || '').trim()
+  a.country = a.country.toUpperCase()
+  a.province = a.province.toUpperCase()
+  for (const k of ['name', 'address1', 'city', 'zip', 'country']) if (!a[k]) throw new Error(`The address needs a ${k === 'address1' ? 'street' : k}`)
+  const id = String(shopifyOrderId || '').trim()
+  if (!/^\d+$/.test(id)) throw new Error('That order has no Shopify id')
+
+  const rows = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: id }, select: { id: true, status: true, designStatus: true, trackingNumber: true, arteloOrderData: true, shopifyOrderData: true } })
+  if (rows.some(r => r.trackingNumber)) throw new Error('That order has shipped. Ask Matt; it is a reship now, not an address change.')
+
+  const { order } = await shopifyFetch(`/orders/${id}.json?fields=id,name,fulfillment_status`)
+  if (order.fulfillment_status === 'fulfilled') throw new Error('Shopify says that order is fulfilled already. Ask Matt; it is a reship now.')
+  const [first, ...last] = a.name.split(/\s+/)
+  await shopifyFetch(`/orders/${id}.json`, {
+    method: 'PUT',
+    body: JSON.stringify({ order: { id: Number(id), shipping_address: {
+      first_name: first, last_name: last.join(' '), address1: a.address1, address2: a.address2 || null, city: a.city,
+      province_code: a.province || null, zip: a.zip, country_code: a.country, phone: a.phone || null,
+    } } }),
+  })
+
+  const ours = { name: a.name, line1: a.address1, line2: a.address2, city: a.city, state: a.province, zip: a.zip, country: a.country, phone: a.phone }
+  const number = String(order.name || rows[0]?.shopifyOrderData?.name || id).replace(/^#/, '')
+  const pasted = formatAddress(a)
+  if (rows.length) {
+    await prisma.order.updateMany({ where: { id: { in: rows.map(r => r.id) } }, data: { shippingAddress: ours } })
+    await prisma.orderComment.createMany({ data: rows.map(r => ({ orderId: r.id, text: `Ship-to changed by support to: ${pasted.replace(/\n/g, ', ')}. Change it in Artelo too.`, authorId: actor?.id || null, authorName: actorName(actor) })) })
+  }
+  await event(thread.id, `${actorName(actor)} changed #${number}'s ship-to in Shopify to ${pasted.replace(/\n/g, ', ')}. Artelo still needs it.`, actor)
+  return { number, address: a, pasted, arteloUrl: arteloOrderUrl(rows[0]?.arteloOrderData?.id) || null }
 }
 
 // ---------------------------------------------------------------------------

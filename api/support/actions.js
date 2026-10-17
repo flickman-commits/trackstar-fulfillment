@@ -7,6 +7,7 @@
  *   orderNote           { id, orderId, text }
  *   fixPersonalization  { id, orderId, runnerName?, year? }
  *   slackMatt           { id, text }
+ *   shippingAddress     { id, shopifyOrderId, address: { name, address1, address2, city, province, zip, country, phone } }
  *
  * Anyone on Support; a discount code also needs the Discount codes
  * capability, the same gate as the dashboard's discount tool. Every
@@ -16,7 +17,7 @@ import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
 import { can } from '../_lib/roles.js'
 import prisma from '../_lib/prisma.js'
-import { discount15, lookupCode, tagReprint, orderNote, fixPersonalization, slackMatt } from '../../server/domain/support/actions.js'
+import { discount15, lookupCode, tagReprint, orderNote, fixPersonalization, slackMatt, shippingAddress } from '../../server/domain/support/actions.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -55,6 +56,11 @@ export default async function handler(req, res) {
       case 'fixPersonalization': {
         const out = await fixPersonalization({ thread, orderId: body.orderId, runnerName: body.runnerName, year: body.year, actor: user })
         await audit(`Changed #${out.number}: ${out.what}`, { orderId: body.orderId })
+        return res.status(200).json(out)
+      }
+      case 'shippingAddress': {
+        const out = await shippingAddress({ thread, shopifyOrderId: body.shopifyOrderId, address: body.address, actor: user })
+        await audit(`Changed #${out.number}'s ship-to`, { shopifyOrderId: body.shopifyOrderId })
         return res.status(200).json(out)
       }
       case 'slackMatt': {

@@ -93,30 +93,30 @@ export interface OrderItem {
   frame: string
   isRush: boolean
   dueDate: string | null
-  proofSentAt: string | null
   approvalUrl: string | null
-  assignee: Teammate | null
-  lookupVerified: boolean | null
-  customerBib: string | null
-  customerFinishTime: string | null
-  tracking: { number: string; carrier: string | null } | null
   hasPhoto: boolean
+  heroImageUrl: string | null
+  productLabel: string | null
 }
+
+export interface Address { name: string; address1: string; address2: string; city: string; province: string; zip: string; country: string; phone: string }
 
 export interface CustomerOrder {
   number: string
   source: string
   shopifyOrderId: string | null
   adminUrl: string | null
+  arteloUrl: string | null
   createdAt: string
   financialStatus: string | null
   fulfillmentStatus: string | null
-  total: string | null
-  currency: string | null
   discountCodes: string[]
-  shipTo: string
-  tracking: { url: string | null; number: string | null; company: string | null; status: string | null; at: string | null }[]
-  lineItems: { title: string; variant: string | null; quantity: number; properties: Record<string, string> }[]
+  shipTo: Address | null
+  shipToLine: string
+  /** The address Artelo has, when we have its copy of the order. */
+  arteloAddress: Address | null
+  tracking: { url: string | null; number: string | null; company: string | null; at: string | null }[]
+  lineItems: { title: string; variant: string | null; quantity: number }[]
   items: OrderItem[]
   imported: boolean
 }

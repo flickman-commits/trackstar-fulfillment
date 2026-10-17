@@ -1,38 +1,99 @@
 import { useState } from 'react'
-import { BadgePercent, ExternalLink, Link2, Loader2, MessageSquareWarning, Pencil, Search, StickyNote, Tag, Truck } from 'lucide-react'
+import { BadgePercent, Check, Copy, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Tag, Truck, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { btnSecondary, chip, chipTone } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { day } from '@/lib/supportDates'
-import type { CodeLookup, CustomerOrder, ThreadDetail } from '@/types/support'
+import type { Address, CodeLookup, CustomerOrder, ThreadDetail } from '@/types/support'
 
 /**
- * The Actions section: the playbook's repeat moves as buttons, beside the
- * conversation they belong to.
+ * The Actions list, in the dashboard's own style: purple text links with an
+ * icon, one per line, under a small grey heading.
  *
- * Two kinds. "Insert" actions drop a line into the reply box: the tracking
- * link, the approval portal link, a one-line order summary. "Do" actions
- * change something and leave an event in the thread: a personal 15% code,
- * REPRINT on the Shopify order, a note on our order row, a name or year
- * fix before production, a ping to Matt in Slack. Refunds, cancellations
- * and edits are money and happen in Shopify, so those are links straight
- * to the right Shopify page. Every button is one press by a person.
+ * Per order: drop the tracking link, the approval link or a one-line status
+ * into the reply; change the ship-to (Shopify and our rows, then the
+ * address copied for Artelo, which has no API to edit an order); fix the
+ * name or year before production; REPRINT on the Shopify order; a note for
+ * fulfillment; refund in Shopify. For the customer: a 15% code, Slack
+ * Matt. Last and small: check a code they pasted. Every one is a person's
+ * press, an event in the thread and an audit line.
  */
-function ActionButton({ onClick, icon: Icon, children, busy, title, href }: { onClick?: () => void; icon: typeof Tag; children: React.ReactNode; busy?: boolean; title?: string; href?: string }) {
-  const cls = `${btnSecondary} justify-start w-full text-left`
-  if (href) return <a href={href} target="_blank" rel="noopener noreferrer" className={cls} title={title}><Icon className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{children}</span><ExternalLink className="w-3 h-3 ml-auto shrink-0 opacity-50" /></a>
-  return <button onClick={onClick} disabled={busy} className={cls} title={title}>{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Icon className="w-3.5 h-3.5 shrink-0" />}<span className="truncate">{children}</span></button>
+const linkCls = 'self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2 disabled:opacity-50 disabled:no-underline text-left'
+
+function ActionLink({ icon: Icon, onClick, href, busy, title, children }: { icon: typeof Tag; onClick?: () => void; href?: string; busy?: boolean; title?: string; children: React.ReactNode }) {
+  const icon = busy ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Icon className="w-3.5 h-3.5 shrink-0" />
+  if (href) return <a href={href} target="_blank" rel="noopener noreferrer" className={linkCls} title={title}>{icon}{children}</a>
+  return <button onClick={onClick} disabled={busy} className={linkCls} title={title}>{icon}{children}</button>
 }
+
+const heading = 'text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5'
+const field = 'w-full px-2 py-1 text-xs bg-white border border-border-gray rounded focus:outline-none focus:ring-1 focus:ring-off-black/20'
 
 function summaryLine(o: CustomerOrder) {
   const it = o.items[0]
   const what = it ? `${it.size} ${it.frame}, ${it.race} ${it.year}` : o.lineItems[0]?.title || 'your print'
-  const state = o.fulfillmentStatus === 'FULFILLED' ? 'shipped' : it?.status === 'completed' || it?.designStatus === 'sent_to_production' ? 'in production' : it?.designStatus && it.designStatus !== 'not_started' ? 'being designed' : 'in the queue'
+  const state = o.fulfillmentStatus === 'FULFILLED' || o.tracking.length ? 'shipped'
+    : it?.status === 'completed' || it?.designStatus === 'sent_to_production' ? 'in production'
+    : it?.designStatus && it.designStatus !== 'not_started' ? 'being designed' : 'in the queue'
   return `Your order #${o.number} (${what}) placed ${day(o.createdAt)} is ${state}.`
 }
 
-function OrderActions({ o, thread, onInsert, onChanged }: { o: CustomerOrder; thread: ThreadDetail; onInsert: (text: string) => void; onChanged: () => void }) {
+/** The ship-to form, prefilled from Shopify (or Artelo's copy), then the hand-off to Artelo. */
+function AddressForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread: ThreadDetail; onDone: () => void; onCancel: () => void }) {
+  const start: Address = o.shipTo || o.arteloAddress || { name: thread.customerName || '', address1: '', address2: '', city: '', province: '', zip: '', country: 'US', phone: '' }
+  const [a, setA] = useState<Address>(start)
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState<{ pasted: string; arteloUrl: string | null } | null>(null)
+  const set = (k: keyof Address) => (e: React.ChangeEvent<HTMLInputElement>) => setA({ ...a, [k]: e.target.value })
+  const save = async () => {
+    setBusy(true)
+    try {
+      const out = await supportApi.action<{ pasted: string; arteloUrl: string | null }>('shippingAddress', { id: thread.id, shopifyOrderId: o.shopifyOrderId, address: a })
+      try { await navigator.clipboard.writeText(out.pasted) } catch { /* the button below copies too */ }
+      setSaved(out)
+      toast.success(`#${o.number} updated in Shopify. Address copied for Artelo.`)
+      onDone()
+    } catch (e) { toast.error((e as Error).message) }
+    finally { setBusy(false) }
+  }
+  if (saved) {
+    return (
+      <div className="w-full bg-subtle-gray border border-border-gray rounded-md p-2.5 space-y-1.5 text-xs">
+        <div className="inline-flex items-center gap-1.5 text-emerald-700 font-medium"><Check className="w-3.5 h-3.5" />Changed in Shopify. Now paste it into Artelo:</div>
+        <pre className="whitespace-pre-wrap font-sans text-off-black/75 bg-white border border-border-gray rounded p-2">{saved.pasted}</pre>
+        <div className="flex items-center gap-3">
+          <button onClick={() => { navigator.clipboard.writeText(saved.pasted).then(() => toast.success('Copied')).catch(() => {}) }} className={linkCls}><Copy className="w-3.5 h-3.5" />Copy again</button>
+          {saved.arteloUrl && <a href={saved.arteloUrl} target="_blank" rel="noopener noreferrer" className={linkCls}><img src="/artelo-icon.png" alt="" className="w-3.5 h-3.5 rounded-[3px]" />Open in Artelo</a>}
+          <button onClick={onCancel} className="ml-auto text-off-black/45 hover:text-off-black">Done</button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="w-full bg-subtle-gray border border-border-gray rounded-md p-2.5 space-y-1.5">
+      <input className={field} value={a.name} onChange={set('name')} placeholder="Name" />
+      <input className={field} value={a.address1} onChange={set('address1')} placeholder="Street" />
+      <input className={field} value={a.address2} onChange={set('address2')} placeholder="Apt, suite (optional)" />
+      <div className="grid grid-cols-[1fr_56px_72px] gap-1.5">
+        <input className={field} value={a.city} onChange={set('city')} placeholder="City" />
+        <input className={field} value={a.province} onChange={set('province')} placeholder="State" />
+        <input className={field} value={a.zip} onChange={set('zip')} placeholder="ZIP" />
+      </div>
+      <div className="grid grid-cols-[56px_1fr] gap-1.5">
+        <input className={field} value={a.country} onChange={set('country')} placeholder="US" />
+        <input className={field} value={a.phone} onChange={set('phone')} placeholder="Phone (optional)" />
+      </div>
+      <div className="flex items-center gap-2 pt-0.5">
+        <span className="text-[11px] text-off-black/45 flex-1">Saves to Shopify; you paste it into Artelo.</span>
+        <button onClick={onCancel} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">Cancel</button>
+        <button onClick={save} disabled={busy} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-dark-fill text-white hover:bg-off-black/85 disabled:opacity-50">{busy && <Loader2 className="w-3 h-3 animate-spin" />}Save</button>
+      </div>
+    </div>
+  )
+}
+
+function OrderActions({ o, thread, multiple, onInsert, onChanged }: { o: CustomerOrder; thread: ThreadDetail; multiple: boolean; onInsert: (text: string) => void; onChanged: () => void }) {
   const [busy, setBusy] = useState<string | null>(null)
+  const [editingAddress, setEditingAddress] = useState(false)
   const run = async (key: string, fn: () => Promise<string | void>) => {
     setBusy(key)
     try { const msg = await fn(); if (msg) toast.success(msg); onChanged() }
@@ -42,52 +103,82 @@ function OrderActions({ o, thread, onInsert, onChanged }: { o: CustomerOrder; th
   const tracking = o.tracking.find(t => t.url) || o.tracking[0] || null
   const approval = o.items.find(it => it.approvalUrl)?.approvalUrl || null
   const editable = o.items.filter(it => it.status !== 'completed' && it.designStatus !== 'sent_to_production')
+  const shipped = o.fulfillmentStatus === 'FULFILLED' || o.tracking.length > 0
   const first = (thread.customerName || '').split(/\s+/)[0] || ''
   return (
-    <div className="rounded-md border border-border-gray bg-white p-2.5">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-semibold text-off-black">#{o.number}</span>
-        <span className="text-[11px] text-off-black/45">{o.items[0] ? `${o.items[0].runner} · ${o.items[0].race}` : day(o.createdAt)}</span>
-      </div>
-      <div className="space-y-1">
-        {tracking && <ActionButton icon={Truck} onClick={() => onInsert(tracking.url ? `Here's your tracking link: ${tracking.url}` : `Your tracking number is ${tracking.number}${tracking.company ? ` (${tracking.company})` : ''}.`)}>Insert tracking link</ActionButton>}
-        {approval && <ActionButton icon={Link2} onClick={() => onInsert(`You can view your design options here: ${approval}`)}>Insert approval link</ActionButton>}
-        <ActionButton icon={Link2} onClick={() => onInsert(summaryLine(o))}>Insert order status line</ActionButton>
+    <div>
+      {multiple && <div className={heading}>#{o.number}{o.items[0] ? ` · ${o.items[0].race}` : ''}</div>}
+      <div className="flex flex-col items-stretch gap-1.5">
+        {tracking && <ActionLink icon={Truck} onClick={() => onInsert(tracking.url ? `Here's your tracking link: ${tracking.url}` : `Your tracking number is ${tracking.number}${tracking.company ? ` (${tracking.company})` : ''}.`)}>Insert tracking link</ActionLink>}
+        {approval && <ActionLink icon={Link2} onClick={() => onInsert(`You can view your design options here: ${approval}`)}>Insert approval link</ActionLink>}
+        <ActionLink icon={Plus} onClick={() => onInsert(summaryLine(o))}>Insert order status</ActionLink>
+        {o.shopifyOrderId && !shipped && (editingAddress
+          ? <AddressForm o={o} thread={thread} onDone={onChanged} onCancel={() => setEditingAddress(false)} />
+          : <ActionLink icon={MapPin} onClick={() => setEditingAddress(true)} title={o.shipToLine || 'No address on file'}>Edit shipping address</ActionLink>)}
+        {editable[0] && (
+          <ActionLink icon={Pencil} busy={busy === 'fix'} title="Before production only. After that it is a reprint." onClick={() => {
+            const it = editable[0]
+            const name = window.prompt(`Runner's name on #${o.number}`, it.runner)
+            if (name === null) return
+            const year = window.prompt('Race year', String(it.year))
+            if (year === null) return
+            run('fix', async () => { const out = await supportApi.action<{ what: string }>('fixPersonalization', { id: thread.id, orderId: it.orderId, runnerName: name, year: year || undefined }); return `Changed ${out.what}` })
+          }}>Fix name or year</ActionLink>
+        )}
         {o.shopifyOrderId && (
-          <ActionButton icon={Tag} busy={busy === 'reprint'} onClick={() => {
+          <ActionLink icon={Tag} busy={busy === 'reprint'} onClick={() => {
             const reason = window.prompt(`Why the reprint on #${o.number}? (goes on the Shopify order)`, 'Arrived damaged')
             if (reason === null) return
             run('reprint', async () => { await supportApi.action('tagReprint', { id: thread.id, shopifyOrderId: o.shopifyOrderId, reason }); return `#${o.number} tagged REPRINT` })
-          }}>Tag REPRINT in Shopify</ActionButton>
-        )}
-        {editable[0] && (
-          <ActionButton icon={Pencil} busy={busy === 'fix'} onClick={() => {
-            const it = editable[0]
-            const name = window.prompt(`Runner's name on #${o.number} (blank to keep "${it.runner}")`, it.runner)
-            if (name === null) return
-            const year = window.prompt(`Race year (blank to keep ${it.year})`, String(it.year))
-            if (year === null) return
-            run('fix', async () => { const out = await supportApi.action<{ what: string }>('fixPersonalization', { id: thread.id, orderId: it.orderId, runnerName: name, year: year || undefined }); return `Changed ${out.what}` })
-          }} title="Before production only. After that it is a reprint.">Fix name or year</ActionButton>
+          }}>Tag REPRINT</ActionLink>
         )}
         {o.items[0] && (
-          <ActionButton icon={StickyNote} busy={busy === 'note'} onClick={() => {
+          <ActionLink icon={Plus} busy={busy === 'note'} onClick={() => {
             const text = window.prompt(`Note for fulfillment on #${o.number}`, first ? `${first} asked: ` : '')
             if (!text) return
             run('note', async () => { await supportApi.action('orderNote', { id: thread.id, orderId: o.items[0].orderId, text }); return 'Note left on the order' })
-          }}>Note for fulfillment</ActionButton>
+          }}>Note for fulfillment</ActionLink>
         )}
-        {o.adminUrl && <ActionButton icon={ExternalLink} href={`${o.adminUrl}/edit`} title="Size, frame, add-ons, address">Edit order in Shopify</ActionButton>}
-        {o.adminUrl && <ActionButton icon={ExternalLink} href={`${o.adminUrl}/refund`} title="Full or partial; over $150 is Matt's call">Refund in Shopify</ActionButton>}
+        {o.adminUrl && <ActionLink icon={Receipt} href={`${o.adminUrl}/refund`} title="Full or partial. Over $150 is Matt's call.">Refund in Shopify</ActionLink>}
       </div>
+    </div>
+  )
+}
+
+/** Check a code the customer pasted: one line, the answer under it. */
+function CodeCheck() {
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [lookup, setLookup] = useState<CodeLookup | null>(null)
+  const check = async () => {
+    const c = code.trim()
+    if (!c) return
+    setBusy(true)
+    try { setLookup(await supportApi.action<CodeLookup>('lookupCode', { code: c })) }
+    catch (e) { toast.error((e as Error).message) }
+    finally { setBusy(false) }
+  }
+  const ok = lookup?.found && /^Valid/.test(lookup.verdict)
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-xs">
+        <Search className="w-3.5 h-3.5 text-off-black/35 shrink-0" />
+        <input value={code} onChange={e => { setCode(e.target.value); setLookup(null) }} onKeyDown={e => { if (e.key === 'Enter') check() }} placeholder="Check a discount code" className="flex-1 min-w-0 bg-transparent border-b border-dashed border-off-black/20 focus:border-off-black/50 focus:outline-none py-0.5 placeholder:text-off-black/35" />
+        {code && <button onClick={check} disabled={busy} className="text-[#4600D6] font-medium hover:underline underline-offset-2">{busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Check'}</button>}
+        {lookup && <button onClick={() => { setLookup(null); setCode('') }} className="text-off-black/35 hover:text-off-black"><X className="w-3 h-3" /></button>}
+      </div>
+      {lookup && (
+        <div className={`mt-1 ml-5 text-[11px] ${ok ? 'text-emerald-700' : 'text-red-700'}`}>
+          {lookup.verdict}
+          {lookup.found && <span className="text-off-black/50"> {lookup.value}{lookup.fromKlaviyo ? ' · Klaviyo' : ''}</span>}
+        </div>
+      )}
     </div>
   )
 }
 
 export default function Actions({ thread, onInsert, onChanged }: { thread: ThreadDetail; onInsert: (text: string) => void; onChanged: () => void }) {
   const [busy, setBusy] = useState<string | null>(null)
-  const [code, setCode] = useState('')
-  const [lookup, setLookup] = useState<CodeLookup | null>(null)
   const first = (thread.customerName || '').trim().split(/\s+/)[0] || ''
   const run = async (key: string, fn: () => Promise<string | void>) => {
     setBusy(key)
@@ -95,50 +186,26 @@ export default function Actions({ thread, onInsert, onChanged }: { thread: Threa
     catch (e) { toast.error((e as Error).message) }
     finally { setBusy(null) }
   }
-  const checkCode = async () => {
-    const c = code.trim()
-    if (!c) return
-    setBusy('lookup')
-    try { setLookup(await supportApi.action<CodeLookup>('lookupCode', { code: c })) }
-    catch (e) { toast.error((e as Error).message) }
-    finally { setBusy(null) }
-  }
+  const orders = thread.context.orders
   return (
-    <div className="space-y-2">
-      <ActionButton icon={BadgePercent} busy={busy === 'code'} onClick={() => run('code', async () => {
-        const out = await supportApi.action<{ code: string; percent: number; endsAt: string }>('discount15', { id: thread.id })
-        onInsert(`Use code ${out.code} for ${out.percent}% off your next print (good for 30 days).`)
-        return `${out.code} created and dropped into the reply`
-      })} title="One use, 30 days, named after them. The Make-It-Right toolkit.">15% code for {first || 'them'}</ActionButton>
-
-      <div className="rounded-md border border-border-gray bg-white p-2">
-        <div className="flex items-center gap-1.5">
-          <Search className="w-3.5 h-3.5 text-off-black/40 shrink-0" />
-          <input value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') checkCode() }} placeholder="Check a code they pasted" className="flex-1 min-w-0 text-xs focus:outline-none placeholder:text-off-black/35" />
-          <button onClick={checkCode} disabled={!code.trim() || busy === 'lookup'} className="text-[11px] font-medium text-off-black/60 hover:text-off-black disabled:opacity-40">{busy === 'lookup' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Check'}</button>
+    <div className="space-y-4">
+      {orders.map(o => <OrderActions key={`${o.source}-${o.number}`} o={o} thread={thread} multiple={orders.length > 1} onInsert={onInsert} onChanged={onChanged} />)}
+      <div>
+        {orders.length > 1 && <div className={heading}>Customer</div>}
+        <div className="flex flex-col items-stretch gap-1.5">
+          <ActionLink icon={BadgePercent} busy={busy === 'code'} title="One use, 30 days, named after them" onClick={() => run('code', async () => {
+            const out = await supportApi.action<{ code: string; percent: number }>('discount15', { id: thread.id })
+            onInsert(`Use code ${out.code} for ${out.percent}% off your next print (good for 30 days).`)
+            return `${out.code} created and added to the reply`
+          })}>Create 15% code for {first || 'them'}</ActionLink>
+          <ActionLink icon={MessageSquareWarning} busy={busy === 'slack'} title="Posts to Slack with a link to this thread, and marks it escalated" onClick={() => {
+            const text = window.prompt('What should Matt know? (goes to Slack with a link to this thread)', '')
+            if (text === null) return
+            run('slack', async () => { await supportApi.action('slackMatt', { id: thread.id, text }); return 'Matt pinged in Slack, thread escalated' })
+          }}>Slack Matt</ActionLink>
         </div>
-        {lookup && (
-          <div className="mt-2 pt-2 border-t border-border-gray/80 text-xs space-y-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-semibold text-off-black">{lookup.code}</span>
-              {lookup.found && <span className={`${chip} ${/^Valid/.test(lookup.verdict) ? chipTone.emerald : chipTone.red}`}>{lookup.verdict}</span>}
-              {lookup.fromKlaviyo && <span className={`${chip} ${chipTone.quiet}`}>Klaviyo</span>}
-            </div>
-            {lookup.found ? (
-              <div className="text-off-black/60">{lookup.value}{lookup.usageLimit ? ` · ${lookup.used ?? 0} of ${lookup.usageLimit} uses` : ''}{lookup.endsAt ? ` · ends ${day(lookup.endsAt)}` : ''}{lookup.oncePerCustomer ? ' · once per customer' : ''}</div>
-            ) : <div className="text-off-black/60">{lookup.verdict}</div>}
-          </div>
-        )}
       </div>
-
-      {thread.context.orders.map(o => <OrderActions key={`${o.source}-${o.number}`} o={o} thread={thread} onInsert={onInsert} onChanged={onChanged} />)}
-      {thread.context.orders.length === 0 && <div className="text-[11px] text-off-black/45">No orders found for this customer, so no order actions. Ask for the order number or the email on the order.</div>}
-
-      <ActionButton icon={MessageSquareWarning} busy={busy === 'slack'} onClick={() => {
-        const text = window.prompt('What should Matt know? (goes to Slack with a link to this thread)', '')
-        if (text === null) return
-        run('slack', async () => { await supportApi.action('slackMatt', { id: thread.id, text }); return 'Matt pinged in Slack, thread escalated' })
-      }} title="Refund over $150, legal or press, race organizer, or unsure">Slack Matt</ActionButton>
+      <CodeCheck />
     </div>
   )
 }

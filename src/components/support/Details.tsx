@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ChevronDown, ExternalLink, Loader2, Package, Truck, AlertCircle, Database, Mail, X, Plus, Instagram, KeyRound } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Loader2, Package, Truck, AlertCircle, Database, Mail, X, Plus, Instagram, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
-import { btnSecondary, chip, chipTone, textLink } from '@/lib/ui'
+import { btnSecondary, chip } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { ago, day } from '@/lib/supportDates'
 import { STATUS_LABEL, STATUS_TONE } from '@/lib/supportStatus'
 import { Avatar } from '@/components/AssigneePicker'
-import type { CustomerOrder, InstagramStatus, MailboxStatus, OrderItem, Teammate, ThreadDetail } from '@/types/support'
+import type { CustomerOrder, InstagramStatus, MailboxStatus, Teammate, ThreadDetail } from '@/types/support'
 import Actions from './Actions'
 
 /**
@@ -38,76 +38,97 @@ function Attr({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
-const FULFILLMENT_TONE: Record<string, string> = {
-  FULFILLED: chipTone.emerald, UNFULFILLED: chipTone.amber, PARTIALLY_FULFILLED: chipTone.amber, IN_PROGRESS: chipTone.blue, ON_HOLD: chipTone.slate, SCHEDULED: chipTone.slate,
+/** "Oct 7 (10 days ago)", the dashboard's wording. */
+function placedAt(iso: string) {
+  const d = new Date(iso)
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000)
+  const md = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  if (days <= 0) return `${md} (today)`
+  if (days === 1) return `${md} (yesterday)`
+  if (days < 14) return `${md} (${days} days ago)`
+  if (days < 365) return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} (${Math.floor(days / 7)} weeks ago)`
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
-const FINANCIAL_TONE: Record<string, string> = { PAID: chipTone.quiet, REFUNDED: chipTone.red, PARTIALLY_REFUNDED: chipTone.rose, PENDING: chipTone.amber, VOIDED: chipTone.red }
-const ITEM_STATUS_LABEL: Record<string, string> = { pending: 'Researching', missing_year: 'Needs year', ready: 'Ready', flagged: 'Flagged', completed: 'Sent to production' }
-const DESIGN_LABEL: Record<string, string> = {
-  not_started: 'Design not started', in_progress: 'Designing', awaiting_review: 'Awaiting review', in_revision: 'In revision',
-  approved_by_customer: 'Approved by customer', final_pdf_uploaded: 'Final uploaded', sent_to_production: 'Sent to production',
-}
-const titleCase = (s: string | null) => (s ? s.toLowerCase().replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()) : '')
+const pill = 'inline-flex items-center px-2 py-0.5 bg-white border border-border-gray rounded text-xs font-semibold text-off-black'
 
-function Item({ it }: { it: OrderItem }) {
-  return (
-    <div className="pt-2 mt-2 border-t border-border-gray/80 text-xs">
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-off-black truncate">{it.runner}</span>
-        <span className="text-off-black/50 shrink-0">{it.size} · {it.frame}</span>
-      </div>
-      <div className="text-off-black/60 truncate">{it.race} {it.year}{it.isRush ? ' · Rush' : ''}{it.hasPhoto ? ' · Photo' : ''}</div>
-      <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        <span className={`${chip} ${it.status === 'completed' || it.designStatus === 'sent_to_production' ? chipTone.emerald : it.status === 'flagged' ? chipTone.red : chipTone.quiet}`}>
-          {it.designStatus ? DESIGN_LABEL[it.designStatus] || titleCase(it.designStatus) : ITEM_STATUS_LABEL[it.status] || titleCase(it.status)}
-        </span>
-        {it.type !== 'standard' && <span className={`${chip} ${chipTone.purple}`}>{titleCase(it.type)}</span>}
-        {it.lookupVerified && <span className={`${chip} ${chipTone.quiet}`} title={`Bib ${it.customerBib || '?'} · ${it.customerFinishTime || ''}`}>Result confirmed</span>}
-      </div>
-      {it.dueDate && it.designStatus && it.designStatus !== 'sent_to_production' && <div className="mt-1 text-off-black/50">Designs due {day(it.dueDate)}{it.assignee ? ` · ${it.assignee.firstName}` : ''}</div>}
-      {it.approvalUrl && <a href={it.approvalUrl} target="_blank" rel="noopener noreferrer" className={`${textLink} mt-1`}>Approval portal <ExternalLink className="w-3 h-3" /></a>}
-    </div>
-  )
+/** Where the order is, in one chip: shipped, in production, being designed, or waiting. */
+function stage(o: CustomerOrder): { label: string; cls: string } | null {
+  if (o.financialStatus === 'REFUNDED') return { label: 'Refunded', cls: 'bg-red-50 border-red-200 text-red-700' }
+  if (o.fulfillmentStatus === 'FULFILLED' || o.tracking.length) return { label: 'Shipped', cls: 'bg-emerald-50 border-emerald-200 text-emerald-700' }
+  const it = o.items[0]
+  if (!it) return o.imported ? null : { label: 'Not imported yet', cls: 'bg-white border-border-gray text-off-black/55' }
+  if (it.status === 'completed' || it.designStatus === 'sent_to_production') return { label: 'In production', cls: 'bg-blue-50 border-blue-200 text-blue-700' }
+  if (it.designStatus && it.designStatus !== 'not_started') return { label: it.designStatus === 'approved_by_customer' ? 'Approved, not yet printed' : 'Being designed', cls: 'bg-purple-50 border-purple-200 text-purple-700' }
+  return { label: 'In the queue', cls: 'bg-white border-border-gray text-off-black/60' }
 }
 
+/**
+ * One order, the way the dashboard's order view shows it: the design's
+ * picture, the race as the headline with the year beside it, size and
+ * photo, when it was ordered, where it is now, then Open in Shopify and
+ * Open in Artelo. Nothing else: totals, line items and properties are a
+ * click away in Shopify.
+ */
 function OrderCard({ o }: { o: CustomerOrder }) {
-  const [more, setMore] = useState(false)
+  const it = o.items[0]
+  const age = Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 86400000)
+  const ageCls = o.fulfillmentStatus === 'FULFILLED' ? 'bg-white border-border-gray text-off-black/60'
+    : age > 5 ? 'bg-red-50 border-red-200 text-red-700 font-medium' : age >= 3 ? 'bg-orange-50 border-orange-200 text-orange-700 font-medium' : 'bg-white border-border-gray text-off-black/60'
+  const st = stage(o)
+  const tracking = o.tracking.find(t => t.url) || o.tracking[0] || null
+  const race = it?.race || o.lineItems[0]?.title || 'Order'
   return (
-    <div className="rounded-md border border-border-gray bg-white p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-off-black">#{o.number}</span>
-        <span className="text-xs text-off-black/50">{day(o.createdAt)}</span>
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        {o.fulfillmentStatus && <span className={`${chip} ${FULFILLMENT_TONE[o.fulfillmentStatus] || chipTone.quiet}`}>{titleCase(o.fulfillmentStatus)}</span>}
-        {o.financialStatus && o.financialStatus !== 'PAID' && <span className={`${chip} ${FINANCIAL_TONE[o.financialStatus] || chipTone.quiet}`}>{titleCase(o.financialStatus)}</span>}
-        {o.total && <span className="text-xs text-off-black/60 tabular-nums">{o.currency === 'USD' ? '$' : `${o.currency} `}{o.total}</span>}
-        {o.source === 'etsy' && <span className={`${chip} ${chipTone.quiet}`}>Etsy</span>}
-        {!o.imported && <span className={`${chip} ${chipTone.quiet}`} title="Not in the fulfillment queue yet">Not imported yet</span>}
-      </div>
-      {o.discountCodes.length > 0 && <div className="mt-1 text-xs text-off-black/55">Code{o.discountCodes.length > 1 ? 's' : ''}: {o.discountCodes.join(', ')}</div>}
-      {o.tracking.length > 0 && (
-        <div className="mt-1.5 space-y-0.5">
-          {o.tracking.map((t, i) => (
-            <div key={i} className="text-xs inline-flex items-center gap-1.5 text-off-black/70">
-              <Truck className="w-3 h-3 shrink-0" />
-              {t.url ? <a href={t.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">{t.company || 'Tracking'} {t.number}</a> : <span>{t.company || 'Tracking'} {t.number}</span>}
-              {t.at && <span className="text-off-black/40">· {ago(t.at)}</span>}
+    <div className="space-y-2">
+      <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+        <div className="flex items-start gap-3">
+          {it?.heroImageUrl ? (
+            <a href={it.heroImageUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 block w-16 h-16 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90" title="View full size">
+              <img src={it.heroImageUrl} alt={it.productLabel || race} className="w-full h-full object-cover" />
+            </a>
+          ) : (
+            <div className="flex-shrink-0 w-16 h-16 rounded border border-border-gray bg-white flex items-center justify-center text-off-black/25"><Package className="w-6 h-6" /></div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Order #{o.number}</div>
+            <div className="flex items-baseline flex-wrap gap-x-1.5 gap-y-1 min-w-0">
+              <h3 className="text-[15px] font-bold text-off-black leading-tight">{race}</h3>
+              {it?.year ? <span className={pill}>{it.year}</span> : null}
             </div>
-          ))}
+            {it?.runner && <div className="text-xs text-off-black/55 truncate mt-0.5">{it.runner}</div>}
+            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+              {it?.size && <span className={pill}>{it.size}</span>}
+              {it?.hasPhoto && <span className="inline-flex items-center px-2 py-0.5 rounded border text-xs font-semibold bg-[#4600D6]/10 text-[#4600D6] border-[#4600D6]/25">Photo</span>}
+              {o.items.length > 1 && <span className={pill}>+{o.items.length - 1} more</span>}
+              {!it && o.lineItems[0]?.variant && <span className={pill}>{o.lineItems[0].variant}</span>}
+            </div>
+            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 border rounded text-xs ${ageCls}`} title={new Date(o.createdAt).toLocaleString()}>📅 Ordered {placedAt(o.createdAt)}</span>
+              {st && <span className={`inline-flex items-center px-2 py-0.5 border rounded text-xs font-medium ${st.cls}`}>{st.label}</span>}
+            </div>
+            {tracking && (
+              <div className="mt-1.5 text-xs inline-flex items-center gap-1.5 text-off-black/70 min-w-0">
+                <Truck className="w-3 h-3 shrink-0" />
+                {tracking.url ? <a href={tracking.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 truncate">{tracking.company || 'Tracking'} {tracking.number}</a> : <span className="truncate">{tracking.company || 'Tracking'} {tracking.number}</span>}
+              </div>
+            )}
+            {o.discountCodes.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {o.discountCodes.map(c => <span key={c} className="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium bg-yellow-50 text-yellow-900/70 border-yellow-200">Discount: {c}</span>)}
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+      {o.adminUrl && (
+        <a href={o.adminUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors">
+          <img src="/shopify-icon.png" alt="" className="w-5 h-5" /> Open in Shopify <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
+        </a>
       )}
-      {o.shipTo && <div className="mt-1 text-xs text-off-black/50 truncate" title={o.shipTo}>To: {o.shipTo}</div>}
-      {o.items.map(it => <Item key={it.orderId} it={it} />)}
-      {o.items.length === 0 && o.lineItems.map((li, i) => (
-        <div key={i} className="pt-2 mt-2 border-t border-border-gray/80 text-xs">
-          <div className="font-medium text-off-black">{li.title}{li.quantity > 1 ? ` ×${li.quantity}` : ''}</div>
-          {li.variant && <div className="text-off-black/60">{li.variant}</div>}
-          {Object.keys(li.properties).length > 0 && <button onClick={() => setMore(v => !v)} className="mt-0.5 text-off-black/45 hover:text-off-black/70">{more ? 'Hide' : 'Show'} what they typed</button>}
-          {more && <dl className="mt-1 space-y-0.5">{Object.entries(li.properties).map(([k, v]) => <div key={k}><dt className="inline text-off-black/45">{k}: </dt><dd className="inline text-off-black/75">{v}</dd></div>)}</dl>}
-        </div>
-      ))}
-      {o.adminUrl && <a href={o.adminUrl} target="_blank" rel="noopener noreferrer" className={`${textLink} mt-2`}>Open in Shopify <ExternalLink className="w-3 h-3" /></a>}
+      {o.arteloUrl && (
+        <a href={o.arteloUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors">
+          <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> Open in Artelo <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
+        </a>
+      )}
     </div>
   )
 }
@@ -357,7 +378,7 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
             {thread.context.shopifyError && <div className="text-xs text-amber-700 inline-flex items-start gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />Shopify did not answer; showing what we have on file.</div>}
             {thread.context.orders.length === 0
               ? <div className="text-xs text-off-black/50 inline-flex items-center gap-1.5"><Package className="w-3.5 h-3.5" />{thread.customerEmail ? `No orders under ${thread.customerEmail}.` : 'No email to look orders up by. Ask for the order number.'}</div>
-              : thread.context.orders.map(o => <OrderCard key={`${o.source}-${o.number}`} o={o} />)}
+              : <div className="space-y-4">{thread.context.orders.map(o => <OrderCard key={`${o.source}-${o.number}`} o={o} />)}</div>}
           </Section>
           <Section title="Actions">
             <Actions thread={thread} onInsert={onInsert} onChanged={onChanged} />
