@@ -1030,7 +1030,15 @@ export default function Dashboard() {
   const [possibleMatchesMap, setPossibleMatchesMap] = useState<Record<string, Array<{ name: string; bib: string; time: string; pace?: string; city?: string; state?: string; eventType?: string; resultsUrl?: string }>>>({})
   // Race database state
   // Tab switcher: standard vs custom order view
-  const [activeView, setActiveView] = useState<'standard' | 'custom' | 'race_partner' | 'bulk'>('standard')
+  // Which orders are on screen, from the address: ?view=custom | partners | bulk
+  // (standard is the default and is left out). Changing the view drops the
+  // race filter, since the race list differs per view.
+  type ActiveView = 'standard' | 'custom' | 'race_partner' | 'bulk'
+  const VIEW_PARAM: Record<ActiveView, string> = { standard: '', custom: 'custom', race_partner: 'partners', bulk: 'bulk' }
+  const activeView: ActiveView = (Object.keys(VIEW_PARAM) as ActiveView[]).find(v => VIEW_PARAM[v] === (searchParams.get('view') || '')) || 'standard'
+  const setActiveView = useCallback((v: ActiveView) => {
+    setSearchParams(prev => { const next = new URLSearchParams(prev); if (VIEW_PARAM[v]) next.set('view', VIEW_PARAM[v]); else next.delete('view'); next.delete('race'); return next }, { replace: true })
+  }, [setSearchParams]) // eslint-disable-line react-hooks/exhaustive-deps
   // Uploading to Artelo sends the print to production, so done is just Completed.
   const doneLabel = 'Completed'
   const doneHeading = 'Completed Orders'
@@ -1763,7 +1771,7 @@ export default function Dashboard() {
     }
     // First load with an order in the address: open it once the list is here.
     if (urlOrderRef && selectedRef !== urlOrderRef) resolve(urlOrderRef)
-  }, [selectedRef, urlOrderRef, orders, activeView, navigate, urlSearch])
+  }, [selectedRef, urlOrderRef, orders, activeView, setActiveView, navigate, urlSearch])
   useEffect(() => {
     document.title = selectedOrder ? `Order ${orderRefOf(selectedOrder)} · Trackstar` : 'Trackstar'
     return () => { document.title = 'Trackstar' }
@@ -2332,11 +2340,6 @@ export default function Dashboard() {
     return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   }, [ordersToFulfill])
 
-  // Reset race filter when switching tabs — the option may not exist in the
-  // new view, which would otherwise leave the queue mysteriously empty.
-  const prevViewRef = useRef(activeView)
-  useEffect(() => { if (prevViewRef.current !== activeView) { prevViewRef.current = activeView; setRaceFilter('') } }, [activeView, setRaceFilter])
-
   // How many open standard orders sit in each stage, for the queue chips.
   const stageCounts = useMemo(() => {
     const c = { review: 0, attach: 0, action: 0, waiting: 0 }
@@ -2478,7 +2481,7 @@ export default function Dashboard() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedOrder])
+  }, [selectedOrder, setActiveView])
 
   // Helper to check if an order has multiple items
   const getOrderItemCount = useCallback((parentOrderNumber: string) => {
