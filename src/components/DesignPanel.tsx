@@ -106,6 +106,7 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
         {opened && onComplete && (
           <button onClick={onComplete} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors`}>
             <Check className="w-5 h-5" /> {compact ? 'Complete' : 'Mark as complete'}
+            {!compact && <kbd className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">⌘↵</kbd>}
           </button>
         )}
       </div>

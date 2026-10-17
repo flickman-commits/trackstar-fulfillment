@@ -1328,6 +1328,7 @@ export default function Dashboard() {
   // look at the same order right after marking it (re-check filename, etc.),
   // and the optimiztic status flip swaps the button to "Re-Open Order" so
   // he can immediately un-do if he hit it by mistake.
+  const markAsCompletedRef = useRef<(orderNumber: string) => void>(() => {})
   const markAsCompleted = async (orderNumber: string) => {
     try {
       const response = await apiFetch(`/api/orders/actions`, {
@@ -1357,6 +1358,8 @@ export default function Dashboard() {
       })
     }
   }
+  markAsCompletedRef.current = markAsCompleted
+
 
   // Re-open a completed order. Brings it back into the active queue with
   // status='ready' (if research exists) or 'pending' (if it doesn't), so
@@ -2312,6 +2315,13 @@ export default function Dashboard() {
         if (target.isContentEditable) return
       }
       if (isEditing) return
+      // Cmd+Enter (Ctrl+Enter elsewhere): Mark as complete.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === 'Enter') {
+        if (selectedOrder.status === 'completed' || selectedOrder.status === 'flagged') return
+        e.preventDefault()
+        markAsCompletedRef.current(selectedOrder.orderNumber)
+        return
+      }
       if (e.metaKey || e.ctrlKey || e.altKey) return
       // j = up (previous), k = down (next) — matches the on-screen chips.
       if (e.key === 'Escape') {
@@ -5389,6 +5399,7 @@ Thank you!`
                         className={`flex-1 px-5 py-3 rounded-md hover:opacity-90 transition-opacity font-medium text-white ${selectedOrder.pipeline?.stage === 'attach' ? 'bg-[#4600D6]' : 'bg-dark-fill'}`}
                       >
                         {selectedOrder.pipeline?.stage === 'attach' ? 'Attached in Artelo, mark done' : 'Mark as Completed'}
+                        <kbd className="ml-2 hidden md:inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">⌘↵</kbd>
                       </button>
                     )}
                     {/* Re-open — only for already-completed orders. Sends the
