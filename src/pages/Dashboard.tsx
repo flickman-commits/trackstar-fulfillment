@@ -2402,6 +2402,8 @@ Thank you!`
   // One icon, chosen by what happens next. Where a result came from (our
   // research, the customer at checkout) is the Tags column's job.
   const getStatusDisplay = (order: Order) => {
+    // Completed right now beats the status from the last list refresh.
+    if (order.status === 'completed') return { icon: '', dot: 'bg-green-500', label: 'Completed', stage: 'done' as const }
     // The server's one status, when it has one (standard orders).
     const p = order.pipeline
     if (p) {
