@@ -143,7 +143,7 @@ export interface ThreadDetail extends ThreadRow {
   pastThreads: PastThread[]
 }
 
-export interface Macro { id: string; name: string; body: string; uses: number; updatedAt: string; createdBy: { id: string; firstName: string } | null }
+export interface Macro { id: string; name: string; shortcut: string | null; body: string; uses: number; updatedAt: string; createdBy: { id: string; firstName: string } | null }
 
 export interface MailboxStatus {
   configured: boolean
@@ -169,3 +169,19 @@ export interface InstagramBackfillResult { conversations: number; seen: number; 
 
 export interface SyncResult { imported?: number; failed?: number; mode?: string; seen?: number; skipped?: string }
 export interface BackfillResult { done: boolean; imported: number; total: number }
+
+/** What Shopify says about a discount code a customer pasted. */
+export interface CodeLookup {
+  code: string
+  found: boolean
+  verdict: string
+  title?: string
+  value?: string
+  status?: string
+  startsAt?: string | null
+  endsAt?: string | null
+  usageLimit?: number | null
+  used?: number
+  oncePerCustomer?: boolean
+  fromKlaviyo?: boolean
+}

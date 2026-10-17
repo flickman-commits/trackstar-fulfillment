@@ -1,0 +1,41 @@
+import { X } from 'lucide-react'
+import { btnGhost } from '@/lib/ui'
+import { useEscape } from '@/lib/useEscape'
+import { RoutingCard, MailboxCard, InstagramCard } from './Details'
+import type { InstagramStatus, MailboxStatus, Teammate } from '@/types/support'
+
+/**
+ * Settings for the inbox, out of the way of the conversation: where new
+ * conversations go, the Gmail mailbox, the Instagram account. Admins only;
+ * everyone else sees the not-connected banner at the top of the page if
+ * something needs an admin.
+ */
+export default function SettingsModal({ team, unassignedCount, status, instagram, isAdmin, onChanged, onClose }: {
+  team: Teammate[]
+  unassignedCount: number
+  status: MailboxStatus | null
+  instagram: InstagramStatus | null
+  isAdmin: boolean
+  onChanged: () => void
+  onClose: () => void
+}) {
+  useEscape(onClose)
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-3.5 border-b border-border-gray flex items-center justify-between">
+          <div>
+            <div className="text-base font-semibold text-off-black">Support settings</div>
+            <div className="text-xs text-off-black/50">Routing, the mailbox and the Instagram account.</div>
+          </div>
+          <button onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {isAdmin && <RoutingCard team={team} unassignedCount={unassignedCount} onChanged={onChanged} />}
+          <MailboxCard status={status} isAdmin={isAdmin} onChanged={onChanged} />
+          <InstagramCard status={instagram} isAdmin={isAdmin} onChanged={onChanged} />
+        </div>
+      </div>
+    </div>
+  )
+}

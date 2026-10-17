@@ -50,7 +50,9 @@ export const supportApi = {
   settings: () => request<{ defaultAssigneeId: string | null }>('/api/support/settings'),
   saveSettings: (defaultAssigneeId: string | null, applyToOpen = false) => post<{ defaultAssigneeId: string | null; assigned: number }>('/api/support/settings', { defaultAssigneeId, applyToOpen }),
   macros: () => request<{ macros: Macro[] }>('/api/support/macros'),
-  saveMacro: (m: { id?: string; name: string; body: string }) => post<Macro>('/api/support/macros', { action: 'save', ...m }),
+  /** The quick actions beside a conversation (server/domain/support/actions.js). */
+  action: <T = Record<string, unknown>,>(action: string, body: Record<string, unknown>) => post<T>('/api/support/actions', { action, ...body }),
+  saveMacro: (m: { id?: string; name: string; shortcut?: string; body: string }) => post<Macro>('/api/support/macros', { action: 'save', ...m }),
   deleteMacro: (id: string) => post<{ id: string }>('/api/support/macros', { action: 'delete', id }),
   useMacro: (id: string) => post<{ ok: boolean }>('/api/support/macros', { action: 'use', id }),
 }

@@ -2,7 +2,7 @@
  * /api/support/macros - saved replies.
  *
  *   GET                                   the list, most used first (seeds the playbook's on first read)
- *   POST { action:'save', id?, name, body }
+ *   POST { action:'save', id?, name, shortcut?, body }
  *   POST { action:'delete', id }
  *   POST { action:'use', id }             counts an insert
  */
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}
     if (body.action === 'save') {
-      const m = await saveMacro({ id: body.id, name: body.name, body: body.body }, user)
+      const m = await saveMacro({ id: body.id, name: body.name, shortcut: body.shortcut, body: body.body }, user)
       await recordAudit({ action: 'support.macro', summary: `${body.id ? 'Edited' : 'Added'} macro "${m.name}"`, detail: { id: m.id }, actor: user })
       return res.status(200).json(m)
     }

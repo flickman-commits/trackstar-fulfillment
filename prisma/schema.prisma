@@ -1189,6 +1189,8 @@ model SupportRead {
 model SupportMacro {
   id          String   @id @default(cuid())
   name        String
+  // Typed after a slash in the reply to insert it: /shipped. Letters, digits and dashes.
+  shortcut    String?
   body        String
   createdById String?
   createdBy   User?    @relation("SupportMacroAuthor", fields: [createdById], references: [id], onDelete: SetNull)
@@ -1197,4 +1199,5 @@ model SupportMacro {
   updatedAt   DateTime @updatedAt
 
   @@index([name])
+  @@index([shortcut])
 }

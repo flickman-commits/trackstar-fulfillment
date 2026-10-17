@@ -12,6 +12,7 @@ import ConversationList from '@/components/support/ConversationList'
 import Conversation from '@/components/support/Conversation'
 import Details from '@/components/support/Details'
 import MacrosModal from '@/components/support/MacrosModal'
+import SettingsModal from '@/components/support/SettingsModal'
 
 /**
  * Support: the shared inbox for fast@trackstar.art, laid out the way
@@ -71,8 +72,10 @@ export default function Support() {
   const [macros, setMacros] = useState<Macro[]>([])
   const [macrosOpen, setMacrosOpen] = useState(false)
   const [keysOpen, setKeysOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const replyRef = useRef<HTMLTextAreaElement>(null)
   const noteRef = useRef<HTMLTextAreaElement>(null)
+  const insertRef = useRef<((text: string) => void) | null>(null)
 
   useEffect(() => { try { localStorage.setItem('support.view', view); localStorage.setItem('support.sort', sort) } catch { /* private mode */ } }, [view, sort])
 
@@ -104,6 +107,11 @@ export default function Support() {
   }, [view, sort, query])
 
   useEffect(() => { loadStatus(); loadMacros() }, [loadStatus, loadMacros])
+  // A link from Slack or a note opens the thread it names.
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('thread')
+    if (id) { openThread(id); navigate('/support', { replace: true }) }
+  }, [location.search, navigate]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const t = window.setTimeout(() => loadInbox(), query ? 250 : 0)
     return () => window.clearTimeout(t)
@@ -266,14 +274,14 @@ export default function Support() {
 
         <section className="flex-1 min-h-0 pb-3">
           <div className="h-full bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex flex-col lg:flex-row">
-            <ViewsColumn view={view} counts={inbox?.counts || null} team={inbox?.team || []} me={me} onView={v => { setView(v); setSelectedId(null); setThread(null) }} onMacros={() => setMacrosOpen(true)} />
+            <ViewsColumn view={view} counts={inbox?.counts || null} team={inbox?.team || []} me={me} onView={v => { setView(v); setSelectedId(null); setThread(null) }} onMacros={() => setMacrosOpen(true)} onSettings={() => setSettingsOpen(true)} />
             <ConversationList title={title} threads={threads} selectedId={selectedId} onSelect={openThread} loading={loading && !inbox} emptyLabel={empty} sort={sort} onSort={setSort} />
             {thread && me ? (
               <Conversation
                 key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros} expectedHandle={instagram?.expectedHandle}
                 onAssign={assign} onStatus={setStatusOf} onSnooze={snooze} onPriority={setPriority} onMarkUnread={markUnread}
                 onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
-                replyRef={replyRef} noteRef={noteRef}
+                replyRef={replyRef} noteRef={noteRef} insertRef={insertRef}
               />
             ) : (
               <div className="flex-1 min-w-0 flex items-center justify-center min-h-[320px] bg-[#fcfcfc]">
@@ -287,15 +295,16 @@ export default function Support() {
               </div>
             )}
             <Details
-              thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} unassignedCount={inbox?.counts.unassigned || 0} onOpenThread={openThread}
+              thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread}
               onAssign={assign} onPriority={setPriority} onTags={setTags}
-              status={status} instagram={instagram} isAdmin={isAdmin} onMailboxChanged={() => { loadStatus(); loadInbox(true) }}
+              onInsert={t => insertRef.current?.(t)} onChanged={() => { if (selectedId) refreshThread(selectedId); loadInbox(true) }}
             />
           </div>
         </section>
       </div>
 
       {macrosOpen && <MacrosModal macros={macros} onChanged={loadMacros} onClose={() => setMacrosOpen(false)} />}
+      {settingsOpen && <SettingsModal team={inbox?.team || []} unassignedCount={inbox?.counts.unassigned || 0} status={status} instagram={instagram} isAdmin={isAdmin} onChanged={() => { loadStatus(); loadInbox(true) }} onClose={() => setSettingsOpen(false)} />}
       {keysOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setKeysOpen(false)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>

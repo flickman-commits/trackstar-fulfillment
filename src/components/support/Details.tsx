@@ -7,6 +7,7 @@ import { ago, day } from '@/lib/supportDates'
 import { STATUS_LABEL, STATUS_TONE } from '@/lib/supportStatus'
 import { Avatar } from '@/components/AssigneePicker'
 import type { CustomerOrder, InstagramStatus, MailboxStatus, OrderItem, Teammate, ThreadDetail } from '@/types/support'
+import Actions from './Actions'
 
 /**
  * The details panel, Intercom's right column: collapsible sections for the
@@ -298,39 +299,43 @@ export function InstagramCard({ status, isAdmin, onChanged }: { status: Instagra
   )
 }
 
-export default function Details({ thread, team, tagSuggestions, unassignedCount, onOpenThread, onAssign, onPriority, onTags, status, instagram, isAdmin, onMailboxChanged }: {
+export default function Details({ thread, team, tagSuggestions, onOpenThread, onAssign, onPriority, onTags, onInsert, onChanged }: {
   thread: ThreadDetail | null
   team: Teammate[]
   tagSuggestions: string[]
-  unassignedCount: number
   onOpenThread: (id: string) => void
   onAssign: (id: string | null) => void
   onPriority: (p: boolean) => void
   onTags: (tags: string[]) => void
-  status: MailboxStatus | null
-  instagram: InstagramStatus | null
-  isAdmin: boolean
-  onMailboxChanged: () => void
+  /** Drops a line into the reply box. */
+  onInsert: (text: string) => void
+  /** Something changed on the thread; read it again. */
+  onChanged: () => void
 }) {
-  const ig = thread?.channel === 'instagram'
   return (
-    <aside className="w-full lg:w-[280px] xl:w-[310px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
+    <aside className="w-full lg:w-[272px] xl:w-[300px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
+      {!thread && <div className="px-4 py-6 text-xs text-off-black/45">Pick a conversation to see the customer, their orders and the actions.</div>}
       {thread && (
         <>
           <Section title="Customer">
             <Attr label="Name">{thread.customer.name || <span className="text-off-black/40">Unknown</span>}</Attr>
-            {ig && (
-              <Attr label="Instagram">
-                {thread.customer.instagram
-                  ? <a href={`https://instagram.com/${thread.customer.instagram}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 break-all inline-flex items-center gap-1">@{thread.customer.instagram}<ExternalLink className="w-3 h-3" /></a>
-                  : <span className="text-off-black/40">Handle not shared by Meta</span>}
-              </Attr>
-            )}
-            {thread.customer.email
-              ? <Attr label="Email"><a href={`mailto:${thread.customer.email}`} className="text-blue-600 hover:text-blue-700 break-all">{thread.customer.email}</a></Attr>
-              : ig ? <Attr label="Email"><span className="text-off-black/40">None. Ask for the email on their order.</span></Attr> : null}
+            {thread.customer.email && <Attr label="Email"><a href={`mailto:${thread.customer.email}`} className="text-blue-600 hover:text-blue-700 break-all">{thread.customer.email}</a></Attr>}
+            {thread.channel === 'instagram' && thread.igUsername && <Attr label="Instagram"><a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">@{thread.igUsername}</a></Attr>}
             <Attr label="First seen">{day(thread.customer.firstSeen)}</Attr>
             <Attr label="Conversations">{thread.customer.conversations}</Attr>
+            {thread.pastThreads.length > 0 && (
+              <div className="pt-1 space-y-1">
+                {thread.pastThreads.map(p => (
+                  <button key={p.id} onClick={() => onOpenThread(p.id)} className="w-full text-left px-2.5 py-1.5 rounded-md border border-border-gray bg-white hover:bg-subtle-gray transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-off-black truncate">{p.subject || '(no subject)'}</span>
+                      <span className="text-[11px] text-off-black/45 shrink-0">{ago(p.lastMessageAt)}</span>
+                    </div>
+                    <div className="mt-0.5"><span className={`${chip} ${STATUS_TONE[p.status]}`}>{p.status === 'waiting' ? 'Waiting' : STATUS_LABEL[p.status]}</span></div>
+                  </button>
+                ))}
+              </div>
+            )}
           </Section>
           <Section title="Conversation">
             <Attr label="Status"><span className={`${chip} ${STATUS_TONE[thread.status]}`}>{STATUS_LABEL[thread.status]}</span></Attr>
@@ -340,7 +345,6 @@ export default function Details({ thread, team, tagSuggestions, unassignedCount,
                 {team.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
               </select>
             </Attr>
-            {thread.assignee && <Attr label=""><span className="inline-flex items-center gap-1.5 text-off-black/60"><Avatar user={thread.assignee} size={16} />{thread.assignee.firstName} has it</span></Attr>}
             <Attr label="Priority">
               <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={thread.priority} onChange={e => onPriority(e.target.checked)} className="accent-amber-500" />{thread.priority ? 'Priority' : 'Normal'}</label>
             </Attr>
@@ -352,27 +356,14 @@ export default function Details({ thread, team, tagSuggestions, unassignedCount,
           <Section title="Orders" count={thread.context.orders.length}>
             {thread.context.shopifyError && <div className="text-xs text-amber-700 inline-flex items-start gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />Shopify did not answer; showing what we have on file.</div>}
             {thread.context.orders.length === 0
-              ? <div className="text-xs text-off-black/50 inline-flex items-start gap-1.5"><Package className="w-3.5 h-3.5 shrink-0 mt-0.5" />{ig ? 'A DM comes without an email, so no orders are matched. Ask for their order number or the email they ordered with.' : `No orders under ${thread.customerEmail || 'this address'}.`}</div>
+              ? <div className="text-xs text-off-black/50 inline-flex items-center gap-1.5"><Package className="w-3.5 h-3.5" />{thread.customerEmail ? `No orders under ${thread.customerEmail}.` : 'No email to look orders up by. Ask for the order number.'}</div>
               : thread.context.orders.map(o => <OrderCard key={`${o.source}-${o.number}`} o={o} />)}
           </Section>
-          {thread.pastThreads.length > 0 && (
-            <Section title="Other conversations" count={thread.pastThreads.length}>
-              {thread.pastThreads.map(p => (
-                <button key={p.id} onClick={() => onOpenThread(p.id)} className="w-full text-left px-3 py-2 rounded-md border border-border-gray bg-white hover:bg-subtle-gray transition-colors">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-off-black truncate">{p.subject || '(no subject)'}</span>
-                    <span className="text-[11px] text-off-black/45 shrink-0">{ago(p.lastMessageAt)}</span>
-                  </div>
-                  <div className="mt-1"><span className={`${chip} ${STATUS_TONE[p.status]}`}>{p.status === 'waiting' ? 'Waiting' : STATUS_LABEL[p.status]}</span></div>
-                </button>
-              ))}
-            </Section>
-          )}
+          <Section title="Actions">
+            <Actions thread={thread} onInsert={onInsert} onChanged={onChanged} />
+          </Section>
         </>
       )}
-      {isAdmin && <RoutingCard team={team} unassignedCount={unassignedCount} onChanged={onMailboxChanged} />}
-      {(isAdmin || !status?.connected) && <MailboxCard status={status} isAdmin={isAdmin} onChanged={onMailboxChanged} />}
-      {(isAdmin || !instagram?.connected) && <InstagramCard status={instagram} isAdmin={isAdmin} onChanged={onMailboxChanged} />}
     </aside>
   )
 }

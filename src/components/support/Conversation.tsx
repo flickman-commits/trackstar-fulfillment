@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Archive, ChevronDown, Clock, Loader2, MailOpen, Paperclip, RotateCcw, Send, Star, StickyNote, Trash2, Zap, X, Search } from 'lucide-react'
+import { AlertTriangle, Archive, ChevronDown, Clock, Loader2, Mail, Paperclip, RotateCcw, Send, Star, StickyNote, Trash2, Zap, X, Search } from 'lucide-react'
 import { btnGhost, btnPrimary, btnSecondary } from '@/lib/ui'
 import { when } from '@/lib/supportDates'
 import { fillMacro } from '@/lib/supportStatus'
@@ -172,7 +172,7 @@ function MacroMenu({ macros, onPick, onClose }: { macros: Macro[]; onPick: (m: M
         {list.length === 0 && <div className="px-3 py-4 text-xs text-off-black/45">No macro matches.</div>}
         {list.map((m, i) => (
           <button key={m.id} onMouseEnter={() => setIdx(i)} onClick={() => onPick(m)} className={`w-full text-left px-3 py-2 border-b border-border-gray/60 last:border-b-0 ${i === idx ? 'bg-subtle-gray' : ''}`}>
-            <div className="text-[13px] font-medium text-off-black">{m.name}</div>
+            <div className="flex items-center justify-between gap-2"><span className="text-[13px] font-medium text-off-black truncate">{m.name}</span>{m.shortcut && <span className="text-[11px] font-mono text-off-black/50 shrink-0">/{m.shortcut}</span>}</div>
             <div className="text-[11px] text-off-black/50 truncate">{m.body.replace(/\s+/g, ' ')}</div>
           </button>
         ))}
@@ -181,7 +181,7 @@ function MacroMenu({ macros, onPick, onClose }: { macros: Macro[]; onPick: (m: M
   )
 }
 
-export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onUseMacro, replyRef, noteRef }: {
+export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onUseMacro, replyRef, noteRef, insertRef }: {
   thread: ThreadDetail
   /** The Instagram account replies go out as, without the @. */
   expectedHandle?: string
@@ -202,6 +202,8 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   /** Lets the page's keyboard shortcuts focus the composer. */
   replyRef: React.RefObject<HTMLTextAreaElement>
   noteRef: React.RefObject<HTMLTextAreaElement>
+  /** The Actions panel drops lines into the reply through this. */
+  insertRef: React.MutableRefObject<((text: string) => void) | null>
 }) {
   const [mode, setMode] = useState<'reply' | 'note'>('reply')
   const [text, setText] = useState(() => starter(thread, me))
@@ -210,6 +212,8 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   const [mentionQ, setMentionQ] = useState<string | null>(null)
   const [mentionIdx, setMentionIdx] = useState(0)
   const [sending, setSending] = useState(false)
+  const [slashQ, setSlashQ] = useState<string | null>(null)
+  const [slashIdx, setSlashIdx] = useState(0)
   const bottom = useRef<HTMLDivElement>(null)
   const close = usePopover()
   const macro = usePopover()
@@ -275,6 +279,57 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     requestAnimationFrame(() => { if (el) { const pos = before.length + name.length + 2; el.focus(); el.setSelectionRange(pos, pos) } })
   }
 
+  /** Put text into the reply: between the greeting and sign-off when nothing is written yet, else at the caret. */
+  const placeInReply = (body: string, replaceSlash = false) => {
+    const el = replyRef.current
+    let base = text
+    let caret = el ? el.selectionStart : text.length
+    let caretEnd = el ? el.selectionEnd : text.length
+    if (replaceSlash) {
+      // The "/shortcut" being typed goes away with the pick.
+      const before = base.slice(0, caret).replace(/\/[\w-]*$/, '')
+      base = before + base.slice(caret)
+      caret = caretEnd = before.length
+    }
+    let next: string
+    let pos: number
+    if (!replaceSlash && (ig ? !base.trim() : isBlank(base))) {
+      if (ig) { next = body; pos = body.length }
+      else {
+        const greet = base.match(/^Hey[^\n]*,\n/)?.[0] || ''
+        const sign = base.match(/\n+Thanks,\n[^\n]*$/)?.[0] || ''
+        next = `${greet}\n${body}\n${sign}`
+        pos = greet.length + 1 + body.length
+      }
+    } else {
+      next = base.slice(0, caret) + body + base.slice(caretEnd)
+      pos = caret + body.length
+    }
+    setText(next)
+    setSlashQ(null)
+    requestAnimationFrame(() => { if (el) { el.focus(); el.setSelectionRange(pos, pos) } })
+  }
+  useEffect(() => { insertRef.current = (t: string) => { setMode('reply'); placeInReply(t) } })
+
+  // /shortcut: a slash at the start of a word in the reply offers the macros; Enter or Tab drops one in.
+  const slashMatches = useMemo(() => {
+    if (slashQ === null) return []
+    const q = slashQ.toLowerCase()
+    const starts = macros.filter(m => (m.shortcut || '').startsWith(q))
+    const rest = q ? macros.filter(m => !starts.includes(m) && (m.name.toLowerCase().includes(q) || (m.shortcut || '').includes(q))) : []
+    return [...starts, ...rest].slice(0, 8)
+  }, [slashQ, macros])
+  const onReplyChange = (v: string, caret: number) => {
+    setText(v)
+    const m = v.slice(0, caret).match(/(?:^|\s)\/([\w-]*)$/)
+    setSlashQ(m ? m[1] : null)
+    setSlashIdx(0)
+  }
+  const pickSlash = (m: Macro) => {
+    placeInReply(fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName }), true)
+    onUseMacro(m.id)
+  }
+
   const insertMacro = (m: Macro) => {
     macro.setOpen(false)
     const body = fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName })
@@ -300,23 +355,25 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   return (
     <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white">
       {/* Header */}
-      <div className="px-5 py-3 border-b border-border-gray flex flex-wrap items-center gap-x-3 gap-y-2 shrink-0">
-        <CustomerAvatar name={thread.customerName} email={thread.customerEmail || thread.igUsername} size={34} />
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold text-off-black truncate leading-tight">{thread.customerName || (ig && thread.igUsername ? `@${thread.igUsername}` : '') || thread.customerEmail || 'Unknown sender'}</div>
-          <div className="text-xs text-off-black/55 truncate inline-flex items-center gap-1.5 max-w-full">
-            <ChannelMark channel={thread.channel} />
-            {ig ? (
-              thread.igUsername ? <a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="truncate hover:text-off-black hover:underline">@{thread.igUsername} · Instagram</a> : <span>Instagram DM</span>
-            ) : <span className="truncate">{thread.subject || '(no subject)'}</span>}
+      <div className="px-5 py-3 border-b border-border-gray shrink-0 space-y-2">
+        <div className="flex items-start gap-3">
+          <CustomerAvatar name={thread.customerName} email={thread.customerEmail || thread.igUsername} size={34} />
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-semibold text-off-black leading-tight">{thread.customerName || (ig && thread.igUsername ? `@${thread.igUsername}` : '') || thread.customerEmail || 'Unknown sender'}<span className="font-normal text-off-black/45 text-xs ml-2">{thread.customerEmail}</span></div>
+            <div className="text-[13px] text-off-black/70 leading-snug inline-flex items-start gap-1.5 max-w-full break-words">
+              <ChannelMark channel={thread.channel} />
+              {ig ? (
+                thread.igUsername ? <a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="hover:text-off-black hover:underline">@{thread.igUsername} · Instagram</a> : <span>Instagram DM</span>
+              ) : <span>{thread.subject || '(no subject)'}</span>}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
           <button onClick={() => onPriority(!thread.priority)} disabled={busy} className={`${btnGhost} px-2`} title={thread.priority ? 'Remove priority (p)' : 'Mark priority (p)'}>
             <Star className={`w-4 h-4 ${thread.priority ? 'text-amber-500 fill-amber-500' : 'text-off-black/40'}`} />
           </button>
           <button onClick={onMarkUnread} disabled={busy} className={`${btnGhost} px-2`} title="Mark unread (u)">
-            <MailOpen className="w-4 h-4 text-off-black/40" />
+            <Mail className="w-4 h-4 text-off-black/40" />
           </button>
           <AssigneePicker team={team} value={thread.assignee?.id || null} meId={me.id} onChange={onAssign} />
           {snoozed && <span className="text-[11px] text-off-black/50 inline-flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(thread.snoozedUntil as string).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>}
@@ -369,15 +426,38 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
         )}
         {mode === 'reply' ? (
           <div className="px-4 pb-3">
-            <textarea
-              ref={replyRef} value={text} onChange={e => setText(e.target.value)} rows={ig ? 4 : 7} disabled={sending || windowClosed}
-              placeholder={ig ? (windowClosed ? 'Replies are held until they write again' : 'Write the DM. Keep it short, like a text.') : undefined}
-              onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(e.shiftKey) } }}
-              className="w-full px-3 py-2.5 text-sm bg-white border border-border-gray rounded-md focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 resize-y leading-relaxed"
-            />
+            <div className="relative">
+              <textarea
+                ref={replyRef} value={text} onChange={e => onReplyChange(e.target.value, e.target.selectionStart)} rows={ig ? 4 : 8} disabled={sending || windowClosed}
+                placeholder={ig ? (windowClosed ? 'Replies are held until they write again' : 'Write the DM. Keep it short, like a text. / for a macro.') : undefined}
+                onKeyDown={e => {
+                  if (slashQ !== null && slashMatches.length) {
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIdx(i => Math.min(slashMatches.length - 1, i + 1)); return }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIdx(i => Math.max(0, i - 1)); return }
+                    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); pickSlash(slashMatches[slashIdx]); return }
+                    if (e.key === 'Escape') { setSlashQ(null); return }
+                  }
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(e.shiftKey) }
+                }}
+                className="w-full px-3 py-2.5 text-sm bg-white border border-border-gray rounded-md focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 resize-y leading-relaxed"
+              />
+              {slashQ !== null && slashMatches.length > 0 && (
+                <div className="absolute left-0 bottom-full mb-1 w-[380px] max-w-[90vw] p-1 rounded-lg bg-white border border-border-gray shadow-[0_8px_30px_rgba(0,0,0,0.14)] z-30">
+                  {slashMatches.map((m, i) => (
+                    <button key={m.id} onMouseDown={e => { e.preventDefault(); pickSlash(m) }} onMouseEnter={() => setSlashIdx(i)} className={`w-full text-left px-2.5 py-1.5 rounded-md ${i === slashIdx ? 'bg-subtle-gray' : ''}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[13px] font-medium text-off-black truncate">{m.name}</span>
+                        {m.shortcut && <span className="text-[11px] font-mono text-off-black/50 shrink-0">/{m.shortcut}</span>}
+                      </div>
+                      <div className="text-[11px] text-off-black/50 truncate">{m.body.replace(/\s+/g, ' ')}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <div className="relative" ref={macro.ref}>
-                <button data-macro-button onClick={() => macro.setOpen(v => !v)} className={btnSecondary} title="Insert a saved reply (m)"><Zap className="w-3.5 h-3.5" /> Macro</button>
+                <button data-macro-button onClick={() => macro.setOpen(v => !v)} className={btnSecondary} title="Insert a saved reply (m), or type / in the reply"><Zap className="w-3.5 h-3.5" /> Macro</button>
                 {macro.open && <MacroMenu macros={macros} onPick={insertMacro} onClose={() => macro.setOpen(false)} />}
               </div>
               {hasEmDash && <span className="text-[11px] text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" />No em dashes in anything a customer sees</span>}

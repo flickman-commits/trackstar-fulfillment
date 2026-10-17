@@ -21,7 +21,7 @@ export default function MacrosModal({ macros, onChanged, onClose }: { macros: Ma
     if (!editing) return
     setSaving(true)
     try {
-      await supportApi.saveMacro({ id: editing.id, name: editing.name || '', body: editing.body || '' })
+      await supportApi.saveMacro({ id: editing.id, name: editing.name || '', shortcut: editing.shortcut || undefined, body: editing.body || '' })
       toast.success(editing.id ? 'Macro saved' : 'Macro added')
       setEditing(null); onChanged()
     } catch (e) { toast.error((e as Error).message) }
@@ -39,7 +39,7 @@ export default function MacrosModal({ macros, onChanged, onClose }: { macros: Ma
         <div className="px-5 py-3.5 border-b border-border-gray flex items-center justify-between">
           <div>
             <div className="text-base font-semibold text-off-black">Macros</div>
-            <div className="text-xs text-off-black/50">Saved replies. {'{{first_name}}'} and {'{{rep}}'} fill in; [brackets] are yours to fill.</div>
+            <div className="text-xs text-off-black/50">Saved replies. Type / and the shortcut in a reply to drop one in. {'{{first_name}}'} and {'{{rep}}'} fill in; [brackets] are yours.</div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setEditing({ name: '', body: '' })} className={btnPrimary}><Plus className="w-3.5 h-3.5" /> New macro</button>
@@ -52,7 +52,7 @@ export default function MacrosModal({ macros, onChanged, onClose }: { macros: Ma
               <button key={m.id} onClick={() => setEditing(m)} className={`w-full text-left px-4 py-2.5 border-b border-border-gray/70 hover:bg-subtle-gray ${editing?.id === m.id ? 'bg-subtle-gray' : ''}`}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[13px] font-medium text-off-black truncate">{m.name}</span>
-                  <span className="text-[10px] text-off-black/40 tabular-nums shrink-0">{m.uses ? `${m.uses}×` : ''}</span>
+                  <span className="text-[10px] text-off-black/40 tabular-nums shrink-0">{m.uses ? `${m.uses}× ` : ''}{m.shortcut ? <span className="font-mono text-off-black/55">/{m.shortcut}</span> : null}</span>
                 </div>
                 {!editing && <div className="text-[11px] text-off-black/50 truncate">{m.body.replace(/\s+/g, ' ')}</div>}
               </button>
@@ -62,6 +62,11 @@ export default function MacrosModal({ macros, onChanged, onClose }: { macros: Ma
           {editing && (
             <div className="flex-1 min-w-0 p-5 flex flex-col gap-3 overflow-y-auto">
               <input value={editing.name || ''} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="Name, e.g. Order shipped" className={`${inputBase} w-full`} autoFocus />
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-off-black/50 font-mono">/</span>
+                <input value={editing.shortcut || ''} onChange={e => setEditing({ ...editing, shortcut: e.target.value })} placeholder={editing.name ? editing.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').split('-').slice(0, 4).join('-') : 'shortcut'} className={`${inputBase} flex-1 font-mono`} />
+                <span className="text-[11px] text-off-black/45">Letters, digits, dashes. Blank uses the name.</span>
+              </div>
               <textarea value={editing.body || ''} onChange={e => setEditing({ ...editing, body: e.target.value })} rows={12} placeholder="The reply, without the greeting or the sign-off." className={`${inputBase} w-full resize-y leading-relaxed`} />
               <div className="flex items-center gap-2">
                 {editing.id && <button onClick={() => remove(editing as Macro)} className={`${btnGhost} text-red-600 hover:text-red-700`}><Trash2 className="w-3.5 h-3.5" /> Delete</button>}

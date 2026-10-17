@@ -1,4 +1,4 @@
-import { Inbox, AtSign, UserRoundX, Layers, Clock, AlertTriangle, Moon, Archive, Settings2 } from 'lucide-react'
+import { Inbox, AtSign, UserRoundX, Layers, Clock, AlertTriangle, Moon, Archive, Settings2, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Avatar } from '@/components/AssigneePicker'
 import type { InboxCounts, InboxView, Teammate } from '@/types/support'
@@ -27,13 +27,14 @@ function ViewRow({ row, active, onClick }: { row: Row; active: boolean; onClick:
   )
 }
 
-export default function ViewsColumn({ view, counts, team, me, onView, onMacros }: {
+export default function ViewsColumn({ view, counts, team, me, onView, onMacros, onSettings }: {
   view: InboxView
   counts: InboxCounts | null
   team: Teammate[]
   me: Teammate | null
   onView: (v: InboxView) => void
   onMacros: () => void
+  onSettings: () => void
 }) {
   const c = counts
   const top: Row[] = [
@@ -49,7 +50,7 @@ export default function ViewsColumn({ view, counts, team, me, onView, onMacros }
     { id: 'closed', label: 'Closed', icon: Archive },
   ]
   return (
-    <nav className="hidden lg:flex w-[180px] xl:w-[200px] shrink-0 flex-col border-r border-border-gray bg-subtle-gray/60 min-h-0 overflow-y-auto">
+    <nav className="hidden lg:flex w-[168px] xl:w-[184px] shrink-0 flex-col border-r border-border-gray bg-subtle-gray/60 min-h-0 overflow-y-auto">
       <div className="px-2 pt-3 pb-1 space-y-0.5">
         {top.map(r => <ViewRow key={r.id} row={r} active={view === r.id} onClick={() => onView(r.id)} />)}
       </div>
@@ -76,7 +77,10 @@ export default function ViewsColumn({ view, counts, team, me, onView, onMacros }
       )}
       <div className="mt-auto px-2 py-3 border-t border-border-gray">
         <button onClick={onMacros} className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] text-off-black/70 hover:bg-off-black/[0.04] hover:text-off-black transition-colors">
-          <Settings2 className="w-4 h-4 text-off-black/45" /><span className="flex-1 text-left">Macros</span>
+          <Zap className="w-4 h-4 text-off-black/45" /><span className="flex-1 text-left">Macros</span>
+        </button>
+        <button onClick={onSettings} className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] text-off-black/70 hover:bg-off-black/[0.04] hover:text-off-black transition-colors">
+          <Settings2 className="w-4 h-4 text-off-black/45" /><span className="flex-1 text-left">Settings</span>
         </button>
       </div>
     </nav>

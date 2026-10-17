@@ -9,21 +9,44 @@
  */
 import prisma from '../../db.js'
 
-const SELECT = { id: true, name: true, body: true, uses: true, updatedAt: true, createdBy: { select: { id: true, firstName: true } } }
+const SELECT = { id: true, name: true, shortcut: true, body: true, uses: true, updatedAt: true, createdBy: { select: { id: true, firstName: true } } }
+
+/** "Broken frame: ask for two photos" -> "broken-frame-ask-for", a few words of it. */
+export function slugify(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').split('-').filter(Boolean).slice(0, 4).join('-')
+}
+
+/** A shortcut nobody else has: the candidate, else candidate-2, -3, ... */
+async function freeShortcut(candidate, exceptId) {
+  const base = slugify(candidate) || 'macro'
+  for (let i = 1; i < 50; i++) {
+    const s = i === 1 ? base : `${base}-${i}`
+    const clash = await prisma.supportMacro.findFirst({ where: { shortcut: s, ...(exceptId ? { id: { not: exceptId } } : {}) }, select: { id: true } })
+    if (!clash) return s
+  }
+  return `${base}-${Date.now().toString(36)}`
+}
 
 export async function listMacros() {
   await seedDefaults()
+  // Macros from before shortcuts existed get one from their name, once.
+  const bare = await prisma.supportMacro.findMany({ where: { shortcut: null }, select: { id: true, name: true } })
+  for (const m of bare) await prisma.supportMacro.update({ where: { id: m.id }, data: { shortcut: await freeShortcut(m.name, m.id) } })
   return prisma.supportMacro.findMany({ orderBy: [{ uses: 'desc' }, { name: 'asc' }], select: SELECT })
 }
 
-export async function saveMacro({ id, name, body }, actor) {
+export async function saveMacro({ id, name, shortcut, body }, actor) {
   const n = String(name || '').trim()
   const b = String(body || '').replace(/\r\n/g, '\n').trim()
   if (!n) throw new Error('A macro needs a name')
   if (!b) throw new Error('A macro needs a body')
-  if (/—/.test(b)) throw new Error('No em dashes in anything a customer sees')
-  if (id) return prisma.supportMacro.update({ where: { id }, data: { name: n, body: b }, select: SELECT })
-  return prisma.supportMacro.create({ data: { name: n, body: b, createdById: actor?.id || null }, select: SELECT })
+  if (/\u2014/.test(b)) throw new Error('No em dashes in anything a customer sees')
+  const wanted = slugify(shortcut || n)
+  if (shortcut && !wanted) throw new Error('A shortcut is letters, digits and dashes')
+  const clash = await prisma.supportMacro.findFirst({ where: { shortcut: wanted, ...(id ? { id: { not: id } } : {}) }, select: { name: true } })
+  if (clash) throw new Error(`/${wanted} is already "${clash.name}". Pick another shortcut.`)
+  if (id) return prisma.supportMacro.update({ where: { id }, data: { name: n, body: b, shortcut: wanted }, select: SELECT })
+  return prisma.supportMacro.create({ data: { name: n, body: b, shortcut: wanted, createdById: actor?.id || null }, select: SELECT })
 }
 
 export async function deleteMacro(id) {

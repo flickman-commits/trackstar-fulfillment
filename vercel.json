@@ -67,6 +67,9 @@
     "api/support/settings.js": {
       "maxDuration": 60
     },
+    "api/support/actions.js": {
+      "maxDuration": 60
+    },
     "api/support/instagram.js": {
       "maxDuration": 300
     },
