@@ -4453,6 +4453,17 @@ Thank you!`
                           <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">
                             {selectedOrder.productSize}
                           </span>
+                          {/* The frame, so the design goes on the right item in Artelo when
+                              one order has the same print in two frames. */}
+                          {selectedOrder.frameType && (() => {
+                            const f = selectedOrder.frameType.replace(/Premium/i, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\s+/g, ' ').trim()
+                            const black = /black/i.test(f), natural = /natural|oak/i.test(f) && !black
+                            return (
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-xs font-semibold ${black ? 'bg-off-black text-white border-off-black' : natural ? 'bg-[#e9d9bd] text-[#5c4425] border-[#d6c09a]' : 'bg-white text-off-black/70 border-border-gray'}`}>
+                                {/unframed/i.test(f) ? 'Unframed' : f}
+                              </span>
+                            )
+                          })()}
                           {/* The photo add-on changes what gets printed, so it
                               belongs with the product facts. */}
                           {selectedOrder.photoPath && (
