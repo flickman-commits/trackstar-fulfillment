@@ -42,12 +42,19 @@ export function DesignCard({ d }: { d: Design }) {
             </span>
           )}
         </button>
-        {d.canManage && (
-          <button onClick={d.create} disabled={d.busy || !state.eligible} title={state.eligible ? 'Render this order again' : state.reasons.join('. ')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 disabled:opacity-40 transition-colors">
-            {d.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-render
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {job.pdfUrl && (
+            <a href={job.pdfUrl} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 transition-colors">
+              <Download className="w-3.5 h-3.5" /> Download
+            </a>
+          )}
+          {d.canManage && (
+            <button onClick={d.create} disabled={d.busy || !state.eligible} title={state.eligible ? 'Render this order again' : state.reasons.join('. ')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 disabled:opacity-40 transition-colors">
+              {d.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-render
+            </button>
+          )}
+        </div>
         {lightbox && (
           <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-6" onClick={() => setLightbox(false)}>
             <img src={job.previewUrl} alt="" className="max-h-full max-w-full rounded shadow-2xl" />
@@ -249,7 +256,7 @@ export function DesignDetailsTags({ d }: { d: Design }) {
     <div>
       <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Design Details</h4>
       <div className="flex flex-wrap gap-1.5">
-        <Tag title={job.requestedBy === 'system' ? 'Rendered automatically' : 'Rendered by hand'}>v{job.version}{job.requestedBy === 'system' ? ' auto' : ''}</Tag>
+        <Tag title={job.requestedBy === 'system' ? 'Rendered automatically' : 'Re-rendered by hand'}>V{job.version}</Tag>
         {job.spec.template && <Tag>{job.spec.template}</Tag>}
         <Tag tone={job.spec.photoPath ? 'blue' : 'gray'}>{job.spec.photoPath ? 'Photo' : 'No photo'}</Tag>
         {job.spec.noTime && <Tag tone="red">No time</Tag>}
@@ -269,7 +276,6 @@ export function DesignDetailsTags({ d }: { d: Design }) {
           ? <Tag tone="purple" href={job.arteloUrl}>In Artelo library ↗</Tag>
           : <Tag tone="red" title={job.arteloError || undefined}>Not in Artelo</Tag>)}
         {job.spec.dateSourceUrl && <Tag href={job.spec.dateSourceUrl} title={`Date verified (${job.spec.dateSource})`}>Date source ↗</Tag>}
-        {job.pdfUrl && <Tag href={job.pdfUrl}><Download className="w-3 h-3" /> PDF</Tag>}
       </div>
       {job.notes && <p className="mt-1.5 text-xs text-amber-700">{job.notes}</p>}
       {job.reviewNote && <p className="mt-1 text-xs text-red-700">{job.review === 'closed' ? 'Closed' : 'Rejected'}: {job.reviewNote}</p>}
