@@ -40,19 +40,6 @@ function Attr({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
-/** "Oct 7 (10 days ago)", the dashboard's wording. */
-function placedAt(iso: string) {
-  const d = new Date(iso)
-  const days = Math.floor((Date.now() - d.getTime()) / 86400000)
-  const md = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  if (days <= 0) return `${md} (today)`
-  if (days === 1) return `${md} (yesterday)`
-  if (days < 14) return `${md} (${days} days ago)`
-  if (days < 365) return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} (${Math.floor(days / 7)} weeks ago)`
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-const pill = 'inline-flex items-center px-2 py-0.5 bg-white border border-border-gray rounded text-xs font-semibold text-off-black'
-
 /** Where the order is, in one chip: shipped, in production, being designed, or waiting. */
 function stage(o: CustomerOrder): { label: string; cls: string } | null {
   if (o.financialStatus === 'REFUNDED') return { label: 'Refunded', cls: 'bg-red-50 border-red-200 text-red-700' }
@@ -65,60 +52,51 @@ function stage(o: CustomerOrder): { label: string; cls: string } | null {
 }
 
 /**
- * One order, the way the dashboard's order view shows it: the design's
- * picture, the race as the headline with the year beside it, size and
- * photo, when it was ordered, where it is now, then Open in Shopify and
- * Open in Artelo. Nothing else: totals, line items and properties are a
- * click away in Shopify.
+ * One order, compact: a small picture, then three short lines (number and
+ * race; runner and what was bought; when and where it is), tracking and a
+ * code only when there is one, then Open in Shopify and Open in Artelo.
  */
 function OrderCard({ o }: { o: CustomerOrder }) {
   const it = o.items[0]
   const age = Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 86400000)
-  const ageCls = o.fulfillmentStatus === 'FULFILLED' ? 'bg-white border-border-gray text-off-black/60'
-    : age > 5 ? 'bg-red-50 border-red-200 text-red-700 font-medium' : age >= 3 ? 'bg-orange-50 border-orange-200 text-orange-700 font-medium' : 'bg-white border-border-gray text-off-black/60'
+  const late = o.fulfillmentStatus !== 'FULFILLED' && !o.tracking.length
+  const ageCls = !late ? 'text-off-black/50' : age > 5 ? 'text-red-600 font-medium' : age >= 3 ? 'text-orange-600 font-medium' : 'text-off-black/50'
   const st = stage(o)
   const tracking = o.tracking.find(t => t.url) || o.tracking[0] || null
-  const race = it?.race || o.lineItems[0]?.title || 'Order'
+  const race = it ? `${it.race}${it.year ? ` ${it.year}` : ''}` : o.lineItems[0]?.title || 'Order'
+  const bought = it ? [it.size, it.frame && !/^unframed$/i.test(it.frame) ? it.frame.replace(/([a-z])([A-Z])/g, '$1 $2') : null, it.hasPhoto ? 'photo' : null].filter(Boolean).join(' · ') : o.lineItems[0]?.variant || ''
+  const placed = new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   return (
-    <div className="space-y-2">
-      <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
-        <div className="flex items-start gap-3">
-          {it?.heroImageUrl ? (
-            <a href={it.heroImageUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 block w-16 h-16 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90" title="View full size">
-              <img src={it.heroImageUrl} alt={it.productLabel || race} className="w-full h-full object-cover" />
-            </a>
-          ) : (
-            <div className="flex-shrink-0 w-16 h-16 rounded border border-border-gray bg-white flex items-center justify-center text-off-black/25"><Package className="w-6 h-6" /></div>
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Order #{o.number}</div>
-            <div className="flex items-baseline flex-wrap gap-x-1.5 gap-y-1 min-w-0">
-              <h3 className="text-[15px] font-bold text-off-black leading-tight">{race}</h3>
-              {it?.year ? <span className={pill}>{it.year}</span> : null}
-            </div>
-            {it?.runner && <div className="text-xs text-off-black/55 truncate mt-0.5">{it.runner}</div>}
-            <div className="flex flex-wrap items-center gap-1 mt-1.5">
-              {it?.size && <span className={pill}>{it.size}</span>}
-              {it?.hasPhoto && <span className="inline-flex items-center px-2 py-0.5 rounded border text-xs font-semibold bg-[#4600D6]/10 text-[#4600D6] border-[#4600D6]/25">Photo</span>}
-              {o.items.length > 1 && <span className={pill}>+{o.items.length - 1} more</span>}
-              {!it && o.lineItems[0]?.variant && <span className={pill}>{o.lineItems[0].variant}</span>}
-            </div>
-            <div className="flex flex-wrap items-center gap-1 mt-1.5">
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 border rounded text-xs ${ageCls}`} title={new Date(o.createdAt).toLocaleString()}>📅 Ordered {placedAt(o.createdAt)}</span>
-              {st && <span className={`inline-flex items-center px-2 py-0.5 border rounded text-xs font-medium ${st.cls}`}>{st.label}</span>}
-            </div>
-            {tracking && (
-              <div className="mt-1.5 text-xs flex items-center gap-1.5 text-off-black/70 min-w-0 max-w-full" title={`${tracking.company || 'Tracking'} ${tracking.number || ''}`}>
-                <Truck className="w-3 h-3 shrink-0" />
-                {tracking.url ? <a href={tracking.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 truncate">{tracking.company || 'Tracking'} {tracking.number}</a> : <span className="truncate">{tracking.company || 'Tracking'} {tracking.number}</span>}
-              </div>
-            )}
-            {o.discountCodes.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {o.discountCodes.map(c => <span key={c} className="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium bg-yellow-50 text-yellow-900/70 border-yellow-200">Discount: {c}</span>)}
-              </div>
-            )}
+    <div className="space-y-1.5">
+      <div className="bg-subtle-gray border border-border-gray rounded-md p-2.5 flex items-start gap-2.5">
+        {it?.heroImageUrl ? (
+          <a href={it.heroImageUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 block w-11 h-11 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90" title="View full size">
+            <img src={it.heroImageUrl} alt={it.productLabel || race} className="w-full h-full object-cover" />
+          </a>
+        ) : (
+          <div className="flex-shrink-0 w-11 h-11 rounded border border-border-gray bg-white flex items-center justify-center text-off-black/25"><Package className="w-4 h-4" /></div>
+        )}
+        <div className="flex-1 min-w-0 text-xs leading-snug">
+          <div className="flex items-baseline gap-1.5 min-w-0">
+            <span className="font-semibold text-off-black shrink-0">#{o.number}</span>
+            <span className="text-off-black truncate" title={race}>{race}</span>
           </div>
+          {(it?.runner || bought) && (
+            <div className="text-off-black/60 truncate" title={[it?.runner, bought].filter(Boolean).join(' · ')}>
+              {[it?.runner, bought].filter(Boolean).join(' · ')}{o.items.length > 1 ? ` · +${o.items.length - 1} more` : ''}
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+            {st && <span className={`inline-flex items-center px-1.5 py-px border rounded text-[11px] font-medium ${st.cls}`}>{st.label}</span>}
+            <span className={`text-[11px] ${ageCls}`} title={new Date(o.createdAt).toLocaleString()}>Ordered {placed}{age > 0 ? `, ${age}d ago` : ', today'}</span>
+          </div>
+          {tracking && (
+            <div className="mt-1 flex items-center gap-1 min-w-0 text-[11px] text-off-black/60" title={`${tracking.company || 'Tracking'} ${tracking.number || ''}`}>
+              <Truck className="w-3 h-3 shrink-0" />
+              {tracking.url ? <a href={tracking.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 truncate">{tracking.company || 'Tracking'} {tracking.number}</a> : <span className="truncate">{tracking.company || 'Tracking'} {tracking.number}</span>}
+            </div>
+          )}
+          {o.discountCodes.length > 0 && <div className="mt-0.5 text-[11px] text-yellow-900/70 truncate" title={o.discountCodes.join(', ')}>Code: {o.discountCodes.join(', ')}</div>}
         </div>
       </div>
       {o.adminUrl && (
@@ -371,9 +349,17 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
             {thread.channel !== 'instagram' && thread.customer.email && (
               <div className="pt-1"><FilterSender email={thread.customer.email} filters={filters} onChanged={onFiltersChanged} /></div>
             )}
+          </Section>
+          <Section title="Orders" count={thread.context.orders.length}>
+            {thread.context.shopifyError && <div className="text-xs text-amber-700 inline-flex items-start gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />Shopify did not answer; showing what we have on file.</div>}
+            {thread.context.orders.length === 0
+              ? <div className="text-xs text-off-black/50 inline-flex items-center gap-1.5"><Package className="w-3.5 h-3.5" />{thread.customerEmail ? `No orders under ${thread.customerEmail}.` : 'No email to look orders up by. Ask for the order number.'}</div>
+              : <div className="space-y-3">{thread.context.orders.map(o => <OrderCard key={`${o.source}-${o.number}`} o={o} />)}</div>}
+          </Section>
+          {thread.pastThreads.length > 0 && (
+          <Section title="Other conversations" count={thread.pastThreads.length}>
             {thread.pastThreads.length > 0 && (
-              <div className="pt-2 space-y-1">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Other conversations</div>
+              <div className="space-y-1">
                 {thread.pastThreads.map(p => (
                   <div key={p.id} className="rounded-md border border-border-gray bg-white">
                   <button onClick={() => onOpenThread(p.id)} className="w-full text-left px-2.5 py-1.5 rounded-t-md hover:bg-subtle-gray transition-colors">
@@ -392,6 +378,7 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
               </div>
             )}
           </Section>
+          )}
           <Section title="Conversation">
             <Attr label="Status"><span className={`${chip} ${STATUS_TONE[thread.status]}`}>{STATUS_LABEL[thread.status]}</span></Attr>
             <Attr label="Assignee">
@@ -407,12 +394,6 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
             <Attr label="Started">{day(thread.createdAt)}</Attr>
             {thread.lastInboundAt && <Attr label="Last from them">{ago(thread.lastInboundAt)} ago</Attr>}
             {thread.lastOutboundAt && <Attr label="Last from us">{ago(thread.lastOutboundAt)} ago</Attr>}
-          </Section>
-          <Section title="Orders" count={thread.context.orders.length}>
-            {thread.context.shopifyError && <div className="text-xs text-amber-700 inline-flex items-start gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />Shopify did not answer; showing what we have on file.</div>}
-            {thread.context.orders.length === 0
-              ? <div className="text-xs text-off-black/50 inline-flex items-center gap-1.5"><Package className="w-3.5 h-3.5" />{thread.customerEmail ? `No orders under ${thread.customerEmail}.` : 'No email to look orders up by. Ask for the order number.'}</div>
-              : <div className="space-y-4">{thread.context.orders.map(o => <OrderCard key={`${o.source}-${o.number}`} o={o} />)}</div>}
           </Section>
           <Section title="Actions">
             <Actions thread={thread} onInsert={onInsert} onAttach={onAttach} onChanged={onChanged} />
