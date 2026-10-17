@@ -4574,11 +4574,8 @@ Thank you!`
                   {/* What the print was made from and what its PDF measured, as tags. */}
                   <DesignDetailsTags d={design} />
 
-                  <div>
-                    <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Filename</h4>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-1">
-                      <CopyableField label="" value={generateFilename(selectedOrder)} />
-                    </div>
+                  <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-1">
+                    <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
                   </div>
 
                   {/* Every tag for the order, in one place. */}
