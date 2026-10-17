@@ -21,7 +21,9 @@ export async function ordersMissingCustomerResult(limit = 500) {
     where: {
       trackstarOrderType: 'standard',
       OR: [{ customerBib: { not: null } }, { customerFinishTime: { not: null } }],
-      runnerResearch: { none: {} },
+      // No result yet, or only a failed lookup: what the customer typed beats
+      // "not found" (two runners on one print, a name the results spell differently).
+      runnerResearch: { none: { researchStatus: 'found' } },
     },
     orderBy: { createdAt: 'asc' },
     take: limit,
