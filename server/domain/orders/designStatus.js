@@ -7,16 +7,21 @@
  *     customer's portal does not stay on the "approved" screen.
  *   - in_progress mints the approval token, so the customer can be messaged
  *     before any proof exists.
- *   - sent_to_production pings the proofs Slack channel.
+ *   - sent_to_production pings the proofs Slack channel and writes an
+ *     "order.complete" line in the Activity Log, the same line a standard
+ *     order gets, so the handling-time stats have an exact timestamp.
  */
 import prisma from '../../db.js'
 import { ensureApprovalToken } from '../../../api/_lib/approvalToken.js'
+import { recordAudit } from '../../../api/_lib/users.js'
+import { describeOrder } from './complete.js'
 
 export const DESIGN_STATUSES = ['not_started', 'in_progress', 'awaiting_review', 'in_revision', 'approved_by_customer', 'final_pdf_uploaded', 'sent_to_production']
 
 // completedById: the person making the change, credited on the payout counter
 // when this sends it to production. Falls back to the assignee (system calls).
-export async function setDesignStatus(existing, designStatus, completedById = null) {
+// actor: the person, for the Activity Log (null for system calls).
+export async function setDesignStatus(existing, designStatus, completedById = null, actor = null) {
   if (!DESIGN_STATUSES.includes(designStatus)) throw new Error(`Invalid designStatus. Must be one of: ${DESIGN_STATUSES.join(', ')}`)
   if (existing.trackstarOrderType !== 'custom' && existing.trackstarOrderType !== 'race_partner') {
     throw new Error('Design status can only be updated for custom or race partner orders')
@@ -43,6 +48,14 @@ export async function setDesignStatus(existing, designStatus, completedById = nu
 
   const order = await prisma.order.update({ where: { id: existing.id }, data: updateData })
   if (designStatus === 'in_progress') await ensureApprovalToken(existing.id)
+  if (designStatus === 'sent_to_production' && existing.designStatus !== 'sent_to_production') {
+    await recordAudit({
+      action: 'order.complete',
+      summary: `Completed ${describeOrder(existing)} (sent to production)`,
+      detail: { orderNumber: existing.orderNumber, orderType: existing.trackstarOrderType, runnerName: existing.runnerName, raceName: existing.raceName, via: 'sent_to_production' },
+      actor: actor || (completedById ? { id: completedById } : null),
+    })
+  }
 
   if (designStatus === 'sent_to_production' && process.env.SLACK_PROOF_WEBHOOK_URL) {
     const shopifyData = existing.shopifyOrderData

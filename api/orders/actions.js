@@ -531,7 +531,7 @@ async function handleDesignStatus({ orderNumber, designStatus }, res, actor) {
   if (existing.trackstarOrderType !== 'custom' && existing.trackstarOrderType !== 'race_partner') {
     return res.status(400).json({ error: 'Design status can only be updated for custom or race partner orders' })
   }
-  const order = await setDesignStatus(existing, designStatus, actor?.id || null)
+  const order = await setDesignStatus(existing, designStatus, actor?.id || null, actor)
   console.log(`[actions/design-status] Order ${orderNumber} design status → ${designStatus}`)
   return res.status(200).json({ success: true, order })
 }

@@ -10,8 +10,9 @@
  *             order: a person's click, or an approval. Orders the Artelo sync
  *             completed on its own (shipped without anyone marking them) have
  *             no line and are left out, since that time is shipping, not ours.
- *   custom    designCompletedAt (Sent to Production), or researchedAt on
- *             older rows, which the tool stamped at completion.
+ *   custom    the same log line (written by Sent to Production since Oct 17,
+ *             2026); before that, designCompletedAt or researchedAt, which the
+ *             tool stamped at completion.
  * The two are reported apart: a custom design is a different job.
  */
 import prisma from '../../db.js'
@@ -61,7 +62,7 @@ export async function computeFulfillmentTime({ since, until }) {
   const leftOut = { standard: { noLogLine: 0, doneBeforeRace: 0 }, custom: { noTimestamp: 0, doneBeforeRace: 0 } }
   for (const o of orders) {
     const type = o.trackstarOrderType
-    const done = type === 'standard' ? completedAt.get(o.orderNumber) : (o.designCompletedAt || o.researchedAt)
+    const done = completedAt.get(o.orderNumber) || (type === 'custom' ? (o.designCompletedAt || o.researchedAt) : null)
     if (!done) { leftOut[type][type === 'standard' ? 'noLogLine' : 'noTimestamp']++; continue }
     if (done < since || done >= until) continue
     const rd = raceDate.get(`${o.raceNameOverride ?? o.raceName}|${o.yearOverride ?? o.raceYear}`) || null
