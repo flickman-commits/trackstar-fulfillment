@@ -7,10 +7,11 @@ import type { Note } from '@/types/support'
  * Claude's draft in the timeline: the reply it would send, and its working
  * (what it found, what to check, which quick actions fit, whether Matt
  * should see it). Nothing goes anywhere until a person uses it and presses
- * Send. Older drafts fold to one line.
+ * Send. Every draft starts folded to one line, so the customer's message
+ * stays readable; opened, the reply scrolls in a short box.
  */
 export default function DraftCard({ n, latest, onUse, onRedraft }: { n: Note; latest: boolean; onUse: (text: string) => void; onRedraft: (instruction: string) => Promise<void> }) {
-  const [open, setOpen] = useState(latest)
+  const [open, setOpen] = useState(false)
   const [showWork, setShowWork] = useState(false)
   const [asking, setAsking] = useState(false)
   const [instruction, setInstruction] = useState('')
@@ -23,18 +24,25 @@ export default function DraftCard({ n, latest, onUse, onRedraft }: { n: Note; la
   }
 
   if (!open) {
+    // Closed by default, so the customer's message stays the thing you read first.
     return (
-      <button onClick={() => setOpen(true)} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-[#4600D6]/25 text-[11px] text-[#4600D6]/70 hover:text-[#4600D6]">
-        <Sparkles className="w-3 h-3" />Earlier draft{d.scenario ? `: ${d.scenario}` : ''} · {when(n.createdAt)}<ChevronDown className="w-3 h-3 ml-auto" />
-      </button>
+      <div className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${latest ? 'border-[#4600D6]/25 bg-[#4600D6]/[0.03]' : 'border-dashed border-[#4600D6]/25'}`}>
+        <button onClick={() => setOpen(true)} className={`flex-1 min-w-0 flex items-center gap-2 text-left ${latest ? 'text-[#4600D6]' : 'text-[#4600D6]/70 hover:text-[#4600D6]'}`}>
+          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+          <span className={`truncate ${latest ? 'font-semibold' : ''}`}>{latest ? "Claude's suggested response" : 'Earlier draft'}{d.scenario ? <span className="font-normal text-off-black/45"> · {d.scenario}</span> : null}</span>
+          {latest && d.escalate?.needed && <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-px rounded bg-red-50 border border-red-200 text-[10px] font-medium text-red-700"><AlertTriangle className="w-3 h-3" />Flag for Matt</span>}
+          <ChevronDown className="w-3.5 h-3.5 ml-auto shrink-0" />
+        </button>
+        {latest && <button onClick={() => onUse(n.body)} className="shrink-0 px-2 py-0.5 rounded text-[11px] font-medium bg-[#4600D6] text-white hover:bg-[#3a00b3]">Use</button>}
+      </div>
     )
   }
 
   return (
-    <div className="rounded-2xl border border-[#4600D6]/25 bg-[#4600D6]/[0.03] px-4 py-3">
+    <div className="rounded-xl border border-[#4600D6]/25 bg-[#4600D6]/[0.03] px-3 py-2.5">
       <div className="flex items-center justify-between gap-3 text-[11px] text-[#4600D6]/80 mb-2">
-        <span className="font-semibold inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />Claude's draft{d.scenario ? ` · ${d.scenario}` : ''}</span>
-        <span className="shrink-0 tabular-nums text-off-black/40">{when(n.createdAt)}</span>
+        <button onClick={() => setOpen(false)} className="font-semibold inline-flex items-center gap-1.5 hover:underline underline-offset-2" title="Collapse"><Sparkles className="w-3.5 h-3.5" />{latest ? "Claude's suggested response" : 'Earlier draft'}{d.scenario ? ` · ${d.scenario}` : ''}</button>
+        <span className="shrink-0 inline-flex items-center gap-1.5 tabular-nums text-off-black/40">{when(n.createdAt)}<button onClick={() => setOpen(false)} title="Collapse"><ChevronDown className="w-3.5 h-3.5 rotate-180" /></button></span>
       </div>
       {d.escalate?.needed && (
         <div className="mb-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-800 inline-flex items-start gap-1.5 w-full">
@@ -42,7 +50,7 @@ export default function DraftCard({ n, latest, onUse, onRedraft }: { n: Note; la
         </div>
       )}
       {d.summary && <div className="text-xs text-off-black/60 mb-2">They want: {d.summary}</div>}
-      <div className="text-sm whitespace-pre-wrap break-words leading-relaxed text-off-black bg-white border border-border-gray rounded-lg px-3 py-2.5">{n.body.replace(/\{\{rep\}\}/g, '…')}</div>
+      <div className="max-h-40 overflow-y-auto text-[13px] whitespace-pre-wrap break-words leading-relaxed text-off-black bg-white border border-border-gray rounded-lg px-3 py-2">{n.body.replace(/\{\{rep\}\}/g, '…')}</div>
       {d.needsInfo && <div className="mt-2 text-xs text-amber-800">Missing: {d.needsInfo}</div>}
       {d.actions && d.actions.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
