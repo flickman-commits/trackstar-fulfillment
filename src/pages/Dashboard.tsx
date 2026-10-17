@@ -4,7 +4,7 @@ import CustomCounter from '@/components/CustomCounter'
 import RenderTemplatesPanel from '@/components/RenderTemplatesPanel'
 import { ToastDot } from '@/components/BrandToaster'
 import { toastCard, toastStyle } from '@/lib/ui'
-import { Hash, Sparkles, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound } from 'lucide-react'
+import { Hash, Sparkles, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound, Mail } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
@@ -25,6 +25,7 @@ import { setTeamColors } from '@/lib/teamColors'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
+import EmailCustomerModal from '@/components/support/EmailCustomerModal'
 import Linkify from '@/components/Linkify'
 import type { Capability } from '@/lib/roles'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
@@ -763,6 +764,8 @@ const SETTINGS_NAV: {
 
 export default function Dashboard() {
   const { user: currentUser, isAdmin, can } = useAuth()
+  // The "Email customer" modal on an order: a new Support conversation about it.
+  const [emailingOrder, setEmailingOrder] = useState<Order | null>(null)
   // Who is on the team, for the assignee picker, and whether the queue shows
   // only my orders. "mine" is the default for anyone who has orders assigned,
   // so Eli opens the tool to Eli's queue; someone with none sees everything.
@@ -3947,6 +3950,14 @@ Thank you!`
           </div>
         )}
 
+        {emailingOrder && (
+          <EmailCustomerModal
+            order={{ id: emailingOrder.id, orderNumber: emailingOrder.orderNumber, customerEmail: emailingOrder.customerEmail, customerName: emailingOrder.customerName, runnerName: emailingOrder.effectiveRunnerName || emailingOrder.runnerName, raceName: emailingOrder.effectiveRaceName || emailingOrder.raceName, raceYear: emailingOrder.effectiveRaceYear || emailingOrder.raceYear }}
+            repName={currentUser?.firstName || ''}
+            onClose={() => setEmailingOrder(null)}
+          />
+        )}
+
         {/* Order Details Modal */}
 
         {/* Orders open in the table's place (inlineDetail); one opened from
@@ -4550,6 +4561,15 @@ Thank you!`
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Order Details</div>
+                          {selectedOrder.customerEmail && can('support') && (
+                            <button
+                              onClick={() => setEmailingOrder(selectedOrder)}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2"
+                              title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}
+                            >
+                              <Mail className="w-3.5 h-3.5" />Email customer
+                            </button>
+                          )}
                         </div>
                         {/* Race leads as the headline, year rides beside it. */}
                         <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 min-w-0">

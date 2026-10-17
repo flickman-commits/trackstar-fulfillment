@@ -26,6 +26,8 @@ const act = <T,>(id: string, action: string, extra: Record<string, unknown> = {}
 
 export const supportApi = {
   status: () => request<MailboxStatus>('/api/support/gmail?action=status'),
+  // The fulfillment tool's "Email customer": a new conversation about one order.
+  emailCustomer: (orderId: string, subject: string, text: string) => post<{ threadId: string; to: string; subject: string }>('/api/support/compose', { orderId, subject, text }),
   connectUrl: `${API_BASE}/api/support/gmail?action=connect`,
   disconnect: () => post<{ success: boolean }>('/api/support/gmail', { action: 'disconnect' }),
   sync: () => post<SyncResult>('/api/support/sync', {}),
