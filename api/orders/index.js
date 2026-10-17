@@ -165,7 +165,18 @@ export default async function handler(req, res) {
     // ?scope=open: leave completed orders out. The dashboard refreshes every
     // minute and only needs them for the completed list and search, so they
     // load on demand. Most of the table's rows (and cost) were completed orders.
-    const openOnly = req.query.scope === 'open'
+    // ?number=5038: the one order behind a URL like /orders/5038, whatever its
+    // type or status, so a reload or a shared link opens it without the list.
+    const number = String(req.query.number || '').trim().replace(/^#/, '')
+    if (number) {
+      delete whereClause.trackstarOrderType
+      whereClause.OR = [
+        { parentOrderNumber: number },
+        { shopifyOrderData: { path: ['name'], equals: number } },
+        { shopifyOrderData: { path: ['name'], equals: `#${number}` } },
+      ]
+    }
+    const openOnly = req.query.scope === 'open' && !number
     let completedCount = null
     if (openOnly) {
       completedCount = await prisma.order.count({ where: { ...whereClause, status: 'completed' } })

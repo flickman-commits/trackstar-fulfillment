@@ -234,6 +234,8 @@ export default function App() {
               <AppShell>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+                {/* An open order has its own address, so a reload or a shared link lands on it. */}
+                <Route path="/orders/:orderRef" element={<Dashboard />} />
                 <Route path="/surveys" element={<DesignSurveys />} />
                 {/* Admin view: the creator programme, the bulk product editor
                     and the brief admin all change things outside the day to day

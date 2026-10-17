@@ -23,7 +23,7 @@ import AssignmentPanel from '@/components/AssignmentPanel'
 import AssigneePicker, { Avatar, QueuePill, PersonFilter, type QueueMember } from '@/components/AssigneePicker'
 import { setTeamColors } from '@/lib/teamColors'
 import StatsPanel from '@/components/StatsPanel'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import Linkify from '@/components/Linkify'
 import type { Capability } from '@/lib/roles'
@@ -303,6 +303,12 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
  * the tags and half the product card off the open modal. Add new fields here
  * and every caller gets them.
  */
+/** The address of an order: its display number, plus -2, -3 for later line items (the file-name convention). */
+function orderRefOf(o: Order): string {
+  const n = String(o.displayOrderNumber || o.parentOrderNumber || '').replace(/^#/, '')
+  return o.lineItemIndex ? `${n}-${o.lineItemIndex + 1}` : n
+}
+
 function mapOrder(order: Record<string, unknown>): Order {
   return {
     id: order.id as string,
@@ -1702,6 +1708,57 @@ export default function Dashboard() {
   // Orders open in place of the table rather than in a popup.
   const inlineDetail = !!selectedOrder && !showCompleted
 
+  // The open order lives in the address bar as /orders/5038 (or /orders/5038-2
+  // for the second line item), so a reload, the back button and a shared link
+  // all land on the order. Clicking in adds a history entry; J/K replaces it.
+  const { orderRef: urlOrderRef = null } = useParams<{ orderRef: string }>()
+  const navigate = useNavigate()
+  const selectedRef = selectedOrder ? orderRefOf(selectedOrder) : null
+  const lastSelectedRef = useRef<string | null>(selectedRef)
+  const lastUrlRef = useRef<string | null>(urlOrderRef)
+  const replaceNextUrl = useRef(false)
+  const lookedUpRef = useRef<string | null>(null)
+  useEffect(() => {
+    const open = (o: Order) => { lastSelectedRef.current = orderRefOf(o); setSelectedOrder(o) }
+    // The order behind a ref: from the loaded list first, otherwise fetched on its own.
+    const resolve = (ref: string) => {
+      const hit = orders.find(o => orderRefOf(o) === ref)
+      if (hit) { open(hit); return }
+      if (lookedUpRef.current === ref) return
+      lookedUpRef.current = ref
+      const [number] = ref.split('-')
+      apiFetch(`/api/orders?number=${encodeURIComponent(number)}`).then(r => r.ok ? r.json() : null).then(d => {
+        const found = ((d?.orders || []) as Record<string, unknown>[]).map(mapOrder).find(o => orderRefOf(o) === ref)
+        if (!found) { setToast({ message: `Order ${ref} was not found`, type: 'error' }); navigate('/', { replace: true }); return }
+        if (found.trackstarOrderType !== activeView) setActiveView(found.trackstarOrderType as typeof activeView)
+        open(found)
+      }).catch(() => {})
+    }
+    if (selectedRef !== lastSelectedRef.current) {
+      // The order changed here (a click, J/K, closing): the address follows.
+      lastSelectedRef.current = selectedRef
+      if (selectedRef !== urlOrderRef) {
+        lastUrlRef.current = selectedRef
+        navigate(selectedRef ? `/orders/${selectedRef}` : '/', { replace: replaceNextUrl.current })
+      }
+      replaceNextUrl.current = false
+      return
+    }
+    if (urlOrderRef !== lastUrlRef.current) {
+      // The address changed (back, forward, a typed link): the order follows.
+      lastUrlRef.current = urlOrderRef
+      if (!urlOrderRef) { lastSelectedRef.current = null; setSelectedOrder(null); return }
+      resolve(urlOrderRef)
+      return
+    }
+    // First load with an order in the address: open it once the list is here.
+    if (urlOrderRef && selectedRef !== urlOrderRef) resolve(urlOrderRef)
+  }, [selectedRef, urlOrderRef, orders, activeView, navigate])
+  useEffect(() => {
+    document.title = selectedOrder ? `Order ${orderRefOf(selectedOrder)} · Trackstar` : 'Trackstar'
+    return () => { document.title = 'Trackstar' }
+  }, [selectedOrder])
+
   // The inline order view scrolls on its own; each order starts at the top.
   const detailScrollRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => { detailScrollRef.current?.scrollTo(0, 0) }, [selectedOrder?.id])
@@ -2353,6 +2410,7 @@ export default function Dashboard() {
     if (currentOrderIndex < 0) return
     const target = direction === 'next' ? currentOrderIndex + 1 : currentOrderIndex - 1
     if (target < 0 || target >= navigableOrders.length) return
+    replaceNextUrl.current = true
     setSelectedOrder(navigableOrders[target])
     setIsEditing(false)
     setEditValues({ runnerNameOverride: '', bibNumber: '', officialTime: '', officialPace: '' })
