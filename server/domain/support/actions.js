@@ -247,6 +247,25 @@ const REFUND_CREATE = `
     }
   }`
 
+const ORDER_CANCEL = `
+  mutation orderCancel($orderId: ID!, $staffNote: String) {
+    orderCancel(orderId: $orderId, reason: CUSTOMER, refund: true, restock: false, notifyCustomer: false, staffNote: $staffNote) {
+      job { id done }
+      orderCancelUserErrors { field message code }
+      userErrors { field message }
+    }
+  }`
+
+/** Shopify cancels in the background; true once the order reads cancelled (about ten seconds at most). */
+async function waitForCancel(id) {
+  for (let i = 0; i < 8; i++) {
+    const o = await refundable(id)
+    if (o.cancelled) return o
+    await new Promise(r => setTimeout(r, 1250))
+  }
+  return null
+}
+
 function guardLimit(cents, actor) {
   if (cents > REFUND_LIMIT_CENTS && actor?.role !== 'admin' && !actor?.isSystem) {
     throw new Error(`${money(cents)} is over the ${money(REFUND_LIMIT_CENTS)} line. That one is Matt's call: Slack Matt with the details.`)
@@ -299,11 +318,14 @@ export async function cancelOrder({ thread, shopifyOrderId, reason, customerConf
   if (produced) throw new Error(`#${o.name} has gone to production. Too late to cancel; see the playbook's "too late" reply.`)
   guardLimit(o.availableCents, actor)
 
-  // One call: cancel, and refund what was paid. No Shopify email; the reply says it.
-  await shopifyFetch(`/orders/${o.id}/cancel.json`, {
-    method: 'POST',
-    body: JSON.stringify({ reason: 'customer', email: false, restock: false, ...(o.availableCents > 0 ? { amount: toAmount(o.availableCents), currency: o.currency } : {}) }),
-  })
+  // One call: cancel, and refund what was paid to the original payment. No
+  // Shopify email; the reply says it. Shopify runs this as a job; wait a few
+  // seconds for it so the rep hears the truth, not just "accepted".
+  const data = await shopifyGraphQL(ORDER_CANCEL, { orderId: o.gid, staffNote: `Support: ${why}`.slice(0, 255) })
+  const errs = data?.orderCancel?.orderCancelUserErrors?.length ? data.orderCancel.orderCancelUserErrors : data?.orderCancel?.userErrors || []
+  if (errs.length) throw new Error(`Shopify would not cancel #${o.name}: ${errs.map(e => e.message).join('; ')}`)
+  const cancelled = await waitForCancel(o.id)
+  if (!cancelled) throw new Error(`Shopify accepted the cancel for #${o.name} but has not finished it yet. Check the order in Shopify in a minute before trying again.`)
 
   const note = `Cancelled and refunded ${money(o.availableCents)} by support: ${why}. Cancel it in Artelo too.`
   if (rows.length) {

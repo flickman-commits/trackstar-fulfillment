@@ -105,19 +105,22 @@ function RefundForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
   useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
   const cents = Math.round(Number(amount) * 100) || 0
   const over = info ? cents > info.limitCents && !info.isAdmin : false
   const tooMuch = info ? cents > info.availableCents : false
   const save = async () => {
-    if (!window.confirm(`Refund ${dollars(cents)} on #${o.number} to the card they paid with? This cannot be undone.`)) return
+    // Two clicks in the panel, not a browser dialog: a browser told to block dialogs answers "no" without showing one.
+    if (!confirming) { setConfirming(true); setFailed(null); return }
     setBusy(true)
     try {
       const out = await supportApi.action<{ display: string; leftCents: number }>('refund', { id: thread.id, shopifyOrderId: o.shopifyOrderId, cents, reason })
       toast.success(`Refunded ${out.display} on #${o.number}`)
       onDone(); onCancel()
-    } catch (e) { toast.error((e as Error).message) }
-    finally { setBusy(false) }
+    } catch (e) { setFailed((e as Error).message); toast.error((e as Error).message) }
+    finally { setBusy(false); setConfirming(false) }
   }
   return (
     <div className={formBox}>
@@ -132,10 +135,12 @@ function RefundForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
           <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Why (goes on the refund), e.g. Buy 2 promo missed" className={field} />
           {over && <div className="text-red-700">Over {dollars(info.limitCents)} is Matt's call. Slack Matt instead.</div>}
           {tooMuch && <div className="text-red-700">That is more than is left.</div>}
+          {failed && <div className="text-red-700">{failed}</div>}
+          {confirming && <div className="text-red-700 font-medium">Refund {dollars(cents)} to the card they paid with? This cannot be undone.</div>}
           <div className="flex items-center gap-2 pt-0.5">
             <span className="text-[11px] text-off-black/45 flex-1">No Shopify email; your reply tells them.</span>
-            <button onClick={onCancel} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">Cancel</button>
-            <button onClick={save} disabled={busy || cents <= 0 || !reason.trim() || over || tooMuch} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-dark-fill text-white hover:bg-off-black/85 disabled:opacity-50">{busy && <Loader2 className="w-3 h-3 animate-spin" />}Refund {cents > 0 ? dollars(cents) : ''}</button>
+            <button onClick={() => (confirming ? setConfirming(false) : onCancel())} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">{confirming ? 'Back' : 'Cancel'}</button>
+            <button onClick={save} disabled={busy || cents <= 0 || !reason.trim() || over || tooMuch} className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded text-white disabled:opacity-50 ${confirming ? 'bg-red-600 hover:bg-red-700' : 'bg-dark-fill hover:bg-off-black/85'}`}>{busy && <Loader2 className="w-3 h-3 animate-spin" />}{confirming ? `Yes, refund ${dollars(cents)}` : `Refund ${cents > 0 ? dollars(cents) : ''}`}</button>
           </div>
         </>
       )}
@@ -150,18 +155,21 @@ function CancelForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
   const [yes, setYes] = useState(false)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<{ display: string; arteloUrl: string | null } | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
   useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
   const over = info ? info.availableCents > info.limitCents && !info.isAdmin : false
   const save = async () => {
-    if (!info || !window.confirm(`Cancel #${o.number} and refund ${dollars(info.availableCents)}? This cannot be undone.`)) return
+    if (!info) return
+    if (!confirming) { setConfirming(true); setFailed(null); return }
     setBusy(true)
     try {
       const out = await supportApi.action<{ display: string; arteloUrl: string | null }>('cancelOrder', { id: thread.id, shopifyOrderId: o.shopifyOrderId, reason, customerConfirmed: yes })
       setDone(out)
       toast.success(`#${o.number} cancelled and ${out.display} refunded`)
       onDone()
-    } catch (e) { toast.error((e as Error).message) }
-    finally { setBusy(false) }
+    } catch (e) { setFailed((e as Error).message); toast.error((e as Error).message) }
+    finally { setBusy(false); setConfirming(false) }
   }
   if (done) {
     return (
@@ -186,10 +194,12 @@ function CancelForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
             The customer said yes to cancelling
           </label>
           {over && <div className="text-red-700">Over {dollars(info.limitCents)} is Matt's call. Slack Matt instead.</div>}
+          {failed && <div className="text-red-700">{failed}</div>}
+          {confirming && <div className="text-red-700 font-medium">Cancel #{o.number} and refund {dollars(info.availableCents)}? This cannot be undone.</div>}
           <div className="flex items-center gap-2 pt-0.5">
             <span className="flex-1" />
-            <button onClick={onCancel} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">Back</button>
-            <button onClick={save} disabled={busy || !yes || over} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{busy && <Loader2 className="w-3 h-3 animate-spin" />}Cancel and refund {dollars(info.availableCents)}</button>
+            <button onClick={() => (confirming ? setConfirming(false) : onCancel())} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">Back</button>
+            <button onClick={save} disabled={busy || !yes || over} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{busy && <Loader2 className="w-3 h-3 animate-spin" />}{busy ? 'Cancelling in Shopify' : confirming ? `Yes, cancel and refund ${dollars(info.availableCents)}` : `Cancel and refund ${dollars(info.availableCents)}`}</button>
           </div>
         </>
       )}
