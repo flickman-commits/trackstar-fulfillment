@@ -13,6 +13,8 @@ import Conversation from '@/components/support/Conversation'
 import Details from '@/components/support/Details'
 import MacrosModal from '@/components/support/MacrosModal'
 import SettingsModal from '@/components/support/SettingsModal'
+import ResizeHandle from '@/components/support/ResizeHandle'
+import { useColumnWidth, useWide } from '@/lib/useColumnWidth'
 
 /**
  * Support: the shared inbox for fast@trackstar.art, laid out the way
@@ -75,6 +77,10 @@ export default function Support() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const replyRef = useRef<HTMLTextAreaElement>(null)
   const noteRef = useRef<HTMLTextAreaElement>(null)
+  // Column widths you drag, remembered on this browser. The conversation takes what is left.
+  const wide = useWide()
+  const listCol = useColumnWidth('support.listWidth', 288, 220, 520)
+  const detailsCol = useColumnWidth('support.detailsWidth', 300, 240, 560)
   const insertRef = useRef<((text: string) => void) | null>(null)
   const attachRef = useRef<((m: Mockup) => void) | null>(null)
 
@@ -276,7 +282,8 @@ export default function Support() {
         <section className="flex-1 min-h-0 pb-3">
           <div className="h-full bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex flex-col lg:flex-row">
             <ViewsColumn view={view} counts={inbox?.counts || null} team={inbox?.team || []} me={me} onView={v => { setView(v); setSelectedId(null); setThread(null) }} onMacros={() => setMacrosOpen(true)} onSettings={() => setSettingsOpen(true)} />
-            <ConversationList title={title} threads={threads} selectedId={selectedId} onSelect={openThread} loading={loading && !inbox} emptyLabel={empty} sort={sort} onSort={setSort} />
+            <ConversationList title={title} threads={threads} selectedId={selectedId} onSelect={openThread} loading={loading && !inbox} emptyLabel={empty} sort={sort} onSort={setSort} width={wide ? listCol.width : undefined} />
+            <ResizeHandle onDrag={listCol.by} onReset={listCol.reset} />
             {thread && me ? (
               <Conversation
                 key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros} expectedHandle={instagram?.expectedHandle}
@@ -295,7 +302,9 @@ export default function Support() {
                 )}
               </div>
             )}
+            <ResizeHandle onDrag={dx => detailsCol.by(-dx)} onReset={detailsCol.reset} />
             <Details
+              width={wide ? detailsCol.width : undefined}
               thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread}
               onAssign={assign} onPriority={setPriority} onTags={setTags}
               onInsert={t => insertRef.current?.(t)} onAttach={m => attachRef.current?.(m)} onChanged={() => { if (selectedId) refreshThread(selectedId); loadInbox(true) }}
