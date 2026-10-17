@@ -618,6 +618,32 @@ export async function sendReply({ userId, thread, html, text, attachments = [] }
 /** Bytes of one attachment, for the page to show or save. */
 export async function attachmentBytes({ gmailMessageId, attachmentId }) {
   const gmail = await client()
-  const res = await gmail.users.messages.attachments.get({ userId: 'me', messageId: gmailMessageId, id: attachmentId }).catch(onGmailError)
+  const res = await withRetry(() => gmail.users.messages.attachments.get({ userId: 'me', messageId: gmailMessageId, id: attachmentId }), { label: 'attachment' }).catch(onGmailError)
   return Buffer.from(String(res.data.data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+}
+
+/**
+ * One stored message's attachment, by its place in the list, so the page
+ * never names a Gmail id it did not get from us. Gmail can hand out a new
+ * attachment id each time a message is read; when the stored one no longer
+ * works, the message is read again and the same file (by name, else by
+ * position) is fetched with the fresh id.
+ */
+export async function messageAttachment(messageId, index) {
+  const m = await prisma.supportMessage.findUnique({ where: { id: messageId }, select: { gmailMessageId: true, attachments: true } })
+  const list = Array.isArray(m?.attachments) ? m.attachments : []
+  const a = list[index]
+  if (!m?.gmailMessageId || !a?.attachmentId) return null
+  try {
+    return { ...a, bytes: await attachmentBytes({ gmailMessageId: m.gmailMessageId, attachmentId: a.attachmentId }) }
+  } catch (err) {
+    if (![400, 404].includes(err?.code)) throw err
+    const gmail = await client()
+    const full = await withRetry(() => gmail.users.messages.get({ userId: 'me', id: m.gmailMessageId, format: 'full' }), { label: 'attachment' }).catch(onGmailError)
+    const parts = { text: '', html: '', attachments: [] }
+    collectParts(full.data.payload, parts)
+    const fresh = parts.attachments.find(p => p.filename === a.filename) || parts.attachments[index]
+    if (!fresh) return null
+    return { ...a, bytes: await attachmentBytes({ gmailMessageId: m.gmailMessageId, attachmentId: fresh.attachmentId }) }
+  }
 }

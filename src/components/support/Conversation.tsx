@@ -6,6 +6,7 @@ import { fillMacro } from '@/lib/supportStatus'
 import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
 import { ChannelMark, CustomerAvatar } from './ConversationList'
 import DraftCard from './DraftCard'
+import Attachments from './Attachments'
 import type { Macro, Message, Mockup, Note, Teammate, ThreadDetail, ThreadStatus } from '@/types/support'
 
 /**
@@ -37,20 +38,8 @@ function Bubble({ m }: { m: Message }) {
           <span className="font-medium truncate">{who}</span>
           <span className="shrink-0 tabular-nums">{when(m.sentAt)}</span>
         </div>
-        <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.text || <span className={out ? 'text-white/50' : 'text-off-black/40'}>(no text)</span>}</div>
-        {m.attachments.length > 0 && (
-          <div className={`mt-2 flex flex-wrap gap-1.5 text-[11px] ${out ? 'text-white/70' : 'text-off-black/60'}`}>
-            {m.attachments.map(a => a.url ? (
-              <a key={a.attachmentId} href={a.url} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border hover:underline ${out ? 'border-white/20' : 'border-border-gray bg-white'}`} title="Open in a new tab (Meta's link expires after a while)">
-                <Paperclip className="w-3 h-3" />{a.filename}
-              </a>
-            ) : (
-              <span key={a.attachmentId} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${out ? 'border-white/20' : 'border-border-gray bg-white'}`} title={`${a.mimeType} · ${Math.round(a.size / 1024)} KB`}>
-                <Paperclip className="w-3 h-3" />{a.filename}
-              </span>
-            ))}
-          </div>
-        )}
+        {(m.text || m.attachments.length === 0) && <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.text || <span className={out ? 'text-white/50' : 'text-off-black/40'}>(no text)</span>}</div>}
+        {m.attachments.length > 0 && <Attachments messageId={m.id} attachments={m.attachments} out={out} />}
         {m.quoted && (
           <button onClick={() => setShowQuoted(v => !v)} className={`mt-2 inline-flex items-center gap-1 text-[11px] ${out ? 'text-white/50 hover:text-white/80' : 'text-off-black/40 hover:text-off-black/70'}`}>
             <ChevronDown className={`w-3 h-3 transition-transform ${showQuoted ? 'rotate-180' : ''}`} />{showQuoted ? 'Hide quoted text' : 'Show quoted text'}

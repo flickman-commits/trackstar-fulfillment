@@ -295,11 +295,11 @@ function MobileTile({ item, active }: { item: Item; active?: boolean }) {
 function railItems(can: (c: Capability) => boolean): Item[] {
   return [
     { id: 'fulfillment', label: 'Fulfillment', icon: Package, to: '/', title: 'Orders to personalize, custom designs and partners' },
+    ...(can('support') ? [{ id: 'support', label: 'Support', icon: Inbox, to: '/support', title: 'The shared inbox for fast@trackstar.art' } as Item] : []),
     // Creators is admin-only, same as the route behind it. Sales is for anyone
     // on the Attio workspace; the API says no to everyone else.
     ...(can('creators') ? [{ id: 'creators', label: 'Creators', icon: Users, to: '/creators', title: 'The creator programme' } as Item] : []),
     ...(can('sales') ? [{ id: 'sales', label: 'Sales', icon: Send, to: '/sales', title: 'Outreach: the emails to send today, read from Attio' } as Item] : []),
-    ...(can('support') ? [{ id: 'support', label: 'Support', icon: Inbox, to: '/support', title: 'The shared inbox for fast@trackstar.art' } as Item] : []),
   ]
 }
 
