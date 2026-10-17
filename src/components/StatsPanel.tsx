@@ -98,12 +98,7 @@ export default function StatsPanel() {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-off-black/50">
-          {data
-            ? `${data.orderCount} order${data.orderCount === 1 ? '' : 's'} in this window, straight from Shopify. Cancelled and test orders are left out.`
-            : 'Straight from Shopify.'}
-        </p>
+      <div className="flex items-center justify-end gap-3">
         <div className="flex items-center gap-2">
           <div className={segmentGroup}>
             {ranges.map(r => (
@@ -133,7 +128,10 @@ export default function StatsPanel() {
       ) : (
         <>
         {data?.fulfillment && <FulfillmentTime f={data.fulfillment} rangeLabel={data.rangeLabel} />}
-        <p className="text-xs font-semibold text-off-black/50 pt-2">From Shopify</p>
+        <div className="pt-2">
+          <p className="text-xs font-semibold text-off-black/50">From Shopify</p>
+          {data && <p className="text-[11px] text-off-black/45">{data.orderCount} order{data.orderCount === 1 ? '' : 's'} in this window. Cancelled and test orders are left out.</p>}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {data?.metrics.map(m => (
             <div
@@ -165,65 +163,64 @@ export default function StatsPanel() {
   )
 }
 
-const fmtHours = (h: number | null) => h === null ? '–' : h < 48 ? `${h.toFixed(h < 10 ? 1 : 0)}h` : `${(h / 24).toFixed(1)}d`
+const fmtHours = (h: number | null) => {
+  if (h === null) return '–'
+  if (h < 48) return `${Math.round(h)} hours`
+  const d = h / 24
+  return `${d < 10 ? d.toFixed(1) : Math.round(d)} days`
+}
+const pctTone = (p: number | null) => p === null ? 'text-off-black' : p >= 90 ? 'text-green-700' : p >= 75 ? 'text-amber-600' : 'text-red-600'
 
 /**
- * Our handling time: order (or race day, if later) to a person marking it
- * complete. The goal is two days. Standard and custom are different jobs, so
- * they get their own rows; the weekly strip shows the share within goal.
+ * Our handling time, said plainly: the share that got out within the goal,
+ * what a typical order took, the slowest tenth, and the last three weeks.
+ * Standard prints and custom designs are different jobs and get their own card.
  */
 function FulfillmentTime({ f, rangeLabel }: { f: Fulfillment; rangeLabel: string }) {
   const goalDays = f.goalHours / 24
-  const Row = ({ label, t, note }: { label: string; t: TimeSummary; note: string }) => (
-    <div className="rounded-lg border border-border-gray bg-white p-4">
-      <div className="flex items-baseline justify-between gap-3">
+  const Card = ({ label, t, how, backlog }: { label: string; t: TimeSummary; how: string; backlog?: { workable: number; pastGoal: number } }) => {
+    const weeks = t.weekly.filter(w => w.count > 0).slice(-3).reverse()
+    const weekWords = ['This week', 'last week', 'the week before']
+    return (
+      <div className="rounded-lg border border-border-gray bg-white p-4 space-y-3">
         <p className="text-sm font-semibold text-off-black">{label}</p>
-        <p className="text-[11px] text-off-black/40">{t.count} completed{t.orderedBeforeRace ? `, ${t.orderedBeforeRace} ordered before race day` : ''}</p>
+        {t.count === 0 ? (
+          <p className="text-sm text-off-black/50">Nothing was completed in this window.</p>
+        ) : (
+          <>
+            <p className="text-off-black leading-snug">
+              <span className={`text-3xl font-semibold tabular-nums ${pctTone(t.withinGoalPct)}`}>{t.withinGoalPct}%</span>
+              <span className="text-sm text-off-black/70"> got out within {goalDays} days. The goal is all of them.</span>
+            </p>
+            <p className="text-sm text-off-black/70">
+              A typical order took <span className="font-semibold text-off-black">{fmtHours(t.medianHours)}</span>.
+              The slowest 1 in 10 took <span className="font-semibold text-off-black">{fmtHours(t.p90Hours)}</span> or more.
+            </p>
+            {weeks.length > 1 && (
+              <p className="text-sm text-off-black/70">
+                {weeks.map((w, i) => (
+                  <span key={w.from}>{i > 0 ? ', ' : ''}{weekWords[i]} <span className={`font-semibold ${pctTone(w.withinGoalPct)}`}>{w.withinGoalPct}%</span></span>
+                ))}.
+              </p>
+            )}
+          </>
+        )}
+        {backlog && (
+          <p className="text-sm text-off-black/70">
+            Right now <span className={`font-semibold ${backlog.pastGoal ? 'text-red-600' : 'text-off-black'}`}>{backlog.pastGoal}</span> open order{backlog.pastGoal === 1 ? ' has' : 's have'} been waiting more than {goalDays} days{backlog.workable ? `, out of ${backlog.workable} we could be working on` : ''}.
+          </p>
+        )}
+        <p className="text-[11px] text-off-black/45 pt-2 border-t border-border-gray/60">{how} Based on {t.count} order{t.count === 1 ? '' : 's'} completed {rangeLabel.toLowerCase()}. Shipping is not counted.</p>
       </div>
-      {t.count === 0 ? (
-        <p className="text-base text-off-black/35 mt-2">Nothing completed in this window</p>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-          <Stat label={`Within ${goalDays} days`} value={`${t.withinGoalPct}%`} sub={`${t.withinGoal} of ${t.count}`} tone={t.withinGoalPct !== null && t.withinGoalPct >= 90 ? 'good' : t.withinGoalPct !== null && t.withinGoalPct >= 75 ? 'warn' : 'bad'} />
-          <Stat label="Median" value={fmtHours(t.medianHours)} sub="half were faster" />
-          <Stat label="90th percentile" value={fmtHours(t.p90Hours)} sub="9 in 10 were faster" />
-          <Stat label="Over 5 days" value={String(t.overFiveDays)} sub="orders" tone={t.overFiveDays ? 'bad' : undefined} />
-        </div>
-      )}
-      {t.weekly.some(w => w.count) && (
-        <div className="mt-3">
-          <p className="text-[11px] text-off-black/40 mb-1">Last 8 weeks, share within {goalDays} days</p>
-          <div className="flex items-end gap-1 h-10">
-            {t.weekly.map(w => (
-              <div key={w.from} className="flex-1 flex flex-col justify-end h-full" title={`Week of ${w.from}: ${w.count} completed, ${w.withinGoalPct ?? '–'}% within ${goalDays} days, median ${fmtHours(w.medianHours)}`}>
-                <div className={`rounded-sm ${w.withinGoalPct === null ? 'bg-off-black/5' : w.withinGoalPct >= 90 ? 'bg-green-500' : w.withinGoalPct >= 75 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ height: `${Math.max(4, w.withinGoalPct ?? 0)}%` }} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      <p className="text-[11px] text-off-black/45 mt-2 pt-2 border-t border-border-gray/60">{note}</p>
-    </div>
-  )
+    )
+  }
   return (
     <div className="space-y-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-xs font-semibold text-off-black/50">Our handling time, {rangeLabel.toLowerCase()}</p>
-        <p className="text-[11px] text-off-black/45">Open now: <span className={f.openStandard.pastGoal ? 'text-red-600 font-semibold' : 'font-semibold'}>{f.openStandard.pastGoal}</span> of {f.openStandard.workable} workable standard orders are past {goalDays} days</p>
-      </div>
-      <Row label="Standard prints" t={f.standard} note={`From the order, or race day if the order came first, to a person marking it complete in this tool. Shipping is not counted. ${f.standard.leftOut.noLogLine ? `${f.standard.leftOut.noLogLine} completed orders have no completion line in the Activity Log (shipped without being marked, or before Aug 26) and are left out.` : ''}`} />
-      <Row label="Custom designs" t={f.custom} note="From the order to Sent to Production. Older rows use the completion stamp the tool kept at the time." />
-    </div>
-  )
-}
-
-function Stat({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: 'good' | 'warn' | 'bad' }) {
-  const color = tone === 'good' ? 'text-green-700' : tone === 'warn' ? 'text-amber-600' : tone === 'bad' ? 'text-red-600' : 'text-off-black'
-  return (
-    <div>
-      <p className="text-[11px] text-off-black/50">{label}</p>
-      <p className={`text-xl font-semibold tabular-nums ${color}`}>{value}</p>
-      <p className="text-[11px] text-off-black/40">{sub}</p>
+      <p className="text-xs font-semibold text-off-black/50">How fast we get orders out</p>
+      <Card label="Standard prints" t={f.standard} backlog={f.openStandard}
+        how={`Counted from when we could start on the order (the order itself, or race day if the race had not happened yet) to when someone on the team marked it complete here.`} />
+      <Card label="Custom designs" t={f.custom}
+        how="Counted from the order to when the design was sent to production." />
     </div>
   )
 }
