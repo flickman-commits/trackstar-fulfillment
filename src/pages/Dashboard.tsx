@@ -14,7 +14,7 @@ import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import ApiKeysPanel from '@/components/ApiKeysPanel'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
-import { DesignCard, DesignReview, DesignDetails } from '@/components/DesignPanel'
+import { DesignCard, DesignReview, DesignDetailsTags } from '@/components/DesignPanel'
 import { useDesign } from '@/lib/useDesign'
 import StatusLegend from '@/components/StatusLegend'
 import RaceDatabasePanel from '@/components/RaceDatabasePanel'
@@ -4542,6 +4542,16 @@ Thank you!`
                     </div>
                   )}
 
+                  {/* What the print was made from and what its PDF measured, as tags. */}
+                  <DesignDetailsTags d={design} />
+
+                  <div>
+                    <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Filename</h4>
+                    <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-1">
+                      <CopyableField label="" value={generateFilename(selectedOrder)} />
+                    </div>
+                  </div>
+
                   {/* Every tag for the order, in one place. */}
                   <div>
                     <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Tags</h4>
@@ -5085,7 +5095,7 @@ Thank you!`
                                     title="Calculate weather from date + city"
                                   >
                                     <CloudSun className="w-3 h-3" />
-                                    Calculate weather
+                                    Re-Calculate Weather
                                   </button>
                                   <button
                                     onClick={() => startEditingWeather(selectedOrder)}
@@ -5219,12 +5229,24 @@ Thank you!`
                                       </span>
                                     }
                                     value={selectedOrder.weatherCondition}
+                                    aside={
+                                      <button type="button" onClick={() => setShowWeatherInfo(v => !v)} title={b ? 'How this weather was worked out' : 'No breakdown on file for this weather'}
+                                        className="text-[11px] text-off-black/50 underline decoration-dotted underline-offset-2 hover:text-off-black">source</button>
+                                    }
                                   />
+                                  {showWeatherInfo && !b && (
+                                    <>
+                                      <div className="fixed inset-0 z-10" onClick={() => setShowWeatherInfo(false)} />
+                                      <div className="absolute right-0 top-full mt-1 z-20 w-64 bg-white border border-border-gray rounded-md shadow-lg p-3 text-[11px] text-off-black/70">
+                                        No breakdown is on file for this weather (entered by hand or computed before breakdowns were kept). Re-Calculate Weather to get one.
+                                      </div>
+                                    </>
+                                  )}
                                   {b && showWeatherInfo && (
                                       <>
                                         {/* Click-away backdrop — clicking anywhere else closes the popover */}
                                         <div className="fixed inset-0 z-10" onClick={() => setShowWeatherInfo(false)} />
-                                      <div className="absolute left-0 top-full mt-1 z-20 w-72 bg-white border border-border-gray rounded-md shadow-lg p-3 text-left" onClick={(e) => e.stopPropagation()}>
+                                      <div className="absolute right-0 top-full mt-1 z-20 w-72 bg-white border border-border-gray rounded-md shadow-lg p-3 text-left" onClick={(e) => e.stopPropagation()}>
                                         <button
                                           onClick={() => setShowWeatherInfo(false)}
                                           className="absolute top-2 right-2 text-off-black/30 hover:text-off-black/70 transition-colors"
@@ -5358,14 +5380,7 @@ Thank you!`
                   {/* Reviewing the automated print is the main action here, so it is big.
                       Once approved, the same spot sends you to Artelo to attach the file. */}
                   <div className="space-y-2">
-                    <DesignDetails d={design} />
                     <div className="hidden md:block"><DesignReview d={design} arteloOrderUrl={selectedOrder.status !== 'completed' ? selectedOrder.arteloUrl : null} onComplete={() => markAsCompleted(selectedOrder.orderNumber)} /></div>
-                  </div>
-
-                  <div>
-                    <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
-                      <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                    </div>
                   </div>
 
                   </div>

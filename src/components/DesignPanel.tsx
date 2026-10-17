@@ -213,3 +213,62 @@ export function DesignDetails({ d }: { d: Design }) {
     </div>
   )
 }
+
+/** A small tag, styled like the order's other chips. tone: green ok, red problem, purple Artelo, gray neutral. */
+function Tag({ tone = 'gray', children, href, title, onClick }: { tone?: 'green' | 'red' | 'purple' | 'gray' | 'blue'; children: React.ReactNode; href?: string | null; title?: string; onClick?: () => void }) {
+  const cls = `inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium ${
+    tone === 'green' ? 'bg-green-50 border-green-200 text-green-800'
+    : tone === 'red' ? 'bg-red-50 border-red-200 text-red-700'
+    : tone === 'purple' ? 'bg-[#4600D6]/[0.06] border-[#4600D6]/25 text-[#4600D6]'
+    : tone === 'blue' ? 'bg-blue-50 border-blue-200 text-blue-700'
+    : 'bg-white border-border-gray text-off-black/70'}`
+  if (href) return <a href={href} target="_blank" rel="noopener noreferrer" title={title} className={`${cls} hover:opacity-80`}>{children}</a>
+  if (onClick) return <button type="button" onClick={onClick} title={title} className={`${cls} hover:opacity-80 disabled:opacity-40`}>{children}</button>
+  return <span title={title} className={cls}>{children}</span>
+}
+
+/**
+ * Design Details for the right column: what the print was made from and what
+ * its PDF measured, as tags, colored where it means something (green = checked
+ * and fine, red = a problem, purple = in Artelo).
+ */
+export function DesignDetailsTags({ d }: { d: Design }) {
+  const job = d.job
+  if (!d.visible || !job || job.status !== 'done') return null
+  const o = job.output
+  const b = o?.bleedIn
+  const bleedOk = b ? [b.left, b.right, b.top, b.bottom].every(v => Math.abs(v - 0.25) <= 0.01) : null
+  const ok = (v: boolean | null) => v === null ? 'gray' : v ? 'green' : 'red'
+  return (
+    <div>
+      <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Design Details</h4>
+      <div className="flex flex-wrap gap-1.5">
+        <Tag title={job.requestedBy === 'system' ? 'Rendered automatically' : 'Rendered by hand'}>v{job.version}{job.requestedBy === 'system' ? ' auto' : ''}</Tag>
+        {job.spec.template && <Tag>{job.spec.template}</Tag>}
+        <Tag tone={job.spec.photoPath ? 'blue' : 'gray'}>{job.spec.photoPath ? 'Photo' : 'No photo'}</Tag>
+        {job.spec.noTime && <Tag tone="red">No time</Tag>}
+        <Tag title={job.finishedAt ? `Finished ${fmt(job.finishedAt)}` : undefined}>Made {fmt(job.createdAt)}</Tag>
+        {o ? (
+          <>
+            <Tag tone={ok(o.trimIn ? o.trimIn === job.spec.size : null)} title="Measured from the PDF's trim box">{o.trimIn ? o.trimIn === job.spec.size ? '✓ ' : '✕ ' : ''}{o.trimIn || job.spec.size} trim</Tag>
+            <Tag tone={ok(bleedOk)} title="Measured from the PDF's bleed box">{bleedOk === null ? '' : bleedOk ? '✓ ' : '✕ '}{b && !bleedOk ? `bleed ${b.left}/${b.right}/${b.top}/${b.bottom}"` : '0.25" bleed'}</Tag>
+            <Tag tone={ok(o.color ? o.color === 'CMYK' : null)} title="Read from the PDF's color">{o.color === 'CMYK' ? '✓ ' : o.color ? '✕ ' : ''}{o.color || 'Color'}</Tag>
+          </>
+        ) : <Tag title="Made before the PDF check">Not measured</Tag>}
+        {job.review === 'approved' && <Tag tone="green" title={job.reviewedAt ? fmt(job.reviewedAt) : undefined}>✓ Approved{job.reviewer ? ` by ${job.reviewer.split(' ')[0]}` : ''}</Tag>}
+        {job.review === 'approved' && (job.deliveredAt
+          ? <Tag tone="green" href={job.deliveredPath}>In Orders folder ↗</Tag>
+          : <Tag tone="red" title={job.deliveryError || undefined}>Not in Drive</Tag>)}
+        {job.review === 'approved' && (job.arteloUploadedAt
+          ? <Tag tone="purple" href={job.arteloUrl}>In Artelo library ↗</Tag>
+          : <Tag tone="red" title={job.arteloError || undefined}>Not in Artelo</Tag>)}
+        {job.spec.dateSourceUrl && <Tag href={job.spec.dateSourceUrl} title={`Date verified (${job.spec.dateSource})`}>Date source ↗</Tag>}
+        {job.pdfUrl && <Tag href={job.pdfUrl}><Download className="w-3 h-3" /> PDF</Tag>}
+        {d.canManage && <Tag onClick={d.state?.eligible && !d.busy ? d.create : undefined} title={d.state?.eligible ? 'Render this order again' : d.state?.reasons.join('. ')}><RefreshCw className="w-3 h-3" /> Re-render</Tag>}
+      </div>
+      {job.notes && <p className="mt-1.5 text-xs text-amber-700">{job.notes}</p>}
+      {job.reviewNote && <p className="mt-1 text-xs text-red-700">{job.review === 'closed' ? 'Closed' : 'Rejected'}: {job.reviewNote}</p>}
+      {d.err && <p className="mt-1 text-xs text-red-600">{d.err}</p>}
+    </div>
+  )
+}
