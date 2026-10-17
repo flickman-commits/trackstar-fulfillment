@@ -4,7 +4,7 @@ import CustomCounter from '@/components/CustomCounter'
 import RenderTemplatesPanel from '@/components/RenderTemplatesPanel'
 import { ToastDot } from '@/components/BrandToaster'
 import { toastCard, toastStyle } from '@/lib/ui'
-import { Hash, Sparkles, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Info, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound } from 'lucide-react'
+import { Hash, Sparkles, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
@@ -5245,20 +5245,7 @@ Thank you!`
                                   {/* Explanation sits inline with the label so it
                                       does not cost its own row. */}
                                   <CopyableField
-                                    label={
-                                      <span className="inline-flex items-center gap-1.5">
-                                        Weather
-                                        {b && (
-                                          <button
-                                            onClick={() => setShowWeatherInfo(v => !v)}
-                                            className="inline-flex items-center text-off-black/35 hover:text-off-black/70 transition-colors"
-                                            title="How this weather was determined"
-                                          >
-                                            <Info className="w-3.5 h-3.5" />
-                                          </button>
-                                        )}
-                                      </span>
-                                    }
+                                    label="Weather"
                                     value={selectedOrder.weatherCondition}
                                     aside={
                                       <span className="inline-flex items-center gap-1.5">
