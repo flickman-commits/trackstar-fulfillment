@@ -36,6 +36,11 @@ const OPENISH = { status: { in: ['open', 'waiting', 'escalated'] } }
 
 /** The where clause for a view. `teammate:<id>` is that person's open work. */
 export function viewWhere(view, userId) {
+  if (view === 'filtered') return { filtered: true }
+  return { filtered: false, ...baseView(view, userId) }
+}
+
+function baseView(view, userId) {
   if (view.startsWith('teammate:')) return { assigneeId: view.slice('teammate:'.length), ...OPENISH }
   switch (view) {
     case 'inbox': return { assigneeId: userId, ...OPENISH }
@@ -85,7 +90,7 @@ export async function listThreads({ view = 'all', userId, q = '', sort = 'waitin
     prisma.supportThread.count({ where: viewWhere('waiting') }),
     prisma.supportThread.count({ where: viewWhere('escalated') }),
     prisma.supportThread.count({ where: viewWhere('snoozed') }),
-    prisma.supportThread.groupBy({ by: ['assigneeId'], where: OPENISH, _count: { _all: true } }),
+    prisma.supportThread.groupBy({ by: ['assigneeId'], where: { ...OPENISH, filtered: false }, _count: { _all: true } }),
   ])
   const reads = userId && threads.length
     ? await prisma.supportRead.findMany({ where: { userId, threadId: { in: threads.map(t => t.id) } } })
@@ -109,6 +114,7 @@ function row(t, readAt) {
     customerName: t.customerName,
     status: t.status,
     snoozedUntil: t.snoozedUntil,
+    filtered: Boolean(t.filtered),
     assignee: t.assignee || null,
     priority: t.priority,
     tags: t.tags || [],

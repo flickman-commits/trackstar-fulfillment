@@ -1,4 +1,4 @@
-import { Inbox, AtSign, UserRoundX, Layers, Clock, AlertTriangle, Moon, Archive, Settings2, Zap } from 'lucide-react'
+import { Inbox, AtSign, UserRoundX, Layers, Clock, AlertTriangle, Moon, Archive, Settings2, Zap, Filter } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Avatar } from '@/components/AssigneePicker'
 import type { InboxCounts, InboxView, Teammate } from '@/types/support'
@@ -48,6 +48,7 @@ export default function ViewsColumn({ view, counts, team, me, onView, onMacros, 
     { id: 'escalated', label: 'Escalated', icon: AlertTriangle, count: c?.escalated },
     { id: 'snoozed', label: 'Snoozed', icon: Moon, count: c?.snoozed },
     { id: 'closed', label: 'Closed', icon: Archive },
+    { id: 'filtered', label: 'Filtered', icon: Filter },
   ]
   return (
     <nav className="hidden lg:flex w-[168px] xl:w-[184px] shrink-0 flex-col border-r border-border-gray bg-subtle-gray/60 min-h-0 overflow-y-auto">

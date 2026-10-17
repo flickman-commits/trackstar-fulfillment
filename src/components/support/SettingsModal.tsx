@@ -2,7 +2,8 @@ import { X } from 'lucide-react'
 import { btnGhost } from '@/lib/ui'
 import { useEscape } from '@/lib/useEscape'
 import { RoutingCard, MailboxCard, InstagramCard } from './Details'
-import type { InstagramStatus, MailboxStatus, Teammate } from '@/types/support'
+import { FilterList } from './SenderFilter'
+import type { InstagramStatus, MailboxStatus, SenderFilter, Teammate } from '@/types/support'
 
 /**
  * Settings for the inbox, out of the way of the conversation: where new
@@ -10,12 +11,13 @@ import type { InstagramStatus, MailboxStatus, Teammate } from '@/types/support'
  * everyone else sees the not-connected banner at the top of the page if
  * something needs an admin.
  */
-export default function SettingsModal({ team, unassignedCount, status, instagram, isAdmin, onChanged, onClose }: {
+export default function SettingsModal({ team, unassignedCount, status, instagram, isAdmin, filters, onChanged, onClose }: {
   team: Teammate[]
   unassignedCount: number
   status: MailboxStatus | null
   instagram: InstagramStatus | null
   isAdmin: boolean
+  filters: SenderFilter[]
   onChanged: () => void
   onClose: () => void
 }) {
@@ -26,12 +28,13 @@ export default function SettingsModal({ team, unassignedCount, status, instagram
         <div className="px-5 py-3.5 border-b border-border-gray flex items-center justify-between">
           <div>
             <div className="text-base font-semibold text-off-black">Support settings</div>
-            <div className="text-xs text-off-black/50">Routing, the mailbox and the Instagram account.</div>
+            <div className="text-xs text-off-black/50">Routing, filtered senders, the mailbox and Instagram.</div>
           </div>
           <button onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto">
           {isAdmin && <RoutingCard team={team} unassignedCount={unassignedCount} onChanged={onChanged} />}
+          <FilterList filters={filters} onChanged={onChanged} />
           <MailboxCard status={status} isAdmin={isAdmin} onChanged={onChanged} />
           <InstagramCard status={instagram} isAdmin={isAdmin} onChanged={onChanged} />
         </div>

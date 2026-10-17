@@ -1095,6 +1095,9 @@ model SupportThread {
   priority        Boolean   @default(false)
   // Free-form labels; the playbook's scenario names are offered as suggestions.
   tags            String[]  @default([])
+  // From a sender the team filtered out (vendors, alerts, newsletters): kept,
+  // never in the inbox views, findable under Filtered. See support/filters.js.
+  filtered        Boolean   @default(false)
   // The newest message's first line, for the list.
   snippet         String    @default("")
   messageCount    Int       @default(0)
@@ -1112,6 +1115,7 @@ model SupportThread {
   reads           SupportRead[]
 
   @@index([status, lastMessageAt])
+  @@index([filtered, status])
   @@index([assigneeId, status])
   @@index([customerEmail])
   @@index([lastMessageAt])

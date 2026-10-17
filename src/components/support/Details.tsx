@@ -6,8 +6,9 @@ import { supportApi } from '@/lib/supportApi'
 import { ago, day } from '@/lib/supportDates'
 import { STATUS_LABEL, STATUS_TONE } from '@/lib/supportStatus'
 import { Avatar } from '@/components/AssigneePicker'
-import type { CustomerOrder, InstagramStatus, MailboxStatus, Mockup, Teammate, ThreadDetail } from '@/types/support'
+import type { CustomerOrder, InstagramStatus, MailboxStatus, Mockup, SenderFilter, Teammate, ThreadDetail } from '@/types/support'
 import Actions from './Actions'
+import { FilterSender } from './SenderFilter'
 
 /**
  * The details panel, Intercom's right column: collapsible sections for the
@@ -320,7 +321,7 @@ export function InstagramCard({ status, isAdmin, onChanged }: { status: Instagra
   )
 }
 
-export default function Details({ thread, team, tagSuggestions, onOpenThread, onAssign, onPriority, onTags, onInsert, onAttach, onChanged, width }: {
+export default function Details({ thread, team, tagSuggestions, onOpenThread, onAssign, onPriority, onTags, onInsert, onAttach, onChanged, width, filters, onFiltersChanged }: {
   thread: ThreadDetail | null
   team: Teammate[]
   tagSuggestions: string[]
@@ -336,6 +337,8 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
   onChanged: () => void
   /** A width the person dragged to, on wide screens. */
   width?: number
+  filters: SenderFilter[]
+  onFiltersChanged: () => void
 }) {
   return (
     <aside style={width ? { width } : undefined} className="w-full lg:w-[272px] xl:w-[300px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
@@ -348,6 +351,9 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
             {thread.channel === 'instagram' && thread.igUsername && <Attr label="Instagram"><a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">@{thread.igUsername}</a></Attr>}
             <Attr label="First seen">{day(thread.customer.firstSeen)}</Attr>
             <Attr label="Conversations">{thread.customer.conversations}</Attr>
+            {thread.channel !== 'instagram' && thread.customer.email && (
+              <div className="pt-1"><FilterSender email={thread.customer.email} filters={filters} onChanged={onFiltersChanged} /></div>
+            )}
             {thread.pastThreads.length > 0 && (
               <div className="pt-1 space-y-1">
                 {thread.pastThreads.map(p => (

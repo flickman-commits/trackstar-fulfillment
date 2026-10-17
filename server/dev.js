@@ -142,6 +142,8 @@ const routes = [
   { method: 'get',    path: '/api/support/settings',           handler: '../api/support/settings.js' },
   { method: 'post',   path: '/api/support/settings',           handler: '../api/support/settings.js' },
   { method: 'post',   path: '/api/support/actions',            handler: '../api/support/actions.js' },
+  { method: 'get',    path: '/api/support/filters',            handler: '../api/support/filters.js' },
+  { method: 'post',   path: '/api/support/filters',            handler: '../api/support/filters.js' },
   { method: 'post',   path: '/api/support/instagram',          handler: '../api/support/instagram.js' },
   { method: 'get',    path: '/api/support/instagram-callback', handler: '../api/support/instagram-callback.js' },
   { method: 'get',    path: '/api/support/instagram-webhook',  handler: '../api/support/instagram-webhook.js' },

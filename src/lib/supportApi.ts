@@ -3,7 +3,7 @@
  * shapes, so the Support screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { BackfillResult, InboxPayload, InboxSort, InboxView, InstagramBackfillResult, InstagramStatus, Macro, MailboxStatus, Note, SyncResult, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
+import type { SenderFilter, BackfillResult, InboxPayload, InboxSort, InboxView, InstagramBackfillResult, InstagramStatus, Macro, MailboxStatus, Note, SyncResult, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -49,6 +49,9 @@ export const supportApi = {
   reply: (id: string, text: string, close = false, attachments: string[] = []) => post<ThreadDetail>('/api/support/reply', { id, text, close, attachments }),
   settings: () => request<{ defaultAssigneeId: string | null }>('/api/support/settings'),
   saveSettings: (defaultAssigneeId: string | null, applyToOpen = false) => post<{ defaultAssigneeId: string | null; assigned: number }>('/api/support/settings', { defaultAssigneeId, applyToOpen }),
+  filters: () => request<{ filters: SenderFilter[] }>('/api/support/filters'),
+  addFilter: (pattern: string) => post<{ pattern: string; filed: number; filters: SenderFilter[] }>('/api/support/filters', { action: 'add', pattern }),
+  removeFilter: (pattern: string) => post<{ pattern: string; restored: number; filters: SenderFilter[] }>('/api/support/filters', { action: 'remove', pattern }),
   macros: () => request<{ macros: Macro[] }>('/api/support/macros'),
   /** The quick actions beside a conversation (server/domain/support/actions.js). */
   action: <T = Record<string, unknown>,>(action: string, body: Record<string, unknown>) => post<T>('/api/support/actions', { action, ...body }),

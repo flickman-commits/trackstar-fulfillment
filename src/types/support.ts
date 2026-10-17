@@ -2,7 +2,7 @@
 
 export type ThreadStatus = 'open' | 'waiting' | 'escalated' | 'closed'
 /** A built-in view, or `teammate:<id>`. */
-export type InboxView = 'inbox' | 'mentions' | 'unassigned' | 'all' | 'waiting' | 'escalated' | 'snoozed' | 'closed' | `teammate:${string}`
+export type InboxView = 'inbox' | 'mentions' | 'unassigned' | 'all' | 'waiting' | 'escalated' | 'snoozed' | 'closed' | 'filtered' | `teammate:${string}`
 export type InboxSort = 'waiting' | 'newest' | 'oldest' | 'priority'
 /** Where the conversation happens: the fast@ mailbox, or a DM to @trackstar_art. */
 export type Channel = 'email' | 'instagram'
@@ -28,6 +28,8 @@ export interface ThreadRow {
   lastInboundAt: string | null
   lastOutboundAt: string | null
   backfilled: boolean
+  /** From a sender the team filtered out: shown only under Filtered. */
+  filtered: boolean
   /** The customer wrote since you last opened it. */
   unread: boolean
 }
@@ -191,3 +193,6 @@ export interface CodeLookup {
   oncePerCustomer?: boolean
   fromKlaviyo?: boolean
 }
+
+/** A sender kept out of the inbox: an address or a domain. */
+export interface SenderFilter { pattern: string; addedBy: string | null; addedAt: string }

@@ -6,7 +6,7 @@ import { btnGhost, btnSecondary, pageShell } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { useAuth } from '@/lib/auth'
 import { useDocumentHead } from '@/lib/useDocumentHead'
-import type { InboxPayload, InboxSort, InboxView, InstagramStatus, Macro, MailboxStatus, Mockup, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
+import type { SenderFilter, InboxPayload, InboxSort, InboxView, InstagramStatus, Macro, MailboxStatus, Mockup, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
 import ViewsColumn from '@/components/support/ViewsColumn'
 import ConversationList from '@/components/support/ConversationList'
 import Conversation from '@/components/support/Conversation'
@@ -32,11 +32,12 @@ import { useColumnWidth, useWide } from '@/lib/useColumnWidth'
  */
 const VIEW_TITLE: Record<string, string> = {
   inbox: 'Your inbox', mentions: 'Mentions', unassigned: 'Unassigned', all: 'All open',
-  waiting: 'Waiting on customer', escalated: 'Escalated', snoozed: 'Snoozed', closed: 'Closed',
+  waiting: 'Waiting on customer', escalated: 'Escalated', snoozed: 'Snoozed', closed: 'Closed', filtered: 'Filtered',
 }
 const EMPTY: Record<string, string> = {
   inbox: 'Nothing assigned to you. Take one from Unassigned.',
   mentions: 'Nobody has mentioned you.',
+  filtered: 'Nothing filtered. Filter a sender from a conversation or in Settings.',
   unassigned: 'Everything open has an owner.',
   all: 'Inbox zero. Nobody is waiting on us.',
   waiting: 'Nothing waiting on a customer.',
@@ -106,6 +107,8 @@ export default function Support() {
     supportApi.instagramStatus().then(setInstagram).catch(() => setInstagram(null))
   }, [])
   const loadMacros = useCallback(() => { supportApi.macros().then(r => setMacros(r.macros)).catch(() => {}) }, [])
+  const [filters, setFilters] = useState<SenderFilter[]>([])
+  const loadFilters = useCallback(() => { supportApi.filters().then(r => setFilters(r.filters)).catch(() => {}) }, [])
   const loadInbox = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
     try { setInbox(await supportApi.inbox(view, sort, query)); setInboxError(null) }
@@ -113,7 +116,7 @@ export default function Support() {
     finally { if (!quiet) setLoading(false) }
   }, [view, sort, query])
 
-  useEffect(() => { loadStatus(); loadMacros() }, [loadStatus, loadMacros])
+  useEffect(() => { loadStatus(); loadMacros(); loadFilters() }, [loadStatus, loadMacros, loadFilters])
   // A link from Slack or a note opens the thread it names.
   useEffect(() => {
     const id = new URLSearchParams(location.search).get('thread')
@@ -307,6 +310,7 @@ export default function Support() {
               width={wide ? detailsCol.width : undefined}
               thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread}
               onAssign={assign} onPriority={setPriority} onTags={setTags}
+              filters={filters} onFiltersChanged={() => { loadFilters(); loadInbox(true); if (selectedId) refreshThread(selectedId) }}
               onInsert={t => insertRef.current?.(t)} onAttach={m => attachRef.current?.(m)} onChanged={() => { if (selectedId) refreshThread(selectedId); loadInbox(true) }}
             />
           </div>
@@ -314,7 +318,7 @@ export default function Support() {
       </div>
 
       {macrosOpen && <MacrosModal macros={macros} onChanged={loadMacros} onClose={() => setMacrosOpen(false)} />}
-      {settingsOpen && <SettingsModal team={inbox?.team || []} unassignedCount={inbox?.counts.unassigned || 0} status={status} instagram={instagram} isAdmin={isAdmin} onChanged={() => { loadStatus(); loadInbox(true) }} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsModal team={inbox?.team || []} unassignedCount={inbox?.counts.unassigned || 0} status={status} instagram={instagram} isAdmin={isAdmin} filters={filters} onChanged={() => { loadStatus(); loadFilters(); loadInbox(true) }} onClose={() => setSettingsOpen(false)} />}
       {keysOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setKeysOpen(false)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>

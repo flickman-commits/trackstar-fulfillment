@@ -35,6 +35,7 @@ import { google } from 'googleapis'
 import prisma from '../../db.js'
 import { oauthClient, originFor, isRevokedToken, buildMime, base64url, newMessageId } from '../sales/gmail.js'
 import { defaultAssigneeId } from './routing.js'
+import { isFiltered } from './filters.js'
 
 const SCOPE_MODIFY = 'https://www.googleapis.com/auth/gmail.modify'
 const SCOPES = [SCOPE_MODIFY]
@@ -339,8 +340,10 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
         status: parsed.direction === 'in' ? 'open' : 'waiting',
         lastMessageAt: parsed.sentAt,
         backfilled: backfill,
-        // New conversations go to the person set under Routing; history goes to nobody.
-        assigneeId: backfill ? null : await defaultAssigneeId(),
+        // A sender the team filtered out (vendors, alerts) is filed, not routed.
+        filtered: await isFiltered(who.email),
+        // New conversations go to the person set under Routing; history and filtered mail go to nobody.
+        assigneeId: backfill || await isFiltered(who.email) ? null : await defaultAssigneeId(),
       },
     })
   }
