@@ -3848,8 +3848,8 @@ Thank you!`
           >
             <div className={inlineDetail ? 'bg-white border border-border-gray rounded-md w-full' : 'bg-white rounded-none md:rounded-md max-w-[45rem] w-full max-h-[90vh] overflow-y-auto shadow-xl'} onClick={(e) => e.stopPropagation()}>
               <div className="p-4 md:p-6">
-                {/* Header. On a phone it stays pinned while the order scrolls under it. */}
-                <div className="sticky top-0 z-30 -mx-4 -mt-4 px-4 pt-3 pb-2.5 mb-4 bg-white/95 backdrop-blur border-b border-border-gray rounded-t-md md:static md:m-0 md:mb-6 md:p-0 md:bg-transparent md:backdrop-blur-none md:border-0 flex items-center justify-between">
+                {/* Header. Stays pinned at the top while the order scrolls under it. */}
+                <div className="sticky top-0 z-30 -mx-4 -mt-4 px-4 pt-3 pb-2.5 mb-4 md:-mx-6 md:-mt-6 md:px-6 md:pt-5 md:pb-4 md:mb-6 bg-white/95 backdrop-blur border-b border-border-gray rounded-t-md flex items-center justify-between">
                   <div className="flex items-center gap-2 md:gap-3 min-w-0">
                     {inlineDetail && (
                       <button onClick={closeModal} title="Back to orders (Esc)" className="inline-flex items-center gap-1 -ml-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors">
