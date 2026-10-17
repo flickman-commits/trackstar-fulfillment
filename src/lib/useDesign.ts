@@ -28,6 +28,8 @@ export type Design = ReturnType<typeof useDesign>
 export function useDesign(orderId: string | null, canManage: boolean) {
   const [state, setState] = useState<State | null>(null)
   const [busy, setBusy] = useState(false)
+  // Re-render has its own flag, so approving or rejecting does not spin the Re-render button.
+  const [creating, setCreating] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   // The order on screen. J/K can move on before a request for the last
@@ -55,10 +57,10 @@ export function useDesign(orderId: string | null, canManage: boolean) {
   }, [inFlight, load])
 
   const create = async () => {
-    setBusy(true); setErr(null)
+    setBusy(true); setCreating(true); setErr(null)
     // Straight to the loading state; the next poll brings the real job.
     setState(s => s && s.job ? { ...s, job: { ...s.job, status: 'queued', previewUrl: null, pdfUrl: null, review: 'pending', output: null } } : s)
-    try { await post({ action: 'create', orderId }); await load() } catch (e) { setErr(e instanceof Error ? e.message : 'Could not start') } finally { setBusy(false) }
+    try { await post({ action: 'create', orderId }); await load() } catch (e) { setErr(e instanceof Error ? e.message : 'Could not start') } finally { setBusy(false); setCreating(false) }
   }
   const review = async (decision: 'approved' | 'rejected', note?: string) => {
     if (!state?.job) return false
@@ -72,6 +74,6 @@ export function useDesign(orderId: string | null, canManage: boolean) {
   const visible = Boolean(orderId && state && (canManage || job?.review === 'approved'))
   // Room is held for the design from the moment the order opens, so the layout does not jump when it loads.
   const reserved = Boolean(orderId && (canManage || job?.review === 'approved'))
-  return { state, job, busy, err, create, review, canManage, visible, reserved, offline: !state || state.workersOnline.length === 0 }
+  return { state, job, busy, creating, err, create, review, canManage, visible, reserved, offline: !state || state.workersOnline.length === 0 }
 }
 

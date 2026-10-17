@@ -51,7 +51,7 @@ export function DesignCard({ d }: { d: Design }) {
           {d.canManage && (
             <button onClick={d.create} disabled={d.busy || !state.eligible} title={state.eligible ? 'Render this order again' : state.reasons.join('. ')}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 disabled:opacity-40 transition-colors">
-              {d.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-render
+              {d.creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-render
             </button>
           )}
         </div>
