@@ -5,7 +5,7 @@ import { when } from '@/lib/supportDates'
 import { fillMacro } from '@/lib/supportStatus'
 import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
 import { ChannelMark, CustomerAvatar } from './ConversationList'
-import type { Macro, Message, Note, Teammate, ThreadDetail, ThreadStatus } from '@/types/support'
+import type { Macro, Message, Mockup, Note, Teammate, ThreadDetail, ThreadStatus } from '@/types/support'
 
 /**
  * The conversation, Intercom's middle column.
@@ -181,7 +181,7 @@ function MacroMenu({ macros, onPick, onClose }: { macros: Macro[]; onPick: (m: M
   )
 }
 
-export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onUseMacro, replyRef, noteRef, insertRef }: {
+export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onUseMacro, replyRef, noteRef, insertRef, attachRef }: {
   thread: ThreadDetail
   /** The Instagram account replies go out as, without the @. */
   expectedHandle?: string
@@ -195,7 +195,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   onSnooze: (until: string | null) => void
   onPriority: (p: boolean) => void
   onMarkUnread: () => void
-  onReply: (text: string, close: boolean) => Promise<boolean>
+  onReply: (text: string, close: boolean, attachments: string[]) => Promise<boolean>
   onNote: (body: string, mentions: string[]) => Promise<boolean>
   onDeleteNote: (noteId: string) => void
   onUseMacro: (id: string) => void
@@ -204,6 +204,8 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   noteRef: React.RefObject<HTMLTextAreaElement>
   /** The Actions panel drops lines into the reply through this. */
   insertRef: React.MutableRefObject<((text: string) => void) | null>
+  /** And mockups onto it through this. */
+  attachRef: React.MutableRefObject<((m: Mockup) => void) | null>
 }) {
   const [mode, setMode] = useState<'reply' | 'note'>('reply')
   const [text, setText] = useState(() => starter(thread, me))
@@ -212,13 +214,14 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   const [mentionQ, setMentionQ] = useState<string | null>(null)
   const [mentionIdx, setMentionIdx] = useState(0)
   const [sending, setSending] = useState(false)
+  const [attached, setAttached] = useState<Mockup[]>([])
   const [slashQ, setSlashQ] = useState<string | null>(null)
   const [slashIdx, setSlashIdx] = useState(0)
   const bottom = useRef<HTMLDivElement>(null)
   const close = usePopover()
   const macro = usePopover()
 
-  useEffect(() => { setText(starter(thread, me)); setNote(''); setMentionIds([]); setMode('reply') }, [thread.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setText(starter(thread, me)); setNote(''); setMentionIds([]); setMode('reply'); setAttached([]) }, [thread.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { bottom.current?.scrollIntoView({ block: 'end' }) }, [thread.id, thread.messages.length, thread.notes.length])
 
   const timeline = useMemo<Item[]>(() => {
@@ -241,7 +244,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   const send = async (closeAfter = false) => {
     if (!canSend) return
     setSending(true)
-    try { if (await onReply(text.trim(), closeAfter)) setText(starter(thread, me)) }
+    try { if (await onReply(text.trim(), closeAfter, attached.map(m => m.ref))) { setText(starter(thread, me)); setAttached([]) } }
     finally { setSending(false) }
   }
   const addNote = async () => {
@@ -310,6 +313,12 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     requestAnimationFrame(() => { if (el) { el.focus(); el.setSelectionRange(pos, pos) } })
   }
   useEffect(() => { insertRef.current = (t: string) => { setMode('reply'); placeInReply(t) } })
+  useEffect(() => {
+    attachRef.current = (m: Mockup) => {
+      setMode('reply')
+      setAttached(list => list.some(x => x.ref === m.ref) ? list.filter(x => x.ref !== m.ref) : list.length >= 4 ? list : [...list, m])
+    }
+  })
 
   // /shortcut: a slash at the start of a word in the reply offers the macros; Enter or Tab drops one in.
   const slashMatches = useMemo(() => {
@@ -455,6 +464,17 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
                 </div>
               )}
             </div>
+            {attached.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {attached.map(m => (
+                  <span key={m.ref} className="inline-flex items-center gap-2 pl-1 pr-2 py-1 rounded-md border border-border-gray bg-subtle-gray text-xs text-off-black/75">
+                    {m.thumbUrl ? <img src={m.thumbUrl} alt="" className="w-8 h-8 rounded object-cover bg-white border border-border-gray" /> : <Paperclip className="w-3.5 h-3.5" />}
+                    {m.label}
+                    <button onClick={() => setAttached(list => list.filter(x => x.ref !== m.ref))} className="text-off-black/40 hover:text-off-black" title="Remove"><X className="w-3 h-3" /></button>
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <div className="relative" ref={macro.ref}>
                 <button data-macro-button onClick={() => macro.setOpen(v => !v)} className={btnSecondary} title="Insert a saved reply (m), or type / in the reply"><Zap className="w-3.5 h-3.5" /> Macro</button>

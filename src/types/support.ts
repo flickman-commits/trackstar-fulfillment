@@ -120,7 +120,12 @@ export interface CustomerOrder {
   lineItems: { title: string; variant: string | null; quantity: number }[]
   items: OrderItem[]
   imported: boolean
+  /** Designs and proofs that can go to the customer, newest first. */
+  mockups: Mockup[]
 }
+
+/** A mockup a rep can attach: the page holds only the reference; the server sends the file. */
+export interface Mockup { ref: string; orderId: string; kind: 'render' | 'proof'; label: string; thumbUrl: string | null; at: string }
 
 export interface PastThread { id: string; subject: string; status: ThreadStatus; lastMessageAt: string; messageCount: number }
 

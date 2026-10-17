@@ -13,6 +13,7 @@ import prisma from '../../db.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { approvalUrl, shopifyAdminUrl, arteloOrderUrl } from '../../lib/links.js'
 import { getProductInfo, loadProductCatalog } from '../../lib/productCatalog.js'
+import { listMockups } from './mockups.js'
 import { stripQuoted } from './mailbox.js'
 import { can } from '../../../api/_lib/roles.js'
 import { replyWindow } from './instagram.js'
@@ -454,5 +455,12 @@ export async function customerContext(email) {
     })
   }
   orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  // The designs and proofs a rep can attach, per order.
+  let mockups = []
+  try { mockups = await listMockups(ours.map(o => o.id)) } catch (err) { console.warn(`[support] mockups: ${err.message}`) }
+  for (const o of orders) {
+    const ids = new Set(o.items.map(it => it.orderId))
+    o.mockups = mockups.filter(m => ids.has(m.orderId))
+  }
   return { orders, shopifyError }
 }

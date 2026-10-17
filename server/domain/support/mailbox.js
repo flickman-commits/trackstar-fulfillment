@@ -540,7 +540,7 @@ export async function sync() {
  * stored at once, with who sent it, so the page shows it without waiting
  * for the next sync. UNREAD comes off the thread in Gmail too.
  */
-export async function sendReply({ userId, thread, html, text }) {
+export async function sendReply({ userId, thread, html, text, attachments = [] }) {
   const gmail = await client()
   const mailbox = mailboxEmail()
   const last = await prisma.supportMessage.findFirst({ where: { threadId: thread.id }, orderBy: { sentAt: 'desc' } })
@@ -549,7 +549,7 @@ export async function sendReply({ userId, thread, html, text }) {
   if (!to) throw new Error('This thread has no customer address to reply to.')
   const subject = last?.subject && /^\s*re:/i.test(last.subject) ? last.subject : `Re: ${thread.subject || last?.subject || ''}`.trim()
   const messageId = newMessageId()
-  const raw = base64url(buildMime({ to, subject, html, inReplyTo: lastIn?.rfcMessageId || last?.rfcMessageId || undefined, messageId }))
+  const raw = base64url(buildMime({ to, subject, html, inReplyTo: lastIn?.rfcMessageId || last?.rfcMessageId || undefined, messageId, attachments }))
   let sent
   try {
     sent = await gmail.users.messages.send({ userId: 'me', requestBody: { raw, threadId: thread.gmailThreadId } })

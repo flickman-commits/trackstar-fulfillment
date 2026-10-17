@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { BadgePercent, Check, Copy, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Star, Truck, X } from 'lucide-react'
+import { BadgePercent, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Star, Truck, X } from 'lucide-react'
 import { reviewAsk, reviewLinkFor } from '@/lib/reviewLinks'
 import { toast } from 'sonner'
 import { supportApi } from '@/lib/supportApi'
-import type { Address, CodeLookup, CustomerOrder, ThreadDetail } from '@/types/support'
+import type { Address, CodeLookup, CustomerOrder, Mockup, ThreadDetail } from '@/types/support'
 
 /**
  * The Actions list, in the dashboard's own style: purple text links with an
@@ -82,7 +82,8 @@ function AddressForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread
   )
 }
 
-function OrderActions({ o, thread, multiple, onInsert, onChanged }: { o: CustomerOrder; thread: ThreadDetail; multiple: boolean; onInsert: (text: string) => void; onChanged: () => void }) {
+function OrderActions({ o, thread, multiple, onInsert, onAttach, onChanged }: { o: CustomerOrder; thread: ThreadDetail; multiple: boolean; onInsert: (text: string) => void; onAttach: (m: Mockup) => void; onChanged: () => void }) {
+  const [picking, setPicking] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [editingAddress, setEditingAddress] = useState(false)
   const run = async (key: string, fn: () => Promise<string | void>) => {
@@ -104,6 +105,21 @@ function OrderActions({ o, thread, multiple, onInsert, onChanged }: { o: Custome
         {tracking
           ? <ActionLink icon={Truck} title={`${tracking.company || 'Carrier'} ${tracking.number || ''}`} onClick={() => onInsert(tracking.url ? `Here's your tracking link: ${tracking.url}` : `Your ${tracking.company || ''} tracking number is ${tracking.number}.`.replace('  ', ' '))}>Insert {tracking.fromArtelo ? 'Artelo ' : ''}tracking link</ActionLink>
           : <span className="self-start inline-flex items-center gap-1.5 text-xs text-off-black/40"><Truck className="w-3.5 h-3.5" />No tracking from Artelo yet</span>}
+        {o.mockups.length > 0 && (o.mockups.length === 1
+          ? <ActionLink icon={ImageIcon} title={o.mockups[0].label} onClick={() => { onAttach(o.mockups[0]); toast.success('Mockup attached to the reply') }}>Attach mockup</ActionLink>
+          : <ActionLink icon={ImageIcon} onClick={() => setPicking(v => !v)}>Attach mockup <span className="text-off-black/40 font-normal">({o.mockups.length})</span></ActionLink>)}
+        {picking && o.mockups.length > 1 && (
+          <div className="flex flex-wrap gap-1.5 pl-5">
+            {o.mockups.map(m => (
+              <button key={m.ref} onClick={() => { onAttach(m); toast.success(`${m.label} attached`) }} className="w-16 text-left group" title={`Attach ${m.label}`}>
+                <span className="block w-16 h-16 rounded border border-border-gray bg-white overflow-hidden group-hover:border-[#4600D6]">
+                  {m.thumbUrl ? <img src={m.thumbUrl} alt="" className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5 m-auto mt-5 text-off-black/25" />}
+                </span>
+                <span className="block text-[10px] text-off-black/55 leading-tight mt-0.5 truncate">{m.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {approval && <ActionLink icon={Link2} onClick={() => onInsert(`You can view your design options here: ${approval}`)}>Insert approval link</ActionLink>}
         {/* Only once it has shipped: a review is for someone holding the print. */}
         {shipped && (() => {
@@ -184,7 +200,7 @@ function CodeCheck() {
   )
 }
 
-export default function Actions({ thread, onInsert, onChanged }: { thread: ThreadDetail; onInsert: (text: string) => void; onChanged: () => void }) {
+export default function Actions({ thread, onInsert, onAttach, onChanged }: { thread: ThreadDetail; onInsert: (text: string) => void; onAttach: (m: Mockup) => void; onChanged: () => void }) {
   const [busy, setBusy] = useState<string | null>(null)
   const first = (thread.customerName || '').trim().split(/\s+/)[0] || ''
   const run = async (key: string, fn: () => Promise<string | void>) => {
@@ -196,7 +212,7 @@ export default function Actions({ thread, onInsert, onChanged }: { thread: Threa
   const orders = thread.context.orders
   return (
     <div className="space-y-4">
-      {orders.map(o => <OrderActions key={`${o.source}-${o.number}`} o={o} thread={thread} multiple={orders.length > 1} onInsert={onInsert} onChanged={onChanged} />)}
+      {orders.map(o => <OrderActions key={`${o.source}-${o.number}`} o={o} thread={thread} multiple={orders.length > 1} onInsert={onInsert} onAttach={onAttach} onChanged={onChanged} />)}
       <div>
         {orders.length > 1 && <div className={heading}>Customer</div>}
         <div className="flex flex-col items-stretch gap-1.5">

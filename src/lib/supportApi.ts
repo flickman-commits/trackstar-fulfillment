@@ -46,7 +46,7 @@ export const supportApi = {
   addNote: (id: string, body: string, mentions: string[]) => act<Note>(id, 'note', { body, mentions }),
   deleteNote: (id: string, noteId: string) => act<{ id: string }>(id, 'deleteNote', { noteId }),
   markUnread: (id: string) => act<{ ok: boolean }>(id, 'unread'),
-  reply: (id: string, text: string, close = false) => post<ThreadDetail>('/api/support/reply', { id, text, close }),
+  reply: (id: string, text: string, close = false, attachments: string[] = []) => post<ThreadDetail>('/api/support/reply', { id, text, close, attachments }),
   settings: () => request<{ defaultAssigneeId: string | null }>('/api/support/settings'),
   saveSettings: (defaultAssigneeId: string | null, applyToOpen = false) => post<{ defaultAssigneeId: string | null; assigned: number }>('/api/support/settings', { defaultAssigneeId, applyToOpen }),
   macros: () => request<{ macros: Macro[] }>('/api/support/macros'),

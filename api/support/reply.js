@@ -1,5 +1,5 @@
 /**
- * POST /api/support/reply { id, text, close? }
+ * POST /api/support/reply { id, text, close?, attachments?: ['render:<id>' | 'proof:<id>'] }
  *
  * Send a reply on a thread, from the support mailbox, as this person. The
  * only place support mail leaves the app, and only ever reached by a person
@@ -16,6 +16,7 @@ import { textToHtml } from '../../server/domain/sales/gmail.js'
 import { sendReply } from '../../server/domain/support/mailbox.js'
 import { sendReply as sendInstagramReply } from '../../server/domain/support/instagram.js'
 import { getThread, setStatus } from '../../server/domain/support/threads.js'
+import { resolveMockup } from '../../server/domain/support/mockups.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -34,14 +35,20 @@ export default async function handler(req, res) {
     if (!thread) return res.status(404).json({ error: 'No such thread' })
 
     const instagram = thread.channel === 'instagram'
+    // Mockups the rep attached, by reference; resolved here, never sent as bytes from the page.
+    const refs = (Array.isArray(body.attachments) ? body.attachments : []).map(String).slice(0, 4)
+    const files = []
+    for (const [i, ref] of refs.entries()) {
+      files.push(await resolveMockup(ref, { filenameStem: refs.length > 1 ? `Your Trackstar print ${i + 1}` : 'Your Trackstar print' }))
+    }
     const sent = instagram
-      ? await sendInstagramReply({ userId: user.id, thread, text })
-      : await sendReply({ userId: user.id, thread, html: textToHtml(text), text })
+      ? await sendInstagramReply({ userId: user.id, thread, text, images: files.map(f => ({ url: f.url })) })
+      : await sendReply({ userId: user.id, thread, html: textToHtml(text), text, attachments: files.map(f => ({ bytes: f.bytes, contentType: f.contentType, filename: f.filename })) })
     const who = instagram ? `@${thread.igUsername || thread.igUserId}` : thread.customerEmail
     await recordAudit({
       action: 'support.reply',
       summary: `Replied to ${who} on "${thread.subject}"`,
-      detail: { threadId: id, channel: thread.channel, gmailMessageId: sent?.gmailMessageId || null, igMessageId: sent?.igMessageId || null, chars: text.length },
+      detail: { threadId: id, channel: thread.channel, gmailMessageId: sent?.gmailMessageId || null, igMessageId: sent?.igMessageId || null, chars: text.length, attachments: refs },
       actor: user,
     })
     // Send and close: Intercom's one-click for a conversation that is done.

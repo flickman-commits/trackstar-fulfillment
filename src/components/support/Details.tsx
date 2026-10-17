@@ -6,7 +6,7 @@ import { supportApi } from '@/lib/supportApi'
 import { ago, day } from '@/lib/supportDates'
 import { STATUS_LABEL, STATUS_TONE } from '@/lib/supportStatus'
 import { Avatar } from '@/components/AssigneePicker'
-import type { CustomerOrder, InstagramStatus, MailboxStatus, Teammate, ThreadDetail } from '@/types/support'
+import type { CustomerOrder, InstagramStatus, MailboxStatus, Mockup, Teammate, ThreadDetail } from '@/types/support'
 import Actions from './Actions'
 
 /**
@@ -320,7 +320,7 @@ export function InstagramCard({ status, isAdmin, onChanged }: { status: Instagra
   )
 }
 
-export default function Details({ thread, team, tagSuggestions, onOpenThread, onAssign, onPriority, onTags, onInsert, onChanged }: {
+export default function Details({ thread, team, tagSuggestions, onOpenThread, onAssign, onPriority, onTags, onInsert, onAttach, onChanged }: {
   thread: ThreadDetail | null
   team: Teammate[]
   tagSuggestions: string[]
@@ -330,6 +330,8 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
   onTags: (tags: string[]) => void
   /** Drops a line into the reply box. */
   onInsert: (text: string) => void
+  /** Puts a mockup on the reply. */
+  onAttach: (m: Mockup) => void
   /** Something changed on the thread; read it again. */
   onChanged: () => void
 }) {
@@ -381,7 +383,7 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
               : <div className="space-y-4">{thread.context.orders.map(o => <OrderCard key={`${o.source}-${o.number}`} o={o} />)}</div>}
           </Section>
           <Section title="Actions">
-            <Actions thread={thread} onInsert={onInsert} onChanged={onChanged} />
+            <Actions thread={thread} onInsert={onInsert} onAttach={onAttach} onChanged={onChanged} />
           </Section>
         </>
       )}

@@ -6,7 +6,7 @@ import { btnGhost, btnSecondary, pageShell } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { useAuth } from '@/lib/auth'
 import { useDocumentHead } from '@/lib/useDocumentHead'
-import type { InboxPayload, InboxSort, InboxView, InstagramStatus, Macro, MailboxStatus, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
+import type { InboxPayload, InboxSort, InboxView, InstagramStatus, Macro, MailboxStatus, Mockup, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
 import ViewsColumn from '@/components/support/ViewsColumn'
 import ConversationList from '@/components/support/ConversationList'
 import Conversation from '@/components/support/Conversation'
@@ -76,6 +76,7 @@ export default function Support() {
   const replyRef = useRef<HTMLTextAreaElement>(null)
   const noteRef = useRef<HTMLTextAreaElement>(null)
   const insertRef = useRef<((text: string) => void) | null>(null)
+  const attachRef = useRef<((m: Mockup) => void) | null>(null)
 
   useEffect(() => { try { localStorage.setItem('support.view', view); localStorage.setItem('support.sort', sort) } catch { /* private mode */ } }, [view, sort])
 
@@ -160,10 +161,10 @@ export default function Support() {
     setInbox(prev => prev ? { ...prev, threads: prev.threads.map(r => (r.id === thread.id ? { ...r, unread: true } : r)) } : prev)
     toast.success('Marked unread')
   })
-  const reply = async (text: string, close: boolean) => {
+  const reply = async (text: string, close: boolean, attachments: string[] = []) => {
     if (!thread) return false
     try {
-      const fresh = await supportApi.reply(thread.id, text, close)
+      const fresh = await supportApi.reply(thread.id, text, close, attachments)
       setThread(fresh)
       const to = fresh.channel === 'instagram' ? `@${fresh.igUsername || 'them'} on Instagram` : fresh.customerEmail
       toast.success(close ? `Sent to ${to} and closed` : `Sent to ${to}`)
@@ -281,7 +282,7 @@ export default function Support() {
                 key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros} expectedHandle={instagram?.expectedHandle}
                 onAssign={assign} onStatus={setStatusOf} onSnooze={snooze} onPriority={setPriority} onMarkUnread={markUnread}
                 onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
-                replyRef={replyRef} noteRef={noteRef} insertRef={insertRef}
+                replyRef={replyRef} noteRef={noteRef} insertRef={insertRef} attachRef={attachRef}
               />
             ) : (
               <div className="flex-1 min-w-0 flex items-center justify-center min-h-[320px] bg-[#fcfcfc]">
@@ -297,7 +298,7 @@ export default function Support() {
             <Details
               thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread}
               onAssign={assign} onPriority={setPriority} onTags={setTags}
-              onInsert={t => insertRef.current?.(t)} onChanged={() => { if (selectedId) refreshThread(selectedId); loadInbox(true) }}
+              onInsert={t => insertRef.current?.(t)} onAttach={m => attachRef.current?.(m)} onChanged={() => { if (selectedId) refreshThread(selectedId); loadInbox(true) }}
             />
           </div>
         </section>

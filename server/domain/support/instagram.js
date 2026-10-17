@@ -531,7 +531,7 @@ export function splitForInstagram(text, max = MAX_MESSAGE_BYTES) {
  * with who pressed Send. Refuses outside the window rather than letting
  * Meta refuse it with a code.
  */
-export async function sendReply({ userId, thread, text }) {
+export async function sendReply({ userId, thread, text, images = [] }) {
   if (thread?.channel !== 'instagram' || !thread.igUserId) throw new Error('This conversation is not an Instagram DM.')
   const token = await requireToken()
   const window = replyWindow(thread)
@@ -539,6 +539,23 @@ export async function sendReply({ userId, thread, text }) {
   const pieces = splitForInstagram(text)
   if (!pieces.length) throw new Error('Write something first')
   let last = null
+  // Pictures first, each its own message (Meta takes one attachment per message, by a URL it can fetch).
+  for (const img of images) {
+    if (!img?.url) continue
+    const body = { recipient: { id: thread.igUserId }, message: { attachment: { type: 'image', payload: { url: img.url } } } }
+    if (window.mode === 'human_agent') { body.messaging_type = 'MESSAGE_TAG'; body.tag = 'HUMAN_AGENT' }
+    let out
+    try {
+      out = await graph('me/messages', { method: 'POST', token, body })
+    } catch (err) {
+      await onGraphError(err)
+    }
+    const mid = String(out?.message_id || out?.id || `sent:${thread.id}:img:${Date.now()}`)
+    await importMessage(
+      { accountId: '', igMessageId: mid, customerId: thread.igUserId, direction: 'out', text: '', attachments: [attachmentRow('image', img.url, `${mid}:0`)], isUnsupported: false, replyToStory: null, sentAt: new Date() },
+      { sentById: userId },
+    )
+  }
   for (const piece of pieces) {
     const body = { recipient: { id: thread.igUserId }, message: { text: piece } }
     if (window.mode === 'human_agent') { body.messaging_type = 'MESSAGE_TAG'; body.tag = 'HUMAN_AGENT' }
