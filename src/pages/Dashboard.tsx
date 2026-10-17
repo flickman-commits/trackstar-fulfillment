@@ -23,7 +23,7 @@ import AssignmentPanel from '@/components/AssignmentPanel'
 import AssigneePicker, { Avatar, QueuePill, PersonFilter, type QueueMember } from '@/components/AssigneePicker'
 import { setTeamColors } from '@/lib/teamColors'
 import StatsPanel from '@/components/StatsPanel'
-import { useSearchParams, useParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import Linkify from '@/components/Linkify'
 import type { Capability } from '@/lib/roles'
@@ -801,9 +801,18 @@ export default function Dashboard() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-  const [raceFilter, setRaceFilter] = useState('')  // empty = show all races
+  // The race and queue filters live in the address (?race=...&queue=review),
+  // so a reload or a shared link keeps the view. Changing one replaces the
+  // history entry; the back button is for orders, not filter clicks.
+  type StageFilter = '' | 'review' | 'attach' | 'action' | 'waiting'
+  const setUrlParam = useCallback((key: string, value: string) => {
+    setSearchParams(prev => { const next = new URLSearchParams(prev); if (value) next.set(key, value); else next.delete(key); return next }, { replace: true })
+  }, [setSearchParams])
+  const raceFilter = searchParams.get('race') || ''  // empty = show all races
+  const setRaceFilter = useCallback((v: string) => setUrlParam('race', v), [setUrlParam])
   // Standard orders: the queue to work. '' is everything open.
-  const [stageFilter, setStageFilter] = useState<'' | 'review' | 'attach' | 'action' | 'waiting'>('')
+  const stageFilter: StageFilter = (['review', 'attach', 'action', 'waiting'] as const).find(k => k === searchParams.get('queue')) || ''
+  const setStageFilter = useCallback((v: StageFilter) => setUrlParam('queue', v), [setUrlParam])
   const [showCompleted, setShowCompleted] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1713,6 +1722,7 @@ export default function Dashboard() {
   // all land on the order. Clicking in adds a history entry; J/K replaces it.
   const { orderRef: urlOrderRef = null } = useParams<{ orderRef: string }>()
   const navigate = useNavigate()
+  const { search: urlSearch } = useLocation()  // the filters ride along when an order opens or closes
   const selectedRef = selectedOrder ? orderRefOf(selectedOrder) : null
   const lastSelectedRef = useRef<string | null>(selectedRef)
   const lastUrlRef = useRef<string | null>(urlOrderRef)
@@ -1729,7 +1739,7 @@ export default function Dashboard() {
       const [number] = ref.split('-')
       apiFetch(`/api/orders?number=${encodeURIComponent(number)}`).then(r => r.ok ? r.json() : null).then(d => {
         const found = ((d?.orders || []) as Record<string, unknown>[]).map(mapOrder).find(o => orderRefOf(o) === ref)
-        if (!found) { setToast({ message: `Order ${ref} was not found`, type: 'error' }); navigate('/', { replace: true }); return }
+        if (!found) { setToast({ message: `Order ${ref} was not found`, type: 'error' }); navigate(`/${urlSearch}`, { replace: true }); return }
         if (found.trackstarOrderType !== activeView) setActiveView(found.trackstarOrderType as typeof activeView)
         open(found)
       }).catch(() => {})
@@ -1739,7 +1749,7 @@ export default function Dashboard() {
       lastSelectedRef.current = selectedRef
       if (selectedRef !== urlOrderRef) {
         lastUrlRef.current = selectedRef
-        navigate(selectedRef ? `/orders/${selectedRef}` : '/', { replace: replaceNextUrl.current })
+        navigate(`${selectedRef ? `/orders/${selectedRef}` : '/'}${urlSearch}`, { replace: replaceNextUrl.current })
       }
       replaceNextUrl.current = false
       return
@@ -1753,7 +1763,7 @@ export default function Dashboard() {
     }
     // First load with an order in the address: open it once the list is here.
     if (urlOrderRef && selectedRef !== urlOrderRef) resolve(urlOrderRef)
-  }, [selectedRef, urlOrderRef, orders, activeView, navigate])
+  }, [selectedRef, urlOrderRef, orders, activeView, navigate, urlSearch])
   useEffect(() => {
     document.title = selectedOrder ? `Order ${orderRefOf(selectedOrder)} · Trackstar` : 'Trackstar'
     return () => { document.title = 'Trackstar' }
@@ -2324,7 +2334,8 @@ export default function Dashboard() {
 
   // Reset race filter when switching tabs — the option may not exist in the
   // new view, which would otherwise leave the queue mysteriously empty.
-  useEffect(() => { setRaceFilter('') }, [activeView])
+  const prevViewRef = useRef(activeView)
+  useEffect(() => { if (prevViewRef.current !== activeView) { prevViewRef.current = activeView; setRaceFilter('') } }, [activeView, setRaceFilter])
 
   // How many open standard orders sit in each stage, for the queue chips.
   const stageCounts = useMemo(() => {
