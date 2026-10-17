@@ -1110,8 +1110,12 @@ export default function Dashboard() {
         if (!prev) return null
         const fresh = transformedOrders.find(o => o.id === prev.id)
         if (!fresh) return prev
-        // Only update if something changed to avoid unnecessary re-renders
-        if (fresh.designStatus !== prev.designStatus || fresh.status !== prev.status) {
+        // Only update if something changed to avoid unnecessary re-renders.
+        // The pipeline is the status in the header ("Confirm weather"): it moves
+        // when a race's weather or date is confirmed, with no change to the row's own status.
+        const pipelineMoved = JSON.stringify(fresh.pipeline || null) !== JSON.stringify(prev.pipeline || null)
+        if (fresh.designStatus !== prev.designStatus || fresh.status !== prev.status || pipelineMoved
+          || fresh.weatherConfirmedAt !== prev.weatherConfirmedAt || fresh.raceDateVerified !== prev.raceDateVerified) {
           return { ...prev, ...fresh }
         }
         return prev
