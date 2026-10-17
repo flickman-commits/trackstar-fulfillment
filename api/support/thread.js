@@ -10,12 +10,14 @@
  *   POST { id, action: 'note', body, mentions }  an internal note; mentions are teammate ids
  *   POST { id, action: 'deleteNote', noteId }
  *   POST { id, action: 'unread' }               back to unread for you
+ *   POST { id, action: 'redraft', instruction }  a fresh Claude draft, optionally steered
  *
  * Every change leaves an event in the thread and a line in the audit log.
  */
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
-import { getThread, assign, setStatus, snooze, setPriority, setTags, addNote, deleteNote, markRead, markUnread } from '../../server/domain/support/threads.js'
+import { getThread, assign, setStatus, snooze, setPriority, setTags, addNote, deleteNote, markRead, markUnread, noteRow } from '../../server/domain/support/threads.js'
+import { draftThread } from '../../server/domain/support/draft.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -67,6 +69,11 @@ export default async function handler(req, res) {
       }
       case 'deleteNote': {
         return res.status(200).json(await deleteNote(String(body.noteId || ''), user))
+      }
+      case 'redraft': {
+        const out = await draftThread(id, { instruction: String(body.instruction || ''), actor: user })
+        await audit('Asked Claude for a new draft', { instruction: body.instruction || null })
+        return res.status(200).json(noteRow(out.note))
       }
       case 'unread': {
         await markUnread(id, user.id)

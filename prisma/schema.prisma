@@ -1165,7 +1165,9 @@ model SupportNote {
   id         String   @id @default(cuid())
   threadId   String
   thread     SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  kind       String   @default("note") // note | event
+  kind       String   @default("note") // note | event | draft
+  // A draft's working: scenario, key facts, steps, suggested actions, escalation. Null on notes and events.
+  data       Json?
   body       String
   authorId   String?
   author     User?    @relation("SupportNoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)

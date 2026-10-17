@@ -190,6 +190,14 @@ export default function Support() {
       return true
     } catch (e) { toast.error((e as Error).message); return false }
   }
+  const redraft = async (instruction: string) => {
+    if (!thread) return
+    try {
+      const n = await supportApi.redraft(thread.id, instruction)
+      setThread(prev => (prev && prev.id === thread.id ? { ...prev, notes: [...prev.notes, n] } : prev))
+      toast.success('New draft ready')
+    } catch (e) { toast.error((e as Error).message) }
+  }
   const deleteNote = (noteId: string) => thread && run(async () => {
     await supportApi.deleteNote(thread.id, noteId)
     setThread(prev => (prev && prev.id === thread.id ? { ...prev, notes: prev.notes.filter(n => n.id !== noteId) } : prev))
@@ -291,7 +299,7 @@ export default function Support() {
               <Conversation
                 key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros} expectedHandle={instagram?.expectedHandle}
                 onAssign={assign} onStatus={setStatusOf} onSnooze={snooze} onPriority={setPriority} onMarkUnread={markUnread}
-                onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
+                onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onRedraft={redraft} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
                 replyRef={replyRef} noteRef={noteRef} insertRef={insertRef} attachRef={attachRef}
               />
             ) : (

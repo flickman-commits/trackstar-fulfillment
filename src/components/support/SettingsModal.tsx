@@ -3,6 +3,7 @@ import { btnGhost } from '@/lib/ui'
 import { useEscape } from '@/lib/useEscape'
 import { RoutingCard, MailboxCard, InstagramCard } from './Details'
 import { FilterList } from './SenderFilter'
+import PlaybookEditor from './PlaybookEditor'
 import type { InstagramStatus, MailboxStatus, SenderFilter, Teammate } from '@/types/support'
 
 /**
@@ -35,6 +36,7 @@ export default function SettingsModal({ team, unassignedCount, status, instagram
         <div className="flex-1 min-h-0 overflow-y-auto">
           {isAdmin && <RoutingCard team={team} unassignedCount={unassignedCount} onChanged={onChanged} />}
           <FilterList filters={filters} onChanged={onChanged} />
+          <PlaybookEditor isAdmin={isAdmin} />
           <MailboxCard status={status} isAdmin={isAdmin} onChanged={onChanged} />
           <InstagramCard status={instagram} isAdmin={isAdmin} onChanged={onChanged} />
         </div>

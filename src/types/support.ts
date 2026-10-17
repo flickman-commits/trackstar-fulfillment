@@ -71,10 +71,24 @@ export interface Message {
 }
 
 /** An internal note, or an event the system wrote (assigned, closed, snoozed). */
+/** Claude's working behind a draft. */
+export interface DraftData {
+  scenario?: string
+  summary?: string
+  keyFacts?: string[]
+  steps?: string[]
+  actions?: { name: string; why: string }[]
+  escalate?: { needed: boolean; reason: string }
+  needsInfo?: string
+  instruction?: string | null
+  model?: string
+}
+
 export interface Note {
   id: string
-  kind: 'note' | 'event'
+  kind: 'note' | 'event' | 'draft'
   body: string
+  data?: DraftData | null
   author: Teammate | null
   authorName: string
   mentions: string[]

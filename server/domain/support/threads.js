@@ -201,8 +201,8 @@ export async function getThread(id, { userId } = {}) {
   }
 }
 
-function noteRow(n) {
-  return { id: n.id, kind: n.kind, body: n.body, author: n.author || null, authorName: n.authorName, mentions: n.mentions || [], createdAt: n.createdAt }
+export function noteRow(n) {
+  return { id: n.id, kind: n.kind, body: n.body, data: n.data || null, author: n.author || null, authorName: n.authorName, mentions: n.mentions || [], createdAt: n.createdAt }
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import { when } from '@/lib/supportDates'
 import { fillMacro } from '@/lib/supportStatus'
 import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
 import { ChannelMark, CustomerAvatar } from './ConversationList'
+import DraftCard from './DraftCard'
 import type { Macro, Message, Mockup, Note, Teammate, ThreadDetail, ThreadStatus } from '@/types/support'
 
 /**
@@ -181,7 +182,7 @@ function MacroMenu({ macros, onPick, onClose }: { macros: Macro[]; onPick: (m: M
   )
 }
 
-export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onUseMacro, replyRef, noteRef, insertRef, attachRef }: {
+export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onRedraft, onUseMacro, replyRef, noteRef, insertRef, attachRef }: {
   thread: ThreadDetail
   /** The Instagram account replies go out as, without the @. */
   expectedHandle?: string
@@ -198,6 +199,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   onReply: (text: string, close: boolean, attachments: string[]) => Promise<boolean>
   onNote: (body: string, mentions: string[]) => Promise<boolean>
   onDeleteNote: (noteId: string) => void
+  onRedraft: (instruction: string) => Promise<void>
   onUseMacro: (id: string) => void
   /** Lets the page's keyboard shortcuts focus the composer. */
   replyRef: React.RefObject<HTMLTextAreaElement>
@@ -232,6 +234,8 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     return items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
   }, [thread.messages, thread.notes])
 
+  // Only the newest draft offers Use and Redraft; older ones fold away.
+  const latestDraftId = useMemo(() => [...thread.notes].reverse().find(n => n.kind === 'draft')?.id || null, [thread.notes])
   const ig = thread.channel === 'instagram'
   const wrote = !isBlank(text)
   const hasEmDash = /—/.test(text)
@@ -410,7 +414,10 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
 
       {/* Timeline */}
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 bg-[#fcfcfc]">
-        {timeline.map(it => it.kind === 'message'
+        {timeline.map(it => it.kind === 'note' && it.n.kind === 'draft'
+          ? <DraftCard key={it.n.id} n={it.n} latest={it.n.id === latestDraftId} onRedraft={onRedraft}
+              onUse={body => { setMode('reply'); setText(body.replace(/\{\{rep\}\}/g, me.firstName)); requestAnimationFrame(() => { const el = replyRef.current; if (el) { el.focus(); el.setSelectionRange(0, 0) } }) }} />
+          : it.kind === 'message'
           ? <Bubble key={it.m.id} m={it.m} />
           : <NoteCard key={it.n.id} n={it.n} team={team} meId={me.id} isAdmin={isAdmin} onDelete={() => onDeleteNote(it.n.id)} />)}
         <div ref={bottom} />
