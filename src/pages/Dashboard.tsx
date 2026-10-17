@@ -1051,6 +1051,9 @@ export default function Dashboard() {
       })
 
       setOrders(transformedOrders)
+      // Current Team's per-person counts come from their own request; reload them
+      // with the list so every count (bubble, queue chips, team) moves together.
+      loadTeam()
 
       // Hydrate possibleMatchesMap from persisted research records so the
       // accept-button picker shows up even after a page reload (not just
@@ -1084,12 +1087,12 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false)
     }
-  }, [activeView, includeCompleted])
+  }, [activeView, includeCompleted, loadTeam])
 
   // Order Assignment changed who has what (help added or ended, the order
   // list spread): reload the list and Current Team so nobody has to refresh.
   useEffect(() => {
-    const onChanged = () => { fetchOrders(); loadTeam() }
+    const onChanged = () => { fetchOrders() }
     window.addEventListener('trackstar:orders-changed', onChanged)
     return () => window.removeEventListener('trackstar:orders-changed', onChanged)
   }, [fetchOrders, loadTeam])
@@ -1786,9 +1789,9 @@ export default function Dashboard() {
     // while someone is looking: a background tab polling all day was most of
     // our Supabase egress. Coming back to the tab refreshes right away.
     const poll = setInterval(() => {
-      if (document.visibilityState === 'visible') { fetchOrders(); loadTeam() }
+      if (document.visibilityState === 'visible') { fetchOrders() }
     }, 60_000)
-    const onVisible = () => { if (document.visibilityState === 'visible') { fetchOrders(); loadTeam() } }
+    const onVisible = () => { if (document.visibilityState === 'visible') { fetchOrders() } }
     document.addEventListener('visibilitychange', onVisible)
     return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [fetchOrders, loadTeam])
