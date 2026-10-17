@@ -397,6 +397,26 @@ export const CHIP_TIME_FIXTURES = [
     expectedBib: '1362',
     notes: 'Oakland 2024 women\'s winner - verifies historic year support. Pace computed: 10659s/26.2 = 6:46.8 (the page truncates to 6:46)',
   },
+  {
+    platform: 'raceroster',
+    race: 'Newport Marathon',
+    year: 2026,
+    runner: 'Melanie Smith',
+    expectedChipTime: '4:40:44',
+    expectedChipPace: '10:43',
+    expectedBib: '1073',
+    notes: 'Newport (RI) 2026 marathon, results.raceroster.com abx5kwqg2kkvv7s2 detail c3zq73gms6tbpy9u - Chip Time 4:40:44, Gun Time 4:47:40, page Overall Pace 10:43 (16844s/26.2 = 10:42.9). Uneven: 13.1M split 2:17:02, second half 2:23:42',
+  },
+  {
+    platform: 'raceroster',
+    race: 'Newport Marathon',
+    year: 2026,
+    runner: 'Michelle Murphy',
+    expectedChipTime: '2:34:01',
+    expectedChipPace: '11:45',
+    expectedBib: '2488',
+    notes: 'Newport (RI) 2026 half, sub-event 379160, detail 9ge2u7z7xxue3rkj - Chip Time 2:34:01, Gun Time 2:44:08 (10 min apart: a gun-time regression fails this), page Overall Pace 11:45 (9241s/13.1 = 11:45.4). Uneven: 5K 35:18, 10M 1:57:03, last 3.1 mi 36:58',
+  },
 
   // ── Brooksee ──────────────────────────────────────────────────────────
   // (CIM, etc. — add when verified)

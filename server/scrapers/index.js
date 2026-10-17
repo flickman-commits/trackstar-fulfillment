@@ -72,6 +72,7 @@ import columbusConfig from './configs/columbus.js'
 import stGeorgeConfig from './configs/stGeorge.js'
 import portlandConfig from './configs/portland.js'
 import missoulaConfig from './configs/missoula.js'
+import newportConfig from './configs/newport.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
 import { applyOverride } from './scraperOverrides.js'
 
@@ -150,6 +151,7 @@ const ALL_CONFIGS = [
   stGeorgeConfig,
   portlandConfig,
   missoulaConfig,
+  newportConfig,
 ]
 
 /**
