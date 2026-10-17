@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { BadgePercent, Check, Copy, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Truck, X } from 'lucide-react'
+import { BadgePercent, Check, Copy, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Star, Truck, X } from 'lucide-react'
+import { reviewAsk, reviewLinkFor } from '@/lib/reviewLinks'
 import { toast } from 'sonner'
 import { supportApi } from '@/lib/supportApi'
 import type { Address, CodeLookup, CustomerOrder, ThreadDetail } from '@/types/support'
@@ -104,6 +105,27 @@ function OrderActions({ o, thread, multiple, onInsert, onChanged }: { o: Custome
           ? <ActionLink icon={Truck} title={`${tracking.company || 'Carrier'} ${tracking.number || ''}`} onClick={() => onInsert(tracking.url ? `Here's your tracking link: ${tracking.url}` : `Your ${tracking.company || ''} tracking number is ${tracking.number}.`.replace('  ', ' '))}>Insert {tracking.fromArtelo ? 'Artelo ' : ''}tracking link</ActionLink>
           : <span className="self-start inline-flex items-center gap-1.5 text-xs text-off-black/40"><Truck className="w-3.5 h-3.5" />No tracking from Artelo yet</span>}
         {approval && <ActionLink icon={Link2} onClick={() => onInsert(`You can view your design options here: ${approval}`)}>Insert approval link</ActionLink>}
+        {/* Only once it has shipped: a review is for someone holding the print. */}
+        {shipped && (() => {
+          const it = o.items[0]
+          const review = reviewLinkFor(it?.race || o.lineItems[0]?.title, it?.type)
+          const delivered = o.tracking.map(t => t.deliveredAt).filter(Boolean).sort().pop() || null
+          const sent = o.tracking[o.tracking.length - 1]?.at
+          const when = delivered ? `delivered ${new Date(delivered).toLocaleDateString([], { month: 'short', day: 'numeric' })}`
+            : sent ? `shipped ${Math.max(0, Math.floor((Date.now() - new Date(sent).getTime()) / 86400000))}d ago, no delivery scan` : 'shipped'
+          const asked = thread.tags.includes('Review requested')
+          if (!review) return <span className="self-start inline-flex items-center gap-1.5 text-xs text-off-black/40" title="Add it to src/lib/reviewLinks.ts"><Star className="w-3.5 h-3.5" />No Yotpo link for {it?.race || 'this product'}</span>
+          return (
+            <span className="self-start inline-flex items-baseline gap-1.5 flex-wrap">
+              <ActionLink icon={Star} busy={busy === 'review'} title={`${review.name} review link. Only for a good experience, after they have the print.`} onClick={() => run('review', async () => {
+                onInsert(reviewAsk(review.link))
+                if (!asked) await supportApi.setTags(thread.id, [...thread.tags, 'Review requested'])
+                return asked ? 'Review link added to the reply' : 'Review link added; tagged Review requested'
+              })}>{asked ? 'Ask for a review again' : 'Ask for a review'}</ActionLink>
+              <span className={`text-[11px] ${delivered ? 'text-emerald-700' : 'text-off-black/40'}`}>{when}</span>
+            </span>
+          )
+        })()}
         {o.shopifyOrderId && !shipped && (editingAddress
           ? <AddressForm o={o} thread={thread} onDone={onChanged} onCancel={() => setEditingAddress(false)} />
           : <ActionLink icon={MapPin} onClick={() => setEditingAddress(true)} title={o.shipToLine || 'No address on file'}>Edit shipping address</ActionLink>)}

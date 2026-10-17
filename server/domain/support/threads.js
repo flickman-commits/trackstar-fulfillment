@@ -26,7 +26,7 @@ export const TAG_SUGGESTIONS = [
   'Refund', 'Product question', 'Custom print', 'Race organizer', 'Pre-race order', 'Order change',
   'Pre-race motivation', 'Happy customer', 'Missing detail', 'Wrong frame', 'Discount not applied',
   'Note from owner', 'Cart trouble', 'Add-on', 'Address change', 'We messed up', 'Results changed',
-  'Preview request', 'Unsure of results', 'Press', 'Spam',
+  'Preview request', 'Unsure of results', 'Press', 'Spam', 'Review requested',
 ]
 
 const TEAM_SELECT = { id: true, firstName: true, lastName: true }
@@ -301,7 +301,7 @@ const ORDERS_BY_EMAIL = `
         totalPriceSet { shopMoney { amount currencyCode } }
         discountCodes
         shippingAddress { name address1 address2 city provinceCode zip countryCodeV2 phone }
-        fulfillments { status createdAt service { handle } trackingInfo { url number company } }
+        fulfillments { status createdAt displayStatus deliveredAt service { handle } trackingInfo { url number company } }
         lineItems(first: 20) { nodes { title variantTitle quantity customAttributes { key value } } }
       }
     }
@@ -425,7 +425,7 @@ export async function customerContext(email) {
       shipToLine: shipToLine(shipTo),
       // Artelo fulfills through Shopify: each fulfillment it creates carries
       // its tracking, so this is Artelo's tracking, read live.
-      tracking: (s.fulfillments || []).flatMap(f => (f.trackingInfo || []).map(t => ({ url: t.url, number: t.number, company: t.company, at: f.createdAt, fromArtelo: f.service?.handle === 'artelo' }))),
+      tracking: (s.fulfillments || []).flatMap(f => (f.trackingInfo || []).map(t => ({ url: t.url, number: t.number, company: t.company, at: f.createdAt, fromArtelo: f.service?.handle === 'artelo', deliveredAt: f.deliveredAt || (f.displayStatus === 'DELIVERED' ? f.createdAt : null) }))),
       // When none of our rows exist yet (not imported), what was bought, from Shopify.
       lineItems: rows.length ? [] : (s.lineItems?.nodes || []).filter(li => !/add-?on/i.test(li.title)).map(li => ({ title: li.title, variant: li.variantTitle, quantity: li.quantity })),
       imported: rows.length > 0,
@@ -447,7 +447,7 @@ export async function customerContext(email) {
       discountCodes: (first.shopifyOrderData?.discount_codes || []).map(d => d.code).filter(Boolean),
       shipTo,
       shipToLine: shipToLine(shipTo),
-      tracking: first.trackingNumber ? [{ url: null, number: first.trackingNumber, company: first.trackingCarrier, at: first.shippedAt, fromArtelo: false }] : [],
+      tracking: first.trackingNumber ? [{ url: null, number: first.trackingNumber, company: first.trackingCarrier, at: first.shippedAt, fromArtelo: false, deliveredAt: null }] : [],
       lineItems: [],
       imported: true,
       ...fromRows(rows),
