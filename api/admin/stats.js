@@ -6,7 +6,8 @@
  * server/services/shopifyStats.js; this endpoint returns whatever is there.
  */
 import { setCors } from '../_lib/auth.js'
-import { computeStats, RANGES } from '../../server/services/shopifyStats.js'
+import { computeStats, RANGES, rangeWindow } from '../../server/services/shopifyStats.js'
+import { computeFulfillmentTime } from '../../server/domain/orders/fulfillmentTime.js'
 import { requireCapability } from '../_lib/users.js'
 
 export default async function handler(req, res) {
@@ -19,8 +20,10 @@ export default async function handler(req, res) {
     if (!RANGES[range]) {
       return res.status(400).json({ error: `Unknown range "${range}"`, ranges: Object.keys(RANGES) })
     }
-    const stats = await computeStats(range)
+    // Our own handling time sits beside the Shopify numbers; a failure there does not blank the page.
+    const [stats, fulfillment] = await Promise.all([computeStats(range), computeFulfillmentTime(rangeWindow(range)).catch(e => { console.error('[stats] fulfillment time', e); return null })])
     return res.status(200).json({
+      fulfillment,
       ...stats,
       ranges: Object.entries(RANGES).map(([key, r]) => ({ key, label: r.label })),
     })
