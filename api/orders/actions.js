@@ -889,7 +889,13 @@ async function handleCalculateWeather({ raceId, city, date, reason }, res, actor
   const weatherService = new WeatherService()
   let result
   try {
-    result = await weatherService.calculateRaceWeather(dateStr, cityStr)
+    // The breakdown saved last time: same date and place from the archive gives the same weather.
+    let previous = null
+    if (raceId) {
+      const row = await prisma.race.findUnique({ where: { id: parseInt(raceId, 10) }, select: { weatherDetails: true } })
+      try { previous = row?.weatherDetails ? JSON.parse(row.weatherDetails) : null } catch { previous = null }
+    }
+    result = await weatherService.calculateRaceWeather(dateStr, cityStr, previous)
   } catch (err) {
     console.error('[actions/calculate-weather] Error:', err.message)
     return res.status(500).json({ error: `Weather lookup failed: ${err.message}` })

@@ -113,7 +113,8 @@ export async function computeRaceWeather(raceId, { by = 'system', reason, actor 
   if (!race) throw new Error('Race not found')
   if (!dateVerified(race)) throw new Error('Verify the date before computing weather')
   if (!race.location) throw new Error('The race needs a location before weather can be computed')
-  const result = await new WeatherService().calculateRaceWeather(race.raceDate.toISOString().slice(0, 10), race.location)
+  let previous = null; try { previous = race.weatherDetails ? JSON.parse(race.weatherDetails) : null } catch { previous = null }
+  const result = await new WeatherService().calculateRaceWeather(race.raceDate.toISOString().slice(0, 10), race.location, previous)
   if (!result?.temp || !result?.condition) throw new Error(result?.error || 'Could not compute weather for that date and place')
   const before = { weatherTemp: race.weatherTemp, weatherCondition: race.weatherCondition }
   const after = { weatherTemp: result.temp, weatherCondition: result.condition }

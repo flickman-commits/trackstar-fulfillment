@@ -175,10 +175,19 @@ export class WeatherService {
    * @param {string} location - City / "City, ST"
    * @returns {Promise<{temp:string|null, condition:string|null, breakdown:object|null}>}
    */
-  async calculateRaceWeather(dateStr, location) {
+  /**
+   * @param previous  the breakdown saved last time, if any. Same date, same
+   *   place and taken from the archive: the weather cannot have changed, so it
+   *   is returned as is. Recalculating without changing the date or location
+   *   always gives the same answer.
+   */
+  async calculateRaceWeather(dateStr, location, previous = null) {
     const coords = await this.geocodeLocation(location)
     if (!coords) {
       return { temp: null, condition: null, breakdown: null, error: `Couldn't find "${location}"` }
+    }
+    if (previous && previous.source === 'archive' && previous.date === dateStr && previous.place === coords.name && previous.avgTempF != null && previous.condition) {
+      return { temp: `${previous.avgTempF}°F`, condition: previous.condition, breakdown: previous, unchanged: true }
     }
 
     const hourly = await this.fetchHourly(dateStr, coords.lat, coords.lon)
@@ -225,6 +234,9 @@ export class WeatherService {
       condition,
       counts,
       hours,
+      // archive = the settled historical record. forecast = the model's numbers for a day the
+      // archive does not have yet (the last ~5 days); those are replaced when the archive catches up.
+      source: hourly._source || 'archive',
     }
 
     return { temp: `${avgTempF}°F`, condition, breakdown }
@@ -251,7 +263,7 @@ export class WeatherService {
       try {
         const resp = await fetchWithTimeout(build(base))
         const data = await resp.json()
-        if (data?.hourly?.temperature_2m?.some(v => v != null)) return data.hourly
+        if (data?.hourly?.temperature_2m?.some(v => v != null)) return { ...data.hourly, _source: base.includes('/archive') ? 'archive' : 'forecast' }
       } catch (err) {
         console.warn(`[WeatherService] fetchHourly ${base} failed: ${err.message}`)
       }

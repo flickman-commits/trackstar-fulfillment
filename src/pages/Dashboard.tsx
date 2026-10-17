@@ -1478,6 +1478,8 @@ export default function Dashboard() {
       return
     }
     setIsCalculatingWeather(true)
+    // Close the calculator so the spinner on the weather values shows it working.
+    setShowWeatherCalc(false)
     try {
       const send = (reason?: string) => apiFetch('/api/orders/actions', {
         method: 'POST',
@@ -5214,6 +5216,11 @@ Thank you!`
                                 <option value="Snowy">Snowy</option>
                               </select>
                             </div>
+                          ) : isCalculatingWeather ? (
+                            <div className="flex justify-between items-center py-1">
+                              <span className="text-body-sm text-off-black/60">Weather</span>
+                              <span className="inline-flex items-center gap-2 text-xs text-off-black/50 mr-9"><Loader2 className="w-5 h-5 animate-spin text-off-black/40" /> Calculating</span>
+                            </div>
                           ) : selectedOrder.weatherCondition ? (
                             (() => {
                               let b: { method?: string; place?: string; date?: string; avgTempF?: number; counts?: Record<string, number>; hours?: { hour: number; tempF: number; condition: string }[] } | null = null
@@ -5296,6 +5303,11 @@ Thank you!`
                                 placeholder="e.g. 65°F"
                                 className="w-40 px-2 py-1 text-sm text-right border border-border-gray rounded focus:outline-none focus:ring-1 focus:ring-off-black/20"
                               />
+                            </div>
+                          ) : isCalculatingWeather ? (
+                            <div className="flex justify-between items-center py-1">
+                              <span className="text-body-sm text-off-black/60">Temp</span>
+                              <Loader2 className="w-5 h-5 animate-spin text-off-black/40 mr-9" />
                             </div>
                           ) : selectedOrder.weatherTemp ? (
                             <CopyableField label="Temp" value={selectedOrder.weatherTemp} />
