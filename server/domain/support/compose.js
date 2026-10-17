@@ -39,7 +39,11 @@ export async function emailCustomer({ orderId, subject, text, actor }) {
   if (!body) throw new Error('Write the email first')
   if (/\[[^\]\n]*what we need[^\]\n]*\]/i.test(body)) throw new Error('Fill in what we need from them first')
   const number = customerOrderNumber(order)
-  const subj = String(subject || '').trim().slice(0, 200) || defaultSubject(number)
+  // A page loaded before the fix filled in our internal id; the customer only knows the display number.
+  let subj = String(subject || '').trim().slice(0, 200) || defaultSubject(number)
+  for (const internal of [order.parentOrderNumber, order.orderNumber].filter(v => v && String(v) !== number)) {
+    subj = subj.split(`#${internal}`).join(number).split(String(internal)).join(number)
+  }
 
   const stored = await sendNew({ userId: actor?.id || null, to, subject: subj, html: replyToHtml(body), text: body })
   const by = actorName(actor)

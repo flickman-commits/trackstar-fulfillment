@@ -4507,6 +4507,16 @@ Thank you!`
 
                       {/* Bottom actions */}
                       <div className="flex gap-3 pt-2">
+                        {selectedOrder.customerEmail && can('support') && (
+                          <button
+                            onClick={() => setEmailingOrder(selectedOrder)}
+                            className="inline-flex items-center gap-2 px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
+                            title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}
+                          >
+                            <Mail className="w-4 h-4" />
+                            Email customer
+                          </button>
+                        )}
                         {ds === 'sent_to_production' && (
                           <button
                             onClick={() => updateDesignStatus(selectedOrder.orderNumber, 'not_started')}
@@ -4563,15 +4573,6 @@ Thank you!`
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Order Details</div>
-                          {selectedOrder.customerEmail && can('support') && (
-                            <button
-                              onClick={() => setEmailingOrder(selectedOrder)}
-                              className="inline-flex items-center gap-1 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2"
-                              title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}
-                            >
-                              <Mail className="w-3.5 h-3.5" />Email customer
-                            </button>
-                          )}
                         </div>
                         {/* Race leads as the headline, year rides beside it. */}
                         <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 min-w-0">
@@ -5612,6 +5613,16 @@ Thank you!`
                           Copy Email
                         </button>
                       </>
+                    )}
+                    {selectedOrder.customerEmail && can('support') && !isEditing && (
+                      <button
+                        onClick={() => setEmailingOrder(selectedOrder)}
+                        className="inline-flex items-center gap-2 px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors"
+                        title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}
+                      >
+                        <Mail className="w-4 h-4" />
+                        Email customer
+                      </button>
                     )}
                     {!isEditing && !inlineDetail && (
                       <button
