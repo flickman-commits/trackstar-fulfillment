@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ArrowUpRight, Check, ChevronDown, Copy, Loader2, Package, Truck, AlertCircle, Database, Mail, X, Plus, Instagram, KeyRound } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Check, ChevronDown, Copy, Loader2, Package, Truck, AlertCircle, Database, Mail, X, Plus, Instagram, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnSecondary, chip } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
@@ -54,8 +54,18 @@ function stage(o: CustomerOrder): { label: string; cls: string } | null {
 /**
  * One order, compact: a small picture, then three short lines (number and
  * race; runner and what was bought; when and where it is), tracking and a
- * code only when there is one, then Open in Shopify and Open in Artelo.
+ * code only when there is one, then one "Open in" row: Fulfillment,
+ * Shopify, Artelo.
  */
+function OpenIn({ href, icon, label, title }: { href: string; icon: ReactNode; label: string; title?: string }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" title={title || `Open in ${label}`}
+      className="flex items-center justify-center gap-1.5 min-w-0 px-2 py-1.5 rounded-md border border-border-gray bg-white text-xs font-medium text-off-black hover:border-off-black/30 transition-colors">
+      {icon}<span className="truncate">{label}</span>
+    </a>
+  )
+}
+
 function OrderCard({ o }: { o: CustomerOrder }) {
   const it = o.items[0]
   const age = Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 86400000)
@@ -66,6 +76,8 @@ function OrderCard({ o }: { o: CustomerOrder }) {
   const race = it ? `${it.race}${it.year ? ` ${it.year}` : ''}` : o.lineItems[0]?.title || 'Order'
   const bought = it ? [it.size, it.frame && !/^unframed$/i.test(it.frame) ? it.frame.replace(/([a-z])([A-Z])/g, '$1 $2') : null, it.hasPhoto ? 'photo' : null].filter(Boolean).join(' · ') : o.lineItems[0]?.variant || ''
   const placed = new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  // Our own order view (/orders/4446, -2 for a later item); every link opens a new tab so Support keeps its place.
+  const fulfillmentUrl = o.imported && it ? `/orders/${o.number}${it.item > 1 ? `-${it.item}` : ''}` : null
   return (
     <div className="space-y-1.5">
       <div className="bg-subtle-gray border border-border-gray rounded-md p-2.5 flex items-start gap-2.5">
@@ -99,21 +111,15 @@ function OrderCard({ o }: { o: CustomerOrder }) {
           {o.discountCodes.length > 0 && <div className="mt-0.5 text-[11px] text-yellow-900/70 truncate" title={o.discountCodes.join(', ')}>Code: {o.discountCodes.join(', ')}</div>}
         </div>
       </div>
-      {/* Our own order view (/orders/4446, -2 for a later item), in a new tab so Support keeps its place. */}
-      {o.imported && o.items[0] && (
-        <a href={`/orders/${o.number}${o.items[0].item > 1 ? `-${o.items[0].item}` : ''}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="This order in the fulfillment tool">
-          <img src="/trackstar-stars-transparent.png" alt="" className="w-5 h-5 object-contain" /> Open in Fulfillment <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
-        </a>
-      )}
-      {o.adminUrl && (
-        <a href={o.adminUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors">
-          <img src="/shopify-icon.png" alt="" className="w-5 h-5" /> Open in Shopify <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
-        </a>
-      )}
-      {o.arteloUrl && (
-        <a href={o.arteloUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors">
-          <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> Open in Artelo <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
-        </a>
+      {(fulfillmentUrl || o.adminUrl || o.arteloUrl) && (
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Open in</div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {fulfillmentUrl && <OpenIn href={fulfillmentUrl} icon={<img src="/trackstar-stars-transparent.png" alt="" className="w-4 h-4 object-contain" />} label="Fulfillment" title="This order in the fulfillment tool" />}
+            {o.adminUrl && <OpenIn href={o.adminUrl} icon={<img src="/shopify-icon.png" alt="" className="w-4 h-4" />} label="Shopify" />}
+            {o.arteloUrl && <OpenIn href={o.arteloUrl} icon={<img src="/artelo-icon.png" alt="" className="w-4 h-4 rounded-[3px]" />} label="Artelo" />}
+          </div>
+        </div>
       )}
     </div>
   )
