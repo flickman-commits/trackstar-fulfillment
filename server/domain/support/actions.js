@@ -6,7 +6,6 @@
  *
  *   discount15        a one-time FIRSTNAME-15 code in Shopify (the Make-It-Right toolkit)
  *   lookupCode        what Shopify says about a code the customer pasted
- *   tagReprint        REPRINT tag and a note on the Shopify order (scenarios 2A, 13)
  *   orderNote         a comment on our order row, for whoever is fulfilling it
  *   fixPersonalization the runner's name or year on our order row, before production (scenario 3)
  *   shippingAddress   a new ship-to on the Shopify order and our rows (scenario 19); Artelo is changed by hand
@@ -112,26 +111,6 @@ export async function lookupCode(code) {
 // Orders
 // ---------------------------------------------------------------------------
 
-/** REPRINT on the Shopify order's tags, and why in its note. Also a comment on our rows for it. */
-export async function tagReprint({ thread, shopifyOrderId, reason, actor }) {
-  const id = String(shopifyOrderId || '').trim()
-  if (!/^\d+$/.test(id)) throw new Error('That order has no Shopify id')
-  const { order } = await shopifyFetch(`/orders/${id}.json?fields=id,name,tags,note`)
-  const tags = String(order.tags || '').split(',').map(s => s.trim()).filter(Boolean)
-  if (!tags.includes('REPRINT')) tags.push('REPRINT')
-  const stamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  const line = `REPRINT (${stamp}, ${actor?.firstName || 'support'}): ${String(reason || '').trim() || 'see support thread'}`
-  const note = [order.note, line].filter(Boolean).join('\n')
-  await shopifyFetch(`/orders/${id}.json`, { method: 'PUT', body: JSON.stringify({ order: { id: Number(id), tags: tags.join(', '), note } }) })
-  const ours = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: id }, select: { id: true } })
-  if (ours.length) {
-    await prisma.orderComment.createMany({ data: ours.map(o => ({ orderId: o.id, text: line, authorId: actor?.id || null, authorName: actorName(actor) })) })
-  }
-  const number = String(order.name || '').replace(/^#/, '') || id
-  await event(thread.id, `${actorName(actor)} tagged #${number} REPRINT: ${String(reason || '').trim() || 'no reason given'}`, actor)
-  return { number, tags }
-}
-
 /** A comment on our order row, where fulfillment reads it. */
 export async function orderNote({ thread, orderId, text, actor }) {
   const t = String(text || '').trim()
@@ -148,7 +127,7 @@ export async function orderNote({ thread, orderId, text, actor }) {
 export async function fixPersonalization({ thread, orderId, runnerName, year, actor }) {
   const o = await prisma.order.findUnique({ where: { id: String(orderId || '') } })
   if (!o) throw new Error('No such order')
-  if (o.status === 'completed' || o.designStatus === 'sent_to_production') throw new Error('That one has gone to production. It is a reprint now (tag REPRINT), not an edit.')
+  if (o.status === 'completed' || o.designStatus === 'sent_to_production') throw new Error('That one has gone to production. It is a reprint now, not an edit; ask Matt.')
   const data = {}
   const name = String(runnerName || '').trim()
   const y = Number(year)

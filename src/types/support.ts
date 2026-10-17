@@ -115,7 +115,8 @@ export interface CustomerOrder {
   shipToLine: string
   /** The address Artelo has, when we have its copy of the order. */
   arteloAddress: Address | null
-  tracking: { url: string | null; number: string | null; company: string | null; at: string | null }[]
+  /** fromArtelo: the fulfillment Artelo created in Shopify, which is where its tracking lives. */
+  tracking: { url: string | null; number: string | null; company: string | null; at: string | null; fromArtelo: boolean }[]
   lineItems: { title: string; variant: string | null; quantity: number }[]
   items: OrderItem[]
   imported: boolean

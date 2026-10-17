@@ -3,7 +3,6 @@
  *
  *   discount15          { id }                                 -> { code, percent, endsAt }
  *   lookupCode          { code }                               -> what Shopify says about it
- *   tagReprint          { id, shopifyOrderId, reason }
  *   orderNote           { id, orderId, text }
  *   fixPersonalization  { id, orderId, runnerName?, year? }
  *   slackMatt           { id, text }
@@ -17,7 +16,7 @@ import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
 import { can } from '../_lib/roles.js'
 import prisma from '../_lib/prisma.js'
-import { discount15, lookupCode, tagReprint, orderNote, fixPersonalization, slackMatt, shippingAddress } from '../../server/domain/support/actions.js'
+import { discount15, lookupCode, orderNote, fixPersonalization, slackMatt, shippingAddress } from '../../server/domain/support/actions.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -41,11 +40,6 @@ export default async function handler(req, res) {
         }
         const out = await discount15({ thread, actor: user })
         await audit(`Created ${out.code} for ${thread.customerEmail}`, out)
-        return res.status(200).json(out)
-      }
-      case 'tagReprint': {
-        const out = await tagReprint({ thread, shopifyOrderId: body.shopifyOrderId, reason: body.reason, actor: user })
-        await audit(`Tagged #${out.number} REPRINT`, { reason: body.reason || null })
         return res.status(200).json(out)
       }
       case 'orderNote': {
