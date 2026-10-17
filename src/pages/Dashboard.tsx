@@ -5329,7 +5329,12 @@ Thank you!`
                               <Loader2 className="w-5 h-5 animate-spin text-off-black/40 mr-9" />
                             </div>
                           ) : selectedOrder.weatherTemp ? (
-                            <CopyableField label="Temp" value={selectedOrder.weatherTemp} />
+                            <CopyableField label="Temp" value={selectedOrder.weatherTemp} aside={
+                              // The temperature is part of the same check as the condition.
+                              selectedOrder.weatherConfirmedAt
+                                ? <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700 border border-green-200" title={`Confirmed${selectedOrder.weatherConfirmedBy ? ` by ${selectedOrder.weatherConfirmedBy}` : ''} ${new Date(selectedOrder.weatherConfirmedAt).toLocaleString()}`}>Confirmed</span>
+                                : <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200" title="Calculated; confirm it beside the weather above">Calculated</span>
+                            } />
                           ) : (
                             <PendingField label="Temp" />
                           )}
