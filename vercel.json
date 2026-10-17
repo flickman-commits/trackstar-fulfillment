@@ -40,46 +40,10 @@
     "api/sales/**/*.js": {
       "maxDuration": 300
     },
-    "api/support/sync.js": {
+    "api/support/{sync,backfill,instagram}.js": {
       "maxDuration": 300
     },
-    "api/support/backfill.js": {
-      "maxDuration": 300
-    },
-    "api/support/reply.js": {
-      "maxDuration": 60
-    },
-    "api/support/thread.js": {
-      "maxDuration": 60
-    },
-    "api/support/threads.js": {
-      "maxDuration": 60
-    },
-    "api/support/gmail.js": {
-      "maxDuration": 60
-    },
-    "api/support/gmail-callback.js": {
-      "maxDuration": 60
-    },
-    "api/support/macros.js": {
-      "maxDuration": 60
-    },
-    "api/support/settings.js": {
-      "maxDuration": 60
-    },
-    "api/support/actions.js": {
-      "maxDuration": 60
-    },
-    "api/support/filters.js": {
-      "maxDuration": 60
-    },
-    "api/support/instagram.js": {
-      "maxDuration": 300
-    },
-    "api/support/instagram-callback.js": {
-      "maxDuration": 60
-    },
-    "api/support/instagram-webhook.js": {
+    "api/support/*.js": {
       "maxDuration": 60
     },
     "api/orders/actions.js": {

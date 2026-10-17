@@ -8,7 +8,7 @@
     "dev": "concurrently -n api,vite -c blue,green \"npm run dev:api\" \"npm run dev:vite\"",
     "dev:api": "node --env-file=.env.local server/dev.js",
     "dev:vite": "vite",
-    "build": "node scripts/lint-scrapers.js && prisma generate && tsc && vite build",
+    "build": "node scripts/check-vercel-config.js && node scripts/lint-scrapers.js && prisma generate && tsc && vite build",
     "postinstall": "prisma generate",
     "preview": "vite preview",
     "lint": "eslint src --report-unused-disable-directives --max-warnings 5",
