@@ -99,6 +99,12 @@ function OrderCard({ o }: { o: CustomerOrder }) {
           {o.discountCodes.length > 0 && <div className="mt-0.5 text-[11px] text-yellow-900/70 truncate" title={o.discountCodes.join(', ')}>Code: {o.discountCodes.join(', ')}</div>}
         </div>
       </div>
+      {/* Our own order view (/orders/4446, -2 for a later item), in a new tab so Support keeps its place. */}
+      {o.imported && o.items[0] && (
+        <a href={`/orders/${o.number}${o.items[0].item > 1 ? `-${o.items[0].item}` : ''}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="This order in the fulfillment tool">
+          <img src="/trackstar-stars-transparent.png" alt="" className="w-5 h-5 object-contain" /> Open in Fulfillment <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
+        </a>
+      )}
       {o.adminUrl && (
         <a href={o.adminUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors">
           <img src="/shopify-icon.png" alt="" className="w-5 h-5" /> Open in Shopify <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
