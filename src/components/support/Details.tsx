@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, ChevronDown, Loader2, Package, Truck, AlertCircle, Database, Mail, X, Plus, Instagram, KeyRound } from 'lucide-react'
+import { ArrowUpRight, Check, ChevronDown, Copy, Loader2, Package, Truck, AlertCircle, Database, Mail, X, Plus, Instagram, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnSecondary, chip } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
@@ -321,6 +321,20 @@ export function InstagramCard({ status, isAdmin, onChanged }: { status: Instagra
   )
 }
 
+/** Copies to the clipboard and says so with a check for a moment. */
+function CopyButton({ text }: { text: string }) {
+  const [done, setDone] = useState(false)
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500) }
+    catch { toast.error('Could not copy') }
+  }
+  return (
+    <button onClick={copy} title={done ? 'Copied' : 'Copy'} className="shrink-0 mt-0.5 text-off-black/35 hover:text-off-black">
+      {done ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
+  )
+}
+
 export default function Details({ thread, team, tagSuggestions, onOpenThread, onAssign, onPriority, onTags, onInsert, onAttach, onChanged, width, filters, onFiltersChanged }: {
   thread: ThreadDetail | null
   team: Teammate[]
@@ -347,7 +361,7 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
         <>
           <Section title="Customer">
             <Attr label="Name">{thread.customer.name || <span className="text-off-black/40">Unknown</span>}</Attr>
-            {thread.customer.email && <Attr label="Email"><a href={`mailto:${thread.customer.email}`} className="text-blue-600 hover:text-blue-700 break-all">{thread.customer.email}</a></Attr>}
+            {thread.customer.email && <Attr label="Email"><span className="inline-flex items-start gap-1.5 min-w-0"><a href={`mailto:${thread.customer.email}`} className="text-blue-600 hover:text-blue-700 break-all">{thread.customer.email}</a><CopyButton text={thread.customer.email} /></span></Attr>}
             {thread.channel === 'instagram' && thread.igUsername && <Attr label="Instagram"><a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">@{thread.igUsername}</a></Attr>}
             <Attr label="First seen">{day(thread.customer.firstSeen)}</Attr>
             <Attr label="Conversations">{thread.customer.conversations}</Attr>
@@ -355,7 +369,8 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
               <div className="pt-1"><FilterSender email={thread.customer.email} filters={filters} onChanged={onFiltersChanged} /></div>
             )}
             {thread.pastThreads.length > 0 && (
-              <div className="pt-1 space-y-1">
+              <div className="pt-2 space-y-1">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Other conversations</div>
                 {thread.pastThreads.map(p => (
                   <button key={p.id} onClick={() => onOpenThread(p.id)} className="w-full text-left px-2.5 py-1.5 rounded-md border border-border-gray bg-white hover:bg-subtle-gray transition-colors">
                     <div className="flex items-center justify-between gap-2">
