@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { BadgePercent, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Star, Truck, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Ban, BadgePercent, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Star, Truck, X } from 'lucide-react'
 import { reviewAsk, reviewLinkFor } from '@/lib/reviewLinks'
 import { toast } from 'sonner'
 import { supportApi } from '@/lib/supportApi'
@@ -13,7 +13,9 @@ import type { Address, CodeLookup, CustomerOrder, Mockup, ThreadDetail } from '@
  * so its tracking is on the Shopify fulfillment it creates) or the approval
  * link into the reply; change the ship-to (Shopify and our rows, then the
  * address copied for Artelo, which has no API to edit an order); fix the
- * name or year before production; a note for fulfillment; refund in Shopify. For the customer: a 15% code, Slack
+ * name or year before production; a note for fulfillment; refund all or
+ * part (over $150 is Matt's); cancel and refund before production, with the
+ * customer's yes, then cancel it in Artelo by hand. For the customer: a 15% code, Slack
  * Matt. Last and small: check a code they pasted. Every one is a person's
  * press, an event in the thread and an audit line.
  */
@@ -82,8 +84,122 @@ function AddressForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread
   )
 }
 
+type Refundable = { number: string; availableCents: number; refundedCents: number; cancelled: boolean; fulfillment: string | null; limitCents: number; isAdmin: boolean }
+const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`
+const formBox = 'w-full bg-subtle-gray border border-border-gray rounded-md p-2.5 space-y-1.5 text-xs'
+
+/** What is left to refund on the order, read from Shopify when a form opens. */
+function useRefundable(thread: ThreadDetail, o: CustomerOrder) {
+  const [info, setInfo] = useState<Refundable | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const load = () => {
+    setErr(null)
+    supportApi.action<Refundable>('refundable', { id: thread.id, shopifyOrderId: o.shopifyOrderId }).then(setInfo).catch(e => setErr((e as Error).message))
+  }
+  return { info, err, load }
+}
+
+/** Money back, all or part (scenarios 5 and 15). Over $150 needs an admin, and the server checks too. */
+function RefundForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread: ThreadDetail; onDone: () => void; onCancel: () => void }) {
+  const { info, err, load } = useRefundable(thread, o)
+  const [amount, setAmount] = useState('')
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const cents = Math.round(Number(amount) * 100) || 0
+  const over = info ? cents > info.limitCents && !info.isAdmin : false
+  const tooMuch = info ? cents > info.availableCents : false
+  const save = async () => {
+    if (!window.confirm(`Refund ${dollars(cents)} on #${o.number} to the card they paid with? This cannot be undone.`)) return
+    setBusy(true)
+    try {
+      const out = await supportApi.action<{ display: string; leftCents: number }>('refund', { id: thread.id, shopifyOrderId: o.shopifyOrderId, cents, reason })
+      toast.success(`Refunded ${out.display} on #${o.number}`)
+      onDone(); onCancel()
+    } catch (e) { toast.error((e as Error).message) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className={formBox}>
+      {err ? <div className="text-red-700">{err}</div> : !info ? <div className="text-off-black/50 inline-flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" />Reading the order from Shopify</div> : (
+        <>
+          <div className="text-off-black/60">{dollars(info.availableCents)} left to refund{info.refundedCents ? ` (${dollars(info.refundedCents)} already refunded)` : ''}.</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-off-black/50">$</span>
+            <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="0.00" className={`${field} w-24`} autoFocus />
+            <button onClick={() => setAmount((info.availableCents / 100).toFixed(2))} className="text-[#4600D6] hover:underline underline-offset-2">All of it</button>
+          </div>
+          <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Why (goes on the refund), e.g. Buy 2 promo missed" className={field} />
+          {over && <div className="text-red-700">Over {dollars(info.limitCents)} is Matt's call. Slack Matt instead.</div>}
+          {tooMuch && <div className="text-red-700">That is more than is left.</div>}
+          <div className="flex items-center gap-2 pt-0.5">
+            <span className="text-[11px] text-off-black/45 flex-1">No Shopify email; your reply tells them.</span>
+            <button onClick={onCancel} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">Cancel</button>
+            <button onClick={save} disabled={busy || cents <= 0 || !reason.trim() || over || tooMuch} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-dark-fill text-white hover:bg-off-black/85 disabled:opacity-50">{busy && <Loader2 className="w-3 h-3 animate-spin" />}Refund {cents > 0 ? dollars(cents) : ''}</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Cancel and refund in full (scenario 14). Only with the customer's yes, only before production. */
+function CancelForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread: ThreadDetail; onDone: () => void; onCancel: () => void }) {
+  const { info, err, load } = useRefundable(thread, o)
+  const [reason, setReason] = useState('')
+  const [yes, setYes] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<{ display: string; arteloUrl: string | null } | null>(null)
+  useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const over = info ? info.availableCents > info.limitCents && !info.isAdmin : false
+  const save = async () => {
+    if (!info || !window.confirm(`Cancel #${o.number} and refund ${dollars(info.availableCents)}? This cannot be undone.`)) return
+    setBusy(true)
+    try {
+      const out = await supportApi.action<{ display: string; arteloUrl: string | null }>('cancelOrder', { id: thread.id, shopifyOrderId: o.shopifyOrderId, reason, customerConfirmed: yes })
+      setDone(out)
+      toast.success(`#${o.number} cancelled and ${out.display} refunded`)
+      onDone()
+    } catch (e) { toast.error((e as Error).message) }
+    finally { setBusy(false) }
+  }
+  if (done) {
+    return (
+      <div className={formBox}>
+        <div className="inline-flex items-center gap-1.5 text-emerald-700 font-medium"><Check className="w-3.5 h-3.5" />Cancelled in Shopify, {done.display} refunded, off the fulfillment queue.</div>
+        <div className="text-off-black/70">Now cancel it in Artelo too, or it stays there.</div>
+        <div className="flex items-center gap-3">
+          {done.arteloUrl && <a href={done.arteloUrl} target="_blank" rel="noopener noreferrer" className={linkCls}><img src="/artelo-icon.png" alt="" className="w-3.5 h-3.5 rounded-[3px]" />Open in Artelo</a>}
+          <button onClick={onCancel} className="ml-auto text-off-black/45 hover:text-off-black">Done</button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className={formBox}>
+      {err ? <div className="text-red-700">{err}</div> : !info ? <div className="text-off-black/50 inline-flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" />Reading the order from Shopify</div> : (
+        <>
+          <div className="text-off-black/70">Cancels #{o.number} in Shopify and refunds {dollars(info.availableCents)}. They reorder if they want something different.</div>
+          <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Why, e.g. Wrong frame, reordering" className={field} />
+          <label className="flex items-start gap-1.5 cursor-pointer text-off-black/80">
+            <input type="checkbox" checked={yes} onChange={e => setYes(e.target.checked)} className="mt-0.5 accent-[#4600D6]" />
+            The customer said yes to cancelling
+          </label>
+          {over && <div className="text-red-700">Over {dollars(info.limitCents)} is Matt's call. Slack Matt instead.</div>}
+          <div className="flex items-center gap-2 pt-0.5">
+            <span className="flex-1" />
+            <button onClick={onCancel} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">Back</button>
+            <button onClick={save} disabled={busy || !yes || over} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{busy && <Loader2 className="w-3 h-3 animate-spin" />}Cancel and refund {dollars(info.availableCents)}</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function OrderActions({ o, thread, multiple, onInsert, onAttach, onChanged }: { o: CustomerOrder; thread: ThreadDetail; multiple: boolean; onInsert: (text: string) => void; onAttach: (m: Mockup) => void; onChanged: () => void }) {
   const [picking, setPicking] = useState(false)
+  const [money, setMoney] = useState<null | 'refund' | 'cancel'>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [editingAddress, setEditingAddress] = useState(false)
   const run = async (key: string, fn: () => Promise<string | void>) => {
@@ -162,7 +278,13 @@ function OrderActions({ o, thread, multiple, onInsert, onAttach, onChanged }: { 
             run('note', async () => { await supportApi.action('orderNote', { id: thread.id, orderId: o.items[0].orderId, text }); return 'Note left on the order' })
           }}>Note for fulfillment</ActionLink>
         )}
-        {o.adminUrl && <ActionLink icon={Receipt} href={`${o.adminUrl}/refund`} title="Full or partial. Over $150 is Matt's call.">Refund in Shopify</ActionLink>}
+        {o.shopifyOrderId && o.financialStatus !== 'REFUNDED' && (money === 'refund'
+          ? <RefundForm o={o} thread={thread} onDone={onChanged} onCancel={() => setMoney(null)} />
+          : <ActionLink icon={Receipt} onClick={() => setMoney('refund')} title="All or part, to the card they paid with. Over $150 is Matt's call.">Refund</ActionLink>)}
+        {/* Cancel only before anything is made or shipped. */}
+        {o.shopifyOrderId && !shipped && !o.items.some(it => it.status === 'completed' || it.designStatus === 'sent_to_production') && o.financialStatus !== 'REFUNDED' && (money === 'cancel'
+          ? <CancelForm o={o} thread={thread} onDone={onChanged} onCancel={() => setMoney(null)} />
+          : <ActionLink icon={Ban} onClick={() => setMoney('cancel')} title="Only after the customer says yes, and only before production">Cancel and refund</ActionLink>)}
       </div>
     </div>
   )

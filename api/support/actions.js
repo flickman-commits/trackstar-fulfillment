@@ -7,6 +7,9 @@
  *   fixPersonalization  { id, orderId, runnerName?, year? }
  *   slackMatt           { id, text }
  *   shippingAddress     { id, shopifyOrderId, address: { name, address1, address2, city, province, zip, country, phone } }
+ *   refundable          { id, shopifyOrderId }                  -> what is left to refund, and the $150 line
+ *   refund              { id, shopifyOrderId, cents, reason }   over $150 refused unless admin (re-read from the database)
+ *   cancelOrder         { id, shopifyOrderId, reason, customerConfirmed: true }
  *
  * Anyone on Support; a discount code also needs the Discount codes
  * capability, the same gate as the dashboard's discount tool. Every
@@ -16,7 +19,7 @@ import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
 import { can } from '../_lib/roles.js'
 import prisma from '../_lib/prisma.js'
-import { discount15, lookupCode, orderNote, fixPersonalization, slackMatt, shippingAddress } from '../../server/domain/support/actions.js'
+import { discount15, lookupCode, orderNote, fixPersonalization, slackMatt, shippingAddress, refundable, refund, cancelOrder, REFUND_LIMIT_CENTS } from '../../server/domain/support/actions.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -55,6 +58,20 @@ export default async function handler(req, res) {
       case 'shippingAddress': {
         const out = await shippingAddress({ thread, shopifyOrderId: body.shopifyOrderId, address: body.address, actor: user })
         await audit(`Changed #${out.number}'s ship-to`, { shopifyOrderId: body.shopifyOrderId })
+        return res.status(200).json(out)
+      }
+      case 'refundable': {
+        const o = await refundable(body.shopifyOrderId)
+        return res.status(200).json({ number: o.name, availableCents: o.availableCents, refundedCents: o.refundedCents, currency: o.currency, cancelled: o.cancelled, fulfillment: o.fulfillment, limitCents: REFUND_LIMIT_CENTS, isAdmin: user.role === 'admin' })
+      }
+      case 'refund': {
+        const out = await refund({ thread, shopifyOrderId: body.shopifyOrderId, cents: body.cents, reason: body.reason, actor: user })
+        await audit(`Refunded ${out.display} on #${out.number}`, { shopifyOrderId: body.shopifyOrderId, cents: out.cents, currency: 'USD', reason: body.reason || null })
+        return res.status(200).json(out)
+      }
+      case 'cancelOrder': {
+        const out = await cancelOrder({ thread, shopifyOrderId: body.shopifyOrderId, reason: body.reason, customerConfirmed: body.customerConfirmed === true, actor: user })
+        await audit(`Cancelled #${out.number} and refunded ${out.display}`, { shopifyOrderId: body.shopifyOrderId, cents: out.cents, currency: 'USD', reason: body.reason || null })
         return res.status(200).json(out)
       }
       case 'slackMatt': {

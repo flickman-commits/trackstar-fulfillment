@@ -9,6 +9,8 @@
  *   orderNote         a comment on our order row, for whoever is fulfilling it
  *   fixPersonalization the runner's name or year on our order row, before production (scenario 3)
  *   shippingAddress   a new ship-to on the Shopify order and our rows (scenario 19); Artelo is changed by hand
+ *   refund            money back on a Shopify order, all or part (scenarios 5, 15); over $150 is an admin's
+ *   cancelOrder       cancel and fully refund an order not yet in production, once the customer said yes (scenario 14)
  *   slackMatt         the escalation rules: a line in Slack with a link to the thread
  *
  * Refunds, cancellations and order edits are money and stay in Shopify;
@@ -187,6 +189,126 @@ export async function shippingAddress({ thread, shopifyOrderId, address, actor }
   }
   await event(thread.id, `${actorName(actor)} changed #${number}'s ship-to in Shopify to ${pasted.replace(/\n/g, ', ')}. Artelo still needs it.`, actor)
   return { number, address: a, pasted, arteloUrl: arteloOrderUrl(rows[0]?.arteloOrderData?.id) || null }
+}
+
+// ---------------------------------------------------------------------------
+// Money: refunds and cancellations
+// ---------------------------------------------------------------------------
+//
+// Amounts travel as integer cents and become Shopify's decimal strings only
+// at the call. The playbook's line is $150: under it a rep refunds on their
+// own, over it the server refuses anyone but an admin, whatever the page
+// says. Nothing here notifies the customer through Shopify; the rep's reply
+// is the message.
+
+export const REFUND_LIMIT_CENTS = 15000
+
+const ORDER_MONEY = `
+  query($id: ID!) {
+    order(id: $id) {
+      id name cancelledAt displayFinancialStatus displayFulfillmentStatus
+      totalReceivedSet { shopMoney { amount currencyCode } }
+      totalRefundedSet { shopMoney { amount currencyCode } }
+      transactions(first: 20) { id kind status gateway amountSet { shopMoney { amount currencyCode } } }
+    }
+  }`
+
+const toCents = amount => Math.round(Number(amount || 0) * 100)
+const toAmount = cents => (cents / 100).toFixed(2)
+const money = cents => `$${toAmount(cents)}`
+
+/** What can still be refunded on a Shopify order, and the payment to refund it against. */
+export async function refundable(shopifyOrderId) {
+  const id = String(shopifyOrderId || '').trim()
+  if (!/^\d+$/.test(id)) throw new Error('That order has no Shopify id')
+  const data = await shopifyGraphQL(ORDER_MONEY, { id: `gid://shopify/Order/${id}` })
+  const o = data?.order
+  if (!o) throw new Error('Shopify does not have that order')
+  const received = toCents(o.totalReceivedSet?.shopMoney?.amount)
+  const refunded = toCents(o.totalRefundedSet?.shopMoney?.amount)
+  const sale = (o.transactions || []).find(t => (t.kind === 'SALE' || t.kind === 'CAPTURE') && t.status === 'SUCCESS') || null
+  return {
+    id, gid: o.id, name: String(o.name || '').replace(/^#/, ''),
+    cancelled: Boolean(o.cancelledAt), financial: o.displayFinancialStatus, fulfillment: o.displayFulfillmentStatus,
+    currency: o.totalReceivedSet?.shopMoney?.currencyCode || 'USD',
+    receivedCents: received, refundedCents: refunded, availableCents: Math.max(0, received - refunded),
+    sale,
+  }
+}
+
+const REFUND_CREATE = `
+  mutation refundCreate($input: RefundInput!) {
+    refundCreate(input: $input) {
+      refund { id totalRefundedSet { shopMoney { amount currencyCode } } }
+      userErrors { field message }
+    }
+  }`
+
+function guardLimit(cents, actor) {
+  if (cents > REFUND_LIMIT_CENTS && actor?.role !== 'admin' && !actor?.isSystem) {
+    throw new Error(`${money(cents)} is over the ${money(REFUND_LIMIT_CENTS)} line. That one is Matt's call: Slack Matt with the details.`)
+  }
+}
+
+/** Money back, all or part, against the order's payment. The order itself stays as it is. */
+export async function refund({ thread, shopifyOrderId, cents, reason, actor }) {
+  const amount = Math.round(Number(cents))
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('How much? Enter an amount above zero.')
+  const why = String(reason || '').trim()
+  if (!why) throw new Error('Say why, in a few words. It goes on the refund in Shopify.')
+  const o = await refundable(shopifyOrderId)
+  if (!o.sale) throw new Error('No captured payment on that order to refund against.')
+  if (amount > o.availableCents) throw new Error(`Only ${money(o.availableCents)} is left to refund on #${o.name}.`)
+  guardLimit(amount, actor)
+
+  const data = await shopifyGraphQL(REFUND_CREATE, {
+    input: {
+      orderId: o.gid,
+      note: `${why} (support, ${actor?.firstName || 'rep'})`,
+      notify: false,
+      transactions: [{ orderId: o.gid, parentId: o.sale.id, gateway: o.sale.gateway, kind: 'REFUND', amount: toAmount(amount) }],
+    },
+  })
+  const errs = data?.refundCreate?.userErrors || []
+  if (errs.length) throw new Error(`Shopify refused the refund: ${errs.map(e => e.message).join('; ')}`)
+
+  const rows = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: o.id }, select: { id: true } })
+  if (rows.length) await prisma.orderComment.createMany({ data: rows.map(r => ({ orderId: r.id, text: `Refunded ${money(amount)} by support: ${why}`, authorId: actor?.id || null, authorName: actorName(actor) })) })
+  await event(thread.id, `${actorName(actor)} refunded ${money(amount)} on #${o.name}: ${why}`, actor)
+  return { number: o.name, cents: amount, display: money(amount), leftCents: o.availableCents - amount }
+}
+
+/**
+ * Cancel and refund in full (scenario 14: wrong frame, changed their mind
+ * before production). Only with the customer's yes, only while nothing has
+ * been produced or shipped. Our rows leave the queue with a note; Artelo
+ * has no API to cancel, so the thread says it still needs cancelling there.
+ */
+export async function cancelOrder({ thread, shopifyOrderId, reason, customerConfirmed, actor }) {
+  if (!customerConfirmed) throw new Error('Only after the customer says yes to cancelling. Ask them first.')
+  const why = String(reason || '').trim() || 'Customer asked to cancel'
+  const o = await refundable(shopifyOrderId)
+  if (o.cancelled) throw new Error(`#${o.name} is already cancelled in Shopify.`)
+  if (o.fulfillment === 'FULFILLED' || o.fulfillment === 'PARTIALLY_FULFILLED') throw new Error(`#${o.name} has shipped. It cannot be cancelled; a refund is Matt's call.`)
+
+  const rows = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: o.id }, select: { id: true, status: true, designStatus: true, trackingNumber: true, arteloOrderData: true } })
+  const produced = rows.find(r => r.status === 'completed' || r.designStatus === 'sent_to_production' || r.trackingNumber)
+  if (produced) throw new Error(`#${o.name} has gone to production. Too late to cancel; see the playbook's "too late" reply.`)
+  guardLimit(o.availableCents, actor)
+
+  // One call: cancel, and refund what was paid. No Shopify email; the reply says it.
+  await shopifyFetch(`/orders/${o.id}/cancel.json`, {
+    method: 'POST',
+    body: JSON.stringify({ reason: 'customer', email: false, restock: false, ...(o.availableCents > 0 ? { amount: toAmount(o.availableCents), currency: o.currency } : {}) }),
+  })
+
+  const note = `Cancelled and refunded ${money(o.availableCents)} by support: ${why}. Cancel it in Artelo too.`
+  if (rows.length) {
+    await prisma.order.updateMany({ where: { id: { in: rows.map(r => r.id) } }, data: { status: 'completed' } })
+    await prisma.orderComment.createMany({ data: rows.map(r => ({ orderId: r.id, text: note, authorId: actor?.id || null, authorName: actorName(actor) })) })
+  }
+  await event(thread.id, `${actorName(actor)} cancelled #${o.name} and refunded ${money(o.availableCents)}: ${why}. Artelo still needs cancelling.`, actor)
+  return { number: o.name, cents: o.availableCents, display: money(o.availableCents), arteloUrl: arteloOrderUrl(rows[0]?.arteloOrderData?.id) || null }
 }
 
 // ---------------------------------------------------------------------------
