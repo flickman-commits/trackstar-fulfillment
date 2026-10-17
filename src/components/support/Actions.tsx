@@ -332,17 +332,44 @@ export default function Actions({ thread, onInsert, onAttach, onChanged }: { thr
     finally { setBusy(null) }
   }
   const orders = thread.context.orders
+  const [codeOpen, setCodeOpen] = useState(false)
+  const [pct, setPct] = useState('15')
+  const pctNum = Number(pct)
+  const pctOk = Number.isInteger(pctNum) && pctNum >= 1 && pctNum <= 100
+  const createCode = () => {
+    if (!pctOk) return
+    if (pctNum >= 50 && !window.confirm(`A ${pctNum}% code? That is a big one.`)) return
+    run('code', async () => {
+      const out = await supportApi.action<{ code: string; percent: number }>('discount15', { id: thread.id, percent: pctNum })
+      onInsert(`Use code ${out.code} for ${out.percent}% off your next print (good for 30 days).`)
+      setCodeOpen(false)
+      return `${out.code} created (one use) and added to the reply`
+    })
+  }
   return (
     <div className="space-y-4">
       {orders.map(o => <OrderActions key={`${o.source}-${o.number}`} o={o} thread={thread} multiple={orders.length > 1} onInsert={onInsert} onAttach={onAttach} onChanged={onChanged} />)}
       <div>
         {orders.length > 1 && <div className={heading}>Customer</div>}
         <div className="flex flex-col items-stretch gap-1.5">
-          <ActionLink icon={BadgePercent} busy={busy === 'code'} title="One use, 30 days, named after them" onClick={() => run('code', async () => {
-            const out = await supportApi.action<{ code: string; percent: number }>('discount15', { id: thread.id })
-            onInsert(`Use code ${out.code} for ${out.percent}% off your next print (good for 30 days).`)
-            return `${out.code} created and added to the reply`
-          })}>Create 15% code for {first || 'them'}</ActionLink>
+          {codeOpen ? (
+            <div className={formBox}>
+              <div className="flex items-center gap-1.5">
+                <input value={pct} onChange={e => setPct(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))} inputMode="numeric" className={`${field} w-14 text-right`} autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter') createCode() }} />
+                <span className="text-off-black/60">% off</span>
+                {[10, 15, 20].map(n => <button key={n} onClick={() => setPct(String(n))} className={`px-1.5 py-0.5 rounded border ${pct === String(n) ? 'border-[#4600D6] text-[#4600D6]' : 'border-border-gray text-off-black/55 hover:text-off-black'}`}>{n}%</button>)}
+              </div>
+              <div className="text-[11px] text-off-black/45">One use, 30 days, named after {first || 'them'}: {(first || 'TRACKSTAR').toUpperCase().replace(/[^A-Z0-9]/g, '')}-{pctNum || '?'}. Added to your reply.</div>
+              <div className="flex items-center gap-2">
+                <span className="flex-1" />
+                <button onClick={() => setCodeOpen(false)} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">Cancel</button>
+                <button onClick={createCode} disabled={busy === 'code' || !pctOk} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-dark-fill text-white hover:bg-off-black/85 disabled:opacity-50">{busy === 'code' && <Loader2 className="w-3 h-3 animate-spin" />}Create {pctOk ? `${pctNum}% ` : ''}code</button>
+              </div>
+            </div>
+          ) : (
+            <ActionLink icon={BadgePercent} title="One use, 30 days, named after them" onClick={() => setCodeOpen(true)}>Create discount code for {first || 'them'}</ActionLink>
+          )}
           <ActionLink icon={MessageSquareWarning} busy={busy === 'slack'} title="Posts to Slack with a link to this thread, and marks it escalated" onClick={() => {
             const text = window.prompt('What should Matt know? (goes to Slack with a link to this thread)', '')
             if (text === null) return

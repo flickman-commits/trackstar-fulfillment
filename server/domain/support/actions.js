@@ -4,7 +4,7 @@
  * person, leaves an event in the thread and a line in the audit log, and
  * does one thing:
  *
- *   discount15        a one-time FIRSTNAME-15 code in Shopify (the Make-It-Right toolkit)
+ *   discount15        a one-time FIRSTNAME-<percent> code in Shopify, any whole percent (the Make-It-Right toolkit)
  *   lookupCode        what Shopify says about a code the customer pasted
  *   orderNote         a comment on our order row, for whoever is fulfilling it
  *   fixPersonalization the runner's name or year on our order row, before production (scenario 3)
@@ -45,8 +45,11 @@ const CREATE_CODE = `
     }
   }`
 
-/** A personal 15% code named after the customer, one use, 30 days. JANE-15, then JANE-15-2 if she has had one. */
+/** A personal code named after the customer, one use, 30 days: JANE-15, then JANE-15-2 if she has had one. */
 export async function discount15({ thread, actor, percent = 15, days = 30 }) {
+  // Whole percent, 1 to 100. Always one use, once per customer: a code is a gift to one person.
+  percent = Number(percent)
+  if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new Error('The discount is a whole percent from 1 to 100.')
   const first = String(thread.customerName || '').trim().split(/\s+/)[0] || ''
   const stem = (first.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'TRACKSTAR').slice(0, 20)
   const endsAt = new Date(Date.now() + days * 86400000).toISOString()

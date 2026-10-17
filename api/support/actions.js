@@ -1,7 +1,7 @@
 /**
  * POST /api/support/actions { id, action, ... } - the quick actions beside a conversation.
  *
- *   discount15          { id }                                 -> { code, percent, endsAt }
+ *   discount15          { id, percent? }                        -> { code, percent, endsAt }  single use, 30 days
  *   lookupCode          { code }                               -> what Shopify says about it
  *   orderNote           { id, orderId, text }
  *   fixPersonalization  { id, orderId, runnerName?, year? }
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
         if (!(user.isSystem || user.role === 'admin' || await can(user.role, 'tools.discounts'))) {
           return res.status(403).json({ error: 'Discount codes are not part of your role. Ask Matt.', code: 'not_allowed' })
         }
-        const out = await discount15({ thread, actor: user })
+        const out = await discount15({ thread, actor: user, percent: body.percent ?? 15 })
         await audit(`Created ${out.code} for ${thread.customerEmail}`, out)
         return res.status(200).json(out)
       }
