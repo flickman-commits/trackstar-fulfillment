@@ -36,8 +36,8 @@ const OPENISH = { status: { in: ['open', 'waiting', 'escalated'] } }
 
 /** The where clause for a view. `teammate:<id>` is that person's open work. */
 export function viewWhere(view, userId) {
-  if (view === 'filtered') return { filtered: true }
-  return { filtered: false, ...baseView(view, userId) }
+  if (view === 'filtered') return { filtered: true, mergedIntoId: null }
+  return { filtered: false, mergedIntoId: null, ...baseView(view, userId) }
 }
 
 function baseView(view, userId) {
@@ -90,7 +90,7 @@ export async function listThreads({ view = 'all', userId, q = '', sort = 'waitin
     prisma.supportThread.count({ where: viewWhere('waiting') }),
     prisma.supportThread.count({ where: viewWhere('escalated') }),
     prisma.supportThread.count({ where: viewWhere('snoozed') }),
-    prisma.supportThread.groupBy({ by: ['assigneeId'], where: { ...OPENISH, filtered: false }, _count: { _all: true } }),
+    prisma.supportThread.groupBy({ by: ['assigneeId'], where: { ...OPENISH, filtered: false, mergedIntoId: null }, _count: { _all: true } }),
   ])
   const reads = userId && threads.length
     ? await prisma.supportRead.findMany({ where: { userId, threadId: { in: threads.map(t => t.id) } } })
@@ -148,15 +148,16 @@ export async function getThread(id, { userId } = {}) {
     },
   })
   if (!t) return null
+  if (t.mergedIntoId && t.mergedIntoId !== id) return getThread(t.mergedIntoId, { userId })
   const [context, pastThreads, customerSince, customerCount] = await Promise.all([
     customerContext(t.customerEmail),
     t.customerEmail ? prisma.supportThread.findMany({
-      where: { customerEmail: t.customerEmail, id: { not: t.id } },
+      where: { customerEmail: t.customerEmail, id: { not: t.id }, mergedIntoId: null },
       orderBy: { lastMessageAt: 'desc' }, take: 6,
       select: { id: true, subject: true, status: true, lastMessageAt: true, messageCount: true },
     }) : [],
     t.customerEmail ? prisma.supportThread.aggregate({ where: { customerEmail: t.customerEmail }, _min: { createdAt: true } }) : null,
-    t.customerEmail ? prisma.supportThread.count({ where: { customerEmail: t.customerEmail } }) : 0,
+    t.customerEmail ? prisma.supportThread.count({ where: { customerEmail: t.customerEmail, mergedIntoId: null } }) : 0,
   ])
   const readAt = userId ? t.reads?.[0]?.readAt : null
   const instagram = t.channel === 'instagram'

@@ -328,6 +328,10 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
   if (parsed.labels?.includes('DRAFT')) return null
 
   let thread = await prisma.supportThread.findUnique({ where: { gmailThreadId: parsed.gmailThreadId } })
+  // Merged away: the message belongs to the conversation it was folded into.
+  for (let hop = 0; thread?.mergedIntoId && hop < 5; hop++) {
+    thread = await prisma.supportThread.findUnique({ where: { id: thread.mergedIntoId } }) || thread
+  }
   const who = counterpart(parsed, mb)
   if (!thread) {
     thread = await prisma.supportThread.create({

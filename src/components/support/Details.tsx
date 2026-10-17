@@ -31,10 +31,11 @@ function Section({ title, count, children, open: initial = true }: { title: stri
 }
 
 function Attr({ label, children }: { label: string; children: React.ReactNode }) {
+  // min-w-0 + break-words below keep a long email or code from widening the panel.
   return (
     <div className="flex items-start gap-3 text-xs">
       <span className="w-[86px] shrink-0 text-off-black/45 pt-0.5">{label}</span>
-      <span className="min-w-0 flex-1 text-off-black">{children}</span>
+      <span className="min-w-0 flex-1 text-off-black break-words">{children}</span>
     </div>
   )
 }
@@ -107,7 +108,7 @@ function OrderCard({ o }: { o: CustomerOrder }) {
               {st && <span className={`inline-flex items-center px-2 py-0.5 border rounded text-xs font-medium ${st.cls}`}>{st.label}</span>}
             </div>
             {tracking && (
-              <div className="mt-1.5 text-xs inline-flex items-center gap-1.5 text-off-black/70 min-w-0">
+              <div className="mt-1.5 text-xs flex items-center gap-1.5 text-off-black/70 min-w-0 max-w-full" title={`${tracking.company || 'Tracking'} ${tracking.number || ''}`}>
                 <Truck className="w-3 h-3 shrink-0" />
                 {tracking.url ? <a href={tracking.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 truncate">{tracking.company || 'Tracking'} {tracking.number}</a> : <span className="truncate">{tracking.company || 'Tracking'} {tracking.number}</span>}
               </div>
@@ -335,11 +336,13 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export default function Details({ thread, team, tagSuggestions, onOpenThread, onAssign, onPriority, onTags, onInsert, onAttach, onChanged, width, filters, onFiltersChanged }: {
+export default function Details({ thread, team, tagSuggestions, onOpenThread, onMerge, onAssign, onPriority, onTags, onInsert, onAttach, onChanged, width, filters, onFiltersChanged }: {
   thread: ThreadDetail | null
   team: Teammate[]
   tagSuggestions: string[]
   onOpenThread: (id: string) => void
+  /** Fold these other conversations of the customer into this one. */
+  onMerge: (ids: string[]) => void
   onAssign: (id: string | null) => void
   onPriority: (p: boolean) => void
   onTags: (tags: string[]) => void
@@ -355,7 +358,7 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
   onFiltersChanged: () => void
 }) {
   return (
-    <aside style={width ? { width } : undefined} className="w-full lg:w-[272px] xl:w-[300px] shrink-0 lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
+    <aside style={width ? { width } : undefined} className="w-full lg:w-[272px] xl:w-[300px] shrink-0 lg:overflow-y-auto overflow-x-hidden border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
       {!thread && <div className="px-4 py-6 text-xs text-off-black/45">Pick a conversation to see the customer, their orders and the actions.</div>}
       {thread && (
         <>
@@ -372,13 +375,19 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
               <div className="pt-2 space-y-1">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Other conversations</div>
                 {thread.pastThreads.map(p => (
-                  <button key={p.id} onClick={() => onOpenThread(p.id)} className="w-full text-left px-2.5 py-1.5 rounded-md border border-border-gray bg-white hover:bg-subtle-gray transition-colors">
+                  <div key={p.id} className="rounded-md border border-border-gray bg-white">
+                  <button onClick={() => onOpenThread(p.id)} className="w-full text-left px-2.5 py-1.5 rounded-t-md hover:bg-subtle-gray transition-colors">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-medium text-off-black truncate">{p.subject || '(no subject)'}</span>
                       <span className="text-[11px] text-off-black/45 shrink-0">{ago(p.lastMessageAt)}</span>
                     </div>
-                    <div className="mt-0.5"><span className={`${chip} ${STATUS_TONE[p.status]}`}>{p.status === 'waiting' ? 'Waiting' : STATUS_LABEL[p.status]}</span></div>
+                    <div className="mt-0.5"><span className={`${chip} ${STATUS_TONE[p.status]}`}>{STATUS_LABEL[p.status]}</span></div>
                   </button>
+                  {thread.channel === 'email' && (
+                    <button onClick={() => { if (window.confirm(`Merge "${p.subject || '(no subject)'}" into this conversation? Its messages move here; this cannot be undone.`)) onMerge([p.id]) }}
+                      className="w-full text-left px-2.5 py-1 border-t border-border-gray text-[11px] font-medium text-[#4600D6] hover:bg-[#4600D6]/5 rounded-b-md">Merge into this conversation</button>
+                  )}
+                  </div>
                 ))}
               </div>
             )}

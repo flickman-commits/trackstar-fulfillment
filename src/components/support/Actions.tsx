@@ -19,7 +19,7 @@ import type { Address, CodeLookup, CustomerOrder, Mockup, ThreadDetail } from '@
  * Matt. Last and small: check a code they pasted. Every one is a person's
  * press, an event in the thread and an audit line.
  */
-const linkCls = 'self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2 disabled:opacity-50 disabled:no-underline text-left'
+const linkCls = 'self-start max-w-full inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2 disabled:opacity-50 disabled:no-underline text-left'
 
 function ActionLink({ icon: Icon, onClick, href, busy, title, children }: { icon: typeof Truck; onClick?: () => void; href?: string; busy?: boolean; title?: string; children: React.ReactNode }) {
   const icon = busy ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Icon className="w-3.5 h-3.5 shrink-0" />
@@ -28,7 +28,7 @@ function ActionLink({ icon: Icon, onClick, href, busy, title, children }: { icon
 }
 
 const heading = 'text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5'
-const field = 'w-full px-2 py-1 text-xs bg-white border border-border-gray rounded focus:outline-none focus:ring-1 focus:ring-off-black/20'
+const field = 'w-full min-w-0 px-2 py-1 text-xs bg-white border border-border-gray rounded focus:outline-none focus:ring-1 focus:ring-off-black/20'
 
 /** The ship-to form, prefilled from Shopify (or Artelo's copy), then the hand-off to Artelo. */
 function AddressForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread: ThreadDetail; onDone: () => void; onCancel: () => void }) {

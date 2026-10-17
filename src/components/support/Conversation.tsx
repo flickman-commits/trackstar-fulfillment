@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Archive, ChevronDown, Clock, Loader2, Mail, Paperclip, RotateCcw, Send, Star, StickyNote, Trash2, Zap, X, Search } from 'lucide-react'
+import { AlertTriangle, Archive, Bold, ChevronDown, Clock, Italic, Link as LinkIcon, Loader2, Mail, Paperclip, RotateCcw, Send, Star, StickyNote, Trash2, Zap, X, Search } from 'lucide-react'
 import { btnGhost, btnPrimary, btnSecondary } from '@/lib/ui'
 import { when } from '@/lib/supportDates'
 import { fillMacro } from '@/lib/supportStatus'
@@ -182,7 +182,7 @@ function MacroMenu({ macros, onPick, onClose }: { macros: Macro[]; onPick: (m: M
   )
 }
 
-export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onRedraft, onUseMacro, replyRef, noteRef, insertRef, attachRef }: {
+export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onRedraft, onMerge, onUseMacro, replyRef, noteRef, insertRef, attachRef }: {
   thread: ThreadDetail
   /** The Instagram account replies go out as, without the @. */
   expectedHandle?: string
@@ -200,6 +200,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   onNote: (body: string, mentions: string[]) => Promise<boolean>
   onDeleteNote: (noteId: string) => void
   onRedraft: (instruction: string) => Promise<void>
+  onMerge: (ids: string[]) => void
   onUseMacro: (id: string) => void
   /** Lets the page's keyboard shortcuts focus the composer. */
   replyRef: React.RefObject<HTMLTextAreaElement>
@@ -284,6 +285,30 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     setMentionIds(ids => (ids.includes(u.id) ? ids : [...ids, u.id]))
     setMentionQ(null)
     requestAnimationFrame(() => { if (el) { const pos = before.length + name.length + 2; el.focus(); el.setSelectionRange(pos, pos) } })
+  }
+
+  /** Wrap the selected words in the reply with a mark (the toolbar), or insert the mark around a placeholder. */
+  const wrapSelection = (kind: 'bold' | 'italic' | 'link') => {
+    const el = replyRef.current
+    if (!el) return
+    const s0 = el.selectionStart, e0 = el.selectionEnd
+    const picked = text.slice(s0, e0)
+    let insert = ''
+    let selStart = 0, selEnd = 0
+    if (kind === 'link') {
+      const url = globalThis.prompt('Link to (https://...)', picked.startsWith('http') ? picked : 'https://')
+      if (!url || !/^https?:\/\/\S+$/.test(url.trim())) return
+      const words = picked && !picked.startsWith('http') ? picked : 'link text'
+      insert = `[${words}](${url.trim()})`
+      selStart = 1; selEnd = 1 + words.length
+    } else {
+      const mark = kind === 'bold' ? '**' : '_'
+      const words = picked || (kind === 'bold' ? 'bold text' : 'italic text')
+      insert = `${mark}${words}${mark}`
+      selStart = mark.length; selEnd = mark.length + words.length
+    }
+    setText(text.slice(0, s0) + insert + text.slice(e0))
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s0 + selStart, s0 + selEnd) })
   }
 
   /** Put text into the reply: between the greeting and sign-off when nothing is written yet, else at the caret. */
@@ -412,6 +437,19 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
         </div>
       </div>
 
+      {/* The customer wrote again instead of replying: offer to fold the others in. */}
+      {(() => {
+        const others = thread.channel === 'email' ? thread.pastThreads.filter(p => p.status !== 'closed') : []
+        if (!others.length) return null
+        return (
+          <div className="px-5 py-2 border-b border-amber-200 bg-amber-50 text-xs text-amber-900 flex flex-wrap items-center gap-x-3 gap-y-1 shrink-0">
+            <span>{(thread.customerName || 'This customer').split(/\s+/)[0]} has {others.length} other open conversation{others.length === 1 ? '' : 's'}{others.length === 1 ? `: "${others[0].subject || '(no subject)'}"` : ''}.</span>
+            <button onClick={() => { if (globalThis.confirm(`Merge ${others.length === 1 ? 'it' : `all ${others.length}`} into this conversation? Their messages move here; this cannot be undone.`)) onMerge(others.map(o => o.id)) }}
+              className="font-semibold text-[#4600D6] hover:underline underline-offset-2">Merge {others.length === 1 ? 'it' : 'them'} here</button>
+          </div>
+        )
+      })()}
+
       {/* Timeline */}
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 bg-[#fcfcfc]">
         {timeline.map(it => it.kind === 'note' && it.n.kind === 'draft'
@@ -454,6 +492,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
                     if (e.key === 'Escape') { setSlashQ(null); return }
                   }
                   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(e.shiftKey) }
+                  if ((e.metaKey || e.ctrlKey) && !ig && ['b', 'i', 'k'].includes(e.key.toLowerCase())) { e.preventDefault(); wrapSelection(e.key.toLowerCase() === 'b' ? 'bold' : e.key.toLowerCase() === 'i' ? 'italic' : 'link') }
                 }}
                 className="w-full px-3 py-2.5 text-sm bg-white border border-border-gray rounded-md focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 resize-y leading-relaxed"
               />
@@ -483,6 +522,13 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
               </div>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
+              {!ig && (
+                <span className="inline-flex items-center rounded-md border border-border-gray overflow-hidden" title="Formatting: **bold**, _italic_, [text](link). Links are made from bare addresses too.">
+                  <button type="button" onClick={() => wrapSelection('bold')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black" title="Bold (⌘B)"><Bold className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => wrapSelection('italic')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black border-l border-border-gray" title="Italic (⌘I)"><Italic className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => wrapSelection('link')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black border-l border-border-gray" title="Link (⌘K)"><LinkIcon className="w-3.5 h-3.5" /></button>
+                </span>
+              )}
               <div className="relative" ref={macro.ref}>
                 <button data-macro-button onClick={() => macro.setOpen(v => !v)} className={btnSecondary} title="Insert a saved reply (m), or type / in the reply"><Zap className="w-3.5 h-3.5" /> Macro</button>
                 {macro.open && <MacroMenu macros={macros} onPick={insertMacro} onClose={() => macro.setOpen(false)} />}

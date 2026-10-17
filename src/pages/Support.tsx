@@ -190,6 +190,11 @@ export default function Support() {
       return true
     } catch (e) { toast.error((e as Error).message); return false }
   }
+  const merge = (sourceIds: string[]) => thread && run(async () => {
+    const fresh = await supportApi.merge(thread.id, sourceIds)
+    setThread(fresh)
+    toast.success(`Merged ${sourceIds.length} conversation${sourceIds.length === 1 ? '' : 's'} into this one`)
+  })
   const redraft = async (instruction: string) => {
     if (!thread) return
     try {
@@ -299,7 +304,7 @@ export default function Support() {
               <Conversation
                 key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros} expectedHandle={instagram?.expectedHandle}
                 onAssign={assign} onStatus={setStatusOf} onSnooze={snooze} onPriority={setPriority} onMarkUnread={markUnread}
-                onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onRedraft={redraft} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
+                onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onRedraft={redraft} onMerge={ids => { merge(ids) }} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
                 replyRef={replyRef} noteRef={noteRef} insertRef={insertRef} attachRef={attachRef}
               />
             ) : (
@@ -316,7 +321,7 @@ export default function Support() {
             <ResizeHandle onDrag={dx => detailsCol.by(-dx)} onReset={detailsCol.reset} />
             <Details
               width={wide ? detailsCol.width : undefined}
-              thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread}
+              thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread} onMerge={ids => { merge(ids) }}
               onAssign={assign} onPriority={setPriority} onTags={setTags}
               filters={filters} onFiltersChanged={() => { loadFilters(); loadInbox(true); if (selectedId) refreshThread(selectedId) }}
               onInsert={t => insertRef.current?.(t)} onAttach={m => attachRef.current?.(m)} onChanged={() => { if (selectedId) refreshThread(selectedId); loadInbox(true) }}

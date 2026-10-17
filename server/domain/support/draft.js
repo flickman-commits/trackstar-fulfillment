@@ -195,7 +195,7 @@ export async function draftPending({ limit = 6 } = {}) {
   if (!isLlmConfigured() || process.env.SUPPORT_DRAFTS === 'off') return { drafted: 0, skipped: 'off' }
   const since = new Date(Date.now() - 3 * 86400000)
   const candidates = await prisma.supportThread.findMany({
-    where: { status: 'open', filtered: false, lastInboundAt: { gte: since } },
+    where: { status: 'open', filtered: false, mergedIntoId: null, lastInboundAt: { gte: since } },
     orderBy: { lastInboundAt: 'asc' },
     take: 40,
     select: { id: true, lastInboundAt: true, lastOutboundAt: true, notes: { where: { kind: 'draft' }, orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },

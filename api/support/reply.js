@@ -12,7 +12,7 @@
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
 import prisma from '../_lib/prisma.js'
-import { textToHtml } from '../../server/domain/sales/gmail.js'
+import { replyToHtml, replyToPlain } from '../../server/domain/support/format.js'
 import { sendReply } from '../../server/domain/support/mailbox.js'
 import { sendReply as sendInstagramReply } from '../../server/domain/support/instagram.js'
 import { getThread, setStatus } from '../../server/domain/support/threads.js'
@@ -41,9 +41,10 @@ export default async function handler(req, res) {
     for (const [i, ref] of refs.entries()) {
       files.push(await resolveMockup(ref, { filenameStem: refs.length > 1 ? `Your Trackstar print ${i + 1}` : 'Your Trackstar print' }))
     }
+    // **bold**, _italic_ and links: real formatting in email, plain text in a DM (format.js).
     const sent = instagram
-      ? await sendInstagramReply({ userId: user.id, thread, text, images: files.map(f => ({ url: f.url })) })
-      : await sendReply({ userId: user.id, thread, html: textToHtml(text), text, attachments: files.map(f => ({ bytes: f.bytes, contentType: f.contentType, filename: f.filename })) })
+      ? await sendInstagramReply({ userId: user.id, thread, text: replyToPlain(text), images: files.map(f => ({ url: f.url })) })
+      : await sendReply({ userId: user.id, thread, html: replyToHtml(text), text: replyToPlain(text), attachments: files.map(f => ({ bytes: f.bytes, contentType: f.contentType, filename: f.filename })) })
     const who = instagram ? `@${thread.igUsername || thread.igUserId}` : thread.customerEmail
     await recordAudit({
       action: 'support.reply',

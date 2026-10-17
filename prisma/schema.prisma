@@ -1099,6 +1099,10 @@ model SupportThread {
   // From a sender the team filtered out (vendors, alerts, newsletters): kept,
   // never in the inbox views, findable under Filtered. See support/filters.js.
   filtered        Boolean   @default(false)
+  // Folded into another conversation (the customer wrote again instead of
+  // replying). Its messages moved there; the row stays so mail that still
+  // arrives on this Gmail thread lands in the merged conversation.
+  mergedIntoId    String?
   // The newest message's first line, for the list.
   snippet         String    @default("")
   messageCount    Int       @default(0)
@@ -1117,6 +1121,7 @@ model SupportThread {
 
   @@index([status, lastMessageAt])
   @@index([filtered, status])
+  @@index([mergedIntoId])
   @@index([assigneeId, status])
   @@index([customerEmail])
   @@index([lastMessageAt])

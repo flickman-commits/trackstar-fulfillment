@@ -51,6 +51,7 @@ export const supportApi = {
   savePlaybook: (text: string) => post<{ playbook: { text: string; edited: boolean } }>('/api/support/settings', { action: 'playbook', text }),
   resetPlaybook: () => post<{ playbook: { text: string; edited: boolean } }>('/api/support/settings', { action: 'playbookReset' }),
   redraft: (id: string, instruction: string) => act<Note>(id, 'redraft', { instruction }),
+  merge: (id: string, sourceIds: string[]) => act<ThreadDetail>(id, 'merge', { sourceIds }),
   saveSettings: (defaultAssigneeId: string | null, applyToOpen = false) => post<{ defaultAssigneeId: string | null; assigned: number }>('/api/support/settings', { defaultAssigneeId, applyToOpen }),
   filters: () => request<{ filters: SenderFilter[] }>('/api/support/filters'),
   addFilter: (pattern: string) => post<{ pattern: string; filed: number; filters: SenderFilter[] }>('/api/support/filters', { action: 'add', pattern }),
