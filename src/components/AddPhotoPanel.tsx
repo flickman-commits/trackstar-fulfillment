@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ImagePlus, Loader2, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnGhost } from '@/lib/ui'
+import PhotoCropper from './PhotoCropper'
 
 /**
  * Admin only: a customer emails a photo after ordering. Attach it to one or
@@ -32,23 +33,23 @@ export default function AddPhotoPanel({
 }) {
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
+  // The crop stage hands back the square to upload.
+  const cropExport = useRef<(() => Promise<File>) | null>(null)
   const [picked, setPicked] = useState<Set<string>>(() => new Set(prints.filter(p => !p.hasPhoto).map(p => p.id).length ? prints.filter(p => !p.hasPhoto).map(p => p.id) : [currentId]))
   const [charge, setCharge] = useState(isShopify)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  const choose = (f: File | null) => {
-    setFile(f)
-    setPreview(f ? URL.createObjectURL(f) : null)
-  }
+  const choose = (f: File | null) => setFile(f)
 
   const submit = async () => {
     if (!file || !picked.size) return
     setBusy(true); setErr(null)
     try {
-      const slot = await post({ action: 'upload-url', filename: file.name })
-      const put = await fetch(slot.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }, body: file })
+      // What goes up is the 1:1 crop, the same as a customer's upload on the site.
+      const cropped = cropExport.current ? await cropExport.current() : file
+      const slot = await post({ action: 'upload-url', filename: cropped.name })
+      const put = await fetch(slot.uploadUrl, { method: 'PUT', headers: { 'Content-Type': cropped.type || 'application/octet-stream', 'x-upsert': 'false' }, body: cropped })
       if (!put.ok) throw new Error('The photo did not upload')
       if (replace) {
         await post({ action: 'replace', orderId: currentId, path: slot.path })
@@ -80,11 +81,22 @@ export default function AddPhotoPanel({
         <button onClick={() => setOpen(false)} className="text-off-black/40 hover:text-off-black" aria-label="Close"><X className="w-4 h-4" /></button>
       </div>
 
+      {file && (
+        <div>
+          <PhotoCropper file={file} exportRef={cropExport} className="max-w-[280px]" />
+          <label className="mt-1 inline-block text-[11px] font-medium text-[#4600D6] hover:underline cursor-pointer">
+            Choose a different photo
+            <input type="file" accept="image/*" className="hidden" onChange={e => choose(e.target.files?.[0] || null)} />
+          </label>
+        </div>
+      )}
       <div className="flex items-start gap-3">
-        <label className="shrink-0 w-24 h-24 rounded-md border border-dashed border-[#4600D6]/40 bg-white flex items-center justify-center cursor-pointer overflow-hidden">
-          {preview ? <img src={preview} alt="" className="w-full h-full object-cover" /> : <ImagePlus className="w-5 h-5 text-[#4600D6]/60" />}
-          <input type="file" accept="image/*" className="hidden" onChange={e => choose(e.target.files?.[0] || null)} />
-        </label>
+        {!file && (
+          <label className="shrink-0 w-24 h-24 rounded-md border border-dashed border-[#4600D6]/40 bg-white flex items-center justify-center cursor-pointer overflow-hidden" title="Choose a photo">
+            <ImagePlus className="w-5 h-5 text-[#4600D6]/60" />
+            <input type="file" accept="image/*" className="hidden" onChange={e => choose(e.target.files?.[0] || null)} />
+          </label>
+        )}
         {replace ? (
           <p className="flex-1 text-xs text-off-black/60">The new photo replaces the one on this print. Nothing is billed. It has to be placed on the artwork again, and a design made with the old photo needs a re-render.</p>
         ) : (
