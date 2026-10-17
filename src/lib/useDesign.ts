@@ -74,6 +74,6 @@ export function useDesign(orderId: string | null, canManage: boolean) {
   const visible = Boolean(orderId && state && (canManage || job?.review === 'approved'))
   // Room is held for the design from the moment the order opens, so the layout does not jump when it loads.
   const reserved = Boolean(orderId && (canManage || job?.review === 'approved'))
-  return { state, job, busy, creating, err, create, review, canManage, visible, reserved, offline: !state || state.workersOnline.length === 0 }
+  return { state, job, busy, creating, err, create, review, reload: load, canManage, visible, reserved, offline: !state || state.workersOnline.length === 0 }
 }
 

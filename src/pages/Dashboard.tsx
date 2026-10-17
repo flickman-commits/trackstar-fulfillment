@@ -925,6 +925,12 @@ export default function Dashboard() {
   // reprint and a refund. Shared by the standard and custom views.
   // The open order's automated print (standard orders only). See DesignPanel.
   const design = useDesign(selectedOrder?.trackstarOrderType === 'standard' ? selectedOrder.id : null, can('orders.render'))
+  // The design's "waiting on" list comes from the server. When what it depends on
+  // changes (weather confirmed, a bib or time entered, a date fixed), ask again,
+  // so Create Design works without reloading the page.
+  const designReload = design.reload
+  const designInputs = selectedOrder ? [selectedOrder.bibNumber, selectedOrder.officialTime, selectedOrder.officialPace, selectedOrder.weatherConfirmedAt, selectedOrder.weatherTemp, selectedOrder.weatherCondition, selectedOrder.raceDate, selectedOrder.raceDateVerified, selectedOrder.photoPath].join('|') : ''
+  useEffect(() => { if (designInputs) designReload() }, [designInputs, designReload])
 
   // The script places the photo itself; an approved render of this photo is the confirmation.
   const photoByRender = !!(selectedOrder?.photoPath && design.job?.status === 'done' && design.job.spec.photoPath === selectedOrder.photoPath)
