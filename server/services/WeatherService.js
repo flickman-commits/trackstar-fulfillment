@@ -54,20 +54,25 @@ export class WeatherService {
       // the first result wins as before.
       const cleanLocation = this.cleanLocationString(location)
       const region = this.regionOf(location)
-      const url = `${this.geocodingBaseUrl}/search?name=${encodeURIComponent(cleanLocation)}&count=10&language=en&format=json`
-      console.log(`[WeatherService] Geocoding: ${cleanLocation}${region ? ` (${region.label})` : ''}`)
-      const response = await fetchWithTimeout(url)
-      const data = await response.json()
-      if (!data.results || data.results.length === 0) {
-        console.log(`[WeatherService] No geocoding results for: ${cleanLocation}`)
-        return null
+      const inRegion = r => (region.country ? r.country_code === region.country : true) && (region.admin1 ? String(r.admin1 || '').toLowerCase() === region.admin1.toLowerCase() : true)
+      // "St Paul" is listed as "Saint Paul"; try both spellings, and look past the
+      // first ten same-named places (Jackson, Wyoming is not in Jackson's top ten).
+      const names = [...new Set([cleanLocation, cleanLocation.replace(/^St\.?\s+/i, 'Saint '), cleanLocation.replace(/^Saint\s+/i, 'St. ')])]
+      let result = null
+      for (const name of names) {
+        const url = `${this.geocodingBaseUrl}/search?name=${encodeURIComponent(name)}&count=${region ? 100 : 10}&language=en&format=json`
+        console.log(`[WeatherService] Geocoding: ${name}${region ? ` (${region.label})` : ''}`)
+        const data = await (await fetchWithTimeout(url)).json()
+        const results = data.results || []
+        if (!results.length) continue
+        if (!region) { result = results[0]; break }
+        const match = results.filter(inRegion).sort((a, b) => (b.population || 0) - (a.population || 0))[0]
+        if (match) { result = match; break }
       }
-      let result = data.results[0]
-      if (region) {
-        const match = data.results.find(r => (region.country ? r.country_code === region.country : true) && (region.admin1 ? String(r.admin1 || '').toLowerCase() === region.admin1.toLowerCase() : true))
-          || (region.country ? data.results.find(r => r.country_code === region.country) : null)
-        if (match) result = match
-        else console.warn(`[WeatherService] No result in ${region.label} for "${cleanLocation}"; using ${result.name}, ${result.admin1 || ''}, ${result.country_code}`)
+      if (!result) {
+        // Never weather for the wrong town: a place outside the state asked for is no answer.
+        console.warn(`[WeatherService] No place named "${cleanLocation}"${region ? ` in ${region.label}` : ''}`)
+        return null
       }
       console.log(`[WeatherService] Geocoded to: ${result.name}, ${result.admin1 || ''}, ${result.country_code} (${result.latitude}, ${result.longitude})`)
       return { lat: result.latitude, lon: result.longitude, name: [result.name, result.admin1, result.country_code].filter(Boolean).join(', ') }
@@ -182,6 +187,10 @@ export class WeatherService {
    *   always gives the same answer.
    */
   async calculateRaceWeather(dateStr, location, previous = null) {
+    // A race that has not happened has no weather. Never a forecast on a print.
+    if (String(dateStr) > new Date().toISOString().slice(0, 10)) {
+      return { temp: null, condition: null, breakdown: null, error: 'The race has not happened yet, so there is no weather to calculate' }
+    }
     const coords = await this.geocodeLocation(location)
     if (!coords) {
       return { temp: null, condition: null, breakdown: null, error: `Couldn't find "${location}"` }

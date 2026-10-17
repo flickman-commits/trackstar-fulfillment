@@ -184,6 +184,9 @@ model Race {
   weatherTemp      String?
   weatherFetchedAt DateTime?
   weatherDetails   String?   // JSON breakdown of how the weather was calculated (for the info popover)
+  // Calculated weather is checked by a person before it prints (Confirm in the order view). Any change clears it.
+  weatherConfirmedAt DateTime?
+  weatherConfirmedBy String?
   createdAt        DateTime  @default(now())
 
   // Relations

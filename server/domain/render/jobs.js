@@ -230,7 +230,9 @@ export async function rerenderChanged({ limit = 10 } = {}) {
   for (const o of rows) {
     if (queued >= limit) break
     const last = o.renderJobs[0]
-    if (!last || !(last.status === 'failed' || (last.status === 'done' && last.review === 'rejected'))) continue
+    // Failed, rejected, or closed because the weather changed under it (closed by
+    // hand-completion never gets here: that order is completed).
+    if (!last || !(last.status === 'failed' || (last.status === 'done' && (last.review === 'rejected' || last.review === 'closed')))) continue
     const { ok, spec } = await checkOrder(o.id).catch(() => ({ ok: false }))
     if (!ok || !printedDiffers(spec, last.spec)) continue
     await createJob({ orderId: o.id, requestedBy: 'system' })

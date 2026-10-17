@@ -78,6 +78,7 @@ export function pipelineFor({ order, research, race, render, hasScraper, templat
   if (!SIZES.includes(order.productSize)) return stage('action', 'Make by hand', { kind: 'setup', fix: `${order.productSize} is not a size the script renders. Make this design by hand.` })
   if (order.hadNoTime && noTimeGaps.has(`${template}|${order.productSize}`)) return stage('action', 'Needs NO TIME layer', { kind: 'setup', fix: `The ${template} ${order.productSize} design needs a NO TIME layer before a no-time print can render. Ask the designer, or make it by hand.` })
   const blockers = printBlockers(race)
+  if (blockers.length === 1 && /not confirmed/.test(blockers[0])) return stage('action', 'Confirm weather', { kind: 'data', fix: 'The weather for this race year is calculated but nobody has checked it. Open the breakdown (source), then Confirm. It confirms every order of this race year.' })
   if (blockers.length) return stage('action', 'Needs race data', { kind: 'setup', fix: `${blockers.join('. ')}. Fix it in the Race Database.` })
   if (photoUnpaid) return stage('waiting', 'Photo not paid', { fix: 'The customer has not paid for the photo add-on yet. The print renders once Shopify reads paid.' })
   if (!render) return stage('waiting', workerOnline ? 'Render queued' : 'Waiting for the renderer', { fix: workerOnline ? 'The print is queued for the next render run.' : 'No render worker is online. The print renders when one checks in.' })

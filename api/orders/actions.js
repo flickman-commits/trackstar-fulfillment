@@ -923,6 +923,8 @@ async function handleCalculateWeather({ raceId, city, date, reason }, res, actor
           weatherCondition: result.condition,
           weatherFetchedAt: new Date(),
           weatherDetails: JSON.stringify(result.breakdown),
+          // New numbers need a person's check again; the same numbers keep it.
+          ...((before?.weatherTemp || '') !== result.temp || String(before?.weatherCondition || '').toLowerCase() !== String(result.condition).toLowerCase() ? { weatherConfirmedAt: null, weatherConfirmedBy: null } : {}),
         },
       })
     } catch (err) {

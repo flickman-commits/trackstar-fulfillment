@@ -68,6 +68,8 @@ interface Order {
   raceDate?: string
   raceDateIso?: string | null  // ISO YYYY-MM-DD, for the date input in edit mode
   raceDateVerified?: boolean
+  weatherConfirmedAt?: string | null
+  weatherConfirmedBy?: string | null
   raceDateSourceUrl?: string | null
   raceDateEvidence?: string | null
   raceLocation?: string
@@ -313,6 +315,8 @@ function mapOrder(order: Record<string, unknown>): Order {
     raceDate: order.raceDate as string | undefined,
     raceDateIso: order.raceDateIso as string | null | undefined,
     raceDateVerified: order.raceDateVerified as boolean | undefined,
+    weatherConfirmedAt: order.weatherConfirmedAt as string | null | undefined,
+    weatherConfirmedBy: order.weatherConfirmedBy as string | null | undefined,
     raceDateSourceUrl: order.raceDateSourceUrl as string | null | undefined,
     raceDateEvidence: order.raceDateEvidence as string | null | undefined,
     raceLocation: order.raceLocation as string | undefined,
@@ -1463,6 +1467,20 @@ export default function Dashboard() {
   const [weatherCalcCity, setWeatherCalcCity] = useState('')
   const [weatherCalcDate, setWeatherCalcDate] = useState('')
   const [isCalculatingWeather, setIsCalculatingWeather] = useState(false)
+  // Confirm a race year's calculated weather for printing.
+  const [confirmingWeather, setConfirmingWeather] = useState(false)
+  const confirmWeather = async (order: Order) => {
+    if (!order.raceId) return
+    setConfirmingWeather(true)
+    try {
+      const res = await apiFetch('/api/races/confirm-weather', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raceId: order.raceId }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setToast({ message: data.error || 'Could not confirm the weather', type: 'error' }); return }
+      setSelectedOrder(prev => prev && prev.raceId === order.raceId ? { ...prev, weatherConfirmedAt: data.weatherConfirmedAt, weatherConfirmedBy: data.weatherConfirmedBy } : prev)
+      setToast({ message: `Weather confirmed for every ${order.effectiveRaceName || order.raceName} ${order.effectiveRaceYear || order.raceYear} order`, type: 'success' })
+      fetchOrders()
+    } finally { setConfirmingWeather(false) }
+  }
   // Which weather field's info popover is open (order-scoped; null = none).
   const [showWeatherInfo, setShowWeatherInfo] = useState(false)
 
@@ -5246,8 +5264,22 @@ Thank you!`
                                     }
                                     value={selectedOrder.weatherCondition}
                                     aside={
-                                      <button type="button" onClick={() => setShowWeatherInfo(v => !v)} title={b ? 'How this weather was worked out' : 'No breakdown on file for this weather'}
-                                        className="text-[11px] text-off-black/50 underline decoration-dotted underline-offset-2 hover:text-off-black">source</button>
+                                      <span className="inline-flex items-center gap-1.5">
+                                        {/* Calculated weather prints only once a person confirms it. */}
+                                        {selectedOrder.weatherConfirmedAt ? (
+                                          <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700 border border-green-200" title={`Confirmed${selectedOrder.weatherConfirmedBy ? ` by ${selectedOrder.weatherConfirmedBy}` : ''} ${new Date(selectedOrder.weatherConfirmedAt).toLocaleString()}`}>Confirmed</span>
+                                        ) : (
+                                          <>
+                                            <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200" title="Calculated from the hourly breakdown; a person has not confirmed it yet. Prints wait for it.">Calculated</span>
+                                            <button type="button" onClick={() => confirmWeather(selectedOrder)} disabled={confirmingWeather}
+                                              className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-off-black text-white hover:opacity-90 disabled:opacity-40">
+                                              {confirmingWeather ? '…' : 'Confirm'}
+                                            </button>
+                                          </>
+                                        )}
+                                        <button type="button" onClick={() => setShowWeatherInfo(v => !v)} title={b ? 'How this weather was worked out' : 'No breakdown on file for this weather'}
+                                          className="text-[11px] text-off-black/50 underline decoration-dotted underline-offset-2 hover:text-off-black">source</button>
+                                      </span>
                                     }
                                   />
                                   {showWeatherInfo && !b && (

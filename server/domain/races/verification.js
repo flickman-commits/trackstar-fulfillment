@@ -33,7 +33,7 @@ export function dateVerified(race) {
  * always the current date's weather.
  */
 export function weatherReady(race) {
-  return Boolean(race?.weatherTemp && race?.weatherCondition && dateVerified(race))
+  return Boolean(race?.weatherTemp && race?.weatherCondition && dateVerified(race) && race?.weatherConfirmedAt)
 }
 
 /** The reasons a race year cannot print yet, in plain words. Empty means it can. */
@@ -45,6 +45,7 @@ export function printBlockers(race) {
   else if (new Date(race.raceDate).getTime() > Date.now()) out.push('Race has not happened yet')
   if (!race.location) out.push('Race has no location, so weather cannot be computed')
   if (!race.weatherTemp || !race.weatherCondition) { if (race.raceDate && new Date(race.raceDate).getTime() <= Date.now()) out.push('Weather has not been computed') }
+  else if (!race.weatherConfirmedAt) out.push('Weather is calculated but not confirmed yet')
   return out
 }
 
@@ -73,7 +74,7 @@ export async function setRaceDate({ raceId, date, source = 'manual', sourceUrl, 
     raceDateVerifiedAt: new Date(), raceDateVerifiedBy: String(by || 'unknown').slice(0, 80),
   }
   // A new date makes the old weather wrong. It is recomputed for the new date by the next research run.
-  if (changed) Object.assign(data, { weatherTemp: null, weatherCondition: null, weatherDetails: null, weatherFetchedAt: null })
+  if (changed) Object.assign(data, { weatherTemp: null, weatherCondition: null, weatherDetails: null, weatherFetchedAt: null, weatherConfirmedAt: null, weatherConfirmedBy: null })
   const updated = await prisma.race.update({ where: { id: race.id }, data })
 
   if (changed) {
@@ -113,15 +114,17 @@ export async function computeRaceWeather(raceId, { by = 'system', reason, actor 
   if (!race) throw new Error('Race not found')
   if (!dateVerified(race)) throw new Error('Verify the date before computing weather')
   if (!race.location) throw new Error('The race needs a location before weather can be computed')
+  if (race.raceDate.getTime() > Date.now()) throw new Error('The race has not happened yet, so there is no weather to calculate')
   let previous = null; try { previous = race.weatherDetails ? JSON.parse(race.weatherDetails) : null } catch { previous = null }
   const result = await new WeatherService().calculateRaceWeather(race.raceDate.toISOString().slice(0, 10), race.location, previous)
   if (!result?.temp || !result?.condition) throw new Error(result?.error || 'Could not compute weather for that date and place')
   const before = { weatherTemp: race.weatherTemp, weatherCondition: race.weatherCondition }
   const after = { weatherTemp: result.temp, weatherCondition: result.condition }
   if (before.weatherTemp) await noteWeatherChange({ raceId: race.id, before, after, by, reason, actor })
+  const changed = (before.weatherTemp || '') !== after.weatherTemp || String(before.weatherCondition || '').toLowerCase() !== String(after.weatherCondition).toLowerCase()
   return prisma.race.update({
     where: { id: race.id },
-    data: { ...after, weatherFetchedAt: new Date(), weatherDetails: JSON.stringify(result.breakdown) },
+    data: { ...after, weatherFetchedAt: new Date(), weatherDetails: JSON.stringify(result.breakdown), ...(changed ? { weatherConfirmedAt: null, weatherConfirmedBy: null } : {}) },
   })
 }
 
@@ -154,4 +157,16 @@ export async function verificationOverview() {
   })
   const missing = Object.entries(counts).filter(([k]) => !races.some(r => `${r.raceName}|${r.year}` === k)).map(([k, n]) => { const [raceName, year] = k.split('|'); return { raceName, year: Number(year), openOrders: n } })
   return { races: rows, missingRaceRows: missing }
+}
+
+/** A person checked the calculated weather against the breakdown and confirms it for printing. */
+export async function confirmWeather({ raceId, user }) {
+  const race = await prisma.race.findUnique({ where: { id: Number(raceId) } })
+  if (!race) throw new Error('Race not found')
+  if (!race.weatherTemp || !race.weatherCondition) throw new Error('There is no weather to confirm')
+  if (race.raceDate && race.raceDate.getTime() > Date.now()) throw new Error('The race has not happened yet')
+  const by = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'unknown'
+  const updated = await prisma.race.update({ where: { id: race.id }, data: { weatherConfirmedAt: new Date(), weatherConfirmedBy: by } })
+  await recordAudit({ action: 'race.weather-confirm', summary: `${race.raceName} ${race.year}: confirmed weather ${race.weatherCondition} ${race.weatherTemp}`, detail: { raceId: race.id }, actor: user })
+  return updated
 }

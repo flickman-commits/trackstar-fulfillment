@@ -301,6 +301,8 @@ export default async function handler(req, res) {
         weatherCondition: race?.weatherCondition ?
           race.weatherCondition.charAt(0).toUpperCase() + race.weatherCondition.slice(1) : null,
         weatherDetails: race?.weatherDetails || null,
+        weatherConfirmedAt: race?.weatherConfirmedAt || null,
+        weatherConfirmedBy: race?.weatherConfirmedBy || null,
         raceId: race?.id || null,
         // Scraper availability - use effective race name
         hasScraperAvailable: hasScraperForRace(effectiveRaceName),
