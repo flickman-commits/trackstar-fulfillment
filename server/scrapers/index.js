@@ -24,6 +24,7 @@ import { LaurelTimingScraper } from './platforms/LaurelTimingScraper.js'
 import { CompetitiveTimingScraper } from './platforms/CompetitiveTimingScraper.js'
 import { SVETimingScraper } from './platforms/SVETimingScraper.js'
 import { SportstatsScraper } from './platforms/SportstatsScraper.js'
+import { RaceResultScraper } from './platforms/RaceResultScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -80,6 +81,9 @@ import bigSurConfig from './configs/bigSur.js'
 import annArborConfig from './configs/annArbor.js'
 import charlotteConfig from './configs/charlotte.js'
 import atlanticCityConfig from './configs/atlanticCity.js'
+import desMoinesConfig from './configs/desMoines.js'
+import coloradoSpringsConfig from './configs/coloradoSprings.js'
+import humboldtRedwoodsConfig from './configs/humboldtRedwoods.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
 import { applyOverride } from './scraperOverrides.js'
 
@@ -106,6 +110,7 @@ const PLATFORM_MAP = {
   competitivetiming: CompetitiveTimingScraper,
   svetiming: SVETimingScraper,
   sportstats: SportstatsScraper,
+  raceresult: RaceResultScraper,
 }
 
 /**
@@ -166,6 +171,9 @@ const ALL_CONFIGS = [
   annArborConfig,
   charlotteConfig,
   atlanticCityConfig,
+  desMoinesConfig,
+  coloradoSpringsConfig,
+  humboldtRedwoodsConfig,
 ]
 
 /**

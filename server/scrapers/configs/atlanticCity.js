@@ -16,7 +16,16 @@
  * always computed from chip time / matched distance.
  *
  * 2022: RunSignUp race 120555 event 545390 has no result set; Athlinks only.
- * 2026 (Oct 18) is on RaceResult (my.raceresult.com/430762), not wired.
+ * 2026 (Oct 18) is on RaceResult (my.raceresult.com/430762, "AmeriHealth
+ * Atlantic City Marathon Weekend - Sunday - 10/18/2026"), wired through
+ * yearOverrides -> platform 'raceresult'. List "Large Race Reports|Overall
+ * Results by Chip" (contest 0, from /430762/results/config); first grouping
+ * level is the contest name. Contests: 1 5K, 2 10K, 3 Half Marathon,
+ * 4 Marathon, 5-8 King Neptune Challenge combos, but this list only carries
+ * "Half Marathon" and "Marathon" groups (checked with term=an, 925 rows).
+ * Only those two match. Chip is read from the detail view's Finish split (Chip vs Gun); the
+ * list's "Chip Pace" is gun-based (Luddy Johnson chip 2:25:07, gun 2:28:31,
+ * list pace 11:20 = gun / 13.1) and is ignored.
  */
 export default {
   platform: 'athlinks',
@@ -45,6 +54,20 @@ export default {
     2023: 1064611,
     2024: 1094085,
     2025: 1126179,
+  },
+  yearOverrides: {
+    2026: {
+      platform: 'raceresult',
+      raceResult: {
+        eventId: 430762,
+        listName: 'Large Race Reports|Overall Results by Chip',
+        chipField: 'Finish.CHIP',
+        contests: {
+          marathon: /^marathon$/i,
+          half: /^half marathon$/i,
+        },
+      },
+    },
   },
   raceDates: {
     2022: '2022-10-23',

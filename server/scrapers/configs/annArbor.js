@@ -21,8 +21,19 @@
  * Courses are anchored: the same events list "Pacers Marathon", "Lakefront
  * Marathon" (2022), "Half Marathon Walk", "Pacer Half Marathon", 10K and 5K.
  *
- * 2026 (Oct 4) is on RaceResult (my.raceresult.com/425548) and is not mirrored
- * to Athlinks yet; there is no RaceResult scraper, so 2026 is not wired.
+ * 2026 (Oct 4) is on RaceResult (my.raceresult.com/425548, header "Trinity
+ * Health Probility Ann Arbor Marathon 2026, 10/04/2026") and not mirrored to
+ * Athlinks yet, so 2026 uses yearOverrides -> platform 'raceresult'. List
+ * "Result Lists|Overall Results" (contest 0, from /425548/results/config).
+ * Its first grouping level is the contest short name: "Marathon", "Early
+ * Marathon" (contest 2, "Early Start Option: Marathon (26.2)"), "Pacer
+ * Marathon" (contest 11, Epic Pace Team), "Half Marathon", "Pacer Half",
+ * "Half - Walk", "10K", "5K"; the relay (contest 3) is filtered out of the
+ * list by RaceResult itself. Early Start and Pacer marathoners run the full
+ * 26.2 on their own chip (detail view shows ChipTime from their own start), so
+ * they count as marathon. Walk, 10K, 5K never match. The list's "Finish"
+ * column is chip (Katherine Smith Finish 05:13:43 = detail ChipTime; GunTime
+ * 05:15:18), but the scraper reads chip from the detail view anyway.
  *
  * Fallback: RunSignUp REST, used when Athlinks errors (it intermittently
  * answers "An error has occurred." for a valid search). Result set ids from
@@ -57,6 +68,20 @@ export default {
     2023: 1063487,
     2024: 1093788,
     2025: 1125452,
+  },
+  yearOverrides: {
+    2026: {
+      platform: 'raceresult',
+      raceResult: {
+        eventId: 425548,
+        listName: 'Result Lists|Overall Results',
+        chipField: 'Finish',
+        contests: {
+          marathon: /^(early |pacer )?marathon$/i,
+          half: /^(half marathon|pacer half)$/i,
+        },
+      },
+    },
   },
   raceDates: {
     2022: '2022-10-02',
