@@ -4859,6 +4859,8 @@ Thank you!`
                       </div>
                     </div>
                   )}
+                  {/* The customer's Support conversations that are still going, linked over. */}
+                  {selectedOrder.trackstarOrderType === 'standard' && <OrderConversations orderId={selectedOrder.id} enabled={!!selectedOrder.customerEmail && can('support')} />}
                   </aside>
 
                   <div className="order-1 md:order-none md:col-start-1 md:row-start-1 min-w-0 flex flex-col gap-4">
@@ -5695,8 +5697,6 @@ Thank you!`
                       </button>
                     )}
                   </div>
-                  {/* The customer's Support conversations that are still going, linked over. */}
-                  <OrderConversations orderId={selectedOrder.id} enabled={!!selectedOrder.customerEmail && can('support')} />
                   </div>{/* end hidden md:block wrapper */}
                   </div>
                   </div>
