@@ -86,6 +86,67 @@ export class RunSignUpScraper extends BaseScraper {
   }
 
   /**
+   * Look a runner up by bib through the REST API's bib_num filter (exact
+   * match). Same result sets and event ids as searchRunner, in the same
+   * order, so only sold distances are ever searched. Needs eventIds for the
+   * year: get-results rejects a request without event_id, and the browser
+   * fallback only filters by name, so a year without them cannot search by bib.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    const yearSets = this.config.resultSets?.[this.year]
+    if (!yearSets) return this.yearNotConfiguredResult('missing resultSets entry')
+    const yearEventIds = this.config.eventIds?.[this.year]
+    if (!yearEventIds) return null
+
+    console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
+    const eventOrder = this.config.eventSearchOrder || ['marathon', 'half']
+    for (const eventKey of eventOrder) {
+      const resultSetId = yearSets[eventKey]
+      const eventId = yearEventIds[eventKey]
+      if (!resultSetId || !eventId) continue
+      const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
+
+      const apiUrl = `https://runsignup.com/Rest/race/${this.raceId}/results/get-results` +
+        `?format=json&resultSetId=${resultSetId}&event_id=${eventId}` +
+        `&bib_num=${encodeURIComponent(wanted)}&page=1&num=10`
+      let data
+      try {
+        const response = await fetchWithTimeout(apiUrl, { headers: { 'User-Agent': USER_AGENT } })
+        if (!response.ok) return this.upstreamErrorResult(`RunSignUp results API returned ${response.status}`)
+        data = await response.json()
+      } catch (error) {
+        console.error(`[${this.tag} ${this.year}] Bib lookup error for ${wanted}:`, error.message)
+        return this.upstreamErrorResult(error.message)
+      }
+      if (data?.error) return this.upstreamErrorResult(`RunSignUp results API error: ${data.error.error_msg || 'unknown'}`)
+
+      const rows = data?.individual_results_sets?.[0]?.results || []
+      const r = rows.find(row => this.bibsEqual(row.bib, wanted))
+      if (!r) continue
+
+      // Chip time only; clock_time is gun time and is never used.
+      const chip = (r.chip_time && String(r.chip_time).trim()) || null
+      const match = {
+        name: `${r.first_name || ''} ${r.last_name || ''}`.trim(),
+        bib: String(r.bib).trim(),
+        chipTime: chip,
+        pace: r.pace || null,
+        placeOverall: r.place != null ? String(r.place) : null,
+        gender: r.gender || null,
+        age: r.age != null ? String(r.age) : null,
+        city: r.city || null,
+        state: r.state || null
+      }
+      console.log(`[${this.tag} ${this.year}] BIB MATCH: ${match.name} bib ${match.bib} ${eventLabel} ${chip || 'no chip time'}`)
+      const resultsUrl = `${this.baseUrl}/Race/Results/${this.raceId}/${resultSetId}#resultSetId-${resultSetId}`
+      return { ...this.extractRunnerData(match, eventLabel), runnerName: match.name, resultsUrl }
+    }
+    return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+  }
+
+  /**
    * Search for a runner via RunSignUp REST API (fast, no browser needed)
    */
   async searchEventTypeViaApi(runnerName, eventType, resultSetId, eventId) {

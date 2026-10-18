@@ -149,6 +149,55 @@ export class MyChipTimeScraper extends BaseScraper {
   }
 
   /**
+   * Look a runner up by bib. searchResultGen.php takes a `bib` param (the
+   * results page's own Bib box) and matches it exactly. Same event ids and
+   * order as searchRunner, so only sold distances are searched. The legacy
+   * searchevent.php layout has no bib filter, so those configs return null.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    const eventIds = this.config.eventIds?.[this.year]
+    if (!eventIds) return this.yearNotConfiguredResult('missing eventIds entry')
+    const parseMode = this.config.parseMode || 'columns'
+    if (parseMode !== 'columns' && parseMode !== 'simple') return null
+
+    console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
+    const eventOrder = this.config.eventSearchOrder || ['marathon', 'halfMarathon']
+    for (const eventKey of eventOrder) {
+      const eventId = eventIds[eventKey]
+      if (!eventId) continue
+      const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
+      const params = new URLSearchParams({ eID: eventId, fname: '', lname: '', bib: wanted })
+      const searchUrl = `${this.baseUrl}/searchResultGen.php?${params.toString()}`
+      let html
+      try {
+        const response = await fetchWithTimeout(searchUrl, {
+          headers: {
+            'User-Agent': USER_AGENT,
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            Referer: `https://www.mychiptime.com/searchevent.php?id=${eventId}`,
+          }
+        })
+        if (!response.ok) return this.upstreamErrorResult(`MyChipTime returned HTTP ${response.status}`)
+        html = await response.text()
+      } catch (error) {
+        console.error(`[${this.tag}] Bib lookup error for ${wanted}:`, error.message)
+        return this.upstreamErrorResult(error.message)
+      }
+
+      const rows = parseMode === 'columns' ? this._parseColumnsHtml(html) : this._parseSimpleHtml(html)
+      const match = rows.find(r => this.bibsEqual(r.bib, wanted))
+      if (!match) continue
+
+      const runnerName = (match.fullName || `${match.firstName || ''} ${match.lastName || ''}`).trim()
+      console.log(`[${this.tag}] BIB MATCH: ${runnerName} bib ${match.bib} ${eventLabel} ${match.chipTime || 'no chip time'}`)
+      return { ...this._extractResult(match, eventLabel, searchUrl), runnerName, rawData: match }
+    }
+    return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+  }
+
+  /**
    * Search a specific event ID on MyChipTime
    */
   async _searchEvent(runnerName, eventId, eventLabel) {

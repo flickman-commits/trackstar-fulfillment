@@ -178,6 +178,53 @@ export class RaceRosterScraper extends BaseScraper {
   }
 
   /**
+   * Look a runner up by bib. participant-search's `phrase` matches bibs (its
+   * "exact-exact-bib-bib" query), so the same endpoint is used; only an exact
+   * bib in one of this year's configured sub-events (eventSearchOrder) is
+   * kept, so a 5K or other unsold sub-event is never returned.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
+
+    const eventCode = this.config.eventCodes?.[this.year]
+    if (!eventCode) return this.yearNotConfiguredResult('missing eventCodes entry')
+    const yearSubEvents = this.config.subEventIds?.[this.year] || {}
+    if (Object.keys(yearSubEvents).length === 0) return this.yearNotConfiguredResult('missing subEventIds entry')
+    const eventOrder = this.config.eventSearchOrder || ['marathon', 'halfMarathon']
+
+    try {
+      const searchData = await this.fetchApi(
+        `/v2/api/events/${eventCode}/participant-search?phrase=${encodeURIComponent(wanted)}`
+      )
+      const all = [...(searchData?.data?.exact || []), ...(searchData?.data?.other || [])]
+      const hits = all.filter(m => this.bibsEqual(m.bib, wanted))
+      if (!hits.length) return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+
+      for (const eventKey of eventOrder) {
+        const subEventId = yearSubEvents[eventKey]
+        if (!subEventId) continue
+        const match = hits.find(m => String(m.resultSubEventId) === String(subEventId))
+        if (!match) continue
+        const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
+        const detailData = await this.fetchApi(`/v2/api/events/${eventCode}/detail/${match.id}`)
+        const result = detailData?.data?.result
+        if (!result) return this.upstreamErrorResult(`could not load detail ${match.id} for bib ${wanted}`)
+        if (!this.bibsEqual(result.bib, wanted)) {
+          return this.notFoundResult(`Bib ${wanted} detail returned bib ${result.bib}`)
+        }
+        const out = this.extractRunnerData(result, eventLabel, eventCode, eventKey)
+        return { ...out, runnerName: result.name || match.name, bibNumber: String(result.bib).trim() }
+      }
+      return this.notFoundResult(`Bib ${wanted} is entered in a ${this.raceName} ${this.year} event this race does not sell`)
+    } catch (error) {
+      console.error(`[${this.tag} ${this.year}] Bib lookup error for ${wanted}:`, error.message)
+      return this.upstreamErrorResult(error.message)
+    }
+  }
+
+  /**
    * Extract standardized data from a RaceRoster detail result
    */
   extractRunnerData(result, eventType, eventCode, eventKey) {

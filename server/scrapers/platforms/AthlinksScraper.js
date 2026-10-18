@@ -60,55 +60,9 @@ export class AthlinksScraper extends BaseScraper {
       const url = `${this.apiBase}/Events/Race/Result/Api/${this.eventId}/Search?search=${encodeURIComponent(runnerName)}`
       console.log(`[${this.tag}] GET ${url}`)
 
-      // Athlinks (alaska.athlinks.com) is occasionally slow or returns 5xx —
-      // we set a hard timeout of 12s per attempt, retry once on 5xx/timeout,
-      // and surface a clear "upstream error" status if both attempts fail.
-      const fetchOnce = async () => {
-        const ctrl = new AbortController()
-        const t = setTimeout(() => ctrl.abort(), 12_000)
-        try {
-          return await fetch(url, {
-            signal: ctrl.signal,
-            headers: {
-              'User-Agent': USER_AGENT,
-              'Accept': 'application/json',
-              'Origin': 'https://www.athlinks.com',
-              'Referer': 'https://www.athlinks.com/'
-            }
-          })
-        } finally { clearTimeout(t) }
-      }
-
-      let resp
-      try {
-        resp = await fetchOnce()
-        if (!resp.ok && resp.status >= 500) {
-          console.log(`[${this.tag}] Got ${resp.status}, retrying once...`)
-          await new Promise(r => setTimeout(r, 1500))
-          resp = await fetchOnce()
-        }
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          console.log(`[${this.tag}] Timed out, retrying once...`)
-          await new Promise(r => setTimeout(r, 1500))
-          try { resp = await fetchOnce() }
-          catch (err2) {
-            return this.upstreamErrorResult(`${err2.name === 'AbortError' ? 'timed out' : err2.message} after retry`)
-          }
-        } else {
-          return this.upstreamErrorResult(err.message)
-        }
-      }
-
-      if (!resp || !resp.ok) {
-        const status = resp ? resp.status : 'no-response'
-        console.log(`[${this.tag}] Search failed after retry: ${status}`)
-        // 5xx / timeout = upstream issue. 4xx = configuration issue (e.g. wrong eventId).
-        if (!resp || resp.status >= 500) {
-          return this.upstreamErrorResult(`HTTP ${status}`)
-        }
-        return this.notFoundResult()
-      }
+      const fetched = await this._fetchSearch(url)
+      if (fetched.error) return fetched.error
+      const resp = fetched.resp
 
       const data = await resp.json()
       const courses = data?.result?.courses || []
@@ -208,6 +162,141 @@ export class AthlinksScraper extends BaseScraper {
     } catch (error) {
       console.error(`[${this.tag}] Error: ${error.message}`)
       return { ...this.notFoundResult(), researchNotes: `Error: ${error.message}` }
+    }
+  }
+
+  /**
+   * GET an Athlinks Search URL with a 12s timeout and one retry on 5xx or
+   * timeout. Returns { resp } on success, or { error } holding the result to
+   * return (upstream error on 5xx/timeout, not found on 4xx).
+   */
+  async _fetchSearch(url) {
+    // Athlinks (alaska.athlinks.com) is occasionally slow or returns 5xx —
+    // we set a hard timeout of 12s per attempt, retry once on 5xx/timeout,
+    // and surface a clear "upstream error" status if both attempts fail.
+    const fetchOnce = async () => {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 12_000)
+      try {
+        return await fetch(url, {
+          signal: ctrl.signal,
+          headers: {
+            'User-Agent': USER_AGENT,
+            'Accept': 'application/json',
+            'Origin': 'https://www.athlinks.com',
+            'Referer': 'https://www.athlinks.com/'
+          }
+        })
+      } finally { clearTimeout(t) }
+    }
+
+    let resp
+    try {
+      resp = await fetchOnce()
+      if (!resp.ok && resp.status >= 500) {
+        console.log(`[${this.tag}] Got ${resp.status}, retrying once...`)
+        await new Promise(r => setTimeout(r, 1500))
+        resp = await fetchOnce()
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log(`[${this.tag}] Timed out, retrying once...`)
+        await new Promise(r => setTimeout(r, 1500))
+        try { resp = await fetchOnce() }
+        catch (err2) {
+          return { error: this.upstreamErrorResult(`${err2.name === 'AbortError' ? 'timed out' : err2.message} after retry`) }
+        }
+      } else {
+        return { error: this.upstreamErrorResult(err.message) }
+      }
+    }
+
+    if (!resp || !resp.ok) {
+      const status = resp ? resp.status : 'no-response'
+      console.log(`[${this.tag}] Search failed after retry: ${status}`)
+      // 5xx / timeout = upstream issue. 4xx = configuration issue (e.g. wrong eventId).
+      if (!resp || resp.status >= 500) {
+        return { error: this.upstreamErrorResult(`HTTP ${status}`) }
+      }
+      return { error: this.notFoundResult() }
+    }
+    return { resp }
+  }
+
+  /**
+   * Look a runner up by bib. The Search API's `search` param matches bibs as
+   * well as names, so the same endpoint and course filter as searchRunner are
+   * used, keeping only an exact bib in a sold course (eventSearchOrder +
+   * courseMap), so a 5K, relay or kids entry is never returned.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
+    if (!this.eventId) return this.yearNotConfiguredResult('missing Athlinks eventIds entry')
+
+    try {
+      const url = `${this.apiBase}/Events/Race/Result/Api/${this.eventId}/Search?search=${encodeURIComponent(wanted)}`
+      console.log(`[${this.tag}] GET ${url}`)
+      const fetched = await this._fetchSearch(url)
+      if (fetched.error) {
+        return fetched.error.status === 'not_found'
+          ? this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+          : fetched.error
+      }
+      const data = await fetched.resp.json()
+      const courses = data?.result?.courses || []
+
+      let unsold = null
+      const order = this.config.eventSearchOrder || ['marathon', 'half']
+      for (const distKey of order) {
+        const courseRegex = this.config.courseMap?.[distKey]
+        if (!courseRegex) continue
+        const eventLabel = this.config.eventLabels?.[distKey] || distKey
+        for (const course of courses.filter(c => courseRegex.test(c.courseName || ''))) {
+          const match = (course.results || []).find(r => this.bibsEqual(r.bib, wanted))
+          if (!match) continue
+          const time = this._extractTime(match)
+          if (!time) {
+            console.log(`[${this.tag}] Bib ${wanted} found but no finish time on first leg`)
+            continue
+          }
+          const formattedTime = this.formatTime(time)
+          const distanceMiles = this.config.distances?.[distKey] || this.config.distanceMiles || 26.2
+          const pace = this.formatPace(this.calculatePace(time, distanceMiles))
+          const runnerName = match.displayName || `${match.firstName || ''} ${match.lastName || ''}`.trim()
+          console.log(`[${this.tag}] BIB MATCH: ${runnerName} bib ${match.bib} ${course.courseName} ${formattedTime}`)
+          return {
+            found: true,
+            runnerName,
+            bibNumber: String(match.bib).trim(),
+            officialTime: formattedTime,
+            officialPace: pace,
+            eventType: eventLabel,
+            yearFound: this.year,
+            researchNotes: null,
+            resultsUrl: `https://www.athlinks.com/event/${this.config.masterEventId}/results/Event/${this.eventId}/Results`,
+            rawData: {
+              displayName: match.displayName,
+              bib: match.bib,
+              age: match.age,
+              gender: match.gender,
+              city: match.city,
+              stateProv: match.stateProv,
+              overallRank: match.overallRank,
+              courseName: course.courseName
+            }
+          }
+        }
+      }
+      for (const course of courses) {
+        if ((course.results || []).some(r => this.bibsEqual(r.bib, wanted))) { unsold = course.courseName; break }
+      }
+      if (unsold) return this.notFoundResult(`Bib ${wanted} is entered in ${unsold}, which this race does not sell`)
+      return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+    } catch (error) {
+      console.error(`[${this.tag}] Bib lookup error for ${wanted}:`, error.message)
+      return this.upstreamErrorResult(error.message)
     }
   }
 

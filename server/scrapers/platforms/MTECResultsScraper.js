@@ -175,6 +175,55 @@ export class MTECResultsScraper extends BaseScraper {
   }
 
   /**
+   * Bib lookup. participantSearch takes `nameorbib`, so the bib goes through
+   * the same call per configured distance raceId; only rows linking to that
+   * raceId with exactly the searched bib count. Time and pace come from the
+   * same Finish-row detail page and chip/distance math as searchRunner.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    const yearRaceIds = this.config.raceIds?.[this.year]
+    if (!yearRaceIds || Object.keys(yearRaceIds).length === 0) {
+      return this.yearNotConfiguredResult('missing MTEC raceIds entry')
+    }
+    for (const distKey of (this.config.eventSearchOrder || ['marathon', 'half'])) {
+      const raceId = yearRaceIds[distKey]
+      if (!raceId) continue
+      const eventLabel = this.config.eventLabels?.[distKey] || distKey
+      let rows
+      try {
+        rows = await this._participantSearch(wanted, raceId)
+      } catch (err) {
+        return this.upstreamErrorResult(err.message)
+      }
+      const match = rows.find(r => r.race === String(raceId) && this.bibsEqual(r.bib, wanted))
+      if (!match) continue
+      let detail
+      try {
+        detail = await this._fetchRunnerDetail(match.rid, raceId)
+      } catch (err) {
+        return this.upstreamErrorResult(err.message)
+      }
+      if (!detail?.chipTime) return this.notFoundResult(`Bib ${wanted} found but Finish time missing`)
+      const distanceMiles = this.config.distances?.[distKey] || 26.2
+      return {
+        found: true,
+        runnerName: match.name,
+        bibNumber: String(match.bib).trim(),
+        officialTime: this.formatTime(detail.chipTime),
+        officialPace: this.formatPace(this.calculatePace(detail.chipTime, distanceMiles)),
+        eventType: eventLabel,
+        yearFound: this.year,
+        researchNotes: null,
+        resultsUrl: `${BASE}/runner/show?rid=${match.rid}&race=${raceId}`,
+        rawData: { name: match.name, city: match.city, state: match.state, rid: match.rid, raceId },
+      }
+    }
+    return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+  }
+
+  /**
    * GET /event/participantSearch?nameorbib=...&race=...
    * Returns parsed rows from the HTML table fragment.
    */

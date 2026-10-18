@@ -246,7 +246,7 @@ export class RTRTScraper extends BaseScraper {
       const pace = rawPace || this.formatPace(
         cleanTime ? this.calculatePace(this.normalizeTime(cleanTime), miles) : null
       )
-      return { time, pace, label: actual?.label || null }
+      return { time, pace, label: actual?.label || null, miles: actual?.miles || null }
     } catch (err) {
       console.log(`[${this.tag}] Could not fetch splits for ${pid}: ${err.message}`)
       return EMPTY
@@ -428,6 +428,76 @@ export class RTRTScraper extends BaseScraper {
       // a genuine miss returns notFoundResult() from the path above. Reporting
       // it as not_found told shoppers their result did not exist and kept the
       // outcome out of the upstream_error bucket that gets alerted on.
+      return this.upstreamErrorResult(error.message)
+    }
+  }
+
+  /**
+   * Bib lookup. RTRT's profile search matches the `search` string against the
+   * bib as well as the name (IL-2026 "17006" returns exactly bib 17006), so
+   * this is the same profiles call with the bib as the query, keeping only
+   * rows whose bib is exactly the one searched. Event resolution, the
+   * unsold-distance filter and the finish split are the same as searchRunner.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
+    try {
+      const rows = await this._searchProfilesOnce(wanted)
+      const hits = rows.filter(p => this.bibsEqual(p.bib, wanted))
+      if (!hits.length) return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+
+      let profile = hits[0]
+      let resolvedEventType = this.config.defaultEventType || 'Marathon'
+      let resolvedDistance = this.config.distanceMiles || 26.2
+      if (this.config.courseMap) {
+        const sold = this._soldMiles()
+        const kept = hits.filter(p => !this._ranOnlyUnsoldDistances(p.course, sold))
+        if (!kept.length) {
+          return this.notFoundResult(`Bib ${wanted} is entered in ${this._labelForCourse(hits[0].course)}, which this race does not sell`)
+        }
+        profile = kept[0]
+        for (const key of (this.config.eventSearchOrder || [])) {
+          const courseId = (this.config.courseMap[key] || '').toLowerCase()
+          if (courseId && String(profile.course || '').toLowerCase().split(',').map(t => t.trim()).includes(courseId)) {
+            resolvedEventType = this.config.eventLabels?.[key] || key
+            resolvedDistance = this.config.distances?.[key] || resolvedDistance
+            break
+          }
+        }
+      }
+
+      const { time, pace, label, miles: finishMiles } = await this._resolveFinish(profile.pid, resolvedDistance)
+      if (label && label !== resolvedEventType) resolvedEventType = label
+      // The finish split is what they actually ran: a half registrant who
+      // crossed the 5K finish is still a 5K, and that print is not sold.
+      const sold = this._soldMiles()
+      if (finishMiles && sold.length && !sold.some(m => Math.abs(m - finishMiles) < 0.2)) {
+        return this.notFoundResult(`Bib ${wanted} finished the ${label}, which this race does not sell`)
+      }
+
+      const fullName = profile.name || `${profile.fname || ''} ${profile.lname || ''}`.trim()
+      console.log(`[${this.tag}] BIB MATCH: ${fullName} bib ${profile.bib} ${resolvedEventType} ${time || 'no time'}`)
+      return {
+        found: true,
+        runnerName: fullName,
+        bibNumber: String(profile.bib).trim(),
+        officialTime: time,
+        officialPace: pace,
+        eventType: resolvedEventType,
+        yearFound: this.year,
+        researchNotes: null,
+        resultsUrl: profile.pid
+          ? `https://track.rtrt.me/e/${this.eventId}#/tracker/${profile.pid}`
+          : `https://track.rtrt.me/e/${this.eventId}#/dashboard`,
+        rawData: profile
+      }
+    } catch (error) {
+      if (error.rtrtType === 'no_roster' && this._raceNotRunYet()) {
+        return this.notFoundResult(`${this.raceName} ${this.year} has not been run yet; results are posted after race day`)
+      }
+      console.error(`[${this.tag}] Bib lookup error for ${wanted}:`, error.message)
       return this.upstreamErrorResult(error.message)
     }
   }

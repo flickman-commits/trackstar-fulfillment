@@ -168,6 +168,47 @@ export class NYRRScraper extends BaseScraper {
     }
   }
 
+  /**
+   * Bib lookup. finishers-filter's searchString also matches bibs, as a
+   * PREFIX ("12" returns 12, 120, 1201...), so sort by bib to put the exact
+   * one first and keep only an exact match. Same eventCode as searchRunner;
+   * the event is the marathon only, so there is no other distance to exclude.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
+    try {
+      const response = await fetchWithTimeout(`${this.baseUrl}/runners/finishers-filter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventCode: this.eventCode,
+          searchString: wanted,
+          handicap: null,
+          sortColumn: 'bib',
+          sortDescending: false,
+          pageIndex: 1,
+          pageSize: 50
+        })
+      })
+      if (!response.ok) return this.upstreamErrorResult(`NYRR HTTP ${response.status}`)
+      const data = await response.json()
+      const hit = (data.items || []).find(r => this.bibsEqual(r.bib, wanted))
+      if (!hit) return this.notFoundResult(`No bib ${wanted} among ${this.raceName} ${this.year} finishers`)
+      const runnerName = `${hit.firstName || ''} ${hit.lastName || ''}`.trim()
+      console.log(`[${this.tag}] BIB MATCH: ${runnerName} bib ${hit.bib} ${hit.overallTime}`)
+      return {
+        ...this._extractRunnerData(hit),
+        runnerName,
+        resultsUrl: `https://results.nyrr.org/event/${this.eventCode}/result/${hit.bib}`
+      }
+    } catch (error) {
+      console.error(`[${this.tag}] Bib lookup error for ${wanted}:`, error.message)
+      return this.upstreamErrorResult(error.message)
+    }
+  }
+
   _extractRunnerData(runner) {
     const rawTime = runner.overallTime || null
     const time = this.formatTime(rawTime)

@@ -29,6 +29,33 @@ export class BaseScraper {
   }
 
   /**
+   * Look a runner up by bib number instead of name.
+   *
+   * Research falls back to this when the name on an order finds nobody (a
+   * married name, a typo, a nickname) but a person has typed the bib in by
+   * hand. Platforms that can search by bib override it and return the same
+   * shape searchRunner does: found with chip time, chip pace, event type,
+   * results URL and bib, or notFoundResult / upstreamErrorResult.
+   *
+   * Contract for implementations: only ever return a runner whose bib equals
+   * the bib searched (exact, after trimming), and only from the event/race
+   * ids searchRunner would use (never a 5K or relay entry).
+   *
+   * @param {string} _bib
+   * @returns {Promise<Object|null>} null = this platform cannot search by bib
+   */
+  async searchRunnerByBib(_bib) {
+    return null
+  }
+
+  /** Exact bib comparison used by every searchRunnerByBib. */
+  bibsEqual(a, b) {
+    const x = String(a ?? '').trim()
+    const y = String(b ?? '').trim()
+    return x !== '' && x === y
+  }
+
+  /**
    * Normalize time string to h:mm:ss format
    * Handles various input formats: "3:42:15", "03:42:15", "3h 42m 15s", etc.
    */

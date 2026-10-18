@@ -206,6 +206,39 @@ export class RaceResultScraper extends BaseScraper {
     )
   }
 
+  /**
+   * Bib lookup: the list's own search term matches bib numbers too. Only rows
+   * whose BIB is exactly the bib and whose contest is a sold one are kept.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    console.log(`\n[${this.tag} ${this.year}] RaceResult bib lookup: ${wanted}`)
+    if (!this.rr?.eventId || !this.rr?.listName || !this.rr?.contests) {
+      return this.yearNotConfiguredResult('missing raceResult eventId/listName/contests')
+    }
+    let ev
+    let rows
+    try {
+      ev = await this.loadEventConfig()
+      rows = await this.searchList(ev, wanted)
+    } catch (err) {
+      console.error(`[${this.tag} ${this.year}] RaceResult error: ${err.message}`)
+      return this.upstreamErrorResult(`RaceResult ${err.status ? `HTTP ${err.status}` : 'request failed'}`)
+    }
+    const hits = rows.filter(r => this.bibsEqual(r.bib, wanted))
+    if (!hits.length) return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+    const order = this.config.eventSearchOrder || Object.keys(this.rr.contests)
+    for (const eventKey of order) {
+      const match = hits.find(r => this.contestKeyFor(r.contestLabel) === eventKey)
+      if (!match) continue
+      const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
+      const result = await this.buildResult(ev, match, eventKey, eventLabel)
+      return result?.found ? { ...result, runnerName: match.name } : result
+    }
+    return this.notFoundResult(`Bib ${wanted} is entered in ${[...new Set(hits.map(h => h.contestLabel))].join(', ')}, which this race does not sell`)
+  }
+
   async buildResult(ev, match, eventKey, eventLabel) {
     let chip = null
     let gun = null

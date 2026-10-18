@@ -174,6 +174,57 @@ export class MikaTimingScraper extends BaseScraper {
     }
   }
 
+  /**
+   * Look a runner up by bib. Mika list pages take search[start_no]; the
+   * listing is filtered to the same event code searchRunner uses, so only the
+   * sold race (the marathon) is searched. The row is parsed and shaped by the
+   * same helpers as a name match, so time and pace are identical.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
+    try {
+      const eventCode = await this.resolveEventCode()
+      const page = await this._fetchListPage({
+        pid: 'list',
+        event_main_group: String(this.year),
+        'search[start_no]': wanted,
+        event: eventCode,
+        num_results: '50',
+      })
+      if (!page.ok) return this.upstreamErrorResult(`Results site returned ${page.status}`)
+      if (page.yearMismatch) {
+        return this.notFoundResult(`Year mismatch: requested ${this.year} but results page shows ${page.yearMismatch}`)
+      }
+      const hits = page.results.filter(r => this.bibsEqual(r.bib, wanted))
+      if (!hits.length) return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+      const runner = hits[0]
+      console.log(`[${this.tag}] BIB MATCH: ${runner.name} bib ${runner.bib} ${runner.finishTime || 'no time'}`)
+      return { ...this._extractRunnerData(runner), runnerName: runner.name, resultsUrl: page.searchUrl }
+    } catch (error) {
+      console.error(`[${this.tag}] Bib lookup error for ${wanted}:`, error.message)
+      return this.upstreamErrorResult(error.message)
+    }
+  }
+
+  /** Fetch and parse one list page with the given query params. */
+  async _fetchListPage(params) {
+    const searchUrl = `${this.baseUrl}/?${new URLSearchParams(params).toString()}`
+    console.log(`[${this.tag}] Search URL: ${searchUrl}`)
+    const response = await fetchWithTimeout(searchUrl, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      }
+    })
+    console.log(`[${this.tag}] Response status: ${response.status}`)
+    if (!response.ok) return { ok: false, status: response.status, searchUrl, results: [] }
+    const html = await response.text()
+    const yearMismatch = this._checkYearMismatch(html)
+    return { ok: true, searchUrl, yearMismatch, results: yearMismatch ? [] : this._parseResultsHtml(html) }
+  }
+
   /** One list-page search. firstName may be empty for a surname-only search. */
   async _searchPage(eventCode, lastName, firstName) {
     const params = {
@@ -183,21 +234,7 @@ export class MikaTimingScraper extends BaseScraper {
     }
     if (firstName) params['search[firstname]'] = firstName
     Object.assign(params, { event: eventCode, num_results: '50', search_sort: 'name' })
-    const searchUrl = `${this.baseUrl}/?${new URLSearchParams(params).toString()}`
-    console.log(`[${this.tag}] Search URL: ${searchUrl}`)
-
-    const response = await fetchWithTimeout(searchUrl, {
-      headers: {
-        'User-Agent': USER_AGENT,
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      }
-    })
-    console.log(`[${this.tag}] Response status: ${response.status}`)
-    if (!response.ok) return { ok: false, searchUrl, results: [] }
-
-    const html = await response.text()
-    const yearMismatch = this._checkYearMismatch(html)
-    return { ok: true, searchUrl, yearMismatch, results: yearMismatch ? [] : this._parseResultsHtml(html) }
+    return this._fetchListPage(params)
   }
 
   /**

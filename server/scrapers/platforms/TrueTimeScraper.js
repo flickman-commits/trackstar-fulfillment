@@ -219,6 +219,37 @@ export class TrueTimeScraper extends BaseScraper {
     )
   }
 
+  /**
+   * Bib lookup: the page's search box takes a bib as well as a name. Only rows
+   * whose No is exactly the bib and whose EId is a sold event are kept.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    console.log(`\n[${this.tag} ${this.year}] TrueTime bib lookup: ${wanted}`)
+    if (!this.tt?.cid || !this.tt?.rid || !this.tt?.events) {
+      return this.yearNotConfiguredResult('missing trueTime cid/rid/events')
+    }
+    let rows
+    try {
+      rows = await this.search(wanted)
+    } catch (err) {
+      console.error(`[${this.tag} ${this.year}] TrueTime error: ${err.message}`)
+      return this.upstreamErrorResult(`TrueTime ${err.status ? `HTTP ${err.status}` : 'request failed'}`)
+    }
+    const hits = rows.filter(r => this.bibsEqual(r.bib, wanted))
+    if (!hits.length) return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+    const order = this.config.eventSearchOrder || Object.keys(this.tt.events)
+    for (const eventKey of order) {
+      const match = hits.find(r => this.eventKeyFor(r.eid) === eventKey)
+      if (!match) continue
+      const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
+      const result = await this.buildResult(match, eventKey, eventLabel)
+      return result?.found ? { ...result, runnerName: match.name } : result
+    }
+    return this.notFoundResult(`Bib ${wanted} is entered in ${[...new Set(hits.map(h => h.event))].join(', ')}, which this race does not sell`)
+  }
+
   async buildResult(match, eventKey, eventLabel) {
     const chip = this.cleanTime(match.net)
     if (!chip) {

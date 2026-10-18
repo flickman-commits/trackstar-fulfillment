@@ -474,11 +474,17 @@ export class ResearchService {
    *   Chromium launch and roughly doubles the wall clock. Callers on a deadline
    *   (the public endpoint, 9s) turn it off rather than blow the budget and
    *   report a timeout as if the timing site were down.
+   * @param {string|null} [opts.bib] - A bib known for this order (typed in by
+   *   a person on the research row, or the customer's). When the name search
+   *   finds nobody, or several people none of whom wear this bib, the runner
+   *   is looked up by bib instead (scraper.searchRunnerByBib). The official
+   *   name it returns is recorded in the notes only; the order's name stays
+   *   what gets printed.
    * @returns {Promise<Object>} Normalized scraper result (found, ambiguous,
    *   possibleMatches, bibNumber, officialTime, officialPace, eventType,
    *   researchStatus, researchNotes, rawData, ...)
    */
-  async findRunner(raceName, year, runnerName, { skipLastNameFallback = false } = {}) {
+  async findRunner(raceName, year, runnerName, { skipLastNameFallback = false, bib = null } = {}) {
     console.log(`[ResearchService] Searching for runner: ${runnerName}`)
     // Dashboard event-id overrides live in a cache that only applies if
     // someone loaded it. Until this call was here, only the repair tools
@@ -550,6 +556,46 @@ export class ResearchService {
         } else {
           console.log(`[ResearchService] Last name fallback also returned no results`)
         }
+      }
+    }
+
+    // Bib fallback. A person who could not find the runner by name (a maiden
+    // name, a typo, a nickname the timer does not know) can type the bib in
+    // by hand, and the bib is the more reliable key anyway. Only when the name
+    // search settled nothing: not after an upstream error, and not when one of
+    // several same-name candidates already wears this bib.
+    const wantedBib = bib != null ? String(bib).trim() : ''
+    const candidates = results.possibleMatches || results.matches || []
+    const bibAmongCandidates = candidates.some(m => m?.bib != null && String(m.bib).trim() === wantedBib)
+    const nameSettledNothing = !results.found && (
+      results.researchStatus === 'not_found' || (results.ambiguous && !bibAmongCandidates)
+    )
+    if (wantedBib && nameSettledNothing && typeof scraper.searchRunnerByBib === 'function') {
+      try {
+        const byBib = await scraper.searchRunnerByBib(wantedBib)
+        // The scraper promises an exact bib match; check anyway, because a
+        // wrong runner here prints a stranger's time on someone's poster.
+        if (byBib?.found && String(byBib.bibNumber || '').trim() === wantedBib) {
+          const officialName = byBib.runnerName || byBib.rawData?.name || null
+          console.log(`[ResearchService] Matched by bib ${wantedBib}: ${officialName || 'unnamed'}`)
+          byBib.researchNotes = [
+            `Matched by bib ${wantedBib} because the name "${runnerName}" did not match`
+              + (officialName ? `; the official results list this bib as "${officialName}".` : '.'),
+            byBib.researchNotes,
+          ].filter(Boolean).join(' ')
+          byBib.matchedByBib = true
+          byBib.officialName = officialName
+          results = byBib
+        } else if (byBib === null) {
+          console.log(`[ResearchService] ${raceName} platform cannot search by bib`)
+        } else {
+          console.log(`[ResearchService] Bib ${wantedBib} lookup: ${byBib?.researchStatus || 'no match'}`)
+          if (byBib?.researchStatus === 'not_found' && results.researchStatus === 'not_found') {
+            results.researchNotes = `${results.researchNotes || ''} Bib ${wantedBib} was also looked up and is not in the results.`.trim()
+          }
+        }
+      } catch (e) {
+        console.warn(`[ResearchService] Bib lookup failed for ${wantedBib}: ${e.message}`)
       }
     }
 
@@ -629,7 +675,9 @@ export class ResearchService {
       // already on the record is overwritten, including what a person entered.
       if (!existingResearch.officialTime && !order.hadNoTime) {
         try {
-          const fresh = await this.findRunner(raceName, raceYear, runnerName)
+          const fresh = await this.findRunner(raceName, raceYear, runnerName, {
+            bib: existingResearch.bibNumber || order.customerBib || null,
+          })
           const sameRunner = !existingResearch.bibNumber || String(fresh?.bibNumber || '') === String(existingResearch.bibNumber)
           if (fresh?.found && fresh.officialTime && sameRunner) {
             console.log(`[ResearchService] Filled the missing time for order ${order.orderNumber}: ${fresh.officialTime}`)
@@ -682,14 +730,24 @@ export class ResearchService {
     }
 
     // Fetch from scraper using effective values (shared, DB-free search core)
-    const results = await this.findRunner(raceName, raceYear, runnerName)
+    // A bib a person typed onto the research row (or the customer gave) lets
+    // research fall back to a bib lookup when the name finds nobody.
+    // A time_unavailable row's bib came from a scrape of the name it was
+    // searched under, which is being replaced here, so it does not count.
+    const handBib = existingResearch && existingResearch.researchStatus !== 'time_unavailable'
+      ? existingResearch.bibNumber || null
+      : null
+    const knownBib = handBib || order.customerBib || null
+    const results = await this.findRunner(raceName, raceYear, runnerName, { bib: knownBib })
 
     // Prepare research data (store the effective name used for search)
     const researchData = {
       orderId: order.id,
       raceId: race.id,
       runnerName: runnerName, // Store the name actually used for search
-      bibNumber: results.bibNumber,
+      // Never blank a bib a person entered just because this search did not
+      // return one.
+      bibNumber: results.bibNumber || handBib || null,
       officialTime: results.officialTime,
       // Backstop for every scraper at once. MyRace hands back paceTime: null
       // for whole races - CIM 2019 for all of them - and the scraper passed

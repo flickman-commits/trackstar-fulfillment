@@ -271,6 +271,64 @@ export class ChronoTrackScraper extends BaseScraper {
   }
 
   /**
+   * Bib lookup. The `term` search matches bibs as well as names (fuzzily:
+   * "10776" also returns 10774...), so keep only an exact bib match among
+   * individual entries in whitelisted courses, then resolve it with the same
+   * _fetchResult as searchRunner (chip time, pace over the matched interval).
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
+    if (!this.eventId) {
+      return this.yearNotConfiguredResult('missing ChronoTrack eventIds entry')
+    }
+
+    const searchUrl = `${API_BASE}/event/${this.eventId}/search?term=${encodeURIComponent(wanted)}`
+    const search = await this._getJson(searchUrl)
+    if (!search.ok) {
+      if (typeof search.status === 'number' && search.status >= 400 && search.status < 500) {
+        return this.notFoundResult(`Search returned HTTP ${search.status}`)
+      }
+      return this.upstreamErrorResult(`HTTP ${search.status}`)
+    }
+
+    const entries = (Array.isArray(search.data) ? search.data : [])
+      .filter(e => this.bibsEqual(e.bib, wanted))
+    if (!entries.length) return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
+
+    let individuals = entries.filter(e => !e.entryType || e.entryType === 'IND')
+    if (this.courseKeyById) {
+      individuals = individuals.filter(e => this.courseKeyById.has(Number(e.azpEventCourseId)))
+    }
+    if (!individuals.length) {
+      return this.notFoundResult(`Bib ${wanted} is not in a distance this race sells`)
+    }
+
+    for (const entry of individuals) {
+      const result = await this._fetchResult(entry)
+      if (!result || !result.time || !this.bibsEqual(result.bib, wanted)) continue
+      // Without a course whitelist, judge by the interval's distance: only a
+      // half or longer is a sold print, never a 5K/10K/mile.
+      if (!this.courseKeyById && !(result.distanceMiles > 12)) continue
+      console.log(`[${this.tag}] BIB MATCH: ${result.name} bib ${result.bib} ${result.eventType} ${result.time}`)
+      return {
+        found: true,
+        runnerName: result.name,
+        bibNumber: result.bib,
+        officialTime: result.time,
+        officialPace: result.pace,
+        eventType: result.eventType,
+        yearFound: this.year,
+        researchNotes: null,
+        resultsUrl: result.resultsUrl,
+        rawData: { entry, gunTime: result.gunTime, distanceMiles: result.distanceMiles },
+      }
+    }
+    return this.notFoundResult(`Bib ${wanted} has no finish time in a distance this race sells`)
+  }
+
+  /**
    * Resolve one search hit into a finish. Returns null if the entry has no
    * usable full-course interval.
    */
