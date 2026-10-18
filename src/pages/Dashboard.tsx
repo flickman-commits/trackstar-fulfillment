@@ -117,7 +117,16 @@ interface Order {
     // Shopper hand-edited time / pace / bib on the review screen, so the values
     // are theirs, not an official-results match.
     | 'edited_by_customer'
+    // Verified match where the shopper changed only the NAME on the print.
+    // Time, pace and bib are still official; the matched name is in
+    // lookupMatchedName.
+    | 'auto_match_name_edited'
+    | 'picked_from_list_name_edited'
+    | 'resolved_from_list_name_edited'
     | null
+  // The name official results matched, when the shopper printed a different
+  // one. Null otherwise.
+  lookupMatchedName?: string | null
   // Supabase Storage path of the customer's uploaded photo, or null for the
   // overwhelming majority of orders. Not openable directly: the bucket is
   // private and the dashboard mints a signed URL on demand.
@@ -410,6 +419,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     eventTypeSource: order.eventTypeSource as Order['eventTypeSource'],
     lookupVerified: order.lookupVerified as boolean | null | undefined,
     lookupOutcome: order.lookupOutcome as Order['lookupOutcome'],
+    lookupMatchedName: order.lookupMatchedName as string | null | undefined,
     // Personalization photo — drives the photo chip, View Photo and the
     // placement sign-off that gates completion.
     photoPath: order.photoPath as string | null | undefined,
@@ -1135,6 +1145,30 @@ export default function Dashboard() {
     window.addEventListener('trackstar:orders-changed', onChanged)
     return () => window.removeEventListener('trackstar:orders-changed', onChanged)
   }, [fetchOrders, loadTeam])
+
+  // A review decision changes the order's status ("Ready for review" becomes
+  // "Design rejected" or "Attach in Artelo"). Flip the header at once, then let
+  // the list refresh confirm it from the server.
+  const reviewKey = design.job ? `${design.job.id}:${design.job.review}` : null
+  const prevReviewKey = useRef<string | null>(reviewKey)
+  const reviewedOrderId = selectedOrder?.id ?? null  // the design hook follows the open order
+  useEffect(() => {
+    const prev = prevReviewKey.current
+    prevReviewKey.current = reviewKey
+    if (!prev || !reviewKey || prev === reviewKey || prev.split(':')[0] !== reviewKey.split(':')[0]) return
+    const review = reviewKey.split(':')[1]
+    const note = design.job?.reviewNote
+    const pipeline: Order['pipeline'] = review === 'rejected'
+      ? { stage: 'action', reason: 'Design rejected', kind: 'data', fix: `The design was rejected: ${note || 'no note'}. Fix the data; a new design renders on the next import.` }
+      : review === 'approved'
+        ? { stage: 'attach', reason: 'Attach in Artelo', fix: 'The print is approved and in the Artelo library (Orders folder). Open the Artelo order, attach the file to the item, then mark the order done here.' }
+        : undefined
+    if (pipeline) {
+      setSelectedOrder(prev => prev && prev.id === reviewedOrderId ? { ...prev, pipeline } : prev)
+      setOrders(prev => prev.map(o => o.id === reviewedOrderId ? { ...o, pipeline } : o))
+    }
+    fetchOrders()
+  }, [reviewKey, design.job, reviewedOrderId, fetchOrders])
 
   // Create a new race-partner "order" (used to send proof links to race orgs)
   const createRacePartner = async () => {
