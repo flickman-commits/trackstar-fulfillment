@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Trackstar Instant Lookup — Preview</title>
+<title>Trackstar Instant Lookup - Preview</title>
 <style>
   body { margin: 0; background: #F7F5F0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.04em; color: #1A1A1A; }
   .pv-bar { position: sticky; top: 0; z-index: 10; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: .75rem 1rem; background: #1A1A1A; color: #fff; font-size: .85rem; }
@@ -200,7 +200,7 @@
   #tsil-preview .tsil__bc-field--time .tsil__bc-value { font-size: 1.6rem; color: var(--tsil-accent); }
   #tsil-preview .tsil__bc-field--muted .tsil__bc-value { font-weight: 500; font-size: 1rem; }
   /* When "no time" is checked, the value reads "No time" / "No pace" in the
-     same big purple style as a real result — visually consistent so the
+     same big purple style as a real result - visually consistent so the
      shopper sees exactly what will (and won't) appear on the poster. */
 
   /* Italic "*printed on your poster" note, sits just under the data card. */
@@ -610,7 +610,7 @@
       // Primary block — name + time are the heroes.
       var primary = document.createElement('div');
       primary.className = 'tsil__bc-primary';
-      primary.appendChild(field('Runner', name || '—', 'tsil__bc-field--name'));
+      primary.appendChild(field('Runner', name || '-', 'tsil__bc-field--name'));
       // Always show the "Finish time" label. When no-time is ticked, the value
       // reads "No time" in the same big purple style — visually consistent so
       // the shopper sees exactly what will / won't appear on the poster.
@@ -803,13 +803,17 @@
           // Everything else (not found, lookup off/404, error, rate-limited) → manual.
           prefillManual(name);
           if (res.status === 429) {
-            root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
+            // Lookup is up but throttling us. Not the shopper's fault, and not
+            // a missing result, so don't imply we searched and found nothing.
+            root.querySelector('[data-tsil-manual-note]').textContent = "Instant lookup isn't working at the moment. Please enter your details manually.";
             pendingFallbackReason = 'manual_rate_limited';
           } else if (res.status >= 500 || res.status === 0) {
-            root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
+            root.querySelector('[data-tsil-manual-note]').textContent = "Instant lookup isn't working at the moment. Please enter your details manually.";
             pendingFallbackReason = 'manual_lookup_error';
           } else {
-            root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
+            // No match in the official results. Say so plainly, so the shopper
+            // understands why they're typing instead of assuming it's broken.
+            root.querySelector('[data-tsil-manual-note]').textContent = "We couldn't find those results with instant lookup. Please add them manually below.";
             pendingFallbackReason = 'manual_no_match';
           }
           show('manual');
@@ -817,7 +821,9 @@
         .catch(function () {
           clearTimeout(timer);
           prefillManual(name);
-          root.querySelector('[data-tsil-manual-note]').textContent = "Enter your details below and we'll take it from here.";
+          // Timed out or the network failed. Same shopper-facing message as the
+          // other lookup failures: the widget is at fault, not their result.
+          root.querySelector('[data-tsil-manual-note]').textContent = "Instant lookup isn't working at the moment. Please enter your details manually.";
           // Distinguish a timeout (slow upstream) from a network/other error so
           // the order's _lookup_outcome tells us which it was.
           pendingFallbackReason = timedOut ? 'manual_timeout' : 'manual_lookup_error';
