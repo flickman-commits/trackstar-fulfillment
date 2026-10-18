@@ -125,6 +125,12 @@ async function onGraphError(err) {
   if (err?.code === 10) {
     throw new Error('Instagram refused the message: the 24-hour reply window after the customer\'s last message has passed. Wait for them to write again.')
   }
+  // Conversation routing: one app answers a thread at a time. A reply typed in
+  // the Instagram app (or Business Suite) hands the thread to Instagram's own
+  // inbox, and it keeps it until that conversation goes quiet or is marked done.
+  if (err?.error_subcode === 2534037 || err?.subcode === 2534037 || /not the thread owner/i.test(err?.message || '')) {
+    throw new Error('Instagram has this conversation in its own inbox, usually because someone replied from the Instagram app. Reply there this time, or mark the conversation Done in the Instagram app and try again here.')
+  }
   throw err
 }
 
