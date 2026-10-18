@@ -4730,6 +4730,11 @@ Thank you!`
                             {isResearching ? 'Researching…' : selectedOrder.researchStatus === 'found' ? 'Re-run research' : 'Research runner'}
                           </button>
                         )}
+                        {selectedOrder.customerEmail && can('support') && !isEditing && (
+                          <button onClick={() => setEmailingOrder(selectedOrder)} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2" title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}>
+                            <Mail className="w-3.5 h-3.5" /> Email customer
+                          </button>
+                        )}
                     {showCommentBox && (
                     <div className="w-full bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
                       <textarea
@@ -5620,16 +5625,6 @@ Thank you!`
                           Copy Email
                         </button>
                       </>
-                    )}
-                    {selectedOrder.customerEmail && can('support') && !isEditing && (
-                      <button
-                        onClick={() => setEmailingOrder(selectedOrder)}
-                        className="inline-flex items-center gap-2 px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors"
-                        title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}
-                      >
-                        <Mail className="w-4 h-4" />
-                        Email customer
-                      </button>
                     )}
                     {!isEditing && !inlineDetail && (
                       <button
