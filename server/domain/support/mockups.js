@@ -13,6 +13,7 @@
  * sends can make the server fetch an arbitrary URL.
  */
 import { createClient } from '@supabase/supabase-js'
+import { readUpload } from './uploads.js'
 import prisma from '../../db.js'
 import { BUCKET } from '../render/jobs.js'
 
@@ -69,6 +70,8 @@ function extFor(type) {
  */
 export async function resolveMockup(ref, { filenameStem = 'Your Trackstar print' } = {}) {
   const [kind, id] = String(ref || '').split(':')
+  // A file the rep attached from their computer keeps its own name.
+  if (kind === 'upload') return readUpload(String(ref).slice('upload:'.length))
   if (kind === 'render') {
     const j = await prisma.renderJob.findUnique({ where: { id: String(id) }, select: { previewPath: true, status: true } })
     if (!j?.previewPath || j.status !== 'done') throw new Error('That design is not ready')

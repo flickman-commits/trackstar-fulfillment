@@ -1,5 +1,5 @@
 /**
- * POST /api/support/reply { id, text, close?, attachments?: ['render:<id>' | 'proof:<id>'] }
+ * POST /api/support/reply { id, text, close?, attachments?: ['render:<id>' | 'proof:<id>' | 'upload:<path>'] }
  *
  * Send a reply on a thread, from the support mailbox, as this person. The
  * only place support mail leaves the app, and only ever reached by a person
@@ -36,11 +36,15 @@ export default async function handler(req, res) {
 
     const instagram = thread.channel === 'instagram'
     // Mockups the rep attached, by reference; resolved here, never sent as bytes from the page.
-    const refs = (Array.isArray(body.attachments) ? body.attachments : []).map(String).slice(0, 4)
+    const refs = (Array.isArray(body.attachments) ? body.attachments : []).map(String).slice(0, 6)
     const files = []
-    for (const [i, ref] of refs.entries()) {
-      files.push(await resolveMockup(ref, { filenameStem: refs.length > 1 ? `Your Trackstar print ${i + 1}` : 'Your Trackstar print' }))
+    const mockups = refs.filter(r => !r.startsWith('upload:'))
+    for (const ref of refs) {
+      const n = mockups.indexOf(ref)
+      files.push(await resolveMockup(ref, { filenameStem: mockups.length > 1 ? `Your Trackstar print ${n + 1}` : 'Your Trackstar print' }))
     }
+    // A DM carries pictures only; Meta has no way to send a PDF from here.
+    if (instagram && files.some(f => !String(f.contentType).startsWith('image/'))) return res.status(400).json({ error: 'Instagram can only send pictures. Remove the PDF.' })
     // **bold**, _italic_ and links: real formatting in email, plain text in a DM (format.js).
     const sent = instagram
       ? await sendInstagramReply({ userId: user.id, thread, text: replyToPlain(text), images: files.map(f => ({ url: f.url })) })

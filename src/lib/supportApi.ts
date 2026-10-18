@@ -31,6 +31,8 @@ export const supportApi = {
   status: () => request<MailboxStatus>('/api/support/gmail?action=status'),
   // The fulfillment tool's "Email customer": a new conversation about one order.
   orderConversations: (orderId: string) => request<{ threads: OrderConversation[] }>(`/api/support/compose?orderId=${encodeURIComponent(orderId)}`),
+  // A place to PUT one attachment from the rep's computer; the reply names it by ref.
+  uploadSlot: (filename: string, contentType: string, size: number) => post<{ ref: string; uploadUrl: string; filename: string }>('/api/support/upload', { filename, contentType, size }),
   emailCustomer: (orderId: string, subject: string, text: string) => post<{ threadId: string; to: string; subject: string }>('/api/support/compose', { orderId, subject, text }),
   connectUrl: `${API_BASE}/api/support/gmail?action=connect`,
   disconnect: () => post<{ success: boolean }>('/api/support/gmail', { action: 'disconnect' }),

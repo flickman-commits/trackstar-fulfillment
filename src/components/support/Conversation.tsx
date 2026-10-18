@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Archive, Bold, ChevronDown, Clock, Italic, Link as LinkIcon, Loader2, Mail, Paperclip, RotateCcw, Send, Star, StickyNote, Trash2, Zap, X, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { btnGhost, btnPrimary, btnSecondary } from '@/lib/ui'
+import { supportApi } from '@/lib/supportApi'
 import { when } from '@/lib/supportDates'
 import { fillMacro, tagStoreLinks } from '@/lib/supportStatus'
 import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
 import { ChannelMark, CustomerAvatar } from './ConversationList'
 import DraftCard from './DraftCard'
+import RichReply, { type RichReplyHandle } from './RichReply'
 import Attachments from './Attachments'
 import type { Macro, Message, Mockup, Note, Teammate, ThreadDetail, ThreadStatus } from '@/types/support'
 
@@ -201,7 +204,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   onMerge: (ids: string[]) => void
   onUseMacro: (id: string) => void
   /** Lets the page's keyboard shortcuts focus the composer. */
-  replyRef: React.RefObject<HTMLTextAreaElement>
+  replyRef: React.RefObject<RichReplyHandle>
   noteRef: React.RefObject<HTMLTextAreaElement>
   /** The Actions panel drops lines into the reply through this. */
   insertRef: React.MutableRefObject<((text: string) => void) | null>
@@ -218,6 +221,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   const [attached, setAttached] = useState<Mockup[]>([])
   const [slashQ, setSlashQ] = useState<string | null>(null)
   const [slashIdx, setSlashIdx] = useState(0)
+  const [uploading, setUploading] = useState(0)
   const bottom = useRef<HTMLDivElement>(null)
   const close = usePopover()
   const macro = usePopover()
@@ -242,7 +246,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   // Meta's rule for a DM. The server says the same thing again on Send; this is so nobody types a reply that cannot go.
   const window = ig ? thread.replyWindow : null
   const windowClosed = Boolean(window && !window.open)
-  const canSend = wrote && !sending && !hasEmDash && !busy && !windowClosed
+  const canSend = wrote && !sending && !hasEmDash && !busy && !windowClosed && uploading === 0
 
   const send = async (closeAfter = false) => {
     if (!canSend) return
@@ -285,74 +289,68 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     requestAnimationFrame(() => { if (el) { const pos = before.length + name.length + 2; el.focus(); el.setSelectionRange(pos, pos) } })
   }
 
-  /** Wrap the selected words in the reply with a mark (the toolbar), or insert the mark around a placeholder. */
-  const wrapSelection = (kind: 'bold' | 'italic' | 'link') => {
-    const el = replyRef.current
-    if (!el) return
-    const s0 = el.selectionStart, e0 = el.selectionEnd
-    const picked = text.slice(s0, e0)
-    let insert = ''
-    let selStart = 0, selEnd = 0
-    if (kind === 'link') {
-      const url = globalThis.prompt('Link to (https://...)', picked.startsWith('http') ? picked : 'https://')
-      if (!url || !/^https?:\/\/\S+$/.test(url.trim())) return
-      const words = picked && !picked.startsWith('http') ? picked : 'link text'
-      insert = `[${words}](${url.trim()})`
-      selStart = 1; selEnd = 1 + words.length
-    } else {
-      const mark = kind === 'bold' ? '**' : '_'
-      const words = picked || (kind === 'bold' ? 'bold text' : 'italic text')
-      insert = `${mark}${words}${mark}`
-      selStart = mark.length; selEnd = mark.length + words.length
-    }
-    setText(text.slice(0, s0) + insert + text.slice(e0))
-    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s0 + selStart, s0 + selEnd) })
-  }
+  /** Bold, italic or a link on the selected words (the toolbar and ⌘B / ⌘I / ⌘K). */
+  const wrapSelection = (kind: 'bold' | 'italic' | 'link') => replyRef.current?.format(kind)
 
   /** Put text into the reply: between the greeting and sign-off when nothing is written yet, else at the caret. */
   const placeInReply = (body: string, replaceSlash = false) => {
-    const el = replyRef.current
-    let base = text
-    let caret = el ? el.selectionStart : text.length
-    let caretEnd = el ? el.selectionEnd : text.length
+    const editor = replyRef.current
+    setSlashQ(null)
     if (replaceSlash) {
       // The "/shortcut" being typed goes away with the pick.
-      const before = base.slice(0, caret).replace(/\/[\w-]*(?: [\w-]*){0,2}$/, '')
-      base = before + base.slice(caret)
-      caret = caretEnd = before.length
+      const typed = editor?.lineBeforeCaret().match(/\/[\w-]*(?: [\w-]*){0,2}$/)?.[0] || ''
+      editor?.insert(body, typed.length)
+      return
     }
-    let next: string
-    let pos: number
-    if (!replaceSlash && (ig ? !base.trim() : isBlank(base))) {
-      if (ig) { next = body; pos = body.length }
+    if (ig ? !text.trim() : isBlank(text)) {
+      let next: string
+      let upTo: string
+      if (ig) { next = body; upTo = body }
       else {
-        const greet = base.match(/^Hey[^\n]*,\n/)?.[0] || ''
-        const sign = base.match(/\n+Thanks,\n[^\n]*$/)?.[0] || ''
+        const greet = text.match(/^Hey[^\n]*,\n/)?.[0] || ''
+        const sign = text.match(/\n+Thanks,\n[^\n]*$/)?.[0] || ''
         next = `${greet}\n${body}\n${sign}`
-        pos = greet.length + 1 + body.length
+        upTo = `${greet}\n${body}`
       }
-    } else {
-      next = base.slice(0, caret) + body + base.slice(caretEnd)
-      pos = caret + body.length
+      setText(next)
+      requestAnimationFrame(() => editor?.focusLine(upTo.split('\n').length - 1, 'end'))
+      return
     }
-    setText(next)
-    setSlashQ(null)
-    requestAnimationFrame(() => { if (el) { el.focus(); el.setSelectionRange(pos, pos) } })
+    editor?.insert(body)
   }
   useEffect(() => { insertRef.current = (t: string) => { setMode('reply'); placeInReply(t) } })
   useEffect(() => {
     attachRef.current = (m: Mockup) => {
       setMode('reply')
-      setAttached(list => list.some(x => x.ref === m.ref) ? list.filter(x => x.ref !== m.ref) : list.length >= 4 ? list : [...list, m])
+      setAttached(list => list.some(x => x.ref === m.ref) ? list.filter(x => x.ref !== m.ref) : list.length >= 6 ? list : [...list, m])
     }
   })
 
+  // Files from the rep's computer: picked, dropped or pasted into the reply. Straight to storage, then attached by ref.
+  const fileInput = useRef<HTMLInputElement>(null)
+  const upload = async (files: File[]) => {
+    const room = 6 - attached.length
+    const take = files.filter(f => (ig ? f.type.startsWith('image/') : f.type.startsWith('image/') || f.type === 'application/pdf')).slice(0, Math.max(0, room))
+    if (take.length < files.length) toast.error(ig ? 'Instagram takes pictures only, up to 6' : 'Images and PDFs only, up to 6 a reply')
+    for (const f of take) {
+      setUploading(n => n + 1)
+      try {
+        const slot = await supportApi.uploadSlot(f.name || 'pasted-image.png', f.type, f.size)
+        const put = await fetch(slot.uploadUrl, { method: 'PUT', headers: { 'Content-Type': f.type || 'application/octet-stream', 'x-upsert': 'false' }, body: f })
+        if (!put.ok) throw new Error(`${f.name} did not upload`)
+        const thumbUrl = f.type.startsWith('image/') && !/hei[cf]/.test(f.type) ? URL.createObjectURL(f) : null
+        setAttached(list => [...list, { ref: slot.ref, orderId: '', kind: 'upload', label: slot.filename, thumbUrl, at: new Date().toISOString() }])
+      } catch (e) { toast.error((e as Error).message) }
+      finally { setUploading(n => n - 1) }
+    }
+  }
+
   // /shortcut: a slash at the start of a word in the reply offers the macros; Enter or Tab drops one in.
   const slashMatches = useMemo(() => (slashQ === null ? [] : macroMatches(macros, slashQ)), [slashQ, macros])
-  const onReplyChange = (v: string, caret: number) => {
+  const onReplyChange = (v: string) => {
     setText(v)
     // A space may continue the query ("/marine corps"); it only stays open while something matches.
-    const m = v.slice(0, caret).match(/(?:^|\s)\/([\w-]*(?: [\w-]*){0,2})$/)
+    const m = (replyRef.current?.lineBeforeCaret() || '').match(/(?:^|\s)\/([\w-]*(?: [\w-]*){0,2})$/)
     const q = m ? m[1] : null
     setSlashQ(q !== null && q.includes(' ') && !macroMatches(macros, q).length ? null : q)
     setSlashIdx(0)
@@ -364,24 +362,8 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
 
   const insertMacro = (m: Macro) => {
     macro.setOpen(false)
-    const body = fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName, channel: thread.channel })
-    const el = replyRef.current
-    if (ig) {
-      // No greeting or sign-off to slot between: at the caret, or after what is there.
-      if (!text.trim()) setText(body)
-      else if (el) { const s = el.selectionStart, e = el.selectionEnd; setText(text.slice(0, s) + body + text.slice(e)) }
-      else setText(text + '\n' + body)
-    } else if (isBlank(text)) {
-      // Drop it between the greeting and the sign-off.
-      const greet = text.match(/^Hey[^\n]*,\n/)?.[0] || ''
-      const sign = text.match(/\n+Thanks,\n[^\n]*$/)?.[0] || ''
-      setText(`${greet}\n${body}\n${sign}`)
-    } else if (el) {
-      const s = el.selectionStart, e = el.selectionEnd
-      setText(text.slice(0, s) + body + text.slice(e))
-    } else setText(text + '\n' + body)
+    placeInReply(fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName, channel: thread.channel }))
     onUseMacro(m.id)
-    requestAnimationFrame(() => el?.focus())
   }
 
   return (
@@ -448,7 +430,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 bg-[#fcfcfc]">
         {timeline.map(it => it.kind === 'note' && it.n.kind === 'draft'
           ? <DraftCard key={it.n.id} n={it.n} latest={it.n.id === latestDraftId} onRedraft={onRedraft}
-              onUse={body => { setMode('reply'); setText(tagStoreLinks(body.replace(/\{\{rep\}\}/g, me.firstName), thread.channel)); requestAnimationFrame(() => { const el = replyRef.current; if (el) { el.focus(); el.setSelectionRange(0, 0) } }) }} />
+              onUse={body => { setMode('reply'); setText(tagStoreLinks(body.replace(/\{\{rep\}\}/g, me.firstName), thread.channel)); requestAnimationFrame(() => replyRef.current?.focusLine(0, 'start')) }} />
           : it.kind === 'message'
           ? <Bubble key={it.m.id} m={it.m} />
           : <NoteCard key={it.n.id} n={it.n} team={team} meId={me.id} isAdmin={isAdmin} onDelete={() => onDeleteNote(it.n.id)} />)}
@@ -475,9 +457,10 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
         {mode === 'reply' ? (
           <div className="px-4 pb-3">
             <div className="relative">
-              <textarea
-                ref={replyRef} value={text} onChange={e => onReplyChange(e.target.value, e.target.selectionStart)} rows={ig ? 4 : 8} disabled={sending || windowClosed}
-                placeholder={ig ? (windowClosed ? 'Replies are held until they write again' : 'Write the DM. Keep it short, like a text. / for a macro.') : undefined}
+              <RichReply
+                ref={replyRef} value={text} onChange={onReplyChange} plain={ig} minHeight={ig ? 96 : 176} disabled={sending || windowClosed}
+                onFiles={files => upload(files)}
+                placeholder={ig ? (windowClosed ? 'Replies are held until they write again' : 'Write the DM. Keep it short, like a text. / for a macro.') : 'Write the reply. / for a macro.'}
                 onKeyDown={e => {
                   if (slashQ !== null && slashMatches.length) {
                     if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIdx(i => Math.min(slashMatches.length - 1, i + 1)); return }
@@ -486,9 +469,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
                     if (e.key === 'Escape') { setSlashQ(null); return }
                   }
                   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(e.shiftKey) }
-                  if ((e.metaKey || e.ctrlKey) && !ig && ['b', 'i', 'k'].includes(e.key.toLowerCase())) { e.preventDefault(); wrapSelection(e.key.toLowerCase() === 'b' ? 'bold' : e.key.toLowerCase() === 'i' ? 'italic' : 'link') }
                 }}
-                className="w-full px-3 py-2.5 text-sm bg-white border border-border-gray rounded-md focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 resize-y leading-relaxed"
               />
               {slashQ !== null && slashMatches.length > 0 && (
                 <div className="absolute left-0 bottom-full mb-1 w-[380px] max-w-[90vw] p-1 rounded-lg bg-white border border-border-gray shadow-[0_8px_30px_rgba(0,0,0,0.14)] z-30">
@@ -504,8 +485,9 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
                 </div>
               )}
             </div>
-            {attached.length > 0 && (
+            {(attached.length > 0 || uploading > 0) && (
               <div className="mt-2 flex flex-wrap gap-2">
+                {uploading > 0 && <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border-gray bg-subtle-gray text-xs text-off-black/60"><Loader2 className="w-3.5 h-3.5 animate-spin" />Uploading {uploading}</span>}
                 {attached.map(m => (
                   <span key={m.ref} className="inline-flex items-center gap-2 pl-1 pr-2 py-1 rounded-md border border-border-gray bg-subtle-gray text-xs text-off-black/75">
                     {m.thumbUrl ? <img src={m.thumbUrl} alt="" className="w-8 h-8 rounded object-cover bg-white border border-border-gray" /> : <Paperclip className="w-3.5 h-3.5" />}
@@ -523,6 +505,9 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
                   <button type="button" onClick={() => wrapSelection('link')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black border-l border-border-gray" title="Link (⌘K)"><LinkIcon className="w-3.5 h-3.5" /></button>
                 </span>
               )}
+              <input ref={fileInput} type="file" multiple accept={ig ? 'image/*' : 'image/*,application/pdf'} className="hidden"
+                onChange={e => { const fs = Array.from(e.target.files || []); e.target.value = ''; if (fs.length) upload(fs) }} />
+              <button type="button" onClick={() => fileInput.current?.click()} disabled={attached.length >= 6} className={btnSecondary} title={ig ? 'Attach pictures (or paste or drop them in the reply)' : 'Attach images or a PDF (or paste or drop them in the reply)'}><Paperclip className="w-3.5 h-3.5" /> Attach</button>
               <div className="relative" ref={macro.ref}>
                 <button data-macro-button onClick={() => macro.setOpen(v => !v)} className={btnSecondary} title="Insert a saved reply (m), or type / in the reply"><Zap className="w-3.5 h-3.5" /> Macro</button>
                 {macro.open && <MacroMenu macros={macros} onPick={insertMacro} onClose={() => macro.setOpen(false)} />}

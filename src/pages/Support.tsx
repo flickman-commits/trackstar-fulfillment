@@ -14,6 +14,7 @@ import Details from '@/components/support/Details'
 import MacrosModal from '@/components/support/MacrosModal'
 import SettingsModal from '@/components/support/SettingsModal'
 import ResizeHandle from '@/components/support/ResizeHandle'
+import type { RichReplyHandle } from '@/components/support/RichReply'
 import { useColumnWidth, useWide } from '@/lib/useColumnWidth'
 
 /**
@@ -45,7 +46,8 @@ const EMPTY: Record<string, string> = {
   snoozed: 'Nothing snoozed.',
   closed: 'Nothing closed yet.',
 }
-const POLL_MS = 60_000
+// Instagram DMs and email land in the database within seconds (webhook, and the mail sync every 5 minutes); this is how soon the page shows them.
+const POLL_MS = 20_000
 
 const SHORTCUTS: [string, string][] = [
   ['j / k', 'Next and previous conversation'], ['r', 'Reply'], ['n', 'Add a note'], ['m', 'Insert a macro'],
@@ -76,7 +78,7 @@ export default function Support() {
   const [macrosOpen, setMacrosOpen] = useState(false)
   const [keysOpen, setKeysOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const replyRef = useRef<HTMLTextAreaElement>(null)
+  const replyRef = useRef<RichReplyHandle>(null)
   const noteRef = useRef<HTMLTextAreaElement>(null)
   // Column widths you drag, remembered on this browser. The conversation takes what is left.
   const wide = useWide()
@@ -130,6 +132,14 @@ export default function Support() {
     const id = window.setInterval(() => { if (document.visibilityState === 'visible') loadInbox(true) }, POLL_MS)
     return () => window.clearInterval(id)
   }, [loadInbox])
+
+  // A new message in the conversation that is open shows up without reopening it.
+  useEffect(() => {
+    if (!thread || !inbox) return
+    const row = inbox.threads.find(r => r.id === thread.id)
+    const newest = thread.messages.reduce((t, m) => Math.max(t, new Date(m.sentAt).getTime()), 0)
+    if (row?.lastMessageAt && new Date(row.lastMessageAt).getTime() > newest) refreshThread(thread.id)
+  }, [inbox]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const openThread = useCallback(async (id: string) => {
     setSelectedId(id)
