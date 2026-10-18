@@ -193,7 +193,10 @@ export async function autoQueueRenders({ limit = 25 } = {}) {
       createdAt: { gte: from },
     },
     orderBy: { createdAt: 'asc' },
-    take: limit * 4,
+    // Every candidate, not a window: many open orders cannot render yet (race
+    // not run, data missing), and a capped window of the oldest ones starved
+    // the ready orders behind them. Checking an order is a cheap read.
+    take: 1000,
     select: { id: true, orderNumber: true },
   })
   let queued = 0, skipped = 0
