@@ -33,11 +33,11 @@ import { useColumnWidth, useWide } from '@/lib/useColumnWidth'
  * has a key; press ? for the list.
  */
 const VIEW_TITLE: Record<string, string> = {
-  inbox: 'Your inbox', mentions: 'Mentions', unassigned: 'Unassigned', all: 'All open',
+  all: 'All open', inbox: 'Your inbox',
   waiting: 'Waiting on customer', escalated: 'Escalated', snoozed: 'Snoozed', closed: 'Closed', filtered: 'Filtered',
 }
 const EMPTY: Record<string, string> = {
-  inbox: 'Nothing assigned to you. Take one from Unassigned.',
+  inbox: 'Nothing assigned to you. Take one from All open.',
   mentions: 'Nobody has mentioned you.',
   filtered: 'Nothing filtered. Filter a sender from a conversation or in Settings.',
   unassigned: 'Everything open has an owner.',
@@ -62,7 +62,7 @@ export default function Support() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const [view, setView] = useState<InboxView>(() => { try { return (localStorage.getItem('support.view') as InboxView) || 'all' } catch { return 'all' } })
+  const [view, setView] = useState<InboxView>(() => { try { const v = localStorage.getItem('support.view') as InboxView | null; return v && v !== 'mentions' && v !== 'unassigned' ? v : 'all' } catch { return 'all' } })
   const [sort, setSort] = useState<InboxSort>(() => { try { return (localStorage.getItem('support.sort') as InboxSort) || 'waiting' } catch { return 'waiting' } })
   const [query, setQuery] = useState('')
   const [inbox, setInbox] = useState<InboxPayload | null>(null)

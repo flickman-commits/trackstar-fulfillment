@@ -1,10 +1,10 @@
-import { Inbox, AtSign, UserRoundX, Layers, Clock, AlertTriangle, Moon, Archive, Settings2, Zap, Filter } from 'lucide-react'
+import { Inbox, Layers, Clock, AlertTriangle, Moon, Archive, Settings2, Zap, Filter } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Avatar } from '@/components/AssigneePicker'
 import type { InboxCounts, InboxView, Teammate } from '@/types/support'
 
 /**
- * The views, Intercom's left column: Your inbox, Mentions, Unassigned, All,
+ * The views, Intercom's left column: All open (the team's shared list), Your inbox,
  * then the states a conversation can be parked in, then one row per
  * teammate with their open count. Clicking a row filters the list beside
  * it; the counts are live from the same request.
@@ -38,10 +38,9 @@ export default function ViewsColumn({ view, counts, team, me, onView, onMacros, 
 }) {
   const c = counts
   const top: Row[] = [
-    { id: 'inbox', label: 'Your inbox', icon: Inbox, count: c?.inbox },
-    { id: 'mentions', label: 'Mentions', icon: AtSign, count: c?.mentions },
-    { id: 'unassigned', label: 'Unassigned', icon: UserRoundX, count: c?.unassigned },
+    // The team works from one shared list; your own sits under it. (Mentions and Unassigned went 2026-10-18.)
     { id: 'all', label: 'All open', icon: Layers, count: c?.all },
+    { id: 'inbox', label: 'Your inbox', icon: Inbox, count: c?.inbox },
   ]
   const states: Row[] = [
     { id: 'waiting', label: 'Waiting on customer', icon: Clock, count: c?.waiting },
