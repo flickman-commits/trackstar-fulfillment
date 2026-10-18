@@ -1657,7 +1657,8 @@ export default function Dashboard() {
   const startEditingWeather = (order: Order) => {
     setWeatherEditValues({
       raceDate: order.raceDateIso || '',
-      weatherCondition: order.weatherCondition || '',
+      // Stored lowercase ("sunny"); the options are capitalized.
+      weatherCondition: order.weatherCondition ? order.weatherCondition.charAt(0).toUpperCase() + order.weatherCondition.slice(1).toLowerCase() : '',
       weatherTemp: order.weatherTemp || ''
     })
     setIsEditingWeather(true)
@@ -1670,7 +1671,7 @@ export default function Dashboard() {
   }
 
   // Save race data edits (date + weather)
-  const saveWeather = async (order: Order) => {
+  const saveWeather = async (order: Order, reason?: string) => {
     if (!order.raceId) {
       setToast({ message: 'No race data to update', type: 'error' })
       return
@@ -1686,11 +1687,21 @@ export default function Dashboard() {
           raceDate: weatherEditValues.raceDate || null,
           weatherTemp: weatherEditValues.weatherTemp || null,
           weatherCondition: weatherEditValues.weatherCondition || null,
-          raceDateSourceUrl: window.prompt('Link where this date is confirmed (results page or race site). Leave blank if the date did not change.') || undefined
+          // Only a changed date needs a source link.
+          raceDateSourceUrl: weatherEditValues.raceDate && weatherEditValues.raceDate !== (order.raceDateIso || '')
+            ? (window.prompt('Link where this date is confirmed (results page or race site).') || undefined) : undefined,
+          reason,
         })
       })
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
+        // A race year that has already printed keeps a record of why its weather changed.
+        if (!reason && /needs a reason/i.test(err.error || '')) {
+          const why = window.prompt(`${err.error}\n\nWhy is it changing?`)
+          if (why && why.trim()) { setIsSavingWeather(false); return saveWeather(order, why.trim()) }
+          setToast({ message: 'Not saved: a reason is needed to change printed weather', type: 'error' })
+          return
+        }
         setToast({ message: err.error || 'Failed to save race data', type: 'error' })
         return
       }
