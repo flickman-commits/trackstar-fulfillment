@@ -1,6 +1,7 @@
+import { isTriathlon } from '../../server/domain/orders/triathlon.js'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { hasScraperForRace, getCanonicalRaceName } from '../../server/scrapers/index.js'
+import { hasScraperForRace } from '../../server/scrapers/index.js'
 import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
 import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../../server/lib/orderValue.js'
 import { getProductInfo, loadProductCatalog } from '../../server/lib/productCatalog.js'
@@ -12,7 +13,7 @@ import { formatRaceDate, formatTemp, formatTime, formatPace } from '../../server
 import { resolveEvent } from '../../server/lib/raceEvent.js'
 import { dateVerified } from '../../server/domain/races/verification.js'
 import { pipelineFor } from '../../server/domain/orders/pipeline.js'
-import { onlineWorkers, noTimeGaps } from '../../server/domain/render/templates.js'
+import { loadPipelineContext } from '../../server/domain/orders/pipelineStatus.js'
 
 
 /**
@@ -220,21 +221,9 @@ export default async function handler(req, res) {
     // Race rows by name and year, so an order that has not been researched
     // yet still gets its race date (and weather). Without this the page could
     // not tell a future race from a missing result, and new orders for a race
-    // not yet run read "Needs research" until research happened to run.
-    const raceRows = await prisma.race.findMany()
-    const raceByKey = new Map(raceRows.map(r => [`${r.raceName}|${r.year}`, r]))
-    // What the render pipeline can do right now, for the pipeline status.
-    const [okTemplates, gaps, workers] = await Promise.all([
-      prisma.printTemplate.findMany({ where: { enabled: true, lastCheckOk: true }, select: { key: true } }),
-      noTimeGaps(),
-      onlineWorkers(),
-    ])
-    const templateKeys = new Set(okTemplates.map(t => t.key))
-    const workerOnline = workers.length > 0
-    const raceFor = (name, year) => {
-      if (!name || !year) return null
-      return raceByKey.get(`${name}|${year}`) || raceByKey.get(`${getCanonicalRaceName(name) || name}|${year}`) || null
-    }
+    // not yet run read "Needs research" until research happened to run. Also
+    // what the render pipeline can do right now, for the pipeline status.
+    const { raceFor, templateKeys, gaps, workerOnline } = await loadPipelineContext()
 
     // Transform orders to include flattened research data
     const transformedOrders = orders.map(order => {
@@ -275,6 +264,11 @@ export default async function handler(req, res) {
         bibNumber: research?.bibNumber || null,
         officialTime: formatTime(research?.officialTime),
         officialPace: formatPace(research?.officialPace),
+        // Triathlons: each leg as it prints, and whether this order is one.
+        isTriathlon: isTriathlon(order),
+        swimTime: research?.swimTime || null, swimDistance: research?.swimDistance || null,
+        bikeTime: research?.bikeTime || null, bikeDistance: research?.bikeDistance || null,
+        runTime: research?.runTime || null, runDistance: research?.runDistance || null,
         // The event: confirmed by research, or assumed from the customer or the product until then.
         ...resolveEvent(research, order, effectiveRaceName),
         researchStatus: research?.researchStatus || null,

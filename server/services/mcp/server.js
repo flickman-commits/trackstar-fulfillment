@@ -38,7 +38,8 @@ export async function toolsFor(principal) {
     if (!principal.scopes.has(t.scope)) continue
     if ((t.scope === 'write' || t.scope === 'admin') && !principal.user) continue
     if (t.scope === 'admin' && principal.role !== 'admin') continue
-    if (t.cap && principal.user && !(await can(principal.role, t.cap))) continue
+    // A capability belongs to a person's role; a service key has no person, so no capability tools.
+    if (t.cap && (!principal.user || !(await can(principal.role, t.cap)))) continue
     out.push(t)
   }
   return out

@@ -10,28 +10,11 @@
  * The rendering itself happens on a Mac with Illustrator (worker/), which
  * talks to api/render/worker.js.
  */
-import { waitUntil } from '@vercel/functions'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireCapability, recordAudit, loadActiveUser } from '../_lib/users.js'
-import { checkOrder, createJob, latestJob, signedFiles, reviewJob, onlineWorkers } from '../../server/domain/render/jobs.js'
-import prisma from '../_lib/prisma.js'
-import { uploadApprovedToArtelo } from '../../server/domain/render/artelo.js'
-import { deliverApproved } from '../../server/domain/render/deliver.js'
-import { markRacePrinted } from '../../server/domain/races/verification.js'
-
-/** Copy an approved print to the Drive Orders folder, then upload it to the Artelo library. */
-async function deliverEverywhere(job) {
-  try {
-    let j = job.deliveredAt ? job : await deliverApproved(job)
-    if (!j.arteloUploadedAt) j = await uploadApprovedToArtelo(j)
-    return j
-  } catch (e) { console.error('[render/jobs] background delivery', job.id, e.message) }
-}
-
-/** Keep the function alive until the work is done (Vercel), without making the caller wait. */
-function inBackground(promise) {
-  try { waitUntil(promise) } catch { /* not on Vercel: the local server keeps running anyway */ }
-}
+import { checkOrder, createJob, latestJob, signedFiles, onlineWorkers } from '../../server/domain/render/jobs.js'
+import { reviewRender, deliverEverywhere } from '../../server/domain/render/review.js'
+import { inBackground } from '../../server/lib/background.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -66,20 +49,10 @@ export default async function handler(req, res) {
     }
 
     if (body.action === 'review') {
-      let job = await reviewJob({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, reviewerId: user.id })
-      if (job.review === 'approved') {
-        if (job.spec?.raceId) await markRacePrinted(job.spec.raceId)
-        // Drive and the Artelo library take several seconds; the person
-        // reviewing does not wait for them. They finish after the response, and
-        // a failure shows on the order and is retried by the import.
-        inBackground(deliverEverywhere(job))
-        // The order is not done yet: the file still has to be attached to the
-        // item in Artelo by hand (no API for that). The order moves to the
-        // Attach stage and is completed from there. Other renders of the
-        // order still waiting for review are moot now.
-        await prisma.renderJob.updateMany({ where: { orderId: job.orderId, review: 'pending', id: { not: job.id } }, data: { review: 'closed', reviewNote: 'Another version was approved', reviewedAt: new Date() } })
-      }
-      await recordAudit({ action: `render.${job.review}`, summary: `${job.review === 'approved' ? 'Approved' : 'Rejected'} the render of ${job.spec?.file || job.orderId} (v${job.version})${job.reviewNote ? `: ${job.reviewNote}` : ''}`, detail: { jobId: job.id, orderId: job.orderId }, actor: user })
+      // Drive and the Artelo library take several seconds; the person
+      // reviewing does not wait for them (server/domain/render/review.js).
+      const { job, delivery } = await reviewRender({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, user })
+      if (delivery) inBackground(delivery)
       const files = await signedFiles(job)
       return res.status(200).json({ job: present(job, files) })
     }

@@ -25,6 +25,8 @@ export default async function handler(req, res) {
       // Manual corrections to the result itself. Elí sometimes needs to use the
       // runner's own watch time rather than the official one we scraped.
       bibNumber, officialTime, officialPace,
+      // Triathlon legs (time and distance each), entered by hand.
+      swimTime, swimDistance, bikeTime, bikeDistance, runTime, runDistance,
       // Partner details. Partner rows have no columns of their own: the
       // organization lives in raceName and the contact in customerName /
       // customerEmail. Named separately here so a caller cannot reach a real
@@ -193,8 +195,11 @@ export default async function handler(req, res) {
     // not the Order, so they get written through to the latest research row.
     // A hand-entered value is authoritative: we mark it found and record the
     // source as manual_entry so the provenance stays honest.
-    if (bibNumber !== undefined || officialTime !== undefined || officialPace !== undefined) {
+    const legs = { swimTime, swimDistance, bikeTime, bikeDistance, runTime, runDistance }
+    const legEdited = Object.values(legs).some(v => v !== undefined)
+    if (bibNumber !== undefined || officialTime !== undefined || officialPace !== undefined || legEdited) {
       const researchData = {}
+      for (const [k, v] of Object.entries(legs)) if (v !== undefined) researchData[k] = v ? String(v).trim().slice(0, 20) : null
       if (bibNumber !== undefined) researchData.bibNumber = bibNumber || null
       if (officialTime !== undefined) researchData.officialTime = officialTime || null
       if (officialPace !== undefined) researchData.officialPace = officialPace || null

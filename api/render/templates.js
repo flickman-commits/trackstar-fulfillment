@@ -11,8 +11,7 @@
  */
 import { setCors } from '../_lib/auth.js'
 import { requireAdminOnly, recordAudit } from '../_lib/users.js'
-import prisma from '../_lib/prisma.js'
-import { templatesOverview, upsertTemplate, setTemplateEnabled, deleteTemplate } from '../../server/domain/render/templates.js'
+import { templatesOverview, upsertTemplate, setTemplateEnabled, deleteTemplate, recheckTemplate } from '../../server/domain/render/templates.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ template: t })
       }
       case 'recheck': {
-        const t = await prisma.printTemplate.update({ where: { key: String(body.key) }, data: { lastCheckMtime: null, lastCheckOk: null, lastCheckAt: null } })
+        const t = await recheckTemplate(body.key)
         return res.status(200).json({ template: t })
       }
       case 'delete': {

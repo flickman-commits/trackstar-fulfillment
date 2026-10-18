@@ -15,8 +15,13 @@ import { designTools } from './design.js'
 import { bulkTools } from './bulk.js'
 import { teamTools } from './team.js'
 import { repairTools } from './repair.js'
+import { renderTools } from './render.js'
+import { raceTools } from './races.js'
+import { researchTools } from './research.js'
+import { statsTools } from './stats.js'
+import { supportTools } from './support.js'
 
-export const ALL_TOOLS = [...opsTools, ...orderTools, ...designTools, ...bulkTools, ...teamTools, ...repairTools]
+export const ALL_TOOLS = [...opsTools, ...orderTools, ...designTools, ...bulkTools, ...teamTools, ...renderTools, ...raceTools, ...researchTools, ...statsTools, ...supportTools, ...repairTools]
 
 const names = ALL_TOOLS.map(t => t.name)
 if (new Set(names).size !== names.length) throw new Error('MCP tool names must be unique')

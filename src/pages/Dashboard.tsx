@@ -94,6 +94,14 @@ interface Order {
   bibNumber?: string
   officialTime?: string
   officialPace?: string
+  // Triathlons: entered by hand, each leg's time and distance as it prints.
+  isTriathlon?: boolean
+  swimTime?: string | null
+  swimDistance?: string | null
+  bikeTime?: string | null
+  bikeDistance?: string | null
+  runTime?: string | null
+  runDistance?: string | null
   researchStatus?: 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'time_unavailable' | 'race_not_run' | null
   // How the result was obtained: scraper vs. customer-confirmed in the widget
   researchSource?: 'scraper' | 'customer_verified' | 'customer_supplied' | null
@@ -353,6 +361,10 @@ function mapOrder(order: Record<string, unknown>): Order {
     bibNumber: order.bibNumber as string | undefined,
     officialTime: order.officialTime as string | undefined,
     officialPace: order.officialPace as string | undefined,
+    isTriathlon: Boolean(order.isTriathlon),
+    swimTime: (order.swimTime as string | null) ?? null, swimDistance: (order.swimDistance as string | null) ?? null,
+    bikeTime: (order.bikeTime as string | null) ?? null, bikeDistance: (order.bikeDistance as string | null) ?? null,
+    runTime: (order.runTime as string | null) ?? null, runDistance: (order.runDistance as string | null) ?? null,
     eventType: order.eventType as string | undefined,
     researchStatus: order.researchStatus as 'found' | 'not_found' | 'ambiguous' | 'no_scraper' | 'year_not_configured' | 'upstream_error' | 'time_unavailable' | 'race_not_run' | null,
     researchNotes: order.researchNotes as string | undefined,
@@ -1651,6 +1663,8 @@ export default function Dashboard() {
     bibNumber: string
     officialTime: string
     officialPace: string
+    // Triathlon legs; absent on every other order.
+    swimTime?: string; swimDistance?: string; bikeTime?: string; bikeDistance?: string; runTime?: string; runDistance?: string
   }>({ runnerNameOverride: '', bibNumber: '', officialTime: '', officialPace: '' })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -1764,6 +1778,11 @@ export default function Dashboard() {
       bibNumber: order.bibNumber || '',
       officialTime: order.officialTime || '',
       officialPace: order.officialPace || '',
+      ...(order.isTriathlon ? {
+        swimTime: order.swimTime || '', swimDistance: order.swimDistance || '',
+        bikeTime: order.bikeTime || '', bikeDistance: order.bikeDistance || '',
+        runTime: order.runTime || '', runDistance: order.runDistance || '',
+      } : {}),
     })
     setIsEditing(true)
   }
@@ -1870,6 +1889,11 @@ export default function Dashboard() {
       }
       if (editValues.officialPace !== (originalOrder.officialPace || '')) {
         updates.officialPace = editValues.officialPace || null
+      }
+      if (originalOrder.isTriathlon) {
+        for (const k of ['swimTime', 'swimDistance', 'bikeTime', 'bikeDistance', 'runTime', 'runDistance'] as const) {
+          if ((editValues[k] ?? '') !== (originalOrder[k] || '')) updates[k] = editValues[k] || null
+        }
       }
 
       const response = await apiFetch(`/api/orders/update`, {
@@ -5382,6 +5406,20 @@ Thank you!`
                                   className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
+                              {selectedOrder.isTriathlon && (['swim', 'bike', 'run'] as const).map(leg => (
+                                <div key={leg} className="flex justify-between items-center gap-2">
+                                  <span className="text-body-sm text-off-black/60 capitalize">{leg}</span>
+                                  <span className="inline-flex gap-1.5">
+                                    <input type="text" value={editValues[`${leg}Time`] ?? ''} onChange={(e) => setEditValues({ ...editValues, [`${leg}Time`]: e.target.value })}
+                                      placeholder={leg === 'swim' ? '00:40:15' : leg === 'bike' ? '01:03:50' : '01:03:39'}
+                                      className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input type="text" value={editValues[`${leg}Distance`] ?? ''} onChange={(e) => setEditValues({ ...editValues, [`${leg}Distance`]: e.target.value })}
+                                      placeholder={leg === 'swim' ? '1.5 mi' : leg === 'bike' ? '18 mi' : '8 mi'}
+                                      className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-20 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                  </span>
+                                </div>
+                              ))}
+                              {!selectedOrder.isTriathlon && (
                               <div className="flex justify-between items-center">
                                 <span className="text-body-sm text-off-black/60">Pace</span>
                                 <input
@@ -5392,6 +5430,7 @@ Thank you!`
                                   className="text-body-sm font-medium text-off-black bg-white border border-border-gray rounded px-2 py-1 w-40 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
+                              )}
                             </>
                           ) : (
                             <>
@@ -5430,7 +5469,13 @@ Thank you!`
                               ) : (
                                 <NotAvailableField label="Time" />
                               )}
-                              {selectedOrder.hadNoTime ? (
+                              {selectedOrder.isTriathlon ? (['swim', 'bike', 'run'] as const).map(leg => {
+                                const t = selectedOrder[`${leg}Time`], d = selectedOrder[`${leg}Distance`]
+                                const label = leg.charAt(0).toUpperCase() + leg.slice(1)
+                                return t || d
+                                  ? <CopyableField key={leg} label={label} value={[t, d].filter(Boolean).join(' · ')} />
+                                  : <NotAvailableField key={leg} label={label} />
+                              }) : selectedOrder.hadNoTime ? (
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs text-off-black/40 w-16">Pace</span>
                                   <span className="text-xs px-2 py-1 bg-warning-amber/10 text-warning-amber border border-warning-amber/20 rounded">

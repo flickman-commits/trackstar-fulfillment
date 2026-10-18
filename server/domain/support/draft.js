@@ -279,11 +279,20 @@ export async function draftThread(threadId, { instruction = '', actor = null, dr
   }
   if (dryRun) return { reply, data }
 
-  const note = await prisma.supportNote.create({
-    data: { threadId: thread.id, kind: 'draft', body: reply, data, authorId: actor?.id || null, authorName: 'Claude' },
+  const note = await storeDraft({ threadId: thread.id, body: reply, data, actor })
+  return { note, reply, data }
+}
+
+/**
+ * Keep a draft reply on a conversation as a note (kind 'draft'), the one the
+ * composer offers. Never sends anything. Claude's drafts and drafts written
+ * through MCP both land here.
+ */
+export async function storeDraft({ threadId, body, data = null, actor = null, authorName = 'Claude' }) {
+  return prisma.supportNote.create({
+    data: { threadId, kind: 'draft', body, data: data ?? undefined, authorId: actor?.id || null, authorName },
     include: { author: { select: { id: true, firstName: true, lastName: true } } },
   })
-  return { note, reply, data }
 }
 
 /**

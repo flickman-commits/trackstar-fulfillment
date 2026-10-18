@@ -94,6 +94,11 @@ export async function deleteTemplate(key) {
   return prisma.printTemplate.delete({ where: { key: String(key) } })
 }
 
+/** Forget the last check of a file, so the next worker to check in runs it again. */
+export async function recheckTemplate(key) {
+  return prisma.printTemplate.update({ where: { key: String(key) }, data: { lastCheckMtime: null, lastCheckOk: null, lastCheckAt: null } })
+}
+
 /** A worker checked a file. Keep the verdict and the mtime it applies to. */
 export async function recordCheck({ key, mtime, ok, report, workerId }) {
   return prisma.printTemplate.update({

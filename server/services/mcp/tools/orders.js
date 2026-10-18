@@ -8,6 +8,7 @@ import prisma from '../../../../api/_lib/prisma.js'
 import { ToolError } from '../server.js'
 import { approvalUrl, shopifyAdminUrl } from '../../../lib/links.js'
 import { rosterFor } from '../../../domain/orders/assignment.js'
+import { pipelinesFor } from '../../../domain/orders/pipelineStatus.js'
 
 export const ORDER_TYPES = ['standard', 'custom', 'race_partner']
 export const STATUSES = ['pending', 'missing_year', 'ready', 'flagged', 'completed']
@@ -98,6 +99,18 @@ export async function findOrdersByNumber(wanted) {
   })
 }
 
+/** The pipeline as a tool shows it: stage, the one-line reason, and what to do. */
+export function pipelineShape(p) {
+  return p ? { stage: p.stage, reason: p.reason, fix: p.fix || undefined } : undefined
+}
+
+/** One item of an order: the one asked for, else the first. */
+export function pickItem(rows, item) {
+  const o = item ? rows.find(r => r.lineItemIndex === item - 1) : rows[0]
+  if (!o) throw new ToolError(`${displayNumber(rows[0])} has no item ${item}.`)
+  return o
+}
+
 export function detail(o) {
   const r = o.runnerResearch?.[0]
   const design = ['custom', 'race_partner'].includes(o.trackstarOrderType)
@@ -177,7 +190,7 @@ export const orderTools = [
   {
     name: 'list_orders',
     title: 'List orders',
-    description: 'Open orders of one type, newest first, with filters. Standard orders are the personalized prints; custom and race_partner are design jobs. Up to 50 a page.',
+    description: 'Open orders of one type, newest first, with filters. Standard orders are the personalized prints (each with its pipeline stage, reason and fix); custom and race_partner are design jobs. Up to 50 a page.',
     scope: 'read',
     readOnly: true,
     input: {
@@ -213,21 +226,22 @@ export const orderTools = [
         prisma.order.count({ where }),
         prisma.order.findMany({ where, orderBy: type === 'custom' ? [{ dueDate: 'asc' }, { createdAt: 'desc' }] : { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit, select: LIST_SELECT }),
       ])
-      const names = await shopifyNames(rows.map(r => r.id))
-      return { total, page, pages: Math.max(1, Math.ceil(total / limit)), orders: rows.map(o => row(o, names.get(o.id)?.name)) }
+      const [names, pipelines] = await Promise.all([shopifyNames(rows.map(r => r.id)), type === 'standard' ? pipelinesFor(rows.map(r => r.id)) : new Map()])
+      return { total, page, pages: Math.max(1, Math.ceil(total / limit)), orders: rows.map(o => ({ ...row(o, names.get(o.id)?.name), pipeline: pipelineShape(pipelines.get(o.id)) })) }
     },
   },
   {
     name: 'get_order',
     title: 'Get order',
-    description: 'One order in full by its number (e.g. "4053"): every item on it, the runner, race, what prints, research, comments, proofs and the approval link for design jobs.',
+    description: 'One order in full by its number (e.g. "4053"): every item on it, the runner, race, what prints, research, the pipeline stage and fix, comments, proofs and the approval link for design jobs.',
     scope: 'read',
     readOnly: true,
     input: { orderNumber: z.string().max(40).describe('The Shopify order number, with or without #.') },
     async handler({ orderNumber }) {
       const rows = await findOrdersByNumber(orderNumber)
       if (!rows.length) throw new ToolError(`No order matching "${orderNumber}".`)
-      return { orderNumber: displayNumber(rows[0]), items: rows.map(detail) }
+      const pipelines = await pipelinesFor(rows.filter(r => r.trackstarOrderType === 'standard').map(r => r.id))
+      return { orderNumber: displayNumber(rows[0]), items: rows.map(o => ({ ...detail(o), pipeline: pipelineShape(pipelines.get(o.id)) })) }
     },
   },
   {
@@ -252,6 +266,38 @@ export const orderTools = [
       const rows = await prisma.order.findMany({ where, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: limit, select: LIST_SELECT })
       const names = await shopifyNames(rows.map(r => r.id))
       return { matches: rows.map(o => row(o, names.get(o.id)?.name)) }
+    },
+  },
+  {
+    name: 'backlog_by_reason',
+    title: 'Backlog by reason',
+    description: 'Open standard orders grouped by pipeline stage and reason, with counts and order numbers. The dashboard\'s Action queue.',
+    scope: 'read',
+    readOnly: true,
+    input: {},
+    async handler() {
+      const rows = await prisma.order.findMany({ where: openWhere('standard'), select: { id: true, parentOrderNumber: true, lineItemIndex: true } })
+      const [names, pipelines] = await Promise.all([shopifyNames(rows.map(r => r.id)), pipelinesFor(rows.map(r => r.id))])
+      const stages = {}
+      for (const o of rows) {
+        const p = pipelines.get(o.id)
+        if (!p) continue
+        const n = String(names.get(o.id)?.name || o.parentOrderNumber).replace(/^#/, '') + (o.lineItemIndex ? `-${o.lineItemIndex + 1}` : '')
+        const st = (stages[p.stage] ||= { count: 0, reasons: {} })
+        st.count++
+        const r = (st.reasons[p.reason] ||= { count: 0, orders: [] })
+        r.count++
+        r.orders.push(n)
+      }
+      const ORDER = ['review', 'attach', 'action', 'needs_research', 'waiting', 'done']
+      return {
+        open: rows.length,
+        stages: ORDER.filter(s => stages[s]).map(s => ({
+          stage: s,
+          count: stages[s].count,
+          reasons: Object.entries(stages[s].reasons).sort((a, b) => b[1].count - a[1].count).map(([reason, v]) => ({ reason, count: v.count, orders: v.orders.sort() })),
+        })),
+      }
     },
   },
 ]

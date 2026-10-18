@@ -17,6 +17,7 @@
  * order's numbers), setup (scraper, production file, race data), render.
  */
 import { printBlockers } from '../races/verification.js'
+import { isTriathlon, triathlonMissing } from './triathlon.js'
 import { templateFor, SIZES } from '../render/spec.js'
 
 const RESULT_STATES = new Set(['found'])
@@ -58,6 +59,22 @@ export function pipelineFor({ order, research, race, render, hasScraper, templat
   // Race and setup problems: things only a person (or a developer) can change.
   if (!raceName) return stage('action', 'Unknown race', { kind: 'setup', fix: 'The tool could not tell which race this is. Set the race on the order.' })
   if (!year || order.status === 'missing_year') return stage('action', 'Year missing', { kind: 'data', fix: 'The order does not say which year. Ask the customer or read it off the order, then set it.' })
+
+  // Triathlons: one design for all of them, no scrapers. A person enters the
+  // result; until every field is there it is manual research, never "needs a scraper".
+  if (isTriathlon(order)) {
+    // Order of work: a known future race waits; otherwise the result comes
+    // first (entering it puts the race on file, which Race > Edit needs), then
+    // the race date, then the weather.
+    if (race?.raceDate && !raceRun(race, year)) return stage('waiting', 'Race not run yet', { fix: `${raceName} ${year} has not happened yet.` })
+    const missing = triathlonMissing(research)
+    if (missing.length) return stage('action', 'Needs manual research', { kind: 'data', fix: `Triathlons are researched by hand. Find the athlete on the race's results site and enter the ${missing.join(', ')} under Runner > Edit.` })
+    if (!race?.raceDate) return stage('action', 'Needs race date', { kind: 'data', fix: `${raceName} ${year} has no race date. Add it with a source under Race > Edit; the weather follows from it.` })
+    const blockers = printBlockers(race)
+    if (blockers.length === 1 && /not confirmed/.test(blockers[0])) return stage('action', 'Confirm weather', { kind: 'data', fix: 'The weather for this race year is calculated but nobody has checked it. Open the breakdown (source), then Confirm.' })
+    if (blockers.length) return stage('action', 'Needs race data', { kind: 'data', fix: `${blockers.join('. ')}.` })
+    return stage('action', 'Make by hand', { kind: 'setup', fix: 'Everything for this triathlon print is here. Make it from the triathlon design, then mark it complete.' })
+  }
   if (!raceRun(race, year)) return stage('waiting', 'Race not run yet', { fix: `${raceName} ${year} has not happened yet. Results are looked up two days after race day.` })
 
   const rs = research?.researchStatus || null

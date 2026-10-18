@@ -215,6 +215,14 @@ model RunnerResearch {
   bibNumber      String?
   officialTime   String?
   officialPace   String?
+  // Triathlons only (server/domain/orders/triathlon.js): each leg's time and
+  // distance as they print ("00:40:15", "1.5 mi"), entered by hand.
+  swimTime       String?
+  swimDistance   String?
+  bikeTime       String?
+  bikeDistance   String?
+  runTime        String?
+  runDistance    String?
   eventType      String?  // "Marathon" or "Half Marathon"
   yearFound      Int?
   researchStatus String   @default("pending") // "found", "not_found", "ambiguous", "no_scraper", "year_not_configured", "upstream_error"
