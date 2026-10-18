@@ -1440,6 +1440,10 @@ export default function Dashboard() {
     }
   }
   markAsCompletedRef.current = markAsCompleted
+  // A standard order's design is approved: the only time Mark as Completed shows for it.
+  const standardDesignApproved = design.job?.status === 'done' && design.job.review === 'approved'
+  const standardDesignApprovedRef = useRef(false)
+  standardDesignApprovedRef.current = standardDesignApproved
 
 
   // Re-open a completed order. Brings it back into the active queue with
@@ -2491,6 +2495,7 @@ export default function Dashboard() {
       // Cmd+Enter (Ctrl+Enter elsewhere): Mark as complete.
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === 'Enter') {
         if (selectedOrder.status === 'completed' || selectedOrder.status === 'flagged') return
+        if (selectedOrder.trackstarOrderType === 'standard' && !standardDesignApprovedRef.current) return
         e.preventDefault()
         markAsCompletedRef.current(selectedOrder.orderNumber)
         return
@@ -4771,6 +4776,16 @@ Thank you!`
                             {isResearching ? 'Researching…' : selectedOrder.researchStatus === 'found' ? 'Re-run research' : 'Research runner'}
                           </button>
                         )}
+                        {/* The script cannot make this print (a 10 miler, a size or race with no
+                            template): a person makes it by hand, then completes it here. Never
+                            offered while a design is on its way, so nothing completes by accident. */}
+                        {selectedOrder.status !== 'completed' && selectedOrder.status !== 'flagged' && !standardDesignApproved && !isEditing
+                          && selectedOrder.pipeline?.stage === 'action' && selectedOrder.pipeline?.kind === 'setup' && (
+                          <button onClick={() => { if (window.confirm(`Mark order ${selectedOrder.displayOrderNumber} complete? Only do this once the print was made by hand and attached in Artelo.`)) markAsCompleted(selectedOrder.orderNumber) }}
+                            className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2">
+                            <Check className="w-3.5 h-3.5" /> Made by hand, mark complete
+                          </button>
+                        )}
                         {selectedOrder.customerEmail && can('support') && !isEditing && (
                           <button onClick={() => setEmailingOrder(selectedOrder)} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2" title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}>
                             <Mail className="w-3.5 h-3.5" /> Email customer
@@ -5634,6 +5649,10 @@ Thank you!`
                      selectedOrder.status !== 'flagged' &&
                      // An approved design has its own Mark as complete beside Attach in Artelo.
                      !((selectedOrder.pipeline?.stage === 'attach' || (design.job?.status === 'done' && design.job.review === 'approved')) && selectedOrder.arteloUrl) &&
+                     // A standard print completes only once its design is approved, so nobody
+                     // completes an order that has no design yet. One the script cannot make
+                     // is completed from Actions ("Made by hand, mark complete").
+                     (selectedOrder.trackstarOrderType !== 'standard' || standardDesignApproved) &&
                      !isEditing && (
                       <button
                         onClick={() => markAsCompleted(selectedOrder.orderNumber)}

@@ -30,7 +30,7 @@ type Overview = {
 const STATUS: Record<Template['status'], { label: string; cls: string; help: string }> = {
   ready: { label: 'Ready', cls: 'bg-green-100 text-green-800', help: 'Checked, and a worker that is online has the file.' },
   problems: { label: 'Problems', cls: 'bg-red-100 text-red-800', help: 'The last check found something the renderer cannot work around. Open the row.' },
-  checking: { label: 'Not checked yet', cls: 'bg-amber-100 text-amber-800', help: 'A worker has the file and will check it on its next check-in.' },
+  checking: { label: 'Checking…', cls: 'bg-amber-100 text-amber-800', help: 'A worker has the file and checks it on its next check-in, within a minute.' },
   no_file: { label: 'No file', cls: 'bg-red-100 text-red-800', help: 'No worker has this file on disk. Check the path, or the Drive sync on the worker Mac.' },
   offline: { label: 'Worker offline', cls: 'bg-off-black/10 text-off-black/60', help: 'Checked and ready, but no machine with the file is online right now.' },
   disabled: { label: 'Off', cls: 'bg-off-black/10 text-off-black/60', help: 'Turned off by hand. Not rendered.' },
@@ -63,7 +63,8 @@ export default function RenderTemplatesPanel() {
     try { const r = await apiFetch('/api/render/templates'); const j = await r.json(); if (!r.ok) throw new Error(j.error); setData(j) }
     catch (e) { toast.error((e as Error).message || 'Could not load') }
   }, [])
-  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t) }, [load])
+  const anyChecking = Boolean(data?.templates.some(t => t.status === 'checking'))
+  useEffect(() => { load(); const t = setInterval(load, anyChecking ? 5000 : 30000); return () => clearInterval(t) }, [load, anyChecking])
 
   const act = async (label: string, body: Record<string, unknown>) => {
     setBusy(label)
@@ -231,7 +232,7 @@ function TemplateRow({ t, st, isOpen, onToggle, busy, act }: {
                 {!r && <div className="text-off-black/50">{st.help}</div>}
               </div>
               <div className="flex lg:flex-col gap-2 shrink-0">
-                <button disabled={!!busy} onClick={() => act('recheck', { action: 'recheck', key: t.key })} className={btnSecondary} title="Forget the last check; the next worker check-in runs it again"><RefreshCw className="w-3.5 h-3.5" /> Re-check</button>
+                <button disabled={!!busy} onClick={() => act('recheck', { action: 'recheck', key: t.key }).then(() => toast.success(`Re-checking ${t.key}. The result shows here in under a minute; a file that has not changed gets the same verdict.`))} className={btnSecondary} title="Forget the last check; the next worker check-in runs it again"><RefreshCw className="w-3.5 h-3.5" /> Re-check</button>
                 <button disabled={!!busy} onClick={() => act('toggle', { action: t.enabled ? 'disable' : 'enable', key: t.key })} className={btnSecondary}><Power className="w-3.5 h-3.5" /> {t.enabled ? 'Turn off' : 'Turn on'}</button>
                 <button disabled={!!busy} onClick={() => { if (confirm(`Remove the ${t.key} template? Orders for it go back to the designers.`)) act('delete', { action: 'delete', key: t.key }) }} className={`${btnGhost} text-red-600`}><Trash2 className="w-3.5 h-3.5" /> Remove</button>
               </div>

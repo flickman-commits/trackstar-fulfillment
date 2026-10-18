@@ -73,6 +73,7 @@ export function pipelineFor({ order, research, race, render, hasScraper, templat
   if (!order.hadNoTime && (!research.officialTime || !research.officialPace)) return stage('action', 'No time', { kind: 'data', fix: 'The result has no finish time or pace. Add them, or mark the order as no time.' })
 
   // Everything a design needs is here. What stops the render?
+  if (research.eventType && !/^marathon$/i.test(research.eventType.trim())) return stage('action', 'Make by hand', { kind: 'setup', fix: `${research.eventType} prints are not automated yet; only the marathon template is mapped. Make this design by hand.` })
   const template = templateKey(raceName, editionOf(order))
   if (!templates.has(template)) return stage('action', 'Needs a production file', { kind: 'setup', fix: `There is no checked production file for ${template}. Add it under Settings > Designs, or make the design by hand.` })
   if (!SIZES.includes(order.productSize)) return stage('action', 'Make by hand', { kind: 'setup', fix: `${order.productSize} is not a size the script renders. Make this design by hand.` })

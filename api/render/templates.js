@@ -35,7 +35,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ template: t })
       }
       case 'recheck': {
-        const t = await prisma.printTemplate.update({ where: { key: String(body.key) }, data: { lastCheckMtime: null } })
+        const t = await prisma.printTemplate.update({ where: { key: String(body.key) }, data: { lastCheckMtime: null, lastCheckOk: null, lastCheckAt: null } })
         return res.status(200).json({ template: t })
       }
       case 'delete': {
