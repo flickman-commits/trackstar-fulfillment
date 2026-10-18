@@ -4262,20 +4262,7 @@ Thank you!`
                           {selectedOrder.isRushOrder && (
                             <span className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-amber-50 text-amber-800 border-amber-200">⚡ Rush (4-day)</span>
                           )}
-                          {(selectedOrder.shopifyAdminUrl || selectedOrder.arteloUrl) && (
-                            <span className="ml-auto inline-flex items-center gap-1.5">
-                              {selectedOrder.shopifyAdminUrl && (
-                                <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className={platformPill} title="Open this order in Shopify">
-                                  <img src="/shopify-icon.png" alt="" className="w-3.5 h-3.5" /> Shopify <ArrowUpRight className="w-3 h-3 opacity-50" />
-                                </a>
-                              )}
-                              {selectedOrder.arteloUrl && (
-                                <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className={platformPill} title="Open this order in Artelo">
-                                  <img src="/artelo-icon.png" alt="" className="w-3.5 h-3.5 rounded-[3px]" /> Artelo <ArrowUpRight className="w-3 h-3 opacity-50" />
-                                </a>
-                              )}
-                            </span>
-                          )}
+                          {/* No Shopify or Artelo links on a custom order: the designers work from the proofs, not the shop. */}
                           {/* Admin only: cut the line by hand. Defaults to 4 days
                               from purchase, like a paid rush; any date can be set. */}
                           {isAdmin && !isProductionStage && !selectedOrder.isRushOrder && rushEditing !== selectedOrder.id && (
