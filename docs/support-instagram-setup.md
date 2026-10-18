@@ -8,8 +8,8 @@ Meta posts every DM to `/api/support/instagram-webhook` within seconds; that is 
 
 ## In Meta for Developers (about 20 minutes)
 
-1. **Create the app.** developers.facebook.com > My Apps > Create app. Use case: "Other", type "Business". Name it Trackstar Support. If it asks for a Business Portfolio, pick or create Trackstar's.
-2. **Add Instagram.** In the app dashboard, Add product > Instagram > "API setup with Instagram login". (Not "with Facebook login".)
+1. **Create the app.** developers.facebook.com > My Apps > Create app. Name it Trackstar Support. Under "Add use cases" tick only **Manage messaging & content on Instagram** (not "Engage with customers on Messenger", which is Facebook Page DMs; "Other" is being retired). If it asks for an app type, Business; if it asks for a Business Portfolio, pick or create Trackstar's.
+2. **Open the Instagram setup.** In the app dashboard, Use cases > Manage messaging & content on Instagram > Customize > "API setup with Instagram login". (Not "with Facebook login".)
 3. **Add the account.** Under step 1 "Generate access tokens", click Add account and sign in as @trackstar_art. It must be a professional account (Business or Creator). This is what makes Standard Access enough.
 4. **App ID and App secret.** App settings > Basic. Copy both into Vercel as `INSTAGRAM_APP_ID` and `INSTAGRAM_APP_SECRET` (and into `.env.local` for local work).
 5. **Redirect URI.** Still under the Instagram product, "Business login settings" (step 3 in that screen): add `https://fast.trackstar.art/api/support/instagram-callback` to the OAuth redirect URIs. Add `http://localhost:3000/api/support/instagram-callback` too for local testing.
