@@ -1496,9 +1496,12 @@ export default function Dashboard() {
   markAsCompletedRef.current = markAsCompleted
   // A standard order's design is approved: the only time Mark as Completed shows for it.
   const standardDesignApproved = design.job?.status === 'done' && design.job.review === 'approved'
-  // No design from the script (none made, or the render failed): the print is
-  // made by hand, and completing it says so. Loading counts as "not yet known".
-  const standardNoDesign = Boolean(design.state) && (!design.job || design.job.status === 'failed')
+  // No usable design from the script: none made, the render failed, or the
+  // design was rejected or closed (Eli makes those by hand when the file has a
+  // problem a re-render cannot fix). Completing it says "Made by Hand". A design
+  // rendering or waiting for review gets no button, so nothing completes past it.
+  const standardNoDesign = Boolean(design.state) && (!design.job || design.job.status === 'failed'
+    || (design.job.status === 'done' && (design.job.review === 'rejected' || design.job.review === 'closed')))
   const standardDesignApprovedRef = useRef(false)
   standardDesignApprovedRef.current = standardDesignApproved
 
