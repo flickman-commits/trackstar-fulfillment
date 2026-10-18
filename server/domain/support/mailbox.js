@@ -33,6 +33,7 @@
  */
 import { google } from 'googleapis'
 import prisma from '../../db.js'
+import { unwrapForward } from './forwards.js'
 import { oauthClient, originFor, isRevokedToken, buildMime, base64url, newMessageId } from '../sales/gmail.js'
 import { defaultAssigneeId } from './routing.js'
 import { isFiltered } from './filters.js'
@@ -276,7 +277,7 @@ export function parseMessage(msg, mailbox) {
   const labels = msg.labelIds || []
   const direction = isOurs(from.email, mailbox) || labels.includes('SENT') ? 'out' : 'in'
   const bodyText = (parts.text || htmlToText(parts.html)).replace(/\r/g, '').trim()
-  return {
+  const parsed = {
     gmailMessageId: msg.id,
     gmailThreadId: msg.threadId,
     rfcMessageId: h['message-id'] || null,
@@ -293,6 +294,9 @@ export function parseMessage(msg, mailbox) {
     sentAt: msg.internalDate ? new Date(Number(msg.internalDate)) : (h.date ? new Date(h.date) : new Date()),
     labels,
   }
+  // A teammate forwarding a customer's email to fast@: it becomes the customer's message (forwards.js).
+  const fwd = unwrapForward(parsed, { isOurs: e => isOurs(e, mailbox || mailboxEmail()) })
+  return fwd ? { ...fwd.message, forward: { note: fwd.note, by: fwd.forwardedBy } } : parsed
 }
 
 /**
@@ -326,12 +330,19 @@ function counterpart(m, mailbox) {
  * ever set, never cleared, so the sync re-reading a message we sent keeps
  * the name of who sent it.
  */
-export async function importMessage(parsed, { sentById = null, backfill = false, mailbox } = {}) {
+export async function importMessage(parsed, { sentById = null, backfill = false, mailbox, threadId = null } = {}) {
   const mb = mailbox || mailboxEmail()
   // Drafts show up in history as they are typed; they are not mail yet.
   if (parsed.labels?.includes('DRAFT')) return null
 
-  let thread = await prisma.supportThread.findUnique({ where: { gmailThreadId: parsed.gmailThreadId } })
+  // A reply we just sent belongs to the conversation it was sent from, even if Gmail filed it on a thread of its own.
+  let thread = threadId ? await prisma.supportThread.findUnique({ where: { id: threadId } }) : null
+  if (!thread) thread = await prisma.supportThread.findUnique({ where: { gmailThreadId: parsed.gmailThreadId } })
+  // A new Gmail thread that answers one of our messages (a forwarded customer writing back) joins that conversation.
+  if (!thread && parsed.inReplyTo) {
+    const parent = await prisma.supportMessage.findFirst({ where: { rfcMessageId: parsed.inReplyTo }, select: { threadId: true } })
+    if (parent) thread = await prisma.supportThread.findUnique({ where: { id: parent.threadId } })
+  }
   // Merged away: the message belongs to the conversation it was folded into.
   for (let hop = 0; thread?.mergedIntoId && hop < 5; hop++) {
     thread = await prisma.supportThread.findUnique({ where: { id: thread.mergedIntoId } }) || thread
@@ -372,14 +383,26 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
     attachments: parsed.attachments,
     sentAt: parsed.sentAt,
   }
+  const existed = parsed.forward ? await prisma.supportMessage.findUnique({ where: { gmailMessageId: parsed.gmailMessageId }, select: { id: true } }) : null
   const message = await prisma.supportMessage.upsert({
     where: { gmailMessageId: parsed.gmailMessageId },
     create: { ...row, gmailMessageId: parsed.gmailMessageId, sentById },
     update: sentById ? { ...row, sentById } : row,
   })
 
+  if (parsed.forward && !existed) await noteForward(thread.id, parsed.forward)
+
   await refreshThread(thread, message, { backfill, mailbox: mb })
   return message
+}
+
+/** Who forwarded it, and what they wrote above the forward, as the team's own lines on the conversation. */
+async function noteForward(threadId, { note, by }) {
+  const user = by?.email ? await prisma.user.findFirst({ where: { email: { equals: by.email, mode: 'insensitive' } }, select: { id: true, firstName: true, lastName: true } }) : null
+  const name = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') : (by?.name || by?.email || 'Someone')
+  const data = [{ threadId, kind: 'event', body: `${name} forwarded this from ${by?.email || 'their email'}`, authorId: user?.id || null, authorName: name }]
+  if (note) data.push({ threadId, kind: 'note', body: note.slice(0, 4000), authorId: user?.id || null, authorName: name })
+  await prisma.supportNote.createMany({ data })
 }
 
 /**
@@ -602,14 +625,14 @@ export async function sendReply({ userId, thread, html, text, attachments = [] }
   let stored = null
   try {
     const full = await gmail.users.messages.get({ userId: 'me', id: sent.data.id, format: 'full' })
-    stored = await importMessage(parseMessage(full.data, mailbox), { sentById: userId, mailbox })
+    stored = await importMessage(parseMessage(full.data, mailbox), { sentById: userId, mailbox, threadId: thread.id })
   } catch (err) {
     console.warn(`[support] sent ${sent.data.id} but could not read it back: ${err.message}`)
     stored = await importMessage({
       gmailMessageId: sent.data.id, gmailThreadId: thread.gmailThreadId, rfcMessageId: messageId, inReplyTo: lastIn?.rfcMessageId || null,
       direction: 'out', fromEmail: mailbox, fromName: 'Trackstar', toEmails: to, ccEmails: '', subject, bodyText: text, bodyHtml: html,
       attachments: [], sentAt: new Date(), labels: ['SENT'],
-    }, { sentById: userId, mailbox })
+    }, { sentById: userId, mailbox, threadId: thread.id })
   }
   try {
     await gmail.users.threads.modify({ userId: 'me', id: thread.gmailThreadId, requestBody: { removeLabelIds: ['UNREAD'] } })
