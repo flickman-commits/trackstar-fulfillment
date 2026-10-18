@@ -136,9 +136,20 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
       </div>
     )
   }
+  // Approve sends the print to Drive and the Artelo library, then opens the
+  // Artelo order so the file can be attached at once. The tab opens on the
+  // click itself (a tab opened after the request would be popup-blocked) and
+  // is pointed at Artelo once the upload is through, or closed if it fails.
+  const approveAndOpen = async () => {
+    const tab = arteloOrderUrl && job ? window.open('about:blank', '_blank') : null
+    const ok = await d.review('approved')
+    if (!tab) return
+    if (ok && arteloOrderUrl && job) { tab.location.href = arteloOrderUrl; writeOpened(job.id); setOpened(true) }
+    else tab.close()
+  }
   const approve = (
-    <button key="a" onClick={() => d.review('approved')} disabled={d.busy} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors`}>
-      {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} {compact ? 'Approve' : 'Approve & Upload to Orders'}
+    <button key="a" onClick={approveAndOpen} disabled={d.busy} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors`}>
+      {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} {compact ? 'Approve' : 'Approve & attach in Artelo'}
     </button>
   )
   const reject = (
