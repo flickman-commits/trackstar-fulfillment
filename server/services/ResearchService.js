@@ -9,6 +9,7 @@
  *   - Bib number, finish time, pace
  *   - Stored in RunnerResearch table
  */
+import { BaseScraper } from '../scrapers/BaseScraper.js'
 import { PrismaClient } from '@prisma/client'
 import { getScraperForRace, hasScraperForRace, getCanonicalRaceName } from '../scrapers/index.js'
 import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
@@ -216,6 +217,24 @@ export class ResearchService {
       })
     }
 
+    // A customer who typed a time but no pace gets the pace worked out from
+    // their time and the event's distance, the same math as the pace tool and
+    // the scrapers (time / distance, rounded to the second). Their time is used
+    // exactly as given; only the missing pace is filled in.
+    const EVENT_MILES = { marathon: 26.2, 'half marathon': 13.1, half: 13.1, '10 mile': 10, '10k': 6.2137, '5k': 3.1069 }
+    const eventMiles = EVENT_MILES[String(order.customerEventType || 'marathon').trim().toLowerCase()] || null
+    // Only a full H:MM:SS time, and only a pace a person could run (4:00 to
+    // 20:00 a mile): "5:35" is ambiguous and 1:18:46 for a marathon is a typo
+    // or a half, so those stay blank for a person to look at.
+    const typed = String(order.customerFinishTime || '').trim()
+    let derivedPace = !order.customerPace && /^\d{1,2}:\d{2}:\d{2}$/.test(typed) && eventMiles
+      ? BaseScraper.prototype.calculatePace.call(null, typed, eventMiles)
+      : null
+    if (derivedPace) {
+      const [m, sec] = derivedPace.split(':').map(Number)
+      if (m * 60 + sec < 240 || m * 60 + sec > 1200) derivedPace = null
+    }
+
     // TIER 2 (replaced): write the customer-confirmed result.
     const researchData = {
       orderId: order.id,
@@ -223,14 +242,14 @@ export class ResearchService {
       runnerName: effectiveRunnerName,
       bibNumber: order.customerBib || null,
       officialTime: order.customerFinishTime || null,
-      officialPace: order.customerPace || null,
+      officialPace: order.customerPace || derivedPace || null,
       eventType: order.customerEventType || null,
       yearFound: effectiveRaceYear,
       researchStatus: 'found',
       source: verified ? 'customer_verified' : 'customer_supplied',
       researchNotes: verified
         ? 'Customer-confirmed via Instant Lookup (matched official results)'
-        : 'Entered by the customer at checkout, not matched against official results. Their numbers, used as given.',
+        : `Entered by the customer at checkout, not matched against official results. Their numbers, used as given.${derivedPace ? ` Pace ${derivedPace} calculated from their time.` : ''}`,
       resultsUrl: race.resultsUrl || null,
       possibleMatches: null,
     }

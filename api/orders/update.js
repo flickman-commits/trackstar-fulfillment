@@ -11,7 +11,9 @@ import { setRaceDate, noteWeatherChange } from '../../server/domain/races/verifi
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  // The person saving: race date and weather edits are logged under their name.
+  const actor = requireAdmin(req, res)
+  if (!actor) return
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
