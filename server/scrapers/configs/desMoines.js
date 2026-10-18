@@ -9,11 +9,17 @@
  *   2022: 1033835 (10/16/2022)  2023: 1063937 (10/15/2023)
  *   2024: 1094088 (10/20/2024)  2025: 1126583 (10/19/2025)
  *
- * 2026 (ran Sun Oct 18 2026) is NOT wired: on race day it was only on
- * TrueTime (results.truetimeracing.com/results.aspx?CId=16535&RId=1793,
- * EId=3 marathon, EId=2 half), a platform with no scraper here, and Athlinks
- * had no 2026 race yet. Add the 2026 Athlinks id once the mirror lands
- * (re-run the find query above). TrueTime 2025 is RId=1609.
+ * 2026 (ran Sun Oct 18 2026) is on TrueTime only (Athlinks had no 2026 race
+ * on race day), so yearOverrides[2026] routes it to the 'truetime' platform:
+ * results.truetimeracing.com/results.aspx?CId=16535&RId=1793, EIds read off
+ * the race page's event list: 3 = "IMT DSM Marathon", 2 = "IMT DSM Half
+ * Marathon" (4 = 5K, 5 = Marathon Relay, 6 = 10K: excluded). Gun 8:00 for both
+ * (runsignup.com race 171802 events 1068634/1068635). TrueTime 2025 is
+ * RId=1609 (served by Athlinks above).
+ * Gun is reported (rawData only) as finish time of day minus gunStart. The
+ * 2026 winners' finish time of day minus net is ~8:02:49 for both marathon and
+ * half, so the real gun (or the timing clock) was ~2:49 off the published
+ * 8:00; derived gun times run that much long. Chip is unaffected.
  *
  * Courses: "Marathon", "Half Marathon", "Marathon Relay", "5K Run" (2022 also
  * "* Virtual"). Anchored regexes keep relay/virtual out.
@@ -62,5 +68,11 @@ export default {
     2023: 1063937,
     2024: 1094088,
     2025: 1126583,
+  },
+  yearOverrides: {
+    2026: {
+      platform: 'truetime',
+      trueTime: { cid: 16535, rid: 1793, gunStart: '08:00:00', events: { marathon: 3, half: 2 } },
+    },
   },
 }

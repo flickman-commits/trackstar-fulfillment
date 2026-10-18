@@ -1,0 +1,265 @@
+/**
+ * TrueTime Racing Platform Scraper (results.truetimeracing.com)
+ *
+ * TrueTime runs RaceTec's ASP.NET WebForms results site. No browser needed:
+ *
+ *   1. GET  results.aspx?CId={cid}&RId={rid}
+ *        -> the race page; we only need its hidden __VIEWSTATE fields and the
+ *           ASP.NET session cookie.
+ *   2. POST the same URL with those fields plus
+ *        __EVENTTARGET=ctl00$edtSearch, ctl00$edtSearch={name or bib}
+ *        -> the search grid (ctl00_Content_Main_grdSearch) across EVERY event
+ *           of the race: Event | No | Name | Gender | Category | Status |
+ *           Time | Net Time. Each name links to
+ *           myresults.aspx?CId=&RId=&EId={event}&AId={athlete}.
+ *   3. GET  myresults.aspx?CId=&RId=&EId=&AId=
+ *        -> runner detail: splits with Time of Day, cumulative time
+ *           "from Start" and a pace.
+ *
+ * Chip vs gun: the finish time is the grid's "Net Time" column (read by its
+ * header, never by position). TrueTime's "Time" column and the detail's
+ * "Finish Time" hero (CSS class rtv3-hero-gun, misleadingly) carry the same
+ * net value for Des Moines 2026, e.g. Mya Sullivan 05:42:44.61 while her
+ * finish time of day is 14:04:41 on an 8:00 gun (start 8:21:56). No gun time
+ * is printed, so gun is derived as finish time-of-day minus the published gun
+ * (`trueTime.gunStart`) and is reported in rawData only.
+ *
+ * Rounding: TrueTime shows hundredths. The official certificate
+ * (cert.racetec.net) TRUNCATES to the second: Ryan Newstrom 05:18:31.50 is
+ * printed 05:18:31. We truncate the same way (Athlinks' mirror agrees).
+ *
+ * Pace: never scraped. The page pace truncates its seconds (Mya Sullivan
+ * 13:04 for 20564s / 26.2 = 784.9). Pace is chip time / the matched event's
+ * distance (config.distances[eventKey]).
+ *
+ * Events are matched by EId from the athlete link, not the event label, so
+ * relays, 5K and 10K (other EIds) can never match.
+ *
+ * Config (usually inside yearOverrides[year]):
+ *   trueTime: { cid: 16535, rid: 1793, gunStart: '08:00:00',
+ *               events: { marathon: 3, half: 2 } }
+ *   distances: { marathon: 26.2, half: 13.1 }, eventSearchOrder, eventLabels
+ */
+import { BaseScraper } from '../BaseScraper.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
+
+const BASE = 'https://results.truetimeracing.com'
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+const DEFAULT_DISTANCES = { marathon: 26.2, half: 13.1 }
+
+function decode(s) {
+  return String(s || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;?/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function toSeconds(t) {
+  const m = String(t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/)
+  return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : null
+}
+
+function fromSeconds(sec) {
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = sec % 60
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+export class TrueTimeScraper extends BaseScraper {
+  constructor(year, config) {
+    super(config.raceName, year)
+    this.config = config
+    this.tag = config.tag || config.raceName
+    this.tt = config.trueTime || null
+  }
+
+  pageUrl(eid = null) {
+    if (!this.tt?.cid || !this.tt?.rid) return null
+    return `${BASE}/results.aspx?CId=${this.tt.cid}&RId=${this.tt.rid}${eid ? `&EId=${eid}` : ''}`
+  }
+
+  async getRaceInfo() {
+    return {
+      raceDate: this.resolveRaceDate(),
+      location: this.config.location,
+      eventTypes: this.config.eventTypes || ['Marathon', 'Half Marathon'],
+      resultsUrl: this.pageUrl(),
+      resultsSiteType: 'truetime',
+    }
+  }
+
+  async fetchText(url, init = {}) {
+    const res = await fetchWithTimeout(url, {
+      ...init,
+      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html', ...(init.headers || {}) },
+    })
+    if (!res.ok) {
+      const err = new Error(`HTTP ${res.status}`)
+      err.status = res.status
+      throw err
+    }
+    return { text: await res.text(), res }
+  }
+
+  /** Run the page's own search postback; returns grid rows across all events. */
+  async search(term) {
+    const url = this.pageUrl()
+    const { text: page, res } = await this.fetchText(url)
+    const cookies = (typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [res.headers.get('set-cookie')])
+      .filter(Boolean)
+      .map(c => c.split(';')[0])
+      .join('; ')
+    const form = new URLSearchParams()
+    for (const m of page.matchAll(/<input type="hidden" name="([^"]+)" id="[^"]*" value="([^"]*)"/g)) {
+      form.set(m[1], m[2].replace(/&amp;/g, '&'))
+    }
+    form.set('__EVENTTARGET', 'ctl00$edtSearch')
+    form.set('__EVENTARGUMENT', '')
+    form.set('ctl00$edtSearch', term)
+    const { text } = await this.fetchText(url, {
+      method: 'POST',
+      body: form.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: url, ...(cookies ? { Cookie: cookies } : {}) },
+    })
+    const grid = text.match(/id="ctl00_Content_Main_grdSearch"[\s\S]*?<\/table>/)
+    if (!grid) return []
+    const headers = [...grid[0].matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map(m => decode(m[1]).toLowerCase())
+    const col = (re) => headers.findIndex(h => re.test(h))
+    const iEvent = col(/^event$/)
+    const iNo = col(/^no$/)
+    const iName = col(/^name$/)
+    const iStatus = col(/^status$/)
+    const iNet = col(/^net time$/)
+    if (iName < 0 || iNet < 0) throw new Error(`unexpected search grid headers: ${headers.join(',')}`)
+    const rows = []
+    for (const tr of grid[0].matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+      const cells = [...tr[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m => m[1])
+      if (cells.length <= iNet) continue
+      const link = cells[iName].match(/href="([^"]*myresults\.aspx[^"]*)"/i)
+      const href = link ? link[1].replace(/&amp;/g, '&') : null
+      const eid = href ? Number(new URLSearchParams(href.split('?')[1]).get('EId')) : null
+      rows.push({
+        event: iEvent >= 0 ? decode(cells[iEvent]) : '',
+        bib: iNo >= 0 ? decode(cells[iNo]) : null,
+        name: decode(cells[iName]),
+        status: iStatus >= 0 ? decode(cells[iStatus]) : '',
+        net: decode(cells[iNet]),
+        eid,
+        href: href ? `${BASE}/${href}` : null,
+      })
+    }
+    return rows
+  }
+
+  /** Finish time of day from the runner detail (last split row). */
+  async fetchFinishTimeOfDay(href) {
+    const { text } = await this.fetchText(href)
+    const rows = [...text.matchAll(/<tr class="rtv3-splits-main[^"]*">([\s\S]*?)<\/tr>/g)]
+    const last = rows[rows.length - 1]
+    if (!last) return null
+    const cells = [...last[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m => decode(m[1]))
+    return /^\d{1,2}:\d{2}:\d{2}$/.test(cells[1] || '') ? cells[1] : null
+  }
+
+  /** Truncate hundredths to whole seconds, as the official certificate does. */
+  cleanTime(t) {
+    const m = String(t || '').trim().match(/^(\d{1,2}):(\d{2}):(\d{2})(\.\d+)?$/)
+    if (!m) return null
+    return `${Number(m[1])}:${m[2]}:${m[3]}`
+  }
+
+  eventKeyFor(eid) {
+    for (const [key, id] of Object.entries(this.tt.events || {})) {
+      if (Number(id) === eid) return key
+    }
+    return null
+  }
+
+  async searchRunner(runnerName) {
+    console.log(`\n[${this.tag} ${this.year}] TrueTime search for: "${runnerName}"`)
+    if (!this.tt?.cid || !this.tt?.rid || !this.tt?.events) {
+      return this.yearNotConfiguredResult('missing trueTime cid/rid/events')
+    }
+
+    let rows
+    try {
+      rows = await this.search(runnerName.trim())
+      const last = String(runnerName).trim().split(/\s+/).pop()
+      if (rows.length === 0 && last && last !== runnerName.trim()) rows = await this.search(last)
+    } catch (err) {
+      console.error(`[${this.tag} ${this.year}] TrueTime error: ${err.message}`)
+      return this.upstreamErrorResult(`TrueTime ${err.status ? `HTTP ${err.status}` : 'request failed'}`)
+    }
+
+    const inEvents = rows.map(r => ({ ...r, eventKey: this.eventKeyFor(r.eid) })).filter(r => r.eventKey)
+    const order = this.config.eventSearchOrder || Object.keys(this.tt.events)
+
+    for (const eventKey of order) {
+      const pool = inEvents.filter(r => r.eventKey === eventKey)
+      const matches = this.filterNameMatches(runnerName, pool, r => r.name)
+      if (matches.length === 0) continue
+      const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
+      if (matches.length > 1) {
+        return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: m.bib, eventType: eventLabel })))
+      }
+      return this.buildResult(matches[0], eventKey, eventLabel)
+    }
+
+    const candidates = this.filterNameMatches(runnerName, rows, r => r.name)
+    return this.notFoundResult(
+      candidates.length ? `Name found only outside the matched events (${[...new Set(candidates.map(c => c.event))].join(', ')})` : null,
+      candidates.slice(0, 10).map(c => ({ name: c.name, bib: c.bib, eventType: c.event }))
+    )
+  }
+
+  async buildResult(match, eventKey, eventLabel) {
+    const chip = this.cleanTime(match.net)
+    if (!chip) {
+      return this.identityOnlyResult(match.name, match.bib, `TrueTime shows no net time (status: ${match.status || 'unknown'})`, match.href || this.pageUrl())
+    }
+
+    // Gun is informational only: finish time of day minus the published gun.
+    let gun = null
+    let finishTimeOfDay = null
+    if (this.tt.gunStart && match.href) {
+      try {
+        finishTimeOfDay = await this.fetchFinishTimeOfDay(match.href)
+        const diff = toSeconds(finishTimeOfDay) - toSeconds(this.tt.gunStart)
+        if (finishTimeOfDay && diff > 0) gun = fromSeconds(diff)
+      } catch (err) {
+        console.warn(`[${this.tag} ${this.year}] detail fetch failed for ${match.href}: ${err.message}`)
+      }
+    }
+
+    const distance = this.config.distances?.[eventKey] ?? DEFAULT_DISTANCES[eventKey]
+    const pace = distance ? this.calculatePace(chip, distance) : null
+    console.log(`[${this.tag} ${this.year}] FOUND ${match.name} bib ${match.bib} ${eventLabel}: chip ${chip} (net ${match.net}), gun ~${gun || '?'}, pace ${pace}`)
+
+    return {
+      found: true,
+      bibNumber: match.bib ? String(match.bib) : null,
+      officialTime: chip,
+      officialPace: pace,
+      eventType: eventLabel,
+      yearFound: this.year,
+      researchNotes: null,
+      resultsUrl: match.href || this.pageUrl(),
+      rawData: {
+        name: match.name,
+        event: match.event,
+        netTime: match.net,
+        chipTime: chip,
+        gunTime: gun,
+        finishTimeOfDay,
+        status: match.status,
+      },
+    }
+  }
+}

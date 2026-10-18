@@ -25,6 +25,7 @@ import { CompetitiveTimingScraper } from './platforms/CompetitiveTimingScraper.j
 import { SVETimingScraper } from './platforms/SVETimingScraper.js'
 import { SportstatsScraper } from './platforms/SportstatsScraper.js'
 import { RaceResultScraper } from './platforms/RaceResultScraper.js'
+import { TrueTimeScraper } from './platforms/TrueTimeScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -111,6 +112,7 @@ const PLATFORM_MAP = {
   svetiming: SVETimingScraper,
   sportstats: SportstatsScraper,
   raceresult: RaceResultScraper,
+  truetime: TrueTimeScraper,
 }
 
 /**

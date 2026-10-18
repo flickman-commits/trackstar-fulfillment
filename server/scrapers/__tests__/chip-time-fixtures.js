@@ -848,6 +848,27 @@ export const CHIP_TIME_FIXTURES = [
     expectedBib: '5944',
     notes: 'Des Moines 2025 Half Marathon - verifies the half distance. TrueTime uid=16535-1609-2-125053: net 02:03:17.80 (Athlinks truncates to 2:03:17), Start 8:12:37 (gun ~2:15:55); page pace 9:24. 7397s / 13.1 = 564.7 -> 9:25.',
   },
+  // ── TrueTime (Des Moines 2026) ────────────────────────────────────────
+  {
+    platform: 'truetime',
+    race: 'Des Moines Marathon',
+    year: 2026,
+    runner: 'Mya Sullivan',
+    expectedChipTime: '5:42:44',
+    expectedChipPace: '13:05',
+    expectedBib: '918',
+    notes: 'Des Moines 2026 Marathon, TrueTime CId=16535 RId=1793 EId=3 AId=287640: Net Time 05:42:44.61 (truncated, as the certificate does), finish time of day 14:04:41, so start ~8:21:56 and gun ~6:04:41 on the 8:00 published gun; page pace 13:04 (truncated). Positive split: Mile 13.1 at 02:20:44.35 (10:44/mi), 23.6 -> 26.2 took 48:09. 20564s / 26.2 = 784.9 -> 13:05.',
+  },
+  {
+    platform: 'truetime',
+    race: 'Des Moines Marathon',
+    year: 2026,
+    runner: 'Taylor Wagner',
+    expectedChipTime: '2:05:55',
+    expectedChipPace: '9:37',
+    expectedBib: '7519',
+    notes: 'Des Moines 2026 Half Marathon (13.1) - verifies the half distance. TrueTime EId=2 AId=290321: Net Time 02:05:55.72, finish time of day 10:19:23 (start ~8:13:28, gun ~2:19:23 on 8:00); page pace 9:36 (truncated). Slowed late: 9:31/mi at Mile 10.5, last 2.6 mi at 9:58/mi. 7555s / 13.1 = 576.7 -> 9:37.',
+  },
   {
     platform: 'athlinks',
     race: 'Colorado Springs Marathon',
