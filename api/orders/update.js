@@ -8,6 +8,7 @@ import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { getCanonicalRaceName } from '../../server/scrapers/index.js'
 import { setRaceDate, noteWeatherChange } from '../../server/domain/races/verification.js'
+import { recordAudit } from '../_lib/users.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -28,7 +29,10 @@ export default async function handler(req, res) {
       // organization lives in raceName and the contact in customerName /
       // customerEmail. Named separately here so a caller cannot reach a real
       // customer's email through this door by accident.
-      partnerName, partnerContactName, partnerEmail } = req.body
+      partnerName, partnerContactName, partnerEmail,
+      // A custom order's approval email: where the proof links go (the buyer
+      // may want them sent to the runner, or used a typo'd address).
+      approvalEmail } = req.body
 
     // Race-specific operations (no orderNumber required)
     if (raceAction === 'update' && raceId) {
@@ -108,6 +112,18 @@ export default async function handler(req, res) {
 
     if (!existingOrder) {
       return res.status(404).json({ error: 'Order not found' })
+    }
+
+    if (approvalEmail !== undefined) {
+      if (existingOrder.trackstarOrderType !== 'custom') {
+        return res.status(400).json({ error: 'The approval email can only be changed on a custom order' })
+      }
+      const email = String(approvalEmail).trim()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: 'That does not look like a valid email address' })
+      }
+      updateData.customerEmail = email
+      await recordAudit({ action: 'order.approval-email', summary: `Order ${existingOrder.orderNumber}: approval emails now go to ${email} (was ${existingOrder.customerEmail || 'none'})`, detail: { orderNumber: existingOrder.orderNumber, before: existingOrder.customerEmail, after: email }, actor })
     }
 
     // Partner details, and only ever on a partner row. The same three columns

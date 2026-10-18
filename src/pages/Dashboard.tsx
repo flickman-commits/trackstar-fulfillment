@@ -706,6 +706,56 @@ function getGreeting(): string {
   return 'Good evening'
 }
 
+/**
+ * A custom order's email, where the proof and approval links are sent. Editable
+ * in place: the buyer may want them to go to the runner, or typed it wrong.
+ */
+function ApprovalEmailField({ order, onSaved }: { order: Order; onSaved: (email: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(order.customerEmail || '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => { setEditing(false); setValue(order.customerEmail || ''); setErr(null) }, [order.id, order.customerEmail])
+  const save = async () => {
+    const email = value.trim()
+    if (email === (order.customerEmail || '')) { setEditing(false); return }
+    setSaving(true); setErr(null)
+    try {
+      const res = await apiFetch('/api/orders/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderNumber: order.orderNumber, approvalEmail: email }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setErr(data.error || 'Could not save'); return }
+      setEditing(false); onSaved(email)
+    } finally { setSaving(false) }
+  }
+  if (!editing) {
+    return (
+      <div className="flex justify-between items-center gap-3">
+        <span className="text-body-sm text-off-black/60" title="Proof and approval links are emailed here">Approval email</span>
+        <span className="inline-flex items-center gap-2 min-w-0">
+          <span className={`text-body-sm font-medium truncate ${order.customerEmail ? 'text-off-black' : 'text-off-black/40'}`}>{order.customerEmail || 'Not set'}</span>
+          <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 shrink-0"><Pencil className="w-3 h-3" /> Edit</button>
+        </span>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between items-center gap-3">
+        <span className="text-body-sm text-off-black/60">Approval email</span>
+        <span className="inline-flex items-center gap-2">
+          <input type="email" autoFocus value={value} onChange={e => setValue(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setEditing(false); setValue(order.customerEmail || '') } }}
+            placeholder="name@example.com" className="w-64 px-2 py-1 text-sm text-right border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20" />
+          <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-1 text-xs font-medium text-green-700 disabled:opacity-40"><Check className="w-3.5 h-3.5" /> Save</button>
+          <button type="button" onClick={() => { setEditing(false); setValue(order.customerEmail || '') }} className="text-xs text-off-black/50">Cancel</button>
+        </span>
+      </div>
+      {err && <p className="text-xs text-red-600 text-right">{err}</p>}
+      <p className="text-[11px] text-off-black/45 text-right">Proof and approval emails go here from now on. The Shopify order is not changed.</p>
+    </div>
+  )
+}
+
 /** The name to greet someone by. Falls back to the part of an email before the @. */
 
 function greetingName(user: { firstName?: string | null; email?: string | null } | null): string {
@@ -4454,7 +4504,16 @@ Thank you!`
                                   <CopyableField label="Time" value={selectedOrder.timeCustomer} />
                                 )}
                                 <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                                {selectedOrder.customerEmail && (
+                                {selectedOrder.trackstarOrderType === 'custom' ? (
+                                  <ApprovalEmailField
+                                    order={selectedOrder}
+                                    onSaved={(email) => {
+                                      setSelectedOrder(prev => prev && prev.id === selectedOrder.id ? { ...prev, customerEmail: email } : prev)
+                                      setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, customerEmail: email } : o))
+                                      setToast({ message: `Approval emails now go to ${email}`, type: 'success' })
+                                    }}
+                                  />
+                                ) : selectedOrder.customerEmail && (
                                   <div className="flex justify-between items-center">
                                     <span className="text-body-sm text-off-black/60">Email</span>
                                     <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
