@@ -259,25 +259,48 @@ export async function moveOpenOrders({ type, fromUserId, toUserId }) {
   return { moved: r.count }
 }
 
+/**
+ * Spread the open queue across everyone on today's roster, interleaved: the
+ * oldest order goes to one person, the next to the other, and so on down the
+ * list (weighted by share), so each person works the queue from the top and
+ * the oldest orders still get done first. A split down the middle would hand
+ * one person every old order and the other every new one.
+ *
+ * Only orders nobody has started move (not started, no proofs); orders routed
+ * to a person by race stay with them. Returns how many changed hands.
+ */
 export async function spreadQueue(shiftId) {
   const s = (await getShifts()).find(x => x.id === shiftId)
   if (!s || !isShiftOn(s)) throw new Error('That shift is not on today')
   const roster = await rosterFor(s.type)
+  if (roster.length < 2) return { moved: 0, orderIds: [] }
   const ids = roster.map(r => r.userId)
-  const counts = await openCounts(s.type, ids)
-  const total = Object.values(counts).reduce((a, b) => a + b, 0)
-  const weightSum = roster.reduce((a, r) => a + r.weight, 0)
-  const want = Math.floor(total * (s.weight / weightSum)) - (counts[s.userId] || 0)
-  if (want <= 0) return { moved: 0, orderIds: [] }
-  const others = ids.filter(id => id !== s.userId)
-  const candidates = await prisma.order.findMany({
-    where: { trackstarOrderType: s.type, status: { not: 'completed' }, designStatus: 'not_started', assigneeId: { in: others }, proofs: { none: {} } },
-    orderBy: { createdAt: 'desc' },
-    select: { id: true },
-    take: want,
+  const routed = new Set((await getRaceRules()).map(r => raceKey(r.race)))
+  const open = await prisma.order.findMany({
+    where: { trackstarOrderType: s.type, status: { not: 'completed' }, designStatus: 'not_started', assigneeId: { in: ids }, proofs: { none: {} } },
+    orderBy: [{ createdAt: 'asc' }, { lineItemIndex: 'asc' }],
+    select: { id: true, assigneeId: true, raceName: true, raceNameOverride: true },
   })
-  const orderIds = candidates.map(c => c.id)
-  if (orderIds.length) await prisma.order.updateMany({ where: { id: { in: orderIds } }, data: { assigneeId: s.userId } })
+  const movable = open.filter(o => !routed.has(raceKey(o.raceNameOverride || o.raceName)))
+
+  // Smooth weighted round robin: each order goes to whoever is furthest
+  // below their share so far. Even shares alternate exactly.
+  const given = Object.fromEntries(ids.map(id => [id, 0]))
+  const target = {}
+  for (const o of movable) {
+    let best = null, bestScore = Infinity
+    for (const r of roster) {
+      const score = (given[r.userId] + 1) / r.weight
+      if (score < bestScore) { bestScore = score; best = r.userId }
+    }
+    given[best]++
+    if (o.assigneeId !== best) (target[best] ||= []).push(o.id)
+  }
+  const orderIds = []
+  for (const [userId, list] of Object.entries(target)) {
+    await prisma.order.updateMany({ where: { id: { in: list } }, data: { assigneeId: userId } })
+    orderIds.push(...list)
+  }
   return { moved: orderIds.length, orderIds }
 }
 

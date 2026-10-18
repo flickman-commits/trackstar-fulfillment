@@ -164,7 +164,7 @@ export default function AssignmentPanel() {
                           title="Move unstarted orders from the order list to them, up to their share"
                           onClick={async () => {
                             const d = await post(`spread-${s.id}`, { action: 'spread', id: s.id })
-                            if (d) { toast.success(d.moved ? `${d.moved} waiting order${d.moved === 1 ? '' : 's'} moved to ${name(s.userId)}` : `${name(s.userId)} already has their share`); load() }
+                            if (d) { toast.success(d.moved ? `Spread oldest first: ${d.moved} order${d.moved === 1 ? '' : 's'} changed hands` : 'Already spread oldest first'); load() }
                           }}
                         >
                           {busy === `spread-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Shuffle className="w-3 h-3" />} Spread the order list
@@ -321,8 +321,8 @@ function MoveOpen({ users, busy, onMove }: { users: User[]; busy: string | null;
   const [to, setTo] = useState('')
   const label = (u: User) => `${u.firstName} ${u.lastName}`.trim()
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-xs font-semibold text-off-black">Move open orders</span>
+    <div className="border-t border-border-gray px-3 py-2.5 flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-xs font-semibold text-off-black mr-1">Move open orders</span>
       <select value={from} onChange={e => setFrom(e.target.value)} className={`${inputBase} w-auto`}>
         <option value="">From…</option>
         {users.map(u => <option key={u.id} value={u.id}>{label(u)}</option>)}
