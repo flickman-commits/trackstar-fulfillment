@@ -1094,14 +1094,35 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Photo sits on the right with its download directly beneath. */}
-          <div className="flex-none w-20">
+          {/* The photo on the right, its two actions stacked to its left. */}
+          <div className="flex-none flex items-start gap-2">
+            <div className="flex flex-col gap-1.5 w-[104px]">
+              <button
+                type="button"
+                onClick={() => downloadPersonalizationPhoto(selectedOrder)}
+                disabled={!photoUrl}
+                className="w-full inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded bg-dark-fill text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+              >
+                <Download className="w-3 h-3" />
+                Download
+              </button>
+              {design.canManage && (
+                <button
+                  type="button"
+                  onClick={openCrop}
+                  disabled={!photoUrl || cropBusy}
+                  className="w-full inline-flex items-center justify-center whitespace-nowrap text-[11px] font-semibold px-2 py-1.5 rounded border border-off-black/20 bg-white text-off-black hover:bg-subtle-gray disabled:opacity-40"
+                >
+                  Crop &amp; re-render
+                </button>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => photoUrl && window.open(photoUrl, '_blank')}
               disabled={!photoUrl}
               title={photoUrl ? 'Open full size' : undefined}
-              className="w-20 h-20 rounded border border-black/10 bg-white overflow-hidden flex items-center justify-center disabled:cursor-default"
+              className="w-28 h-28 rounded border border-black/10 bg-white overflow-hidden flex items-center justify-center disabled:cursor-default"
             >
               {photoLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin text-off-black/30" />
@@ -1111,25 +1132,6 @@ export default function Dashboard() {
                 <span className="text-[10px] text-off-black/40 px-2 text-center">No preview</span>
               )}
             </button>
-            <button
-              type="button"
-              onClick={() => downloadPersonalizationPhoto(selectedOrder)}
-              disabled={!photoUrl}
-              className="mt-1.5 w-20 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded bg-dark-fill text-white hover:opacity-90 transition-opacity disabled:opacity-40"
-            >
-              <Download className="w-3 h-3" />
-              Download
-            </button>
-            {design.canManage && (
-              <button
-                type="button"
-                onClick={openCrop}
-                disabled={!photoUrl || cropBusy}
-                className="mt-1.5 w-20 inline-flex items-center justify-center text-center leading-tight text-[11px] font-semibold px-1 py-1.5 rounded border border-off-black/20 bg-white text-off-black hover:bg-subtle-gray disabled:opacity-40"
-              >
-                Crop &amp; re-render
-              </button>
-            )}
           </div>
         </div>
         {cropFile && (
