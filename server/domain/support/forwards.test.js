@@ -74,3 +74,10 @@ test('a forward with nothing typed above it: the signature is not a note', () =>
   assert.equal(out.message.fromName, 'craig twigg')
   assert.match(out.message.bodyText, /^Please cancel the following order/)
 })
+
+test('the note stops at the forwarder\'s name, even with no other signature marker', () => {
+  const bodyText = 'Please refund this one\n\nMatt Hickman\nOwner | Trackstar\nNew York, NY\n\n---------- Forwarded message ---------\nFrom: Bob <bob@b.com>\nSubject: Refund\n\nhi'
+  assert.equal(unwrapForward({ ...base, bodyText }, { isOurs: ours }).note, 'Please refund this one')
+  const only = 'Matt Hickman\nOwner | Trackstar\n\n---------- Forwarded message ---------\nFrom: Bob <bob@b.com>\nSubject: Refund\n\nhi'
+  assert.equal(unwrapForward({ ...base, bodyText: only }, { isOurs: ours }).note, '')
+})

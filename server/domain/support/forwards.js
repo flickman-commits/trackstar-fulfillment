@@ -98,6 +98,12 @@ export function unwrapForward(parsed, { isOurs }) {
   const f = findForwarded(parsed.bodyText)
   if (!f || isOurs(f.from.email)) return null
   const subject = f.subject || String(parsed.subject || '').replace(/^\s*((fwd?|fw)\s*:\s*)+/i, '').trim()
+  // The note is only what the forwarder typed: it stops where their signature starts,
+  // a line that is just their name ("Matt Hickman") if the markers above missed it.
+  const name = String(parsed.fromName || '').trim().toLowerCase()
+  const lines = f.note.split('\n')
+  const sig = name ? lines.findIndex(l => l.trim().toLowerCase() === name) : -1
+  const note = (sig >= 0 ? lines.slice(0, sig) : lines).join('\n').trim()
   return {
     message: {
       ...parsed,
@@ -113,7 +119,7 @@ export function unwrapForward(parsed, { isOurs }) {
       // In-Reply-To pointed at whatever the forwarder was answering, not at anything the customer has.
       inReplyTo: null,
     },
-    note: f.note,
+    note,
     forwardedBy: { email: parsed.fromEmail, name: parsed.fromName },
   }
 }
