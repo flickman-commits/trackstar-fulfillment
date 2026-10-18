@@ -15,12 +15,15 @@
  * from one of our own addresses.
  */
 
-// Where each mail client starts the forwarded message.
+// Where each mail client starts the forwarded message. Mail on the iPhone
+// quotes the whole forward ("> Begin forwarded message:", "> From: ..."), so
+// a marker may sit behind any number of "> ".
+const Q = '^((?:>[ \\t]?)*)'
 const MARKERS = [
-  /^-{2,}\s*Forwarded message\s*-{2,}\s*$/im, // Gmail
-  /^Begin forwarded message:\s*$/im, // Apple Mail
-  /^-{2,}\s*Original Message\s*-{2,}\s*$/im, // Outlook, older
-  /^_{10,}\s*$/m, // Outlook: a rule of underscores, then From:/Sent:
+  new RegExp(`${Q}-{2,}\\s*Forwarded message\\s*-{2,}\\s*$`, 'im'), // Gmail
+  new RegExp(`${Q}Begin forwarded message:\\s*$`, 'im'), // Apple Mail
+  new RegExp(`${Q}-{2,}\\s*Original Message\\s*-{2,}\\s*$`, 'im'), // Outlook, older
+  new RegExp(`${Q}_{10,}\\s*$`, 'm'), // Outlook: a rule of underscores, then From:/Sent:
 ]
 
 const HEADER = /^\s*(From|Date|Sent|Subject|To|Cc|Reply-To)\s*:\s*(.*)$/i
@@ -50,12 +53,15 @@ export function findForwarded(text) {
   const src = String(text || '').replace(/\r/g, '')
   let at = -1
   let markerEnd = -1
+  let depth = 0
   for (const re of MARKERS) {
     const m = re.exec(src)
-    if (m && (at < 0 || m.index < at)) { at = m.index; markerEnd = m.index + m[0].length }
+    if (m && (at < 0 || m.index < at)) { at = m.index; markerEnd = m.index + m[0].length; depth = (m[1].match(/>/g) || []).length }
   }
   if (at < 0) return null
-  const lines = src.slice(markerEnd).split('\n')
+  // Take off as many levels of "> " as the marker had.
+  const unquote = line => { let l = line; for (let d = 0; d < depth; d++) l = l.replace(/^>[ \t]?/, ''); return l }
+  const lines = src.slice(markerEnd).split('\n').map(unquote)
   const head = {}
   let i = 0
   // Apple Mail leaves a blank line after its marker; skip blanks until the headers start.
@@ -72,7 +78,8 @@ export function findForwarded(text) {
   const from = parseForwardedAddress(head.from)
   if (!from.email) return null
   return {
-    note: src.slice(0, at).trim(),
+    // What the forwarder wrote, without their signature (a "--" line, or a bare <link> line as Apple Mail writes one).
+    note: src.slice(0, at).split(/\n\s*(?:--|<https?:\/\/[^>\s]+>)\s*\n/)[0].trim(),
     from,
     to: head.to || '',
     subject: (head.subject || '').trim(),

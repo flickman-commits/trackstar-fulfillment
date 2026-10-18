@@ -55,3 +55,14 @@ test('no subject in the forwarded headers: the forward\'s own subject, without F
   const out = unwrapForward({ ...base, subject: 'Fwd: Fw: Help!', bodyText: '---------- Forwarded message ---------\nFrom: Bob <bob@b.com>\n\nhi' }, { isOurs: ours })
   assert.equal(out.message.subject, 'Help!')
 })
+
+test('Mail on the iPhone: the whole forward quoted with "> ", under a signature', () => {
+  const bodyText = "Help him with discount code please\n \n <https://trackstar.art/>\t\nMatt Hickman\nOwner | Trackstar <https://trackstar.art/>\nNew York, NY\n\n\n> Begin forwarded message:\n> \n> From: Randi <buckeyes13b@comcast.net>\n> Subject: Discount code expired\n> Date: October 17, 2026 at 11:18:31 AM EDT\n> To: matt@trackstar.art\n> \n> I signed up a\n> Received code but expired . I would like to use it asap .\n> Can you resend it ?\n> Sent from my iPhone"
+  const out = unwrapForward({ ...base, subject: 'Fwd: Discount code expired', bodyText }, { isOurs: ours })
+  assert.equal(out.message.fromEmail, 'buckeyes13b@comcast.net')
+  assert.equal(out.message.fromName, 'Randi')
+  assert.equal(out.message.subject, 'Discount code expired')
+  assert.equal(out.message.bodyText, 'I signed up a\nReceived code but expired . I would like to use it asap .\nCan you resend it ?\nSent from my iPhone')
+  assert.equal(out.message.sentAt.toISOString(), '2026-10-17T15:18:31.000Z')
+  assert.equal(out.note, 'Help him with discount code please')
+})
