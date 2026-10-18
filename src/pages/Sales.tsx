@@ -1,3 +1,4 @@
+import PageHeader from '@/components/PageHeader'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -508,10 +509,11 @@ export default function Sales({ active = true }: { active?: boolean }) {
     <div className={pageShell}>
       {active && <SalesHead />}
       <div className="px-3 md:px-5 w-full flex flex-col h-full">
+        <PageHeader title="Sales" pill={`${sentCount} of ${cap} sent today`} subtitle={today ? `${today.followUps.length} due for a touch` : undefined} />
         {/* Header: stars and title on one line, the day's count on the right. */}
-        <div className="pt-4 md:pt-5 pb-3 md:pb-4 flex items-center justify-between gap-4 flex-shrink-0">
+        <div className="pt-4 md:pt-5 pb-3 md:pb-4 hidden md:flex items-center justify-between gap-4 flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-fit" />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-auto shrink-0 object-contain" />
             <h1 className="text-2xl md:text-[28px] font-bold text-off-black leading-none">Sales</h1>
             {loading && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
           </div>

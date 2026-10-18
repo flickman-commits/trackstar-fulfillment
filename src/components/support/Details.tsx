@@ -348,7 +348,7 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
   onFiltersChanged: () => void
 }) {
   return (
-    <aside style={width ? { width } : undefined} className="w-full lg:w-[272px] xl:w-[300px] shrink-0 lg:overflow-y-auto overflow-x-hidden border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
+    <aside style={width ? { width } : undefined} className="hidden lg:block w-full lg:w-[272px] xl:w-[300px] shrink-0 lg:overflow-y-auto overflow-x-hidden border-t lg:border-t-0 lg:border-l border-border-gray min-h-0 bg-white">
       {!thread && <div className="px-4 py-6 text-xs text-off-black/45">Pick a conversation to see the customer, their orders and the actions.</div>}
       {thread && (
         <>

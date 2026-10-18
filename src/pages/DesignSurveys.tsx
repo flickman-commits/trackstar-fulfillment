@@ -1,3 +1,4 @@
+import PageHeader from '@/components/PageHeader'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Plus, Copy, ExternalLink, ImagePlus, X, Trash2, ArrowLeft, MessageSquareText } from 'lucide-react'
@@ -51,9 +52,10 @@ export default function DesignSurveys() {
   return (
     <div className={pageShell}>
       <div className={`${pageColumn} max-w-6xl overflow-y-auto`}>
-        <div className={pageHeader}>
+        <PageHeader title="Design Survey" subtitle="Let the community vote on new designs." />
+        <div className={`${pageHeader} hidden md:flex`}>
           <div className="flex flex-col gap-3">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className={`${pageLogo} self-start object-contain`} />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className={`${pageLogo} self-start object-contain shrink-0`} />
             <h1 className={pageTitle}>Design Survey</h1>
             <p className="text-sm text-off-black/55 -mt-1">Let the community vote on new designs. Share the link on a story.</p>
           </div>

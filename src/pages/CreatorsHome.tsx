@@ -1,3 +1,4 @@
+import PageHeader from '@/components/PageHeader'
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send, Mail, Music2, Pencil, ChevronDown, Search } from 'lucide-react'
@@ -262,9 +263,10 @@ export default function CreatorsHome() {
     <div className="min-h-screen bg-[#F0F0F0]">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+        <PageHeader title="Creator Program" subtitle="Creators, content and performance" />
+        <div className="hidden md:flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 md:h-10" />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 md:h-10 w-auto shrink-0 object-contain" />
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-off-black">Creator Program</h1>
               <p className="text-sm text-off-black/50">Overview of creators, content, and performance</p>

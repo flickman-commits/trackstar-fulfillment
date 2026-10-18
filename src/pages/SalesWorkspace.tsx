@@ -1,3 +1,4 @@
+import PageHeader from '@/components/PageHeader'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -49,9 +50,14 @@ export default function SalesWorkspace() {
   return (
     <div className={pageShell}>
       <div className="px-3 md:px-5 w-full flex flex-col h-full">
-        <div className="pt-4 md:pt-5 pb-3 md:pb-4 flex items-center justify-between gap-4 flex-shrink-0">
+        <PageHeader title="Sales" subtitle={tabs.find(t => t[0] === section)?.[1]} control={
+          <select value={tabs.find(t => t[0] === section)?.[2] || '/sales'} onChange={e => { window.location.assign(e.target.value) }} className="text-xs font-medium bg-white border border-border-gray rounded-full pl-3 pr-7 py-1.5 appearance-none">
+            {tabs.map(([key, label, to]) => <option key={key} value={to}>{label}</option>)}
+          </select>
+        } />
+        <div className="pt-4 md:pt-5 pb-3 md:pb-4 hidden md:flex items-center justify-between gap-4 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-fit" />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-auto shrink-0 object-contain" />
             <h1 className="text-2xl md:text-[28px] font-bold text-off-black leading-none">Sales</h1>
           </div>
           <div className={segmentGroup}>

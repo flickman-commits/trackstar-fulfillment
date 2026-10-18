@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Inbox, Keyboard, Loader2, Mail, RefreshCw, Search, X } from 'lucide-react'
+import { ChevronLeft, Inbox, Keyboard, Loader2, Mail, RefreshCw, Search, X } from 'lucide-react'
+import PageHeader from '@/components/PageHeader'
 import { btnGhost, btnSecondary, pageShell } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { useAuth } from '@/lib/auth'
@@ -272,9 +273,23 @@ export default function Support() {
   return (
     <div className={pageShell}>
       <div className="px-3 md:px-5 w-full flex flex-col h-full">
-        <div className="pt-4 md:pt-5 pb-3 flex items-center justify-between gap-4 flex-shrink-0">
+        {/* The phone header. While a conversation is open it steps aside; the conversation has its own bar. */}
+        {!thread && (
+          <PageHeader
+            title="Support"
+            subtitle={`${title} · ${threads.length}`}
+            pill={inbox ? `${inbox.counts.all ?? threads.length} open` : undefined}
+            control={
+              <select value={view} onChange={e => setView(e.target.value as InboxView)} className="text-xs font-medium bg-white border border-border-gray rounded-full pl-3 pr-7 py-1.5 appearance-none">
+                {Object.entries(VIEW_TITLE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {inbox?.team.map(u => <option key={u.id} value={`teammate:${u.id}`}>{u.firstName}</option>)}
+              </select>
+            }
+          />
+        )}
+        <div className="pt-4 md:pt-5 pb-3 hidden md:flex items-center justify-between gap-4 flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-fit" />
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-auto shrink-0 object-contain" />
             <h1 className="text-2xl md:text-[28px] font-bold text-off-black leading-none">Support</h1>
             {loading && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
           </div>
@@ -308,17 +323,26 @@ export default function Support() {
         <section className="flex-1 min-h-0 pb-3">
           <div className="h-full bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex flex-col lg:flex-row">
             <ViewsColumn view={view} counts={inbox?.counts || null} team={inbox?.team || []} me={me} onView={v => { setView(v); setSelectedId(null); setThread(null) }} onMacros={() => setMacrosOpen(true)} onSettings={() => setSettingsOpen(true)} />
+            {/* On the phone the list and the conversation take turns: the list until one is picked, then the conversation alone. */}
+            <div className={`${thread ? 'hidden lg:contents' : 'contents'}`}>
             <ConversationList title={title} threads={threads} selectedId={selectedId} onSelect={openThread} loading={loading && !inbox} emptyLabel={empty} sort={sort} onSort={setSort} width={wide ? listCol.width : undefined} />
+            </div>
             <ResizeHandle onDrag={listCol.by} onReset={listCol.reset} />
             {thread && me ? (
+              <div className="flex-1 min-w-0 flex flex-col min-h-0">
+              <div className="lg:hidden flex items-center gap-2 px-2 py-2 border-b border-border-gray bg-white shrink-0">
+                <button onClick={() => { setSelectedId(null); setThread(null) }} className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-sm font-medium text-off-black hover:bg-subtle-gray"><ChevronLeft className="w-4 h-4" /> Inbox</button>
+                <span className="text-sm font-medium text-off-black truncate">{thread.subject}</span>
+              </div>
               <Conversation
                 key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros} expectedHandle={instagram?.expectedHandle}
                 onAssign={assign} onStatus={setStatusOf} onSnooze={snooze} onPriority={setPriority} onMarkUnread={markUnread}
                 onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onRedraft={redraft} onMerge={ids => { merge(ids) }} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
                 replyRef={replyRef} noteRef={noteRef} insertRef={insertRef} attachRef={attachRef}
               />
+              </div>
             ) : (
-              <div className="flex-1 min-w-0 flex items-center justify-center min-h-[320px] bg-[#fcfcfc]">
+              <div className="flex-1 min-w-0 hidden lg:flex items-center justify-center min-h-[320px] bg-[#fcfcfc]">
                 {threadLoading ? <Loader2 className="w-6 h-6 animate-spin text-off-black/30" /> : (
                   <div className="text-center max-w-[40ch] px-6">
                     <Inbox className="w-8 h-8 mx-auto text-off-black/25 mb-2" />

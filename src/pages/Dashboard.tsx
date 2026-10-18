@@ -27,6 +27,8 @@ import { useSearchParams, useParams, useNavigate, useLocation } from 'react-rout
 import { useAuth } from '@/lib/auth'
 import EmailCustomerModal from '@/components/support/EmailCustomerModal'
 import OrderConversations from '@/components/support/OrderConversations'
+import PageHeader from '@/components/PageHeader'
+import ProofShowcase from '@/components/ProofShowcase'
 import Linkify from '@/components/Linkify'
 import type { Capability } from '@/lib/roles'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
@@ -1070,6 +1072,8 @@ export default function Dashboard() {
   // Comment composer stays collapsed until asked for. Auto-opens when the
   // order already has a thread worth replying to.
   const [showCommentBox, setShowCommentBox] = useState(false)
+  // Custom order on the phone: the proofs lead; the rest opens on demand.
+  const [customDetailsOpen, setCustomDetailsOpen] = useState(false)
   const [commentImageFile, setCommentImageFile] = useState<File | null>(null)
   const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
@@ -2737,24 +2741,26 @@ Thank you!`
                 .sort((a, b) => (a.lineItemIndex || 0) - (b.lineItemIndex || 0))[0]
               if (hit) { e.preventDefault(); setSelectedOrder(hit); searchInputRef.current?.blur() }
             }}
-            className="w-full pl-9 md:pl-11 pr-4 py-2.5 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
+            className="w-full pl-9 md:pl-11 pr-4 py-2 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
           />
         </div>
         {/* Whose orders. Clicking a person in Current Team does the same. */}
+        {/* On the phone the person and race pickers share one row, with no labels. */}
+        <div className="grid grid-cols-2 gap-2 md:contents">
         {scoped && (
-          <div className="md:w-52">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Team Member</div>
+          <div className={`md:w-52 ${activeView === 'standard' ? '' : 'col-span-2'}`}>
+            <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Team Member</div>
             <PersonFilter team={team} value={person} meId={myId} onChange={setPersonFilter} />
           </div>
         )}
         {activeView === 'standard' && (
-        <div className="md:w-64">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Race</div>
+        <div className={`md:w-64 ${scoped ? '' : 'col-span-2'}`}>
+          <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Race</div>
           <div className="relative">
           <select
             value={raceFilter}
             onChange={(e) => setRaceFilter(e.target.value)}
-            className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2.5 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors cursor-pointer ${
+            className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors cursor-pointer ${
               raceFilter
                 ? 'bg-dark-fill text-white border-dark-fill'
                 : 'bg-subtle-gray border-border-gray text-off-black'
@@ -2769,15 +2775,16 @@ Thank you!`
           </div>
         </div>
         )}
+        </div>
         {activeView === 'standard' && (
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Queue</div>
+          <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Queue</div>
           <div className="flex md:inline-flex w-full md:w-auto rounded-md border border-border-gray bg-subtle-gray p-0.5">
             {([['', 'All', ordersToFulfill.length], ['review', 'Review', stageCounts.review], ['attach', 'Attach', stageCounts.attach], ['action', 'Action', stageCounts.action], ['waiting', 'Waiting', stageCounts.waiting]] as const).map(([key, label, n]) => (
               <button
                 key={key || 'all'}
                 onClick={() => setStageFilter(key)}
-                className={`flex-1 md:flex-none px-2 md:px-3 py-2 md:py-2.5 rounded text-xs md:text-sm font-medium whitespace-nowrap transition-colors inline-flex items-center justify-center gap-1 md:gap-1.5 ${stageFilter === key ? 'bg-white text-off-black shadow-sm' : 'text-off-black/55 hover:text-off-black'}`}
+                className={`flex-1 md:flex-none px-2 md:px-3 py-1.5 md:py-2.5 rounded text-xs md:text-sm font-medium whitespace-nowrap transition-colors inline-flex items-center justify-center gap-1 md:gap-1.5 ${stageFilter === key ? 'bg-white text-off-black shadow-sm' : 'text-off-black/55 hover:text-off-black'}`}
               >
                 {label}
                 <span className={`text-[11px] tabular-nums ${stageFilter === key ? 'text-off-black/50' : 'text-off-black/35'}`}>{n}</span>
@@ -2803,18 +2810,38 @@ Thank you!`
     <div className="h-[calc(100dvh-92px-env(safe-area-inset-bottom))] md:h-screen overflow-hidden bg-[#f3f3f3] flex flex-col">
       <div className="max-w-[1800px] mx-auto px-4 md:px-6 lg:px-8 w-full flex flex-col h-full">
         {/* Header - Compact bar on mobile, full greeting on desktop */}
-        <div className={`pt-4 md:pt-5 pb-3 items-center justify-between gap-3 md:gap-6 flex-shrink-0 ${inlineDetail ? 'hidden md:flex' : 'flex'}`}>
+        {/* The phone header: stars, count, tool name, the view picker. */}
+        {!inlineDetail && (
+          <PageHeader
+            title={activeView === 'standard' ? 'Standard Orders' : activeView === 'custom' ? 'Custom Orders' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}
+            pill={`${activeView === 'bulk' ? (bulkCount ?? '') : ordersToFulfill.length} orders`}
+            subtitle={lastImportedAt ? `Last refreshed ${new Date(lastImportedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : undefined}
+            control={
+              <div className="relative">
+                <select
+                  value={activeView}
+                  onChange={(e) => { setActiveView(e.target.value as 'standard' | 'custom' | 'race_partner' | 'bulk'); setSearchQuery('') }}
+                  className="appearance-none pl-3 pr-7 py-1.5 text-xs font-medium rounded-full border border-border-gray bg-white text-off-black focus:outline-none focus:ring-2 focus:ring-off-black/20"
+                >
+                  <option value="standard">Standard</option>
+                  <option value="custom">Custom</option>
+                  <option value="race_partner">Partners</option>
+                  <option value="bulk">Bulk</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center"><ChevronDownIcon className="w-3.5 h-3.5 text-off-black/40" /></div>
+              </div>
+            }
+          />
+        )}
+        <div className={`pt-4 md:pt-5 pb-3 items-center justify-between gap-3 md:gap-6 flex-shrink-0 hidden md:flex`}>
           {/* Left side: logo, greeting, and summary */}
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <div className="flex items-center gap-2.5">
               <img
                 src="/trackstar-stars-transparent.png"
                 alt="Trackstar"
-                className="h-8 md:h-[34px]"
+                className="h-8 md:h-[34px] w-auto shrink-0 object-contain"
               />
-              <span className="md:hidden px-2 py-0.5 bg-off-black/10 text-off-black/60 text-xs font-medium rounded">
-                {ordersToFulfill.length} orders
-              </span>
             </div>
             <div className="hidden md:block">
               <h1 className="text-[29px] font-bold text-off-black">
@@ -2831,11 +2858,10 @@ Thank you!`
         {!isLoading && (
         <section className={inlineDetail ? 'flex-shrink-0 flex flex-col' : 'flex-1 flex flex-col min-h-0 pb-4'}>
           {/* Section Header */}
-          <div className={`items-center justify-between mb-3 md:mb-4 flex-shrink-0 ${inlineDetail ? 'hidden md:flex' : 'flex'}`}>
+          <div className={`items-center justify-between mb-3 md:mb-4 flex-shrink-0 hidden md:flex`}>
             <div>
             <div className="flex items-center gap-3 md:gap-6">
               <h2 className="text-base md:text-lg font-semibold text-off-black uppercase tracking-tight">
-                <span className="md:hidden">{activeView === 'standard' ? 'Standard Orders' : activeView === 'custom' ? 'Custom Orders' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}</span>
                 <span className="hidden md:inline-block relative">
                   {activeView === 'standard' ? 'Standard Orders' : activeView === 'custom' ? 'Custom Orders' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}
                   {/* Notification bubble, overlapping the end of the heading. */}
@@ -2857,22 +2883,6 @@ Thank you!`
                 {isImporting ? 'Checking for new orders…' : `Last refreshed ${new Date(lastImportedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
               </button>
             )}
-            </div>
-            {/* View Switcher - Mobile (dropdown) */}
-            <div className="relative md:hidden">
-              <select
-                value={activeView}
-                onChange={(e) => { setActiveView(e.target.value as 'standard' | 'custom' | 'race_partner' | 'bulk'); setSearchQuery('') }}
-                className="appearance-none pl-3 pr-7 py-1.5 text-xs font-medium rounded-full border border-border-gray bg-white text-off-black focus:outline-none focus:ring-2 focus:ring-off-black/20"
-              >
-                <option value="standard">Standard</option>
-                <option value="custom">Custom</option>
-                <option value="race_partner">Partners</option>
-                <option value="bulk">Bulk</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-                <ChevronDownIcon className="w-3.5 h-3.5 text-off-black/40" />
-              </div>
             </div>
             {/* View Switcher - Desktop. A segmented control rather than three
                 free-standing pills: these are three views of one list, not three
@@ -3509,12 +3519,12 @@ Thank you!`
 
         {/* Bottom bar: Completed Orders Toggle + Settings */}
         {!isLoading && !inlineDetail && (
-          <div className="flex-shrink-0 py-3 md:py-4 mt-2 mb-4 md:mb-8 border-t border-border-gray/50">
+          <div className="flex-shrink-0 py-1.5 md:py-4 md:mt-2 mb-2 md:mb-8 md:border-t border-border-gray/50">
             <div className="flex items-center justify-center gap-3">
               {(completedOrders.length > 0 || (completedCount ?? 0) > 0) && (
                 <button
                   onClick={() => setShowCompleted(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-border-gray rounded-full shadow-sm text-sm text-off-black/70 hover:bg-subtle-gray transition-colors"
+                  className="inline-flex items-center gap-2 px-3 md:px-4 py-1 md:py-2 md:bg-white md:border border-border-gray rounded-full md:shadow-sm text-xs md:text-sm text-off-black/60 md:text-off-black/70 hover:bg-subtle-gray transition-colors"
                 >
                   <span>{showCompleted ? `Close ${doneHeading}` : `View ${doneHeading}`}</span>
                   <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-off-black/5 text-off-black/60">
@@ -4151,6 +4161,22 @@ Thank you!`
 
                         return (
                       <div className="space-y-4">
+                      {/* On the phone, lead with the work: the proofs, big. Everything
+                          else waits behind Details (customDetailsOpen). */}
+                      {selectedOrder.trackstarOrderType === 'custom' && (
+                        <div className="md:hidden space-y-3">
+                          <ProofShowcase orderId={selectedOrder.id} />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium ${(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).bgColor} ${(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).color}`}>
+                              {(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).icon} {designLabel(DESIGN_STATUS_CONFIG[ds] ? ds : 'not_started', selectedOrder.trackstarOrderType)}
+                            </span>
+                            <button type="button" onClick={() => setCustomDetailsOpen(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-[#4600D6]">
+                              {customDetailsOpen ? 'Hide details' : 'Details'} <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${customDetailsOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      <div className={`space-y-4 ${selectedOrder.trackstarOrderType === 'custom' && !customDetailsOpen ? 'hidden md:block' : ''}`}>
                       {/* Stage Progress Indicator */}
                       <div className="flex items-center gap-1 px-1">
                         {progressSteps.map((step, i) => (
@@ -4593,6 +4619,7 @@ Thank you!`
                         </button>
                       </div>
                       <OrderConversations orderId={selectedOrder.id} enabled={!!selectedOrder.customerEmail && can('support')} />
+                      </div>{/* end details (hidden on the phone until opened) */}
                       </div>
                         )
                       })()}{/* end custom detail */}
