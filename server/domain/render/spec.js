@@ -37,6 +37,28 @@ export function templateKey(raceName, edition) {
   return edition ? `${raceName} / ${edition}` : raceName
 }
 
+/** The standard name for an event, as template keys spell it. */
+export function eventLabel(eventType) {
+  const e = String(eventType || '').trim()
+  if (/half/i.test(e)) return 'Half Marathon'
+  if (/^10\s*k$/i.test(e)) return '10K'
+  if (/^5\s*k$/i.test(e)) return '5K'
+  if (/10\s*mile/i.test(e)) return '10 Miler'
+  return e
+}
+
+/**
+ * Which production file a print uses. A race's main event (the marathon, or
+ * the event a race is named for) is "<race>"; any other event at the race has
+ * its own file, "<race> / Half Marathon", "<race> / 10K". The World Majors
+ * edition stacks in front: "Chicago Marathon / World Majors".
+ */
+export function templateFor(order, raceName, eventType) {
+  const edition = editionOf(order)
+  const ev = eventType && !isMainEvent(raceName, eventType) ? eventLabel(eventType) : null
+  return templateKey(raceName, [edition, ev].filter(Boolean).join(' / ') || null)
+}
+
 /** The order fields buildSpec reads. Use this select so callers cannot forget one. */
 export const SPEC_SELECT = {
   id: true, orderNumber: true, parentOrderNumber: true, lineItemIndex: true, trackstarOrderType: true, status: true,
@@ -64,7 +86,9 @@ export function buildSpec(order, templates = [], raceRow = null, noTimeGaps = ne
   if (order.trackstarOrderType !== 'standard') reasons.push('Only standard race prints are rendered')
   if (!SIZES.includes(order.productSize)) reasons.push(`No artboard for size "${order.productSize}"`)
   const edition = editionOf(order)
-  const template = templateKey(raceName, edition)
+  const research0 = order.runnerResearch?.find(r => r.researchStatus === 'found') || order.runnerResearch?.[0]
+  const template = templateFor(order, raceName, research0?.eventType)
+  const eventTag = template.includes(' / ') && !edition ? eventLabel(research0?.eventType) : null
   if (!templates.includes(template)) reasons.push(`No prepared template for ${template}`)
   if (!name) reasons.push('No runner name')
 
@@ -74,7 +98,6 @@ export function buildSpec(order, templates = [], raceRow = null, noTimeGaps = ne
   const bib = research?.bibNumber || null
   const time = formatTime(research?.officialTime)
   const pace = formatPace(research?.officialPace)
-  if (research?.eventType && !isMainEvent(raceName, research.eventType)) reasons.push(`${research.eventType} prints are not automated yet (the template is the race's main event)`)
   if (!bib) reasons.push('No bib number yet')
   if (!order.hadNoTime && (!time || !pace)) reasons.push('No finish time and pace yet')
   if (order.photoPath && noTimeGaps.has(`photo|${template}|${order.productSize}`)) reasons.push(`The ${order.productSize} design has no photo window, so a print with a customer photo is made by hand`)
@@ -118,7 +141,7 @@ export function buildSpec(order, templates = [], raceRow = null, noTimeGaps = ne
       dateSource: race?.raceDateSource || null,
       dateSourceUrl: race?.raceDateSourceUrl || null,
       // The filename convention the shop uses: 4551_Chicago_Bogard
-      file: `${displayNumber(order)}${order.lineItemIndex ? `-${order.lineItemIndex + 1}` : ''}_${shortRace(raceName)}${edition ? '_WM' : ''}_${lastName(name)}`,
+      file: `${displayNumber(order)}${order.lineItemIndex ? `-${order.lineItemIndex + 1}` : ''}_${shortRace(raceName)}${edition ? '_WM' : ''}${eventTag ? `_${eventTag.replace(/ Marathon$/, '').replace(/\s+/g, '')}` : ''}_${lastName(name)}`,
     },
   }
 }

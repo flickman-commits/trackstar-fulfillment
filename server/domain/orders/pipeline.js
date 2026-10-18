@@ -17,8 +17,7 @@
  * order's numbers), setup (scraper, production file, race data), render.
  */
 import { printBlockers } from '../races/verification.js'
-import { editionOf, templateKey, SIZES } from '../render/spec.js'
-import { isMainEvent } from '../../scrapers/index.js'
+import { templateFor, SIZES } from '../render/spec.js'
 
 const RESULT_STATES = new Set(['found'])
 
@@ -74,8 +73,7 @@ export function pipelineFor({ order, research, race, render, hasScraper, templat
   if (!order.hadNoTime && (!research.officialTime || !research.officialPace)) return stage('action', 'No time', { kind: 'data', fix: 'The result has no finish time or pace. Add them, or mark the order as no time.' })
 
   // Everything a design needs is here. What stops the render?
-  if (research.eventType && !isMainEvent(raceName, research.eventType)) return stage('action', 'Make by hand', { kind: 'setup', fix: `${research.eventType} prints are not automated yet; the template is the race's main event. Make this design by hand.` })
-  const template = templateKey(raceName, editionOf(order))
+  const template = templateFor(order, raceName, research.eventType)
   if (!templates.has(template)) return stage('action', 'Needs a production file', { kind: 'setup', fix: `There is no checked production file for ${template}. Add it under Settings > Designs, or make the design by hand.` })
   if (!SIZES.includes(order.productSize)) return stage('action', 'Make by hand', { kind: 'setup', fix: `${order.productSize} is not a size the script renders. Make this design by hand.` })
   if (order.photoPath && noTimeGaps.has(`photo|${template}|${order.productSize}`)) return stage('action', 'Make by hand', { kind: 'setup', fix: `The ${template} ${order.productSize} design has no photo window, and this order has a customer photo. Make this design by hand.` })

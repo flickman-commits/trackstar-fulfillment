@@ -455,7 +455,10 @@ export function isMainEvent(raceName, eventType) {
   const e = String(eventType || '').trim().toLowerCase()
   if (!e || e === 'marathon') return true
   const main = findConfigForRace(raceName)?.eventTypes?.[0]
-  return Boolean(main && String(main).trim().toLowerCase() === e)
+  if (main && String(main).trim().toLowerCase() === e) return true
+  // A race named for its event ("Donna Half Marathon", "Semper Fred 5K").
+  const words = e.replace(/marathon/, '').trim()
+  return Boolean(words) && String(raceName || '').toLowerCase().includes(words)
 }
 
 export function getCoveredYears(raceName) {
