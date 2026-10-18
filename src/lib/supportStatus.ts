@@ -1,5 +1,8 @@
 import { chipTone } from '@/lib/ui'
 import type { ThreadStatus } from '@/types/support'
+import { tagStoreLinks } from './storeLinks'
+
+export { tagStoreLinks }
 
 /** How each thread status reads, and its chip tone. */
 export const STATUS_TONE: Record<ThreadStatus, string> = {
@@ -33,9 +36,9 @@ export function customerColor(key: string): string {
   return `hsl(${HUES[h % HUES.length]} 55% 45%)`
 }
 
-/** Fill a macro's placeholders with what the page knows. Brackets are left for the rep. */
-export function fillMacro(body: string, { firstName, rep }: { firstName: string; rep: string }): string {
-  return body
+/** Fill a macro's placeholders with what the page knows. Brackets are left for the rep. Store links get the support UTM. */
+export function fillMacro(body: string, { firstName, rep, channel }: { firstName: string; rep: string; channel?: string }): string {
+  return tagStoreLinks(body
     .replace(/\{\{\s*first_name\s*\}\}/gi, firstName || 'there')
-    .replace(/\{\{\s*rep\s*\}\}/gi, rep)
+    .replace(/\{\{\s*rep\s*\}\}/gi, rep), channel)
 }

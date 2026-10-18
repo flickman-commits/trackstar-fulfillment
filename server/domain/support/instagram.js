@@ -315,6 +315,12 @@ export async function fetchProfile(igsid) {
   }
 }
 
+/** True when the thread has a person's name, not the "@username" stand-in. */
+function hasRealName(thread) {
+  const n = String(thread.customerName || '').trim()
+  return Boolean(n) && n !== `@${thread.igUsername}` && !n.startsWith('@')
+}
+
 function subjectFor(username) {
   return username ? `Instagram DM with @${username}` : 'Instagram DM'
 }
@@ -330,7 +336,8 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
   if (!parsed?.customerId || !parsed?.igMessageId) return null
   let thread = await prisma.supportThread.findUnique({ where: { igUserId: parsed.customerId } })
   if (!thread) {
-    const who = profile || await fetchProfile(parsed.customerId)
+    // The import knows the username but not the display name; ask Meta for it.
+    const who = profile?.name ? profile : { ...(await fetchProfile(parsed.customerId)), ...(profile?.username ? { username: profile.username } : {}) }
     const username = who?.username || ''
     thread = await prisma.supportThread.create({
       data: {
@@ -351,7 +358,15 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
     const patch = {}
     if (conversationId && !thread.igConversationId) patch.igConversationId = conversationId
     if (profile?.username && !thread.igUsername) { patch.igUsername = profile.username; patch.subject = subjectFor(profile.username) }
-    if (profile?.name && !thread.customerName) patch.customerName = profile.name
+    if (profile?.name && !hasRealName(thread)) patch.customerName = profile.name
+    // Meta shares a display name only once the person has written since the
+    // account was connected, so a placeholder ("@username") is retried on each
+    // message they send until the real name comes back.
+    else if (parsed.direction === 'in' && !hasRealName(thread)) {
+      const p = await fetchProfile(parsed.customerId)
+      if (p?.name) patch.customerName = p.name
+      if (p?.username && !thread.igUsername) { patch.igUsername = p.username; patch.subject = subjectFor(p.username) }
+    }
     if (Object.keys(patch).length) thread = await prisma.supportThread.update({ where: { id: thread.id }, data: patch })
   }
 

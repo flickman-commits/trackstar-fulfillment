@@ -33,7 +33,8 @@ export function ChannelMark({ channel, className = 'w-3 h-3' }: { channel: Threa
 function Row({ t, active, onClick }: { t: ThreadRow; active: boolean; onClick: () => void }) {
   const ig = t.channel === 'instagram'
   const who = t.customerName || (ig && t.igUsername ? `@${t.igUsername}` : '') || t.customerEmail || 'Unknown sender'
-  const line = ig ? (t.igUsername ? `@${t.igUsername} · Instagram` : 'Instagram DM') : (t.subject || '(no subject)')
+  // Until Meta shares their name, the name is the @handle; say it once.
+  const line = ig ? (t.igUsername && who !== `@${t.igUsername}` ? `@${t.igUsername} · Instagram` : 'Instagram DM') : (t.subject || '(no subject)')
   const wait = t.status === 'open' ? waitingFor(t.lastInboundAt, t.lastOutboundAt) : null
   const snoozed = t.snoozedUntil && new Date(t.snoozedUntil) > new Date()
   const bold = t.unread && t.status !== 'closed'

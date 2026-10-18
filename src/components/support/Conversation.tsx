@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Archive, Bold, ChevronDown, Clock, Italic, Link as LinkIcon, Loader2, Mail, Paperclip, RotateCcw, Send, Star, StickyNote, Trash2, Zap, X, Search } from 'lucide-react'
 import { btnGhost, btnPrimary, btnSecondary } from '@/lib/ui'
 import { when } from '@/lib/supportDates'
-import { fillMacro } from '@/lib/supportStatus'
+import { fillMacro, tagStoreLinks } from '@/lib/supportStatus'
 import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
 import { ChannelMark, CustomerAvatar } from './ConversationList'
 import DraftCard from './DraftCard'
@@ -25,6 +25,15 @@ import type { Macro, Message, Mockup, Note, Teammate, ThreadDetail, ThreadStatus
  * the customer's last message has closed.
  */
 type Item = { at: string; kind: 'message'; m: Message } | { at: string; kind: 'note'; n: Note }
+
+/** Macros for a "/query": shortcut starts first, then name or shortcut contains. Spaces read as dashes. */
+function macroMatches(macros: Macro[], query: string): Macro[] {
+  const q = query.toLowerCase().trim()
+  const dashed = q.replace(/\s+/g, '-')
+  const starts = macros.filter(m => (m.shortcut || '').startsWith(dashed))
+  const rest = q ? macros.filter(m => !starts.includes(m) && (m.name.toLowerCase().includes(q) || (m.shortcut || '').includes(dashed))) : []
+  return [...starts, ...rest].slice(0, 8)
+}
 
 function Bubble({ m }: { m: Message }) {
   const [showQuoted, setShowQuoted] = useState(false)
@@ -308,7 +317,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     let caretEnd = el ? el.selectionEnd : text.length
     if (replaceSlash) {
       // The "/shortcut" being typed goes away with the pick.
-      const before = base.slice(0, caret).replace(/\/[\w-]*$/, '')
+      const before = base.slice(0, caret).replace(/\/[\w-]*(?: [\w-]*){0,2}$/, '')
       base = before + base.slice(caret)
       caret = caretEnd = before.length
     }
@@ -339,27 +348,23 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   })
 
   // /shortcut: a slash at the start of a word in the reply offers the macros; Enter or Tab drops one in.
-  const slashMatches = useMemo(() => {
-    if (slashQ === null) return []
-    const q = slashQ.toLowerCase()
-    const starts = macros.filter(m => (m.shortcut || '').startsWith(q))
-    const rest = q ? macros.filter(m => !starts.includes(m) && (m.name.toLowerCase().includes(q) || (m.shortcut || '').includes(q))) : []
-    return [...starts, ...rest].slice(0, 8)
-  }, [slashQ, macros])
+  const slashMatches = useMemo(() => (slashQ === null ? [] : macroMatches(macros, slashQ)), [slashQ, macros])
   const onReplyChange = (v: string, caret: number) => {
     setText(v)
-    const m = v.slice(0, caret).match(/(?:^|\s)\/([\w-]*)$/)
-    setSlashQ(m ? m[1] : null)
+    // A space may continue the query ("/marine corps"); it only stays open while something matches.
+    const m = v.slice(0, caret).match(/(?:^|\s)\/([\w-]*(?: [\w-]*){0,2})$/)
+    const q = m ? m[1] : null
+    setSlashQ(q !== null && q.includes(' ') && !macroMatches(macros, q).length ? null : q)
     setSlashIdx(0)
   }
   const pickSlash = (m: Macro) => {
-    placeInReply(fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName }), true)
+    placeInReply(fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName, channel: thread.channel }), true)
     onUseMacro(m.id)
   }
 
   const insertMacro = (m: Macro) => {
     macro.setOpen(false)
-    const body = fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName })
+    const body = fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName, channel: thread.channel })
     const el = replyRef.current
     if (ig) {
       // No greeting or sign-off to slot between: at the caret, or after what is there.
@@ -390,7 +395,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
             <div className="text-[13px] text-off-black/70 leading-snug inline-flex items-start gap-1.5 max-w-full break-words">
               <ChannelMark channel={thread.channel} />
               {ig ? (
-                thread.igUsername ? <a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="hover:text-off-black hover:underline">@{thread.igUsername} · Instagram</a> : <span>Instagram DM</span>
+                thread.igUsername ? <a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="hover:text-off-black hover:underline">{thread.customerName && thread.customerName !== `@${thread.igUsername}` ? `@${thread.igUsername} · ` : ''}Instagram</a> : <span>Instagram DM</span>
               ) : <span>{thread.subject || '(no subject)'}</span>}
             </div>
           </div>
@@ -443,7 +448,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 bg-[#fcfcfc]">
         {timeline.map(it => it.kind === 'note' && it.n.kind === 'draft'
           ? <DraftCard key={it.n.id} n={it.n} latest={it.n.id === latestDraftId} onRedraft={onRedraft}
-              onUse={body => { setMode('reply'); setText(body.replace(/\{\{rep\}\}/g, me.firstName)); requestAnimationFrame(() => { const el = replyRef.current; if (el) { el.focus(); el.setSelectionRange(0, 0) } }) }} />
+              onUse={body => { setMode('reply'); setText(tagStoreLinks(body.replace(/\{\{rep\}\}/g, me.firstName), thread.channel)); requestAnimationFrame(() => { const el = replyRef.current; if (el) { el.focus(); el.setSelectionRange(0, 0) } }) }} />
           : it.kind === 'message'
           ? <Bubble key={it.m.id} m={it.m} />
           : <NoteCard key={it.n.id} n={it.n} team={team} meId={me.id} isAdmin={isAdmin} onDelete={() => onDeleteNote(it.n.id)} />)}
