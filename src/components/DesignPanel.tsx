@@ -228,6 +228,26 @@ export function DesignDetails({ d }: { d: Design }) {
 }
 
 /** A small tag, styled like the order's other chips. tone: green ok, red problem, purple Artelo, gray neutral. */
+/** Where the approved print went, as one quiet line for under the filename. Nothing until a design is approved. */
+export function DesignFileLinks({ d }: { d: Design }) {
+  const job = d.job
+  if (!d.visible || !job || job.status !== 'done' || job.review !== 'approved') return null
+  const link = 'underline decoration-dotted underline-offset-2 hover:text-off-black'
+  return (
+    <p className="mt-1 text-[11px] text-off-black/50">
+      This file is{' '}
+      {job.deliveredAt
+        ? <a href={job.deliveredPath || undefined} target="_blank" rel="noopener noreferrer" className={link}>in the Orders folder ↗</a>
+        : <span className="text-red-600" title={job.deliveryError || undefined}>not in the Orders folder</span>}
+      {' and '}
+      {job.arteloUploadedAt
+        ? <a href={job.arteloUrl || undefined} target="_blank" rel="noopener noreferrer" className={link}>in the Artelo library ↗</a>
+        : <span className="text-red-600" title={job.arteloError || undefined}>not in the Artelo library</span>}
+      .
+    </p>
+  )
+}
+
 function Tag({ tone = 'gray', children, href, title, onClick }: { tone?: 'green' | 'red' | 'purple' | 'gray' | 'blue'; children: React.ReactNode; href?: string | null; title?: string; onClick?: () => void }) {
   const cls = `inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium ${
     tone === 'green' ? 'bg-green-50 border-green-200 text-green-800'
@@ -256,11 +276,10 @@ export function DesignDetailsTags({ d }: { d: Design }) {
     <div>
       <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Design Details</h4>
       <div className="flex flex-wrap gap-1.5">
-        <Tag title={job.requestedBy === 'system' ? 'Rendered automatically' : 'Re-rendered by hand'}>V{job.version}</Tag>
-        {job.spec.template && <Tag>{job.spec.template}</Tag>}
-        <Tag tone={job.spec.photoPath ? 'blue' : 'gray'}>{job.spec.photoPath ? 'Photo' : 'No photo'}</Tag>
+        {/* The race, photo, approver and date source all show elsewhere on the order;
+            what belongs here is the version and what the PDF measured. */}
+        <Tag title={`${job.requestedBy === 'system' ? 'Rendered automatically' : 'Re-rendered by hand'}, ${fmt(job.createdAt)}`}>V{job.version}</Tag>
         {job.spec.noTime && <Tag tone="red">No time</Tag>}
-        <Tag title={job.finishedAt ? `Finished ${fmt(job.finishedAt)}` : undefined}>Made {fmt(job.createdAt)}</Tag>
         {o ? (
           <>
             <Tag tone={ok(o.trimIn ? o.trimIn === job.spec.size : null)} title="Measured from the PDF's trim box">{o.trimIn ? o.trimIn === job.spec.size ? '✓ ' : '✕ ' : ''}{o.trimIn || job.spec.size} trim</Tag>
@@ -268,14 +287,6 @@ export function DesignDetailsTags({ d }: { d: Design }) {
             <Tag tone={ok(o.color ? o.color === 'CMYK' : null)} title="Read from the PDF's color">{o.color === 'CMYK' ? '✓ ' : o.color ? '✕ ' : ''}{o.color || 'Color'}</Tag>
           </>
         ) : <Tag title="Made before the PDF check">Not measured</Tag>}
-        {job.review === 'approved' && <Tag tone="green" title={job.reviewedAt ? fmt(job.reviewedAt) : undefined}>✓ Approved{job.reviewer ? ` by ${job.reviewer.split(' ')[0]}` : ''}</Tag>}
-        {job.review === 'approved' && (job.deliveredAt
-          ? <Tag tone="green" href={job.deliveredPath}>In Orders folder ↗</Tag>
-          : <Tag tone="red" title={job.deliveryError || undefined}>Not in Drive</Tag>)}
-        {job.review === 'approved' && (job.arteloUploadedAt
-          ? <Tag tone="purple" href={job.arteloUrl}>In Artelo library ↗</Tag>
-          : <Tag tone="red" title={job.arteloError || undefined}>Not in Artelo</Tag>)}
-        {job.spec.dateSourceUrl && <Tag href={job.spec.dateSourceUrl} title={`Date verified (${job.spec.dateSource})`}>Date source ↗</Tag>}
       </div>
       {job.notes && <p className="mt-1.5 text-xs text-amber-700">{job.notes}</p>}
       {job.reviewNote && <p className="mt-1 text-xs text-red-700">{job.review === 'closed' ? 'Closed' : 'Rejected'}: {job.reviewNote}</p>}

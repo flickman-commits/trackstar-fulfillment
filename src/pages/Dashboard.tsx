@@ -14,7 +14,7 @@ import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import ApiKeysPanel from '@/components/ApiKeysPanel'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
-import { DesignCard, DesignReview, DesignDetailsTags } from '@/components/DesignPanel'
+import { DesignCard, DesignReview, DesignDetailsTags, DesignFileLinks } from '@/components/DesignPanel'
 import { useDesign } from '@/lib/useDesign'
 import StatusLegend from '@/components/StatusLegend'
 import RaceDatabasePanel from '@/components/RaceDatabasePanel'
@@ -1782,14 +1782,18 @@ export default function Dashboard() {
   useEffect(() => {
     const open = (o: Order) => { lastSelectedRef.current = orderRefOf(o); setSelectedOrder(o) }
     // The order behind a ref: from the loaded list first, otherwise fetched on its own.
+    // A bare number (no -2 suffix) also opens an order whose only print is a
+    // later line item, as when the first item was not a print.
+    const pick = (list: Order[], ref: string) => list.find(o => orderRefOf(o) === ref)
+      || (!ref.includes('-') ? list.filter(o => orderRefOf(o).split('-')[0] === ref).sort((a, b) => (a.lineItemIndex || 0) - (b.lineItemIndex || 0))[0] : undefined)
     const resolve = (ref: string) => {
-      const hit = orders.find(o => orderRefOf(o) === ref)
+      const hit = pick(orders, ref)
       if (hit) { open(hit); return }
       if (lookedUpRef.current === ref) return
       lookedUpRef.current = ref
       const [number] = ref.split('-')
       apiFetch(`/api/orders?number=${encodeURIComponent(number)}`).then(r => r.ok ? r.json() : null).then(d => {
-        const found = ((d?.orders || []) as Record<string, unknown>[]).map(mapOrder).find(o => orderRefOf(o) === ref)
+        const found = pick(((d?.orders || []) as Record<string, unknown>[]).map(mapOrder), ref)
         if (!found) { setToast({ message: `Order ${ref} was not found`, type: 'error' }); navigate(`/${urlSearch}`, { replace: true }); return }
         if (found.trackstarOrderType !== activeView) setActiveView(found.trackstarOrderType as typeof activeView)
         open(found)
@@ -4736,8 +4740,11 @@ Thank you!`
                   {/* What the print was made from and what its PDF measured, as tags. */}
                   <DesignDetailsTags d={design} />
 
-                  <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-1">
-                    <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
+                  <div>
+                    <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-1">
+                      <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
+                    </div>
+                    <DesignFileLinks d={design} />
                   </div>
 
                   {/* Every tag for the order, in one place. */}
