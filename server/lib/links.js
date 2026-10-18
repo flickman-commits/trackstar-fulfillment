@@ -21,6 +21,11 @@ export function bulkIntakeUrl(token) {
   return token ? `${appBaseUrl()}/intake/${token}` : null
 }
 
+/** The order's page in the Etsy shop manager, from its receipt id, or null. */
+export function etsyOrderUrl(receiptId) {
+  return receiptId ? `https://www.etsy.com/your/orders/sold?order_id=${encodeURIComponent(String(receiptId))}` : null
+}
+
 /** The order's page in Shopify admin, or null when it is not a Shopify order. */
 export function shopifyAdminUrl(shopifyOrderId) {
   const handle = String(process.env.SHOPIFY_STORE || '').replace(/\.myshopify\.com$/, '').trim()

@@ -179,6 +179,10 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   }
   if (o.researchSource === 'customer_verified') {
     tags.push({ key: 'trust', ...(lookupTrust?.tone === 'green' ? lookupTrust : { label: 'Verified', sublabel: 'by customer', tone: 'green' as const, title: 'The customer confirmed an official-results match before checkout.' }) })
+  } else if (o.researchSource === 'scraper' && o.researchStatus === 'found') {
+    tags.push({ key: 'trust', label: 'Found', sublabel: 'by research', tone: 'gray' as const, title: 'The tool looked this runner up on the official results site itself. The customer gave only their name; check the match before approving.' })
+  } else if (o.researchSource === 'manual_entry') {
+    tags.push({ key: 'trust', label: 'Entered', sublabel: 'by hand', tone: 'gray' as const, title: 'Someone on the team typed this result in by hand.' })
   } else if (o.researchSource === 'customer_supplied') {
     tags.push({ key: 'trust', ...(lookupTrust?.tone === 'blue' ? lookupTrust : { label: 'Customer typed', tone: 'blue' as const, title: 'The customer typed these numbers at checkout. They were never matched against official results. Print them as given.' }) })
   }

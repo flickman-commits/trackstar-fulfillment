@@ -445,6 +445,19 @@ function explicitYearsOf(obj) {
  * @param {string} raceName
  * @returns {number[]|null}
  */
+/**
+ * Whether a result's event is the one the race's print is designed for: a
+ * marathon, or the race's own signature distance (the first of its config's
+ * eventTypes, e.g. the Army Ten-Miler's 10 Miler). Halves and side races at a
+ * marathon are not; their prints are made by hand.
+ */
+export function isMainEvent(raceName, eventType) {
+  const e = String(eventType || '').trim().toLowerCase()
+  if (!e || e === 'marathon') return true
+  const main = findConfigForRace(raceName)?.eventTypes?.[0]
+  return Boolean(main && String(main).trim().toLowerCase() === e)
+}
+
 export function getCoveredYears(raceName) {
   const config = findConfigForRace(raceName)
   if (!config) return null

@@ -12,6 +12,7 @@
 import { formatRaceDate, formatTemp, formatTime, formatPace, formatCondition } from '../../lib/printFormat.js'
 import { unpaidPhotoRows } from '../orders/photoPayment.js'
 import { printBlockers } from '../races/verification.js'
+import { isMainEvent } from '../../scrapers/index.js'
 
 export const SIZES = ['8x10', '12x18', '16x24']
 
@@ -73,9 +74,10 @@ export function buildSpec(order, templates = [], raceRow = null, noTimeGaps = ne
   const bib = research?.bibNumber || null
   const time = formatTime(research?.officialTime)
   const pace = formatPace(research?.officialPace)
-  if (research?.eventType && !/^marathon$/i.test(research.eventType.trim())) reasons.push(`${research.eventType} prints are not automated yet (only the marathon template is mapped)`)
+  if (research?.eventType && !isMainEvent(raceName, research.eventType)) reasons.push(`${research.eventType} prints are not automated yet (the template is the race's main event)`)
   if (!bib) reasons.push('No bib number yet')
   if (!order.hadNoTime && (!time || !pace)) reasons.push('No finish time and pace yet')
+  if (order.photoPath && noTimeGaps.has(`photo|${template}|${order.productSize}`)) reasons.push(`The ${order.productSize} design has no photo window, so a print with a customer photo is made by hand`)
   if (order.hadNoTime && noTimeGaps.has(`${template}|${order.productSize}`)) reasons.push(`This ${order.productSize} design has details to the right of pace, so a no-time print needs a NO TIME layer in the file first`)
 
   const date = formatRaceDate(race?.raceDate)

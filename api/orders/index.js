@@ -6,7 +6,7 @@ import { getOrderTotalUsd, isBigSpender, BIG_SPENDER_THRESHOLD_USD } from '../..
 import { getProductInfo, loadProductCatalog } from '../../server/lib/productCatalog.js'
 import { isRushAddonLineItem, isRemovedLineItem } from '../../server/lib/lineItemMatching.js'
 import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
-import { shopifyAdminUrl, arteloOrderUrl } from '../../server/lib/links.js'
+import { shopifyAdminUrl, arteloOrderUrl, etsyOrderUrl } from '../../server/lib/links.js'
 import { getEtsyListingImageUrl } from '../../server/lib/etsyImageCache.js'
 import { formatRaceDate, formatTemp, formatTime, formatPace } from '../../server/lib/printFormat.js'
 import { resolveEvent } from '../../server/lib/raceEvent.js'
@@ -335,6 +335,7 @@ export default async function handler(req, res) {
         isGift: order.isGift,
         // The order in Shopify admin, for the order modal's View in Shopify.
         shopifyAdminUrl: ['standard', 'custom'].includes(order.trackstarOrderType) ? shopifyAdminUrl(order.shopifyOrderData?.id) : null,
+        etsyOrderUrl: order.source === 'etsy' ? etsyOrderUrl(order.parentOrderNumber) : null,
         arteloUrl: arteloOrderUrl(order.arteloOrderData?.id),
         // Race-partner virtual fields (aliases for existing columns — no schema change)
         partnerName: order.trackstarOrderType === 'race_partner' ? order.raceName : null,

@@ -56,7 +56,11 @@ export async function availableTemplateKeys() {
 export async function noTimeGaps() {
   const rows = await prisma.printTemplate.findMany({ where: { enabled: true, lastCheckOk: true }, select: { key: true, lastCheckReport: true } })
   const out = new Set()
-  for (const r of rows) for (const [size, v] of Object.entries(r.lastCheckReport?.sizes || {})) if (v?.noTime === 'needs NO TIME layout') out.add(`${r.key}|${size}`)
+  for (const r of rows) for (const [size, v] of Object.entries(r.lastCheckReport?.sizes || {})) {
+    if (v?.noTime === 'needs NO TIME layout') out.add(`${r.key}|${size}`)
+    // The same set carries designs with no photo window, as "photo|template|size".
+    if (v && v.photoWindow === false) out.add(`photo|${r.key}|${size}`)
+  }
   return out
 }
 
