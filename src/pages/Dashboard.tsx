@@ -707,8 +707,6 @@ function getGreeting(): string {
 }
 
 /** The name to greet someone by. Falls back to the part of an email before the @. */
-/** A quiet link to the order in another platform, with that platform's mark. */
-const platformPill = 'inline-flex items-center gap-1 pl-1.5 pr-2 py-0.5 rounded-full border border-border-gray bg-white text-[11px] font-medium text-off-black/60 hover:text-off-black hover:border-off-black/25 transition-colors'
 
 function greetingName(user: { firstName?: string | null; email?: string | null } | null): string {
   return (user?.firstName || '').trim() || (user?.email || '').split('@')[0] || 'there'
