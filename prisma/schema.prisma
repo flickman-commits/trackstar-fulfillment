@@ -87,8 +87,17 @@ model Order {
   //   "manual_lookup_error" → endpoint errored / unreachable → typed it in
   //   "manual_rate_limited" → 429 → typed it in
   //   "manual_user_choice"  → customer chose "Enter info manually" themselves
+  //   "edited_by_customer"  → matched, then the customer changed time/pace/bib
+  //   "<outcome>_name_edited" (e.g. "auto_match_name_edited") → verified match,
+  //                           customer changed only the NAME on the print;
+  //                           time, pace and bib are still the official ones
   //   null                  → no widget data (Etsy / pre-widget order)
   lookupOutcome      String?
+  // The runner name official results matched, set only when the customer then
+  // printed a different name ("Jonathan Smith" for a result listed as "Jon
+  // Smith"). Lets whoever fulfills the order see both. From the hidden cart
+  // property _matched_name.
+  lookupMatchedName  String?
 
   // Personalization photo, captured by the storefront wizard's photo step.
   // Stores the Supabase Storage PATH, never a URL: the bucket is private and a

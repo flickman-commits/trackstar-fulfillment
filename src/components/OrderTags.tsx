@@ -38,6 +38,7 @@ export interface TaggableOrder {
   researchStatus?: string | null
   researchSource?: string | null
   lookupOutcome?: string | null
+  lookupMatchedName?: string | null
   lookupVerified?: boolean | null
   trackstarOrderType?: string | null
   hasScraperAvailable?: boolean
@@ -162,7 +163,20 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   // "Customer typed" or "Customer edited" means print their numbers as given.
   // Research progress (needs research, not found, retry) is the Status
   // column's job, not a tag, so it is never said twice.
-  const lookupTrust = o.lookupOutcome ? TRUST_TAGS[o.lookupOutcome] : null
+  // A verified match where the customer changed only the name on the print
+  // arrives as "<outcome>_name_edited". The time, pace and bib are still the
+  // official ones, so it stays a green Verified tag, saying what changed and
+  // which name official results actually matched.
+  const nameEdited = !!o.lookupOutcome && o.lookupOutcome.endsWith('_name_edited')
+  const matchedName = o.lookupMatchedName ? `"${o.lookupMatchedName}"` : 'this runner'
+  let lookupTrust = nameEdited
+    ? { label: 'Verified', sublabel: 'name edited', tone: 'green' as const,
+        title: `Official results matched ${matchedName} and the customer approved it, then changed the name on the print. Time, pace and bib are the official ones. Print the name the customer gave.` }
+    : (o.lookupOutcome ? TRUST_TAGS[o.lookupOutcome] : null)
+  // Customer edited the numbers after also changing the name: say who matched.
+  if (lookupTrust && !nameEdited && o.lookupMatchedName) {
+    lookupTrust = { ...lookupTrust, title: `${lookupTrust.title} Official results matched ${matchedName}.` }
+  }
   if (o.researchSource === 'customer_verified') {
     tags.push({ key: 'trust', ...(lookupTrust?.tone === 'green' ? lookupTrust : { label: 'Verified', sublabel: 'by customer', tone: 'green' as const, title: 'The customer confirmed an official-results match before checkout.' }) })
   } else if (o.researchSource === 'customer_supplied') {

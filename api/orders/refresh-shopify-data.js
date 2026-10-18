@@ -96,6 +96,7 @@ async function refreshOrderFromShopify(shopifyOrderId) {
         customerEventType: lineItemData.customerEventType,
         lookupVerified: lineItemData.lookupVerified,
         lookupOutcome: lineItemData.lookupOutcome,
+        lookupMatchedName: lineItemData.lookupMatchedName,
         photoPath: lineItemData.photoPath,
         isGift: lineItemData.isGift
       }
@@ -192,6 +193,7 @@ function extractShopifyData(lineItems) {
     customerEventType: null,
     lookupVerified: null,
     lookupOutcome: null,
+    lookupMatchedName: null,
     photoPath: null,
     isGift: false,
     rawProductTitle: null,
@@ -266,6 +268,9 @@ function extractShopifyData(lineItems) {
       }
       else if (name === '_lookup_outcome' || name === 'lookup_outcome') {
         result.lookupOutcome = value || null
+      }
+      else if (name === '_matched_name') {
+        result.lookupMatchedName = value || null
       }
       else if (name === '_photo_path' || name === 'photo_path') {
         result.photoPath = value || null
