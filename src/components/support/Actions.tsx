@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Ban, BadgePercent, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Star, Truck, X } from 'lucide-react'
+import { Ban, BadgePercent, Repeat, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Star, Truck, X } from 'lucide-react'
 import { reviewAsk, reviewLinkFor } from '@/lib/reviewLinks'
 import { toast } from 'sonner'
 import { supportApi } from '@/lib/supportApi'
+import { useAuth } from '@/lib/auth'
 import type { Address, CodeLookup, CustomerOrder, Mockup, ThreadDetail } from '@/types/support'
 
 /**
@@ -207,11 +208,103 @@ function CancelForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
   )
 }
 
-function OrderActions({ o, thread, multiple, onInsert, onAttach, onChanged }: { o: CustomerOrder; thread: ThreadDetail; multiple: boolean; onInsert: (text: string) => void; onAttach: (m: Mockup) => void; onChanged: () => void }) {
+type ReorderPrep = { number: string; nextOrderId: string; items: { orderId: string; label: string; productLabel: string; designFrom: string | null; copyable: boolean }[] }
+
+/**
+ * A new Artelo order for this customer: the same print, their address and
+ * email, $0. For a reprint or a replacement. "Test only" makes an Artelo test
+ * order that is never produced, to try it first.
+ */
+function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: CustomerOrder; thread: ThreadDetail; isAdmin: boolean; onDone: () => void; onCancel: () => void }) {
+  const [prep, setPrep] = useState<ReorderPrep | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [picked, setPicked] = useState<string[]>([])
+  const [a, setA] = useState<Address>(o.shipTo || o.arteloAddress || { name: thread.customerName || '', address1: '', address2: '', city: '', province: '', zip: '', country: 'US', phone: '' })
+  const [email, setEmail] = useState(thread.customerEmail || '')
+  const [instructions, setInstructions] = useState('')
+  const [test, setTest] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<{ orderId: string; url: string | null; test: boolean } | null>(null)
+  useEffect(() => {
+    supportApi.arteloOrder<ReorderPrep>({ action: 'prep', id: thread.id, shopifyOrderId: o.shopifyOrderId })
+      .then(r => { setPrep(r); setPicked(r.items.filter(i => i.copyable).map(i => i.orderId)) })
+      .catch(e => setErr((e as Error).message))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (k: keyof Address) => (e: React.ChangeEvent<HTMLInputElement>) => setA({ ...a, [k]: e.target.value })
+  const create = async () => {
+    if (!confirming) { setConfirming(true); return }
+    setBusy(true)
+    try {
+      const out = await supportApi.arteloOrder<{ orderId: string; url: string | null; test: boolean }>({ action: 'create', id: thread.id, shopifyOrderId: o.shopifyOrderId, orderIds: picked, address: a, email, instructions, test })
+      setDone(out)
+      toast.success(`${out.test ? 'Test order' : 'Artelo order'} ${out.orderId} created`)
+      onDone()
+    } catch (e) { setErr((e as Error).message); toast.error((e as Error).message) }
+    finally { setBusy(false); setConfirming(false) }
+  }
+  if (done) {
+    return (
+      <div className={formBox}>
+        <div className="inline-flex items-center gap-1.5 text-emerald-700 font-medium"><Check className="w-3.5 h-3.5" />{done.test ? 'Test order' : 'Artelo order'} {done.orderId} created{done.test ? ' (not produced)' : ''}.</div>
+        <div className="flex items-center gap-3">
+          {done.url && <a href={done.url} target="_blank" rel="noopener noreferrer" className={linkCls}><img src="/artelo-icon.png" alt="" className="w-3.5 h-3.5 rounded-[3px]" />Open in Artelo</a>}
+          <button onClick={onCancel} className="ml-auto text-off-black/45 hover:text-off-black">Done</button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className={formBox}>
+      {!prep && !err && <div className="text-off-black/50 inline-flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" />Reading the order from Artelo</div>}
+      {prep && (
+        <>
+          <div className="text-off-black/70">New order <b>{prep.nextOrderId}</b> in Artelo, $0, the same print:</div>
+          {prep.items.map(i => (
+            <label key={i.orderId} className={`flex items-start gap-1.5 ${i.copyable ? 'cursor-pointer text-off-black/80' : 'text-off-black/40'}`} title={i.copyable ? `Design from ${i.designFrom}` : 'No design attached in Artelo and no approved render to copy. Build this one in Artelo.'}>
+              <input type="checkbox" disabled={!i.copyable} checked={picked.includes(i.orderId)} onChange={e => setPicked(p => e.target.checked ? [...p, i.orderId] : p.filter(x => x !== i.orderId))} className="mt-0.5 accent-[#4600D6]" />
+              <span>{i.label} <span className="text-off-black/45">· {i.productLabel}{i.copyable ? '' : ' · no design to copy'}</span></span>
+            </label>
+          ))}
+          <div className="pt-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Ship to</div>
+          <input className={field} value={a.name} onChange={set('name')} placeholder="Name" />
+          <input className={field} value={email} onChange={e => setEmail(e.target.value)} placeholder="Email (for Artelo's shipping notice)" />
+          <input className={field} value={a.address1} onChange={set('address1')} placeholder="Street" />
+          <input className={field} value={a.address2} onChange={set('address2')} placeholder="Apt, suite (optional)" />
+          <div className="grid grid-cols-[1fr_56px_72px] gap-1.5">
+            <input className={field} value={a.city} onChange={set('city')} placeholder="City" />
+            <input className={field} value={a.province} onChange={set('province')} placeholder="State" />
+            <input className={field} value={a.zip} onChange={set('zip')} placeholder="ZIP" />
+          </div>
+          <div className="grid grid-cols-[56px_1fr] gap-1.5">
+            <input className={field} value={a.country} onChange={set('country')} placeholder="US" />
+            <input className={field} value={a.phone} onChange={set('phone')} placeholder="Phone (needed outside the US)" />
+          </div>
+          <input className={field} value={instructions} onChange={e => setInstructions(e.target.value)} placeholder="Note for Artelo (optional), e.g. Replacement, frame arrived cracked" />
+          {isAdmin && (
+            <label className="flex items-center gap-1.5 cursor-pointer text-off-black/70" title="Artelo makes it with status Ignored: never printed, no charge">
+              <input type="checkbox" checked={test} onChange={e => setTest(e.target.checked)} className="accent-[#4600D6]" />Test only (Artelo won't produce it)
+            </label>
+          )}
+        </>
+      )}
+      {err && <div className="text-red-700">{err}</div>}
+      {confirming && <div className="text-red-700 font-medium">{test ? 'Create a test order in Artelo?' : `Send ${picked.length} print${picked.length === 1 ? '' : 's'} to production in Artelo? Artelo charges for it.`}</div>}
+      <div className="flex items-center gap-2 pt-0.5">
+        <span className="flex-1" />
+        <button onClick={() => (confirming ? setConfirming(false) : onCancel())} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">{confirming ? 'Back' : 'Cancel'}</button>
+        <button onClick={create} disabled={busy || !prep || !picked.length} className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded text-white disabled:opacity-50 ${confirming ? 'bg-[#4600D6] hover:bg-[#3a00b3]' : 'bg-dark-fill hover:bg-off-black/85'}`}>{busy && <Loader2 className="w-3 h-3 animate-spin" />}{confirming ? (test ? 'Yes, create test order' : 'Yes, create it') : 'Create Artelo order'}</button>
+      </div>
+    </div>
+  )
+}
+
+function OrderActions({ o, thread, multiple, isAdmin, onInsert, onAttach, onChanged }: { o: CustomerOrder; thread: ThreadDetail; multiple: boolean; isAdmin: boolean; onInsert: (text: string) => void; onAttach: (m: Mockup) => void; onChanged: () => void }) {
   const [picking, setPicking] = useState(false)
   const [money, setMoney] = useState<null | 'refund' | 'cancel'>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [editingAddress, setEditingAddress] = useState(false)
+  const [reordering, setReordering] = useState(false)
   const run = async (key: string, fn: () => Promise<string | void>) => {
     setBusy(key)
     try { const msg = await fn(); if (msg) toast.success(msg); onChanged() }
@@ -288,6 +381,10 @@ function OrderActions({ o, thread, multiple, onInsert, onAttach, onChanged }: { 
             run('note', async () => { await supportApi.action('orderNote', { id: thread.id, orderId: o.items[0].orderId, text }); return 'Note left on the order' })
           }}>Note for fulfillment</ActionLink>
         )}
+        {/* A reprint or replacement: the same print to this customer, built in Artelo from here. */}
+        {o.shopifyOrderId && o.items.length > 0 && (reordering
+          ? <ArteloOrderForm o={o} thread={thread} isAdmin={isAdmin} onDone={onChanged} onCancel={() => setReordering(false)} />
+          : <ActionLink icon={Repeat} onClick={() => setReordering(true)} title="The same print to this customer at $0: a reprint or a replacement">New Artelo order</ActionLink>)}
         {o.shopifyOrderId && o.financialStatus !== 'REFUNDED' && (money === 'refund'
           ? <RefundForm o={o} thread={thread} onDone={onChanged} onCancel={() => setMoney(null)} />
           : <ActionLink icon={Receipt} onClick={() => setMoney('refund')} title="All or part, to the card they paid with. Over $150 is Matt's call.">Refund</ActionLink>)}
@@ -333,6 +430,7 @@ function CodeCheck() {
 }
 
 export default function Actions({ thread, onInsert, onAttach, onChanged }: { thread: ThreadDetail; onInsert: (text: string) => void; onAttach: (m: Mockup) => void; onChanged: () => void }) {
+  const { isAdmin } = useAuth()
   const [busy, setBusy] = useState<string | null>(null)
   const first = (thread.customerName || '').trim().split(/\s+/)[0] || ''
   const run = async (key: string, fn: () => Promise<string | void>) => {
@@ -358,7 +456,7 @@ export default function Actions({ thread, onInsert, onAttach, onChanged }: { thr
   }
   return (
     <div className="space-y-4">
-      {orders.map(o => <OrderActions key={`${o.source}-${o.number}`} o={o} thread={thread} multiple={orders.length > 1} onInsert={onInsert} onAttach={onAttach} onChanged={onChanged} />)}
+      {orders.map(o => <OrderActions key={`${o.source}-${o.number}`} o={o} thread={thread} multiple={orders.length > 1} isAdmin={isAdmin} onInsert={onInsert} onAttach={onAttach} onChanged={onChanged} />)}
       <div>
         {orders.length > 1 && <div className={heading}>Customer</div>}
         <div className="flex flex-col items-stretch gap-1.5">

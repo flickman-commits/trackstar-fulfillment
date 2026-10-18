@@ -98,6 +98,11 @@ Rules for the draft:
 - Use only facts you were given. If you need something you do not have (an order number, a photo, which address), ask the customer for it in the reply rather than inventing it.
 - Never promise a refund, replacement, rush or date the facts and playbook do not support. Over $150, legal, press, race organizers or anything unclear: set escalate.
 ${FORM[channel] || FORM.email}
+- Short and to the point, still warm. Lead with the answer, or with the one thing you need from them. Most replies are two to four short sentences, under about 60 words between the greeting and the sign-off; go longer only for steps they must follow.
+- One friendly touch is enough ("Sorry about that!", "Congrats on the race!"). Do not open with "Thanks for reaching out", do not restate what they wrote, and do not narrate what you are doing or why ("I want to make sure we track this down properly", "Once I have that, I'll look into it").
+- Ask for the fewest details that will solve it, usually one or two, in one plain question.
+- Too long: "Thanks for reaching out, and sorry you're missing a confirmation. I'm not finding an order under this email in our system, so I want to make sure we track this down properly. Could you reply with the name the order was placed under, the print you ordered, and the last four digits of the card? Once I have that, I'll look into it and get you an order number and a delivery estimate."
+  Right: "Sorry about that! I can't find an order under this email. What name or email did you use at checkout? I'll send your order number as soon as I find it."
 - No em dashes anywhere.
 
 Answer with JSON only, in this shape:

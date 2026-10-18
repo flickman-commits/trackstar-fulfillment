@@ -67,6 +67,8 @@ export const supportApi = {
   macros: () => request<{ macros: Macro[] }>('/api/support/macros'),
   /** The quick actions beside a conversation (server/domain/support/actions.js). */
   action: <T = Record<string, unknown>,>(action: string, body: Record<string, unknown>) => post<T>('/api/support/actions', { action, ...body }),
+  // A new Artelo order (reprint or replacement): 'prep' then 'create'.
+  arteloOrder: <T = Record<string, unknown>,>(body: Record<string, unknown>) => post<T>('/api/support/artelo', body),
   saveMacro: (m: { id?: string; name: string; shortcut?: string; body: string }) => post<Macro>('/api/support/macros', { action: 'save', ...m }),
   deleteMacro: (id: string) => post<{ id: string }>('/api/support/macros', { action: 'delete', id }),
   useMacro: (id: string) => post<{ ok: boolean }>('/api/support/macros', { action: 'use', id }),
