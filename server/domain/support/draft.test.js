@@ -40,3 +40,10 @@ test('suggested actions: only for this customer\'s own orders, filled in, nothin
   assert.equal(out[1].type, 'discount')
   assert.equal(out[1].percent, 15)
 })
+
+test('drafts never name the Ironman brand to a customer', async () => {
+  const { noBrand } = await import('./draft.js')
+  assert.equal(noBrand('Yes! We have an Ironman print: https://www.trackstar.art/pages/triathlon'), 'Yes! We have a triathlon print: https://www.trackstar.art/pages/triathlon')
+  assert.equal(noBrand('Congrats on your IRONMAN 70.3!'), 'Congrats on your half-distance triathlon!')
+  assert.equal(noBrand('Your ironman finish'), 'Your triathlon finish')
+})

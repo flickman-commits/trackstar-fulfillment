@@ -44,6 +44,7 @@ Trackstar sells personalized race prints: an illustrated course map with the run
 - "NO TIME" after the name removes the time. A watch time instead of the official one goes in the Personalization field.
 - Half marathons: depends on the race; no half product photo on the site usually means no half design. They can DM @trackstar_art to check.
 - Custom prints: any race, any year. 3 to 5 design options within 2 weeks of the order, through a personal approval link; nothing prints until they approve. Rush is possible but ask Matt before promising. Page: trackstar.art/products/custom
+- Triathlon prints, full and half distance: https://www.trackstar.art/pages/triathlon. Customers often call their race an Ironman. Never write "Ironman", "IRONMAN" or "70.3" to a customer: it is a trademark we cannot use. Say "triathlon print" (or full-distance / half-distance triathlon) and send the triathlon page, not custom.
 - Hall of Fame: fastest marathon finishers who ordered get featured; top 5 (men or women) get a $50 gift card. Official results from November 2025 on.
 
 ## Shipping
@@ -69,7 +70,7 @@ Trackstar sells personalized race prints: an illustrated course map with the run
 2. Damaged print: ask for a photo, then a free replacement, no return needed.
 3. Broken frame in transit (most common): ask for TWO photos, the broken frame and the shipping label on the box. Do not promise a replacement until Artelo confirms the ticket.
 4. Wrong personalization: our error means remake under the Accuracy Guarantee. Their typo before production: fix it free. Their typo after production: offer a corrected print at 50% off.
-5. Race not available: point to custom prints (trackstar.art/products/custom) and say we are adding their race to the request list.
+5. Race not available: point to custom prints (trackstar.art/products/custom) and say we are adding their race to the request list. A triathlon is available: send the triathlon page.
 6. Refunds: damage or our error, offer a reprint first; refund if they insist. Never on a correct print. Over $150 is Matt's.
 7. Product questions: answer from the facts above, briefly.
 8. Custom order status: designs land 2 weeks after the order date (give the date). Proofs already sent: resend the approval link. Past due: apologize, give a new date, flag Matt.

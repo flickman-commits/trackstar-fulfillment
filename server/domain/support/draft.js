@@ -35,6 +35,18 @@ function supportModel() {
 }
 
 /** No em dashes in anything a customer sees. */
+/**
+ * Ironman is a trademark we cannot use with customers; our word is
+ * "triathlon". The playbook says so; this catches the slip in a draft.
+ */
+export function noBrand(s) {
+  return String(s || '')
+    .replace(/\ban\s+iron\s?man(?:\s*70\.3)?\b/gi, m => (m[0] === 'A' ? 'A triathlon' : 'a triathlon'))
+    .replace(/\biron\s?man\s*70\.3\b/gi, 'half-distance triathlon')
+    .replace(/\biron\s?man\b/gi, 'triathlon')
+    .replace(/\b70\.3\b/g, 'half-distance triathlon')
+}
+
 export function noEmDash(s) {
   return String(s || '').replace(/\s*—\s*/g, ', ').replace(/,\s*,/g, ',')
 }
@@ -248,7 +260,7 @@ export async function draftThread(threadId, { instruction = '', actor = null, dr
     purpose: 'support.draft',
   })
   const j = out.json || {}
-  const reply = noEmDash(String(j.reply || '').trim())
+  const reply = noBrand(noEmDash(String(j.reply || '').trim()))
   if (!reply) throw new Error('The model returned no reply. Try Redraft.')
 
   const data = {

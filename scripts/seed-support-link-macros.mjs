@@ -37,13 +37,15 @@ const LINKS = [
   ['Missoula Marathon', 'missoula', 'missoula'],
   ['Oakland Marathon', 'oakland', 'oakland'],
   ['Custom print (any race)', 'custom', 'custom'],
+  // A page, not a product. The name says Ironman so /ironman finds it; the link and the reply never do (trademark).
+  ['Triathlon page (Ironman, 70.3)', 'triathlon', '/pages/triathlon'],
 ]
 
 const apply = process.argv.includes('--apply')
 let added = 0
 for (const [race, shortcut, handle] of LINKS) {
   const name = `Link: ${race}`
-  const body = `${SHOP}/${handle}`
+  const body = handle.startsWith('/') ? `https://www.trackstar.art${handle}` : `${SHOP}/${handle}`
   const byName = await prisma.supportMacro.findFirst({ where: { name }, select: { id: true } })
   if (byName) { console.log(`skip   ${name} (already there)`); continue }
   const clash = await prisma.supportMacro.findFirst({ where: { shortcut }, select: { name: true } })
