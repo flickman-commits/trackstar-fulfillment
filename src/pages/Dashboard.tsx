@@ -1496,6 +1496,9 @@ export default function Dashboard() {
   markAsCompletedRef.current = markAsCompleted
   // A standard order's design is approved: the only time Mark as Completed shows for it.
   const standardDesignApproved = design.job?.status === 'done' && design.job.review === 'approved'
+  // No design from the script (none made, or the render failed): the print is
+  // made by hand, and completing it says so. Loading counts as "not yet known".
+  const standardNoDesign = Boolean(design.state) && (!design.job || design.job.status === 'failed')
   const standardDesignApprovedRef = useRef(false)
   standardDesignApprovedRef.current = standardDesignApproved
 
@@ -4864,16 +4867,6 @@ Thank you!`
                             {isResearching ? 'Researching…' : selectedOrder.researchStatus === 'found' ? 'Re-run research' : 'Research runner'}
                           </button>
                         )}
-                        {/* The script cannot make this print (a 10 miler, a size or race with no
-                            template): a person makes it by hand, then completes it here. Never
-                            offered while a design is on its way, so nothing completes by accident. */}
-                        {selectedOrder.status !== 'completed' && selectedOrder.status !== 'flagged' && !standardDesignApproved && !isEditing
-                          && selectedOrder.pipeline?.stage === 'action' && selectedOrder.pipeline?.kind === 'setup' && (
-                          <button onClick={() => { if (window.confirm(`Mark order ${selectedOrder.displayOrderNumber} complete? Only do this once the print was made by hand and attached in Artelo.`)) markAsCompleted(selectedOrder.orderNumber) }}
-                            className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2">
-                            <Check className="w-3.5 h-3.5" /> Made by hand, mark complete
-                          </button>
-                        )}
                         {selectedOrder.customerEmail && can('support') && !isEditing && (
                           <button onClick={() => setEmailingOrder(selectedOrder)} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2" title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}>
                             <Mail className="w-3.5 h-3.5" /> Email customer
@@ -5739,17 +5732,17 @@ Thank you!`
                      selectedOrder.status !== 'flagged' &&
                      // An approved design has its own Mark as complete beside Attach in Artelo.
                      !((selectedOrder.pipeline?.stage === 'attach' || (design.job?.status === 'done' && design.job.review === 'approved')) && selectedOrder.arteloUrl) &&
-                     // A standard print completes only once its design is approved, so nobody
-                     // completes an order that has no design yet. One the script cannot make
-                     // is completed from Actions ("Made by hand, mark complete").
-                     (selectedOrder.trackstarOrderType !== 'standard' || standardDesignApproved) &&
+                     // A standard print completes once its design is approved. With no design
+                     // from the script at all, it was made by hand, and the button says so.
+                     // While a design is rendering or waiting for review, there is no button.
+                     (selectedOrder.trackstarOrderType !== 'standard' || standardDesignApproved || standardNoDesign) &&
                      !isEditing && (
                       <button
                         onClick={() => markAsCompleted(selectedOrder.orderNumber)}
                         className={`flex-1 px-5 py-3 rounded-md hover:opacity-90 transition-opacity font-medium text-white ${selectedOrder.pipeline?.stage === 'attach' ? 'bg-[#4600D6]' : 'bg-dark-fill'}`}
                       >
-                        {selectedOrder.pipeline?.stage === 'attach' ? 'Attached in Artelo, mark done' : 'Mark as Completed'}
-                        <kbd className="ml-2 hidden md:inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">⌘↵</kbd>
+                        {selectedOrder.pipeline?.stage === 'attach' ? 'Attached in Artelo, mark done' : selectedOrder.trackstarOrderType === 'standard' && !standardDesignApproved ? 'Mark as Complete (Made by Hand)' : 'Mark as Completed'}
+                        {!(selectedOrder.trackstarOrderType === 'standard' && !standardDesignApproved) && <kbd className="ml-2 hidden md:inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">⌘↵</kbd>}
                       </button>
                     )}
                     {/* Re-open — only for already-completed orders. Sends the
