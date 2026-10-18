@@ -29,6 +29,7 @@ import EmailCustomerModal from '@/components/support/EmailCustomerModal'
 import OrderConversations from '@/components/support/OrderConversations'
 import PageHeader from '@/components/PageHeader'
 import ProofShowcase from '@/components/ProofShowcase'
+import PhotoCropper from '@/components/PhotoCropper'
 import Linkify from '@/components/Linkify'
 import type { Capability } from '@/lib/roles'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
@@ -1018,6 +1019,43 @@ export default function Dashboard() {
   // The script places the photo itself; an approved render of this photo is the confirmation.
   const photoByRender = !!(selectedOrder?.photoPath && design.job?.status === 'done' && design.job.spec.photoPath === selectedOrder.photoPath)
   const photoPlaced = !!selectedOrder?.photoPlacedAt || photoByRender
+  // Re-crop the customer's photo by hand and render the design again with it.
+  const [cropFile, setCropFile] = useState<File | null>(null)
+  const [cropBusy, setCropBusy] = useState(false)
+  const cropExport = useRef<(() => Promise<File>) | null>(null)
+  useEffect(() => { setCropFile(null) }, [selectedOrder?.id])
+  const openCrop = async () => {
+    if (!photoUrl) return
+    try {
+      const blob = await (await fetch(photoUrl)).blob()
+      setCropFile(new File([blob], 'customer-photo.' + (blob.type.split('/')[1] || 'jpg'), { type: blob.type || 'image/jpeg' }))
+    } catch { setToast({ message: 'Could not load the photo to crop', type: 'error' }) }
+  }
+  const cropAndRerender = async () => {
+    if (!selectedOrder || !cropExport.current) return
+    setCropBusy(true)
+    try {
+      const cropped = await cropExport.current()
+      const post = async (body: Record<string, unknown>) => {
+        const r = await apiFetch('/api/orders/photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(d.error || 'Request failed')
+        return d
+      }
+      const slot = await post({ action: 'upload-url', filename: cropped.name })
+      const put = await fetch(slot.uploadUrl, { method: 'PUT', headers: { 'Content-Type': cropped.type, 'x-upsert': 'false' }, body: cropped })
+      if (!put.ok) throw new Error('The cropped photo did not upload')
+      await post({ action: 'replace', orderId: selectedOrder.id, path: slot.path })
+      setSelectedOrder(prev => prev && prev.id === selectedOrder.id ? { ...prev, photoPath: slot.path, photoPlacedAt: null } : prev)
+      setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, photoPath: slot.path, photoPlacedAt: null } : o))
+      setCropFile(null)
+      if (design.canManage) await design.create()
+      setToast({ message: design.canManage ? 'Photo cropped. Re-rendering the design.' : 'Photo cropped.', type: 'success' })
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : 'Could not crop the photo', type: 'error' })
+    } finally { setCropBusy(false) }
+  }
+
   const photoCard = selectedOrder?.photoPath ? (
       <div
         className={`rounded-md border p-3 ${
@@ -1082,8 +1120,31 @@ export default function Dashboard() {
               <Download className="w-3 h-3" />
               Download
             </button>
+            {design.canManage && (
+              <button
+                type="button"
+                onClick={openCrop}
+                disabled={!photoUrl || cropBusy}
+                className="mt-1.5 w-20 inline-flex items-center justify-center text-center leading-tight text-[11px] font-semibold px-1 py-1.5 rounded border border-off-black/20 bg-white text-off-black hover:bg-subtle-gray disabled:opacity-40"
+              >
+                Crop &amp; re-render
+              </button>
+            )}
           </div>
         </div>
+        {cropFile && (
+          <div className="mt-3 pt-3 border-t border-black/10">
+            <PhotoCropper file={cropFile} exportRef={cropExport} className="max-w-[320px]" />
+            <div className="mt-2 flex items-center gap-2">
+              <button type="button" onClick={cropAndRerender} disabled={cropBusy}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-dark-fill text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50">
+                {cropBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Crop &amp; re-render
+              </button>
+              <button type="button" onClick={() => setCropFile(null)} disabled={cropBusy} className="text-xs text-off-black/55 hover:text-off-black">Cancel</button>
+            </div>
+            <p className="mt-1 text-[11px] text-off-black/50">The square is what prints. The cropped photo replaces this one, and a new design renders with it.</p>
+          </div>
+        )}
       </div>
     ) : null
 

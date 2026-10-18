@@ -20,7 +20,7 @@
 import crypto from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { requireAdminRole, recordAudit } from '../_lib/users.js'
+import { requireAdminRole, requireCapability, recordAudit } from '../_lib/users.js'
 import prisma from '../_lib/prisma.js'
 import { addVariantToOrder, PHOTO_ADDON_VARIANT_ID } from '../../server/services/shopifyOrderEdit.js'
 
@@ -31,12 +31,17 @@ export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
   const actor = requireAdmin(req, res)
   if (!actor) return
-  const admin = await requireAdminRole(req, res, actor)
-  if (!admin) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
+  // Re-cropping the photo already on a print (upload, then replace) is design
+  // work, open to anyone who renders designs. Adding a photo bills the
+  // customer, so attach stays with admins.
+  const admin = ['upload-url', 'replace'].includes(body.action)
+    ? await requireCapability(req, res, 'orders.render')
+    : await requireAdminRole(req, res, actor)
+  if (!admin) return
 
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
 
     if (body.action === 'upload-url') {
       let ext = String(body.filename || 'photo.jpg').split('.').pop().toLowerCase()
