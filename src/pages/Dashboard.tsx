@@ -4677,22 +4677,25 @@ Thank you!`
                   </div>
 
                   {(selectedOrder.shopifyAdminUrl || selectedOrder.arteloUrl || selectedOrder.resultsUrl) && (
-                    <div className="flex flex-col gap-2">
-                      {selectedOrder.shopifyAdminUrl && (
-                        <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Shopify">
-                          <img src="/shopify-icon.png" alt="" className="w-5 h-5" /> Open in Shopify <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
-                        </a>
-                      )}
-                      {selectedOrder.arteloUrl && (
-                        <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Artelo">
-                          <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> Open in Artelo <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
-                        </a>
-                      )}
-                      {selectedOrder.resultsUrl && (
-                        <a href={selectedOrder.resultsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="The runner's result on the timing site">
-                          <span className="w-5 h-5 inline-flex items-center justify-center text-base leading-none">🏁</span> View Results <ArrowUpRight className="w-4 h-4 ml-auto opacity-40" />
-                        </a>
-                      )}
+                    <div>
+                      <p className="text-[11px] font-semibold tracking-wide uppercase text-off-black/40 mb-1.5">Open in</p>
+                      <div className="flex gap-2">
+                        {selectedOrder.shopifyAdminUrl && (
+                          <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Shopify">
+                            <img src="/shopify-icon.png" alt="" className="w-4 h-4" /> Shopify <ArrowUpRight className="w-3.5 h-3.5 opacity-40" />
+                          </a>
+                        )}
+                        {selectedOrder.arteloUrl && (
+                          <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Artelo">
+                            <img src="/artelo-icon.png" alt="" className="w-4 h-4 rounded-[3px]" /> Artelo <ArrowUpRight className="w-3.5 h-3.5 opacity-40" />
+                          </a>
+                        )}
+                        {selectedOrder.resultsUrl && (
+                          <a href={selectedOrder.resultsUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="The runner's result on the timing site">
+                            <span className="text-sm leading-none">🏁</span> Results <ArrowUpRight className="w-3.5 h-3.5 opacity-40" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                   )}
 
