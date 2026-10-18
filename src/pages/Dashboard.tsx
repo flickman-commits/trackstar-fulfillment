@@ -4723,7 +4723,6 @@ Thank you!`
 
                   {(selectedOrder.shopifyAdminUrl || selectedOrder.etsyOrderUrl || selectedOrder.arteloUrl || selectedOrder.resultsUrl) && (
                     <div>
-                      <p className="text-[11px] font-semibold tracking-wide uppercase text-off-black/40 mb-1.5">Open in</p>
                       <div className="flex gap-2">
                         {selectedOrder.shopifyAdminUrl && (
                           <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Shopify">
