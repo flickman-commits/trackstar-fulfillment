@@ -48,8 +48,11 @@ export function useDesign(orderId: string | null, canManage: boolean) {
 
   useEffect(() => { setState(null); setErr(null); load() }, [load])
 
-  // While a render is in flight, ask again every few seconds.
-  const inFlight = state?.job && (state.job.status === 'queued' || state.job.status === 'rendering')
+  // While a render is in flight, or an approved print is still on its way to
+  // Drive and Artelo (that happens after Approve answers), ask again every few seconds.
+  const j = state?.job
+  const uploading = Boolean(j && j.review === 'approved' && ((!j.deliveredAt && !j.deliveryError) || (!j.arteloUploadedAt && !j.arteloError)))
+  const inFlight = j && (j.status === 'queued' || j.status === 'rendering' || uploading)
   useEffect(() => {
     if (!inFlight) return
     const t = setInterval(load, 4000)
@@ -74,6 +77,6 @@ export function useDesign(orderId: string | null, canManage: boolean) {
   const visible = Boolean(orderId && state && (canManage || job?.review === 'approved'))
   // Room is held for the design from the moment the order opens, so the layout does not jump when it loads.
   const reserved = Boolean(orderId && (canManage || job?.review === 'approved'))
-  return { state, job, busy, creating, err, create, review, reload: load, canManage, visible, reserved, offline: !state || state.workersOnline.length === 0 }
+  return { state, job, busy, creating, err, create, review, reload: load, uploading, canManage, visible, reserved, offline: !state || state.workersOnline.length === 0 }
 }
 

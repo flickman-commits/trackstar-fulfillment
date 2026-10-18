@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2, Sparkles, Download, Check, X, RefreshCw, ArrowUpRight } from 'lucide-react'
 import type { Design } from '@/lib/useDesign'
 import { btnPrimary, btnGhost, inputBase } from '@/lib/ui'
@@ -106,6 +106,26 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
   const job = d.job
   const [opened, setOpened] = useState(false)
   useEffect(() => { setOpened(job ? readOpened(job.id) : false) }, [job?.id])  // eslint-disable-line react-hooks/exhaustive-deps
+  // A approves, R starts a rejection, while a design waits for review. The card
+  // renders twice (phone bar and desktop), so only the one on screen listens,
+  // or one key press would act twice. Typing in a field never triggers them.
+  const approveRef = useRef<() => void>(() => {})
+  const reviewable = Boolean(d.visible && d.canManage && job?.status === 'done' && job.review === 'pending')
+  useEffect(() => {
+    if (!reviewable) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return
+      const t = e.target as HTMLElement | null
+      if (t && (['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable)) return
+      if (window.matchMedia('(min-width: 768px)').matches === compact) return
+      if (d.busy) return
+      const k = e.key.toLowerCase()
+      if (k === 'a') { e.preventDefault(); approveRef.current() }
+      else if (k === 'r') { e.preventDefault(); setRejecting(true) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [reviewable, compact, d.busy])
   // Approved, and the order is still open: attach the file in Artelo. Mark as
   // complete appears beside it only once Attach has been clicked, and Attach
   // stays, because a click is not proof the attaching got done.
@@ -147,14 +167,17 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
     if (ok && arteloOrderUrl && job) { tab.location.href = arteloOrderUrl; writeOpened(job.id); setOpened(true) }
     else tab.close()
   }
+  approveRef.current = approveAndOpen
   const approve = (
     <button key="a" onClick={approveAndOpen} disabled={d.busy} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors`}>
       {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} {compact ? 'Approve' : 'Approve & attach in Artelo'}
+      {!compact && <kbd className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">A</kbd>}
     </button>
   )
   const reject = (
     <button key="r" onClick={() => setRejecting(true)} disabled={d.busy} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-white border-2 border-red-200 text-red-700 font-semibold hover:bg-red-50 disabled:opacity-50 transition-colors`}>
       <X className="w-5 h-5" /> Reject
+      {!compact && <kbd className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded border border-red-200 text-[11px] font-medium opacity-70 font-sans">R</kbd>}
     </button>
   )
   // On a phone Approve is the wide button on the right, under the thumb.
@@ -244,6 +267,11 @@ export function DesignFileLinks({ d }: { d: Design }) {
   const job = d.job
   if (!d.visible || !job || job.status !== 'done' || job.review !== 'approved') return null
   const link = 'underline decoration-dotted underline-offset-2 hover:text-off-black'
+  // Just approved: the uploads run after the click and land within seconds.
+  const fresh = job.reviewedAt && Date.now() - new Date(job.reviewedAt).getTime() < 120000
+  if (fresh && (!job.deliveredAt || !job.arteloUploadedAt) && !job.deliveryError && !job.arteloError) {
+    return <p className="mt-1 text-[11px] text-off-black/50 inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Sending to the Orders folder and the Artelo library…</p>
+  }
   return (
     <p className="mt-1 text-[11px] text-off-black/50">
       This file is{' '}

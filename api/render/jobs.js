@@ -10,6 +10,7 @@
  * The rendering itself happens on a Mac with Illustrator (worker/), which
  * talks to api/render/worker.js.
  */
+import { waitUntil } from '@vercel/functions'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireCapability, recordAudit, loadActiveUser } from '../_lib/users.js'
 import { checkOrder, createJob, latestJob, signedFiles, reviewJob, onlineWorkers } from '../../server/domain/render/jobs.js'
@@ -17,6 +18,20 @@ import prisma from '../_lib/prisma.js'
 import { uploadApprovedToArtelo } from '../../server/domain/render/artelo.js'
 import { deliverApproved } from '../../server/domain/render/deliver.js'
 import { markRacePrinted } from '../../server/domain/races/verification.js'
+
+/** Copy an approved print to the Drive Orders folder, then upload it to the Artelo library. */
+async function deliverEverywhere(job) {
+  try {
+    let j = job.deliveredAt ? job : await deliverApproved(job)
+    if (!j.arteloUploadedAt) j = await uploadApprovedToArtelo(j)
+    return j
+  } catch (e) { console.error('[render/jobs] background delivery', job.id, e.message) }
+}
+
+/** Keep the function alive until the work is done (Vercel), without making the caller wait. */
+function inBackground(promise) {
+  try { waitUntil(promise) } catch { /* not on Vercel: the local server keeps running anyway */ }
+}
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -29,9 +44,12 @@ export default async function handler(req, res) {
       const orderId = String(req.query?.orderId || '')
       if (!orderId) return res.status(400).json({ error: 'orderId is required' })
       let [{ ok, reasons }, job, workers] = await Promise.all([checkOrder(orderId), latestJob(orderId), onlineWorkers()])
-      // An approved render that did not reach Drive (a hiccup at approval time) is retried on sight.
-      if (job && job.review === 'approved' && !job.deliveredAt) job = { ...job, ...(await deliverApproved(job)) }
-      if (job && job.review === 'approved' && !job.arteloUploadedAt) job = { ...job, ...(await uploadApprovedToArtelo(job)) }
+      // An approved render that did not reach Drive or Artelo is retried on
+      // sight, in the background so opening the order never waits on it. The
+      // first two minutes after an approval belong to that approval's own
+      // upload, so the two never send the same file twice.
+      const missing = job && job.review === 'approved' && (!job.deliveredAt || !job.arteloUploadedAt)
+      if (missing && (!job.reviewedAt || Date.now() - new Date(job.reviewedAt).getTime() > 120000)) inBackground(deliverEverywhere(job))
       const files = job ? await signedFiles(job) : { pdfUrl: null, previewUrl: null }
       return res.status(200).json({ eligible: ok, reasons, job: job ? present(job, files) : null, workersOnline: workers.map(w => w.name) })
     }
@@ -51,8 +69,10 @@ export default async function handler(req, res) {
       let job = await reviewJob({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, reviewerId: user.id })
       if (job.review === 'approved') {
         if (job.spec?.raceId) await markRacePrinted(job.spec.raceId)
-        job = await deliverApproved(job)
-        job = await uploadApprovedToArtelo(job)
+        // Drive and the Artelo library take several seconds; the person
+        // reviewing does not wait for them. They finish after the response, and
+        // a failure shows on the order and is retried by the import.
+        inBackground(deliverEverywhere(job))
         // The order is not done yet: the file still has to be attached to the
         // item in Artelo by hand (no API for that). The order moves to the
         // Attach stage and is completed from there. Other renders of the
