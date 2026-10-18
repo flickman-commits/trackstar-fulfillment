@@ -5005,7 +5005,6 @@ Thank you!`
                     </div>
                   )}
                   {/* The customer's Support conversations that are still going, linked over. */}
-                  {selectedOrder.trackstarOrderType === 'standard' && <OrderConversations orderId={selectedOrder.id} enabled={!!selectedOrder.customerEmail && can('support')} />}
                   </aside>
 
                   <div className="order-1 md:order-none md:col-start-1 md:row-start-1 min-w-0 flex flex-col gap-4">
@@ -5272,6 +5271,8 @@ Thank you!`
                         <p className="text-[13px] leading-snug text-red-800"><span className="font-semibold text-red-700 mr-1.5">{selectedOrder.pipeline.reason}.</span>{selectedOrder.pipeline.fix}</p>
                       </div>
                     )}
+                    {/* The customer's open Support conversations, above the design: many are a request to change it. */}
+                    <OrderConversations variant="alert" orderId={selectedOrder.id} enabled={!!selectedOrder.customerEmail && can('support')} />
                     {/* Missing year. The tag says it, this says what to do. */}
                     {selectedOrder.status === 'missing_year' && (
                       <div className="bg-amber-50 border border-amber-200 rounded-md p-4">

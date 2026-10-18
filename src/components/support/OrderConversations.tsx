@@ -10,7 +10,7 @@ import { chip } from '@/lib/ui'
  * conversations that are still going, each opening in Support. Shows
  * nothing when there are none, or for someone without Support.
  */
-export default function OrderConversations({ orderId, enabled }: { orderId: string; enabled: boolean }) {
+export default function OrderConversations({ orderId, enabled, variant = 'list' }: { orderId: string; enabled: boolean; variant?: 'list' | 'alert' }) {
   const [threads, setThreads] = useState<OrderConversation[]>([])
   useEffect(() => {
     if (!enabled) return
@@ -20,6 +20,34 @@ export default function OrderConversations({ orderId, enabled }: { orderId: stri
     return () => { live = false }
   }, [orderId, enabled])
   if (!enabled || threads.length === 0) return null
+  // Above the design, amber: a customer writing in is often asking to change
+  // something on the print, so it is seen before anyone approves.
+  if (variant === 'alert') {
+    return (
+      <div className="bg-amber-50 border border-amber-300 rounded-md p-3 space-y-2">
+        <div className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider inline-flex items-center gap-1.5">
+          <Inbox className="w-3.5 h-3.5" />The customer is talking to Support{threads.length > 1 ? ` · ${threads.length} conversations` : ''}
+        </div>
+        {threads.map(t => (
+          <div key={t.id} className="flex items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                {t.channel === 'instagram' && <Instagram className="w-3.5 h-3.5 shrink-0 text-amber-800/70" />}
+                <span className="text-sm font-semibold text-amber-950 truncate">{t.subject}</span>
+                <span className={`${chip} ${STATUS_TONE[t.status]} shrink-0`}>{t.snoozed ? 'Snoozed' : STATUS_LABEL[t.status]}</span>
+              </div>
+              {t.snippet && <p className="text-[13px] text-amber-900/80 line-clamp-2 mt-0.5">{t.snippet}</p>}
+              <div className="text-[11px] text-amber-800/60 mt-0.5">{t.assignee ? `${t.assignee} · ` : ''}{ago(t.lastMessageAt)}</div>
+            </div>
+            <a href={`/support?thread=${encodeURIComponent(t.id)}`} target="_blank" rel="noopener noreferrer"
+              className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700">
+              Open in Support <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        ))}
+      </div>
+    )
+  }
   return (
     <div className="pt-3">
       <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5 inline-flex items-center gap-1.5">
