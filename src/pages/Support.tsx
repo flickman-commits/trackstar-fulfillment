@@ -53,7 +53,7 @@ const POLL_MS = 20_000
 const SHORTCUTS: [string, string][] = [
   ['j / k', 'Next and previous conversation'], ['r', 'Reply'], ['n', 'Add a note'], ['m', 'Insert a macro'],
   ['a', 'Assign to yourself'], ['p', 'Toggle priority'], ['c', 'Close'], ['u', 'Mark unread'],
-  ['⌘↵', 'Send'], ['⌘⇧↵', 'Send and close'], ['Esc', 'Leave the composer'], ['?', 'This list'],
+  ['⌘↵', 'Send and close (just close, with nothing written)'], ['⌘⇧↵', 'Send, keep it open'], ['Esc', 'Leave the composer'], ['?', 'This list'],
 ]
 
 export default function Support() {
@@ -243,6 +243,12 @@ export default function Support() {
       const el = e.target as HTMLElement | null
       const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)
       if (typing) { if (e.key === 'Escape') (el as HTMLElement).blur(); return }
+      // ⌘↵ away from the composer closes the conversation that is open.
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        const open = threadRef.current
+        if (open && open.status !== 'closed') { e.preventDefault(); setStatusOf('closed') }
+        return
+      }
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const list = threadsRef.current
       const idx = list.findIndex(t => t.id === selectedRef.current)

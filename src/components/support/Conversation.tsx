@@ -350,18 +350,36 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   }
 
   // /shortcut: a slash at the start of a word in the reply offers the macros; Enter or Tab drops one in.
-  const slashMatches = useMemo(() => (slashQ === null ? [] : macroMatches(macros, slashQ)), [slashQ, macros])
+  // Built in, not saved: /tracking drops in the customer's newest tracking link, Artelo's first (one per order with tracking).
+  const builtins = useMemo<Macro[]>(() => {
+    const orders = thread.context?.orders || []
+    const withTracking = orders.map(o => {
+      const t = [...o.tracking].reverse().find(x => x.fromArtelo && x.url) || [...o.tracking].reverse().find(x => x.url) || null
+      return t ? { o, t } : null
+    }).filter((x): x is { o: (typeof orders)[number]; t: (typeof orders)[number]['tracking'][number] } => Boolean(x))
+    return withTracking.map(({ o, t }, i) => ({
+      id: `builtin:tracking:${o.number}`,
+      name: `Tracking link · #${o.number}${t.company ? ` · ${t.company}` : ''}${t.deliveredAt ? ' · delivered' : ''}`,
+      shortcut: i === 0 ? 'tracking' : `tracking-${o.number}`,
+      body: t.url || '',
+      uses: 0,
+      updatedAt: t.at || '',
+      createdBy: null,
+    } as Macro))
+  }, [thread.context])
+  const allMacros = useMemo(() => [...builtins, ...macros], [builtins, macros])
+  const slashMatches = useMemo(() => (slashQ === null ? [] : macroMatches(allMacros, slashQ)), [slashQ, allMacros])
   const onReplyChange = (v: string) => {
     setText(v)
     // A space may continue the query ("/marine corps"); it only stays open while something matches.
     const m = (replyRef.current?.lineBeforeCaret() || '').match(/(?:^|\s)\/([\w-]*(?: [\w-]*){0,2})$/)
     const q = m ? m[1] : null
-    setSlashQ(q !== null && q.includes(' ') && !macroMatches(macros, q).length ? null : q)
+    setSlashQ(q !== null && q.includes(' ') && !macroMatches(allMacros, q).length ? null : q)
     setSlashIdx(0)
   }
   const pickSlash = (m: Macro) => {
     placeInReply(fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName, channel: thread.channel }), true)
-    onUseMacro(m.id)
+    if (!m.id.startsWith('builtin:')) onUseMacro(m.id)
   }
 
   /** Run a suggested action from Claude's draft, the same call the Actions panel makes, then mark it done. */
@@ -497,7 +515,12 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
                     if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); pickSlash(slashMatches[slashIdx]); return }
                     if (e.key === 'Escape') { setSlashQ(null); return }
                   }
-                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); send(e.shiftKey) }
+                  // ⌘↵ sends and closes (most replies finish the conversation); ⌘⇧↵ sends and keeps it open. With nothing written, ⌘↵ just closes.
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault()
+                    if (wrote) send(!e.shiftKey)
+                    else if (!e.shiftKey && thread.status !== 'closed') onStatus('closed')
+                  }
                 }}
               />
               {slashQ !== null && slashMatches.length > 0 && (
@@ -544,7 +567,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
               {hasEmDash && <span className="text-[11px] text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" />No em dashes in anything a customer sees</span>}
               {ig && window?.open && window.mode === 'standard' && window.closesAt && <span className="text-[11px] text-off-black/45 inline-flex items-center gap-1" title="Instagram allows a reply within 24 hours of their last message"><Clock className="w-3 h-3" />Window closes {when(window.closesAt)}</span>}
               <span className="flex-1" />
-              <span className="text-[11px] text-off-black/40 hidden md:inline">⌘↵ send · ⌘⇧↵ send and close</span>
+              <span className="text-[11px] text-off-black/40 hidden md:inline">⌘↵ send and close · ⌘⇧↵ send</span>
               <button onClick={() => send(true)} disabled={!canSend} className={btnSecondary}>Send and close</button>
               <button onClick={() => send(false)} disabled={!canSend} className={btnPrimary}>
                 {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send
