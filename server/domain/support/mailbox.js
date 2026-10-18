@@ -383,11 +383,15 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
     attachments: parsed.attachments,
     sentAt: parsed.sentAt,
   }
-  const existed = parsed.forward ? await prisma.supportMessage.findUnique({ where: { gmailMessageId: parsed.gmailMessageId }, select: { id: true } }) : null
+  const existed = await prisma.supportMessage.findUnique({ where: { gmailMessageId: parsed.gmailMessageId }, select: { id: true, direction: true } })
+  // A forward already unwrapped into the customer's message stays unwrapped: a later read
+  // that sees only "our teammate's email" (code from before a forward format was understood,
+  // still running in a tab opened earlier) must not turn it back.
+  const keepForward = existed?.direction === 'in' && parsed.direction === 'out' && !parsed.forward && !parsed.labels?.includes('SENT') && isOurs(parsed.fromEmail, mb)
   const message = await prisma.supportMessage.upsert({
     where: { gmailMessageId: parsed.gmailMessageId },
     create: { ...row, gmailMessageId: parsed.gmailMessageId, sentById },
-    update: sentById ? { ...row, sentById } : row,
+    update: keepForward ? {} : sentById ? { ...row, sentById } : row,
   })
 
   if (parsed.forward && !existed) await noteForward(thread.id, parsed.forward)

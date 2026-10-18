@@ -66,3 +66,11 @@ test('Mail on the iPhone: the whole forward quoted with "> ", under a signature'
   assert.equal(out.message.sentAt.toISOString(), '2026-10-17T15:18:31.000Z')
   assert.equal(out.note, 'Help him with discount code please')
 })
+
+test('a forward with nothing typed above it: the signature is not a note', () => {
+  const bodyText = "<https://trackstar.art/>\t\nMatt Hickman\nOwner | Trackstar\n\n\n> Begin forwarded message:\n> \n> From: craig twigg <craigtwigg73@gmail.com>\n> Subject: Cancel order\n> Date: October 17, 2026 at 8:57:13 PM EDT\n> To: \"matt@trackstar.art\" <matt@trackstar.art>\n> \n> Please cancel the following order\n￼\n> \n> Craig M Twigg"
+  const out = unwrapForward({ ...base, subject: 'Fwd: Cancel order', bodyText }, { isOurs: ours })
+  assert.equal(out.note, '')
+  assert.equal(out.message.fromName, 'craig twigg')
+  assert.match(out.message.bodyText, /^Please cancel the following order/)
+})

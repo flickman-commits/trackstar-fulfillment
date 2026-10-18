@@ -79,7 +79,7 @@ export function findForwarded(text) {
   if (!from.email) return null
   return {
     // What the forwarder wrote, without their signature (a "--" line, or a bare <link> line as Apple Mail writes one).
-    note: src.slice(0, at).split(/\n\s*(?:--|<https?:\/\/[^>\s]+>)\s*\n/)[0].trim(),
+    note: src.slice(0, at).split(/(?:^|\n)\s*(?:--|<https?:\/\/[^>\s]+>)\s*(?:\n|$)/)[0].trim(),
     from,
     to: head.to || '',
     subject: (head.subject || '').trim(),
