@@ -140,10 +140,10 @@ export const CHIP_TIME_FIXTURES = [
     race: 'San Francisco Marathon',
     year: 2026,
     runner: 'Qiongfeng Pan',
-    expectedChipTime: '3:49:04',
+    expectedChipTime: '3:49:05',
     expectedChipPace: '8:44',
     expectedBib: '10776',
-    notes: 'UNEVEN SPLITS + large gun/chip gap: gun 3:54:03 vs chip 3:49:04 (299s apart). A gun-time regression fails here. Last split is the 24-mile mark, so a split-interval regression also fails.',
+    notes: 'UNEVEN SPLITS + large gun/chip gap: gun 3:54:04 vs chip 3:49:05 (page values, entry 79158318; was 3:49:04 while ChronoTrackScraper rounded ms to nearest instead of up like the page). A gun-time regression fails here. Last split is the 24-mile mark, so a split-interval regression also fails.',
   },
   {
     platform: 'chronotrack',
@@ -251,6 +251,41 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipPace: '8:31',
     expectedBib: '11732',
     notes: 'Detroit 2024 International Half-Marathon (half-only entrant, so it exercises the half fall-through). 6690s ÷ 13.1 = 8:30.7 → 8:31; pacing this against 26.2 would give ~4:15/mi, so it catches a wrong-distance regression. Also proves the half courseMap matches "International Half-Marathon" rather than a single brand name.',
+  },
+
+  // ── ChronoTrack (Detroit 2026) ────────────────────────────────────────
+  // 2026 moved from Athlinks to ChronoTrack (event 95042) via yearOverrides.
+  // Values read from the entry-result API behind
+  // sites.chronotrack.com/event/95042/results (Full Course interval).
+  {
+    platform: 'chronotrack',
+    race: 'Detroit Marathon',
+    year: 2026,
+    runner: 'Anna Smith',
+    expectedChipTime: '4:52:03',
+    expectedChipPace: '11:09',
+    expectedBib: '898',
+    notes: 'Detroit 2026 Marathon (race 252625). Entry page live.chronotrack.com/event/95042/results/entry/80968062: TIME (CHIP) 4:52:03, GUN TIME 5:16:03, page PACE 11:08 (page paces over 42.195 km = 26.219 mi; ours uses 26.2 like the Athlinks years, so do not change it to 11:08). UNEVEN SPLITS: 13.1 Mile 2:22:58, second half 2:29:05; 25 Miles 4:39:01 so the last 1.22 mi ran ~10:41/mi. 17523s / 26.2 = 668.8s = 11:09.',
+  },
+  {
+    platform: 'chronotrack',
+    race: 'Detroit Marathon',
+    year: 2026,
+    runner: 'Asia Smith',
+    expectedChipTime: '3:12:02',
+    expectedChipPace: '14:40',
+    expectedBib: '15618',
+    notes: 'Detroit 2026 International Half-Marathon (race 252628). Entry page .../entry/80981330: TIME (CHIP) 3:12:02, GUN TIME 3:42:36, page PACE 14:39 (over 13.11 mi). 11522s / 13.1 = 879.5s = 14:40 (14:39.54 rounds up); paced against 26.2 it would read ~7:20, so a wrong-distance regression fails.',
+  },
+  {
+    platform: 'chronotrack',
+    race: 'Detroit Marathon',
+    year: 2026,
+    runner: 'Aaron Garcia',
+    expectedChipTime: '2:06:22',
+    expectedChipPace: '9:39',
+    expectedBib: '31080',
+    notes: 'Detroit 2026 Motor City Half-Marathon (race 252629), proves the second half is whitelisted. Entry page .../entry/80991500: TIME (CHIP) 2:06:22, GUN TIME 2:07:03, page PACE 9:38 (over 13.11 mi). 7582s / 13.1 = 578.8s = 9:39.',
   },
 
   // ── MyChipTime (Dallas) ───────────────────────────────────────────────

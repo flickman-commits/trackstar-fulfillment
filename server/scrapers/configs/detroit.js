@@ -15,7 +15,23 @@
  * "Motor City Half-Marathon" (2024-25), "U.S.-Only Half-Marathon" (2022-23) —
  * so the half pattern matches on the suffix rather than any one brand name.
  *
- * Verified finisher: see chip-time-fixtures.js (Detroit 2024).
+ * 2026 MOVED TO CHRONOTRACK. Results: sites.chronotrack.com/event/95042/results
+ * (same data as live.chronotrack.com/event/95042, read from the reignite API by
+ * ChronoTrackScraper). `yearOverrides[2026]` below swaps platform for that one
+ * year only; 2022-2025 still go through Athlinks exactly as before.
+ *
+ * ChronoTrack race ids for event 95042 were read off each race's own
+ * `race.name` in the entry-result API (one entry per azpEventCourseId):
+ *   252625 Marathon                    -> marathon
+ *   252628 International Half-Marathon -> half
+ *   252629 Motor City Half-Marathon    -> half
+ *   excluded: 252627 Marathon Relay (MEMBER entries), 252630 5K, 252631 1 Mile,
+ *             252632 Kids Marathon, 252633 DNF Designated Race
+ * They are whitelisted with `courseIds`, because the event-wide name search
+ * returns every race and the 5K / mile / kids / DNF rows are all IND entries
+ * with a full-course time. Ids are per year; look them up again for 2027.
+ *
+ * Verified finishers: see chip-time-fixtures.js (Detroit 2024, Detroit 2026).
  */
 export default {
   platform: 'athlinks',
@@ -72,6 +88,21 @@ export default {
     2023: 'detroitnews.com race report dated 2023-10-15 (Mitch Klingler wins) + enmotive.com 2023 results hub',
     2024: 'wxyz.com "2024 Detroit Free Press Marathon set for October 20th" + marathonview.net/race/137370',
     2025: 'cbsnews.com/detroit 2025 winners story + Oakland Press/AOL naming the 48th annual on Sunday, Oct. 19, 2025',
-    2026: 'marathonguide.com 2026 details page, marathon Sunday October 18 2026 7 a.m. + freepmarathon.com (weekend Oct 16-18; the full is the Sunday)',
+    2026: 'ChronoTrack event 95042 race 252625 "Marathon" plannedStartTime 1792321200 = Sun 2026-10-18 07:00 EDT + marathonguide.com 2026 details page, marathon Sunday October 18 2026 7 a.m. + freepmarathon.com (weekend Oct 16-18; the full is the Sunday)',
+  },
+  /**
+   * 2026 only: ChronoTrack. Shallow-merged over this config by the factory
+   * (createScraper in server/scrapers/index.js), so these keys replace the
+   * Athlinks ones for 2026 and nothing else. Pace = chip time ÷
+   * distances[matched key] (26.2 / 13.1), same convention as the Athlinks years.
+   */
+  yearOverrides: {
+    2026: {
+      platform: 'chronotrack',
+      eventIds: { 2026: 95042 },
+      courseIds: {
+        2026: { marathon: [252625], half: [252628, 252629] },
+      },
+    },
   },
 }

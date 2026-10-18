@@ -72,12 +72,27 @@ export class ChronoTrackScraper extends BaseScraper {
    * @param {number} config.eventIds[year] - ChronoTrack event id (URL: /event/{id}/results)
    * @param {Object} [config.raceIds] - optional distanceKey -> ChronoTrack raceId,
    *        used only to label the event type; distance itself comes from the API.
+   * @param {Object} [config.courseIds] - optional { [year]: { distKey: [raceId, ...] } }.
+   *        When set for this year, ONLY entries in those races are considered,
+   *        and pace uses config.distances[distKey]. An event's search covers
+   *        every race in it (5K, mile, kids races, a "DNF Designated Race"),
+   *        all as IND entries with a `full` interval, so without this a 5K
+   *        finisher who shares a customer's name would come back as their time.
    */
   constructor(year, config) {
     super(config.raceName, year)
     this.config = config
     this.tag = config.tag || config.raceName
     this.eventId = config.eventIds?.[year] || null
+    // raceId -> distKey, for events where we whitelist races (see courseIds).
+    this.courseKeyById = null
+    const byKey = config.courseIds?.[year]
+    if (byKey) {
+      this.courseKeyById = new Map()
+      for (const [key, ids] of Object.entries(byKey)) {
+        for (const id of ids) this.courseKeyById.set(Number(id), key)
+      }
+    }
   }
 
   async getRaceInfo() {
@@ -111,10 +126,15 @@ export class ChronoTrackScraper extends BaseScraper {
     }
   }
 
-  /** ms -> "h:mm:ss" */
+  /**
+   * ms -> "h:mm:ss", rounding UP any fraction of a second. That is what the
+   * ChronoTrack results page prints (and the USATF convention): Detroit 2026
+   * 17522150ms shows as 4:52:03, SF 2026 13744360ms as 3:49:05. Rounding to
+   * nearest returned 4:52:02 / 3:49:04, a second off the official page.
+   */
   _formatMillis(ms) {
     if (typeof ms !== 'number' || ms <= 0) return null
-    const total = Math.round(ms / 1000)
+    const total = Math.ceil(ms / 1000)
     const h = Math.floor(total / 3600)
     const m = Math.floor((total % 3600) / 60)
     const s = total % 60
@@ -166,7 +186,10 @@ export class ChronoTrackScraper extends BaseScraper {
 
     // Only individual entries — relay/team rows have their own entry type and
     // no personal finish time.
-    const individuals = entries.filter(e => !e.entryType || e.entryType === 'IND')
+    let individuals = entries.filter(e => !e.entryType || e.entryType === 'IND')
+    if (this.courseKeyById) {
+      individuals = individuals.filter(e => this.courseKeyById.has(Number(e.azpEventCourseId)))
+    }
     const matches = this.filterNameMatches(runnerName, individuals, e => e.displayName || '')
     console.log(`[${this.tag}] ${matches.length} name match(es)`)
 
@@ -278,7 +301,17 @@ export class ChronoTrackScraper extends BaseScraper {
     // paced against 26.2. Read `meters` — do NOT be tempted by the sibling
     // `units: "mi"`, which is a display hint; the value really is metres.
     const meters = course.distance?.meters || null
-    const distanceMiles = meters ? meters / METERS_PER_MILE : (this.config.distanceMiles || 26.2)
+    let distanceMiles = meters ? meters / METERS_PER_MILE : (this.config.distanceMiles || 26.2)
+    let eventType = this._labelForMeters(meters)
+
+    // Whitelisted race: the matched distance key decides distance and label.
+    const raceId = Number(res.data?.race?.id || entry.azpEventCourseId)
+    if (this.courseKeyById) {
+      const key = this.courseKeyById.get(raceId)
+      if (!key) return null
+      distanceMiles = this.config.distances?.[key] || distanceMiles
+      eventType = this.config.eventLabels?.[key] || eventType
+    }
 
     return {
       name: res.data?.displayName || entry.displayName,
@@ -289,7 +322,7 @@ export class ChronoTrackScraper extends BaseScraper {
       distanceMiles,
       // Label from the distance, not the race's marketing name ("CHINA
       // AIRLINES BRIDGE HALF MARATHON" is not what we print on a poster).
-      eventType: this._labelForMeters(meters),
+      eventType,
       resultsUrl: this._resultsUrl(res.data?.race?.id || entry.azpEventCourseId),
     }
   }
