@@ -73,6 +73,13 @@ import stGeorgeConfig from './configs/stGeorge.js'
 import portlandConfig from './configs/portland.js'
 import missoulaConfig from './configs/missoula.js'
 import newportConfig from './configs/newport.js'
+import honoluluConfig from './configs/honolulu.js'
+import bayshoreConfig from './configs/bayshore.js'
+import sanAntonioConfig from './configs/sanAntonio.js'
+import bigSurConfig from './configs/bigSur.js'
+import annArborConfig from './configs/annArbor.js'
+import charlotteConfig from './configs/charlotte.js'
+import atlanticCityConfig from './configs/atlanticCity.js'
 import { normalizeRaceName } from './raceNameNormalization.js'
 import { applyOverride } from './scraperOverrides.js'
 
@@ -152,6 +159,13 @@ const ALL_CONFIGS = [
   portlandConfig,
   missoulaConfig,
   newportConfig,
+  honoluluConfig,
+  bayshoreConfig,
+  sanAntonioConfig,
+  bigSurConfig,
+  annArborConfig,
+  charlotteConfig,
+  atlanticCityConfig,
 ]
 
 /**

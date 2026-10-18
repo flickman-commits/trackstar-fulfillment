@@ -463,7 +463,77 @@ export const CHIP_TIME_FIXTURES = [
   // (Buffalo — add when verified)
 
   // ── RTRT ──────────────────────────────────────────────────────────────
-  // (Marine Corps, Jersey City — add when verified)
+  // (Jersey City — add when verified)
+  {
+    platform: 'rtrt',
+    race: 'Marine Corps Marathon',
+    year: 2025,
+    runner: 'Jake Deyton',
+    expectedChipTime: '3:44:30',
+    expectedChipPace: '8:34',
+    expectedBib: '6935',
+    notes: "MCM 2025 (RTRT MCM-2025, pid RNVFH3K9, registered as Jacob Deyton) - searched as 'Jake' to exercise the surname fallback + nickname match. Positive split: 21K 1:40:57 (7:43/mi) then 7:44->8:34 avg as he slowed past 30K. FINISH-M netTime 03:44:30.055 (chip), page avg pace 08:34 min/mile = 3:44:30/26.2. Started 7:21:26 vs gun 7:15:00, so gun ~3:50:56. https://track.rtrt.me/e/MCM-2025#/tracker/RNVFH3K9",
+  },
+  {
+    platform: 'rtrt',
+    race: 'Marine Corps Marathon',
+    year: 2023,
+    runner: 'Timothy Goodsell',
+    expectedChipTime: '4:16:48',
+    expectedChipPace: '9:48',
+    expectedBib: '5057',
+    notes: 'MCM 2023 (RTRT MCM-2023, pid RJCTL3GA, registered as Tim Goodsell) - full name is no_results on RTRT, surname fallback + nickname table finds him. Big positive split: HALF 1:46:44 (8:09/mi), second half ~2:30. FINISH netTime 04:16:48.42 (chip), page avg pace 09:48 min/mile = 4:16:48/26.2. Started 7:59:08 vs gun 7:15:00, so gun ~5:00:56. https://track.rtrt.me/e/MCM-2023#/tracker/RJCTL3GA',
+  },
+  {
+    platform: 'athlinks',
+    race: 'Marine Corps Marathon',
+    year: 2019,
+    runner: 'Lisa Quinones',
+    expectedChipTime: '6:34:33',
+    expectedChipPace: '15:04',
+    expectedBib: '16289',
+    notes: 'MCM 2019 on Athlinks (race 668089, master 3281) via yearOverrides; RTRT has no MCM-2019. Single chip-ranked time 6:34:33 (bracketRankType CHIP); Athlinks prints no gun time and no splits, so no uneven-splits check is possible for this year. Page paceString 15:03 is truncated; 6:34:33/26.2 = 15:03.6 -> 15:04 computed. https://www.athlinks.com/event/3281/results/Event/668089',
+  },
+  {
+    platform: 'rtrt',
+    race: 'Illinois Marathon',
+    year: 2025,
+    runner: 'Rachel Smith',
+    expectedChipTime: '5:11:34',
+    expectedChipPace: '11:53',
+    expectedBib: '766',
+    notes: 'Illinois 2025 Marathon (RTRT IL-2025, pid RY6E9C4A). Heavy positive split: 21K 2:22:44 (10:57/mi), 22MI 4:19:41. FINISH-MAR netTime 05:11:33.831 (chip) rounds to 5:11:34; waveTime (gun) 05:17:41.346. Page avg pace 11:53 = chip/26.2. https://track.rtrt.me/e/IL-2025#/tracker/RY6E9C4A',
+  },
+  {
+    platform: 'rtrt',
+    race: 'Illinois Marathon',
+    year: 2025,
+    runner: 'Amber Smith',
+    expectedChipTime: '2:40:34',
+    expectedChipPace: '12:15',
+    expectedBib: '4357',
+    notes: 'Illinois 2025 Half (RTRT IL-2025, pid RKW4Y3B7) - pace against 13.1. Slowed from 11:01/mi at 1MI to 12:17 at 20K. FINISH-HM netTime 02:40:34.284 (chip), waveTime (gun) 02:51:44.488. Page avg pace 12:15. https://track.rtrt.me/e/IL-2025#/tracker/RKW4Y3B7',
+  },
+  {
+    platform: 'rtrt',
+    race: 'Illinois Marathon',
+    year: 2026,
+    runner: 'Michelle Smith',
+    expectedChipTime: '4:27:49',
+    expectedChipPace: '10:13',
+    expectedBib: '375',
+    notes: 'Illinois 2026 Marathon (RTRT IL-2026, pid RW3NCUJM). Positive split: 21K 2:11:29, second half ~2:16:19; avg pace drifts 9:52 -> 10:14. FINISH-MAR netTime 04:27:48.543 (chip) rounds to 4:27:49; waveTime (gun) 04:36:03.79. Page avg pace 10:13 = chip/26.2. https://track.rtrt.me/e/IL-2026#/tracker/RW3NCUJM',
+  },
+  {
+    platform: 'rtrt',
+    race: 'Illinois Marathon',
+    year: 2026,
+    runner: 'Greg Smith',
+    expectedChipTime: '1:37:30',
+    expectedChipPace: '7:27',
+    expectedBib: '3002',
+    notes: 'Illinois 2026 Half (RTRT IL-2026, pid RHRS68KD) - pace against 13.1. FINISH-HM netTime 01:37:29.685 (chip) rounds to 1:37:30; waveTime (gun) 01:39:43.679. Page avg pace 07:27. https://track.rtrt.me/e/IL-2026#/tracker/RHRS68KD',
+  },
 
   // ── RunSignUp ─────────────────────────────────────────────────────────
   // Note: Eugene moved off RunSignUp to Brooksee in 2026.
@@ -519,4 +589,202 @@ export const CHIP_TIME_FIXTURES = [
 
   // ── MyRaceAi ──────────────────────────────────────────────────────────
   // (Twin Cities, Mesa — add when verified)
+
+  // ── Honolulu / Philadelphia 2021-23 / LA 2021-22 backfill ─────────────
+  {
+    platform: 'athlinks',
+    race: 'Honolulu Marathon',
+    year: 2024,
+    runner: 'Maxwell Garcia',
+    expectedChipTime: '3:14:56',
+    expectedChipPace: '7:26',
+    expectedBib: '1136',
+    notes: 'Honolulu 2024 Marathon (Athlinks event 1098986, course "Marathon"). 11696s ÷ 26.2 = 7:26.4; Athlinks prints 07:26. Single time published (Athlinks ranks as CHIP); no gun time to compare. https://www.athlinks.com/event/3321/results/Event/1098986/Results',
+  },
+  {
+    platform: 'athlinks',
+    race: 'Honolulu Marathon',
+    year: 2025,
+    runner: 'Fabian Garcia',
+    expectedChipTime: '3:56:06',
+    expectedChipPace: '9:01',
+    expectedBib: '13061',
+    notes: 'Honolulu 2025 Marathon (Athlinks event 1132344). 14166s ÷ 26.2 = 9:00.7 → 9:01; Athlinks prints 09:00 because it paces against 26.2188 mi. Do not "fix" to 9:00.',
+  },
+  {
+    platform: 'athlinks',
+    race: 'Honolulu Marathon',
+    year: 2023,
+    runner: 'Takeshi Nakamura',
+    expectedChipTime: '4:28:12',
+    expectedChipPace: '10:14',
+    expectedBib: '1600',
+    notes: 'Honolulu 2023 (Athlinks event 1068315, course named "Honolulu Marathon", not "Marathon") - proves the anchored courseMap takes the renamed course. 16092s ÷ 26.2 = 10:14.2; Athlinks prints 10:14.',
+  },
+  {
+    platform: 'athlinks',
+    race: 'Philadelphia Marathon',
+    year: 2021,
+    runner: 'Agustin Garcia',
+    expectedChipTime: '3:35:23',
+    expectedChipPace: '8:13',
+    expectedBib: '6902',
+    notes: 'Philadelphia 2021 via yearOverrides -> Athlinks event 996156, course "Marathon  Runner" (double space). 12923s ÷ 26.2 = 8:13.2; Athlinks prints 08:13. Athlinks Philly = chip (2024 cross-check vs MyChipTime: bib 559 chip 2:47:25, gun 2:47:39).',
+  },
+  {
+    platform: 'xacte',
+    race: 'LA Marathon',
+    year: 2021,
+    runner: 'Andres Gonzalez',
+    expectedChipTime: '5:11:04',
+    expectedChipPace: '11:52',
+    expectedBib: '12490',
+    notes: 'LA 2021 (Nov 7) Xacte event 2410, subevent 5985. chiptime 5:11:04 vs clocktime 5:18:22 - a gun-time regression fails this. 18664s ÷ 26.2 = 11:52.4.',
+  },
+  {
+    platform: 'xacte',
+    race: 'LA Marathon',
+    year: 2022,
+    runner: 'Dennis Smith',
+    expectedChipTime: '3:18:29',
+    expectedChipPace: '15:08',
+    expectedBib: '90278',
+    notes: 'LA 2022 Charity Challenge (Xacte 2426, subevent 6043, finish split 69218 ft = 13.11 mi). chip 3:18:29, clock 3:18:37. Paced against 21097 m (13.109 mi): 11909s -> 15:08.5. Pacing against 26.2 would give 7:35, so a wrong-distance regression fails.',
+  },
+  // ── RunSignUp (Bayshore) ─────────────────────────────────────────────
+  // Both picked for a clear positive split AND gun != chip, from the 2023
+  // result sets (the year with an open order).
+  {
+    platform: 'runsignup',
+    race: 'Bayshore Marathon',
+    year: 2023,
+    runner: 'Ryan Stock',
+    expectedChipTime: '4:34:30',
+    expectedChipPace: '10:29',
+    expectedBib: '7329',
+    notes: 'Bayshore 2023 Marathon (event 659741, result set 378142). Chip 4:34:30.4, clock (gun) 4:35:51.4. Positive split: 13.1 mi split 1:57:35.7 (8:59/mi) then 11:59/mi for the second half. 16470s ÷ 26.2 = 628.6 → 10:29; RunSignUp page pace 10:29. https://runsignup.com/Race/Results/26384',
+  },
+  {
+    platform: 'runsignup',
+    race: 'Bayshore Marathon',
+    year: 2023,
+    runner: 'Alex Knue',
+    expectedChipTime: '2:20:08',
+    expectedChipPace: '10:42',
+    expectedBib: '2536',
+    notes: 'Bayshore 2023 Half Marathon (event 659742, result set 378140) - verifies pace uses 13.1. Chip 2:20:08.1, clock (gun) 2:23:15.9. Positive split: 6 mi in 59:19.4 (9:53/mi), 11:23/mi after. 8408s ÷ 13.1 = 641.8 → 10:42; page pace 10:42 (26.2 would give 5:21).',
+  },
+
+  // ── Brooksee / Laurel (San Antonio) ──────────────────────────────────
+  // This scraper returns the page pace column, so the marathon runner is a
+  // positive splitter whose final interval pace (9:42) is far from the overall.
+  {
+    platform: 'brooksee',
+    race: 'San Antonio Marathon',
+    year: 2025,
+    runner: 'Charles Garcia',
+    expectedChipTime: '4:38:46',
+    expectedChipPace: '10:38',
+    expectedBib: '6278',
+    notes: 'San Antonio 2025 Marathon (race 167812). Chip 4:38:46, gun 4:50:59. Positive split: 10:08/mi through mile 13, ~11:09/mi after, final 0.2 interval 9:42/mi. 16726s ÷ 26.2 = 638.4 → 10:38; page overall pace 10:38. https://results.laurelt.com/sat/results?pk=8457335',
+  },
+  {
+    platform: 'brooksee',
+    race: 'San Antonio Marathon',
+    year: 2025,
+    runner: 'Lesly Martinez',
+    expectedChipTime: '1:50:07',
+    expectedChipPace: '8:24',
+    expectedBib: '14672',
+    notes: 'San Antonio 2025 Half Marathon - verifies the half distance. Chip 1:50:07, gun 2:09:20 (19 min gap). 6607s ÷ 13.1 = 504.4 → 8:24; page pace 8:24. https://results.laurelt.com/sat/results?pk=8510373',
+  },
+
+  // ── SVE Timing (Big Sur) ─────────────────────────────────────────────
+  // SVE has no per-athlete splits; pace is computed. Picked for a wide
+  // gun/chip gap so reading the adjacent Gun Elapsed column fails.
+  {
+    platform: 'svetiming',
+    race: 'Big Sur Marathon',
+    year: 2026,
+    runner: 'Ayla Johnson',
+    expectedChipTime: '05:02:27',
+    expectedChipPace: '11:33',
+    expectedBib: '2897',
+    notes: 'Big Sur 2026 MARATHON division. Gun 05:08:33 vs chip 05:02:27 (366s apart). 18147s ÷ 26.2 = 692.6 → 11:33. Division must match /^MARATHON$/ and not 21 MILER / 11 MILER. https://results.svetiming.com/Big-Sur/events/2026/Big-Sur-International-Marathon/results',
+  },
+  // ── Ann Arbor (Athlinks, RunSignUp fallback) ─────────────────────────
+  {
+    platform: 'athlinks',
+    race: 'Ann Arbor Marathon',
+    year: 2024,
+    runner: 'Jessica Johnson',
+    expectedChipTime: '5:05:06',
+    expectedChipPace: '11:39',
+    expectedBib: '2884',
+    notes: 'Ann Arbor 2024 Marathon. RunSignUp (race 29595, set 497802) chip 5:05:06.6, clock 5:06:22.9. Positive split: 13.1 mi 2:30:09 (11:28/mi), 2nd half 2:34:57 (11:50/mi). 18306s / 26.2 = 698.7 -> 11:39. Athlinks event 1093788 shows 5:05:06.',
+  },
+  {
+    platform: 'athlinks',
+    race: 'Ann Arbor Marathon',
+    year: 2025,
+    runner: 'Elizabeth Smith',
+    expectedChipTime: '5:26:10',
+    expectedChipPace: '12:27',
+    expectedBib: '3955',
+    notes: 'Ann Arbor 2025 Marathon. RaceResult 365741 ChipTime 05:26:10, GunTime 05:38:01, page pace 12:26 (truncated). 19570s / 26.2 = 746.9 -> 12:27. Athlinks event 1125452 shows 5:26:10.',
+  },
+  {
+    platform: 'athlinks',
+    race: 'Ann Arbor Marathon',
+    year: 2025,
+    runner: 'Lucas Miller',
+    expectedChipTime: '1:55:33',
+    expectedChipPace: '8:49',
+    expectedBib: '1761',
+    notes: 'Ann Arbor 2025 Half Marathon - verifies the half distance. RunSignUp set 658537 chip 1:55:33, clock 2:04:20, page pace 8:49. 6933s / 13.1 = 529.2 -> 8:49. Athlinks event 1125452 shows 1:55:33.',
+  },
+
+  // ── Charlotte (RaceRoster, Athlinks fallback) ────────────────────────
+  {
+    platform: 'raceroster',
+    race: 'Charlotte Marathon',
+    year: 2025,
+    runner: 'Sam Johnson',
+    expectedChipTime: '4:59:37',
+    expectedChipPace: '11:26',
+    expectedBib: '2310',
+    notes: 'Charlotte 2025 Marathon (RaceRoster 3vgp2qeac5c9rhab, sub-event 248066). Chip 4:59:37.1, gun 5:06:55.2, page overall pace 11:26. Positive split: cumulative pace 9:41 at first split, 10:16 at 4th, 11:01 at last. 17977s / 26.2 = 686.2 -> 11:26.',
+  },
+  {
+    platform: 'raceroster',
+    race: 'Charlotte Marathon',
+    year: 2025,
+    runner: 'Erin Johnson',
+    expectedChipTime: '2:37:42',
+    expectedChipPace: '12:02',
+    expectedBib: '7055',
+    notes: 'Charlotte 2025 Half Marathon (sub-event 248067) - verifies the half distance. Chip 2:37:42.2, gun 2:43:54.7, page pace 12:02. 9462s / 13.1 = 722.3 -> 12:02.',
+  },
+
+  // ── Atlantic City (Athlinks, RunSignUp fallback) ─────────────────────
+  {
+    platform: 'athlinks',
+    race: 'Atlantic City Marathon',
+    year: 2025,
+    runner: 'Chandler Smith',
+    expectedChipTime: '5:08:17',
+    expectedChipPace: '11:46',
+    expectedBib: '5567',
+    notes: 'Atlantic City 2025 Marathon. RaceResult 365346 chip 5:08:17, gun 5:11:46, page chip pace 11:46. 18497s / 26.2 = 706.0 -> 11:46. A Chandler Smith also ran the 10K (1:30:22) - must return the marathon. Athlinks event 1126179.',
+  },
+  {
+    platform: 'athlinks',
+    race: 'Atlantic City Marathon',
+    year: 2025,
+    runner: 'Brandon Smith',
+    expectedChipTime: '2:21:41',
+    expectedChipPace: '10:49',
+    expectedBib: '2836',
+    notes: 'Atlantic City 2025 Half Marathon - verifies the half distance. RaceResult 365346 chip 2:21:41, gun 2:23:17, chip pace 10:49 (the "Overall Results by Chip" list shows 10:56, a gun pace). 8501s / 13.1 = 648.9 -> 10:49. Athlinks event 1126179.',
+  },
 ]

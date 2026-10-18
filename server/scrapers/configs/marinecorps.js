@@ -1,6 +1,15 @@
 /**
  * Marine Corps Marathon - RTRT platform
- * Results: https://track.rtrt.me/e/MCM-{year}
+ * Results: https://track.rtrt.me/e/MCM-{year} (2022 onward; marinemarathon.com/results
+ * links the RTRT trackers). RTRT has no MCM event before 2022: api.rtrt.me
+ * answers "Invalid Event Name:MCM-2019".
+ *
+ * Older years live on Athlinks, master event 3281 ("Marine Corps Marathon",
+ * Washington DC). Discovery: GET alaska.athlinks.com/Events/Race/Api/Find?term=
+ * Marine%20Corps%20Marathon lists every edition's raceId and date; wire a year
+ * through yearOverrides with the raceId whose eventDate matches.
+ * 1989 (raceId 1051128) is listed with 0 finishers and its result search
+ * returns no courses, so 1989 is not online anywhere we know of; left out.
  */
 export default {
   platform: 'rtrt',
@@ -8,7 +17,18 @@ export default {
   tag: 'MCM',
   location: 'Arlington, VA',
   eventPrefix: 'MCM',
+  yearOverrides: {
+    // Athlinks raceId 668089, eventDate 2019-10-27, 26,063 finishers. One
+    // course ("Marathon", 42164.81 m), one leg, chip-ranked; no splits.
+    2019: {
+      platform: 'athlinks',
+      masterEventId: 3281,
+      eventIds: { 2019: 668089 },
+      courseMap: { marathon: /^(full )?marathon$/i },
+    },
+  },
   raceDates: {
+    2019: '2019-10-27',
     2022: '2022-10-30',
     2023: '2023-10-29',
     2024: '2024-10-27',
@@ -16,6 +36,7 @@ export default {
     2026: '2026-10-25',
   },
   raceDateSources: {
+    2019: 'Athlinks race 668089 (master event 3281) eventDate 2019-10-27, the 44th MCM; result entryDate for finishers is the same day',
     2022: 'Washington Post race report published 2022-10-30 ("Kyle King wins 47th Marine Corps Marathon") + RunWashington report dated 2022-10-30',
     2023: 'Stars and Stripes race-day report published 2023-10-29 + Washington Post 2023-10-29 coverage of the 48th MCM',
     2024: 'Stars and Stripes race-day report published 2024-10-27 ("Marine wins the 49th annual") + MarathonGuide 2024 results page',

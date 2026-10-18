@@ -236,7 +236,13 @@ export class RTRTScraper extends BaseScraper {
       const cleanTime = rawTime ? this.roundTime(rawTime) : null
       const time = this.formatTime(cleanTime ? this.normalizeTime(cleanTime) : null)
 
-      const rawPace = finishSplit.paceAvg?.replace(/\s*min\/mile$/i, '') || null
+      // RTRT's paceAvg is the overall average (chip time / distance; checked
+      // on positive-split runners in MCM 2023/2025 and Illinois 2025/2026),
+      // computed from the unrounded time, so it is kept over recomputing from
+      // the rounded one (which drifts a second, e.g. 11:54 vs the page's 11:53).
+      // It arrives zero-padded ("08:34 min/mile"); strip the pad so it reads
+      // like every other platform's pace.
+      const rawPace = finishSplit.paceAvg?.replace(/\s*min\/mile$/i, '').replace(/^0(\d:)/, '$1') || null
       const pace = rawPace || this.formatPace(
         cleanTime ? this.calculatePace(this.normalizeTime(cleanTime), miles) : null
       )
@@ -408,6 +414,14 @@ export class RTRTScraper extends BaseScraper {
         console.log(`[${this.tag}] No roster yet; ${this.year} has not been run`)
         return this.notFoundResult(`${this.raceName} ${this.year} has not been run yet; results are posted after race day`)
       }
+      // A year the config never listed, which RTRT also does not host ("Invalid
+      // Event Name:MCM-1989"), is a coverage gap, not an outage: say so rather
+      // than tell the queue to retry forever. A LISTED year with an invalid id
+      // is a broken config and still falls through to upstream_error below.
+      if (error.rtrtType === 'failed' && /invalid event name/i.test(error.message)
+        && this.config.raceDates && !(this.year in this.config.raceDates)) {
+        return this.yearNotConfiguredResult(`RTRT has no event ${this.eventId}`)
+      }
       console.error(`[${this.tag}] Error searching for ${runnerName}:`, error.message)
       // An exception here means the lookup could not be completed — network,
       // auth, or a malformed response. It does NOT mean the runner is absent;
@@ -426,7 +440,59 @@ export class RTRTScraper extends BaseScraper {
     return now < endOfRaceDay
   }
 
+  /**
+   * Search, tolerating how RTRT matches names.
+   *
+   * RTRT matches the whole search string against the entered name, so the
+   * nickname a shopper types never finds the registered form: "Jake Deyton"
+   * is no_results on MCM-2025 where "Deyton" returns Jacob Deyton, and
+   * "Timothy Goodsell" misses Tim Goodsell on MCM-2023. When the full name
+   * finds nobody, retry on the surname alone and let filterNameMatches (with
+   * its nickname table) decide; a surname too common to list (too_many_results)
+   * is left as a miss rather than guessed at.
+   */
   async _searchProfiles(runnerName) {
+    const full = await this._searchProfilesOnce(runnerName)
+    if (full.length) return full
+    const parts = String(runnerName || '').trim().split(/\s+/)
+    if (parts.length < 2) return full
+    const surname = parts[parts.length - 1]
+    console.log(`[${this.tag}] No hit on full name; retrying on surname "${surname}"`)
+    try {
+      return await this._searchProfilesOnce(surname)
+    } catch (err) {
+      if (err.rtrtType === 'too_many_results') return []
+      throw err
+    }
+  }
+
+  /**
+   * Confirm the event id itself is real, once per scraper instance.
+   *
+   * no_results only means "nobody by that name" when the event exists; an
+   * invalid id answers type "failed" ("Invalid Event Name") and a bad
+   * credential "not_authorized", both of which still throw and stay
+   * upstream_error so a broken config is loud. This check is the belt to that
+   * braces: a no_results is only downgraded to not_found after the event
+   * record itself has loaded.
+   */
+  async _assertEventResolves() {
+    if (this._eventVerified) return
+    const response = await fetchWithTimeout(`${this.baseUrl}/events/${this.eventId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT },
+      body: new URLSearchParams({ appid: this.appId, token: this.token, source: 'webtracker' }).toString()
+    })
+    if (!response.ok) throw new Error(`RTRT event lookup error ${response.status} for ${this.eventId}`)
+    const data = await response.json()
+    assertNoRtrtError(data, this.tag, 'event lookup')
+    if (data?.name !== this.eventId) {
+      throw new Error(`RTRT event lookup for ${this.eventId} returned ${data?.name || 'no event'}`)
+    }
+    this._eventVerified = true
+  }
+
+  async _searchProfilesOnce(runnerName) {
     const url = `${this.baseUrl}/events/${this.eventId}/profiles`
 
     const form = new URLSearchParams({
@@ -459,6 +525,14 @@ export class RTRTScraper extends BaseScraper {
     }
 
     const data = await response.json()
+    // HTTP 200 + no_results is RTRT's answer for "nobody by that name". On a
+    // valid event that is a genuine miss (not_found), not an outage; it used
+    // to throw and park orders in the "Timing site down" queue forever. Only
+    // after the event itself resolves, so a wrong id can never hide here.
+    if (data?.error?.type === 'no_results') {
+      await this._assertEventResolves()
+      return []
+    }
     assertNoRtrtError(data, this.tag, 'profile search')
     return Array.isArray(data.list) ? data.list : []
   }
