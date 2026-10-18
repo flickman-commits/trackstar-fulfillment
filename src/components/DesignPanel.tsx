@@ -163,7 +163,7 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
   approveRef.current = approveAndOpen
   const approve = (
     <button key="a" onClick={approveAndOpen} disabled={d.busy} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors`}>
-      {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} {compact ? 'Approve' : 'Approve'}
+      {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} Approve
       {!compact && <kbd className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">A</kbd>}
     </button>
   )
