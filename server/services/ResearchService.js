@@ -622,6 +622,33 @@ export class ResearchService {
 
     // If we already found the runner, return cached data
     if (existingResearch && existingResearch.researchStatus === 'found') {
+      // A result found before the finish time was posted (race morning: the
+      // runner's bib is listed, the time is not yet) used to stay timeless
+      // forever. Look again, and fill in only what is missing: the time, pace,
+      // event and results link, and only when the bib still matches. Nothing
+      // already on the record is overwritten, including what a person entered.
+      if (!existingResearch.officialTime && !order.hadNoTime) {
+        try {
+          const fresh = await this.findRunner(raceName, raceYear, runnerName)
+          const sameRunner = !existingResearch.bibNumber || String(fresh?.bibNumber || '') === String(existingResearch.bibNumber)
+          if (fresh?.found && fresh.officialTime && sameRunner) {
+            console.log(`[ResearchService] Filled the missing time for order ${order.orderNumber}: ${fresh.officialTime}`)
+            return prisma.runnerResearch.update({
+              where: { id: existingResearch.id },
+              data: {
+                officialTime: fresh.officialTime,
+                officialPace: existingResearch.officialPace || fresh.officialPace || null,
+                bibNumber: existingResearch.bibNumber || fresh.bibNumber || null,
+                eventType: existingResearch.eventType || fresh.eventType || null,
+                resultsUrl: existingResearch.resultsUrl || fresh.resultsUrl || null,
+                researchNotes: `${existingResearch.researchNotes || ''} Time filled from the official results once posted.`.trim(),
+              },
+            })
+          }
+        } catch (e) {
+          console.warn(`[ResearchService] Could not refill the time for ${order.orderNumber}: ${e.message}`)
+        }
+      }
       console.log(`[ResearchService] Runner data found in cache for order ${order.orderNumber}`)
       return existingResearch
     }

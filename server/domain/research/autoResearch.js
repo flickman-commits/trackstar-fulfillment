@@ -67,7 +67,10 @@ export async function autoResearchNew({ since, limit = 20 } = {}) {
 
 /**
  * The orders that came in before their race: once the race is two days past
- * (results posted), research every open order for it that has none yet.
+ * (results posted), research every open order for it that has none yet, or
+ * that has a result with no finish time (a bib looked up before race day, or
+ * on race morning before the time was posted). Research fills only the
+ * missing time on those (ResearchService.getOrFetchRunnerData).
  * Runs on each import; only races from the last three weeks are looked at.
  */
 export async function autoResearchAfterRace({ limit = 10 } = {}) {
@@ -84,8 +87,11 @@ export async function autoResearchAfterRace({ limit = 10 } = {}) {
     where: {
       trackstarOrderType: 'standard',
       status: { notIn: ['completed', 'flagged'] },
-      runnerResearch: { none: {} },
-      OR: races.flatMap(r => [{ raceName: r.raceName, raceYear: r.year }, { raceNameOverride: r.raceName, yearOverride: r.year }]),
+      hadNoTime: false,
+      AND: [
+        { OR: [{ runnerResearch: { none: {} } }, { runnerResearch: { some: { researchStatus: 'found', officialTime: null } } }] },
+        { OR: races.flatMap(r => [{ raceName: r.raceName, raceYear: r.year }, { raceNameOverride: r.raceName, yearOverride: r.year }]) },
+      ],
     },
     orderBy: { createdAt: 'asc' },
     take: 200,
