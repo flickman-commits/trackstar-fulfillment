@@ -18,3 +18,25 @@ test('order numbers a customer quoted are found, phone numbers are not', () => {
 test('the actions a draft may suggest are the Actions list names', () => {
   for (const n of ['Insert Artelo tracking link', 'Attach mockup', 'Refund', 'Cancel and refund', 'Slack Matt']) assert.ok(ACTION_NAMES.includes(n))
 })
+
+test('suggested actions: only for this customer\'s own orders, filled in, nothing shipped re-addressed', async () => {
+  const { cleanProposals } = await import('./draft.js')
+  const orders = [
+    { number: '4855', shopifyOrderId: '111', fulfillmentStatus: 'UNFULFILLED', tracking: [], items: [{ orderId: 'row1' }] },
+    { number: '4000', shopifyOrderId: '222', fulfillmentStatus: 'FULFILLED', tracking: [{}], items: [{ orderId: 'row2' }] },
+  ]
+  const out = cleanProposals([
+    { type: 'shippingAddress', orderNumber: '4855', address: { name: 'Christine Olsen', address1: '117 E 77th St', address2: 'Apt 3D', city: 'New York', province: 'ny', zip: '10075' } },
+    { type: 'shippingAddress', orderNumber: '4000', address: { name: 'X', address1: '1 A St', city: 'B', zip: '00000' } },
+    { type: 'shippingAddress', orderNumber: '9999', address: { name: 'X', address1: '1 A St', city: 'B', zip: '00000' } },
+    { type: 'discount', percent: 90 },
+  ], orders)
+  assert.equal(out.length, 2)
+  assert.equal(out[0].type, 'shippingAddress')
+  assert.equal(out[0].shopifyOrderId, '111')
+  assert.equal(out[0].address.province, 'NY')
+  assert.equal(out[0].address.country, 'US')
+  assert.match(out[0].label, /117 E 77th St, Apt 3D, New York, NY 10075/)
+  assert.equal(out[1].type, 'discount')
+  assert.equal(out[1].percent, 15)
+})

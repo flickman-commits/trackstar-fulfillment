@@ -4,6 +4,7 @@ import { reviewAsk, reviewLinkFor } from '@/lib/reviewLinks'
 import { toast } from 'sonner'
 import { supportApi } from '@/lib/supportApi'
 import { useAuth } from '@/lib/auth'
+import { parseAddress } from '@/lib/parseAddress'
 import type { Address, CodeLookup, CustomerOrder, Mockup, ThreadDetail } from '@/types/support'
 
 /**
@@ -30,6 +31,26 @@ function ActionLink({ icon: Icon, onClick, href, busy, title, children }: { icon
 
 const heading = 'text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5'
 const field = 'w-full min-w-0 px-2 py-1 text-xs bg-white border border-border-gray rounded focus:outline-none focus:ring-1 focus:ring-off-black/20'
+
+/** Paste a whole address from the customer's email; it fills the fields below. */
+function PasteAddress({ onParsed }: { onParsed: (a: Partial<Address>) => void }) {
+  const [v, setV] = useState('')
+  const fill = (text: string) => {
+    const parsed = parseAddress(text)
+    const found = Object.entries(parsed).filter(([, x]) => x)
+    if (!found.length) { toast.error('Could not read an address in that'); return }
+    onParsed(Object.fromEntries(found) as Partial<Address>)
+    setV('')
+    toast.success('Filled in. Check it before saving.')
+  }
+  return (
+    <textarea value={v} rows={2} placeholder="Paste a whole address here to fill it in"
+      onChange={e => setV(e.target.value)}
+      onPaste={e => { const t = e.clipboardData.getData('text/plain'); if (t.includes('\n') || /\d{5}/.test(t)) { e.preventDefault(); fill(t) } }}
+      onBlur={() => { if (v.trim()) fill(v) }}
+      className={`${field} resize-none placeholder:text-off-black/40`} />
+  )
+}
 
 /** The ship-to form, prefilled from Shopify (or Artelo's copy), then the hand-off to Artelo. */
 function AddressForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread: ThreadDetail; onDone: () => void; onCancel: () => void }) {
@@ -64,6 +85,7 @@ function AddressForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread
   }
   return (
     <div className="w-full bg-subtle-gray border border-border-gray rounded-md p-2.5 space-y-1.5">
+      <PasteAddress onParsed={p => setA({ ...a, ...p })} />
       <input className={field} value={a.name} onChange={set('name')} placeholder="Name" />
       <input className={field} value={a.address1} onChange={set('address1')} placeholder="Street" />
       <input className={field} value={a.address2} onChange={set('address2')} placeholder="Apt, suite (optional)" />
@@ -267,6 +289,7 @@ function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: Customer
             </label>
           ))}
           <div className="pt-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Ship to</div>
+          <PasteAddress onParsed={p => setA({ ...a, ...p })} />
           <input className={field} value={a.name} onChange={set('name')} placeholder="Name" />
           <input className={field} value={email} onChange={e => setEmail(e.target.value)} placeholder="Email (for Artelo's shipping notice)" />
           <input className={field} value={a.address1} onChange={set('address1')} placeholder="Street" />

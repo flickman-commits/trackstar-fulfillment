@@ -82,6 +82,22 @@ export interface DraftData {
   needsInfo?: string
   instruction?: string | null
   model?: string
+  proposals?: Proposal[]
+}
+
+/** A suggested action on Claude's draft, filled in and waiting for a person's Approve. */
+export interface Proposal {
+  id: string
+  type: 'shippingAddress' | 'discount' | 'orderNote'
+  label: string
+  orderNumber?: string
+  shopifyOrderId?: string
+  orderId?: string
+  address?: Address
+  percent?: number
+  text?: string
+  status?: 'done' | 'dismissed'
+  by?: string | null
 }
 
 export interface Note {

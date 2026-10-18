@@ -285,6 +285,20 @@ export async function deleteNote(noteId, actor) {
   return { id: noteId }
 }
 
+/**
+ * A suggested action on Claude's draft was approved (it ran) or dismissed:
+ * recorded on the draft so it is not offered, or run, again.
+ */
+export async function setProposal(threadId, noteId, proposalId, status, actor) {
+  if (!['done', 'dismissed'].includes(status)) throw new Error('status is done or dismissed')
+  const n = await prisma.supportNote.findUnique({ where: { id: noteId } })
+  if (!n || n.kind !== 'draft' || n.threadId !== threadId) throw new Error('No such draft')
+  const data = n.data && typeof n.data === 'object' ? n.data : {}
+  const proposals = (Array.isArray(data.proposals) ? data.proposals : []).map(p => p.id === proposalId ? { ...p, status, by: [actor?.firstName, actor?.lastName].filter(Boolean).join(' ') || null, at: new Date().toISOString() } : p)
+  const row = await prisma.supportNote.update({ where: { id: noteId }, data: { data: { ...data, proposals } }, include: { author: { select: { id: true, firstName: true, lastName: true } } } })
+  return noteRow(row)
+}
+
 /** This person has seen the thread as it stands now. */
 export async function markRead(id, userId) {
   if (!userId) return

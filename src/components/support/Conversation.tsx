@@ -10,7 +10,7 @@ import { ChannelMark, CustomerAvatar } from './ConversationList'
 import DraftCard from './DraftCard'
 import RichReply, { type RichReplyHandle } from './RichReply'
 import Attachments from './Attachments'
-import type { Macro, Message, Mockup, Note, Teammate, ThreadDetail, ThreadStatus } from '@/types/support'
+import type { Macro, Message, Mockup, Note, Proposal, Teammate, ThreadDetail, ThreadStatus } from '@/types/support'
 
 /**
  * The conversation, Intercom's middle column.
@@ -183,7 +183,7 @@ function MacroMenu({ macros, onPick, onClose }: { macros: Macro[]; onPick: (m: M
   )
 }
 
-export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onRedraft, onMerge, onUseMacro, replyRef, noteRef, insertRef, attachRef }: {
+export default function Conversation({ thread, team, me, isAdmin, busy, macros, expectedHandle = 'trackstar_art', onAssign, onStatus, onSnooze, onPriority, onMarkUnread, onReply, onNote, onDeleteNote, onRedraft, onMerge, onUseMacro, onRefresh, replyRef, noteRef, insertRef, attachRef }: {
   thread: ThreadDetail
   /** The Instagram account replies go out as, without the @. */
   expectedHandle?: string
@@ -203,6 +203,8 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   onRedraft: (instruction: string) => Promise<void>
   onMerge: (ids: string[]) => void
   onUseMacro: (id: string) => void
+  /** Reload this conversation after an approved suggested action. */
+  onRefresh: () => void
   /** Lets the page's keyboard shortcuts focus the composer. */
   replyRef: React.RefObject<RichReplyHandle>
   noteRef: React.RefObject<HTMLTextAreaElement>
@@ -222,6 +224,8 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   const [slashQ, setSlashQ] = useState<string | null>(null)
   const [slashIdx, setSlashIdx] = useState(0)
   const [uploading, setUploading] = useState(0)
+  // A code made from a suggested action, for the [CODE] in a draft not used yet.
+  const [madeCode, setMadeCode] = useState<string | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
   const close = usePopover()
   const macro = usePopover()
@@ -360,6 +364,30 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     onUseMacro(m.id)
   }
 
+  /** Run a suggested action from Claude's draft, the same call the Actions panel makes, then mark it done. */
+  const approveProposal = async (n: Note, p: Proposal) => {
+    try {
+      if (p.type === 'shippingAddress') {
+        await supportApi.action('shippingAddress', { id: thread.id, shopifyOrderId: p.shopifyOrderId, address: p.address })
+        toast.success(`#${p.orderNumber} ship-to changed in Shopify. Artelo still needs it.`)
+      } else if (p.type === 'discount') {
+        const out = await supportApi.action<{ code: string }>('discount15', { id: thread.id, percent: p.percent })
+        setMadeCode(out.code)
+        setText(t => (t.includes('[CODE]') ? t.replace(/\[CODE\]/g, out.code) : t))
+        try { await navigator.clipboard.writeText(out.code) } catch { /* it is in the reply or the draft */ }
+        toast.success(`${out.code} created${text.includes('[CODE]') ? ' and put in the reply' : '; it goes in when you use the draft'}`)
+      } else if (p.type === 'orderNote') {
+        await supportApi.action('orderNote', { id: thread.id, orderId: p.orderId, text: p.text })
+        toast.success(`Note left on #${p.orderNumber}`)
+      }
+      await supportApi.setProposal(thread.id, n.id, p.id, 'done')
+      onRefresh()
+    } catch (e) { toast.error((e as Error).message) }
+  }
+  const dismissProposal = async (n: Note, p: Proposal) => {
+    try { await supportApi.setProposal(thread.id, n.id, p.id, 'dismissed'); onRefresh() } catch (e) { toast.error((e as Error).message) }
+  }
+
   const insertMacro = (m: Macro) => {
     macro.setOpen(false)
     placeInReply(fillMacro(m.body, { firstName: firstNameOf(thread), rep: me.firstName, channel: thread.channel }))
@@ -430,7 +458,8 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 bg-[#fcfcfc]">
         {timeline.map(it => it.kind === 'note' && it.n.kind === 'draft'
           ? <DraftCard key={it.n.id} n={it.n} latest={it.n.id === latestDraftId} onRedraft={onRedraft}
-              onUse={body => { setMode('reply'); setText(tagStoreLinks(body.replace(/\{\{rep\}\}/g, me.firstName), thread.channel)); requestAnimationFrame(() => replyRef.current?.focusLine(0, 'start')) }} />
+              onApprove={p => approveProposal(it.n, p)} onDismiss={p => dismissProposal(it.n, p)}
+              onUse={body => { setMode('reply'); setText(tagStoreLinks(body.replace(/\{\{rep\}\}/g, me.firstName).replace(/\[CODE\]/g, c => madeCode || c), thread.channel)); requestAnimationFrame(() => replyRef.current?.focusLine(0, 'start')) }} />
           : it.kind === 'message'
           ? <Bubble key={it.m.id} m={it.m} />
           : <NoteCard key={it.n.id} n={it.n} team={team} meId={me.id} isAdmin={isAdmin} onDelete={() => onDeleteNote(it.n.id)} />)}

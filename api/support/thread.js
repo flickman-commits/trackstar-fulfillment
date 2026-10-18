@@ -12,12 +12,13 @@
  *   POST { id, action: 'unread' }               back to unread for you
  *   POST { id, action: 'redraft', instruction }  a fresh Claude draft, optionally steered
  *   POST { id, action: 'merge', sourceIds }     fold the customer's other conversations into this one
+ *   POST { id, action: 'proposal', noteId, proposalId, status }   a suggested action on a draft: done | dismissed
  *
  * Every change leaves an event in the thread and a line in the audit log.
  */
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
-import { getThread, assign, setStatus, snooze, setPriority, setTags, addNote, deleteNote, markRead, markUnread, noteRow } from '../../server/domain/support/threads.js'
+import { getThread, assign, setStatus, snooze, setPriority, setTags, addNote, deleteNote, markRead, markUnread, noteRow, setProposal } from '../../server/domain/support/threads.js'
 import { draftThread } from '../../server/domain/support/draft.js'
 import { mergeThreads } from '../../server/domain/support/merge.js'
 
@@ -81,6 +82,11 @@ export default async function handler(req, res) {
         const out = await draftThread(id, { instruction: String(body.instruction || ''), actor: user })
         await audit('Asked Claude for a new draft', { instruction: body.instruction || null })
         return res.status(200).json(noteRow(out.note))
+      }
+      case 'proposal': {
+        const n = await setProposal(id, String(body.noteId || ''), String(body.proposalId || ''), String(body.status || ''), user)
+        await audit(`${body.status === 'done' ? 'Approved' : 'Dismissed'} a suggested action`, { noteId: body.noteId, proposalId: body.proposalId })
+        return res.status(200).json(n)
       }
       case 'unread': {
         await markUnread(id, user.id)

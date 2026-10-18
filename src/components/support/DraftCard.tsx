@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { AlertTriangle, ChevronDown, Loader2, RefreshCw, Sparkles } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, Loader2, RefreshCw, Sparkles, X } from 'lucide-react'
 import { when } from '@/lib/supportDates'
-import type { Note } from '@/types/support'
+import type { Note, Proposal } from '@/types/support'
 
 /**
  * Claude's draft in the timeline: the reply it would send, and its working
@@ -10,7 +10,23 @@ import type { Note } from '@/types/support'
  * Send. Every draft starts folded to one line, so the customer's message
  * stays readable; opened, the reply scrolls in a short box.
  */
-export default function DraftCard({ n, latest, onUse, onRedraft }: { n: Note; latest: boolean; onUse: (text: string) => void; onRedraft: (instruction: string) => Promise<void> }) {
+/** One suggested action: what it would do, Approve to run it, or dismiss it. */
+function ProposalRow({ p, onApprove, onDismiss }: { p: Proposal; onApprove: (p: Proposal) => Promise<void>; onDismiss: (p: Proposal) => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  if (p.status) {
+    return <div className={`flex items-start gap-1.5 text-xs ${p.status === 'done' ? 'text-emerald-700' : 'text-off-black/40 line-through'}`}>{p.status === 'done' ? <Check className="w-3.5 h-3.5 shrink-0 mt-px" /> : <X className="w-3.5 h-3.5 shrink-0 mt-px" />}<span>{p.label}{p.status === 'done' && p.by ? <span className="text-off-black/40"> · {p.by}</span> : null}</span></div>
+  }
+  const go = async (fn: (p: Proposal) => Promise<void>) => { setBusy(true); try { await fn(p) } finally { setBusy(false) } }
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-[#4600D6]/20 bg-white px-2.5 py-2">
+      <span className="flex-1 text-xs text-off-black/80 leading-snug">{p.label}</span>
+      <button disabled={busy} onClick={() => go(onApprove)} className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-[#4600D6] text-white hover:bg-[#3a00b3] disabled:opacity-50">{busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}Approve</button>
+      <button disabled={busy} onClick={() => go(onDismiss)} className="shrink-0 p-0.5 text-off-black/35 hover:text-off-black" title="Not this one"><X className="w-3.5 h-3.5" /></button>
+    </div>
+  )
+}
+
+export default function DraftCard({ n, latest, onUse, onRedraft, onApprove, onDismiss }: { n: Note; latest: boolean; onUse: (text: string) => void; onRedraft: (instruction: string) => Promise<void>; onApprove: (p: Proposal) => Promise<void>; onDismiss: (p: Proposal) => Promise<void> }) {
   const [open, setOpen] = useState(false)
   const [showWork, setShowWork] = useState(false)
   const [asking, setAsking] = useState(false)
@@ -30,6 +46,7 @@ export default function DraftCard({ n, latest, onUse, onRedraft }: { n: Note; la
         <button onClick={() => setOpen(true)} className={`flex-1 min-w-0 flex items-center gap-2 text-left ${latest ? 'text-[#4600D6]' : 'text-[#4600D6]/70 hover:text-[#4600D6]'}`}>
           <Sparkles className="w-3.5 h-3.5 shrink-0" />
           <span className={`truncate ${latest ? 'font-semibold' : ''}`}>{latest ? "Claude's suggested response" : 'Earlier draft'}{d.scenario ? <span className="font-normal text-off-black/45"> · {d.scenario}</span> : null}</span>
+          {latest && (d.proposals || []).some(p => !p.status) && <span className="shrink-0 px-1.5 py-px rounded bg-[#4600D6]/10 text-[10px] font-medium text-[#4600D6]">{(d.proposals || []).filter(p => !p.status).length} to approve</span>}
           {latest && d.escalate?.needed && <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-px rounded bg-red-50 border border-red-200 text-[10px] font-medium text-red-700"><AlertTriangle className="w-3 h-3" />Flag for Matt</span>}
           <ChevronDown className="w-3.5 h-3.5 ml-auto shrink-0" />
         </button>
@@ -51,6 +68,12 @@ export default function DraftCard({ n, latest, onUse, onRedraft }: { n: Note; la
       )}
       {d.summary && <div className="text-xs text-off-black/60 mb-2">They want: {d.summary}</div>}
       <div className="max-h-40 overflow-y-auto text-[13px] whitespace-pre-wrap break-words leading-relaxed text-off-black bg-white border border-border-gray rounded-lg px-3 py-2">{n.body.replace(/\{\{rep\}\}/g, '…')}</div>
+      {(d.proposals || []).length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-[#4600D6]/70">Suggested actions</div>
+          {(d.proposals || []).map(p => latest || p.status ? <ProposalRow key={p.id} p={p} onApprove={onApprove} onDismiss={onDismiss} /> : null)}
+        </div>
+      )}
       {d.needsInfo && <div className="mt-2 text-xs text-amber-800">Missing: {d.needsInfo}</div>}
       {d.actions && d.actions.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">

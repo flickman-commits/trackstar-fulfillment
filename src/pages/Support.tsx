@@ -337,7 +337,7 @@ export default function Support() {
               <Conversation
                 key={thread.id} thread={thread} team={inbox?.team || []} me={me} isAdmin={isAdmin} busy={busy} macros={macros} expectedHandle={instagram?.expectedHandle}
                 onAssign={assign} onStatus={setStatusOf} onSnooze={snooze} onPriority={setPriority} onMarkUnread={markUnread}
-                onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onRedraft={redraft} onMerge={ids => { merge(ids) }} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }}
+                onReply={reply} onNote={addNote} onDeleteNote={deleteNote} onRedraft={redraft} onMerge={ids => { merge(ids) }} onUseMacro={id => { supportApi.useMacro(id).catch(() => {}) }} onRefresh={() => { if (thread) { refreshThread(thread.id); loadInbox(true) } }}
                 replyRef={replyRef} noteRef={noteRef} insertRef={insertRef} attachRef={attachRef}
               />
               </div>

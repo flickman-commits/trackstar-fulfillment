@@ -15,6 +15,7 @@
 import prisma from '../../db.js'
 import { complete, isLlmConfigured, llmInfo } from '../../lib/llm.js'
 import { customerContext } from './threads.js'
+import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { stripQuoted } from './mailbox.js'
 import { getPlaybook } from './playbook.js'
 import { listMacros } from './macros.js'
@@ -89,7 +90,7 @@ Follow this playbook for voice, facts, policy and escalation:
 
 ${playbook}
 
-These saved replies show how the team phrases common answers. Borrow their wording where one fits; never copy a [BRACKET] placeholder into the reply, fill it from the facts or leave the point out:
+These saved replies show how the team phrases common answers. Borrow their wording where one fits; never copy a [BRACKET] placeholder into the reply (the one exception is [CODE], below), fill it from the facts or leave the point out:
 
 ${macros}
 
@@ -100,13 +101,45 @@ Rules for the draft:
 ${FORM[channel] || FORM.email}
 - Short and to the point, still warm. Lead with the answer, or with the one thing you need from them. Most replies are two to four short sentences, under about 60 words between the greeting and the sign-off; go longer only for steps they must follow.
 - One friendly touch is enough ("Sorry about that!", "Congrats on the race!"). Do not open with "Thanks for reaching out", do not restate what they wrote, and do not narrate what you are doing or why ("I want to make sure we track this down properly", "Once I have that, I'll look into it").
-- Ask for the fewest details that will solve it, usually one or two, in one plain question.
+- Be resourceful and do the work for them: everything in the facts is yours to use. If their order is listed (even one found by their name or an order number), answer from it ("I found your order #4675 from Oct 14") instead of asking them to identify it.
+- Ask the customer for something only when the facts truly cannot answer it, and then only the single thing that unblocks it, in one plain question. Never ask for card digits, the charge amount, or details we already have.
+- When they have already said clearly what they want (a new address, the right spelling, which size), do not ask them to confirm it again. Say it is taken care of and propose the action below; the rep approves it before the reply goes. Ask only if what they sent is incomplete or contradicts itself.
+- Never make up a discount code, link, order number, tracking number or date. Where a discount code belongs, write [CODE] and add "Create discount code" to actions; the rep makes the real one and it replaces [CODE].
 - Too long: "Thanks for reaching out, and sorry you're missing a confirmation. I'm not finding an order under this email in our system, so I want to make sure we track this down properly. Could you reply with the name the order was placed under, the print you ordered, and the last four digits of the card? Once I have that, I'll look into it and get you an order number and a delivery estimate."
   Right: "Sorry about that! I can't find an order under this email. What name or email did you use at checkout? I'll send your order number as soon as I find it."
 - No em dashes anywhere.
 
 Answer with JSON only, in this shape:
-{"scenario": "<the playbook situation, a few words>", "summary": "<what they want, one line>", "reply": "<the reply>", "keyFacts": ["<fact the rep should know>", ...], "steps": ["<what the rep should check or do before or after sending>", ...], "actions": [{"name": "<one of: ${ACTION_NAMES.join(' | ')}>", "why": "<short>"}], "escalate": {"needed": false, "reason": ""}, "needsInfo": "<what is missing, or empty>"}`
+{"scenario": "<the playbook situation, a few words>", "summary": "<what they want, one line>", "reply": "<the reply>", "keyFacts": ["<fact the rep should know>", ...], "steps": ["<what the rep should check or do before or after sending>", ...], "actions": [{"name": "<one of: ${ACTION_NAMES.join(' | ')}>", "why": "<short>"}], "escalate": {"needed": false, "reason": ""}, "needsInfo": "<what is missing, or empty>", "proposals": [<suggested action>, ...]}
+
+Suggested actions are things the rep can approve with one click, filled in from the conversation. Propose one only when the facts support it, at most three:
+- {"type": "shippingAddress", "orderNumber": "<one of their order numbers>", "address": {"name": "", "address1": "", "address2": "", "city": "", "province": "<two-letter state>", "zip": "", "country": "<two-letter, usually US>", "phone": ""}}: they gave a new ship-to for an order that has not shipped. Write the address out in full ("New York", not "NY", for the city).
+- {"type": "discount", "percent": 15}: a discount code belongs in the reply (the reply has [CODE]).
+- {"type": "orderNote", "orderNumber": "<one of their order numbers>", "text": "<what fulfillment must know>"}: something the people making the print must see.`
+
+/**
+ * When their email finds no order, look for one under their name, the way a
+ * rep would before asking the customer to dig: people check out with another
+ * address (a spouse's, a work email). Only a full name ("Dennis Holloway"),
+ * never a single word, and only orders from the last six months. Returns the
+ * email the order was placed under, so the usual lookup can take it from there.
+ */
+export async function orderEmailByName(name) {
+  const n = String(name || '').trim().replace(/["\\:()]/g, '')
+  if (!/^[A-Za-z][A-Za-z'.-]+(\s+[A-Za-z][A-Za-z'.-]+)+$/.test(n)) return null
+  const since = new Date(Date.now() - 183 * 86400000).toISOString().slice(0, 10)
+  try {
+    const data = await shopifyGraphQL(`query($q: String!) { orders(first: 5, sortKey: CREATED_AT, reverse: true, query: $q) { nodes { name email shippingAddress { name } billingAddress { name } } } }`, { q: `${n} created_at:>=${since}` })
+    const want = n.toLowerCase()
+    const hits = (data?.orders?.nodes || []).filter(o => [o.shippingAddress?.name, o.billingAddress?.name].some(x => String(x || '').trim().toLowerCase() === want) && o.email)
+    const emails = [...new Set(hits.map(o => o.email.toLowerCase()))]
+    // One person, one address: anything else is a guess, and the rep should ask.
+    return emails.length === 1 ? { email: emails[0], orders: hits.map(o => o.name) } : null
+  } catch (err) {
+    console.warn(`[support.draft] order search by name: ${err.message}`)
+    return null
+  }
+}
 
 /** Gather everything the draft needs. Exported for a dry run. */
 export async function gatherFacts(threadId) {
@@ -120,11 +153,19 @@ export async function gatherFacts(threadId) {
 
   // Their orders by email, else by an order number they quoted.
   let context = t.customerEmail ? await customerContext(t.customerEmail) : { orders: [] }
+  let foundBy = ''
   if (!context.orders.length) {
     const numbers = quotedOrderNumbers(recent.filter(m => m.direction === 'in').map(m => m.bodyText).join('\n'))
     for (const n of numbers) {
       const row = await prisma.order.findFirst({ where: { shopifyOrderData: { path: ['name'], equals: `#${n}` } }, select: { customerEmail: true } })
-      if (row?.customerEmail) { context = await customerContext(row.customerEmail); if (context.orders.length) break }
+      if (row?.customerEmail) { context = await customerContext(row.customerEmail); if (context.orders.length) { foundBy = `the order number they quoted (#${n})`; break } }
+    }
+  }
+  if (!context.orders.length) {
+    const byName = await orderEmailByName(t.customerName)
+    if (byName) {
+      context = await customerContext(byName.email)
+      if (context.orders.length) foundBy = `their name, under a different email (${byName.email})`
     }
   }
   const past = t.customerEmail ? await prisma.supportThread.findMany({
@@ -140,14 +181,44 @@ export async function gatherFacts(threadId) {
     `Customer: ${name || 'unknown name'}${realName ? ` (greet as "${first}")` : ' (no clear first name: use the name they sign with, or "Hey there,")'}, ${t.channel === 'instagram' ? `Instagram @${t.igUsername}` : t.customerEmail}.`,
     `Subject: ${t.subject || '(none)'}. Channel: ${t.channel === 'instagram' ? 'Instagram DM' : 'email'}.`,
     '',
-    'Their orders:',
+    foundBy ? `Their orders (found by ${foundBy}; it is theirs, use it):` : 'Their orders:',
     ordersBrief(context.orders),
     past.length ? `\nEarlier conversations: ${past.map(p => `"${p.subject}" (${p.status}, ${new Date(p.lastMessageAt).toDateString()})`).join('; ')}.` : '',
     '',
     'The conversation, oldest first:',
     conversation,
   ].join('\n')
-  return { thread: t, facts, lastInbound: [...t.messages].reverse().find(m => m.direction === 'in') || null }
+  return { thread: t, facts, context, lastInbound: [...t.messages].reverse().find(m => m.direction === 'in') || null }
+}
+
+/**
+ * The model's suggested actions, kept only when they point at one of this
+ * customer's own orders and carry what the action needs. Each gets an id so
+ * the page can mark it approved or dismissed (threads.js setProposal).
+ */
+export function cleanProposals(list, orders = []) {
+  const out = []
+  for (const p of (Array.isArray(list) ? list : []).slice(0, 8)) {
+    if (out.length >= 3) break
+    const order = orders.find(o => String(o.number).replace(/^#/, '') === String(p?.orderNumber || '').replace(/^#/, ''))
+    if (p?.type === 'shippingAddress' && order?.shopifyOrderId) {
+      const a = p.address || {}
+      const address = Object.fromEntries(['name', 'address1', 'address2', 'city', 'province', 'zip', 'country', 'phone'].map(k => [k, noEmDash(clip(String(a[k] || '').trim(), 120))]))
+      address.country = (address.country || 'US').toUpperCase()
+      address.province = address.province.toUpperCase()
+      const shipped = order.fulfillmentStatus === 'FULFILLED' || order.tracking?.length
+      if (!shipped && address.name && address.address1 && address.city && address.zip) {
+        out.push({ id: `p${out.length + 1}`, type: 'shippingAddress', orderNumber: order.number, shopifyOrderId: order.shopifyOrderId, address, label: `Change #${order.number}'s ship-to to ${[address.address1, address.address2, `${address.city}, ${address.province} ${address.zip}`].filter(Boolean).join(', ')}` })
+      }
+    } else if (p?.type === 'discount') {
+      const percent = Number.isInteger(Number(p.percent)) && Number(p.percent) >= 5 && Number(p.percent) <= 25 ? Number(p.percent) : 15
+      out.push({ id: `p${out.length + 1}`, type: 'discount', percent, label: `Create a ${percent}% code (one use, 30 days) and put it in the reply` })
+    } else if (p?.type === 'orderNote' && order?.items?.[0] && String(p.text || '').trim()) {
+      const text = noEmDash(clip(String(p.text).trim(), 400))
+      out.push({ id: `p${out.length + 1}`, type: 'orderNote', orderNumber: order.number, orderId: order.items[0].orderId, text, label: `Note for fulfillment on #${order.number}: ${text}` })
+    }
+  }
+  return out
 }
 
 function cleanList(v, n = 8) {
@@ -161,7 +232,7 @@ function cleanList(v, n = 8) {
  */
 export async function draftThread(threadId, { instruction = '', actor = null, dryRun = false } = {}) {
   if (!isLlmConfigured()) throw new Error('No model is configured for drafting (ANTHROPIC_API_KEY).')
-  const { thread, facts, lastInbound } = await gatherFacts(threadId)
+  const { thread, facts, context, lastInbound } = await gatherFacts(threadId)
   if (!lastInbound) throw new Error('Nothing from the customer to answer yet.')
   const [{ text: playbook }, macros] = await Promise.all([getPlaybook(), listMacros()])
   const macroText = macros.slice(0, 45).map(m => `- ${m.name}: ${clip(m.body.replace(/\s+/g, ' '), 400)}`).join('\n')
@@ -188,6 +259,7 @@ export async function draftThread(threadId, { instruction = '', actor = null, dr
     actions: (Array.isArray(j.actions) ? j.actions : []).filter(a => ACTION_NAMES.includes(a?.name)).slice(0, 5).map(a => ({ name: a.name, why: noEmDash(clip(a.why, 160)) })),
     escalate: { needed: Boolean(j.escalate?.needed), reason: noEmDash(clip(j.escalate?.reason, 240)) },
     needsInfo: noEmDash(clip(j.needsInfo, 240)),
+    proposals: cleanProposals(j.proposals, context.orders),
     forMessageId: lastInbound.id,
     instruction: instruction ? clip(instruction, 500) : null,
     model: out.model,
