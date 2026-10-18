@@ -883,14 +883,14 @@ export default function Dashboard() {
   // The race and queue filters live in the address (?race=...&queue=review),
   // so a reload or a shared link keeps the view. Changing one replaces the
   // history entry; the back button is for orders, not filter clicks.
-  type StageFilter = '' | 'review' | 'attach' | 'action' | 'waiting'
+  type StageFilter = '' | 'review' | 'attach' | 'action' | 'waiting' | 'not_run'
   const setUrlParam = useCallback((key: string, value: string) => {
     setSearchParams(prev => { const next = new URLSearchParams(prev); if (value) next.set(key, value); else next.delete(key); return next }, { replace: true })
   }, [setSearchParams])
   const raceFilter = searchParams.get('race') || ''  // empty = show all races
   const setRaceFilter = useCallback((v: string) => setUrlParam('race', v), [setUrlParam])
   // Standard orders: the queue to work. '' is everything open.
-  const stageFilter: StageFilter = (['review', 'attach', 'action', 'waiting'] as const).find(k => k === searchParams.get('queue')) || ''
+  const stageFilter: StageFilter = (['review', 'attach', 'action', 'waiting', 'not_run'] as const).find(k => k === searchParams.get('queue')) || ''
   const setStageFilter = useCallback((v: StageFilter) => setUrlParam('queue', v), [setUrlParam])
   const [showCompleted, setShowCompleted] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -2541,21 +2541,38 @@ export default function Dashboard() {
   // active queue rather than completedOrders so we don't surface stale races.
   const raceFilterOptions = useMemo(() => {
     const counts = new Map<string, number>()
+    // Counted like the queue: races not yet run only when that chip is on.
+    const notRun = (o: Order) => o.pipeline?.stage === 'waiting' && o.pipeline?.reason === 'Race not run yet'
     for (const o of ordersToFulfill) {
+      if (activeView === 'standard' && notRun(o) !== (stageFilter === 'not_run')) continue
       const name = o.effectiveRaceName || o.raceName || ''
       if (!name) continue
       counts.set(name, (counts.get(name) || 0) + 1)
     }
     return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [ordersToFulfill])
+  }, [ordersToFulfill, activeView, stageFilter])
 
   // How many open standard orders sit in each stage, for the queue chips.
+  // Orders for a race that has not happened yet cannot be fulfilled, so they
+  // are kept out of every "to fulfill" count and live in their own bucket.
+  const isNotRun = (o: Order) => o.pipeline?.stage === 'waiting' && o.pipeline?.reason === 'Race not run yet'
+  const fulfillable = useMemo(() => activeView === 'standard' ? ordersToFulfill.filter(o => !isNotRun(o)) : ordersToFulfill, [ordersToFulfill, activeView])
+  // Current Team shows the same: each person's orders that can be worked now.
+  const teamQueue = useMemo(() => {
+    const people = queues[activeView]
+    if (activeView !== 'standard' || !people) return people
+    const n: Record<string, number> = {}
+    for (const o of fulfillable) if (o.assigneeId) n[o.assigneeId] = (n[o.assigneeId] || 0) + 1
+    return people.map(p => p.open == null ? p : { ...p, open: n[p.userId] || 0 })
+  }, [queues, activeView, fulfillable])
+
   const stageCounts = useMemo(() => {
-    const c = { review: 0, attach: 0, action: 0, waiting: 0 }
+    const c = { review: 0, attach: 0, action: 0, waiting: 0, notRun: 0 }
     if (activeView !== 'standard') return c
     for (const o of ordersToFulfill) {
       const s = o.pipeline?.stage
-      if (s === 'review') c.review++
+      if (isNotRun(o)) c.notRun++
+      else if (s === 'review') c.review++
       else if (s === 'attach') c.attach++
       else if (s === 'action') c.action++
       else if (s === 'waiting' || s === 'needs_research') c.waiting++
@@ -2569,7 +2586,12 @@ export default function Dashboard() {
       base = base.filter(o => (o.effectiveRaceName || o.raceName) === raceFilter)
     }
     if (stageFilter && activeView === 'standard') {
-      base = base.filter(o => stageFilter === 'waiting' ? (o.pipeline?.stage === 'waiting' || o.pipeline?.stage === 'needs_research') : o.pipeline?.stage === stageFilter)
+      base = base.filter(o => stageFilter === 'not_run' ? isNotRun(o)
+        : stageFilter === 'waiting' ? ((o.pipeline?.stage === 'waiting' || o.pipeline?.stage === 'needs_research') && !isNotRun(o))
+        : o.pipeline?.stage === stageFilter)
+    } else if (activeView === 'standard') {
+      // "All" is everything that can be fulfilled; races not yet run sit under their own chip.
+      base = base.filter(o => !isNotRun(o))
     }
     if (!searchQuery) return base
     const query = searchQuery.trim().toLowerCase()
@@ -2921,7 +2943,7 @@ Thank you!`
         <div>
           <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Queue</div>
           <div className="flex md:inline-flex w-full md:w-auto rounded-md border border-border-gray bg-subtle-gray p-0.5">
-            {([['', 'All', ordersToFulfill.length], ['review', 'Review', stageCounts.review], ['attach', 'Attach', stageCounts.attach], ['action', 'Action', stageCounts.action], ['waiting', 'Waiting', stageCounts.waiting]] as const).map(([key, label, n]) => (
+            {([['', 'All', fulfillable.length], ['review', 'Review', stageCounts.review], ['attach', 'Attach', stageCounts.attach], ['action', 'Action', stageCounts.action], ['waiting', 'Waiting', stageCounts.waiting]] as const).map(([key, label, n]) => (
               <button
                 key={key || 'all'}
                 onClick={() => setStageFilter(key)}
@@ -2932,6 +2954,14 @@ Thank you!`
               </button>
             ))}
           </div>
+          {/* Set apart: orders for races not yet run. Not in any count above. */}
+          {stageCounts.notRun > 0 && (
+            <button onClick={() => setStageFilter(stageFilter === 'not_run' ? '' : 'not_run')}
+              title="Orders for races that have not happened yet. Nothing to do until race day; they are not counted as orders to fulfill."
+              className={`ml-0 md:ml-2 mt-1.5 md:mt-0 inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2.5 rounded-md border border-dashed text-xs md:text-sm font-medium whitespace-nowrap transition-colors ${stageFilter === 'not_run' ? 'bg-white border-off-black/30 text-off-black shadow-sm' : 'border-border-gray text-off-black/45 hover:text-off-black'}`}>
+              Not run yet <span className="text-[11px] tabular-nums opacity-70">{stageCounts.notRun}</span>
+            </button>
+          )}
         </div>
         )}
         {(activeView === 'race_partner' || activeView === 'bulk') && (
@@ -2955,7 +2985,7 @@ Thank you!`
         {!inlineDetail && (
           <PageHeader
             title={activeView === 'standard' ? 'Standard Orders' : activeView === 'custom' ? 'Custom Orders' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}
-            pill={`${activeView === 'bulk' ? (bulkCount ?? '') : ordersToFulfill.length} orders`}
+            pill={`${activeView === 'bulk' ? (bulkCount ?? '') : fulfillable.length} orders`}
             subtitle={lastImportedAt ? `Last refreshed ${new Date(lastImportedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : undefined}
             control={
               <div className="relative">
@@ -3007,7 +3037,7 @@ Thank you!`
                   {activeView === 'standard' ? 'Standard Orders' : activeView === 'custom' ? 'Custom Orders' : activeView === 'bulk' ? 'Bulk Orders' : 'Partners'}
                   {/* Notification bubble, overlapping the end of the heading. */}
                   <span className="absolute -top-3 -right-6 z-10 inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-[#4600D6] text-white text-[11px] font-bold leading-none tracking-normal shadow-[0_2px_6px_rgba(70,0,214,0.45)] ring-2 ring-white">
-                    {activeView === 'bulk' ? (bulkCount ?? '') : ordersToFulfill.length}
+                    {activeView === 'bulk' ? (bulkCount ?? '') : fulfillable.length}
                   </span>
                 </span>
               </h2>
@@ -3032,7 +3062,7 @@ Thank you!`
                 is the right control when the options do not fit side by side. */}
             <div className="hidden md:block relative">
             {/* Floats above the switcher so the header keeps its height. */}
-            <div className="absolute bottom-full right-0 mb-2.5"><QueuePill people={queues[activeView]} team={team} selected={person} onSelect={scoped ? (id) => setPersonFilter(f => f === id ? '' : id) : undefined} /></div>
+            <div className="absolute bottom-full right-0 mb-2.5"><QueuePill people={teamQueue} team={team} selected={person} onSelect={scoped ? (id) => setPersonFilter(f => f === id ? '' : id) : undefined} /></div>
             <div className={`inline-flex ${segmentGroup}`}>
               {([
                 ['standard', 'Standard'],
