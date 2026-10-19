@@ -58,6 +58,8 @@ const routes = [
   { method: 'get',  path: '/api/products/pricing',          handler: '../api/products/pricing.js' },
   { method: 'get',  path: '/api/products/bulk-edit',       handler: '../api/products/bulk-edit.js' },
   { method: 'post', path: '/api/products/bulk-edit',       handler: '../api/products/bulk-edit.js' },
+  { method: 'get',  path: '/api/products/custom-fee',      handler: '../api/products/custom-fee.js' },
+  { method: 'post', path: '/api/products/custom-fee',      handler: '../api/products/custom-fee.js' },
   { method: 'get',  path: '/api/etsy/auth',                 handler: '../api/etsy/auth.js' },
   { method: 'get',  path: '/api/admin/lookups-recent',     handler: '../api/admin/lookups-recent.js' },
   // Consolidated Instant Lookup + scraper health (replaces the two panels).

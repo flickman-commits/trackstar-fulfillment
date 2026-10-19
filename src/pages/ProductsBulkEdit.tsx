@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Loader2, ArrowLeft, RotateCcw, AlertTriangle, Check, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
+import CustomFeePanel from '@/components/CustomFeePanel'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -342,6 +343,10 @@ export default function ProductsBulkEdit() {
             <button onClick={loadCatalog} className="ml-3 underline">Retry</button>
           </div>
         )}
+
+        {/* Custom prints are priced by rule (standard + design fee), so they
+            get their own control rather than a bulk price edit. */}
+        <CustomFeePanel onApplied={() => { loadCatalog(); loadBatches() }} />
 
         {!loading && !loadError && (
           <>

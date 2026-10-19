@@ -28,6 +28,7 @@ import {
   deleteVariants,
   recreateVariants,
 } from '../../server/services/shopifyProducts.js'
+import { setCustomFee } from '../../server/services/customPricing.js'
 
 // A full 8x10 sweep is ~116 variants. This is a runaway guard, not a real limit.
 const MAX_BATCH = 1000
@@ -292,6 +293,12 @@ export default async function handler(req, res) {
       // Only mark the batch undone if every variant went back. A partial undo
       // stays open so the remainder can be retried.
       if (updated.length === changes.length) {
+        // A custom design fee change also moved the fee the storefront copy
+        // shows; put that back with the prices so the two keep agreeing.
+        const f = batch.filters
+        if (f && f.kind === 'custom_fee' && f.feeSaved && Number.isInteger(f.feeBefore)) {
+          await setCustomFee(f.feeBefore)
+        }
         await prisma.productEditBatch.update({
           where: { id: batchId },
           data: { undoneAt: new Date(), undoneBy: req.actingUser?.email || actor.email || null },
