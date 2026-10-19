@@ -192,3 +192,47 @@ export function PersonFilter({ team, value, meId, onChange }: {
     </div>
   )
 }
+
+/**
+ * Current Team on Standard Orders: two rows, what each person sent to
+ * production today (who pressed the button) and what is still waiting on
+ * their approval, each with a total. Clicking a name on the approve row
+ * shows only their orders, as the old team chips did.
+ */
+export function TeamPanel({ team, sent, toApprove, selected, onSelect }: {
+  team: Teammate[]
+  sent: { name: string; count: number }[] | null
+  toApprove: { userId: string; count: number }[]
+  selected?: string
+  onSelect?: (userId: string) => void
+}) {
+  const byName = (name: string) => team.find(u => u.firstName === name)
+  const chip = (key: string, user: Teammate | undefined, label: string, count: number, active = false, onClick?: () => void) => (
+    <span key={key} onClick={onClick} className={`inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full border text-xs ${active ? 'border-off-black bg-off-black/5' : 'border-border-gray bg-white'} ${onClick ? 'cursor-pointer hover:border-off-black/40' : ''}`}>
+      {user ? <Avatar user={user} size={18} /> : <span className="w-[18px]" />}
+      <span className="font-semibold text-off-black tabular-nums">{count}</span>
+      <span className="text-off-black/60">{label}</span>
+    </span>
+  )
+  const total = (n: number) => <span className="text-xs text-off-black/50 pl-1.5"><span className="text-sm font-semibold text-off-black tabular-nums">{n}</span> total</span>
+  const sentTotal = (sent || []).reduce((n, p) => n + p.count, 0)
+  const approveTotal = toApprove.reduce((n, p) => n + p.count, 0)
+  return (
+    <div className="hidden md:grid grid-cols-[auto_auto] items-center gap-x-3 gap-y-1.5 whitespace-nowrap">
+      <span className="col-span-2 text-right text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Current Team</span>
+      <span className="text-[11px] text-off-black/50 text-right">Sent to production today</span>
+      <span className="flex items-center justify-end gap-1.5">
+        {(sent || []).map(p => chip(`s-${p.name}`, byName(p.name), p.name, p.count))}
+        {total(sentTotal)}
+      </span>
+      <span className="text-[11px] text-off-black/50 text-right">Still left to approve</span>
+      <span className="flex items-center justify-end gap-1.5">
+        {toApprove.map(p => {
+          const user = team.find(u => u.id === p.userId)
+          return chip(`a-${p.userId}`, user, user?.firstName || 'Unassigned', p.count, selected === p.userId, onSelect && user ? () => onSelect(p.userId) : undefined)
+        })}
+        {total(approveTotal)}
+      </span>
+    </div>
+  )
+}

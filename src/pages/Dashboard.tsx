@@ -20,7 +20,7 @@ import StatusLegend from '@/components/StatusLegend'
 import RaceDatabasePanel from '@/components/RaceDatabasePanel'
 import SourceLinks from '@/components/SourceLinks'
 import AssignmentPanel from '@/components/AssignmentPanel'
-import AssigneePicker, { Avatar, QueuePill, PersonFilter, type QueueMember } from '@/components/AssigneePicker'
+import AssigneePicker, { Avatar, QueuePill, PersonFilter, TeamPanel, type QueueMember } from '@/components/AssigneePicker'
 import { setTeamColors } from '@/lib/teamColors'
 import StatsPanel from '@/components/StatsPanel'
 import { useSearchParams, useParams, useNavigate, useLocation } from 'react-router-dom'
@@ -914,13 +914,13 @@ export default function Dashboard() {
   const [onTime, setOnTime] = useState<{ pct: number; n: number } | null>(null)
   // And standard orders sent to production since midnight (New York). Read
   // again every two minutes, so it climbs through the day and resets overnight.
-  const [sentToday, setSentToday] = useState<number | null>(null)
+  const [sentToday, setSentToday] = useState<{ count: number; byPerson: { name: string; count: number }[] } | null>(null)
   useEffect(() => {
     if (!can('settings.stats')) return
     const read = () => apiFetch('/api/admin/stats?range=7d&only=fulfillment').then(r => r.ok ? r.json() : null)
       .then(d => {
         const s = d?.fulfillment?.standard; if (s?.count) setOnTime({ pct: s.withinGoalPct, n: s.count })
-        if (typeof d?.sentToday?.count === 'number') setSentToday(d.sentToday.count)
+        if (typeof d?.sentToday?.count === 'number') setSentToday({ count: d.sentToday.count, byPerson: d.sentToday.byPerson || [] })
       }).catch(() => {})
     read()
     const t = setInterval(read, 120000)
@@ -2598,6 +2598,13 @@ export default function Dashboard() {
     return people.map(p => p.open == null ? p : { ...p, open: n[p.userId] || 0 })
   }, [queues, activeView, fulfillable])
 
+  // Standard orders ready to approve, by who they are assigned to (the team panel).
+  const toApprove = useMemo(() => {
+    const n = new Map<string, number>()
+    for (const o of fulfillable) if (o.pipeline?.stage === 'review') { const k = o.assigneeId || ''; n.set(k, (n.get(k) || 0) + 1) }
+    return [...n.entries()].map(([userId, count]) => ({ userId, count })).sort((a, b) => b.count - a.count)
+  }, [fulfillable])
+
   const stageCounts = useMemo(() => {
     const c = { review: 0, attach: 0, action: 0, waiting: 0, notRun: 0 }
     if (activeView !== 'standard') return c
@@ -3075,12 +3082,6 @@ Thank you!`
               </h2>
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
               {activeView === 'standard' && onTime && <OnTimeStat pct={onTime.pct} n={onTime.n} />}
-              {activeView === 'standard' && sentToday !== null && (
-                <div className="ml-6 pl-6 border-l border-border-gray flex flex-col gap-1" title="Standard orders marked complete since midnight (New York time)">
-                  <span className="text-xs text-off-black/60 whitespace-nowrap">Orders sent to production today</span>
-                  <span className="text-2xl font-semibold text-off-black tabular-nums leading-none">{sentToday}</span>
-                </div>
-              )}
             </div>
             {lastImportedAt && (
               <button
@@ -3101,7 +3102,11 @@ Thank you!`
                 is the right control when the options do not fit side by side. */}
             <div className="hidden md:block relative">
             {/* Floats above the switcher so the header keeps its height. */}
-            <div className="absolute bottom-full right-0 mb-2.5"><QueuePill people={teamQueue} team={team} selected={person} onSelect={scoped ? (id) => setPersonFilter(f => f === id ? '' : id) : undefined} /></div>
+            <div className="absolute bottom-full right-0 mb-2.5">
+              {activeView === 'standard' && sentToday
+                ? <TeamPanel team={team} sent={sentToday.byPerson} toApprove={toApprove} selected={person} onSelect={(id) => setPersonFilter(f => f === id ? '' : id)} />
+                : <QueuePill people={teamQueue} team={team} selected={person} onSelect={scoped ? (id) => setPersonFilter(f => f === id ? '' : id) : undefined} />}
+            </div>
             <div className={`inline-flex ${segmentGroup}`}>
               {([
                 ['standard', 'Standard'],

@@ -150,10 +150,20 @@ function RefundForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
       {err ? <div className="text-red-700">{err}</div> : !info ? <div className="text-off-black/50 inline-flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" />Reading the order from Shopify</div> : (
         <>
           <div className="text-off-black/60">{dollars(info.availableCents)} left to refund{info.refundedCents ? ` (${dollars(info.refundedCents)} already refunded)` : ''}.</div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-off-black/50">$</span>
+          {/* Quick amounts: a share of what the order was paid (never more than is left), or type any amount. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[10, 15, 100].map(pct => {
+              const cents = Math.min(info.availableCents, Math.round(((info.availableCents + (info.refundedCents || 0)) * pct) / 100))
+              const value = (cents / 100).toFixed(2)
+              return (
+                <button key={pct} type="button" onClick={() => setAmount(value)} title={dollars(cents)}
+                  className={`px-2 py-1 rounded-md border text-xs font-medium ${amount === value ? 'border-[#4600D6] bg-[#4600D6]/10 text-[#4600D6]' : 'border-border-gray bg-white text-off-black/70 hover:border-off-black/30'}`}>
+                  {pct}%
+                </button>
+              )
+            })}
+            <span className="text-off-black/50 ml-1">$</span>
             <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="0.00" className={`${field} w-24`} autoFocus />
-            <button onClick={() => setAmount((info.availableCents / 100).toFixed(2))} className="text-[#4600D6] hover:underline underline-offset-2">All of it</button>
           </div>
           <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Why (goes on the refund), e.g. Buy 2 promo missed" className={field} />
           {over && <div className="text-red-700">Over {dollars(info.limitCents)} is Matt's call. Slack Matt instead.</div>}
