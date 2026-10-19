@@ -912,10 +912,19 @@ export default function Dashboard() {
   const [showCompleted, setShowCompleted] = useState(false)
   // Header stat: share of standard orders out within 2 days, past 7 days (goal 100%).
   const [onTime, setOnTime] = useState<{ pct: number; n: number } | null>(null)
+  // And standard orders sent to production since midnight (New York). Read
+  // again every two minutes, so it climbs through the day and resets overnight.
+  const [sentToday, setSentToday] = useState<number | null>(null)
   useEffect(() => {
     if (!can('settings.stats')) return
-    apiFetch('/api/admin/stats?range=7d&only=fulfillment').then(r => r.ok ? r.json() : null)
-      .then(d => { const s = d?.fulfillment?.standard; if (s?.count) setOnTime({ pct: s.withinGoalPct, n: s.count }) }).catch(() => {})
+    const read = () => apiFetch('/api/admin/stats?range=7d&only=fulfillment').then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const s = d?.fulfillment?.standard; if (s?.count) setOnTime({ pct: s.withinGoalPct, n: s.count })
+        if (typeof d?.sentToday?.count === 'number') setSentToday(d.sentToday.count)
+      }).catch(() => {})
+    read()
+    const t = setInterval(read, 120000)
+    return () => clearInterval(t)
   }, [can])
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -3066,6 +3075,12 @@ Thank you!`
               </h2>
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
               {activeView === 'standard' && onTime && <OnTimeStat pct={onTime.pct} n={onTime.n} />}
+              {activeView === 'standard' && sentToday !== null && (
+                <div className="ml-6 pl-6 border-l border-border-gray flex flex-col gap-1" title="Standard orders marked complete since midnight (New York time)">
+                  <span className="text-xs text-off-black/60 whitespace-nowrap">Orders sent to production today</span>
+                  <span className="text-2xl font-semibold text-off-black tabular-nums leading-none">{sentToday}</span>
+                </div>
+              )}
             </div>
             {lastImportedAt && (
               <button

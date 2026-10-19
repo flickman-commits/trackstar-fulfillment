@@ -114,3 +114,24 @@ export async function computeFulfillmentTime({ since, until }) {
   out.goalHours = GOAL_HOURS
   return out
 }
+
+/** Midnight today in New York, as a Date. The team's day, whatever the server's zone. */
+export function startOfTodayNY(now = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(now).map(p => [p.type, p.value]))
+  const sinceMidnight = ((Number(parts.hour) * 60 + Number(parts.minute)) * 60 + Number(parts.second)) * 1000 + now.getMilliseconds()
+  return new Date(now.getTime() - sinceMidnight)
+}
+
+/**
+ * Standard orders sent to production since midnight (New York): each order
+ * counted once, by its first "order.complete" line today. The header counter
+ * that says whether the day's pace keeps up with what comes in.
+ */
+export async function sentToProductionToday() {
+  const since = startOfTodayNY()
+  const events = await prisma.auditEvent.findMany({ where: { action: 'order.complete', createdAt: { gte: since } }, select: { detail: true } })
+  const numbers = [...new Set(events.map(e => e.detail?.orderNumber).filter(Boolean))]
+  if (!numbers.length) return { count: 0, since }
+  const count = await prisma.order.count({ where: { orderNumber: { in: numbers }, trackstarOrderType: 'standard' } })
+  return { count, since }
+}
