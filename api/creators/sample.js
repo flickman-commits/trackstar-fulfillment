@@ -13,6 +13,7 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireAdminRole, recordAudit } from '../_lib/users.js'
 import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
+import { recordSampleCostSafely } from '../../server/domain/samples/costs.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -74,6 +75,8 @@ export default async function handler(req, res) {
         customerEmail: creator.email || null,
       },
     })
+    await recordSampleCostSafely({ source: 'creator', orderName: order.orderNumber, recipient: creator.name || 'Creator', email: creator.email, createdById: admin.id || null },
+      [{ title: b.productTitle || raceName, size: order.productSize, frame: order.frameType, quantity: 1 }])
     await prisma.creator.update({ where: { id: creator.id }, data: { sampleOrderId: order.id, status: creator.status === 'denied' ? creator.status : 'active' } })
     await recordAudit({
       action: 'creator.sample-added',

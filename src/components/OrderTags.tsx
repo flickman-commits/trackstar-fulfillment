@@ -50,6 +50,7 @@ export interface TaggableOrder {
   timeFromName?: string | null
   isExpedited?: boolean
   isBigSpender?: boolean
+  isSample?: boolean
   photoPath?: string | null
   photoPlacedAt?: string | null
   photoUnpaid?: boolean
@@ -121,6 +122,9 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   const tags: OrderTag[] = []
 
   // Priority handling first. These change what Eli works on next.
+  if (o.isSample) {
+    tags.push({ key: 'sample', label: '🎁 Sample', tone: 'purple', weight: 2, title: 'A sample we sent: a creator sample, or an order from Tools > Samples.' })
+  }
   if (o.isExpedited && o.trackstarOrderType === 'standard') {
     tags.push({ key: 'expedited', label: '🚀 Expedited', tone: 'red', weight: -2,
       title: `Customer paid for ${o.shippingMethod || 'expedited'} shipping. Move this to the front of the queue.` })

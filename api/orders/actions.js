@@ -31,6 +31,7 @@ import { completeOrder, CompleteError } from '../../server/domain/orders/complet
 import { noteWeatherChange } from '../../server/domain/races/verification.js'
 import { acceptMatch, AcceptMatchError } from '../../server/domain/research/acceptMatch.js'
 import { listWinningAds } from '../../server/domain/creators/winningAds.js'
+import { recordSampleCostSafely } from '../../server/domain/samples/costs.js'
 import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
@@ -2276,6 +2277,8 @@ async function handleApproveCreatorSample({ creatorId }, res) {
     where: { id: creatorId },
     data: { status: 'active' }
   })
+  // What the sample costs us, for the monthly sample spend (never blocks approval).
+  await recordSampleCostSafely({ source: 'creator', orderName: order.orderNumber, recipient: creator.name || 'Creator', email: creator.email }, [{ title: creator.raceName, size: creator.productSize, frame: creator.frameType, quantity: 1 }])
 
   // Slack — DM Elí with everything he needs to manually build the order in
   // Artelo. We send the full address and contact details inline so he doesn't

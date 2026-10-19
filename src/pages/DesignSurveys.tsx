@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Plus, Copy, ExternalLink, ImagePlus, X, Trash2, ArrowLeft, MessageSquareText } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
-import { btnPrimary, btnSecondary, btnGhost, inputBase, segment, segmentGroup, pageShell, pageColumn, pageHeader, pageTitle, pageLogo, fieldLabel } from '@/lib/ui'
+import { btnPrimary, btnSecondary, btnGhost, inputBase, segment, segmentGroup, pageShell, fieldLabel } from '@/lib/ui'
 
 /**
  * Design Survey: put a few new design options in front of the community and
@@ -51,15 +51,17 @@ export default function DesignSurveys() {
 
   return (
     <div className={pageShell}>
-      <div className={`${pageColumn} max-w-6xl overflow-y-auto`}>
-        <PageHeader title="Design Survey" subtitle="Let the community vote on new designs." />
-        <div className={`${pageHeader} hidden md:flex`}>
-          <div className="flex flex-col gap-3">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className={`${pageLogo} self-start object-contain shrink-0`} />
-            <h1 className={pageTitle}>Design Survey</h1>
-            <p className="text-sm text-off-black/55 -mt-1">Let the community vote on new designs. Share the link on a story.</p>
+      <div className="px-3 md:px-5 w-full flex flex-col h-full overflow-y-auto">
+        {/* Same headers as the other tools: the phone header, then stars and title on one row. */}
+        <PageHeader title="Design Survey" subtitle="Let the community vote on new designs."
+          control={!openId ? <button onClick={() => setCreating(true)} className="inline-flex items-center gap-1 text-xs font-medium bg-dark-fill text-white rounded-full px-3 py-1.5"><Plus className="w-3.5 h-3.5" /> New</button> : undefined} />
+        <div className="pt-4 md:pt-5 pb-3 hidden md:flex items-center justify-between gap-4 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-auto shrink-0 object-contain" />
+            <h1 className="text-2xl md:text-[28px] font-bold text-off-black leading-none">Design Survey</h1>
+            <span className="text-sm text-off-black/45 ml-2 truncate">Let the community vote on new designs. Share the link on a story.</span>
           </div>
-          {!openId && <button onClick={() => setCreating(true)} className={`${btnPrimary} whitespace-nowrap shrink-0`}><Plus className="w-4 h-4" /> New survey</button>}
+          {!openId && <button onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-dark-fill text-white text-sm font-medium rounded-md hover:opacity-90 transition-opacity whitespace-nowrap"><Plus className="w-4 h-4" /> New survey</button>}
         </div>
 
         {creating && !openId && (

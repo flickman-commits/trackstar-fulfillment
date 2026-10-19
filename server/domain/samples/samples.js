@@ -16,6 +16,7 @@
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { fetchVariantCatalog } from '../../services/shopifyProducts.js'
 import { fetchArteloCost, BRANDING_COST_PER_ORDER } from '../../services/arteloCosts.js'
+import { recordSampleCostSafely } from './costs.js'
 
 const round = n => Math.round(n * 100) / 100
 // orderCreate needs 2024-07 or later; the rest of the app stays on 2024-01.
@@ -69,7 +70,7 @@ function cleanAddress(a = {}) {
 
 /**
  * Create the sample order in Shopify.
- * @param {{ email, address, items: [{ variantId, quantity, runnerName, raceYear, bib, time, unitPrice? }], mode: 'free'|'cost', shipping?, note?, sendEmails? }} input
+ * @param {{ email, address, source?, items: [{ variantId, quantity, title?, size?, frame?, runnerName, raceYear, bib, time, unitPrice? }], mode: 'free'|'cost', shipping?, note?, sendEmails? }} input
  */
 export async function sendSample(input, actor) {
   const email = String(input.email || '').trim()
@@ -118,5 +119,12 @@ export async function sendSample(input, actor) {
     if (errs?.length) throw Object.assign(new Error(`Order ${created.name} was created, but the invoice failed: ${errs.map(e => e.message).join('; ')}`), { status: 400 })
     invoiced = true
   }
-  return { name: created.name, id: created.legacyResourceId, total: Number(created.totalPriceSet.shopMoney.amount), invoiced, adminUrl: `https://admin.shopify.com/store/flickman-3247/orders/${created.legacyResourceId}` }
+  const totalPaid = Number(created.totalPriceSet.shopMoney.amount)
+  // What it cost us, for the monthly sample spend. Never fails the send.
+  const cost = await recordSampleCostSafely({
+    source: input.source || 'samples_tool', orderName: created.name,
+    recipient: [address.firstName, address.lastName].filter(Boolean).join(' '), email,
+    chargedCents: Math.round(totalPaid * 100), createdById: actor?.id || null,
+  }, items.map(it => ({ title: it.title, size: it.size, frame: it.frame, quantity: it.quantity })))
+  return { name: created.name, id: created.legacyResourceId, total: totalPaid, invoiced, costCents: cost?.costCents ?? null, adminUrl: `https://admin.shopify.com/store/flickman-3247/orders/${created.legacyResourceId}` }
 }

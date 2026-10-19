@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { ToolError } from '../server.js'
 import { sampleCatalog, quoteAtCost, sendSample } from '../../../domain/samples/samples.js'
+import { estimateSampleCost } from '../../../domain/samples/costs.js'
 
 const item = z.object({
   print: z.string().min(2).max(120).describe('The race print, e.g. "Berlin World Major" or "Chicago Marathon". Matched against the store\'s product titles.'),
@@ -81,6 +82,7 @@ export const sampleTools = [
         for (const l of lines) l.unitPrice = q.lines.find(x => x.variantId === l.variant.variantId)?.unit || 0
         shipping = args.shipping ?? q.shipping
       }
+      const ourCost = await estimateSampleCost(lines.map(l => ({ size: l.size, frame: l.variant.frame, quantity: l.quantity })))
       const total = args.mode === 'cost' ? Math.round((lines.reduce((n, l) => n + l.unitPrice * l.quantity, 0) + shipping) * 100) / 100 : 0
 
       // The fingerprint of exactly what would be sent; confirm must match it.
@@ -91,6 +93,7 @@ export const sampleTools = [
         shipTo: [args.address.address1, args.address.address2, `${args.address.city}, ${args.address.province} ${args.address.zip}`].filter(Boolean).join(', '),
         prints: lines.map(l => ({ print: shortTitle(l.product.title), size: l.size, frame: l.variant.frame, quantity: l.quantity, runnerName: l.runnerName || null, raceYear: l.raceYear || null, bib: l.bib || null, time: l.time || null, price: args.mode === 'cost' ? l.unitPrice : 0 })),
         pricing: args.mode === 'cost' ? `At cost: $${total.toFixed(2)} including $${shipping.toFixed(2)} shipping, invoiced by Shopify` : 'Free: a $0 order, marked paid',
+        costsUs: `$${(ourCost.totalCents / 100).toFixed(2)} (production $${(ourCost.productionCents / 100).toFixed(2)}, shipping and branding $${(ourCost.shippingCents / 100).toFixed(2)})${args.mode === 'cost' ? `; they pay $${total.toFixed(2)}, so net $${Math.max(0, ourCost.totalCents / 100 - total).toFixed(2)}` : ''}`,
       }
 
       if (!args.confirm) {
@@ -100,9 +103,9 @@ export const sampleTools = [
 
       const [firstName, ...rest] = args.name.trim().split(/\s+/)
       const out = await sendSample({
-        email: args.email, mode: args.mode, shipping, note: [args.note, `Sent through the MCP by ${principal.name}`].filter(Boolean).join('\n'),
+        source: 'mcp', email: args.email, mode: args.mode, shipping, note: [args.note, `Sent through the MCP by ${principal.name}`].filter(Boolean).join('\n'),
         address: { firstName, lastName: rest.join(' '), ...args.address },
-        items: lines.map(l => ({ variantId: l.variant.variantId, quantity: l.quantity, runnerName: l.runnerName, raceYear: l.raceYear, bib: l.bib, time: l.time, unitPrice: l.unitPrice || 0 })),
+        items: lines.map(l => ({ variantId: l.variant.variantId, title: shortTitle(l.product.title), size: l.size, frame: l.variant.frame, quantity: l.quantity, runnerName: l.runnerName, raceYear: l.raceYear, bib: l.bib, time: l.time, unitPrice: l.unitPrice || 0 })),
       }, principal.user)
       return {
         summary: `Sent sample ${out.name} to ${args.email} (${args.mode === 'cost' ? `at cost, $${out.total.toFixed(2)}` : 'free'})`,

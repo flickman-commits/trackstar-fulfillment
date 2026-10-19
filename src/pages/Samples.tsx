@@ -72,7 +72,12 @@ export default function Samples() {
   const [note, setNote] = useState('')
   const [reviewing, setReviewing] = useState(false)
   const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState<{ name: string; total: number; invoiced: boolean; adminUrl: string } | null>(null)
+  const [sent, setSent] = useState<{ name: string; total: number; invoiced: boolean; adminUrl: string; costCents?: number | null } | null>(null)
+  // What the prints cost us (Artelo production, shipping, branding), free or not.
+  const [ourCost, setOurCost] = useState<number | null>(null)
+  const [spend, setSpend] = useState<{ months: { month: string; count: number; costCents: number; chargedCents: number; netCents: number }[]; recent: { id: string; at: string; source: string; orderName: string | null; recipient: string; costCents: number; chargedCents: number }[] } | null>(null)
+  const loadSpend = () => apiFetch('/api/samples?view=spend').then(r => r.ok ? r.json() : null).then(d => d && setSpend(d)).catch(() => {})
+  useEffect(() => { loadSpend() }, [])
 
   useEffect(() => {
     apiFetch('/api/samples').then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Could not load the store'); setProducts(d.products) })
@@ -98,6 +103,17 @@ export default function Samples() {
   }
   useEffect(() => { if (mode === 'cost') fillCosts() }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const costKey = lines.map(l => `${l.size}|${l.frame}|${l.quantity}|${l.product ? 1 : 0}`).join(',')
+  useEffect(() => {
+    const items = lines.filter(l => l.product).map(l => ({ size: l.size, frame: l.frame, quantity: l.quantity }))
+    if (!items.length) { setOurCost(null); return }
+    const t = setTimeout(() => {
+      apiFetch('/api/samples', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cost', items }) })
+        .then(r => r.ok ? r.json() : null).then(d => setOurCost(d ? d.totalCents / 100 : null)).catch(() => setOurCost(null))
+    }, 400)
+    return () => clearTimeout(t)
+  }, [costKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const total = useMemo(() => mode === 'free' ? 0 : lines.reduce((n, l) => n + (Number(l.unitPrice) || 0) * l.quantity, 0) + (Number(shipping) || 0), [mode, lines, shipping])
 
   const send = async () => {
@@ -107,12 +123,12 @@ export default function Samples() {
       const body = {
         action: 'send', mode, email: email.trim(), note, shipping: mode === 'cost' ? shipping : 0,
         address: { firstName, lastName: rest.join(' '), ...addr },
-        items: lines.map(l => ({ variantId: variantOf(l)!.variantId, quantity: l.quantity, runnerName: l.runnerName, raceYear: l.raceYear, bib: l.bib, time: l.time, unitPrice: mode === 'cost' ? l.unitPrice : 0 })),
+        items: lines.map(l => ({ variantId: variantOf(l)!.variantId, title: shortTitle(l.product!.title), size: l.size, frame: l.frame, quantity: l.quantity, runnerName: l.runnerName, raceYear: l.raceYear, bib: l.bib, time: l.time, unitPrice: mode === 'cost' ? l.unitPrice : 0 })),
       }
       const r = await apiFetch('/api/samples', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || `Could not send the sample (server said ${r.status})`)
-      setSent(d); setReviewing(false)
+      setSent(d); setReviewing(false); loadSpend()
       toast.success(`Sample ${d.name} created${d.invoiced ? ' and invoiced' : ''}`)
     } catch (e) { toast.error((e as Error).message) } finally { setSending(false) }
   }
@@ -227,12 +243,42 @@ export default function Samples() {
                     <span className="text-sm text-off-black/60">They pay</span>
                     <span className="text-xl font-semibold text-off-black tabular-nums">${total.toFixed(2)}</span>
                   </div>
+                  <div className="mt-1.5 flex items-baseline justify-between" title="Artelo production, shipping and branding">
+                    <span className="text-sm text-off-black/60">Costs us</span>
+                    <span className="text-sm font-semibold text-off-black tabular-nums">{ourCost == null ? '…' : `$${Math.max(0, ourCost - total).toFixed(2)}`}{ourCost != null && total > 0 && <span className="font-normal text-off-black/45"> (of ${ourCost.toFixed(2)})</span>}</span>
+                  </div>
                 </div>
 
                 <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Note on the order (optional), e.g. Creator sample for Rob" className={`${field} resize-none`} />
                 <button onClick={() => setReviewing(true)} disabled={!ready} className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-dark-fill text-white text-sm font-medium rounded-md disabled:opacity-40">Review and send</button>
                 {!ready && <p className="text-[11px] text-off-black/45 text-center">Needs a print, a name, an email and an address.</p>}
               </div>
+            </div>
+          )}
+
+          {/* Sample spend by month: every sample from here, the MCP and creator samples. */}
+          {spend && (
+            <div className="mt-5 bg-white border border-border-gray rounded-lg p-4 md:p-6">
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className={sectionLabel}>Sample spend</h2>
+                <span className="text-xs text-off-black/45">Artelo production, shipping and branding, less what at-cost recipients paid</span>
+              </div>
+              {spend.months.length === 0 ? <p className="text-sm text-off-black/45">No samples recorded yet.</p> : (
+                <table className="w-full text-sm">
+                  <thead><tr className="text-left text-xs text-off-black/50"><th className="py-1.5 font-medium">Month</th><th className="font-medium text-right">Samples</th><th className="font-medium text-right">Cost</th><th className="font-medium text-right">Paid back</th><th className="font-medium text-right">Spent</th></tr></thead>
+                  <tbody className="divide-y divide-border-gray">
+                    {spend.months.map(m => (
+                      <tr key={m.month}>
+                        <td className="py-2">{new Date(`${m.month}-15T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</td>
+                        <td className="text-right tabular-nums">{m.count}</td>
+                        <td className="text-right tabular-nums">${(m.costCents / 100).toFixed(2)}</td>
+                        <td className="text-right tabular-nums text-off-black/55">{m.chargedCents ? `$${(m.chargedCents / 100).toFixed(2)}` : '-'}</td>
+                        <td className="text-right tabular-nums font-semibold">${(m.netCents / 100).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
         </div>
@@ -249,6 +295,7 @@ export default function Samples() {
               {lines.map(l => <div key={l.key} className="flex items-center gap-2">{thumb(l.product?.image || null, 'w-7 h-9')}<span>{l.quantity} × {shortTitle(l.product!.title)}, {l.size} {l.frame}{l.runnerName ? `, ${l.runnerName}` : ''}{mode === 'cost' ? ` · $${(Number(l.unitPrice) || 0).toFixed(2)}` : ''}</span></div>)}
               <div className="pt-2 border-t border-border-gray">To {name}, {email}<br />{[addr.address1, addr.address2, `${addr.city}, ${addr.province} ${addr.zip}`].filter(Boolean).join(', ')}</div>
               <div className="font-medium text-off-black">{mode === 'free' ? 'Free: a $0 order, marked paid.' : `At cost: $${total.toFixed(2)} including $${(Number(shipping) || 0).toFixed(2)} shipping. Shopify emails the invoice.`}</div>
+              {ourCost != null && <div className="text-off-black/70">Costs us ${Math.max(0, ourCost - total).toFixed(2)}{total > 0 ? ` (production and shipping $${ourCost.toFixed(2)}, less the $${total.toFixed(2)} they pay)` : ' (Artelo production, shipping and branding)'}.</div>}
               <div className="text-xs text-off-black/50">Creates a real Shopify order. They get Shopify's order emails, and Artelo makes it like any other order.</div>
             </div>
             <div className="mt-4 flex justify-end gap-2">

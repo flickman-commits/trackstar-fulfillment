@@ -1268,3 +1268,24 @@ model WinningAd {
 
   @@index([createdAt])
 }
+
+// What a sample cost us, recorded when it is sent: from Tools > Samples, the
+// MCP's send_sample, or a creator's sample. Money in integer cents.
+// cost is Artelo production + shipping + branding at the time it was sent;
+// charged is what the recipient paid (at-cost samples), so cost - charged is
+// what the sample really cost. The monthly sample spend reads this table.
+model SampleCost {
+  id           String   @id @default(cuid())
+  source       String   // "samples_tool" | "mcp" | "creator"
+  orderName    String?  // Shopify order name (#5321) or CREATOR-XXXXXX
+  recipient    String
+  email        String?
+  items        Json     // [{ title, size, frame, quantity }]
+  costCents    Int
+  chargedCents Int      @default(0)
+  currency     String   @default("USD")
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}

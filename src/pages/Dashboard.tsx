@@ -221,6 +221,7 @@ interface Order {
   // Big-spender flag — true if order total > $300 (configurable on backend)
   orderTotalUsd?: number | null
   isBigSpender?: boolean
+  isSample?: boolean
   bigSpenderThresholdUsd?: number
   // Which Shopify/Etsy product was ordered — drives which design template
   // Eli uses (e.g. regular Boston print vs Boston World Major poster).
@@ -423,6 +424,7 @@ function mapOrder(order: Record<string, unknown>): Order {
     // Big-spender (>= $300) badge + prioritize callout
     orderTotalUsd: order.orderTotalUsd as number | null | undefined,
     isBigSpender: order.isBigSpender as boolean | undefined,
+    isSample: order.isSample as boolean | undefined,
     bigSpenderThresholdUsd: order.bigSpenderThresholdUsd as number | undefined,
     // Which product was ordered → drives design variant
     productInfo: order.productInfo as Order['productInfo'],

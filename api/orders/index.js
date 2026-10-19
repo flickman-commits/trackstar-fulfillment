@@ -368,6 +368,8 @@ export default async function handler(req, res) {
         // Order total + big-spender flag — for the "💰 BIG SPENDER" prioritize callout
         orderTotalUsd: getOrderTotalUsd(order),
         isBigSpender: isBigSpender(order),
+        // A sample: a creator's sample, or an order sent from Tools > Samples (Shopify tag "sample").
+        isSample: order.source === 'creator_sample' || String(order.shopifyOrderData?.tags || '').split(',').some(t => t.trim().toLowerCase() === 'sample'),
         bigSpenderThresholdUsd: BIG_SPENDER_THRESHOLD_USD,
         // Which product/design variant Eli should use. Keyed off the stable
         // Shopify product_id (or Etsy listing_id), not the rename-able title.
