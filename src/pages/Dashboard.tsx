@@ -769,6 +769,17 @@ function ApprovalEmailField({ order, onSaved }: { order: Order; onSaved: (email:
   )
 }
 
+/** Share of standard orders out within 2 days over the past week, against a goal of 100%. */
+function OnTimeStat({ pct, n }: { pct: number; n: number }) {
+  const color = pct >= 90 ? 'bg-green-500' : pct >= 75 ? 'bg-amber-400' : 'bg-red-400'
+  return (
+    <div className="ml-5 flex items-center gap-2.5" title={`Past 7 days: ${pct}% of ${n} standard orders were completed within 2 days of the order (or race day). Goal: 100%.`}>
+      <div className="w-32 h-2 rounded-full bg-off-black/10 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>
+      <span className="text-xs text-off-black/60 whitespace-nowrap"><span className="font-semibold text-off-black tabular-nums">{pct}%</span> out in 2 days · 7d</span>
+    </div>
+  )
+}
+
 /** The name to greet someone by. Falls back to the part of an email before the @. */
 
 function greetingName(user: { firstName?: string | null; email?: string | null } | null): string {
@@ -893,6 +904,13 @@ export default function Dashboard() {
   const stageFilter: StageFilter = (['review', 'attach', 'action', 'waiting', 'not_run'] as const).find(k => k === searchParams.get('queue')) || ''
   const setStageFilter = useCallback((v: StageFilter) => setUrlParam('queue', v), [setUrlParam])
   const [showCompleted, setShowCompleted] = useState(false)
+  // Header stat: share of standard orders out within 2 days, past 7 days (goal 100%).
+  const [onTime, setOnTime] = useState<{ pct: number; n: number } | null>(null)
+  useEffect(() => {
+    if (!can('settings.stats')) return
+    apiFetch('/api/admin/stats?range=7d&only=fulfillment').then(r => r.ok ? r.json() : null)
+      .then(d => { const s = d?.fulfillment?.standard; if (s?.count) setOnTime({ pct: s.withinGoalPct, n: s.count }) }).catch(() => {})
+  }, [can])
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -3042,6 +3060,7 @@ Thank you!`
                 </span>
               </h2>
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
+              {activeView === 'standard' && onTime && <OnTimeStat pct={onTime.pct} n={onTime.n} />}
             </div>
             {lastImportedAt && (
               <button
