@@ -229,22 +229,16 @@ function SalesTile({ item, active }: { item: Item; active: boolean }) {
  */
 export function MobileToolBar({
   can,
-  onOpenDiscounts,
-  onOpenPaceConverter,
   onOpenSettings,
   activeId,
 }: {
   can: (c: Capability) => boolean
-  onOpenDiscounts: () => void
-  onOpenPaceConverter: () => void
   onOpenSettings: () => void
   activeId?: string
 }) {
   const items: Item[] = [
     ...railItems(can),
-    ...(can('tools.discounts') ? [{ id: 'discounts', label: 'Discounts', icon: Ticket, onClick: onOpenDiscounts, title: 'One-time discount code' } as Item] : []),
-    ...(can('tools.pace') ? [{ id: 'pace', label: 'Pace', icon: Calculator, onClick: onOpenPaceConverter, title: 'Finish time to pace' } as Item] : []),
-    ...(can('tools.weather') ? [{ id: 'weather', label: 'Weather', icon: CloudSun, href: 'https://weatherspark.com', title: 'Race-day weather on WeatherSpark' } as Item] : []),
+    // Discounts, Pace and Weather are desktop tools; the phone bar keeps to the pages.
     ...(can('tools.surveys') ? [{ id: 'surveys', label: 'Survey', icon: Vote, to: '/surveys', title: 'Design Survey' } as Item] : []),
     { id: 'settings', label: 'Settings', icon: Settings, onClick: onOpenSettings, title: 'Settings' },
   ]

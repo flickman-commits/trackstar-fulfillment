@@ -156,6 +156,9 @@ export default function ProductsBulkEdit({ embedded = false }: { embedded?: bool
     [variants]
   )
 
+  // Removing variants stays folded away until asked for.
+  const [showRemove, setShowRemove] = useState(false)
+
   const matched = useMemo(() => {
     const q = titleQuery.trim().toLowerCase()
     return variants.filter(v => {
@@ -443,23 +446,39 @@ export default function ProductsBulkEdit({ embedded = false }: { embedded?: bool
                 preview - a variant you are deleting has no "new price", so
                 `changing` would be empty and the button dead.
               */}
-              <div className="mt-4 pt-4 border-t border-border-gray flex items-center gap-3">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-off-black">Discontinue a size or frame</p>
-                  <p className="text-xs text-off-black/50 mt-0.5">
-                    Deletes all {matched.length} matched variant{matched.length === 1 ? '' : 's'} from Shopify.
-                    Undoable from the batch list, though restored variants get new IDs.
+              {/* Removal is tucked away and only offered once a size or frame is
+                  picked, and never for the whole catalog: deleting is the rare
+                  job here, and it should never be the obvious button. */}
+              <div className="mt-4 pt-4 border-t border-border-gray">
+                {!showRemove ? (
+                  <button onClick={() => setShowRemove(true)} className="text-xs text-off-black/45 hover:text-off-black/70 underline underline-offset-2">
+                    Discontinue a size or frame
+                  </button>
+                ) : !(sizes.length || frames.length) || matched.length === variants.length ? (
+                  <p className="text-xs text-off-black/50">
+                    To discontinue, first pick the size or frame to remove in the filters above. Removing is never offered for the whole catalog.{' '}
+                    <button onClick={() => setShowRemove(false)} className="underline underline-offset-2">Hide</button>
                   </p>
-                </div>
-                <button
-                  onClick={previewRemove}
-                  disabled={!matched.length || removing}
-                  className="px-4 py-2.5 text-sm font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md transition-colors disabled:opacity-30 inline-flex items-center gap-2"
-                >
-                  {removing && !removePreview
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking…</>
-                    : <><Trash2 className="w-4 h-4" /> Remove {matched.length} variant{matched.length === 1 ? '' : 's'}</>}
-                </button>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-off-black">Discontinue {[...sizes, ...frames].join(', ')}</p>
+                      <p className="text-xs text-off-black/50 mt-0.5">
+                        Deletes the {matched.length} matched variant{matched.length === 1 ? '' : 's'} from Shopify. You review the list before anything is deleted, and it can be undone from the batch list (restored variants get new IDs).
+                      </p>
+                    </div>
+                    <button onClick={() => setShowRemove(false)} className="text-sm text-off-black/50 px-2">Cancel</button>
+                    <button
+                      onClick={previewRemove}
+                      disabled={!matched.length || removing}
+                      className="px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-30 inline-flex items-center gap-2"
+                    >
+                      {removing && !removePreview
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking…</>
+                        : <><Trash2 className="w-4 h-4" /> Review removal</>}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -68,8 +68,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <MobileToolBar
         can={can}
         activeId={activeId}
-        onOpenDiscounts={() => setRailPanel(p => (p === 'discounts' ? null : 'discounts'))}
-        onOpenPaceConverter={() => setRailPanel(p => (p === 'pace' ? null : 'pace'))}
         onOpenSettings={openSettings}
       />
       <AppSidebar
