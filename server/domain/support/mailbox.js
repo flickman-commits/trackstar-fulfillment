@@ -34,6 +34,7 @@
 import { google } from 'googleapis'
 import prisma from '../../db.js'
 import { unwrapForward } from './forwards.js'
+import { isForwarder } from './forwarders.js'
 import { oauthClient, originFor, isRevokedToken, buildMime, base64url, newMessageId } from '../sales/gmail.js'
 import { defaultAssigneeId } from './routing.js'
 import { isFiltered } from './filters.js'
@@ -334,6 +335,13 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
   const mb = mailbox || mailboxEmail()
   // Drafts show up in history as they are typed; they are not mail yet.
   if (parsed.labels?.includes('DRAFT')) return null
+  // A forward from a teammate's other inbox (not our domain, which parseMessage
+  // already handles): listed in Settings, or a teammate's sign-in address.
+  if (!parsed.forward && parsed.direction === 'in' && !parsed.labels?.includes('SENT') && await isForwarder(parsed.fromEmail)) {
+    const sender = String(parsed.fromEmail || '').toLowerCase()
+    const fwd = unwrapForward(parsed, { isOurs: e => isOurs(e, mb) || String(e || '').toLowerCase() === sender })
+    if (fwd) parsed = { ...fwd.message, forward: { note: fwd.note, by: fwd.forwardedBy } }
+  }
 
   // A reply we just sent belongs to the conversation it was sent from, even if Gmail filed it on a thread of its own.
   let thread = threadId ? await prisma.supportThread.findUnique({ where: { id: threadId } }) : null
@@ -383,11 +391,13 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
     attachments: parsed.attachments,
     sentAt: parsed.sentAt,
   }
-  const existed = await prisma.supportMessage.findUnique({ where: { gmailMessageId: parsed.gmailMessageId }, select: { id: true, direction: true } })
+  const existed = await prisma.supportMessage.findUnique({ where: { gmailMessageId: parsed.gmailMessageId }, select: { id: true, direction: true, fromEmail: true } })
   // A forward already unwrapped into the customer's message stays unwrapped: a later read
   // that sees only "our teammate's email" (code from before a forward format was understood,
   // still running in a tab opened earlier) must not turn it back.
-  const keepForward = existed?.direction === 'in' && parsed.direction === 'out' && !parsed.forward && !parsed.labels?.includes('SENT') && isOurs(parsed.fromEmail, mb)
+  const keepForward = existed?.direction === 'in' && !parsed.forward && !parsed.labels?.includes('SENT')
+    && String(existed.fromEmail || '').toLowerCase() !== String(parsed.fromEmail || '').toLowerCase()
+    && (isOurs(parsed.fromEmail, mb) || await isForwarder(parsed.fromEmail))
   const message = await prisma.supportMessage.upsert({
     where: { gmailMessageId: parsed.gmailMessageId },
     create: { ...row, gmailMessageId: parsed.gmailMessageId, sentById },
