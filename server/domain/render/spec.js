@@ -12,7 +12,7 @@
 import { formatRaceDate, formatTemp, formatTime, formatPace, formatCondition } from '../../lib/printFormat.js'
 import { unpaidPhotoRows } from '../orders/photoPayment.js'
 import { printBlockers } from '../races/verification.js'
-import { isMainEvent } from '../../scrapers/index.js'
+import { isMainEvent, getCanonicalRaceName } from '../../scrapers/index.js'
 
 export const SIZES = ['8x10', '12x18', '16x24']
 
@@ -53,6 +53,23 @@ export function eventLabel(eventType) {
  * its own file, "<race> / Half Marathon", "<race> / 10K". The World Majors
  * edition stacks in front: "Chicago Marathon / World Majors".
  */
+/**
+ * The production file for an order, given the files that exist: its race name
+ * as written first, then the race's standard name, so an order that says
+ * "Chicago" finds the "Chicago Marathon" file. Exact names win, so a race
+ * keyed by its own spelling never moves.
+ */
+export function resolveTemplate(order, raceName, eventType, has) {
+  const exact = templateFor(order, raceName, eventType)
+  if (has(exact)) return exact
+  const canonical = getCanonicalRaceName(raceName)
+  if (canonical && canonical !== raceName) {
+    const alt = templateFor(order, canonical, eventType)
+    if (has(alt)) return alt
+  }
+  return exact
+}
+
 export function templateFor(order, raceName, eventType) {
   const edition = editionOf(order)
   const ev = eventType && !isMainEvent(raceName, eventType) ? eventLabel(eventType) : null
@@ -87,7 +104,7 @@ export function buildSpec(order, templates = [], raceRow = null, noTimeGaps = ne
   if (!SIZES.includes(order.productSize)) reasons.push(`No artboard for size "${order.productSize}"`)
   const edition = editionOf(order)
   const research0 = order.runnerResearch?.find(r => r.researchStatus === 'found') || order.runnerResearch?.[0]
-  const template = templateFor(order, raceName, research0?.eventType)
+  const template = resolveTemplate(order, raceName, research0?.eventType, k => templates.includes(k))
   const eventTag = template.includes(' / ') && !edition ? eventLabel(research0?.eventType) : null
   if (!templates.includes(template)) reasons.push(`No prepared template for ${template}`)
   if (!name) reasons.push('No runner name')
