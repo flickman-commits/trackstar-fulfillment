@@ -444,12 +444,12 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
 
   return (
     <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white">
-      {/* Header */}
-      <div className="px-5 py-3 border-b border-border-gray shrink-0 space-y-2">
+      {/* Header: who and what on the left; star, unread and who has it on the right, on the same line. */}
+      <div className="px-5 py-3 border-b border-border-gray shrink-0">
         <div className="flex items-start gap-3">
           <CustomerAvatar name={thread.customerName} email={thread.customerEmail || thread.igUsername} size={34} />
           <div className="min-w-0 flex-1">
-            <div className="text-[15px] font-semibold text-off-black leading-tight">{thread.customerName || (ig && thread.igUsername ? `@${thread.igUsername}` : '') || thread.customerEmail || 'Unknown sender'}<span className="font-normal text-off-black/45 text-xs ml-2">{thread.customerEmail}</span></div>
+            <div className="text-[15px] font-semibold text-off-black leading-tight truncate">{thread.customerName || (ig && thread.igUsername ? `@${thread.igUsername}` : '') || thread.customerEmail || 'Unknown sender'}<span className="font-normal text-off-black/45 text-xs ml-2">{thread.customerEmail}</span></div>
             <div className="text-[13px] text-off-black/70 leading-snug inline-flex items-start gap-1.5 max-w-full break-words">
               <ChannelMark channel={thread.channel} />
               {ig ? (
@@ -457,16 +457,16 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
               ) : <span>{thread.subject || '(no subject)'}</span>}
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <button onClick={() => onPriority(!thread.priority)} disabled={busy} className={`${btnGhost} px-2`} title={thread.priority ? 'Remove priority (p)' : 'Mark priority (p)'}>
-            <Star className={`w-4 h-4 ${thread.priority ? 'text-amber-500 fill-amber-500' : 'text-off-black/40'}`} />
-          </button>
-          <button onClick={onMarkUnread} disabled={busy} className={`${btnGhost} px-2`} title="Mark unread (u)">
-            <Mail className="w-4 h-4 text-off-black/40" />
-          </button>
-          <AssigneePicker team={team} value={thread.assignee?.id || null} meId={me.id} onChange={onAssign} />
-          {snoozed && <span className="text-[11px] text-off-black/50 inline-flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(thread.snoozedUntil as string).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>}
+          <div className="shrink-0 flex items-center gap-0.5 -mt-0.5">
+            {snoozed && <span className="mr-1 text-[11px] text-off-black/50 inline-flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(thread.snoozedUntil as string).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>}
+            <button onClick={() => onPriority(!thread.priority)} disabled={busy} className={`${btnGhost} px-1.5`} title={thread.priority ? 'Remove priority (p)' : 'Mark priority (p)'}>
+              <Star className={`w-4 h-4 ${thread.priority ? 'text-amber-500 fill-amber-500' : 'text-off-black/40'}`} />
+            </button>
+            <button onClick={onMarkUnread} disabled={busy} className={`${btnGhost} px-1.5`} title="Mark unread (u)">
+              <Mail className="w-4 h-4 text-off-black/40" />
+            </button>
+            <AssigneePicker team={team} value={thread.assignee?.id || null} meId={me.id} onChange={onAssign} firstNameOnly />
+          </div>
         </div>
       </div>
 

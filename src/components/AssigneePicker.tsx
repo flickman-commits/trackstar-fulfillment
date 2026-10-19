@@ -20,8 +20,10 @@ export function Avatar({ user, size = 24 }: { user: Teammate; size?: number }) {
   )
 }
 
-export default function AssigneePicker({ team, value, meId, onChange, readOnly = false, readOnlyReason }: {
+export default function AssigneePicker({ team, value, meId, onChange, readOnly = false, readOnlyReason, firstNameOnly = false }: {
   team: Teammate[]
+  /** Just "Matt", for a tight header. */
+  firstNameOnly?: boolean
   value: string | null
   meId?: string | null
   onChange: (id: string | null) => void
@@ -57,7 +59,7 @@ export default function AssigneePicker({ team, value, meId, onChange, readOnly =
         {current ? (
           <>
             <Avatar user={current} />
-            <span className="text-sm font-medium text-off-black">{current.firstName} {current.lastName}</span>
+            <span className="text-sm font-medium text-off-black">{firstNameOnly ? current.firstName : `${current.firstName} ${current.lastName}`}</span>
           </>
         ) : (
           <span className="text-sm text-off-black/40">Unassigned</span>
