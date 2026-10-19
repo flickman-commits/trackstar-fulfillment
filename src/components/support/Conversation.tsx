@@ -221,6 +221,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
   const [mentionIdx, setMentionIdx] = useState(0)
   const [sending, setSending] = useState(false)
   const [attached, setAttached] = useState<Mockup[]>([])
+  const [enlarged, setEnlarged] = useState<{ src: string; label: string } | null>(null)
   const [slashQ, setSlashQ] = useState<string | null>(null)
   const [slashIdx, setSlashIdx] = useState(0)
   const [uploading, setUploading] = useState(0)
@@ -412,6 +413,31 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     onUseMacro(m.id)
   }
 
+  // Escalate, Close (with snooze and waiting) and Reopen: down with Send, so every action on the conversation sits in one row.
+  const statusActions = (
+    <span className="inline-flex items-center gap-2">
+          {thread.status !== 'escalated' && thread.status !== 'closed' && (
+            <button onClick={() => onStatus('escalated')} disabled={busy} className={btnSecondary} title="Pull Matt in"><AlertTriangle className="w-3.5 h-3.5" /> Escalate</button>
+          )}
+          {thread.status === 'closed' ? (
+            <button onClick={() => onStatus('open')} disabled={busy} className={btnPrimary}><RotateCcw className="w-3.5 h-3.5" /> Reopen</button>
+          ) : (
+            <div className="relative inline-flex" ref={close.ref}>
+              <button onClick={() => onStatus('closed')} disabled={busy} className={`${btnPrimary} rounded-r-none`} title="Close (c)"><Archive className="w-3.5 h-3.5" /> Close <Kbd>C</Kbd></button>
+              <button onClick={() => close.setOpen(v => !v)} disabled={busy} className={`${btnPrimary} rounded-l-none px-1.5 border-l border-white/20`} title="Snooze, or mark waiting"><ChevronDown className="w-3.5 h-3.5" /></button>
+              {close.open && (
+                <div className="absolute right-0 bottom-full mb-1 w-52 p-1 rounded-lg bg-white border border-border-gray shadow-[0_6px_24px_rgba(0,0,0,0.12)] z-20">
+                  <div className="px-3 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Snooze</div>
+                  {SNOOZES.map(s => <button key={s.label} onClick={() => { close.setOpen(false); onSnooze(s.until().toISOString()) }} className="w-full text-left px-3 py-1.5 text-sm rounded-md hover:bg-subtle-gray">{s.label}</button>)}
+                  {snoozed && <button onClick={() => { close.setOpen(false); onSnooze(null) }} className="w-full text-left px-3 py-1.5 text-sm rounded-md hover:bg-subtle-gray text-off-black/60">Unsnooze</button>}
+                  {thread.status === 'open' && <><div className="my-1 border-t border-border-gray" /><button onClick={() => { close.setOpen(false); onStatus('waiting') }} className="w-full text-left px-3 py-1.5 text-sm rounded-md hover:bg-subtle-gray">Mark waiting on customer</button></>}
+                </div>
+              )}
+            </div>
+          )}
+    </span>
+  )
+
   return (
     <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white">
       {/* Header */}
@@ -437,25 +463,6 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
           </button>
           <AssigneePicker team={team} value={thread.assignee?.id || null} meId={me.id} onChange={onAssign} />
           {snoozed && <span className="text-[11px] text-off-black/50 inline-flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(thread.snoozedUntil as string).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>}
-          {thread.status !== 'escalated' && thread.status !== 'closed' && (
-            <button onClick={() => onStatus('escalated')} disabled={busy} className={btnSecondary} title="Pull Matt in"><AlertTriangle className="w-3.5 h-3.5" /> Escalate</button>
-          )}
-          {thread.status === 'closed' ? (
-            <button onClick={() => onStatus('open')} disabled={busy} className={btnPrimary}><RotateCcw className="w-3.5 h-3.5" /> Reopen</button>
-          ) : (
-            <div className="relative inline-flex" ref={close.ref}>
-              <button onClick={() => onStatus('closed')} disabled={busy} className={`${btnPrimary} rounded-r-none`} title="Close (c)"><Archive className="w-3.5 h-3.5" /> Close</button>
-              <button onClick={() => close.setOpen(v => !v)} disabled={busy} className={`${btnPrimary} rounded-l-none px-1.5 border-l border-white/20`} title="Snooze, or mark waiting"><ChevronDown className="w-3.5 h-3.5" /></button>
-              {close.open && (
-                <div className="absolute right-0 top-full mt-1 w-52 p-1 rounded-lg bg-white border border-border-gray shadow-[0_6px_24px_rgba(0,0,0,0.12)] z-20">
-                  <div className="px-3 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Snooze</div>
-                  {SNOOZES.map(s => <button key={s.label} onClick={() => { close.setOpen(false); onSnooze(s.until().toISOString()) }} className="w-full text-left px-3 py-1.5 text-sm rounded-md hover:bg-subtle-gray">{s.label}</button>)}
-                  {snoozed && <button onClick={() => { close.setOpen(false); onSnooze(null) }} className="w-full text-left px-3 py-1.5 text-sm rounded-md hover:bg-subtle-gray text-off-black/60">Unsnooze</button>}
-                  {thread.status === 'open' && <><div className="my-1 border-t border-border-gray" /><button onClick={() => { close.setOpen(false); onStatus('waiting') }} className="w-full text-left px-3 py-1.5 text-sm rounded-md hover:bg-subtle-gray">Mark waiting on customer</button></>}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -537,12 +544,22 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
                 </div>
               )}
             </div>
+            {/* An attached mockup, full size. Click anywhere or press Esc to close. */}
+            {enlarged && (
+              <div className="fixed inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center p-4 md:p-10 cursor-zoom-out" onClick={() => setEnlarged(null)} onKeyDown={e => { if (e.key === 'Escape') setEnlarged(null) }} tabIndex={-1} ref={el => el?.focus()}>
+                <img src={enlarged.src} alt={enlarged.label} className="max-w-full max-h-[85vh] object-contain rounded shadow-2xl bg-white" />
+                <div className="mt-3 text-sm text-white/80">{enlarged.label}</div>
+                <button onClick={() => setEnlarged(null)} className="absolute top-4 right-4 text-white/70 hover:text-white" title="Close (Esc)"><X className="w-6 h-6" /></button>
+              </div>
+            )}
             {(attached.length > 0 || uploading > 0) && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {uploading > 0 && <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border-gray bg-subtle-gray text-xs text-off-black/60"><Loader2 className="w-3.5 h-3.5 animate-spin" />Uploading {uploading}</span>}
                 {attached.map(m => (
                   <span key={m.ref} className="inline-flex items-center gap-2 pl-1 pr-2 py-1 rounded-md border border-border-gray bg-subtle-gray text-xs text-off-black/75">
-                    {m.thumbUrl ? <img src={m.thumbUrl} alt="" className="w-8 h-8 rounded object-cover bg-white border border-border-gray" /> : <Paperclip className="w-3.5 h-3.5" />}
+                    {m.thumbUrl
+                      ? <button type="button" onClick={() => setEnlarged({ src: m.thumbUrl!, label: m.label })} title="Click to enlarge" className="shrink-0 cursor-zoom-in"><img src={m.thumbUrl} alt="" className="w-8 h-8 rounded object-cover bg-white border border-border-gray hover:ring-2 hover:ring-off-black/20" /></button>
+                      : <Paperclip className="w-3.5 h-3.5" />}
                     {m.label}
                     <button onClick={() => setAttached(list => list.filter(x => x.ref !== m.ref))} className="text-off-black/40 hover:text-off-black" title="Remove"><X className="w-3 h-3" /></button>
                   </span>
@@ -567,10 +584,11 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
               {hasEmDash && <span className="text-[11px] text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" />No em dashes in anything a customer sees</span>}
               {ig && window?.open && window.mode === 'standard' && window.closesAt && <span className="text-[11px] text-off-black/45 inline-flex items-center gap-1" title="Instagram allows a reply within 24 hours of their last message"><Clock className="w-3 h-3" />Window closes {when(window.closesAt)}</span>}
               <span className="flex-1" />
-              <span className="text-[11px] text-off-black/40 hidden md:inline">⌘↵ send and close · ⌘⇧↵ send</span>
-              <button onClick={() => send(true)} disabled={!canSend} className={btnSecondary}>Send and close</button>
+              {statusActions}
+              <span className="hidden md:block w-px h-6 bg-border-gray mx-1" />
+              <button onClick={() => send(true)} disabled={!canSend} className={btnSecondary}>Send and close <Kbd>⌘↵</Kbd></button>
               <button onClick={() => send(false)} disabled={!canSend} className={btnPrimary}>
-                {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send
+                {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send <Kbd>⌘⇧↵</Kbd>
               </button>
             </div>
           </div>
@@ -602,6 +620,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
             <div className="mt-2 flex items-center gap-2">
               <span className="text-[11px] text-amber-900/60">Mentioned teammates see it under Mentions.</span>
               <span className="flex-1" />
+              {statusActions}
               <button onClick={() => { setNote(''); setMentionIds([]); setMode('reply') }} className={btnGhost}><X className="w-3.5 h-3.5" /> Cancel</button>
               <button onClick={addNote} disabled={!note.trim() || sending} className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <StickyNote className="w-3.5 h-3.5" />} Add note
@@ -612,4 +631,9 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
       </div>
     </div>
   )
+}
+
+/** A keyboard shortcut shown inside a button's label. */
+function Kbd({ children }: { children: React.ReactNode }) {
+  return <kbd className="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded border border-current/25 text-[10px] font-medium leading-none opacity-60 font-sans">{children}</kbd>
 }
