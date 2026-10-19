@@ -56,7 +56,13 @@ const SHORTCUTS: [string, string][] = [
   ['⌘↵', 'Send and close (just close, with nothing written)'], ['⌘⇧↵', 'Send, keep it open'], ['Esc', 'Leave the composer'], ['?', 'This list'],
 ]
 
-export default function Support() {
+/**
+ * `active` is false while another page is showing: Support stays mounted
+ * (App.tsx SupportKeepAlive) so the open conversation, the list and a
+ * half-written reply are still there on the way back, but it does not read
+ * the address, poll, or answer keys while hidden.
+ */
+export default function Support({ active = true }: { active?: boolean } = {}) {
   useDocumentHead({ title: 'Support · Trackstar' })
   const { user, isAdmin } = useAuth()
   const location = useLocation()
@@ -95,7 +101,7 @@ export default function Support() {
     const params = new URLSearchParams(location.search)
     const g = params.get('gmail')
     const i = params.get('instagram')
-    if (!g && !i) return
+    if (!active || (!g && !i)) return
     if (g === 'connected') toast.success(`Mailbox connected as ${params.get('account') || 'the support account'}`)
     else if (g === 'denied') toast.error('Mailbox connection was cancelled')
     else if (g) toast.error(`Mailbox connection failed: ${params.get('reason') || 'unknown error'}`)
@@ -103,7 +109,7 @@ export default function Support() {
     else if (i === 'denied') toast.error('Instagram connection was cancelled')
     else if (i) toast.error(`Instagram connection failed: ${params.get('reason') || 'unknown error'}`)
     navigate('/support', { replace: true })
-  }, [location.search, navigate])
+  }, [location.search, navigate, active])
 
   const loadStatus = useCallback(() => {
     supportApi.status().then(setStatus).catch(() => setStatus(null))
@@ -122,17 +128,21 @@ export default function Support() {
   useEffect(() => { loadStatus(); loadMacros(); loadFilters() }, [loadStatus, loadMacros, loadFilters])
   // A link from Slack or a note opens the thread it names.
   useEffect(() => {
+    if (!active) return
     const id = new URLSearchParams(location.search).get('thread')
     if (id) { openThread(id); navigate('/support', { replace: true }) }
-  }, [location.search, navigate]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.search, navigate, active]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const t = window.setTimeout(() => loadInbox(), query ? 250 : 0)
     return () => window.clearTimeout(t)
   }, [loadInbox, query])
   useEffect(() => {
+    if (!active) return
+    // Coming back to Support: catch up at once, then the usual interval.
+    loadInbox(true)
     const id = window.setInterval(() => { if (document.visibilityState === 'visible') loadInbox(true) }, POLL_MS)
     return () => window.clearInterval(id)
-  }, [loadInbox])
+  }, [loadInbox, active])
 
   // A new message in the conversation that is open shows up without reopening it.
   useEffect(() => {
@@ -195,7 +205,18 @@ export default function Support() {
       toast.success(close ? `Sent to ${to} and closed` : `Sent to ${to}`)
       loadInbox(true)
       return true
-    } catch (e) { toast.error((e as Error).message); return false }
+    } catch (e) {
+      const msg = (e as Error).message
+      // ManyChat or Instagram's inbox holds the DM: hand the reply to the Instagram app instead of losing it.
+      if (thread.channel === 'instagram' && /in control of this conversation/.test(msg)) {
+        const plain = text.replace(/\[([^\]]+)\]\((\S+?)\)/g, '$1: $2').replace(/\*\*(.+?)\*\*/g, '$1').replace(/(^|\s)_(.+?)_/g, '$1$2')
+        try { await navigator.clipboard.writeText(plain) } catch { /* the reply is still in the box */ }
+        if (thread.igUsername) window.open(`https://ig.me/m/${encodeURIComponent(thread.igUsername)}`, '_blank', 'noopener')
+        toast.error(msg, { duration: 12000 })
+        return false
+      }
+      toast.error(msg); return false
+    }
   }
   const addNote = async (body: string, mentions: string[]) => {
     if (!thread) return false
@@ -272,6 +293,7 @@ export default function Support() {
         case 'Escape': setKeysOpen(false); break
       }
     }
+    if (!active) return
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }) // every render: the handlers close over the latest thread

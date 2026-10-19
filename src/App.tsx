@@ -156,6 +156,22 @@ function SalesKeepAlive() {
   )
 }
 
+/** Support, mounted once opened and only hidden after, like Sales: back and forth with Fulfillment keeps your place. */
+function SupportKeepAlive() {
+  const { pathname } = useLocation()
+  const { can } = useAuth()
+  const onSupport = pathname === '/support'
+  const [opened, setOpened] = useState(onSupport)
+  useEffect(() => { if (onSupport) setOpened(true) }, [onSupport])
+  if (!can('support')) return onSupport ? <RequireCap cap="support"><></></RequireCap> : null
+  if (!opened) return null
+  return (
+    <div className={onSupport ? 'contents' : 'hidden'} aria-hidden={!onSupport}>
+      <Support active={onSupport} />
+    </div>
+  )
+}
+
 export default function App() {
   if (isCreatorHost()) {
     return (
@@ -258,10 +274,12 @@ export default function App() {
                 <Route path="/sales/variables" element={<RequireCap cap="sales"><SalesWorkspace /></RequireCap>} />
                 <Route path="/send" element={null} />
                 {/* Support: the shared inbox for fast@trackstar.art. */}
-                <Route path="/support" element={<RequireCap cap="support"><Support /></RequireCap>} />
+                {/* Rendered by SupportKeepAlive below, so the open conversation survives a trip to Fulfillment. */}
+                <Route path="/support" element={null} />
                 <Route path="/monopoly/model" element={<RedirectToMonopolyHost path="/model" />} />
               </Routes>
               <SalesKeepAlive />
+              <SupportKeepAlive />
               </AppShell>
             </SignInGate>
           } />

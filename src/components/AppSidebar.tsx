@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send, FileText, ListOrdered, Braces, Vote, Inbox } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Capability } from '@/lib/roles'
@@ -236,8 +236,9 @@ export function MobileToolBar({
   onOpenSettings: () => void
   activeId?: string
 }) {
+  const fulfillmentTo = useFulfillmentReturn()
   const items: Item[] = [
-    ...railItems(can),
+    ...railItems(can, fulfillmentTo),
     // Discounts, Pace and Weather are desktop tools; the phone bar keeps to the pages.
     ...(can('tools.surveys') ? [{ id: 'surveys', label: 'Survey', icon: Vote, to: '/surveys', title: 'Design Survey' } as Item] : []),
     { id: 'settings', label: 'Settings', icon: Settings, onClick: onOpenSettings, title: 'Settings' },
@@ -286,9 +287,29 @@ function MobileTile({ item, active }: { item: Item; active?: boolean }) {
 }
 
 /** The places you go. Shared by the desktop rail and the mobile bar. */
-function railItems(can: (c: Capability) => boolean): Item[] {
+/**
+ * Where the Fulfillment tile goes: back to the queue, filters and order you
+ * last had open (they live in the address), not to the bare page. Kept for
+ * the tab's life; Support keeps its own place by staying mounted.
+ */
+let lastFulfillment = '/'
+try { lastFulfillment = sessionStorage.getItem('rail.fulfillment') || '/' } catch { /* private window */ }
+function useFulfillmentReturn() {
+  const { pathname, search } = useLocation()
+  const [to, setTo] = useState(lastFulfillment)
+  useEffect(() => {
+    if (pathname === '/' || pathname.startsWith('/orders/')) {
+      lastFulfillment = `${pathname}${search}`
+      try { sessionStorage.setItem('rail.fulfillment', lastFulfillment) } catch { /* fine */ }
+      setTo(lastFulfillment)
+    }
+  }, [pathname, search])
+  return to
+}
+
+function railItems(can: (c: Capability) => boolean, fulfillmentTo = '/'): Item[] {
   return [
-    { id: 'fulfillment', label: 'Fulfillment', icon: Package, to: '/', title: 'Orders to personalize, custom designs and partners' },
+    { id: 'fulfillment', label: 'Fulfillment', icon: Package, to: fulfillmentTo, title: 'Orders to personalize, custom designs and partners' },
     ...(can('support') ? [{ id: 'support', label: 'Support', icon: Inbox, to: '/support', title: 'The shared inbox for fast@trackstar.art' } as Item] : []),
     // Creators is admin-only, same as the route behind it. Sales is for anyone
     // on the Attio workspace; the API says no to everyone else.
@@ -311,7 +332,8 @@ export default function AppSidebar({
   /** Which tile reads as current. 'fulfillment' on the dashboard. */
   activeId?: string
 }) {
-  const items = railItems(can)
+  const fulfillmentTo = useFulfillmentReturn()
+  const items = railItems(can, fulfillmentTo)
 
   return (
     <aside className="hidden md:flex fixed left-3 top-3 bottom-3 w-[78px] z-30 flex-col rounded-[22px] bg-dark-fill shadow-[0_2px_10px_rgba(0,0,0,0.10)]">

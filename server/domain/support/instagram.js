@@ -127,11 +127,12 @@ async function onGraphError(err) {
   if (err?.code === 10) {
     throw new Error('Instagram refused the message: the 24-hour reply window after the customer\'s last message has passed. Wait for them to write again.')
   }
-  // Conversation routing: one app answers a thread at a time. A reply typed in
-  // the Instagram app (or Business Suite) hands the thread to Instagram's own
-  // inbox, and it keeps it until that conversation goes quiet or is marked done.
+  // Conversation routing: one app answers a thread at a time. ManyChat's follow
+  // message makes ManyChat the owner; a reply typed in the Instagram app hands it
+  // to Instagram's inbox. Control lapses after about 24 hours of quiet. Taking it
+  // back needs the Page-based API, which an Instagram Login app does not have.
   if (err?.error_subcode === 2534037 || err?.subcode === 2534037 || /not the thread owner/i.test(err?.message || '')) {
-    throw new Error('Instagram has this conversation in its own inbox, usually because someone replied from the Instagram app. Reply there this time, or mark the conversation Done in the Instagram app and try again here.')
+    throw new Error('Another app is in control of this conversation right now: ManyChat (its follow message takes it) or Instagram\'s own inbox (after a reply from the app). It usually lets go after a day of quiet. Your reply is copied and the conversation is open in Instagram to paste it.')
   }
   throw err
 }
