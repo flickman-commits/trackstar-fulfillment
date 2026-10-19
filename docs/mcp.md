@@ -39,7 +39,13 @@ Read: `connection_check`, `orders_overview`, `list_orders`, `get_order`,
 
 Write: `assign_order`, `add_comment`, `set_design_status`, `run_import`.
 
-Admin: `add_help_shift`, `end_help_shift`, `spread_order_list`.
+Admin: `add_help_shift`, `end_help_shift`, `spread_order_list`, `send_sample`.
+
+`send_sample` is the one tool that creates an order and makes Shopify email
+someone (a sample print, free or at cost, as in Tools > Samples). It is
+two-step: called without `confirm` it only returns a preview and a
+`previewId`; it creates the order only when called again with the same
+details, `confirm: true` and that `previewId`.
 
 Repair: `run_sweep`, `finish_sweep`, `probe_scrapers`, `capture_fixture`,
 `discover_event_ids`, `trace_scraper`, `fetch_timing_page`, `save_event_id`,
