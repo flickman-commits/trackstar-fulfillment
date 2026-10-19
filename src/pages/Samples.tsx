@@ -61,7 +61,7 @@ export default function Samples() {
     if (!items.length) return
     setQuoting(true)
     try {
-      const r = await apiFetch('/api/samples', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'quote', items }) })
+      const r = await apiFetch('/api/samples', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'quote', items, address: addr.zip ? { name, ...addr } : null }) })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || 'Could not get Artelo costs')
       setLines(ls => ls.map(l => { const q = d.lines.find((x: { variantId: string; unit: number }) => x.variantId === variantOf(l)?.variantId); return q ? { ...l, unitPrice: q.unit.toFixed(2) } : l }))
@@ -70,12 +70,12 @@ export default function Samples() {
   }
   useEffect(() => { if (mode === 'cost') fillCosts() }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const costKey = lines.map(l => `${l.size}|${l.frame}|${l.quantity}|${l.product ? 1 : 0}`).join(',')
+  const costKey = lines.map(l => `${l.size}|${l.frame}|${l.quantity}|${l.product ? 1 : 0}`).join(',') + `|${addr.zip}|${addr.country}`
   useEffect(() => {
     const items = lines.filter(l => l.product).map(l => ({ size: l.size, frame: l.frame, quantity: l.quantity }))
     if (!items.length) { setOurCost(null); return }
     const t = setTimeout(() => {
-      apiFetch('/api/samples', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cost', items }) })
+      apiFetch('/api/samples', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cost', items, address: addr.zip ? { name, ...addr } : null }) })
         .then(r => r.ok ? r.json() : null).then(d => setOurCost(d ? d.totalCents / 100 : null)).catch(() => setOurCost(null))
     }, 400)
     return () => clearTimeout(t)

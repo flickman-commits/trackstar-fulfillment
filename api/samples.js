@@ -24,9 +24,9 @@ export default async function handler(req, res) {
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
     const b = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
-    if (b.action === 'quote') return res.status(200).json(await quoteAtCost(b.items || []))
+    if (b.action === 'quote') return res.status(200).json(await quoteAtCost(b.items || [], b.address || null))
     // What these prints cost us (production, shipping, branding), free or not.
-    if (b.action === 'cost') return res.status(200).json(await estimateSampleCost(b.items || []))
+    if (b.action === 'cost') return res.status(200).json(await estimateSampleCost(b.items || [], b.address || null))
     if (b.action === 'send') {
       const out = await sendSample(b, user)
       await recordAudit({ action: 'samples.send', summary: `Sent sample ${out.name} to ${b.email} (${b.mode === 'cost' ? `at cost, $${out.total.toFixed(2)}` : 'free'})`, detail: { order: out.name, items: (b.items || []).length }, actor: user })

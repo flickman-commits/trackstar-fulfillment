@@ -1,32 +1,21 @@
 /**
  * What samples cost us. Every sample is recorded when it is sent (Tools >
  * Samples, the MCP's send_sample, a creator's sample) with its cost at that
- * moment: Artelo production for each print, Artelo shipping, and branding
- * once per order. Money is integer cents.
+ * moment, from Artelo's price check for the whole order: production,
+ * shipping and branding. Money is integer cents.
  */
 import prisma from '../../db.js'
-import { fetchArteloCost, BRANDING_COST_PER_ORDER } from '../../services/arteloCosts.js'
-
-const cents = n => Math.round(Number(n || 0) * 100)
+import { arteloPriceCheck } from '../../services/arteloPriceCheck.js'
 
 /**
- * Our cost for a set of prints: [{ size, frame, quantity }] -> cents, with the
- * per-print production costs. Shipping is summed per print (two prints in one
- * box ship for a little less, so this can run slightly high).
+ * Our cost for a set of prints, priced by Artelo's own price check for the
+ * whole order (server/services/arteloPriceCheck.js): production, shipping
+ * for the shipment, and branding. [{ size, frame, quantity }] -> cents.
+ * `address` prices shipping to where it goes; without one, a US default.
  */
-export async function estimateSampleCost(items) {
-  let production = 0, shipping = 0
-  const perItem = []
-  for (const it of items) {
-    const framed = it.frame && !/unframed/i.test(it.frame)
-    const c = await fetchArteloCost({ size: `x${String(it.size).replace(/^x/, '')}`, frameStyle: framed ? 'PremiumOak' : 'Unframed' })
-    const q = Math.max(1, Number(it.quantity) || 1)
-    production += c.productionCost * q
-    shipping += c.shippingCost * q
-    perItem.push({ productionCents: cents(c.productionCost), shippingCents: cents(c.shippingCost) })
-  }
-  const totalCents = cents(production) + cents(shipping) + cents(BRANDING_COST_PER_ORDER)
-  return { productionCents: cents(production), shippingCents: cents(shipping) + cents(BRANDING_COST_PER_ORDER), totalCents, perItem }
+export async function estimateSampleCost(items, address = null) {
+  const p = await arteloPriceCheck({ items, address })
+  return { productionCents: p.productionCents, shippingCents: p.shippingCents + p.brandingCents, totalCents: p.totalCents, perItem: p.perItem }
 }
 
 export async function recordSampleCost({ source, creatorId = null, orderName, recipient, email, items, costCents, chargedCents = 0, createdById = null }) {
@@ -40,9 +29,9 @@ export async function recordSampleCost({ source, creatorId = null, orderName, re
 }
 
 /** Record a sample's cost without ever failing the send it belongs to. */
-export async function recordSampleCostSafely(input, items) {
+export async function recordSampleCostSafely(input, items, address = null) {
   try {
-    const est = input.costCents != null ? { totalCents: input.costCents } : await estimateSampleCost(items)
+    const est = input.costCents != null ? { totalCents: input.costCents } : await estimateSampleCost(items, address)
     return await recordSampleCost({ ...input, items, costCents: est.totalCents })
   } catch (err) {
     console.error('[samples] could not record the sample cost:', err.message)

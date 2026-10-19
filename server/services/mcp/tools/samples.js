@@ -78,11 +78,11 @@ export const sampleTools = [
 
       let shipping = 0
       if (args.mode === 'cost') {
-        const q = await quoteAtCost(lines.map(l => ({ variantId: l.variant.variantId, size: l.size, frame: l.variant.frame, quantity: l.quantity })))
+        const q = await quoteAtCost(lines.map(l => ({ variantId: l.variant.variantId, size: l.size, frame: l.variant.frame, quantity: l.quantity })), { name: args.name, ...args.address })
         for (const l of lines) l.unitPrice = q.lines.find(x => x.variantId === l.variant.variantId)?.unit || 0
         shipping = args.shipping ?? q.shipping
       }
-      const ourCost = await estimateSampleCost(lines.map(l => ({ size: l.size, frame: l.variant.frame, quantity: l.quantity })))
+      const ourCost = await estimateSampleCost(lines.map(l => ({ size: l.size, frame: l.variant.frame, quantity: l.quantity })), { name: args.name, ...args.address })
       const total = args.mode === 'cost' ? Math.round((lines.reduce((n, l) => n + l.unitPrice * l.quantity, 0) + shipping) * 100) / 100 : 0
 
       // The fingerprint of exactly what would be sent; confirm must match it.

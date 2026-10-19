@@ -15,7 +15,7 @@
  */
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { printCatalog } from '../catalog/printCatalog.js'
-import { fetchArteloCost, BRANDING_COST_PER_ORDER } from '../../services/arteloCosts.js'
+import { arteloPriceCheck } from '../../services/arteloPriceCheck.js'
 import { recordSampleCostSafely } from './costs.js'
 
 const round = n => Math.round(n * 100) / 100
@@ -25,27 +25,17 @@ const API = '2025-01'
 /** The store's race prints (the shared catalog, server/domain/catalog/printCatalog.js). */
 export const sampleCatalog = () => printCatalog()
 
-/** Artelo's cost for one print: production, and shipping for that print alone. */
-async function costOf(size, frame) {
-  const framed = frame && !/unframed/i.test(frame)
-  return fetchArteloCost({ size: `x${String(size).replace(/^x/, '')}`, frameStyle: framed ? 'PremiumOak' : 'Unframed' })
-}
-
 /**
- * The at-cost price of an order: each item at its production cost, shipping
- * as the sum of each print's own shipping plus branding once per order. Two
- * prints in one box ship for less than two boxes, so this can run a little
- * high; every number can be edited before sending.
+ * The at-cost price of an order, from Artelo's price check for the whole
+ * order: each item at its production cost, and shipping as Artelo's shipping
+ * for the shipment plus branding. `address` prices shipping to where it goes.
  */
-export async function quoteAtCost(items) {
-  const lines = []
-  let shipping = 0
-  for (const it of items) {
-    const c = await costOf(it.size, it.frame)
-    lines.push({ variantId: it.variantId, unit: c.productionCost })
-    shipping += c.shippingCost * (Number(it.quantity) || 1)
+export async function quoteAtCost(items, address = null) {
+  const p = await arteloPriceCheck({ items, address })
+  return {
+    lines: items.map((it, i) => ({ variantId: it.variantId, unit: (p.perItem[i]?.productionCents || 0) / 100 })),
+    shipping: round((p.shippingCents + p.brandingCents) / 100),
   }
-  return { lines, shipping: round(shipping + BRANDING_COST_PER_ORDER) }
 }
 
 const ORDER_CREATE = `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) {
@@ -116,6 +106,7 @@ export async function sendSample(input, actor) {
     source: input.source || 'samples_tool', creatorId: input.creatorId || null, orderName: created.name,
     recipient: [address.firstName, address.lastName].filter(Boolean).join(' '), email,
     chargedCents: Math.round(totalPaid * 100), createdById: actor?.id || null,
-  }, items.map(it => ({ title: it.title, size: it.size, frame: it.frame, quantity: it.quantity })))
+  }, items.map(it => ({ title: it.title, size: it.size, frame: it.frame, quantity: it.quantity })),
+  { name: [address.firstName, address.lastName].filter(Boolean).join(' '), address1: address.address1, address2: address.address2, city: address.city, province: address.provinceCode, zip: address.zip, country: address.countryCode })
   return { name: created.name, id: created.legacyResourceId, total: totalPaid, invoiced, costCents: cost?.costCents ?? null, adminUrl: `https://admin.shopify.com/store/flickman-3247/orders/${created.legacyResourceId}` }
 }
