@@ -370,7 +370,7 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
         // A sender the team filtered out (vendors, alerts) is filed, not routed.
         filtered: await isFiltered(who.email),
         // New conversations go to the person set under Routing; history and filtered mail go to nobody.
-        assigneeId: backfill || await isFiltered(who.email) ? null : await defaultAssigneeId(),
+        assigneeId: backfill || await isFiltered(who.email) ? null : await defaultAssigneeId('email'),
       },
     })
   }

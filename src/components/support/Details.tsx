@@ -1,11 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Check, ChevronDown, Copy, Loader2, Package, Truck, AlertCircle, Database, Mail, X, Plus, Instagram, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { btnSecondary, chip } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { ago, day } from '@/lib/supportDates'
 import { STATUS_LABEL, STATUS_TONE } from '@/lib/supportStatus'
-import { Avatar } from '@/components/AssigneePicker'
 import type { CustomerOrder, InstagramStatus, MailboxStatus, Mockup, SenderFilter, Teammate, ThreadDetail } from '@/types/support'
 import Actions from './Actions'
 import { FilterSender } from './SenderFilter'
@@ -158,41 +157,6 @@ function Tags({ tags, suggestions, onChange }: { tags: string[]; suggestions: st
 }
 
 /** Where new conversations go, for an admin: one person, on every channel, with a hand-over of what is open now. */
-export function RoutingCard({ team, unassignedCount, onChanged }: { team: Teammate[]; unassignedCount: number; onChanged: () => void }) {
-  const [value, setValue] = useState<string | null | undefined>(undefined)
-  const [saving, setSaving] = useState(false)
-  useEffect(() => { supportApi.settings().then(r => setValue(r.defaultAssigneeId)).catch(() => setValue(null)) }, [])
-  const who = team.find(u => u.id === value) || null
-  const save = async (id: string | null, applyToOpen = false) => {
-    setSaving(true)
-    try {
-      const out = await supportApi.saveSettings(id, applyToOpen)
-      setValue(out.defaultAssigneeId)
-      const name = team.find(u => u.id === out.defaultAssigneeId)?.firstName
-      toast.success(out.defaultAssigneeId ? `New conversations go to ${name}${out.assigned ? `, and ${out.assigned} open ${out.assigned === 1 ? 'one' : 'ones'} handed over` : ''}` : 'New conversations go to nobody')
-      onChanged()
-    } catch (e) { toast.error((e as Error).message) }
-    finally { setSaving(false) }
-  }
-  return (
-    <Section title="Routing">
-      <Attr label="New ones go to">
-        <select value={value || ''} disabled={value === undefined || saving} onChange={e => save(e.target.value || null)} className="w-full text-xs bg-white border border-border-gray rounded px-1.5 py-1 focus:outline-none">
-          <option value="">Nobody (unassigned)</option>
-          {team.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-        </select>
-      </Attr>
-      {who && unassignedCount > 0 && (
-        <button onClick={() => save(who.id, true)} disabled={saving} className={btnSecondary}>
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Avatar user={who} size={14} />}
-          Hand the {unassignedCount} open unassigned to {who.firstName}
-        </button>
-      )}
-      <p className="text-[11px] text-off-black/45">Every new email or DM is assigned to them as it arrives. History imports stay unassigned.</p>
-    </Section>
-  )
-}
-
 /** The mailbox, for an admin: connect it, import its history, see when it last synced. */
 export function MailboxCard({ status, isAdmin, onChanged }: { status: MailboxStatus | null; isAdmin: boolean; onChanged: () => void }) {
   const [importing, setImporting] = useState(false)

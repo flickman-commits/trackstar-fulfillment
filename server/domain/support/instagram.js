@@ -357,7 +357,7 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
         status: parsed.direction === 'in' ? 'open' : 'waiting',
         lastMessageAt: parsed.sentAt,
         backfilled: backfill,
-        assigneeId: backfill ? null : await defaultAssigneeId(),
+        assigneeId: backfill ? null : await defaultAssigneeId('instagram'),
       },
     })
   } else {

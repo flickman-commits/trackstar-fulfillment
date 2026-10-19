@@ -228,3 +228,7 @@ export interface CodeLookup {
 
 /** A sender kept out of the inbox: an address or a domain. */
 export interface SenderFilter { pattern: string; addedBy: string | null; addedAt: string }
+
+/** Who new conversations on a channel go to (server/domain/support/routing.js). */
+export interface RoutingRule { mode: 'none' | 'person' | 'split'; people: { userId: string; weight: number }[] }
+export interface RoutingRules { email: RoutingRule; instagram: RoutingRule }

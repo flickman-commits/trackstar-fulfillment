@@ -3,7 +3,7 @@
  * shapes, so the Support screens never touch fetch or JSON directly.
  */
 import { apiFetch } from '@/lib/api'
-import type { SenderFilter, BackfillResult, InboxPayload, InboxSort, InboxView, InstagramBackfillResult, InstagramStatus, Macro, MailboxStatus, Note, SyncResult, ThreadDetail, ThreadRow, ThreadStatus } from '@/types/support'
+import type { SenderFilter, BackfillResult, InboxPayload, InboxSort, InboxView, InstagramBackfillResult, InstagramStatus, Macro, MailboxStatus, Note, SyncResult, ThreadDetail, ThreadRow, ThreadStatus, RoutingRules } from '@/types/support'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -55,7 +55,8 @@ export const supportApi = {
   deleteNote: (id: string, noteId: string) => act<{ id: string }>(id, 'deleteNote', { noteId }),
   markUnread: (id: string) => act<{ ok: boolean }>(id, 'unread'),
   reply: (id: string, text: string, close = false, attachments: string[] = []) => post<ThreadDetail>('/api/support/reply', { id, text, close, attachments }),
-  settings: () => request<{ defaultAssigneeId: string | null; playbook?: { text: string; edited: boolean; updatedAt: string | null }; forwarders?: string[] }>('/api/support/settings'),
+  settings: () => request<{ defaultAssigneeId: string | null; playbook?: { text: string; edited: boolean; updatedAt: string | null }; forwarders?: string[]; routing?: RoutingRules }>('/api/support/settings'),
+  saveRouting: (routing: RoutingRules, applyToOpen = false) => post<{ routing: RoutingRules; assigned: number }>('/api/support/settings', { action: 'routing', routing, applyToOpen }),
   saveForwarders: (emails: string[]) => post<{ forwarders: string[] }>('/api/support/settings', { action: 'forwarders', emails }),
   savePlaybook: (text: string) => post<{ playbook: { text: string; edited: boolean } }>('/api/support/settings', { action: 'playbook', text }),
   resetPlaybook: () => post<{ playbook: { text: string; edited: boolean } }>('/api/support/settings', { action: 'playbookReset' }),

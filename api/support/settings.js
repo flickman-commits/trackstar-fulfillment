@@ -4,11 +4,12 @@
  *   GET                                               { defaultAssigneeId, playbook }
  *   POST { defaultAssigneeId, applyToOpen? }          admin: who new conversations go to; applyToOpen hands over the open unassigned ones now
  *   POST { action:'playbook', text } / { action:'playbookReset' }   admin: what Claude drafts from
+ *   POST { action:'routing', routing, applyToOpen? }   admin: who new conversations go to, per channel (routing.js)
  *   POST { action:'forwarders', emails }            admin: other inboxes whose forwards to fast@ become the customer's conversation
  */
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, requireAdminOnly, recordAudit } from '../_lib/users.js'
-import { defaultAssigneeId, setDefaultAssignee } from '../../server/domain/support/routing.js'
+import { defaultAssigneeId, setDefaultAssignee, getRouting, saveRouting } from '../../server/domain/support/routing.js'
 import { getPlaybook, savePlaybook, resetPlaybook } from '../../server/domain/support/playbook.js'
 import { listForwarders, saveForwarders } from '../../server/domain/support/forwarders.js'
 
@@ -18,12 +19,18 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const user = await requireCapability(req, res, 'support')
       if (!user) return
-      return res.status(200).json({ defaultAssigneeId: await defaultAssigneeId(), playbook: await getPlaybook(), forwarders: await listForwarders() })
+      return res.status(200).json({ defaultAssigneeId: await defaultAssigneeId(), routing: await getRouting(), playbook: await getPlaybook(), forwarders: await listForwarders() })
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
     const user = await requireAdminOnly(req, res)
     if (!user) return
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}
+    if (body.action === 'routing') {
+      const out = await saveRouting(body.routing, { applyToOpen: Boolean(body.applyToOpen), actor: user })
+      const say = r => r.mode === 'none' ? 'nobody' : r.mode === 'person' ? '1 person' : `split across ${r.people.length}`
+      await recordAudit({ action: 'support.routing', summary: `Routing: email to ${say(out.routing.email)}, Instagram to ${say(out.routing.instagram)}${out.assigned ? ` (${out.assigned} open handed out)` : ''}`, detail: out, actor: user })
+      return res.status(200).json(out)
+    }
     if (body.action === 'forwarders') {
       const forwarders = await saveForwarders(body.emails)
       await recordAudit({ action: 'support.forwarders', summary: `Forwarding addresses: ${forwarders.join(', ') || 'none'}`, detail: { forwarders }, actor: user })

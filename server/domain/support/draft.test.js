@@ -47,3 +47,14 @@ test('drafts never name the Ironman brand to a customer', async () => {
   assert.equal(noBrand('Congrats on your IRONMAN 70.3!'), 'Congrats on your half-distance triathlon!')
   assert.equal(noBrand('Your ironman finish'), 'Your triathlon finish')
 })
+
+test('routing split: the person furthest below their share gets the next one', async () => {
+  const { pickByShare } = await import('./routing.js')
+  const people = [{ userId: 'matt', weight: 1 }, { userId: 'eli', weight: 1 }]
+  assert.equal(pickByShare(people, { matt: 3, eli: 1 }), 'eli')
+  assert.equal(pickByShare(people, { matt: 0, eli: 0 }), 'matt')
+  // A double share takes two for every one.
+  const weighted = [{ userId: 'matt', weight: 1 }, { userId: 'eli', weight: 2 }]
+  assert.equal(pickByShare(weighted, { matt: 2, eli: 3 }), 'eli')
+  assert.equal(pickByShare(weighted, { matt: 1, eli: 4 }), 'matt')
+})

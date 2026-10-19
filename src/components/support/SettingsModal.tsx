@@ -1,7 +1,8 @@
 import { X } from 'lucide-react'
 import { btnGhost } from '@/lib/ui'
 import { useEscape } from '@/lib/useEscape'
-import { RoutingCard, MailboxCard, InstagramCard } from './Details'
+import { MailboxCard, InstagramCard } from './Details'
+import RoutingRules from './RoutingRules'
 import { FilterList } from './SenderFilter'
 import PlaybookEditor from './PlaybookEditor'
 import ForwardersCard from './ForwardersCard'
@@ -35,7 +36,7 @@ export default function SettingsModal({ team, unassignedCount, status, instagram
           <button onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {isAdmin && <RoutingCard team={team} unassignedCount={unassignedCount} onChanged={onChanged} />}
+          {isAdmin && <RoutingRules team={team} unassignedCount={unassignedCount} onChanged={onChanged} />}
           <FilterList filters={filters} onChanged={onChanged} />
           <ForwardersCard isAdmin={isAdmin} />
           <PlaybookEditor isAdmin={isAdmin} />
