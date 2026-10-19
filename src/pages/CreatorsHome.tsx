@@ -761,6 +761,9 @@ interface SampleOrder {
   shippedAt: string | null
   /** Sent as a Shopify order, not imported into the queue yet. */
   pending?: boolean
+  shopifyUrl?: string | null
+  arteloUrl?: string | null
+  fulfillmentPath?: string | null
 }
 
 const SIZES = ['8x10', '12x18', '16x24']
@@ -880,35 +883,6 @@ function CreatorDetail({ creator, onBack, decide, onChanged, onDeleted, catalog 
             </form>
           </Card>
 
-          <Card title={`Samples${samples?.length ? ` (${samples.length})` : ''}`}>
-            {samples === null ? (
-              <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />
-            ) : samples.length === 0 ? (
-              <p className="text-sm text-off-black/45">No sample made yet.</p>
-            ) : (
-              <ul className="divide-y divide-border-gray -my-2">
-                {samples.map(s => {
-                  const st = s.pending ? { label: 'Sent to Shopify', color: 'text-blue-700' } : s.shippedAt || s.trackingNumber ? { label: 'Shipped', color: 'text-emerald-700' } : sampleStatusLabel(s.status)
-                  return (
-                    <li key={s.orderNumber} className="py-2.5 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <Link to={`/orders/${s.orderNumber}`} className="text-sm font-medium text-off-black hover:text-[#4F2DD4] hover:underline">{s.raceName} {s.raceYear}</Link>
-                        <div className="text-xs text-off-black/50">{[s.productSize, s.frameType].filter(v => v && v !== '-').join(' · ')} · {s.orderNumber} · {new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className={`text-xs font-medium ${st.color}`}>{st.label}</div>
-                        {s.trackingNumber && <div className="text-[11px] text-off-black/45 font-mono">{s.trackingCarrier ? `${s.trackingCarrier} ` : ''}{s.trackingNumber}</div>}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-            {creator.status !== 'denied' && !isApplicant(creator) && (
-              <SendSample creator={creator} catalog={catalog} hasSample={!!samples?.length} onDone={async () => { await loadSamples(); await onChanged() }} />
-            )}
-          </Card>
-
           {(creator.whyWorkWithUs || (creator.briefAssignments?.length ?? 0) > 0) && (
             <Card title="Application">
               {creator.whyWorkWithUs && <p className="text-sm text-off-black/80 whitespace-pre-wrap leading-relaxed">{creator.whyWorkWithUs}</p>}
@@ -923,6 +897,20 @@ function CreatorDetail({ creator, onBack, decide, onChanged, onDeleted, catalog 
             </Card>
           )}
 
+          <EditCard
+            title="Requested print (from their application)"
+            creator={creator}
+            onSave={save}
+            catalog={catalog}
+            fields={[
+              { key: 'productTitle', label: 'Print', kind: 'print', display: v => catalog?.find(c => c.title === v)?.label || v },
+              { key: 'raceYear', label: 'Year' },
+              { key: 'bibNumber', label: 'Bib' },
+              { key: 'finishTime', label: 'Time' },
+              { key: 'productSize', label: 'Size', options: SIZES },
+              { key: 'frameType', label: 'Frame', options: FRAMES },
+            ]}
+          />
           <Card title="Notes">
             <textarea
               value={notes}
@@ -948,20 +936,46 @@ function CreatorDetail({ creator, onBack, decide, onChanged, onDeleted, catalog 
               { key: 'tiktokHandle', label: 'TikTok', display: socialHandle, href: v => socialUrl('tiktok', v) },
             ]}
           />
-          <EditCard
-            title="Requested print"
-            creator={creator}
-            onSave={save}
-            catalog={catalog}
-            fields={[
-              { key: 'productTitle', label: 'Print', kind: 'print', display: v => catalog?.find(c => c.title === v)?.label || v },
-              { key: 'raceYear', label: 'Year' },
-              { key: 'bibNumber', label: 'Bib' },
-              { key: 'finishTime', label: 'Time' },
-              { key: 'productSize', label: 'Size', options: SIZES },
-              { key: 'frameType', label: 'Frame', options: FRAMES },
-            ]}
-          />
+          {/* Every sample they have had, each with where to open it. */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className={sectionLabel}>Samples{samples?.length ? ` (${samples.length})` : ''}</h4>
+            </div>
+            <div className={infoCard}>
+              {samples === null ? (
+                <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />
+              ) : samples.length === 0 ? (
+                <p className="text-sm text-off-black/45">No sample sent yet.</p>
+              ) : (
+                <ul className="divide-y divide-border-gray -my-2">
+                  {samples.map(s => {
+                    const st = s.pending ? { label: 'Sent to Shopify', color: 'text-blue-700' } : s.shippedAt || s.trackingNumber ? { label: 'Shipped', color: 'text-emerald-700' } : sampleStatusLabel(s.status)
+                    return (
+                      <li key={s.orderNumber} className="py-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-off-black truncate">{s.raceName}{s.raceYear ? ` ${s.raceYear}` : ''}</div>
+                            <div className="text-xs text-off-black/50">{[s.productSize, s.frameType].filter(v => v && v !== '-').join(' · ')} · #{s.orderNumber} · {new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                          </div>
+                          <span className={`text-xs font-medium shrink-0 ${st.color}`}>{st.label}</span>
+                        </div>
+                        {s.trackingNumber && <div className="text-[11px] text-off-black/45 font-mono mt-0.5">{s.trackingCarrier ? `${s.trackingCarrier} ` : ''}{s.trackingNumber}</div>}
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {s.shopifyUrl && <a href={s.shopifyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border-gray bg-white text-[11px] text-off-black/75 hover:border-off-black/30"><img src="/shopify-icon.png" alt="" className="w-3 h-3" />Shopify</a>}
+                          {s.arteloUrl && <a href={s.arteloUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border-gray bg-white text-[11px] text-off-black/75 hover:border-off-black/30"><img src="/artelo-icon.png" alt="" className="w-3 h-3 rounded-[2px]" />Artelo</a>}
+                          {s.fulfillmentPath && <Link to={s.fulfillmentPath} className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border-gray bg-white text-[11px] text-off-black/75 hover:border-off-black/30"><img src="/trackstar-stars-transparent.png" alt="" className="w-3 h-3 object-contain" />Fulfillment</Link>}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              {creator.status !== 'denied' && !isApplicant(creator) && (
+                <SendSample creator={creator} catalog={catalog} hasSample={!!samples?.length} onDone={async () => { await loadSamples(); await onChanged() }} />
+              )}
+            </div>
+          </div>
+
           <EditCard
             title="Shipping"
             creator={creator}
