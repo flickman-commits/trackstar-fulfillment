@@ -651,6 +651,40 @@ export const CHIP_TIME_FIXTURES = [
     expectedBib: '90278',
     notes: 'LA 2022 Charity Challenge (Xacte 2426, subevent 6043, finish split 69218 ft = 13.11 mi). chip 3:18:29, clock 3:18:37. Paced against 21097 m (13.109 mi): 11909s -> 15:08.5. Pacing against 26.2 would give 7:35, so a wrong-distance regression fails.',
   },
+  // ── RunSignUp browser fallback (Louisiana, Kiawah) ───────────────────
+  // These configs have no eventIds, so the Puppeteer table read runs. Their
+  // tables put split columns ahead of "Clock Time" (gun) and "Chip Time";
+  // every runner below has gun != chip and uneven splits.
+  {
+    platform: 'runsignup',
+    race: 'Louisiana Marathon',
+    year: 2025,
+    runner: 'John Barham',
+    expectedChipTime: '2:30:26',
+    expectedChipPace: '5:45',
+    expectedBib: '1726',
+    notes: 'Louisiana 2025 Marathon (result set 523599). Chip 2:30:25.98, Clock (gun) 2:34:53.08. First 10K 5:30/mi, final 10K 6:04/mi. 9026s ÷ 26.2 = 344.5 → 5:45; page pace 5:45. https://runsignup.com/Race/Results/100074/523599',
+  },
+  {
+    platform: 'runsignup',
+    race: 'Louisiana Marathon',
+    year: 2025,
+    runner: 'Cesar Rico',
+    expectedChipTime: '1:24:34',
+    expectedChipPace: '6:27',
+    expectedBib: '4300',
+    notes: 'Louisiana 2025 Half Marathon (result set 523600) - half pace against 13.1. Chip 1:24:34.21, Clock (gun) 1:29:50.63. First 10K 6:18/mi, rest 6:36/mi. 5074s ÷ 13.1 = 387.3 → 6:27; page pace 6:27. https://runsignup.com/Race/Results/100074/523600',
+  },
+  {
+    platform: 'runsignup',
+    race: 'Kiawah Island Marathon',
+    year: 2024,
+    runner: 'Christian Thompson',
+    expectedChipTime: '2:33:11',
+    expectedChipPace: '5:51',
+    expectedBib: '31',
+    notes: 'Kiawah 2024 Marathon (result set 516051). Chip 2:33:11.26, Clock (gun) 2:33:12.35. 13.1 mi 5:45/mi, 23.5-26.2 6:19/mi. 9191s ÷ 26.2 = 350.8 → 5:51; page pace 5:51. https://runsignup.com/Race/Results/68851/516051',
+  },
   // ── RunSignUp (Bayshore) ─────────────────────────────────────────────
   // Both picked for a clear positive split AND gun != chip, from the 2023
   // result sets (the year with an open order).

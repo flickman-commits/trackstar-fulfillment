@@ -3,7 +3,8 @@
  * Consolidates all races hosted on RunSignUp (Kiawah Island, Louisiana, etc.)
  * Supports two modes:
  *   1. REST API (fast) — if config has eventIds, uses /Rest/race/.../results/get-results
- *   2. Puppeteer (fallback) — launches headless browser for client-side search
+ *   2. Puppeteer (fallback) — launches headless browser for client-side search;
+ *      columns are found by header text, and only "Chip Time" is read
  */
 import { BaseScraper } from '../BaseScraper.js'
 import { launchBrowser } from '../browserLauncher.js'
@@ -280,41 +281,66 @@ export class RunSignUpScraper extends BaseScraper {
       // Wait for client-side filtering
       await new Promise(resolve => setTimeout(resolve, 1500))
 
-      // Extract visible results from the table
-      const results = await page.evaluate(() => {
-        const rows = Array.from(document.querySelectorAll('table tbody tr'))
-
-        return rows
-          .filter(row => {
-            const style = window.getComputedStyle(row)
-            return style.display !== 'none'
-          })
-          .map(row => {
-            const cells = Array.from(row.querySelectorAll('td'))
-            if (cells.length < 9) return null
-
-            // RunSignUp table structure:
-            // 0: Place, 1: Pace, 2: Bib, 3: Name, 4: Gender,
-            // 5: City, 6: State, 7: Country, 8: Clock Time, 9: Age
-            return {
-              placeOverall: cells[0]?.innerText?.trim(),
-              pace: cells[1]?.innerText?.trim(),
-              bib: cells[2]?.innerText?.trim(),
-              name: cells[3]?.innerText?.trim().replace(/\n/g, ' '),
-              gender: cells[4]?.innerText?.trim(),
-              city: cells[5]?.innerText?.trim(),
-              state: cells[6]?.innerText?.trim(),
-              chipTime: cells[8]?.innerText?.trim(),
-              age: cells[9]?.innerText?.trim()
-            }
-          })
-          .filter(r => r !== null)
+      // Extract visible results. Columns differ per race (Louisiana puts
+      // split columns before "Clock Time" and "Chip Time"), and a results
+      // page can hold several tables, so every column is located by its own
+      // table's header text, never by a fixed index. "Clock Time" is gun
+      // time and is never read; a table with no chip column yields nothing.
+      const { results, tablesWithoutChip } = await page.evaluate(() => {
+        const text = el => (el?.innerText || '').trim()
+        const out = []
+        let tablesWithoutChip = 0
+        for (const table of document.querySelectorAll('table')) {
+          const headers = Array.from(table.querySelectorAll('thead th'))
+            .map(th => text(th).replace(/\s+/g, ' ').toLowerCase())
+          if (headers.length === 0) continue
+          const col = (...patterns) => headers.findIndex(h => patterns.some(re => re.test(h)))
+          const nameCol = col(/^name$/, /^participant$/)
+          if (nameCol === -1) continue
+          const chipCol = col(/^chip time$/, /^chip$/, /^net time$/)
+          if (chipCol === -1) { tablesWithoutChip++; continue }
+          const idx = {
+            place: col(/^place$/, /^overall place$/),
+            pace: col(/^pace$/),
+            bib: col(/^bib$/),
+            gender: col(/^gender$/, /^sex$/),
+            age: col(/^age$/),
+            city: col(/^city$/),
+            state: col(/^state$/)
+          }
+          for (const row of table.querySelectorAll('tbody tr')) {
+            if (window.getComputedStyle(row).display === 'none') continue
+            const cells = row.querySelectorAll('td')
+            if (cells.length <= Math.max(nameCol, chipCol)) continue
+            const cell = i => (i >= 0 ? text(cells[i]) : '') || null
+            // The name cell carries an avatar initial ("J John Barham");
+            // the link holds just the name.
+            const nameLink = cells[nameCol].querySelector('.participantName__nameLink, a')
+            // The time cell can carry a "Video" link under the time.
+            const chipTime = (text(cells[chipCol]).match(/\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?/) || [null])[0]
+            out.push({
+              placeOverall: cell(idx.place),
+              pace: cell(idx.pace),
+              bib: cell(idx.bib),
+              name: text(nameLink || cells[nameCol]).replace(/\s+/g, ' '),
+              gender: cell(idx.gender),
+              city: cell(idx.city),
+              state: cell(idx.state),
+              chipTime,
+              age: cell(idx.age)
+            })
+          }
+        }
+        return { results: out, tablesWithoutChip }
       })
 
+      if (results.length === 0 && tablesWithoutChip > 0) {
+        console.warn(`[${this.tag} ${this.year}] ${tablesWithoutChip} results table(s) have no Chip Time column - refusing to use clock (gun) time`)
+      }
       console.log(`[${this.tag} ${this.year}] Found ${results.length} visible results after filtering`)
 
       if (results.length === 0) {
-        return this.notFoundResult()
+        return this.notFoundResult(tablesWithoutChip > 0 ? 'Results page shows no chip time column; clock (gun) time is not used' : undefined)
       }
 
       // Filter for exact name matches
@@ -348,6 +374,9 @@ export class RunSignUpScraper extends BaseScraper {
 
       // Single match found
       const match = matches[0]
+      if (!match.chipTime) {
+        return this.notFoundResult(`${match.name} has no chip time on the results page; clock (gun) time is not used`)
+      }
 
       console.log(`\n[${this.tag} ${this.year}] FOUND RUNNER:`)
       console.log(`  Name: ${match.name}`)
