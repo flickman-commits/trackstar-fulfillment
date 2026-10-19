@@ -169,7 +169,15 @@ try {
     var pw = photoWindowOf(doc, ab);
     if (!pw) throw new Error('No photo window on the ' + spec.size + ' artboard');
     var group = pw.group, clip = pw.clip;
-    for (var q2 = 0; q2 < group.pathItems.length; q2++) if (!group.pathItems[q2].clipping) group.pathItems[q2].hidden = true;
+    // Everything in the window but the clipping path is placeholder art and is hidden, nested
+    // groups and compound paths included: Ann Arbor's 8x10 keeps its orange square inside a
+    // sub-group, which printed over the photo when only direct paths were hidden.
+    for (var q2 = 0; q2 < group.pageItems.length; q2++) {
+      var it2 = group.pageItems[q2];
+      if (it2.typename == 'PathItem' && it2.clipping) continue;
+      if (it2.typename == 'PlacedItem' || it2.typename == 'RasterItem') continue; // old photos, removed below
+      it2.hidden = true;
+    }
     var cb = clip.geometricBounds;
     doc.activeLayer = photoLayer; group.locked = false; group.hidden = false;
     var img = group.placedItems.add();
