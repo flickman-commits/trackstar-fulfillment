@@ -168,7 +168,12 @@ export default function Support() {
     finally { setBusy(false) }
   }
   const assign = (assigneeId: string | null) => thread && run(async () => { patchRow(await supportApi.assign(thread.id, assigneeId)); await refreshThread(thread.id) })
-  const setStatusOf = (s: ThreadStatus) => thread && run(async () => { patchRow(await supportApi.setStatus(thread.id, s)); await refreshThread(thread.id) })
+  // Closing takes the conversation off your plate: the pane goes back to empty.
+  const putDown = () => { setSelectedId(null); setThread(null) }
+  const setStatusOf = (s: ThreadStatus) => thread && run(async () => {
+    patchRow(await supportApi.setStatus(thread.id, s))
+    if (s === 'closed') { toast.success('Closed'); putDown(); loadInbox(true) } else await refreshThread(thread.id)
+  })
   const snooze = (until: string | null) => thread && run(async () => {
     patchRow(await supportApi.snooze(thread.id, until))
     toast.success(until ? `Snoozed until ${new Date(until).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Unsnoozed')
@@ -185,7 +190,7 @@ export default function Support() {
     if (!thread) return false
     try {
       const fresh = await supportApi.reply(thread.id, text, close, attachments)
-      setThread(fresh)
+      if (close) putDown(); else setThread(fresh)
       const to = fresh.channel === 'instagram' ? `@${fresh.igUsername || 'them'} on Instagram` : fresh.customerEmail
       toast.success(close ? `Sent to ${to} and closed` : `Sent to ${to}`)
       loadInbox(true)
