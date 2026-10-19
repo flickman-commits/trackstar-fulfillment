@@ -31,7 +31,8 @@ import { completeOrder, CompleteError } from '../../server/domain/orders/complet
 import { noteWeatherChange } from '../../server/domain/races/verification.js'
 import { acceptMatch, AcceptMatchError } from '../../server/domain/research/acceptMatch.js'
 import { listWinningAds } from '../../server/domain/creators/winningAds.js'
-import { recordSampleCostSafely } from '../../server/domain/samples/costs.js'
+import { sendCreatorSample, linkCreatorSamples } from '../../server/domain/creators/creatorSample.js'
+import { publicPrintCatalog } from '../../server/domain/catalog/printCatalog.js'
 import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
@@ -1734,6 +1735,8 @@ async function handleCreatorHomeMetrics(res) {
 // Returns all creators with their sample-order status joined in. Ordered by
 // invite date descending so the most recent shows up first.
 async function handleListCreators(res) {
+  // Samples sent as Shopify orders: link each to its order once it has been imported.
+  await linkCreatorSamples(await prisma.creator.findMany({ where: { NOT: { sampleShopifyOrderIds: { isEmpty: true } } }, select: { id: true, sampleOrderId: true, sampleShopifyOrderIds: true } }))
   const creators = await prisma.creator.findMany({
     // Hide abandoned public applications — someone clicked "Apply" on the public
     // landing page but never submitted the wizard. They're blank rows (no name,
@@ -1776,7 +1779,7 @@ const CREATOR_EDITABLE_FIELDS = [
   // Sample details — editable after onboarding in case the creator emails
   // a correction (different race, size, bib, etc.)
   'raceName', 'raceYear', 'bibNumber', 'finishTime',
-  'productSize', 'frameType',
+  'productTitle', 'productSize', 'frameType',
   // Shipping — these get re-mirrored onto the linked fulfillment Order below
   // so the dashboard reflects the corrected address.
   'shippingName', 'shippingAddress1', 'shippingAddress2',
@@ -1994,6 +1997,9 @@ async function handleCreatorPortalData(token, res) {
     return res.status(400).json({ error: 'token is required' })
   }
 
+  const pending = await prisma.creator.findUnique({ where: { inviteToken: token }, select: { id: true, sampleOrderId: true, sampleShopifyOrderIds: true } })
+  if (pending) await linkCreatorSamples([pending])
+
   const creator = await prisma.creator.findUnique({
     where: { inviteToken: token },
     include: {
@@ -2041,6 +2047,7 @@ async function handleCreatorPortalData(token, res) {
       raceYear: creator.raceYear,
       bibNumber: creator.bibNumber,
       finishTime: creator.finishTime,
+      productTitle: creator.productTitle,
       productSize: creator.productSize,
       frameType: creator.frameType,
       shippingName: creator.shippingName,
@@ -2056,6 +2063,8 @@ async function handleCreatorPortalData(token, res) {
     briefs,
     sampleOrder: creator.sampleOrder,
     races,
+    // The store's prints, for "Which product do you want?" (names and pictures only).
+    catalog: await publicPrintCatalog().catch(() => []),
     winningAds: await listWinningAds(),
   })
 }
@@ -2068,7 +2077,7 @@ const CREATOR_ONBOARD_FIELDS = [
   'name', 'email', 'instagramHandle', 'tiktokHandle',
   'bestContentLinks', 'whyWorkWithUs',
   'raceName', 'raceYear', 'bibNumber', 'finishTime',
-  'productSize', 'frameType',
+  'productTitle', 'productSize', 'frameType',
   'shippingName', 'shippingAddress1', 'shippingAddress2',
   'shippingCity', 'shippingState', 'shippingZip', 'shippingCountry',
 ]
@@ -2159,134 +2168,28 @@ async function pingSampleRequested(creator) {
   await postSlack(webhookUrl, lines.join('\n'))
 }
 
-// DM'd to Elí (via SLACK_ELI_DM_WEBHOOK_URL) once Matt clicks Approve. We
-// inline everything he needs to manually mirror this into Artelo: full
-// shipping address, race, print spec, runner details, contact info — so he
-// doesn't have to log into the dashboard to fulfill.
-async function pingSampleApprovedToEli(creator, order) {
-  const webhookUrl = process.env.SLACK_ELI_DM_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
-  if (!webhookUrl) return
-
-  const fullAddress = [
-    creator.shippingName || creator.name,
-    creator.shippingAddress1,
-    creator.shippingAddress2,
-    [creator.shippingCity, creator.shippingState, creator.shippingZip].filter(Boolean).join(', '),
-    creator.shippingCountry || 'US',
-  ].filter(Boolean).join('\n')
-
-  const runnerDetails = [
-    creator.bibNumber ? `Bib #${creator.bibNumber}` : null,
-    creator.finishTime ? `Time: ${creator.finishTime}` : null,
-  ].filter(Boolean).join(' · ')
-
-  const lines = [
-    `🎁 *New Creator Sample to Build* - ${order.orderNumber}`,
-    `Please create this order manually in Artelo.`,
-    ``,
-    `*Creator:* ${creator.name || '(unnamed)'}${creator.instagramHandle ? ` · ${creator.instagramHandle}` : ''}`,
-    creator.email ? `*Email:* ${creator.email}` : null,
-    ``,
-    `*Race:* ${creator.raceName || 'Unknown'}${creator.raceYear ? ` ${creator.raceYear}` : ''}`,
-    runnerDetails ? `*Runner:* ${runnerDetails}` : null,
-    `*Print:* ${creator.productSize || '-'} · ${creator.frameType || '-'}`,
-    ``,
-    `*Ship to:*`,
-    '```',
-    fullAddress || '(no address on file)',
-    '```',
-  ].filter(Boolean)
-  await postSlack(webhookUrl, lines.join('\n'))
-}
-
-// Helper — create the Standard Order that Elí will fulfill as the creator's
-// sample print. Reuses the existing Order table so the whole fulfillment
-// pipeline (queue, drawer, completion) works unchanged.
-async function createCreatorSampleOrder(creator) {
-  const shortId = creator.id.slice(-6).toUpperCase()
-  const orderNumber = `CREATOR-${shortId}`
-
-  const order = await prisma.order.create({
-    data: {
-      orderNumber,
-      parentOrderNumber: orderNumber,
-      lineItemIndex: 0,
-      source: 'creator_sample',
-      trackstarOrderType: 'standard',
-      assigneeId: await defaultAssigneeFor('standard'),
-      status: 'pending',
-
-      // Race + product (all required NOT NULL — populated from onboarding)
-      raceName: creator.raceName || 'Unknown Race',
-      raceYear: creator.raceYear || new Date().getFullYear(),
-      runnerName: creator.name || 'Creator',
-      productSize: creator.productSize || '-',
-      frameType: creator.frameType || '-',
-
-      // Everything Elí needs to actually produce + ship this lives here.
-      // She'll manually mirror this into Artelo. Keeping it in a single
-      // JSON blob avoids schema changes on Order.
-      arteloOrderData: {
-        creatorSample: true,
-        creatorId: creator.id,
-        bibNumber: creator.bibNumber || null,
-        finishTime: creator.finishTime || null,
-        shipping: {
-          name: creator.shippingName || creator.name || null,
-          address1: creator.shippingAddress1 || null,
-          address2: creator.shippingAddress2 || null,
-          city: creator.shippingCity || null,
-          state: creator.shippingState || null,
-          zip: creator.shippingZip || null,
-          country: creator.shippingCountry || 'US',
-        },
-        instagramHandle: creator.instagramHandle || null,
-      },
-
-      // Contact on the Order (mirrors race_partner pattern so the drawer's
-      // existing "customer" fields render sensibly).
-      customerName: creator.name || null,
-      customerEmail: creator.email || null,
-    }
-  })
-
-  // Link it back to the Creator
-  await prisma.creator.update({
-    where: { id: creator.id },
-    data: { sampleOrderId: order.id },
-  })
-
-  console.log(`[actions/creator-onboard] Created sample order ${order.orderNumber} for creator ${creator.id}`)
-  return order
-}
-
 // --- approve-creator-sample ---
-// Admin clicks "Approve" on a Sample Request in the /creators dashboard.
-// We create the fulfillment Order, flip the Creator to active, and ping
-// the team Slack so Elí knows there's a new creator sample to produce.
-async function handleApproveCreatorSample({ creatorId }, res) {
+// Admin clicks "Approve" on a creator who applied. The sample goes out as a
+// free Shopify order through the Samples flow (server/domain/creators/creatorSample.js).
+async function handleApproveCreatorSample({ creatorId }, res, actor) {
   if (!creatorId) return res.status(400).json({ error: 'creatorId is required' })
 
   const creator = await prisma.creator.findUnique({ where: { id: creatorId } })
   if (!creator) return res.status(404).json({ error: 'Creator not found' })
   if (!creator.onboardedAt) return res.status(400).json({ error: 'Creator has not onboarded yet' })
-  if (creator.sampleOrderId) return res.status(400).json({ error: 'Sample already approved for this creator' })
+  if (creator.sampleOrderId || creator.sampleShopifyOrderIds?.length) return res.status(400).json({ error: 'Sample already approved for this creator' })
 
-  const order = await createCreatorSampleOrder(creator)
-  await prisma.creator.update({
-    where: { id: creatorId },
-    data: { status: 'active' }
-  })
-  // What the sample costs us, for the monthly sample spend (never blocks approval).
-  await recordSampleCostSafely({ source: 'creator', orderName: order.orderNumber, recipient: creator.name || 'Creator', email: creator.email }, [{ title: creator.raceName, size: creator.productSize, frame: creator.frameType, quantity: 1 }])
-
-  // Slack — DM Elí with everything he needs to manually build the order in
-  // Artelo. We send the full address and contact details inline so he doesn't
-  // have to context-switch into the dashboard. Best-effort; non-blocking.
-  await pingSampleApprovedToEli(creator, order)
-
-  console.log(`[actions/approve-creator-sample] Approved ${creatorId} → order ${order.orderNumber}`)
-  return res.status(200).json({ success: true, orderNumber: order.orderNumber })
+  // A free Shopify order through the Samples flow: Shopify emails the creator,
+  // Artelo makes it like any order, and the cost goes into the sample spend.
+  // (It used to be a manual Artelo order Eli built from a Slack message.)
+  try {
+    const out = await sendCreatorSample({ creatorId, actor })
+    console.log(`[actions/approve-creator-sample] Approved ${creatorId} -> Shopify ${out.name}`)
+    return res.status(200).json({ success: true, orderNumber: out.name, shopifyUrl: out.adminUrl })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    throw err
+  }
 }
 
 // --- decline-creator-sample ---

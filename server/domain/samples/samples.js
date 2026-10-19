@@ -14,7 +14,7 @@
  * tagged "sample" (and "sample-at-cost").
  */
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
-import { fetchVariantCatalog } from '../../services/shopifyProducts.js'
+import { printCatalog } from '../catalog/printCatalog.js'
 import { fetchArteloCost, BRANDING_COST_PER_ORDER } from '../../services/arteloCosts.js'
 import { recordSampleCostSafely } from './costs.js'
 
@@ -22,17 +22,8 @@ const round = n => Math.round(n * 100) / 100
 // orderCreate needs 2024-07 or later; the rest of the app stays on 2024-01.
 const API = '2025-01'
 
-/** Active race prints, one entry per product, each with its sizes and frames. */
-export async function sampleCatalog() {
-  const rows = await fetchVariantCatalog()
-  const byProduct = new Map()
-  for (const r of rows) {
-    if (r.productStatus !== 'ACTIVE' || r.isCustom || /gift card/i.test(r.productTitle) || !r.size) continue
-    if (!byProduct.has(r.productId)) byProduct.set(r.productId, { productId: r.productId, title: r.productTitle, image: r.imageUrl, variants: [] })
-    byProduct.get(r.productId).variants.push({ variantId: r.variantId, size: r.size, frame: r.frame, price: Number(r.price) })
-  }
-  return [...byProduct.values()].sort((a, b) => a.title.localeCompare(b.title))
-}
+/** The store's race prints (the shared catalog, server/domain/catalog/printCatalog.js). */
+export const sampleCatalog = () => printCatalog()
 
 /** Artelo's cost for one print: production, and shipping for that print alone. */
 async function costOf(size, frame) {
@@ -104,7 +95,7 @@ export async function sendSample(input, actor) {
     lineItems,
     shippingLines: [{ title: atCost ? 'Shipping (at cost)' : 'Free sample shipping', priceSet: { shopMoney: { amount: shipping.toFixed(2), currencyCode: 'USD' } } }],
     financialStatus: atCost ? 'PENDING' : 'PAID',
-    tags: atCost ? ['sample', 'sample-at-cost'] : ['sample'],
+    tags: [...(atCost ? ['sample', 'sample-at-cost'] : ['sample']), ...(input.source === 'creator' ? ['creator-sample'] : [])],
     note: [`Sample sent by ${by} from the fulfillment tool${atCost ? ', at cost' : ', free'}.`, String(input.note || '').trim()].filter(Boolean).join('\n'),
     sourceName: 'trackstar-samples',
   }
@@ -122,7 +113,7 @@ export async function sendSample(input, actor) {
   const totalPaid = Number(created.totalPriceSet.shopMoney.amount)
   // What it cost us, for the monthly sample spend. Never fails the send.
   const cost = await recordSampleCostSafely({
-    source: input.source || 'samples_tool', orderName: created.name,
+    source: input.source || 'samples_tool', creatorId: input.creatorId || null, orderName: created.name,
     recipient: [address.firstName, address.lastName].filter(Boolean).join(' '), email,
     chargedCents: Math.round(totalPaid * 100), createdById: actor?.id || null,
   }, items.map(it => ({ title: it.title, size: it.size, frame: it.frame, quantity: it.quantity })))

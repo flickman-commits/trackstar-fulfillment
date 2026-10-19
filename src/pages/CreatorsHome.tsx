@@ -4,8 +4,10 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Loader2, X, Copy, Check, Instagram, Plus, Mail, Pencil, ChevronDown, ChevronLeft, Search, ExternalLink } from 'lucide-react'
 import { btnSecondary, pageShell, sectionLabel, infoCard, cardLabel, textLink } from '@/lib/ui'
 import { apiFetch } from '@/lib/api'
+import { toast } from 'sonner'
 import { TRYBE_URL } from '@/lib/creatorLinks'
 import CreatorsTabs from '@/components/CreatorsTabs'
+import PrintPicker from '@/components/PrintPicker'
 
 type CreatorStatus = 'invited' | 'applied' | 'active' | 'paused' | 'denied'
 type CommissionModel = 'free_product' | 'flat_per_asset' | 'rev_share' | 'hybrid'
@@ -33,6 +35,7 @@ interface Creator {
   raceYear: number | null
   bibNumber: string | null
   finishTime: string | null
+  productTitle?: string | null
   productSize: string | null
   frameType: string | null
   shippingName: string | null
@@ -189,7 +192,7 @@ export default function CreatorsHome() {
 
   // The races we sell, live from Shopify, for picking a sample's race.
   useEffect(() => {
-    apiFetch('/api/creators/catalog').then(r => r.ok ? r.json() : { races: [] }).then(d => setCatalog(d.races || [])).catch(() => setCatalog([]))
+    apiFetch('/api/creators/catalog').then(r => r.ok ? r.json() : { products: [] }).then(d => setCatalog(d.products || [])).catch(() => setCatalog([]))
   }, [])
 
   const applicants = creators.filter(isApplicant)
@@ -258,6 +261,8 @@ export default function CreatorsHome() {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || `Approve failed: ${res.status}`)
       }
+      const out = await res.json().catch(() => ({}))
+      toast.success(`Approved. Sample ${out.orderNumber || ''} sent as a free Shopify order.`.replace('  ', ' '))
       await loadAll()
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to approve')
@@ -754,6 +759,8 @@ interface SampleOrder {
   trackingNumber: string | null
   trackingCarrier: string | null
   shippedAt: string | null
+  /** Sent as a Shopify order, not imported into the queue yet. */
+  pending?: boolean
 }
 
 const SIZES = ['8x10', '12x18', '16x24']
@@ -881,7 +888,7 @@ function CreatorDetail({ creator, onBack, decide, onChanged, onDeleted, catalog 
             ) : (
               <ul className="divide-y divide-border-gray -my-2">
                 {samples.map(s => {
-                  const st = s.shippedAt || s.trackingNumber ? { label: 'Shipped', color: 'text-emerald-700' } : sampleStatusLabel(s.status)
+                  const st = s.pending ? { label: 'Sent to Shopify', color: 'text-blue-700' } : s.shippedAt || s.trackingNumber ? { label: 'Shipped', color: 'text-emerald-700' } : sampleStatusLabel(s.status)
                   return (
                     <li key={s.orderNumber} className="py-2.5 flex items-center justify-between gap-3">
                       <div className="min-w-0">
@@ -947,7 +954,7 @@ function CreatorDetail({ creator, onBack, decide, onChanged, onDeleted, catalog 
             onSave={save}
             catalog={catalog}
             fields={[
-              { key: 'raceName', label: 'Race', kind: 'race' },
+              { key: 'productTitle', label: 'Print', kind: 'print', display: v => catalog?.find(c => c.title === v)?.label || v },
               { key: 'raceYear', label: 'Year' },
               { key: 'bibNumber', label: 'Bib' },
               { key: 'finishTime', label: 'Time' },
@@ -1005,7 +1012,7 @@ function Card({ title, right, children }: { title: string; right?: React.ReactNo
 type EditField = {
   key: keyof Creator
   label: string
-  kind?: 'race'
+  kind?: 'race' | 'print'
   options?: string[]
   display?: (v: string | null) => string | null
   href?: (v: string) => string | null
@@ -1027,7 +1034,10 @@ function EditCard({ title, creator, fields, onSave, note, catalog }: {
   const submit = async () => {
     setBusy(true)
     try {
-      await onSave(Object.fromEntries(fields.map(f => [f.key, draft[f.key as string]?.trim() || null])) as Partial<Creator>)
+      const updates = Object.fromEntries(fields.map(f => [f.key, draft[f.key as string]?.trim() || null])) as Partial<Creator>
+      // Picking a print also sets its race.
+      if (fields.some(f => f.kind === 'print') && draft.raceName) updates.raceName = draft.raceName
+      await onSave(updates)
       setEditing(false)
     } catch (e) { alert(e instanceof Error ? e.message : 'Could not save') } finally { setBusy(false) }
   }
@@ -1047,7 +1057,9 @@ function EditCard({ title, creator, fields, onSave, note, catalog }: {
               return (
                 <label key={f.key as string} className="block">
                   <span className={cardLabel}>{f.label}</span>
-                  {f.kind === 'race' ? (
+                  {f.kind === 'print' ? (
+                    <PrintPicker value={v || null} options={catalog || null} onChange={(c: CatalogRace) => setDraft(d => ({ ...d, productTitle: c.title, raceName: c.race }))} />
+                  ) : f.kind === 'race' ? (
                     <RacePicker value={v} onChange={set} catalog={catalog || null} />
                   ) : f.options ? (
                     <select value={v} onChange={e => set(e.target.value)} className={fieldCls}>
@@ -1104,40 +1116,6 @@ function RacePicker({ value, onChange, catalog }: { value: string; onChange: (v:
   )
 }
 
-/** Pick the exact print from the store, with its picture: Berlin and Berlin (World Majors) are different designs. */
-function ProductPicker({ value, onChange, catalog }: { value: CatalogRace | null; onChange: (v: CatalogRace) => void; catalog: CatalogRace[] | null }) {
-  const [open, setOpen] = useState(false)
-  const [q, setQ] = useState('')
-  if (!catalog) return <div className={`${fieldCls} text-off-black/40 inline-flex items-center gap-2`}><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading the store's prints</div>
-  const shown = catalog.filter(c => !q.trim() || c.label.toLowerCase().includes(q.trim().toLowerCase()))
-  const thumb = (c: CatalogRace | null) => c?.image
-    ? <img src={`${c.image}${c.image.includes('?') ? '&' : '?'}width=80`} alt="" className="w-8 h-10 object-cover rounded bg-subtle-gray shrink-0" />
-    : <span className="w-8 h-10 rounded bg-subtle-gray shrink-0" />
-  return (
-    <div className="relative">
-      <button type="button" onClick={() => setOpen(o => !o)} className={`${fieldCls} flex items-center gap-2 text-left py-1.5`}>
-        {thumb(value)}
-        <span className={`flex-1 truncate ${value ? 'text-off-black' : 'text-off-black/40'}`}>{value?.label || 'Choose a print'}</span>
-        <ChevronDown className="w-4 h-4 text-off-black/40 shrink-0" />
-      </button>
-      {open && (
-        <div className="absolute z-40 left-0 right-0 mt-1 bg-white border border-border-gray rounded-md shadow-[0_8px_30px_rgba(0,0,0,0.14)] p-1.5">
-          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search races" className={`${fieldCls} mb-1.5`} />
-          <div className="max-h-72 overflow-y-auto">
-            {shown.map(c => (
-              <button key={`${c.race}|${c.edition || ''}`} type="button" onClick={() => { onChange(c); setOpen(false); setQ('') }}
-                className={`w-full flex items-center gap-2.5 px-1.5 py-1 rounded text-left text-sm hover:bg-subtle-gray ${value && value.race === c.race && value.edition === c.edition ? 'bg-subtle-gray font-medium' : ''}`}>
-                {thumb(c)}<span className="truncate">{c.label}</span>
-              </button>
-            ))}
-            {!shown.length && <div className="px-2 py-3 text-sm text-off-black/45">No print matches.</div>}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 /**
  * Send a creator a sample: the first one or another (a second race, a
  * reshoot, a replacement). Goes into the Standard queue as CREATOR-XXXXXX
@@ -1158,7 +1136,7 @@ function SendSample({ creator, catalog, hasSample, onDone }: { creator: Creator;
   const [f, setF] = useState(blank)
   // The exact print; starts on their requested race's standard edition.
   const [product, setProduct] = useState<CatalogRace | null>(null)
-  useEffect(() => { if (!product && catalog && f.raceName) setProduct(catalog.find(c => c.race === f.raceName && !c.edition) || catalog.find(c => c.race === f.raceName) || null) }, [catalog, f.raceName, product])
+  useEffect(() => { if (!product && catalog && f.raceName) setProduct((!hasSample && catalog.find(c => c.title === creator.productTitle)) || catalog.find(c => c.race === f.raceName && !c.edition) || catalog.find(c => c.race === f.raceName) || null) }, [catalog, f.raceName, product, hasSample, creator.productTitle])
   const inCatalog = !!product
   const submit = async () => {
     setBusy(true); setErr(null)
@@ -1181,14 +1159,14 @@ function SendSample({ creator, catalog, hasSample, onDone }: { creator: Creator;
     <div className="mt-3 border border-border-gray rounded-md p-3 space-y-2.5 bg-white">
       <div className={cardLabel}>{hasSample ? 'Another sample' : 'New sample'}</div>
       <div className="grid grid-cols-2 gap-2">
-        <div className="col-span-2 sm:col-span-1"><ProductPicker value={product} onChange={setProduct} catalog={catalog} /></div>
+        <div className="col-span-2 sm:col-span-1"><PrintPicker value={product?.title || null} onChange={(p: CatalogRace) => setProduct(p)} options={catalog} /></div>
         <input value={f.raceYear} onChange={e => setF({ ...f, raceYear: e.target.value })} placeholder="Year" inputMode="numeric" className={`${fieldCls} col-span-2 sm:col-span-1`} />
         <input value={f.bibNumber} onChange={e => setF({ ...f, bibNumber: e.target.value })} placeholder="Bib # (optional)" className={fieldCls} />
         <input value={f.finishTime} onChange={e => setF({ ...f, finishTime: e.target.value })} placeholder="Finish time (optional)" className={fieldCls} />
         <select value={f.productSize} onChange={e => setF({ ...f, productSize: e.target.value })} className={fieldCls}>{SIZES.map(s => <option key={s}>{s}</option>)}</select>
         <select value={f.frameType} onChange={e => setF({ ...f, frameType: e.target.value })} className={fieldCls}>{FRAMES.map(s => <option key={s}>{s}</option>)}</select>
       </div>
-      <p className="text-[11px] text-off-black/50">Goes into the Standard queue for Eli, shipped to the address on file.</p>
+      <p className="text-[11px] text-off-black/50">Sent as a free Shopify order to the address on file: they get Shopify's order emails and Artelo makes it like any order.</p>
       {err && <p className="text-xs text-red-600">{err}</p>}
       <div className="flex gap-2">
         <button onClick={submit} disabled={busy || !inCatalog || !/^\d{4}$/.test(f.raceYear)} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-dark-fill text-white rounded-md disabled:opacity-50">

@@ -29,10 +29,10 @@ export async function estimateSampleCost(items) {
   return { productionCents: cents(production), shippingCents: cents(shipping) + cents(BRANDING_COST_PER_ORDER), totalCents, perItem }
 }
 
-export async function recordSampleCost({ source, orderName, recipient, email, items, costCents, chargedCents = 0, createdById = null }) {
+export async function recordSampleCost({ source, creatorId = null, orderName, recipient, email, items, costCents, chargedCents = 0, createdById = null }) {
   return prisma.sampleCost.create({
     data: {
-      source, orderName: orderName || null, recipient: String(recipient || 'Unknown'), email: email || null,
+      source, creatorId, orderName: orderName || null, recipient: String(recipient || 'Unknown'), email: email || null,
       items: (items || []).map(i => ({ title: i.title || null, size: i.size || null, frame: i.frame || null, quantity: i.quantity || 1 })),
       costCents: Math.max(0, Math.round(costCents || 0)), chargedCents: Math.max(0, Math.round(chargedCents || 0)), createdById,
     },

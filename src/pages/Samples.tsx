@@ -4,15 +4,16 @@
  * and Artelo picks the order up like any other. Server: api/samples.js.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ExternalLink, Gift, Loader2, Plus, Receipt, Search, Trash2, X } from 'lucide-react'
+import { ExternalLink, Gift, Loader2, Plus, Receipt, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 import { parseAddress } from '@/lib/parseAddress'
 import PageHeader from '@/components/PageHeader'
+import PrintPicker from '@/components/PrintPicker'
 import { btnSecondary, pageShell, sectionLabel, infoCard, cardLabel } from '@/lib/ui'
 
 interface Variant { variantId: string; size: string; frame: string | null; price: number }
-interface Product { productId: string; title: string; image: string | null; variants: Variant[] }
+interface Product { productId: string; title: string; label: string; image: string | null; variants: Variant[] }
 interface Line { key: number; product: Product | null; size: string; frame: string; quantity: number; runnerName: string; raceYear: string; bib: string; time: string; unitPrice: string }
 
 const field = 'w-full px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-off-black/10'
@@ -23,40 +24,6 @@ const thumb = (url: string | null, cls = 'w-9 h-11') => url
 
 let nextKey = 1
 const blankLine = (): Line => ({ key: nextKey++, product: null, size: '12x18', frame: 'Black Oak', quantity: 1, runnerName: '', raceYear: String(new Date().getFullYear()), bib: '', time: '', unitPrice: '' })
-
-/** Pick a print from the store, with its picture. */
-function PrintPicker({ value, onChange, products }: { value: Product | null; onChange: (p: Product) => void; products: Product[] | null }) {
-  const [open, setOpen] = useState(false)
-  const [q, setQ] = useState('')
-  if (!products) return <div className={`${field} text-off-black/40 inline-flex items-center gap-2`}><Loader2 className="w-3.5 h-3.5 animate-spin" />Loading the store's prints</div>
-  const shown = products.filter(p => !q.trim() || p.title.toLowerCase().includes(q.trim().toLowerCase()))
-  return (
-    <div className="relative">
-      <button type="button" onClick={() => setOpen(o => !o)} className={`${field} flex items-center gap-2 text-left py-1.5`}>
-        {thumb(value?.image || null)}
-        <span className={`flex-1 truncate ${value ? 'text-off-black' : 'text-off-black/40'}`}>{value ? shortTitle(value.title) : 'Choose a print'}</span>
-        <ChevronDown className="w-4 h-4 text-off-black/40 shrink-0" />
-      </button>
-      {open && (
-        <div className="absolute z-40 left-0 right-0 mt-1 bg-white border border-border-gray rounded-md shadow-[0_8px_30px_rgba(0,0,0,0.14)] p-1.5">
-          <div className="relative mb-1.5">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/40" />
-            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search races" className={`${field} pl-8`} />
-          </div>
-          <div className="max-h-80 overflow-y-auto">
-            {shown.map(p => (
-              <button key={p.productId} type="button" onClick={() => { onChange(p); setOpen(false); setQ('') }}
-                className={`w-full flex items-center gap-2.5 px-1.5 py-1 rounded text-left text-sm hover:bg-subtle-gray ${value?.productId === p.productId ? 'bg-subtle-gray font-medium' : ''}`}>
-                {thumb(p.image)}<span className="truncate">{shortTitle(p.title)}</span>
-              </button>
-            ))}
-            {!shown.length && <div className="px-2 py-3 text-sm text-off-black/45">No print matches.</div>}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 export default function Samples() {
   const [products, setProducts] = useState<Product[] | null>(null)
@@ -172,7 +139,7 @@ export default function Samples() {
                         <span className={cardLabel}>Print {i + 1}</span>
                         {lines.length > 1 && <button onClick={() => setLines(ls => ls.filter(x => x.key !== l.key))} className="text-off-black/40 hover:text-red-600" title="Remove this print"><Trash2 className="w-3.5 h-3.5" /></button>}
                       </div>
-                      <PrintPicker value={l.product} products={products} onChange={p => {
+                      <PrintPicker value={l.product?.title || null} options={products} onChange={(p: Product) => {
                         const size = p.variants.some(v => v.size === l.size) ? l.size : p.variants[0]?.size || ''
                         const frame = p.variants.some(v => v.size === size && (v.frame || '') === l.frame) ? l.frame : p.variants.find(v => v.size === size)?.frame || ''
                         setLine(l.key, { product: p, size, frame, unitPrice: '' })

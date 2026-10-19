@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
+import PrintPicker from '@/components/PrintPicker'
 import { Loader2, AlertTriangle, ChevronRight, ChevronLeft, ChevronDown, ClipboardList, CheckCircle2, Truck, Home, ExternalLink } from 'lucide-react'
 import { TRYBE_URL } from '@/lib/creatorLinks'
 
@@ -30,6 +31,7 @@ interface PortalCreator {
   bestContentLinks: string | null
   whyWorkWithUs: string | null
   raceName: string | null
+  productTitle?: string | null
   raceYear: number | null
   bibNumber: string | null
   finishTime: string | null
@@ -62,11 +64,16 @@ interface RaceOption {
   year: number
 }
 
+/** A print from the store (names and pictures only). */
+interface CatalogPrint { title: string; label: string; race: string; edition: string | null; image: string | null; sizes: string[]; frames: string[] }
+
 interface PortalData {
   creator: PortalCreator
   briefs: PortalBrief[]
   sampleOrder: PortalCreatorSampleOrder | null
   races: RaceOption[]
+  /** The store's prints, the same list every picker uses. */
+  catalog?: CatalogPrint[]
   winningAds?: { id: string; title: string; url: string; imageUrl: string | null; notes: string | null }[]
 }
 
@@ -149,7 +156,8 @@ interface OnboardingDraft {
   tiktokHandle: string
   bestContentLinks: string  // freeform — URLs / handles
   whyWorkWithUs: string     // optional pitch
-  // Step 2: race (split into two dependent dropdowns)
+  // Step 2: which print (from the store catalog) and the year they ran it
+  productTitle: string
   raceName: string
   raceYear: string  // string for <select> binding
   // Step 3: product
@@ -183,6 +191,7 @@ function OnboardingWizard({ data, token, onDone }: {
     tiktokHandle: data.creator.tiktokHandle || '',
     bestContentLinks: data.creator.bestContentLinks || '',
     whyWorkWithUs: data.creator.whyWorkWithUs || '',
+    productTitle: data.creator.productTitle || '',
     raceName: data.creator.raceName || '',
     raceYear: data.creator.raceYear ? String(data.creator.raceYear) : '',
     productSize: data.creator.productSize || '',
@@ -202,7 +211,7 @@ function OnboardingWizard({ data, token, onDone }: {
   const canProceed = () => {
     if (step === 0) return true // welcome
     if (step === 1) return draft.name.trim().length > 0 && draft.email.trim().length > 0 && draft.whyWorkWithUs.trim().length > 0
-    if (step === 2) return draft.raceName.length > 0 && draft.raceYear.length > 0
+    if (step === 2) return draft.productTitle.length > 0 && draft.raceYear.length > 0
     if (step === 3) return draft.productSize.length > 0 && draft.frameType.length > 0
     if (step === 4) return (
       draft.shippingName.trim().length > 0 &&
@@ -231,6 +240,7 @@ function OnboardingWizard({ data, token, onDone }: {
             tiktokHandle: draft.tiktokHandle.trim() || null,
             bestContentLinks: draft.bestContentLinks.trim() || null,
             whyWorkWithUs: draft.whyWorkWithUs.trim() || null,
+            productTitle: draft.productTitle || null,
             raceName: draft.raceName || null,
             raceYear: draft.raceYear || null,
             productSize: draft.productSize,
@@ -264,8 +274,8 @@ function OnboardingWizard({ data, token, onDone }: {
           <div className="bg-white border border-border-gray rounded-md shadow-sm p-5 md:p-6">
             {step === 0 && <StepWelcome briefs={data.briefs} />}
             {step === 1 && <StepProfile draft={draft} setDraft={setDraft} />}
-            {step === 2 && <StepRace draft={draft} setDraft={setDraft} races={data.races} />}
-            {step === 3 && <StepProduct draft={draft} setDraft={setDraft} />}
+            {step === 2 && <StepRace draft={draft} setDraft={setDraft} catalog={data.catalog || null} />}
+            {step === 3 && <StepProduct draft={draft} setDraft={setDraft} print={(data.catalog || []).find(c => c.title === draft.productTitle) || null} />}
             {step === 4 && <StepShipping draft={draft} setDraft={setDraft} />}
             {step === 5 && (
               <StepContentAgreement
@@ -471,57 +481,36 @@ function StepProfile({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d
   )
 }
 
-function StepRace({ draft, setDraft, races }: {
+function StepRace({ draft, setDraft, catalog }: {
   draft: OnboardingDraft
   setDraft: (d: OnboardingDraft) => void
-  races: RaceOption[]
+  catalog: CatalogPrint[] | null
 }) {
-  // Unique race names, sorted alphabetically.
-  const raceNames = Array.from(new Set(races.map(r => r.raceName))).sort()
-  // Year options — fixed range from 2000 → current year (newest first). The
-  // race table can't be the source of truth for available years because not
-  // every variant has rows in Race yet, and creators may pick years we haven't
-  // imported orders for.
+  // Year options: 2000 to this year, newest first.
   const currentYear = new Date().getFullYear()
-  const yearOptions = Array.from(
-    { length: currentYear - 2000 + 1 },
-    (_, i) => currentYear - i
-  )
+  const yearOptions = Array.from({ length: currentYear - 2000 + 1 }, (_, i) => currentYear - i)
 
   return (
     <div>
-      <h2 className="text-3xl font-bold text-off-black mb-1 leading-tight">Which race did you run?</h2>
+      <h2 className="text-3xl font-bold text-off-black mb-1 leading-tight">Which product do you want?</h2>
       <p className="text-xs text-off-black/60 mb-4">
-        We'll find your bib # and finish time for you, based off your name.
+        Pick the print for the race you ran. We'll find your bib # and finish time for you, based off your name.
       </p>
 
-      {/* Eligibility callout — the dropdown only contains races we currently
-          have designs for, but applicants don't know that without an
-          explanation. Spelling it out here also gates expectations: if
-          their race isn't listed, they're not eligible (yet). */}
       <div className="mb-4 p-3 bg-[#4F2DD4]/5 border border-[#4F2DD4]/20 rounded-md">
         <p className="text-sm text-off-black/80 leading-relaxed">
-          <strong>To be eligible</strong>, you must've run a race we have a design for. If you don't see your race in the list below, we don't currently have a design for it.
+          <strong>To be eligible</strong>, you must've run a race we have a print for. If you don't see your race in the list, we don't have a design for it yet.
         </p>
       </div>
 
       <div className="space-y-3">
         <div>
-          <div className="text-xs text-off-black/60 mb-1">Race *</div>
-          <select
-            value={draft.raceName}
-            onChange={(e) => setDraft({ ...draft, raceName: e.target.value, raceYear: '' })}
-            autoFocus
-            className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 bg-white"
-          >
-            <option value="">Select a race…</option>
-            {raceNames.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
+          <div className="text-xs text-off-black/60 mb-1">Print *</div>
+          <PrintPicker value={draft.productTitle || null} options={catalog} placeholder="Choose your race's print"
+            onChange={(p: CatalogPrint) => setDraft({ ...draft, productTitle: p.title, raceName: p.race })} />
         </div>
         <div>
-          <div className="text-xs text-off-black/60 mb-1">Year *</div>
+          <div className="text-xs text-off-black/60 mb-1">Year you ran it *</div>
           <select
             value={draft.raceYear}
             onChange={(e) => setDraft({ ...draft, raceYear: e.target.value })}
@@ -533,17 +522,18 @@ function StepRace({ draft, setDraft, races }: {
             ))}
           </select>
         </div>
-        {races.length === 0 && (
-          <p className="text-xs text-amber-600 mt-2">
-            No race options available yet. Reach out to Matt so he can add yours.
-          </p>
+        {catalog && catalog.length === 0 && (
+          <p className="text-xs text-amber-600 mt-2">The store's prints did not load. Refresh, or reach out to Matt.</p>
         )}
       </div>
     </div>
   )
 }
 
-function StepProduct({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d: OnboardingDraft) => void }) {
+function StepProduct({ draft, setDraft, print }: { draft: OnboardingDraft; setDraft: (d: OnboardingDraft) => void; print: CatalogPrint | null }) {
+  // Sizes we send as samples, and the frames this print comes in.
+  const sizes = PRODUCT_SIZES.filter(sz => !print || print.sizes.includes(sz))
+  const frames = print?.frames.length ? print.frames : FRAME_TYPES
   return (
     <div>
       <h2 className="text-3xl font-bold text-off-black mb-1 leading-tight">If you're approved, which size and frame would you like?</h2>
@@ -552,7 +542,7 @@ function StepProduct({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d
       <div className="mb-4">
         <div className="text-xs text-off-black/60 mb-2">Size *</div>
         <div className="grid grid-cols-3 gap-2">
-          {PRODUCT_SIZES.map(s => (
+          {sizes.map(s => (
             <button
               key={s}
               onClick={() => setDraft({ ...draft, productSize: s })}
@@ -571,7 +561,7 @@ function StepProduct({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (d
       <div>
         <div className="text-xs text-off-black/60 mb-2">Frame *</div>
         <div className="space-y-2">
-          {FRAME_TYPES.map(f => (
+          {frames.map(f => (
             <button
               key={f}
               onClick={() => setDraft({ ...draft, frameType: f })}

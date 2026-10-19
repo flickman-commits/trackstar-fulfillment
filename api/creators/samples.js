@@ -15,11 +15,23 @@ export default async function handler(req, res) {
     const id = String(req.query.creatorId || '')
     if (!id) return res.status(400).json({ error: 'creatorId is required' })
     const base = `CREATOR-${id.slice(-6).toUpperCase()}`
-    const samples = await prisma.order.findMany({
-      where: { source: 'creator_sample', orderNumber: { startsWith: base } },
-      orderBy: { createdAt: 'desc' },
-      select: { orderNumber: true, status: true, raceName: true, raceYear: true, productSize: true, frameType: true, createdAt: true, trackingNumber: true, trackingCarrier: true, shippedAt: true },
+    const creator = await prisma.creator.findUnique({ where: { id }, select: { sampleShopifyOrderIds: true } })
+    const shopifyIds = creator?.sampleShopifyOrderIds || []
+    const select = { orderNumber: true, parentOrderNumber: true, shopifyOrderData: true, status: true, raceName: true, raceYear: true, productSize: true, frameType: true, createdAt: true, trackingNumber: true, trackingCarrier: true, shippedAt: true }
+    // Old samples were CREATOR-XXXXXX rows; new ones are Shopify orders.
+    const rows = await prisma.order.findMany({
+      where: { OR: [{ source: 'creator_sample', orderNumber: { startsWith: base } }, ...(shopifyIds.length ? [{ source: 'shopify', parentOrderNumber: { in: shopifyIds } }] : [])] },
+      orderBy: { createdAt: 'desc' }, select,
     })
+    // eslint-disable-next-line no-unused-vars
+    const samples = rows.map(({ shopifyOrderData, parentOrderNumber, ...r }) => ({ ...r, orderNumber: shopifyOrderData?.name ? String(shopifyOrderData.name).replace('#', '') : r.orderNumber }))
+    // Sent to Shopify but not imported yet: shown from what we recorded when it was sent.
+    const sentCosts = await prisma.sampleCost.findMany({ where: { creatorId: id }, orderBy: { createdAt: 'desc' } })
+    for (const sc of sentCosts) {
+      if (!sc.orderName?.startsWith('#') || samples.some(s => `#${s.orderNumber}` === sc.orderName)) continue
+      const it = Array.isArray(sc.items) ? sc.items[0] || {} : {}
+      samples.unshift({ orderNumber: sc.orderName.replace('#', ''), status: 'sent', raceName: it.title || null, raceYear: null, productSize: it.size || null, frameType: it.frame || null, createdAt: sc.createdAt, trackingNumber: null, trackingCarrier: null, shippedAt: null, pending: true })
+    }
     return res.status(200).json({ samples })
   } catch (error) {
     console.error('[API /creators/samples]', error)

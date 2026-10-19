@@ -576,6 +576,9 @@ model Creator {
   finishTime          String?
 
   // Product preferences for the sample
+  // The exact store print they picked ("Personalized Berlin World Major Race
+  // Poster"), from the shared catalog; raceName is that print's race.
+  productTitle        String?
   productSize         String?
   frameType           String?
 
@@ -620,6 +623,10 @@ model Creator {
   // Link to the Standard Order that fulfills their sample.
   sampleOrderId       String?   @unique
   sampleOrder         Order?    @relation("CreatorSample", fields: [sampleOrderId], references: [id])
+  // Samples sent as Shopify orders (the Samples flow), newest last. The order
+  // reaches our Order table on the next import; sampleOrder is then linked to
+  // the newest one (server/domain/creators/creatorSample.js linkCreatorSamples).
+  sampleShopifyOrderIds String[] @default([])
 
   // Briefs assigned to this creator — selected by Matt at invite time.
   briefAssignments    BriefAssignment[]
@@ -1283,6 +1290,7 @@ model SampleCost {
   items        Json     // [{ title, size, frame, quantity }]
   costCents    Int
   chargedCents Int      @default(0)
+  creatorId    String?  // set for a creator's sample
   currency     String   @default("USD")
   createdById  String?
   createdAt    DateTime @default(now())
