@@ -156,6 +156,8 @@ export interface CustomerOrder {
   imported: boolean
   /** Designs and proofs that can go to the customer, newest first. */
   mockups: Mockup[]
+  /** Here only because a teammate linked it to this customer by number (they ordered under another email). */
+  linked?: boolean
 }
 
 /** A mockup a rep can attach: the page holds only the reference; the server sends the file. */

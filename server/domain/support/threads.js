@@ -149,8 +149,9 @@ export async function getThread(id, { userId } = {}) {
   })
   if (!t) return null
   if (t.mergedIntoId && t.mergedIntoId !== id) return getThread(t.mergedIntoId, { userId })
+  const linked = await linkedOrderNumbers(t)
   const [context, pastThreads, customerSince, customerCount] = await Promise.all([
-    customerContext(t.customerEmail),
+    customerContext(t.customerEmail, { linked }),
     t.customerEmail ? prisma.supportThread.findMany({
       where: { customerEmail: t.customerEmail, id: { not: t.id }, mergedIntoId: null },
       orderBy: { lastMessageAt: 'desc' }, take: 6,
@@ -318,7 +319,7 @@ const ORDERS_BY_EMAIL = `
   query($q: String!) {
     orders(first: 10, query: $q, sortKey: CREATED_AT, reverse: true) {
       nodes {
-        id legacyResourceId name createdAt
+        id legacyResourceId name createdAt email
         displayFinancialStatus displayFulfillmentStatus
         totalPriceSet { shopMoney { amount currencyCode } }
         discountCodes
@@ -379,13 +380,16 @@ function itemRow(o, catalog) {
  * rows Shopify did not return (Etsy, or an email that differs). Shopify
  * being down costs the live half, never the page.
  */
-export async function customerContext(email) {
+export async function customerContext(email, { linked = [] } = {}) {
   const e = String(email || '').trim().toLowerCase()
-  if (!e) return { orders: [], shopifyError: null }
+  if (!e && !linked.length) return { orders: [], shopifyError: null }
 
+  // Orders under their email, plus any a teammate linked to them by number
+  // because they bought under a different address.
+  const linkedWhere = linked.flatMap(orderNumberWhere)
   const [ours, catalog] = await Promise.all([
     prisma.order.findMany({
-      where: { customerEmail: { equals: e, mode: 'insensitive' } },
+      where: { OR: [...(e ? [{ customerEmail: { equals: e, mode: 'insensitive' } }] : []), ...linkedWhere] },
       orderBy: [{ createdAt: 'desc' }, { lineItemIndex: 'asc' }],
       take: 60,
       include: { approvalToken: { select: { token: true } } },
@@ -410,11 +414,21 @@ export async function customerContext(email) {
   let shopifyError = null
   if (process.env.SHOPIFY_STORE) {
     try {
-      const data = await shopifyGraphQL(ORDERS_BY_EMAIL, { q: `email:${e}` })
-      shopify = data?.orders?.nodes || []
+      // Two searches, not one OR'd query: ten orders under the email must not
+      // crowd a linked order out of the results.
+      const [byEmail, byNumber] = await Promise.all([
+        e ? shopifyGraphQL(ORDERS_BY_EMAIL, { q: `email:${e}` }) : null,
+        linked.length ? shopifyGraphQL(ORDERS_BY_EMAIL, { q: linked.map(n => `name:#${n}`).join(' OR ') }) : null,
+      ])
+      const seenIds = new Set()
+      for (const node of [...(byEmail?.orders?.nodes || []), ...(byNumber?.orders?.nodes || [])]) {
+        if (seenIds.has(node.legacyResourceId)) continue
+        seenIds.add(node.legacyResourceId)
+        shopify.push(node)
+      }
     } catch (err) {
       shopifyError = err.message.slice(0, 200)
-      console.warn(`[support] Shopify orders for ${e}: ${err.message}`)
+      console.warn(`[support] Shopify orders for ${e || linked.join(',')}: ${err.message}`)
     }
   }
 
@@ -429,6 +443,7 @@ export async function customerContext(email) {
 
   const orders = []
   const seen = new Set()
+  const shopifyEmailOf = new Map(shopify.map(n => [String(n.name || '').replace(/^#/, ''), String(n.email || '').toLowerCase()]))
   for (const s of shopify) {
     const number = String(s.name || '').replace(/^#/, '')
     const rows = byKey.get(String(s.legacyResourceId)) || byName.get(number) || []
@@ -476,6 +491,17 @@ export async function customerContext(email) {
     })
   }
   orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  // Mark the ones that are here only because a teammate linked them, so the
+  // panel can say so and offer to unlink. An order under their own email
+  // needs no link, even if someone added one.
+  const linkedSet = new Set(linked)
+  for (const o of orders) {
+    const underEmail = e && (
+      o.items.some(it => ours.find(r => r.id === it.orderId && String(r.customerEmail || '').toLowerCase() === e)) ||
+      shopifyEmailOf.get(o.number) === e
+    )
+    o.linked = linkedSet.has(o.number) && !underEmail
+  }
   // The designs and proofs a rep can attach, per order.
   let mockups = []
   try { mockups = await listMockups(ours.map(o => o.id)) } catch (err) { console.warn(`[support] mockups: ${err.message}`) }
@@ -484,4 +510,91 @@ export async function customerContext(email) {
     o.mockups = mockups.filter(m => ids.has(m.orderId))
   }
   return { orders, shopifyError }
+}
+
+// ---------------------------------------------------------------------------
+// Orders linked by hand: the customer wrote in from a different email than
+// the one they ordered under. Stored per customer, so it sticks.
+// ---------------------------------------------------------------------------
+
+/**
+ * Our rows for an order number. Shopify's order name is stored as "5281" on
+ * nearly every row but "#5281" on a few early ones, so both are matched; an
+ * Etsy order's number is its receipt id.
+ */
+export function orderNumberWhere(n) {
+  return [
+    { shopifyOrderData: { path: ['name'], equals: n } },
+    { shopifyOrderData: { path: ['name'], equals: `#${n}` } },
+    { source: 'etsy', parentOrderNumber: n },
+  ]
+}
+
+/** Who this conversation is with, as a stable key: their email, or their Instagram id. */
+export function customerKeyOf(t) {
+  const email = String(t?.customerEmail || '').trim().toLowerCase()
+  if (email) return email
+  return t?.igUserId ? `ig:${t.igUserId}` : ''
+}
+
+export async function linkedOrderNumbers(t) {
+  const key = customerKeyOf(t)
+  if (!key) return []
+  const rows = await prisma.supportLinkedOrder.findMany({ where: { customerKey: key }, orderBy: { createdAt: 'asc' }, select: { orderNumber: true } })
+  return rows.map(r => r.orderNumber)
+}
+
+function userError(message) {
+  const err = new Error(message)
+  err.status = 400
+  return err
+}
+
+/** "#4517", "4517" or "4517-2" (our per-item number) all mean order 4517. */
+export function normalizeOrderNumber(raw) {
+  const n = String(raw || '').trim().replace(/^#/, '').replace(/\s+/g, '').replace(/-\d+$/, '')
+  return /^\d{3,12}$/.test(n) ? n : null
+}
+
+const ORDER_BY_NAME = `query($q: String!) { orders(first: 1, query: $q) { nodes { name email } } }`
+
+export async function linkOrder(threadId, raw, actor) {
+  const t = await prisma.supportThread.findUnique({ where: { id: threadId } })
+  if (!t) throw userError('No such thread')
+  const number = normalizeOrderNumber(raw)
+  if (!number) throw userError('Enter an order number, like 4517')
+  const key = customerKeyOf(t)
+  if (!key) throw userError('This conversation has no email or Instagram id to link an order to')
+
+  // It has to be a real order: ours first, then Shopify (not imported yet).
+  const ours = await prisma.order.findFirst({
+    where: { OR: orderNumberWhere(number) },
+    select: { customerEmail: true },
+  })
+  let orderEmail = ours?.customerEmail || ''
+  if (!ours) {
+    const data = await shopifyGraphQL(ORDER_BY_NAME, { q: `name:#${number}` })
+    const node = (data?.orders?.nodes || []).find(n => String(n.name).replace(/^#/, '') === number)
+    if (!node) throw userError(`We can't find order #${number}`)
+    orderEmail = node.email || ''
+  }
+
+  await prisma.supportLinkedOrder.upsert({
+    where: { customerKey_orderNumber: { customerKey: key, orderNumber: number } },
+    create: { customerKey: key, orderNumber: number, orderEmail: String(orderEmail).toLowerCase(), linkedById: actor?.id || null, linkedByName: actorName(actor) },
+    update: {},
+  })
+  await event(threadId, `Linked order #${number}${orderEmail ? ` (ordered under ${orderEmail})` : ''}`, actor)
+  return { number, orderEmail }
+}
+
+export async function unlinkOrder(threadId, raw, actor) {
+  const t = await prisma.supportThread.findUnique({ where: { id: threadId } })
+  if (!t) throw userError('No such thread')
+  const number = normalizeOrderNumber(raw)
+  const key = customerKeyOf(t)
+  if (!number || !key) throw userError('Nothing to unlink')
+  const { count } = await prisma.supportLinkedOrder.deleteMany({ where: { customerKey: key, orderNumber: number } })
+  if (count) await event(threadId, `Unlinked order #${number}`, actor)
+  return { number, removed: count }
 }

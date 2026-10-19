@@ -14,7 +14,7 @@
  */
 import prisma from '../../db.js'
 import { complete, isLlmConfigured, llmInfo } from '../../lib/llm.js'
-import { customerContext } from './threads.js'
+import { customerContext, linkedOrderNumbers, orderNumberWhere } from './threads.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { stripQuoted } from './mailbox.js'
 import { getPlaybook } from './playbook.js'
@@ -184,13 +184,15 @@ export async function gatherFacts(threadId) {
   const recent = t.messages.slice(-6)
   const conversation = recent.map(m => `${m.direction === 'in' ? `CUSTOMER (${m.fromName || m.fromEmail || 'them'})` : 'TRACKSTAR'} on ${new Date(m.sentAt).toDateString()}:\n${clip(stripQuoted(m.bodyText) || '(no text)', 2500)}${Array.isArray(m.attachments) && m.attachments.length ? `\n[attached: ${m.attachments.map(a => a.filename).join(', ')}]` : ''}`).join('\n\n')
 
-  // Their orders by email, else by an order number they quoted.
-  let context = t.customerEmail ? await customerContext(t.customerEmail) : { orders: [] }
+  // Their orders by email plus any a teammate linked to them, else by an
+  // order number they quoted.
+  const linked = await linkedOrderNumbers(t)
+  let context = (t.customerEmail || linked.length) ? await customerContext(t.customerEmail, { linked }) : { orders: [] }
   let foundBy = ''
   if (!context.orders.length) {
     const numbers = quotedOrderNumbers(recent.filter(m => m.direction === 'in').map(m => m.bodyText).join('\n'))
     for (const n of numbers) {
-      const row = await prisma.order.findFirst({ where: { shopifyOrderData: { path: ['name'], equals: `#${n}` } }, select: { customerEmail: true } })
+      const row = await prisma.order.findFirst({ where: { OR: orderNumberWhere(n) }, select: { customerEmail: true } })
       if (row?.customerEmail) { context = await customerContext(row.customerEmail); if (context.orders.length) { foundBy = `the order number they quoted (#${n})`; break } }
     }
   }

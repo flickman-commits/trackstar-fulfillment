@@ -65,7 +65,7 @@ function OpenIn({ href, icon, label, title }: { href: string; icon: ReactNode; l
   )
 }
 
-function OrderCard({ o }: { o: CustomerOrder }) {
+function OrderCard({ o, onUnlink }: { o: CustomerOrder; onUnlink?: () => void }) {
   const it = o.items[0]
   const age = Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 86400000)
   const late = o.fulfillmentStatus !== 'FULFILLED' && !o.tracking.length
@@ -91,6 +91,12 @@ function OrderCard({ o }: { o: CustomerOrder }) {
           <div className="flex items-baseline gap-1.5 min-w-0">
             <span className="font-semibold text-off-black shrink-0">#{o.number}</span>
             <span className="text-off-black truncate" title={race}>{race}</span>
+            {o.linked && (
+              <span className="ml-auto shrink-0 inline-flex items-center gap-0.5 px-1.5 py-px rounded border border-blue-200 bg-blue-50 text-[10px] font-medium text-blue-700" title="Linked by hand: they ordered under a different email">
+                Linked
+                {onUnlink && <button onClick={onUnlink} title="Unlink this order" aria-label={`Unlink order #${o.number}`} className="-mr-0.5 text-blue-700/60 hover:text-blue-900"><X className="w-3 h-3" /></button>}
+              </span>
+            )}
           </div>
           {(it?.runner || bought) && (
             <div className="text-off-black/60 truncate" title={[it?.runner, bought].filter(Boolean).join(' · ')}>
@@ -122,6 +128,69 @@ function OrderCard({ o }: { o: CustomerOrder }) {
       )}
     </div>
   )
+}
+
+/**
+ * Link an order to this customer by its number. For the customer who writes in
+ * from a different email than the one they ordered under: once someone finds
+ * the order, it is linked to the customer (not just this conversation), so it
+ * shows here from now on and in their future conversations too.
+ */
+function AddOrder({ threadId, onChanged }: { threadId: string; onChanged: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    const v = value.trim()
+    if (!v || busy) return
+    setBusy(true)
+    try {
+      await supportApi.linkOrder(threadId, v)
+      toast.success(`Linked order #${v.replace(/^#/, '')}`)
+      setValue(''); setOpen(false)
+      onChanged()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not link that order')
+    } finally {
+      setBusy(false)
+    }
+  }
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
+        <Plus className="w-3.5 h-3.5" /> Add order
+      </button>
+    )
+  }
+  return (
+    <form onSubmit={e => { e.preventDefault(); submit() }} className="mt-2 flex items-center gap-1.5">
+      <input
+        autoFocus
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setValue('') } }}
+        placeholder="Order #, e.g. 4517"
+        aria-label="Order number to link"
+        inputMode="numeric"
+        className="flex-1 min-w-0 px-2 py-1 border border-border-gray rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-off-black/20"
+      />
+      <button type="submit" disabled={!value.trim() || busy} className={btnSecondary}>
+        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Link'}
+      </button>
+      <button type="button" onClick={() => { setOpen(false); setValue('') }} aria-label="Cancel" className="text-off-black/40 hover:text-off-black"><X className="w-3.5 h-3.5" /></button>
+    </form>
+  )
+}
+
+async function unlinkOrder(threadId: string, number: string, onChanged: () => void) {
+  if (!window.confirm(`Unlink order #${number} from this customer?`)) return
+  try {
+    await supportApi.unlinkOrder(threadId, number)
+    toast.success(`Unlinked order #${number}`)
+    onChanged()
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Could not unlink')
+  }
 }
 
 /** Tags on the conversation: chips, a + to add, with the playbook's scenarios suggested. */
@@ -330,7 +399,10 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
             {thread.context.shopifyError && <div className="text-xs text-amber-700 inline-flex items-start gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />Shopify did not answer; showing what we have on file.</div>}
             {thread.context.orders.length === 0
               ? <div className="text-xs text-off-black/50 inline-flex items-center gap-1.5"><Package className="w-3.5 h-3.5" />{thread.customerEmail ? `No orders under ${thread.customerEmail}.` : 'No email to look orders up by. Ask for the order number.'}</div>
-              : <div className="space-y-3">{thread.context.orders.map(o => <OrderCard key={`${o.source}-${o.number}`} o={o} />)}</div>}
+              : <div className="space-y-3">{thread.context.orders.map(o => (
+                  <OrderCard key={`${o.source}-${o.number}`} o={o} onUnlink={o.linked ? () => unlinkOrder(thread.id, o.number, onChanged) : undefined} />
+                ))}</div>}
+            <AddOrder threadId={thread.id} onChanged={onChanged} />
           </Section>
           {thread.pastThreads.length > 0 && (
           <Section title="Other conversations" count={thread.pastThreads.length}>

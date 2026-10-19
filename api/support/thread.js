@@ -13,12 +13,15 @@
  *   POST { id, action: 'redraft', instruction }  a fresh Claude draft, optionally steered
  *   POST { id, action: 'merge', sourceIds }     fold the customer's other conversations into this one
  *   POST { id, action: 'proposal', noteId, proposalId, status }   a suggested action on a draft: done | dismissed
+ *   POST { id, action: 'linkOrder', number }    attach an order to this customer by its number, for when they
+ *                                               wrote in from a different email than they ordered under
+ *   POST { id, action: 'unlinkOrder', number }
  *
  * Every change leaves an event in the thread and a line in the audit log.
  */
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
-import { getThread, assign, setStatus, snooze, setPriority, setTags, addNote, deleteNote, markRead, markUnread, noteRow, setProposal } from '../../server/domain/support/threads.js'
+import { getThread, assign, setStatus, snooze, setPriority, setTags, addNote, deleteNote, markRead, markUnread, noteRow, setProposal, linkOrder, unlinkOrder } from '../../server/domain/support/threads.js'
 import { draftThread } from '../../server/domain/support/draft.js'
 import { mergeThreads } from '../../server/domain/support/merge.js'
 
@@ -88,6 +91,16 @@ export default async function handler(req, res) {
         await audit(`${body.status === 'done' ? 'Approved' : 'Dismissed'} a suggested action`, { noteId: body.noteId, proposalId: body.proposalId })
         return res.status(200).json(n)
       }
+      case 'linkOrder': {
+        const out = await linkOrder(id, body.number, user)
+        await audit(`Linked order #${out.number} to a customer`, { number: out.number, orderEmail: out.orderEmail })
+        return res.status(200).json(await getThread(id, { userId: user.id }))
+      }
+      case 'unlinkOrder': {
+        const out = await unlinkOrder(id, body.number, user)
+        await audit(`Unlinked order #${out.number}`, { number: out.number })
+        return res.status(200).json(await getThread(id, { userId: user.id }))
+      }
       case 'unread': {
         await markUnread(id, user.id)
         return res.status(200).json({ ok: true })
@@ -96,6 +109,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: `Unknown action: ${body.action}` })
     }
   } catch (error) {
+    // A 400 is the person's input ("We can't find order #1234"); say it as is.
+    if (error.status === 400) return res.status(400).json({ error: error.message })
     console.error('[API /support/thread]', error)
     return res.status(500).json({ error: error.message })
   }

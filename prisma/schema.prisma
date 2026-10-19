@@ -1145,6 +1145,26 @@ model SupportThread {
   @@index([channel, status])
 }
 
+// An order a teammate attached to a customer by hand, because they wrote in
+// from a different email than the one on the order. Keyed by the customer,
+// not the conversation, so every conversation with them (now and later) shows
+// it. customerKey is the lowercased email, or "ig:<igUserId>" for an
+// Instagram customer with no email.
+model SupportLinkedOrder {
+  id           String   @id @default(cuid())
+  customerKey  String
+  // The number a person reads, without "#": "4517" (Shopify) or an Etsy receipt.
+  orderNumber  String
+  // The email on the order, for reference: the address they actually bought under.
+  orderEmail   String   @default("")
+  linkedById   String?
+  linkedByName String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@unique([customerKey, orderNumber])
+  @@index([customerKey])
+}
+
 model SupportMessage {
   id              String    @id @default(cuid())
   threadId        String
