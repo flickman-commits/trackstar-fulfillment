@@ -2,7 +2,7 @@
  * POST /api/creators/sample - admin only. Send an existing creator another
  * sample print (a second race, a reshoot, a replacement).
  *
- *   { creatorId, raceName, raceYear, bibNumber?, finishTime?, productSize?, frameType? }
+ *   { creatorId, raceName, raceYear, productTitle?, bibNumber?, finishTime?, productSize?, frameType? }
  *
  * Creates another creator_sample order in the Standard queue, numbered
  * CREATOR-XXXXXX-2, -3..., shipped to the creator's address on file. The
@@ -68,6 +68,8 @@ export default async function handler(req, res) {
           instagramHandle: creator.instagramHandle || null,
           additionalSample: true,
         },
+        // The product title picks the design edition (World Majors) at render time.
+        ...(b.productTitle ? { shopifyOrderData: { line_items: [{ title: String(b.productTitle), name: String(b.productTitle) }] } } : {}),
         customerName: creator.name || null,
         customerEmail: creator.email || null,
       },
@@ -82,6 +84,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, orderNumber: order.orderNumber })
   } catch (error) {
     console.error('[API /creators/sample]', error)
-    return res.status(500).json({ error: 'Could not create the sample' })
+    // Admin-only endpoint: say what went wrong rather than a blank failure.
+    return res.status(500).json({ error: `Could not create the sample: ${String(error.message || error).split('\n').filter(Boolean).pop().slice(0, 300)}` })
   }
 }

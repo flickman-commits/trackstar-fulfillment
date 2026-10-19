@@ -741,7 +741,7 @@ function InviteModal({ briefs, onClose, onCreated }: {
 // statuses on the left; profile, race and shipping on the right. Every card
 // saves itself, so there is no page-wide Save.
 // ---------------------------------------------------------------------------
-interface CatalogRace { race: string; title: string; image: string | null }
+interface CatalogRace { race: string; edition: string | null; label: string; title: string; image: string | null }
 
 interface SampleOrder {
   orderNumber: string
@@ -1094,13 +1094,47 @@ function EditCard({ title, creator, fields, onSave, note, catalog }: {
 /** Pick a race from the live Shopify catalog. A race not in the catalog stays selectable so old records still show. */
 function RacePicker({ value, onChange, catalog }: { value: string; onChange: (v: string) => void; catalog: CatalogRace[] | null }) {
   if (!catalog) return <div className={`${fieldCls} text-off-black/40 inline-flex items-center gap-2`}><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading races from Shopify</div>
-  const known = catalog.some(c => c.race === value)
+  const races = [...new Set(catalog.map(c => c.race))]
   return (
     <select value={value} onChange={e => onChange(e.target.value)} className={fieldCls}>
       <option value="">Choose a race</option>
-      {value && !known && <option value={value}>{value} (not in the store)</option>}
-      {catalog.map(c => <option key={c.race} value={c.race}>{c.race}</option>)}
+      {value && !races.includes(value) && <option value={value}>{value} (not in the store)</option>}
+      {races.map(r => <option key={r} value={r}>{r}</option>)}
     </select>
+  )
+}
+
+/** Pick the exact print from the store, with its picture: Berlin and Berlin (World Majors) are different designs. */
+function ProductPicker({ value, onChange, catalog }: { value: CatalogRace | null; onChange: (v: CatalogRace) => void; catalog: CatalogRace[] | null }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  if (!catalog) return <div className={`${fieldCls} text-off-black/40 inline-flex items-center gap-2`}><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading the store's prints</div>
+  const shown = catalog.filter(c => !q.trim() || c.label.toLowerCase().includes(q.trim().toLowerCase()))
+  const thumb = (c: CatalogRace | null) => c?.image
+    ? <img src={`${c.image}${c.image.includes('?') ? '&' : '?'}width=80`} alt="" className="w-8 h-10 object-cover rounded bg-subtle-gray shrink-0" />
+    : <span className="w-8 h-10 rounded bg-subtle-gray shrink-0" />
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)} className={`${fieldCls} flex items-center gap-2 text-left py-1.5`}>
+        {thumb(value)}
+        <span className={`flex-1 truncate ${value ? 'text-off-black' : 'text-off-black/40'}`}>{value?.label || 'Choose a print'}</span>
+        <ChevronDown className="w-4 h-4 text-off-black/40 shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-40 left-0 right-0 mt-1 bg-white border border-border-gray rounded-md shadow-[0_8px_30px_rgba(0,0,0,0.14)] p-1.5">
+          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search races" className={`${fieldCls} mb-1.5`} />
+          <div className="max-h-72 overflow-y-auto">
+            {shown.map(c => (
+              <button key={`${c.race}|${c.edition || ''}`} type="button" onClick={() => { onChange(c); setOpen(false); setQ('') }}
+                className={`w-full flex items-center gap-2.5 px-1.5 py-1 rounded text-left text-sm hover:bg-subtle-gray ${value && value.race === c.race && value.edition === c.edition ? 'bg-subtle-gray font-medium' : ''}`}>
+                {thumb(c)}<span className="truncate">{c.label}</span>
+              </button>
+            ))}
+            {!shown.length && <div className="px-2 py-3 text-sm text-off-black/45">No print matches.</div>}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1122,20 +1156,23 @@ function SendSample({ creator, catalog, hasSample, onDone }: { creator: Creator;
     frameType: creator.frameType || 'Black Oak',
   })
   const [f, setF] = useState(blank)
-  const inCatalog = !!catalog?.some(c => c.race === f.raceName)
+  // The exact print; starts on their requested race's standard edition.
+  const [product, setProduct] = useState<CatalogRace | null>(null)
+  useEffect(() => { if (!product && catalog && f.raceName) setProduct(catalog.find(c => c.race === f.raceName && !c.edition) || catalog.find(c => c.race === f.raceName) || null) }, [catalog, f.raceName, product])
+  const inCatalog = !!product
   const submit = async () => {
     setBusy(true); setErr(null)
     try {
-      const res = await apiFetch('/api/creators/sample', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ creatorId: creator.id, ...f, raceYear: Number(f.raceYear) }) })
+      const res = await apiFetch('/api/creators/sample', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ creatorId: creator.id, ...f, raceName: product!.race, productTitle: product!.title, raceYear: Number(f.raceYear) }) })
       const d = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(d.error || 'Could not create the sample')
+      if (!res.ok) throw new Error(d.error || `Could not create the sample (server said ${res.status})`)
       setOpen(false)
       await onDone()
     } catch (e) { setErr(e instanceof Error ? e.message : 'Could not create the sample') } finally { setBusy(false) }
   }
   if (!open) {
     return (
-      <button onClick={() => { setF(blank()); setOpen(true) }} className="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium border border-dashed border-border-gray rounded-md text-off-black/70 bg-white hover:bg-subtle-gray">
+      <button onClick={() => { setF(blank()); setProduct(null); setOpen(true) }} className="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium border border-dashed border-border-gray rounded-md text-off-black/70 bg-white hover:bg-subtle-gray">
         <Plus className="w-3.5 h-3.5" /> {hasSample ? 'Send another sample' : 'Send a sample'}
       </button>
     )
@@ -1144,7 +1181,7 @@ function SendSample({ creator, catalog, hasSample, onDone }: { creator: Creator;
     <div className="mt-3 border border-border-gray rounded-md p-3 space-y-2.5 bg-white">
       <div className={cardLabel}>{hasSample ? 'Another sample' : 'New sample'}</div>
       <div className="grid grid-cols-2 gap-2">
-        <div className="col-span-2 sm:col-span-1"><RacePicker value={f.raceName} onChange={v => setF({ ...f, raceName: v })} catalog={catalog} /></div>
+        <div className="col-span-2 sm:col-span-1"><ProductPicker value={product} onChange={setProduct} catalog={catalog} /></div>
         <input value={f.raceYear} onChange={e => setF({ ...f, raceYear: e.target.value })} placeholder="Year" inputMode="numeric" className={`${fieldCls} col-span-2 sm:col-span-1`} />
         <input value={f.bibNumber} onChange={e => setF({ ...f, bibNumber: e.target.value })} placeholder="Bib # (optional)" className={fieldCls} />
         <input value={f.finishTime} onChange={e => setF({ ...f, finishTime: e.target.value })} placeholder="Finish time (optional)" className={fieldCls} />
