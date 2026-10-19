@@ -241,6 +241,7 @@ export default function App() {
                     and the brief admin all change things outside the day to day
                     fulfillment work. */}
                 <Route path="/creators" element={<RequireCap cap="creators"><CreatorsHome /></RequireCap>} />
+                <Route path="/creators/:creatorId" element={<RequireCap cap="creators"><CreatorsHome /></RequireCap>} />
                 <Route path="/products" element={<RequireAdmin><ProductsBulkEdit /></RequireAdmin>} />
                 <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
                 {/* Sales is for reps: anyone signed in whose email is on the Attio

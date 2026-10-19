@@ -30,6 +30,7 @@ import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
 import { completeOrder, CompleteError } from '../../server/domain/orders/complete.js'
 import { noteWeatherChange } from '../../server/domain/races/verification.js'
 import { acceptMatch, AcceptMatchError } from '../../server/domain/research/acceptMatch.js'
+import { listWinningAds } from '../../server/domain/creators/winningAds.js'
 import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
@@ -2054,6 +2055,7 @@ async function handleCreatorPortalData(token, res) {
     briefs,
     sampleOrder: creator.sampleOrder,
     races,
+    winningAds: await listWinningAds(),
   })
 }
 

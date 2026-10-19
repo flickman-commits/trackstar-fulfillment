@@ -1,8 +1,10 @@
 import PageHeader from '@/components/PageHeader'
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import { Loader2, Package, DollarSign, TrendingUp, X, Copy, Check, Instagram, Plus, Send, Mail, Music2, Pencil, ChevronDown, Search } from 'lucide-react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Loader2, X, Copy, Check, Instagram, Plus, Mail, Music2, Pencil, ChevronDown, ChevronLeft, Search, ExternalLink } from 'lucide-react'
+import { btnSecondary, pageShell, sectionLabel } from '@/lib/ui'
 import { apiFetch } from '@/lib/api'
+import { TRYBE_URL } from '@/lib/creatorLinks'
 
 type CreatorStatus = 'invited' | 'applied' | 'active' | 'paused' | 'denied'
 type CommissionModel = 'free_product' | 'flat_per_asset' | 'rev_share' | 'hybrid'
@@ -81,13 +83,6 @@ const CONTENT_STATUS_CONFIG: Record<ContentStatus, { label: string; color: strin
   posted:       { label: 'Posted',       color: 'text-emerald-700',  bg: 'bg-emerald-50' },
 }
 
-const COMMISSION_LABEL: Record<CommissionModel, string> = {
-  free_product:    'Free product',
-  flat_per_asset:  'Flat per asset',
-  rev_share:       'Rev share',
-  hybrid:          'Hybrid',
-}
-
 function sampleStatusLabel(orderStatus: string | undefined | null): { label: string; color: string } {
   if (!orderStatus) return { label: 'Not yet requested', color: 'text-off-black/40' }
   if (orderStatus === 'completed') return { label: 'Sent to Production', color: 'text-emerald-700' }
@@ -120,67 +115,54 @@ function formatUsd(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 }
 
-/** Single metric tile. Greyed/dashed when `placeholder` is true. */
-function Tile({
-  icon,
-  label,
-  shortLabel,
-  value,
-  subLabel,
-  placeholder = false,
-}: {
-  icon: React.ReactNode
-  label: string
-  shortLabel?: string  // Used on mobile when the full label is too long
-  value: string | number
-  subLabel?: string
-  placeholder?: boolean
-}) {
-  return (
-    <div className={`relative bg-white border rounded-md p-3 md:p-5 ${
-      placeholder ? 'border-dashed border-off-black/20' : 'border-border-gray shadow-sm'
-    }`}>
-      <div className="flex items-center gap-1.5 md:gap-2 text-off-black/50 mb-1.5 md:mb-2">
-        <span className="hidden md:inline-flex">{icon}</span>
-        <span className="text-[10px] md:text-xs font-semibold uppercase tracking-tight md:tracking-wider leading-tight">
-          {shortLabel ? <><span className="md:hidden">{shortLabel}</span><span className="hidden md:inline">{label}</span></> : label}
-        </span>
-      </div>
-      <div className={`text-xl md:text-3xl font-bold ${placeholder ? 'text-off-black/30' : 'text-off-black'}`}>
-        {value}
-      </div>
-      {subLabel && <div className="text-[10px] md:text-xs text-off-black/50 mt-1 hidden md:block">{subLabel}</div>}
-      {placeholder && (
-        <span
-          className="absolute top-2 right-2 px-1.5 py-0.5 bg-off-black/5 text-off-black/40 text-[9px] font-medium rounded uppercase tracking-wider hidden md:inline"
-          title="Placeholder value - real metric lands in a later phase"
-        >
-          Placeholder
-        </span>
-      )}
-    </div>
-  )
+type CreatorsView = 'applied' | 'active' | 'all' | 'denied' | 'ads'
+
+const VIEW_LABEL: Record<CreatorsView, string> = {
+  applied: 'Applied',
+  active: 'Active',
+  all: 'All',
+  denied: 'Denied',
+  ads: 'Winning ads',
 }
+
+interface WinningAd {
+  id: string
+  title: string
+  url: string
+  imageUrl: string | null
+  notes: string | null
+  createdAt: string
+}
+
+/** An applicant still waiting on a yes or no. */
+const isApplicant = (c: Creator) => c.status === 'applied' && !c.sampleOrder
 
 export default function CreatorsHome() {
   const [metrics, setMetrics] = useState<HomeMetrics | null>(null)
   const [creators, setCreators] = useState<Creator[]>([])
   const [briefs, setBriefs] = useState<BriefLite[]>([])
+  const [ads, setAds] = useState<WinningAd[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null)
   const [showInvite, setShowInvite] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [decliningId, setDecliningId] = useState<string | null>(null)
-  const [showDenied, setShowDenied] = useState(false)
   const [query, setQuery] = useState('')
+
+  // The open creator lives in the address bar as /creators/<id> and the view
+  // as ?view=, so a reload, the back button and a shared link land in place.
+  const { creatorId = null } = useParams<{ creatorId: string }>()
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const viewParam = searchParams.get('view') as CreatorsView | null
 
   const loadAll = useCallback(async () => {
     try {
-      const [metricsRes, creatorsRes, briefsRes] = await Promise.all([
+      const [metricsRes, creatorsRes, briefsRes, adsRes] = await Promise.all([
         apiFetch('/api/orders/actions?action=creator-home-metrics'),
         apiFetch('/api/orders/actions?action=list-creators'),
         apiFetch('/api/orders/actions?action=list-briefs'),
+        apiFetch('/api/creators/ads'),
       ])
       if (!metricsRes.ok) throw new Error(`Metrics failed: ${metricsRes.status}`)
       if (!creatorsRes.ok) throw new Error(`Creators failed: ${creatorsRes.status}`)
@@ -190,6 +172,7 @@ export default function CreatorsHome() {
       const { briefs } = await briefsRes.json()
       setCreators(creators)
       setBriefs(briefs.filter((b: BriefLite) => b.status === 'active'))
+      if (adsRes.ok) setAds((await adsRes.json()).ads || [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load data')
     } finally {
@@ -201,25 +184,41 @@ export default function CreatorsHome() {
     loadAll()
   }, [loadAll])
 
-  // Creators that submitted the public application but haven't been approved
-  // yet. They show in the Creators Applied queue above the main list.
+  const applicants = creators.filter(isApplicant)
+  // Default to the applicants while any are waiting; otherwise the active list.
+  const view: CreatorsView = viewParam && viewParam in VIEW_LABEL ? viewParam : applicants.length ? 'applied' : 'active'
+  const setView = (v: CreatorsView) => setSearchParams(v === (applicants.length ? 'applied' : 'active') ? {} : { view: v }, { replace: true })
+
+  const selected = creatorId ? creators.find(c => c.id === creatorId) || null : null
+  const openCreator = (c: Creator) => navigate({ pathname: `/creators/${c.id}`, search: searchParams.toString() })
+  const closeCreator = useCallback(() => navigate({ pathname: '/creators', search: searchParams.toString() }), [navigate, searchParams])
+
+  useEffect(() => {
+    if (!creatorId) return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement
+      if (e.key === 'Escape' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) closeCreator()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [creatorId, closeCreator])
+
   // Search across name, email, Instagram, race and sample order number.
   const q = query.trim().toLowerCase().replace(/^@/, '')
   const matches = (c: Creator) => !q || [c.name, c.email, c.instagramHandle, c.raceName, c.sampleOrder?.orderNumber]
     .some(v => String(v || '').toLowerCase().includes(q))
-  const pendingSampleRequests = creators.filter(matches).filter(c =>
-    c.status === 'applied' && !c.sampleOrder
-  )
-  const otherCreators = creators.filter(matches).filter(c =>
-    !(c.status === 'applied' && !c.sampleOrder) &&
-    // Denied creators stay in the DB (can be un-denied from the drawer) but
-    // are hidden from the table.
-    c.status !== 'denied'
-  )
-  const deniedCreators = creators.filter(matches).filter(c => c.status === 'denied')
+  const inView: Record<Exclude<CreatorsView, 'ads'>, Creator[]> = {
+    applied: applicants,
+    active: creators.filter(c => !isApplicant(c) && c.status !== 'denied'),
+    all: creators,
+    denied: creators.filter(c => c.status === 'denied'),
+  }
+  const counts = { applied: inView.applied.length, active: inView.active.length, all: inView.all.length, denied: inView.denied.length, ads: ads.length }
+  // A search reaches past the view, so a name is found wherever it is.
+  const list = view === 'ads' ? [] : (q ? creators : inView[view]).filter(matches)
 
   const handleDeclineSample = async (creator: Creator) => {
-    if (!confirm(`Decline sample request from ${creator.name || 'this creator'}? They'll be marked denied and hidden from the list - no fulfillment order will be created. You can un-deny them later from "Show denied".`)) return
+    if (!confirm(`Decline ${creator.name || 'this creator'}? They'll be marked denied and no sample is made. You can un-deny them later from the Denied view.`)) return
     setDecliningId(creator.id)
     try {
       const res = await apiFetch('/api/orders/actions', {
@@ -259,313 +258,130 @@ export default function CreatorsHome() {
     }
   }
 
+  const decide = (c: Creator) => isApplicant(c) ? (
+    <div className="flex items-center gap-2 shrink-0">
+      <button
+        onClick={(e) => { e.stopPropagation(); handleDeclineSample(c) }}
+        disabled={decliningId === c.id || approvingId === c.id}
+        className={btnSecondary}
+      >
+        {decliningId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />} Decline
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); handleApproveSample(c) }}
+        disabled={approvingId === c.id || decliningId === c.id}
+        className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-40 whitespace-nowrap"
+      >
+        {approvingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Approve
+      </button>
+    </div>
+  ) : null
+
+  const statsLine = metrics && (
+    <span className="text-xs text-off-black/50 whitespace-nowrap">
+      {metrics.creators.appliedThisMonth} new this month · {metrics.samples.total} samples · {formatUsd(metrics.samples.costEstimatedUsd)} spent
+    </span>
+  )
+
   return (
-    <div className="min-h-screen bg-[#F0F0F0]">
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-8">
-        {/* Header */}
-        <PageHeader title="Creator Program" subtitle="Creators, content and performance" />
-        <div className="hidden md:flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-          <div className="flex items-center gap-3">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 md:h-10 w-auto shrink-0 object-contain" />
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-off-black">Creator Program</h1>
-              <p className="text-sm text-off-black/50">Overview of creators, content, and performance</p>
-            </div>
+    <div className={pageShell}>
+      <div className="px-3 md:px-5 w-full flex flex-col h-full">
+        {!selected && (
+          <PageHeader
+            title="Creators"
+            subtitle={statsLine}
+            pill={applicants.length ? `${applicants.length} applied` : undefined}
+            control={
+              <select value={view} onChange={e => setView(e.target.value as CreatorsView)} className="text-xs font-medium bg-white border border-border-gray rounded-full pl-3 pr-7 py-1.5 appearance-none">
+                {(Object.keys(VIEW_LABEL) as CreatorsView[]).map(k => <option key={k} value={k}>{VIEW_LABEL[k]} ({counts[k]})</option>)}
+              </select>
+            }
+          />
+        )}
+        <div className="pt-4 md:pt-5 pb-3 hidden md:flex items-center justify-between gap-4 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-auto shrink-0 object-contain" />
+            <h1 className="text-2xl md:text-[28px] font-bold text-off-black leading-none">Creators</h1>
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              to="/briefs"
-              className="px-3 py-1.5 text-xs md:text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
-            >
-              Briefs
-            </Link>
-            <Link
-              to="/"
-              className="px-3 py-1.5 text-xs md:text-sm font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-off-black/5 transition-colors"
-            >
-              Fulfillment
-            </Link>
+          <div className="flex-1 flex items-center justify-end gap-2 md:gap-3 min-w-0">
+            <div className="relative flex-1 max-w-[760px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
+              <input
+                value={query}
+                onChange={e => { setQuery(e.target.value); if (selected) closeCreator() }}
+                placeholder="Search by name, email, Instagram, race or order #"
+                className="w-full pl-9 pr-8 py-2 bg-white border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30"
+              />
+              {query && <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-off-black/40 hover:text-off-black"><X className="w-3.5 h-3.5" /></button>}
+            </div>
+            <a href={TRYBE_URL} target="_blank" rel="noopener noreferrer" className={btnSecondary} title="Where creators upload content, handle revisions and get into the ad account">
+              Trybe <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+            <Link to="/briefs" className={btnSecondary}>Briefs</Link>
+            <button onClick={() => setShowInvite(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-dark-fill text-white text-sm font-medium rounded-md hover:opacity-90 transition-opacity whitespace-nowrap">
+              <Plus className="w-4 h-4" /> New invite
+            </button>
           </div>
         </div>
 
-        {/* Loading / Error */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 className="w-8 h-8 animate-spin text-off-black/40" />
-          </div>
-        )}
         {error && !isLoading && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-800 text-sm">
-            {error}
-          </div>
+          <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 mb-3 text-sm text-red-800 flex-shrink-0">{error}</div>
         )}
 
-        {/* Metric tiles */}
-        {metrics && !isLoading && (
-          <>
-            <div className="grid grid-cols-3 gap-2 md:gap-4">
-              <Tile
-                icon={<TrendingUp className="w-4 h-4" />}
-                label="New Creators This Month"
-                shortLabel="New This Mo."
-                value={metrics.creators.appliedThisMonth}
-                subLabel={`${metrics.creators.total} total in program`}
-              />
-              <Tile
-                icon={<Package className="w-4 h-4" />}
-                label="Samples"
-                value={metrics.samples.total}
-                subLabel={
-                  metrics.samples.pending > 0
-                    ? `${metrics.samples.shipped} shipped · ${metrics.samples.pending} pending`
-                    : `${metrics.samples.shipped} shipped`
-                }
-              />
-              <Tile
-                icon={<DollarSign className="w-4 h-4" />}
-                label="Spent on Samples"
-                shortLabel="Spent"
-                value={formatUsd(metrics.samples.costEstimatedUsd)}
-                subLabel="COGS by size + frame"
-                placeholder={metrics.samples.costIsPlaceholder}
-              />
-            </div>
-
-            {/* Search the whole program: applied, active and denied. */}
-            <div className="mt-6 relative">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-off-black/40" />
-              <input
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Search creators by name, email, Instagram, race or order #..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10"
-              />
-            </div>
-            {q && !pendingSampleRequests.length && !otherCreators.length && !deniedCreators.length && (
-              <p className="mt-4 text-sm text-off-black/50">No creators match "{query}".</p>
-            )}
-
-            {/* Creators Applied — applicants awaiting Matt's approval */}
-            {pendingSampleRequests.length > 0 && (
-              <div className="mt-10">
-                <h2 className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-3">
-                  Creators Applied ({pendingSampleRequests.length})
-                </h2>
-                <div className="space-y-2">
-                  {pendingSampleRequests.map(c => (
-                    <div key={c.id} className="bg-amber-50 border border-amber-200 rounded-md p-4 flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
-                      <button
-                        onClick={() => setSelectedCreator(c)}
-                        className="flex-1 min-w-0 text-left"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-off-black">{c.name || 'Unnamed Creator'}</span>
-                          {c.instagramHandle && (
-                            <span className="inline-flex items-center gap-1 text-xs text-off-black/60">
-                              <Instagram className="w-3 h-3" />
-                              {c.instagramHandle}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-off-black/60 mt-1">
-                          {c.raceName ? `${c.raceName}${c.raceYear ? ` ${c.raceYear}` : ''}` : 'No race selected'}
-                          {c.productSize && c.frameType && (
-                            <span className="mx-1.5 text-off-black/30">·</span>
-                          )}
-                          {c.productSize && c.frameType && `${c.productSize} ${c.frameType}`}
-                          {c.shippingCity && c.shippingState && (
-                            <>
-                              <span className="mx-1.5 text-off-black/30">·</span>
-                              Ships to {c.shippingCity}, {c.shippingState}
-                            </>
-                          )}
-                        </div>
-                        {c.whyWorkWithUs && (
-                          <div className="mt-2 text-xs text-off-black/70 bg-white/60 border border-amber-200 rounded p-2 leading-relaxed line-clamp-4">
-                            <span className="text-off-black/40">Why us: </span>
-                            {c.whyWorkWithUs}
-                          </div>
-                        )}
-                      </button>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleDeclineSample(c)}
-                          disabled={decliningId === c.id || approvingId === c.id}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-border-gray hover:bg-off-black/5 text-off-black/70 text-xs font-medium rounded transition-colors disabled:opacity-40 whitespace-nowrap"
-                        >
-                          {decliningId === c.id ? (
-                            <><Loader2 className="w-3 h-3 animate-spin" /> Declining…</>
-                          ) : (
-                            <><X className="w-3 h-3" /> Decline</>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleApproveSample(c)}
-                          disabled={approvingId === c.id || decliningId === c.id}
-                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-40 whitespace-nowrap"
-                        >
-                          {approvingId === c.id ? (
-                            <><Loader2 className="w-3 h-3 animate-spin" /> Approving…</>
-                          ) : (
-                            <><Send className="w-3 h-3" /> Approve & notify Elí</>
-                          )}
-                        </button>
-                      </div>
-                    </div>
+        {selected ? (
+          <div className="flex-1 min-h-0 overflow-y-auto pb-36 md:pb-8">
+            <CreatorDrawer
+              key={selected.id}
+              creator={selected}
+              onClose={closeCreator}
+              decide={decide(selected)}
+              onSaved={async () => { await loadAll() }}
+              onDeleted={async () => { closeCreator(); await loadAll() }}
+            />
+          </div>
+        ) : creatorId && isLoading ? (
+          <div className="flex-1 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-off-black/30" /></div>
+        ) : (
+          <section className="flex-1 min-h-0 pb-3">
+            <div className="h-full bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex flex-col">
+              {/* Views, with the program's numbers on the right. */}
+              <div className="hidden md:flex items-center justify-between gap-3 px-3 py-2.5 border-b border-border-gray flex-shrink-0">
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  {(Object.keys(VIEW_LABEL) as CreatorsView[]).map(k => (
+                    <button
+                      key={k}
+                      onClick={() => setView(k)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${view === k && !q ? 'bg-dark-fill text-white' : 'text-off-black/70 hover:bg-subtle-gray'}`}
+                    >
+                      {VIEW_LABEL[k]}
+                      <span className={`text-xs ${view === k && !q ? 'text-white/70' : k === 'applied' && counts.applied ? 'text-amber-700 font-semibold' : 'text-off-black/40'}`}>{counts[k]}</span>
+                    </button>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Creators list */}
-            <div className="mt-10">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs font-semibold text-off-black/50 uppercase tracking-wider">
-                  Creators {otherCreators.length > 0 && <span className="text-off-black/30">({otherCreators.length})</span>}
-                </h2>
-                <button
-                  onClick={() => setShowInvite(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-dark-fill text-white text-xs font-medium rounded hover:opacity-90 transition-opacity"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  New Creator Invite
-                </button>
+                {statsLine}
               </div>
 
-              {otherCreators.length === 0 ? (
-                <div className="bg-white border border-dashed border-off-black/20 rounded-md p-8 text-center text-off-black/50">
-                  <p className="text-sm mb-1">No creators yet.</p>
-                  <p className="text-xs text-off-black/40">Generate an invite link to onboard your first creator.</p>
-                </div>
-              ) : (
-                <div className="bg-white border border-border-gray rounded-md shadow-sm overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-subtle-gray border-b border-border-gray">
-                      <tr>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider">Creator</th>
-                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-32">Status</th>
-                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-44">Sample</th>
-                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-32">Content</th>
-                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden md:table-cell w-40">Commission</th>
-                        <th className="text-left px-3 py-3 text-xs font-semibold text-off-black/60 uppercase tracking-wider hidden lg:table-cell w-36">Invited</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-gray">
-                      {otherCreators.map((c, i) => {
-                        const statusCfg = STATUS_CONFIG[c.status]
-                        const sampleDisplay = sampleStatusLabel(c.sampleOrder?.status)
-                        return (
-                          <tr
-                            key={c.id}
-                            onClick={() => setSelectedCreator(c)}
-                            className={`hover:bg-subtle-gray cursor-pointer transition-colors ${i % 2 === 1 ? 'bg-subtle-gray/30' : ''}`}
-                          >
-                            <td className="px-4 py-3.5">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium text-off-black">
-                                  {c.name || <span className="text-off-black/40 italic">Not yet onboarded</span>}
-                                </span>
-                                {c.instagramHandle && (
-                                  <span className="text-xs text-off-black/50 flex items-center gap-1 mt-0.5">
-                                    <Instagram className="w-3 h-3" />
-                                    {c.instagramHandle}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-3 py-3.5">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusCfg.bg} ${statusCfg.color}`}>
-                                {statusCfg.label}
-                              </span>
-                            </td>
-                            <td className={`px-3 py-3.5 text-sm ${sampleDisplay.color}`}>
-                              {sampleDisplay.label}
-                            </td>
-                            <td className="px-3 py-3.5">
-                              {(() => {
-                                const cs = CONTENT_STATUS_CONFIG[c.contentStatus] || CONTENT_STATUS_CONFIG.not_received
-                                return (
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cs.bg} ${cs.color}`}>
-                                    {cs.label}
-                                  </span>
-                                )
-                              })()}
-                            </td>
-                            <td className="px-3 py-3.5 text-sm text-off-black/70 hidden md:table-cell">
-                              {COMMISSION_LABEL[c.commissionModel]}
-                            </td>
-                            <td className="px-3 py-3.5 text-sm text-off-black/60 hidden lg:table-cell">
-                              {new Date(c.invitedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Denied creators — hidden by default. Toggle reveals them so they
-                can be re-opened and un-denied via the drawer. */}
-            {deniedCreators.length > 0 && (
-              <div className="mt-8">
-                <button
-                  onClick={() => setShowDenied(v => !v)}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-off-black/40 hover:text-off-black/70 transition-colors"
-                >
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDenied ? '' : '-rotate-90'}`} />
-                  {showDenied ? 'Hide' : 'Show'} denied ({deniedCreators.length})
-                </button>
-                {(showDenied || q) && (
-                  <div className="mt-3 bg-white border border-border-gray rounded-md shadow-sm divide-y divide-border-gray">
-                    {deniedCreators.map(c => (
-                      <button
-                        key={c.id}
-                        onClick={() => setSelectedCreator(c)}
-                        className="w-full text-left px-4 py-3 hover:bg-subtle-gray transition-colors flex items-center justify-between gap-3"
-                      >
-                        <div className="min-w-0">
-                          <span className="text-sm font-medium text-off-black/70">
-                            {c.name || <span className="italic text-off-black/40">Unnamed Creator</span>}
-                          </span>
-                          {c.instagramHandle && (
-                            <span className="text-xs text-off-black/40 flex items-center gap-1 mt-0.5">
-                              <Instagram className="w-3 h-3" />
-                              {c.instagramHandle}
-                            </span>
-                          )}
-                        </div>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 shrink-0">
-                          Denied
-                        </span>
-                      </button>
-                    ))}
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {view === 'ads' && !q ? (
+                  <WinningAdsPanel ads={ads} onChanged={loadAll} />
+                ) : isLoading ? (
+                  <div className="flex items-center justify-center py-24"><Loader2 className="w-6 h-6 animate-spin text-off-black/30" /></div>
+                ) : list.length === 0 ? (
+                  <div className="text-center py-20 px-6 text-sm text-off-black/50">
+                    {q ? `No creators match "${query}".` : view === 'applied' ? 'No one is waiting on a decision.' : 'Nobody here yet.'}
                   </div>
+                ) : (
+                  <ul className="divide-y divide-border-gray">
+                    {list.map(c => <CreatorRow key={c.id} c={c} onOpen={() => openCreator(c)} decide={decide(c)} />)}
+                  </ul>
                 )}
               </div>
-            )}
-          </>
+            </div>
+          </section>
         )}
       </div>
 
-      {/* Drawer */}
-      {selectedCreator && (
-        <CreatorDrawer
-          creator={selectedCreator}
-          onClose={() => setSelectedCreator(null)}
-          onSaved={async (updated) => {
-            setSelectedCreator(updated)
-            await loadAll()
-          }}
-          onDeleted={async () => {
-            setSelectedCreator(null)
-            await loadAll()
-          }}
-        />
-      )}
-
-      {/* Invite Modal */}
       {showInvite && (
         <InviteModal
           briefs={briefs}
@@ -575,6 +391,134 @@ export default function CreatorsHome() {
           }}
         />
       )}
+    </div>
+  )
+}
+
+/** One creator in the list. Applicants show their pitch and the decision buttons. */
+function CreatorRow({ c, onOpen, decide }: { c: Creator; onOpen: () => void; decide: React.ReactNode }) {
+  const statusCfg = STATUS_CONFIG[c.status]
+  const sample = sampleStatusLabel(c.sampleOrder?.status)
+  const content = CONTENT_STATUS_CONFIG[c.contentStatus] || CONTENT_STATUS_CONFIG.not_received
+  const race = c.raceName ? `${c.raceName}${c.raceYear ? ` ${c.raceYear}` : ''}` : null
+  const facts = [race, c.productSize && c.frameType ? `${c.productSize} ${c.frameType}` : null, c.shippingCity && c.shippingState ? `${c.shippingCity}, ${c.shippingState}` : null].filter(Boolean)
+  return (
+    <li onClick={onOpen} className="px-4 py-3.5 hover:bg-subtle-gray cursor-pointer transition-colors flex flex-col md:flex-row md:items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold text-off-black">{c.name || <span className="text-off-black/40 italic font-normal">Not yet onboarded</span>}</span>
+          {c.instagramHandle && (
+            <span className="inline-flex items-center gap-1 text-xs text-off-black/50"><Instagram className="w-3 h-3" />{socialHandle(c.instagramHandle)}</span>
+          )}
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${statusCfg.bg} ${statusCfg.color}`}>{statusCfg.label}</span>
+        </div>
+        {facts.length > 0 && <div className="text-xs text-off-black/55 mt-1">{facts.join(' · ')}</div>}
+        {isApplicant(c) && c.whyWorkWithUs && (
+          <p className="text-xs text-off-black/70 mt-1.5 leading-relaxed line-clamp-2 max-w-[90ch]">{c.whyWorkWithUs}</p>
+        )}
+      </div>
+      {decide || (
+        <div className="flex items-center gap-4 text-xs shrink-0">
+          <span className={sample.color}>{sample.label}</span>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded font-medium ${content.bg} ${content.color}`}>{content.label}</span>
+          <span className="text-off-black/40 hidden lg:inline w-24 text-right">{new Date(c.invitedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+        </div>
+      )}
+    </li>
+  )
+}
+
+/**
+ * Ads that are working, so the team and the creators can see what to make
+ * more of. Creators see the same list in their portal. Also holds the links
+ * creators need: Trybe, and the community once it exists.
+ */
+function WinningAdsPanel({ ads, onChanged }: { ads: WinningAd[]; onChanged: () => void | Promise<void> }) {
+  const [adding, setAdding] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [f, setF] = useState({ title: '', url: '', imageUrl: '', notes: '' })
+  const field = 'w-full px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-off-black/10'
+
+  const save = async () => {
+    setBusy(true); setErr(null)
+    try {
+      const res = await apiFetch('/api/creators/ads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(f) })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || 'Could not add the ad')
+      setF({ title: '', url: '', imageUrl: '', notes: '' }); setAdding(false)
+      await onChanged()
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not add the ad') } finally { setBusy(false) }
+  }
+  const remove = async (ad: WinningAd) => {
+    if (!confirm(`Remove "${ad.title}" from winning ads? Creators will stop seeing it.`)) return
+    const res = await apiFetch(`/api/creators/ads?id=${encodeURIComponent(ad.id)}`, { method: 'DELETE' })
+    if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || 'Could not remove the ad'); return }
+    await onChanged()
+  }
+
+  return (
+    <div className="p-4 md:p-5 space-y-5">
+      <div className="grid md:grid-cols-2 gap-3">
+        <a href={TRYBE_URL} target="_blank" rel="noopener noreferrer" className="group border border-border-gray rounded-md p-4 hover:bg-subtle-gray transition-colors">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-off-black">Trybe <ExternalLink className="w-3.5 h-3.5 text-off-black/40" /></div>
+          <p className="text-xs text-off-black/55 mt-1">Where creators upload content, do revisions and get it into our ad account. Creators sign up at jointrybe.com.</p>
+        </a>
+        <div className="border border-dashed border-border-gray rounded-md p-4" title="Link coming once the community is live">
+          <div className="flex items-center gap-2 text-sm font-semibold text-off-black/50">Community <span className="px-1.5 py-0.5 bg-off-black/5 text-off-black/45 text-[10px] font-medium rounded uppercase tracking-wider">Coming soon</span></div>
+          <p className="text-xs text-off-black/45 mt-1">Where creators will learn more about which ads are working.</p>
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className={sectionLabel}>Winning ads <span className="text-off-black/30">({ads.length})</span></h2>
+          {!adding && <button onClick={() => setAdding(true)} className={btnSecondary}><Plus className="w-3.5 h-3.5" /> Add winning ad</button>}
+        </div>
+        {adding && (
+          <div className="border border-border-gray rounded-md p-4 mb-4 space-y-2.5 bg-subtle-gray/50">
+            <div className="grid md:grid-cols-2 gap-2.5">
+              <input value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="Title, e.g. Chicago unboxing, POV hook" className={field} autoFocus />
+              <input value={f.url} onChange={e => setF({ ...f, url: e.target.value })} placeholder="Link to the ad or video" className={field} />
+            </div>
+            <input value={f.imageUrl} onChange={e => setF({ ...f, imageUrl: e.target.value })} placeholder="Thumbnail image link (optional)" className={field} />
+            <textarea value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} rows={3} placeholder="Why it works: the hook, the angle, the numbers (optional)" className={`${field} resize-none`} />
+            {err && <p className="text-xs text-red-600">{err}</p>}
+            <div className="flex gap-2">
+              <button onClick={save} disabled={busy || !f.title.trim() || !f.url.trim()} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-dark-fill text-white rounded-md disabled:opacity-50">
+                {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Add
+              </button>
+              <button onClick={() => { setAdding(false); setErr(null) }} className="px-3 py-2 text-sm text-off-black/60">Cancel</button>
+            </div>
+            <p className="text-[11px] text-off-black/45">Creators see these in their portal.</p>
+          </div>
+        )}
+        {ads.length === 0 && !adding ? (
+          <div className="border border-dashed border-border-gray rounded-md p-8 text-center text-sm text-off-black/50">No winning ads yet. Add the first one so creators can see what works.</div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {ads.map(ad => (
+              <div key={ad.id} className="border border-border-gray rounded-md overflow-hidden bg-white flex flex-col">
+                {ad.imageUrl && (
+                  <a href={ad.url} target="_blank" rel="noopener noreferrer" className="block aspect-[4/5] bg-subtle-gray">
+                    <img src={ad.imageUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  </a>
+                )}
+                <div className="p-3 flex-1 flex flex-col gap-1.5">
+                  <a href={ad.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-off-black hover:text-[#4F2DD4] inline-flex items-center gap-1">
+                    {ad.title} <ExternalLink className="w-3 h-3 text-off-black/40" />
+                  </a>
+                  {ad.notes && <p className="text-xs text-off-black/65 whitespace-pre-wrap leading-relaxed">{ad.notes}</p>}
+                  <div className="mt-auto pt-1 flex items-center justify-between text-[11px] text-off-black/40">
+                    <span>{new Date(ad.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    <button onClick={() => remove(ad)} className="hover:text-red-600">Remove</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -790,11 +734,14 @@ function CreatorDrawer({
   onClose,
   onSaved,
   onDeleted,
+  decide,
 }: {
   creator: Creator
   onClose: () => void
-  onSaved: (updated: Creator) => void
+  onSaved: (updated: Creator) => void | Promise<void>
   onDeleted: () => void | Promise<void>
+  /** Approve and Decline, for an applicant. */
+  decide?: React.ReactNode
 }) {
   const [draft, setDraft] = useState<Creator>(creator)
   const [isSaving, setIsSaving] = useState(false)
@@ -905,21 +852,20 @@ function CreatorDrawer({
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="bg-white rounded-md max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
-        <div className="p-6">
-          {/* Header — name only. Program + content status moved into colored
-              dropdowns just below the invite link so they're easy to scan/edit. */}
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-semibold text-off-black">
-              {creator.name || 'Pending Creator'}
-            </h3>
-            <button onClick={onClose} className="text-off-black/40 hover:text-off-black">
-              <X className="w-5 h-5" />
-            </button>
+    <div className="bg-white border border-border-gray rounded-md w-full">
+      <div className="p-4 md:p-6 max-w-3xl">
+          {/* Header: back to the list, the name, and the decision for an applicant. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div className="flex items-center gap-2 min-w-0">
+              <button onClick={onClose} title="Back to creators (Esc)" className="inline-flex items-center gap-1 -ml-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors">
+                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
+                <span className="text-sm hidden md:inline">Creators</span>
+              </button>
+              <h3 className="text-lg font-semibold text-off-black truncate">
+                {creator.name || 'Pending Creator'}
+              </h3>
+            </div>
+            {decide}
           </div>
 
           {/* Invite link — always visible, copy-able */}
@@ -1082,7 +1028,7 @@ function CreatorDrawer({
             )}
 
             {/* Another print for this creator: a second race, a reshoot, a replacement. */}
-            {creator.sampleOrder && <AnotherSample creator={creator} onDone={() => onSaved(creator)} />}
+            {creator.status !== 'denied' && !isApplicant(creator) && <AnotherSample creator={creator} onDone={() => onSaved(creator)} />}
 
             {showShipping && (
             <EditableCard
@@ -1159,7 +1105,6 @@ function CreatorDrawer({
               </button>
             </div>
           </div>
-        </div>
       </div>
     </div>
   )
@@ -1432,7 +1377,7 @@ function AnotherSample({ creator, onDone }: { creator: Creator; onDone: () => vo
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium border border-dashed border-border-gray rounded-md text-off-black/70 hover:bg-subtle-gray">
-        <Plus className="w-3.5 h-3.5" /> Send another sample
+        <Plus className="w-3.5 h-3.5" /> {creator.sampleOrder ? 'Send another sample' : 'Send a sample'}
       </button>
     )
   }

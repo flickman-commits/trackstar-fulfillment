@@ -1233,3 +1233,18 @@ model SupportMacro {
   @@index([name])
   @@index([shortcut])
 }
+
+// An ad that is working, shown to the team in /creators and to creators in
+// their portal so everyone can see what to make more of. Link-based: the
+// video lives wherever it already is (Meta ad library, Instagram, Drive).
+model WinningAd {
+  id          String   @id @default(cuid())
+  title       String
+  url         String
+  imageUrl    String?
+  notes       String?  // why it works, the hook, the numbers
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}

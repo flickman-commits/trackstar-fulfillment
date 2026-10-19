@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { Loader2, AlertTriangle, ChevronRight, ChevronLeft, ChevronDown, ClipboardList, CheckCircle2, Truck, Home } from 'lucide-react'
+import { Loader2, AlertTriangle, ChevronRight, ChevronLeft, ChevronDown, ClipboardList, CheckCircle2, Truck, Home, ExternalLink } from 'lucide-react'
+import { TRYBE_URL } from '@/lib/creatorLinks'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -66,6 +67,7 @@ interface PortalData {
   briefs: PortalBrief[]
   sampleOrder: PortalCreatorSampleOrder | null
   races: RaceOption[]
+  winningAds?: { id: string; title: string; url: string; imageUrl: string | null; notes: string | null }[]
 }
 
 export default function CreatorPortal() {
@@ -617,6 +619,7 @@ function StepShipping({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (
 // ---------------------------------------------------------------------------
 function CreatorDashboard({ data }: { data: PortalData }) {
   const { creator, briefs, sampleOrder } = data
+  const winningAds = data.winningAds || []
   const firstName = creator.name?.split(' ')[0] || 'there'
 
   // Build the personality bubbles
@@ -679,19 +682,59 @@ function CreatorDashboard({ data }: { data: PortalData }) {
           </div>
         )}
 
+        {/* What's working: ads the team has picked, so creators can see what to make. */}
+        {winningAds.length > 0 && (
+          <div className="mb-5">
+            <h2 className="text-sm font-semibold text-off-black mb-3">What's working</h2>
+            <div className="space-y-3">
+              {winningAds.map(ad => (
+                <a key={ad.id} href={ad.url} target="_blank" rel="noopener noreferrer" className="flex gap-3 bg-white border border-border-gray rounded-md p-3 hover:border-[#4F2DD4]/40 transition-colors">
+                  {ad.imageUrl && <img src={ad.imageUrl} alt="" className="w-20 h-24 object-cover rounded shrink-0 bg-subtle-gray" loading="lazy" />}
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-off-black inline-flex items-center gap-1">{ad.title} <ExternalLink className="w-3 h-3 text-off-black/40" /></div>
+                    {ad.notes && <p className="text-xs text-off-black/65 mt-1 leading-relaxed whitespace-pre-wrap">{ad.notes}</p>}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Trybe, and the community once it exists. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+          <a href={TRYBE_URL} target="_blank" rel="noopener noreferrer" className="bg-white border border-border-gray rounded-md p-4 hover:border-[#4F2DD4]/40 transition-colors">
+            <div className="text-sm font-semibold text-off-black inline-flex items-center gap-1">Join us on Trybe <ExternalLink className="w-3 h-3 text-off-black/40" /></div>
+            <p className="text-xs text-off-black/60 mt-1 leading-relaxed">Where you upload your content, handle revisions, and get it running as an ad. Sign up at jointrybe.com.</p>
+          </a>
+          <div className="bg-white border border-dashed border-border-gray rounded-md p-4">
+            <div className="text-sm font-semibold text-off-black/50">Creator community <span className="ml-1 px-1.5 py-0.5 bg-off-black/5 text-off-black/45 text-[10px] font-medium rounded uppercase tracking-wider align-middle">Coming soon</span></div>
+            <p className="text-xs text-off-black/45 mt-1 leading-relaxed">Learn more about which ads are working.</p>
+          </div>
+        </div>
+
         {/* Upload reminder card */}
         <div className="bg-white border border-border-gray rounded-md p-5">
           <p className="text-sm text-off-black/80 mb-4 leading-relaxed">
             <strong>Reminder</strong>, please submit content no later than 7 days after receiving your print.
           </p>
+          <div className="flex flex-wrap gap-2">
           <a
-            href="https://drive.google.com/drive/folders/16SZxJ-1wa6cbmVndkCGIaOmxZX-_pGsf?usp=sharing"
+            href={TRYBE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
           >
-            Upload Content Here
+            Upload on Trybe <ExternalLink className="w-3.5 h-3.5" />
           </a>
+          <a
+            href="https://drive.google.com/drive/folders/16SZxJ-1wa6cbmVndkCGIaOmxZX-_pGsf?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-border-gray text-off-black text-sm font-medium rounded hover:bg-subtle-gray transition-colors"
+          >
+            Upload to Google Drive
+          </a>
+          </div>
           <p className="text-xs text-off-black/50 mt-3">
             *Please email{' '}
             <a href="mailto:matt@trackstar.art" className="text-[#4F2DD4] hover:underline">
