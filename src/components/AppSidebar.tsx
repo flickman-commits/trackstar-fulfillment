@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send, FileText, ListOrdered, Braces, Vote, Inbox } from 'lucide-react'
+import { Package, Users, Ticket, Calculator, CloudSun, Settings, Wrench, Send, FileText, ListOrdered, Braces, Vote, Inbox, Gift } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Capability } from '@/lib/roles'
 
@@ -119,6 +119,7 @@ function ToolsTile({
     { id: 'pace', cap: 'tools.pace' as Capability, label: 'Pace Converter', hint: 'Finish time to pace', icon: Calculator, onClick: onOpenPaceConverter },
     { id: 'weather', cap: 'tools.weather' as Capability, label: 'Weather Lookup', hint: 'Race-day weather on WeatherSpark', icon: CloudSun, href: 'https://weatherspark.com' },
     { id: 'surveys', cap: 'tools.surveys' as Capability, label: 'Design Survey', hint: 'Community votes on new designs', icon: Vote, to: '/surveys' },
+    { id: 'samples', cap: 'settings.admin' as Capability, label: 'Samples', hint: 'Send prints as Shopify orders', icon: Gift, to: '/samples' },
   ].filter(t => can(t.cap))
 
   // Nothing to offer this role: no Tools tile at all.

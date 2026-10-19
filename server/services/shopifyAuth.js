@@ -111,14 +111,16 @@ export async function shopifyFetch(endpoint, options = {}) {
  * Make an authenticated GraphQL request to the Shopify Admin API.
  * @param {string} query - GraphQL query/mutation
  * @param {object} variables - GraphQL variables
+ * @param {{ version?: string }} [opts] - API version, default 2024-01
  * @returns {object} the `data` object from the response
  */
-export async function shopifyGraphQL(query, variables = {}) {
+export async function shopifyGraphQL(query, variables = {}, { version = '2024-01' } = {}) {
   const token = await getShopifyToken()
   const store = process.env.SHOPIFY_STORE
 
+  // Pass a newer version only for a call that needs it (orderCreate is 2024-07+).
   const response = await fetchWithTimeout(
-    `https://${store}/admin/api/2024-01/graphql.json`,
+    `https://${store}/admin/api/${version}/graphql.json`,
     {
       method: 'POST',
       headers: {

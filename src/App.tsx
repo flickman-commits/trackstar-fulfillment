@@ -10,6 +10,7 @@ import RunnerClaim from '@/pages/RunnerClaim'
 import SurveyVote from './pages/SurveyVote'
 import DesignSurveys from './pages/DesignSurveys'
 import CreatorsHome from '@/pages/CreatorsHome'
+import Samples from '@/pages/Samples'
 import BriefsAdmin from '@/pages/BriefsAdmin'
 import CreatorPortal from '@/pages/CreatorPortal'
 import CreatorApply from '@/pages/CreatorApply'
@@ -252,6 +253,7 @@ export default function App() {
                 {/* An open order has its own address, so a reload or a shared link lands on it. */}
                 <Route path="/orders/:orderRef" element={<Dashboard />} />
                 <Route path="/surveys" element={<DesignSurveys />} />
+                <Route path="/samples" element={<RequireAdmin><Samples /></RequireAdmin>} />
                 {/* Admin view: the creator programme, the bulk product editor
                     and the brief admin all change things outside the day to day
                     fulfillment work. */}

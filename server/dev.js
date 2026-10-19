@@ -25,6 +25,8 @@ const routes = [
   { method: 'get',  path: '/api/orders',                    handler: '../api/orders/index.js' },
   { method: 'post', path: '/api/orders/cancel-creator-sample', handler: '../api/orders/cancel-creator-sample.js' },
   { method: 'post', path: '/api/creators/sample',             handler: '../api/creators/sample.js' },
+  { method: 'get',  path: '/api/samples', handler: '../api/samples.js' },
+  { method: 'post', path: '/api/samples', handler: '../api/samples.js' },
   { method: 'get', path: '/api/creators/ads', handler: '../api/creators/ads.js' },
   { method: 'get', path: '/api/creators/catalog', handler: '../api/creators/catalog.js' },
   { method: 'get', path: '/api/creators/samples', handler: '../api/creators/samples.js' },
