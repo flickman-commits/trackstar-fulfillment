@@ -26,6 +26,7 @@ import { SVETimingScraper } from './platforms/SVETimingScraper.js'
 import { SportstatsScraper } from './platforms/SportstatsScraper.js'
 import { RaceResultScraper } from './platforms/RaceResultScraper.js'
 import { TrueTimeScraper } from './platforms/TrueTimeScraper.js'
+import { UltraSignupScraper } from './platforms/UltraSignupScraper.js'
 
 // --- Race configs ---
 import kiawahIslandConfig from './configs/kiawahIsland.js'
@@ -81,6 +82,17 @@ import sanAntonioConfig from './configs/sanAntonio.js'
 import bigSurConfig from './configs/bigSur.js'
 import annArborConfig from './configs/annArbor.js'
 import charlotteConfig from './configs/charlotte.js'
+import binationalConfig from './configs/binational.js'
+import northshoreConfig from './configs/northshore.js'
+import santaBarbaraConfig from './configs/santaBarbara.js'
+import behindTheRocksConfig from './configs/behindTheRocks.js'
+import gulfCoastConfig from './configs/gulfCoast.js'
+import lasVegasConfig from './configs/lasVegas.js'
+import bangorConfig from './configs/bangor.js'
+import brooklynHalfConfig from './configs/brooklynHalf.js'
+import capitalCityConfig from './configs/capitalCity.js'
+import carmelConfig from './configs/carmel.js'
+import coastGuardConfig from './configs/coastGuard.js'
 import atlanticCityConfig from './configs/atlanticCity.js'
 import desMoinesConfig from './configs/desMoines.js'
 import coloradoSpringsConfig from './configs/coloradoSprings.js'
@@ -113,6 +125,7 @@ const PLATFORM_MAP = {
   sportstats: SportstatsScraper,
   raceresult: RaceResultScraper,
   truetime: TrueTimeScraper,
+  ultrasignup: UltraSignupScraper,
 }
 
 /**
@@ -172,6 +185,17 @@ const ALL_CONFIGS = [
   bigSurConfig,
   annArborConfig,
   charlotteConfig,
+  binationalConfig,
+  northshoreConfig,
+  santaBarbaraConfig,
+  behindTheRocksConfig,
+  gulfCoastConfig,
+  lasVegasConfig,
+  bangorConfig,
+  brooklynHalfConfig,
+  capitalCityConfig,
+  carmelConfig,
+  coastGuardConfig,
   atlanticCityConfig,
   desMoinesConfig,
   coloradoSpringsConfig,

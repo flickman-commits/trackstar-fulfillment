@@ -19,7 +19,8 @@ export class NYRRScraper extends BaseScraper {
     this.config = config
     this.baseUrl = 'https://rmsprodapi.nyrr.org/api/v2'
     this.tag = config.tag || config.raceName
-    this.eventCode = config.eventCodePattern.replace('{year}', year)
+    // A per-year code wins: Brooklyn Half went from 24BKH to B2025.
+    this.eventCode = config.eventCodes?.[year] || (config.eventCodePattern ? config.eventCodePattern.replace('{year}', year) : null)
   }
 
   async getRaceInfo() {
@@ -212,7 +213,8 @@ export class NYRRScraper extends BaseScraper {
   _extractRunnerData(runner) {
     const rawTime = runner.overallTime || null
     const time = this.formatTime(rawTime)
-    const pace = this.formatPace(runner.pace)
+    // Overall pace from chip time ÷ the race's distance; the page value only when there is no time.
+    const pace = time ? this.calculatePace(time, this.config.distanceMiles || 26.2) : this.formatPace(runner.pace)
 
     return {
       found: true,

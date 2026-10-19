@@ -110,7 +110,7 @@ export class RunSignUpScraper extends BaseScraper {
       const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
 
       const apiUrl = `https://runsignup.com/Rest/race/${this.raceId}/results/get-results` +
-        `?format=json&resultSetId=${resultSetId}&event_id=${eventId}` +
+        `?format=json&resultSetId=${resultSetId}&individual_result_set_id=${resultSetId}&event_id=${eventId}` +
         `&bib_num=${encodeURIComponent(wanted)}&page=1&num=10`
       let data
       try {
@@ -157,7 +157,7 @@ export class RunSignUpScraper extends BaseScraper {
       const lastName = nameParts[nameParts.length - 1]
 
       const apiUrl = `https://runsignup.com/Rest/race/${this.raceId}/results/get-results` +
-        `?format=json&resultSetId=${resultSetId}&event_id=${eventId}` +
+        `?format=json&resultSetId=${resultSetId}&individual_result_set_id=${resultSetId}&event_id=${eventId}` +
         `&last_name=${encodeURIComponent(lastName)}&page=1&num=50`
 
       console.log(`[${this.tag} ${this.year}] API request: ${apiUrl}`)
@@ -414,7 +414,9 @@ export class RunSignUpScraper extends BaseScraper {
     // Compute overall pace from chip time ÷ distance rather than trusting the
     // scraped pace column (per the add-race-scraper skill). Distance comes from
     // the matched event so half-marathon paces aren't computed against 26.2.
-    const distanceMiles = /half/i.test(eventType) ? 13.1 : 26.2
+    // A race's own distances win (Northshore's 10 Miler is 10, not 26.2).
+    const key = Object.keys(this.config?.eventLabels || {}).find(k => this.config.eventLabels[k] === eventType)
+    const distanceMiles = (key && this.config?.distances?.[key]) || (/half/i.test(eventType) ? 13.1 : 26.2)
     const pace = this.calculatePace(time, distanceMiles)
 
     return {
