@@ -2,18 +2,14 @@
 // Access tokens expire in 1 hour — we cache with a 55-minute safety margin
 // Refresh tokens may rotate on each refresh — we persist the latest in the DB
 
-import { PrismaClient } from '@prisma/client'
+import sharedPrisma from '../db.js'
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
 
 let cachedToken = null
 let tokenExpiry = null
-let prismaInstance = null
-
+// The one shared client (server/db.js): a second pool per instance is what exhausts the database's connection limit.
 function getPrisma() {
-  if (!prismaInstance) {
-    prismaInstance = new PrismaClient()
-  }
-  return prismaInstance
+  return sharedPrisma
 }
 
 /**

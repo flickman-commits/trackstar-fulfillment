@@ -10,12 +10,11 @@
  *   - Stored in RunnerResearch table
  */
 import { BaseScraper } from '../scrapers/BaseScraper.js'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../db.js'
 import { getScraperForRace, hasScraperForRace, getCanonicalRaceName, namedEventsFor } from '../scrapers/index.js'
 import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
 import WeatherService from './WeatherService.js'
 
-const prisma = new PrismaClient()
 
 /**
  * Race distance in miles for an event type, or null when we cannot be sure.

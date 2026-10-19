@@ -13,7 +13,7 @@
  * - CLI scripts for testing
  */
 
-import { PrismaClient } from '@prisma/client'
+import sharedPrisma from './db.js'
 import { shopifyFetch } from './services/shopifyAuth.js'
 import { etsyFetch } from './services/etsyAuth.js'
 import { parseEtsyRaceName, parseEtsyPersonalization } from './services/etsyPersonalization.js'
@@ -615,7 +615,7 @@ export function extractEtsyPersonalization(transaction) {
  * @param {Object} options - Processing options
  * @param {boolean} options.runResearch - Whether to run research for supported races (default: false)
  * @param {boolean} options.verbose - Whether to log detailed output (default: true)
- * @param {PrismaClient} options.prisma - Optional existing Prisma client
+ * @param {import('@prisma/client').PrismaClient} options.prisma - Optional existing Prisma client
  * @returns {Promise<Object>} Processing results
  */
 export async function processOrders(options = {}) {
@@ -625,8 +625,10 @@ export async function processOrders(options = {}) {
     prisma: externalPrisma = null
   } = options
 
-  const prisma = externalPrisma || new PrismaClient()
-  const shouldDisconnect = !externalPrisma
+  // Always the shared client: a fresh PrismaClient per run opened a whole
+  // extra pool, and enough of them exhausted the database's connections.
+  const prisma = externalPrisma || sharedPrisma
+  const shouldDisconnect = false
 
   const log = verbose ? console.log.bind(console) : () => {}
 

@@ -20,10 +20,13 @@ import { PrismaClient } from '@prisma/client'
  */
 function datasourceUrl() {
   const url = process.env.DATABASE_URL
-  if (!url || process.env.NODE_ENV !== 'production') return undefined
+  if (!url) return undefined
   if (/connection_limit=/.test(url)) return url
   const sep = url.includes('?') ? '&' : '?'
-  return `${url}${sep}connection_limit=5&pool_timeout=30`
+  // Local processes (dev server, render worker, scripts) talk to the same
+  // database, so they get a small cap too: uncapped, each opened ~20.
+  const limit = process.env.NODE_ENV === 'production' ? 5 : 3
+  return `${url}${sep}connection_limit=${limit}&pool_timeout=30`
 }
 
 let prisma
@@ -34,7 +37,8 @@ if (process.env.NODE_ENV === 'production') {
 } else {
   // Reuse across dev hot-reloads instead of leaking a client per reload.
   if (!globalThis.__prisma) {
-    globalThis.__prisma = new PrismaClient()
+    const url = datasourceUrl()
+    globalThis.__prisma = new PrismaClient(url ? { datasources: { db: { url } } } : undefined)
   }
   prisma = globalThis.__prisma
 }
