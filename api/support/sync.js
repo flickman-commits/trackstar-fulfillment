@@ -9,7 +9,7 @@
 import { setCors, isCronRequest } from '../_lib/auth.js'
 import { requireCapability } from '../_lib/users.js'
 import { sync, status } from '../../server/domain/support/mailbox.js'
-import { refreshTokenIfDue } from '../../server/domain/support/instagram.js'
+import { refreshTokenIfDue, ensureSubscribed, catchUpIfDue } from '../../server/domain/support/instagram.js'
 import { draftPending } from '../../server/domain/support/draft.js'
 
 export default async function handler(req, res) {
@@ -23,8 +23,13 @@ export default async function handler(req, res) {
     try {
       const ig = await refreshTokenIfDue()
       if (ig.refreshed) console.log('[support.instagram] token refreshed')
+      // Without a webhook subscription Meta sends nothing; check it hourly, and catch up on anything missed.
+      const sub = await ensureSubscribed()
+      if (sub.subscribed) console.warn('[support.instagram] webhook subscription was missing; subscribed again')
+      const caught = await catchUpIfDue()
+      if (caught.seen) console.log(`[support.instagram] hourly catch-up read ${caught.seen} recent DMs (already-stored ones are left as they are)`)
     } catch (err) {
-      console.warn(`[support.instagram] token refresh: ${err.message}`)
+      console.warn(`[support.instagram] upkeep: ${err.message}`)
     }
     const s = await status()
     if (!s.connected) return res.status(200).json({ skipped: 'not_connected' })

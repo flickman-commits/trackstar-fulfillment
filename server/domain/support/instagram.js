@@ -45,6 +45,8 @@ const KEY_APP_USER_ID = 'support_ig_app_user_id' // the app-scoped id the token 
 const KEY_USERNAME = 'support_ig_username'
 const KEY_EXPIRES = 'support_ig_token_expires_at'
 const KEY_REFRESHED = 'support_ig_token_refreshed_at'
+const KEY_SUBSCRIBED_CHECKED = 'support_ig_subscribed_checked_at'
+const KEY_CATCHUP = 'support_ig_catchup_at'
 
 export const STANDARD_WINDOW_MS = 24 * 60 * 60 * 1000
 export const HUMAN_AGENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
@@ -194,7 +196,26 @@ async function saveToken(token, expiresIn) {
   await setConfig(KEY_APP_USER_ID, String(me.id || ''))
   await setConfig(KEY_EXPIRES, new Date(now + (expiresIn ? expiresIn * 1000 : LONG_LIVED_DAYS * 86400000)).toISOString())
   await setConfig(KEY_REFRESHED, new Date(now).toISOString())
+  await ensureSubscribed({ force: true }).catch(err => console.warn(`[support.instagram] subscribe on connect: ${err.message}`))
   return { username, accountId: String(me.user_id || me.id) }
+}
+
+/**
+ * Meta only sends DMs to our webhook for an account subscribed to the app
+ * (POST me/subscribed_apps). Connecting does not do it on its own, and for
+ * two days nothing arrived because of it (Oct 2026). Checked on connect and
+ * then at most hourly from the sync cron; re-subscribes if it is missing.
+ */
+export async function ensureSubscribed({ force = false } = {}) {
+  const token = await getConfig(KEY_TOKEN)
+  if (!token) return { ok: false, reason: 'not_connected' }
+  const checked = new Date((await getConfig(KEY_SUBSCRIBED_CHECKED)) || 0).getTime()
+  if (!force && Date.now() - checked < 3600e3) return { ok: true, reason: 'checked_recently' }
+  const now = await graph('me/subscribed_apps', { token })
+  const has = (now?.data || []).some(a => (a.subscribed_fields || []).includes('messages'))
+  if (!has) await graph('me/subscribed_apps', { method: 'POST', token, query: { subscribed_fields: 'messages' } })
+  await setConfig(KEY_SUBSCRIBED_CHECKED, new Date().toISOString())
+  return { ok: true, subscribed: !has }
 }
 
 /**
@@ -439,7 +460,7 @@ const MESSAGE_FIELDS_PLAIN = 'id,created_time,from,to,message'
  * One call per message, so this is for the first day, not for keeping up:
  * the webhook does that.
  */
-export async function backfill({ conversations = 20, perConversation = 20 } = {}) {
+export async function backfill({ conversations = 20, perConversation = 20, catchUp = false } = {}) {
   const token = await requireToken()
   const ours = await ourIds()
   let list
@@ -472,7 +493,7 @@ export async function backfill({ conversations = 20, perConversation = 20 } = {}
         }
         const g = parseGraphMessage(m, ours)
         if (!g) continue
-        if (await importMessage(g.parsed, { backfill: true, conversationId: String(conv.id), profile: g.profile })) imported++
+        if (await importMessage(g.parsed, { backfill: !catchUp, conversationId: String(conv.id), profile: g.profile })) imported++
       } catch (err) {
         // An id older than the 20 Meta serves comes back as "deleted"; that is expected, not a failure worth a line.
         if (!/deleted/i.test(err.message || '')) { failed++; console.warn(`[support.instagram] message ${id}: ${err.message}`) }
@@ -593,4 +614,17 @@ export async function sendReply({ userId, thread, text, images = [] }) {
     )
   }
   return last
+}
+
+/**
+ * The safety net under the webhook: at most hourly, read the newest
+ * conversations and store anything missing, as new mail (routed and drafted,
+ * not filed as history). Keyed by Meta's message id, so nothing doubles.
+ */
+export async function catchUpIfDue() {
+  if (!(await getConfig(KEY_TOKEN))) return { skipped: 'not_connected' }
+  const last = new Date((await getConfig(KEY_CATCHUP)) || 0).getTime()
+  if (Date.now() - last < 3600e3) return { skipped: 'not_due' }
+  await setConfig(KEY_CATCHUP, new Date().toISOString())
+  return backfill({ conversations: 15, perConversation: 10, catchUp: true })
 }
