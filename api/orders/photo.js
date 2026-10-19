@@ -36,7 +36,7 @@ export default async function handler(req, res) {
   // Re-cropping the photo already on a print (upload, then replace) is design
   // work, open to anyone who renders designs. Adding a photo bills the
   // customer, so attach stays with admins.
-  const admin = ['upload-url', 'replace'].includes(body.action)
+  const admin = ['upload-url', 'replace', 'remove'].includes(body.action)
     ? await requireCapability(req, res, 'orders.render')
     : await requireAdminRole(req, res, actor)
   if (!admin) return
@@ -107,11 +107,15 @@ export default async function handler(req, res) {
     }
 
     if (body.action === 'remove') {
-      const o = await prisma.order.findUnique({ where: { id: String(body.orderId || '') }, select: { id: true, orderNumber: true, photoAddedManually: true } })
+      // Any photo: one added here, or the one the customer uploaded at checkout
+      // (a customer sometimes asks for the print without it). The design renders
+      // again without a photo window. A paid Photo Add-On stays on the Shopify
+      // order; refunding it is done there.
+      const o = await prisma.order.findUnique({ where: { id: String(body.orderId || '') }, select: { id: true, orderNumber: true, photoPath: true, photoAddedManually: true } })
       if (!o) return res.status(404).json({ error: 'Order not found' })
-      if (!o.photoAddedManually) return res.status(400).json({ error: 'Only a photo added here can be removed here' })
+      if (!o.photoPath) return res.status(400).json({ error: 'This print has no photo to remove' })
       await prisma.order.update({ where: { id: o.id }, data: { photoPath: null, photoAddedManually: false, photoPlacedAt: null } })
-      await recordAudit({ action: 'order.photo-removed', summary: `Removed the customer photo from ${o.orderNumber}`, detail: { orderId: o.id }, actor: admin })
+      await recordAudit({ action: 'order.photo-removed', summary: `Removed the customer photo from ${o.orderNumber}${o.photoAddedManually ? '' : ' (uploaded at checkout)'}`, detail: { orderId: o.id, removed: o.photoPath, addedHere: o.photoAddedManually }, actor: admin })
       return res.status(200).json({ ok: true })
     }
 

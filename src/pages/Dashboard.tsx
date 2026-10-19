@@ -4987,6 +4987,23 @@ Thank you!`
                             {isResearching ? 'Researching…' : selectedOrder.researchStatus === 'found' ? 'Re-run research' : 'Research runner'}
                           </button>
                         )}
+                        {/* The customer asked for the print without their photo. */}
+                        {selectedOrder.photoPath && design.canManage && selectedOrder.status !== 'completed' && !isEditing && (
+                          <button onClick={async () => {
+                              if (!confirm('Remove the customer photo from this print and render the design again without it? If they paid for the Photo Add-On, refund it in Shopify.')) return
+                              try {
+                                const res = await apiFetch('/api/orders/photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', orderId: selectedOrder.id }) })
+                                if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not remove the photo')
+                                setSelectedOrder(prev => prev && prev.id === selectedOrder.id ? { ...prev, photoPath: null, photoAddedManually: false, photoUnpaid: false, photoPlacedAt: null } : prev)
+                                setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, photoPath: null, photoAddedManually: false, photoUnpaid: false, photoPlacedAt: null } : o))
+                                await design.create()
+                                setToast({ message: 'Photo removed. Re-rendering the design without it.', type: 'success' })
+                              } catch (e) { setToast({ message: e instanceof Error ? e.message : 'Could not remove the photo', type: 'error' }) }
+                            }}
+                            className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2">
+                            <X className="w-3.5 h-3.5" /> Remove photo &amp; re-render
+                          </button>
+                        )}
                         {selectedOrder.customerEmail && can('support') && !isEditing && (
                           <button onClick={() => setEmailingOrder(selectedOrder)} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2" title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}>
                             <Mail className="w-3.5 h-3.5" /> Email customer
