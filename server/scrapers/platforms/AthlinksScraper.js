@@ -137,7 +137,7 @@ export class AthlinksScraper extends BaseScraper {
             bibNumber: match.bib ? String(match.bib) : null,
             officialTime: formattedTime,
             officialPace: pace,
-            eventType: eventLabel,
+            eventType: this.namedEvent(course.courseName, eventLabel),
             yearFound: this.year,
             researchNotes: null,
             resultsUrl: this.eventId
@@ -272,7 +272,7 @@ export class AthlinksScraper extends BaseScraper {
             bibNumber: String(match.bib).trim(),
             officialTime: formattedTime,
             officialPace: pace,
-            eventType: eventLabel,
+            eventType: this.namedEvent(course.courseName, eventLabel),
             yearFound: this.year,
             researchNotes: null,
             resultsUrl: `https://www.athlinks.com/event/${this.config.masterEventId}/results/Event/${this.eventId}/Results`,

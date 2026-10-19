@@ -1,10 +1,11 @@
 import PageHeader from '@/components/PageHeader'
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Loader2, X, Copy, Check, Instagram, Plus, Mail, Music2, Pencil, ChevronDown, ChevronLeft, Search, ExternalLink } from 'lucide-react'
-import { btnSecondary, pageShell, sectionLabel } from '@/lib/ui'
+import { Loader2, X, Copy, Check, Instagram, Plus, Mail, Pencil, ChevronDown, ChevronLeft, Search, ExternalLink } from 'lucide-react'
+import { btnSecondary, pageShell, sectionLabel, infoCard, cardLabel, textLink } from '@/lib/ui'
 import { apiFetch } from '@/lib/api'
 import { TRYBE_URL } from '@/lib/creatorLinks'
+import CreatorsTabs from '@/components/CreatorsTabs'
 
 type CreatorStatus = 'invited' | 'applied' | 'active' | 'paused' | 'denied'
 type CommissionModel = 'free_product' | 'flat_per_asset' | 'rev_share' | 'hybrid'
@@ -115,14 +116,14 @@ function formatUsd(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 }
 
-type CreatorsView = 'applied' | 'active' | 'all' | 'denied' | 'ads'
+/** The queues inside the Creators tab, like the order queues. */
+type CreatorsView = 'applied' | 'active' | 'all' | 'denied'
 
 const VIEW_LABEL: Record<CreatorsView, string> = {
   applied: 'Applied',
   active: 'Active',
   all: 'All',
   denied: 'Denied',
-  ads: 'Winning ads',
 }
 
 interface WinningAd {
@@ -148,6 +149,7 @@ export default function CreatorsHome() {
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [decliningId, setDecliningId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [catalog, setCatalog] = useState<CatalogRace[] | null>(null)
 
   // The open creator lives in the address bar as /creators/<id> and the view
   // as ?view=, so a reload, the back button and a shared link land in place.
@@ -155,6 +157,7 @@ export default function CreatorsHome() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const viewParam = searchParams.get('view') as CreatorsView | null
+  const tab: 'creators' | 'ads' = searchParams.get('tab') === 'ads' ? 'ads' : 'creators'
 
   const loadAll = useCallback(async () => {
     try {
@@ -184,6 +187,11 @@ export default function CreatorsHome() {
     loadAll()
   }, [loadAll])
 
+  // The races we sell, live from Shopify, for picking a sample's race.
+  useEffect(() => {
+    apiFetch('/api/creators/catalog').then(r => r.ok ? r.json() : { races: [] }).then(d => setCatalog(d.races || [])).catch(() => setCatalog([]))
+  }, [])
+
   const applicants = creators.filter(isApplicant)
   // Default to the applicants while any are waiting; otherwise the active list.
   const view: CreatorsView = viewParam && viewParam in VIEW_LABEL ? viewParam : applicants.length ? 'applied' : 'active'
@@ -207,15 +215,15 @@ export default function CreatorsHome() {
   const q = query.trim().toLowerCase().replace(/^@/, '')
   const matches = (c: Creator) => !q || [c.name, c.email, c.instagramHandle, c.raceName, c.sampleOrder?.orderNumber]
     .some(v => String(v || '').toLowerCase().includes(q))
-  const inView: Record<Exclude<CreatorsView, 'ads'>, Creator[]> = {
+  const inView: Record<CreatorsView, Creator[]> = {
     applied: applicants,
     active: creators.filter(c => !isApplicant(c) && c.status !== 'denied'),
     all: creators,
     denied: creators.filter(c => c.status === 'denied'),
   }
-  const counts = { applied: inView.applied.length, active: inView.active.length, all: inView.all.length, denied: inView.denied.length, ads: ads.length }
-  // A search reaches past the view, so a name is found wherever it is.
-  const list = view === 'ads' ? [] : (q ? creators : inView[view]).filter(matches)
+  const counts = { applied: inView.applied.length, active: inView.active.length, all: inView.all.length, denied: inView.denied.length }
+  // A search reaches past the queue, so a name is found wherever it is.
+  const list = (q ? creators : inView[view]).filter(matches)
 
   const handleDeclineSample = async (creator: Creator) => {
     if (!confirm(`Decline ${creator.name || 'this creator'}? They'll be marked denied and no sample is made. You can un-deny them later from the Denied view.`)) return
@@ -305,7 +313,7 @@ export default function CreatorsHome() {
             {isLoading && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
           </div>
           <div className="flex-1 flex items-center justify-end gap-2 md:gap-3 min-w-0">
-            <div className="relative flex-1 max-w-[760px]">
+            {tab === 'creators' && <div className="relative flex-1 max-w-[640px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
               <input
                 value={query}
@@ -314,11 +322,8 @@ export default function CreatorsHome() {
                 className="w-full pl-9 pr-8 py-2 bg-white border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30"
               />
               {query && <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-off-black/40 hover:text-off-black"><X className="w-3.5 h-3.5" /></button>}
-            </div>
-            <a href={TRYBE_URL} target="_blank" rel="noopener noreferrer" className={btnSecondary} title="Where creators upload content, handle revisions and get into the ad account">
-              Trybe <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-            <Link to="/briefs" className={btnSecondary}>Briefs</Link>
+            </div>}
+            <CreatorsTabs active={tab} />
             <button onClick={() => setShowInvite(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-dark-fill text-white text-sm font-medium rounded-md hover:opacity-90 transition-opacity whitespace-nowrap">
               <Plus className="w-4 h-4" /> New invite
             </button>
@@ -331,21 +336,28 @@ export default function CreatorsHome() {
 
         {selected ? (
           <div className="flex-1 min-h-0 overflow-y-auto pb-36 md:pb-8">
-            <CreatorDrawer
+            <CreatorDetail
               key={selected.id}
               creator={selected}
-              onClose={closeCreator}
+              onBack={closeCreator}
               decide={decide(selected)}
-              onSaved={async () => { await loadAll() }}
+              catalog={catalog}
+              onChanged={loadAll}
               onDeleted={async () => { closeCreator(); await loadAll() }}
             />
           </div>
         ) : creatorId && isLoading ? (
           <div className="flex-1 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-off-black/30" /></div>
+        ) : tab === 'ads' ? (
+          <section className="flex-1 min-h-0 pb-3">
+            <div className="h-full bg-white border border-border-gray rounded-lg shadow-sm overflow-y-auto">
+              <WinningAdsPanel ads={ads} onChanged={loadAll} />
+            </div>
+          </section>
         ) : (
           <section className="flex-1 min-h-0 pb-3">
             <div className="h-full bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex flex-col">
-              {/* Views, with the program's numbers on the right. */}
+              {/* The queues, with the program's numbers on the right. */}
               <div className="hidden md:flex items-center justify-between gap-3 px-3 py-2.5 border-b border-border-gray flex-shrink-0">
                 <div className="flex items-center gap-1 overflow-x-auto">
                   {(Object.keys(VIEW_LABEL) as CreatorsView[]).map(k => (
@@ -363,9 +375,7 @@ export default function CreatorsHome() {
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto">
-                {view === 'ads' && !q ? (
-                  <WinningAdsPanel ads={ads} onChanged={loadAll} />
-                ) : isLoading ? (
+                {isLoading ? (
                   <div className="flex items-center justify-center py-24"><Loader2 className="w-6 h-6 animate-spin text-off-black/30" /></div>
                 ) : list.length === 0 ? (
                   <div className="text-center py-20 px-6 text-sm text-off-black/50">
@@ -727,384 +737,427 @@ function InviteModal({ briefs, onClose, onCreated }: {
 }
 
 // ---------------------------------------------------------------------------
-// Drawer — view + edit a single creator
+// CreatorDetail: one creator, laid out like an order. Content, samples and
+// statuses on the left; profile, race and shipping on the right. Every card
+// saves itself, so there is no page-wide Save.
 // ---------------------------------------------------------------------------
-function CreatorDrawer({
-  creator,
-  onClose,
-  onSaved,
-  onDeleted,
-  decide,
-}: {
+interface CatalogRace { race: string; title: string; image: string | null }
+
+interface SampleOrder {
+  orderNumber: string
+  status: string
+  raceName: string | null
+  raceYear: number | null
+  productSize: string | null
+  frameType: string | null
+  createdAt: string
+  trackingNumber: string | null
+  trackingCarrier: string | null
+  shippedAt: string | null
+}
+
+const SIZES = ['8x10', '12x18', '16x24']
+const FRAMES = ['Black Oak', 'Natural Oak', 'Unframed']
+const fieldCls = 'w-full px-3 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-off-black/10'
+
+function CreatorDetail({ creator, onBack, decide, onChanged, onDeleted, catalog }: {
   creator: Creator
-  onClose: () => void
-  onSaved: (updated: Creator) => void | Promise<void>
-  onDeleted: () => void | Promise<void>
+  onBack: () => void
   /** Approve and Decline, for an applicant. */
   decide?: React.ReactNode
+  onChanged: () => void | Promise<void>
+  onDeleted: () => void | Promise<void>
+  catalog: CatalogRace[] | null
 }) {
-  const [draft, setDraft] = useState<Creator>(creator)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [tokenCopied, setTokenCopied] = useState(false)
-  const [isEditingProfile, setIsEditingProfile] = useState(false)
-  const [isEditingSample, setIsEditingSample] = useState(false)
-  const [isEditingShipping, setIsEditingShipping] = useState(false)
+  const [samples, setSamples] = useState<SampleOrder[] | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [notes, setNotes] = useState(creator.notes || '')
+  const [link, setLink] = useState('')
+  const statusCfg = STATUS_CONFIG[creator.status]
+  const portalUrl = `${window.location.origin}/creator/${creator.inviteToken}`
+  const links = (creator.bestContentLinks || '').split(/\s+/).map(s => s.trim()).filter(Boolean)
 
-  // Reset the draft only when a different creator opens. Keying on the whole
-  // object would wipe in-progress edits every time the parent re-renders.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setDraft(creator) }, [creator.id])
+  const loadSamples = useCallback(async () => {
+    const res = await apiFetch(`/api/creators/samples?creatorId=${encodeURIComponent(creator.id)}`)
+    if (res.ok) setSamples((await res.json()).samples || [])
+  }, [creator.id])
+  useEffect(() => { loadSamples() }, [loadSamples])
 
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(creator)
-
-  // Progressive disclosure by lifecycle status — show each section only once
-  // it's relevant. Driven off draft.status so changing the status dropdown
-  // reveals/hides sections live. An invited creator who's done nothing yet sees
-  // just the essentials; commission/whitelisting appear once they're active.
-  const st = draft.status
-  const showSample = st !== 'invited'
-  const showShipping = st !== 'invited'
-
-  const handleCopyInvite = async () => {
-    const url = `${window.location.origin}/creator/${creator.inviteToken}`
-    try {
-      await navigator.clipboard.writeText(url)
-      setTokenCopied(true)
-      setTimeout(() => setTokenCopied(false), 1500)
-    } catch {
-      // Clipboard can fail on insecure contexts — fall through silently
+  const save = async (updates: Partial<Creator>) => {
+    const res = await apiFetch('/api/orders/actions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update-creator', creatorId: creator.id, updates }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Could not save')
     }
+    await onChanged()
+  }
+  const saveQuietly = (updates: Partial<Creator>) => save(updates).catch(e => alert(e instanceof Error ? e.message : 'Could not save'))
+
+  const remove = async () => {
+    const note = creator.sampleOrder && !creator.sampleOrder.shippedAt && creator.sampleOrder.status !== 'completed'
+      ? `\n\nTheir sample ${creator.sampleOrder.orderNumber} has not shipped and will be deleted too.` : ''
+    if (!confirm(`Delete ${creator.name || 'this creator'}? This can't be undone.${note}`)) return
+    const res = await apiFetch('/api/orders/actions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete-creator', creatorId: creator.id }),
+    })
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Could not delete'); return }
+    await onDeleted()
   }
 
-  const handleDelete = async () => {
-    const shippedOrCompleted = !!(creator.sampleOrder?.shippedAt || creator.sampleOrder?.status === 'completed')
-    const orderNote = creator.sampleOrder
-      ? shippedOrCompleted
-        ? `\n\nThe linked sample order ${creator.sampleOrder.orderNumber} has already shipped/completed - it will stay in the fulfillment queue.`
-        : `\n\nThe linked sample order ${creator.sampleOrder.orderNumber} (not yet shipped) will also be deleted.`
-      : ''
-    if (!confirm(`Delete creator "${creator.name || 'unnamed'}"? This can't be undone.${orderNote}`)) return
-    setIsDeleting(true)
-    try {
-      const res = await apiFetch('/api/orders/actions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete-creator', creatorId: creator.id }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || `Delete failed: ${res.status}`)
-      }
-      await onDeleted()
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to delete')
-    } finally {
-      setIsDeleting(false)
-    }
-  }
-
-  const handleSave = async () => {
-    setIsSaving(true)
-    try {
-      const updates = {
-        // Profile
-        name: draft.name,
-        email: draft.email,
-        instagramHandle: draft.instagramHandle,
-        tiktokHandle: draft.tiktokHandle,
-        // Sample
-        raceName: draft.raceName,
-        raceYear: draft.raceYear,
-        bibNumber: draft.bibNumber,
-        finishTime: draft.finishTime,
-        productSize: draft.productSize,
-        frameType: draft.frameType,
-        // Shipping — server mirrors these onto the linked fulfillment order
-        shippingName: draft.shippingName,
-        shippingAddress1: draft.shippingAddress1,
-        shippingAddress2: draft.shippingAddress2,
-        shippingCity: draft.shippingCity,
-        shippingState: draft.shippingState,
-        shippingZip: draft.shippingZip,
-        shippingCountry: draft.shippingCountry,
-        // Lifecycle + free-form notes
-        status: draft.status,
-        contentStatus: draft.contentStatus,
-        notes: draft.notes,
-      }
-      const res = await apiFetch('/api/orders/actions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update-creator', creatorId: creator.id, updates }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || `Save failed: ${res.status}`)
-      }
-      const { creator: updated } = await res.json()
-      onSaved(updated)
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to save')
-    } finally {
-      setIsSaving(false)
-    }
+  const copyPortal = async () => {
+    try { await navigator.clipboard.writeText(portalUrl); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* clipboard unavailable */ }
   }
 
   return (
     <div className="bg-white border border-border-gray rounded-md w-full">
-      <div className="p-4 md:p-6 max-w-3xl">
-          {/* Header: back to the list, the name, and the decision for an applicant. */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-            <div className="flex items-center gap-2 min-w-0">
-              <button onClick={onClose} title="Back to creators (Esc)" className="inline-flex items-center gap-1 -ml-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors">
-                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
-                <span className="text-sm hidden md:inline">Creators</span>
-              </button>
-              <h3 className="text-lg font-semibold text-off-black truncate">
-                {creator.name || 'Pending Creator'}
-              </h3>
-            </div>
-            {decide}
+      {/* Header, as on an order: back, status, name, and the decision for an applicant. */}
+      <div className="sticky top-0 z-30 px-4 md:px-6 py-3 md:py-4 bg-white/95 backdrop-blur border-b border-border-gray rounded-t-md flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          <button onClick={onBack} title="Back to creators (Esc)" className="inline-flex items-center gap-1 -ml-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors">
+            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
+            <span className="text-sm hidden md:inline">Creators</span>
+          </button>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusCfg.bg} ${statusCfg.color}`}>{statusCfg.label}</span>
+          <h3 className="text-lg md:text-xl font-semibold text-off-black truncate">{creator.name || 'Pending creator'}</h3>
+          {creator.instagramHandle && (
+            <a href={socialUrl('instagram', creator.instagramHandle) || '#'} target="_blank" rel="noopener noreferrer" className="hidden md:inline-flex items-center gap-1 text-sm text-off-black/50 hover:text-[#4F2DD4]">
+              <Instagram className="w-3.5 h-3.5" />{socialHandle(creator.instagramHandle)}
+            </a>
+          )}
+        </div>
+        {decide}
+      </div>
+
+      <div className="p-4 md:p-6 grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5">
+        {/* Left: where they stand, their content, their samples. */}
+        <div className="space-y-5 min-w-0">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <StatusSelect<CreatorStatus>
+              label="Program"
+              value={creator.status}
+              onChange={(v) => saveQuietly({ status: v })}
+              options={['invited', 'applied', 'active', 'paused', 'denied']}
+              config={STATUS_CONFIG}
+            />
+            <StatusSelect<ContentStatus>
+              label="Content"
+              value={creator.contentStatus}
+              onChange={(v) => saveQuietly({ contentStatus: v })}
+              options={['not_received', 'received', 'edited', 'posted']}
+              config={CONTENT_STATUS_CONFIG}
+            />
           </div>
 
-          {/* Invite link — always visible, copy-able */}
-          <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-5">
-            <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-1.5">Invite / Portal Link</div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs text-off-black/80 bg-white px-2 py-1.5 rounded border border-border-gray truncate">
-                {window.location.origin}/creator/{creator.inviteToken}
-              </code>
-              <button
-                onClick={handleCopyInvite}
-                className="px-2.5 py-1.5 text-xs font-medium bg-white border border-border-gray rounded hover:bg-off-black/5 transition-colors inline-flex items-center gap-1"
-              >
-                {tokenCopied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
-              </button>
-            </div>
-            {creator.onboardedAt && (
-              <p className="text-[10px] text-off-black/40 mt-1.5">
-                Onboarded {new Date(creator.onboardedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </p>
+          <Card title="Content" right={<a href={TRYBE_URL} target="_blank" rel="noopener noreferrer" className={textLink}>Trybe <ExternalLink className="w-3 h-3" /></a>}>
+            {links.length === 0 ? (
+              <p className="text-sm text-off-black/45">No content yet. Paste links to their videos as they come in.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {links.map(l => (
+                  <li key={l} className="flex items-center justify-between gap-2 text-sm">
+                    <a href={/^https?:\/\//.test(l) ? l : `https://${l}`} target="_blank" rel="noopener noreferrer" className="text-off-black hover:text-[#4F2DD4] hover:underline truncate">{l}</a>
+                    <button onClick={() => saveQuietly({ bestContentLinks: links.filter(x => x !== l).join('\n') || null })} className="text-off-black/30 hover:text-red-600 shrink-0" title="Remove"><X className="w-3.5 h-3.5" /></button>
+                  </li>
+                ))}
+              </ul>
             )}
-          </div>
+            <form className="mt-3 flex gap-2" onSubmit={e => { e.preventDefault(); if (!link.trim()) return; saveQuietly({ bestContentLinks: [...links, link.trim()].join('\n') }); setLink('') }}>
+              <input value={link} onChange={e => setLink(e.target.value)} placeholder="Paste a link to a video" className={fieldCls} />
+              <button type="submit" disabled={!link.trim()} className={btnSecondary}><Plus className="w-3.5 h-3.5" /> Add</button>
+            </form>
+          </Card>
 
-          {/* Editable fields */}
-          <div className="space-y-4">
-            {/* Two top-level statuses — color-tinted dropdowns. Program = where
-                the creator stands in our pipeline. Content = where the asset is. */}
-            <div className="grid grid-cols-2 gap-3">
-              <StatusSelect<CreatorStatus>
-                label="Program"
-                value={draft.status}
-                onChange={(v) => setDraft({ ...draft, status: v })}
-                options={['invited', 'applied', 'active', 'paused', 'denied']}
-                config={STATUS_CONFIG}
-              />
-              <StatusSelect<ContentStatus>
-                label="Content"
-                value={draft.contentStatus}
-                onChange={(v) => setDraft({ ...draft, contentStatus: v })}
-                options={['not_received', 'received', 'edited', 'posted']}
-                config={CONTENT_STATUS_CONFIG}
-              />
-            </div>
+          <Card title={`Samples${samples?.length ? ` (${samples.length})` : ''}`}>
+            {samples === null ? (
+              <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />
+            ) : samples.length === 0 ? (
+              <p className="text-sm text-off-black/45">No sample made yet.</p>
+            ) : (
+              <ul className="divide-y divide-border-gray -my-2">
+                {samples.map(s => {
+                  const st = s.shippedAt || s.trackingNumber ? { label: 'Shipped', color: 'text-emerald-700' } : sampleStatusLabel(s.status)
+                  return (
+                    <li key={s.orderNumber} className="py-2.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link to={`/orders/${s.orderNumber}`} className="text-sm font-medium text-off-black hover:text-[#4F2DD4] hover:underline">{s.raceName} {s.raceYear}</Link>
+                        <div className="text-xs text-off-black/50">{[s.productSize, s.frameType].filter(v => v && v !== '-').join(' · ')} · {s.orderNumber} · {new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className={`text-xs font-medium ${st.color}`}>{st.label}</div>
+                        {s.trackingNumber && <div className="text-[11px] text-off-black/45 font-mono">{s.trackingCarrier ? `${s.trackingCarrier} ` : ''}{s.trackingNumber}</div>}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            {creator.status !== 'denied' && !isApplicant(creator) && (
+              <SendSample creator={creator} catalog={catalog} hasSample={!!samples?.length} onDone={async () => { await loadSamples(); await onChanged() }} />
+            )}
+          </Card>
 
-            <EditableCard
-              title="Profile"
-              isEditing={isEditingProfile}
-              onToggle={() => setIsEditingProfile(v => !v)}
-            >
-              {isEditingProfile ? (
-                <div className="space-y-2.5">
-                  <TextField label="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
-                  <TextField label="Email" value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} type="email" />
-                  <TextField label="Instagram" value={draft.instagramHandle} onChange={(v) => setDraft({ ...draft, instagramHandle: v })} placeholder="@handle or full URL" />
-                  <TextField label="TikTok" value={draft.tiktokHandle} onChange={(v) => setDraft({ ...draft, tiktokHandle: v })} placeholder="@handle or full URL" />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <ProfileRow label="Name" value={draft.name} />
-                  <ProfileRow
-                    label="Email"
-                    value={draft.email}
-                    href={draft.email ? `mailto:${draft.email}` : null}
-                    icon={<Mail className="w-3.5 h-3.5" />}
-                  />
-                  <ProfileRow
-                    label="Instagram"
-                    value={draft.instagramHandle}
-                    display={socialHandle(draft.instagramHandle)}
-                    href={socialUrl('instagram', draft.instagramHandle)}
-                    icon={<Instagram className="w-3.5 h-3.5" />}
-                  />
-                  <ProfileRow
-                    label="TikTok"
-                    value={draft.tiktokHandle}
-                    display={socialHandle(draft.tiktokHandle)}
-                    href={socialUrl('tiktok', draft.tiktokHandle)}
-                    icon={<Music2 className="w-3.5 h-3.5" />}
-                  />
-                </div>
-              )}
-
-              {/* Why they want to work with us — folded into Profile (only when
-                  they actually gave a reason). */}
-              {draft.whyWorkWithUs && (
-                <div className="mt-3 pt-3 border-t border-border-gray">
-                  <Label>Why they want to work with us</Label>
-                  <p className="text-sm text-off-black/80 whitespace-pre-wrap leading-relaxed">{draft.whyWorkWithUs}</p>
-                </div>
-              )}
-
-              {/* Assigned briefs — also folded into Profile. */}
-              <div className="mt-3 pt-3 border-t border-border-gray">
-                <Label>{`Assigned Briefs${(creator.briefAssignments?.length ?? 0) > 0 ? ` (${creator.briefAssignments!.length})` : ''}`}</Label>
-                {(creator.briefAssignments?.length ?? 0) === 0 ? (
-                  <p className="text-xs text-off-black/40 italic">No briefs assigned yet.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {creator.briefAssignments!.map(a => (
-                      <span
-                        key={a.brief.id}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-off-black/5 text-off-black/70 text-xs rounded"
-                      >
-                        {a.brief.title}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </EditableCard>
-
-            {showSample && (
-            <EditableCard
-              title="Sample Details"
-              isEditing={isEditingSample}
-              onToggle={() => setIsEditingSample(v => !v)}
-              collapsible
-              defaultCollapsed
-            >
-              {isEditingSample ? (
-                <div className="space-y-2.5">
-                  <div className="grid grid-cols-2 gap-3">
-                    <TextField label="Race" value={draft.raceName} onChange={(v) => setDraft({ ...draft, raceName: v })} placeholder="Boston Marathon" />
-                    <NumberField label="Year" value={draft.raceYear} onChange={(v) => setDraft({ ...draft, raceYear: v })} />
-                    <TextField label="Bib #" value={draft.bibNumber} onChange={(v) => setDraft({ ...draft, bibNumber: v })} />
-                    <TextField label="Finish time" value={draft.finishTime} onChange={(v) => setDraft({ ...draft, finishTime: v })} placeholder="3:42:18" />
-                    <TextField label="Size" value={draft.productSize} onChange={(v) => setDraft({ ...draft, productSize: v })} placeholder='18x24"' />
-                    <TextField label="Frame" value={draft.frameType} onChange={(v) => setDraft({ ...draft, frameType: v })} placeholder="Black / White / Natural" />
+          {(creator.whyWorkWithUs || (creator.briefAssignments?.length ?? 0) > 0) && (
+            <Card title="Application">
+              {creator.whyWorkWithUs && <p className="text-sm text-off-black/80 whitespace-pre-wrap leading-relaxed">{creator.whyWorkWithUs}</p>}
+              {(creator.briefAssignments?.length ?? 0) > 0 && (
+                <div className={creator.whyWorkWithUs ? 'mt-3 pt-3 border-t border-border-gray' : ''}>
+                  <div className={cardLabel}>Briefs</div>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {creator.briefAssignments!.map(a => <span key={a.brief.id} className="px-2 py-1 bg-off-black/5 text-off-black/70 text-xs rounded">{a.brief.title}</span>)}
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <ProfileRow
-                    label="Race"
-                    value={draft.raceName ? `${draft.raceName}${draft.raceYear ? ` · ${draft.raceYear}` : ''}` : null}
-                  />
-                  <ProfileRow label="Bib #" value={draft.bibNumber} />
-                  <ProfileRow label="Finish time" value={draft.finishTime} />
-                  <ProfileRow label="Size" value={draft.productSize} />
-                  <ProfileRow label="Frame" value={draft.frameType} />
-                </div>
               )}
-              {creator.sampleOrder && (
-              <div className="mt-3 pt-3 border-t border-border-gray space-y-2">
-                <ProfileRow
-                  label="Cost (COGS)"
-                  value={creator.sampleCostUsd ? formatUsd(creator.sampleCostUsd) : '-'}
-                />
-                <ProfileRow
-                  label="Order"
-                  value={creator.sampleOrder.orderNumber}
-                />
-                <ProfileRow
-                  label="Status"
-                  value={sampleStatusLabel(creator.sampleOrder.status).label}
-                />
-              </div>
-              )}
-            </EditableCard>
-            )}
+            </Card>
+          )}
 
-            {/* Another print for this creator: a second race, a reshoot, a replacement. */}
-            {creator.status !== 'denied' && !isApplicant(creator) && <AnotherSample creator={creator} onDone={() => onSaved(creator)} />}
+          <Card title="Notes">
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              onBlur={() => { if (notes !== (creator.notes || '')) saveQuietly({ notes: notes || null }) }}
+              rows={3}
+              placeholder="Anything worth remembering about this creator. Saves when you click away."
+              className={`${fieldCls} resize-y`}
+            />
+          </Card>
+        </div>
 
-            {showShipping && (
-            <EditableCard
-              title="Shipping"
-              isEditing={isEditingShipping}
-              onToggle={() => setIsEditingShipping(v => !v)}
-              collapsible
-              defaultCollapsed
-            >
-              {isEditingShipping ? (
-                <div className="space-y-2.5">
-                  <p className="text-[10px] text-off-black/50 leading-relaxed">
-                    Edits here are mirrored onto the fulfillment order so Elí ships to the new address.
-                  </p>
-                  <TextField label="Recipient name" value={draft.shippingName} onChange={(v) => setDraft({ ...draft, shippingName: v })} />
-                  <TextField label="Address line 1" value={draft.shippingAddress1} onChange={(v) => setDraft({ ...draft, shippingAddress1: v })} />
-                  <TextField label="Address line 2" value={draft.shippingAddress2} onChange={(v) => setDraft({ ...draft, shippingAddress2: v })} placeholder="Apt / suite (optional)" />
-                  <div className="grid grid-cols-3 gap-3">
-                    <TextField label="City" value={draft.shippingCity} onChange={(v) => setDraft({ ...draft, shippingCity: v })} />
-                    <TextField label="State" value={draft.shippingState} onChange={(v) => setDraft({ ...draft, shippingState: v })} />
-                    <TextField label="ZIP" value={draft.shippingZip} onChange={(v) => setDraft({ ...draft, shippingZip: v })} />
-                  </div>
-                  <TextField label="Country" value={draft.shippingCountry} onChange={(v) => setDraft({ ...draft, shippingCountry: v })} placeholder="US" />
-                </div>
-              ) : (
-                <AddressBlock
-                  name={draft.shippingName}
-                  address1={draft.shippingAddress1}
-                  address2={draft.shippingAddress2}
-                  city={draft.shippingCity}
-                  state={draft.shippingState}
-                  zip={draft.shippingZip}
-                  country={draft.shippingCountry}
-                />
-              )}
-            </EditableCard>
-            )}
+        {/* Right: who they are and where things go. */}
+        <div className="space-y-4">
+          <EditCard
+            title="Profile"
+            creator={creator}
+            onSave={save}
+            fields={[
+              { key: 'name', label: 'Name' },
+              { key: 'email', label: 'Email', href: v => `mailto:${v}` },
+              { key: 'instagramHandle', label: 'Instagram', display: socialHandle, href: v => socialUrl('instagram', v) },
+              { key: 'tiktokHandle', label: 'TikTok', display: socialHandle, href: v => socialUrl('tiktok', v) },
+            ]}
+          />
+          <EditCard
+            title="Requested print"
+            creator={creator}
+            onSave={save}
+            catalog={catalog}
+            fields={[
+              { key: 'raceName', label: 'Race', kind: 'race' },
+              { key: 'raceYear', label: 'Year' },
+              { key: 'bibNumber', label: 'Bib' },
+              { key: 'finishTime', label: 'Time' },
+              { key: 'productSize', label: 'Size', options: SIZES },
+              { key: 'frameType', label: 'Frame', options: FRAMES },
+            ]}
+          />
+          <EditCard
+            title="Shipping"
+            creator={creator}
+            onSave={save}
+            note="Changes also go onto their sample order, so it ships to the new address."
+            fields={[
+              { key: 'shippingName', label: 'Recipient' },
+              { key: 'shippingAddress1', label: 'Address' },
+              { key: 'shippingAddress2', label: 'Apt / suite' },
+              { key: 'shippingCity', label: 'City' },
+              { key: 'shippingState', label: 'State' },
+              { key: 'shippingZip', label: 'ZIP' },
+              { key: 'shippingCountry', label: 'Country' },
+            ]}
+          />
 
-            {/* Notes — free-form admin notes, always available. */}
-            <Section title="Notes">
-              <TextField
-                label=""
-                value={draft.notes}
-                onChange={(v) => setDraft({ ...draft, notes: v })}
-                placeholder="Anything worth remembering about this creator…"
-                multiline
-              />
-            </Section>
-
+          <div>
+            <div className={sectionLabel}>Actions</div>
+            <div className="mt-2 flex flex-col items-start gap-2">
+              <button onClick={copyPortal} className={textLink}>{copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy their portal link'}</button>
+              <a href={portalUrl} target="_blank" rel="noopener noreferrer" className={textLink}><ExternalLink className="w-3.5 h-3.5" /> Open their portal</a>
+              {creator.email && <a href={`mailto:${creator.email}`} className={textLink}><Mail className="w-3.5 h-3.5" /> Email them</a>}
+              <button onClick={remove} className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"><X className="w-3.5 h-3.5" /> Delete creator</button>
+            </div>
+            <p className="text-[11px] text-off-black/40 mt-3">
+              Invited {new Date(creator.invitedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              {creator.onboardedAt && ` · applied ${new Date(creator.onboardedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+            </p>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-          {/* Footer — Delete pinned to the far left (destructive actions get
-              spatial separation from primary actions). */}
-          <div className="flex items-center justify-between gap-2 mt-6 pt-4 border-t border-border-gray">
-            <button
-              onClick={handleDelete}
-              disabled={isDeleting || isSaving}
-              className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-40 inline-flex items-center gap-1.5"
-            >
-              {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-              {isDeleting ? 'Deleting…' : 'Delete creator'}
-            </button>
-            <div className="flex items-center gap-2">
-              <button onClick={onClose} className="px-4 py-2 text-sm text-off-black/60 hover:bg-off-black/5 rounded transition-colors">
-                Close
+function Card({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className={sectionLabel}>{title}</h4>
+        {right}
+      </div>
+      <div className={infoCard}>{children}</div>
+    </div>
+  )
+}
+
+type EditField = {
+  key: keyof Creator
+  label: string
+  kind?: 'race'
+  options?: string[]
+  display?: (v: string | null) => string | null
+  href?: (v: string) => string | null
+}
+
+/** A card of fields that shows values and edits in place, saving just its own fields. */
+function EditCard({ title, creator, fields, onSave, note, catalog }: {
+  title: string
+  creator: Creator
+  fields: EditField[]
+  onSave: (updates: Partial<Creator>) => Promise<void>
+  note?: string
+  catalog?: CatalogRace[] | null
+}) {
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const start = () => { setDraft(Object.fromEntries(fields.map(f => [f.key, creator[f.key] == null ? '' : String(creator[f.key])]))); setEditing(true) }
+  const submit = async () => {
+    setBusy(true)
+    try {
+      await onSave(Object.fromEntries(fields.map(f => [f.key, draft[f.key as string]?.trim() || null])) as Partial<Creator>)
+      setEditing(false)
+    } catch (e) { alert(e instanceof Error ? e.message : 'Could not save') } finally { setBusy(false) }
+  }
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className={sectionLabel}>{title}</h4>
+        {!editing && <button onClick={start} className={textLink}><Pencil className="w-3 h-3" /> Edit</button>}
+      </div>
+      <div className={infoCard}>
+        {editing ? (
+          <div className="space-y-2">
+            {note && <p className="text-[11px] text-off-black/50">{note}</p>}
+            {fields.map(f => {
+              const v = draft[f.key as string] ?? ''
+              const set = (val: string) => setDraft(d => ({ ...d, [f.key]: val }))
+              return (
+                <label key={f.key as string} className="block">
+                  <span className={cardLabel}>{f.label}</span>
+                  {f.kind === 'race' ? (
+                    <RacePicker value={v} onChange={set} catalog={catalog || null} />
+                  ) : f.options ? (
+                    <select value={v} onChange={e => set(e.target.value)} className={fieldCls}>
+                      <option value="">-</option>
+                      {[...new Set([...f.options, ...(v && !f.options.includes(v) ? [v] : [])])].map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <input value={v} onChange={e => set(e.target.value)} className={fieldCls} />
+                  )}
+                </label>
+              )
+            })}
+            <div className="flex gap-2 pt-1">
+              <button onClick={submit} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-dark-fill text-white rounded-md disabled:opacity-50">
+                {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save
               </button>
-              <button
-                onClick={handleSave}
-                disabled={!isDirty || isSaving || isDeleting}
-                className="px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
-              >
-                {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {isSaving ? 'Saving…' : 'Save changes'}
-              </button>
+              <button onClick={() => setEditing(false)} className="px-3 py-1.5 text-sm text-off-black/60">Cancel</button>
             </div>
           </div>
+        ) : (
+          <dl className="space-y-1.5">
+            {fields.map(f => {
+              const raw = creator[f.key] == null || creator[f.key] === '' ? null : String(creator[f.key])
+              const text = raw && f.display ? f.display(raw) : raw
+              const href = raw && f.href ? f.href(raw) : null
+              return (
+                <div key={f.key as string} className="flex items-baseline justify-between gap-3 text-sm">
+                  <dt className="text-off-black/50 text-xs shrink-0">{f.label}</dt>
+                  <dd className="text-right min-w-0 break-words">
+                    {!text ? <span className="text-off-black/30">-</span>
+                      : href ? <a href={href} target={href.startsWith('mailto:') ? undefined : '_blank'} rel="noopener noreferrer" className="text-off-black hover:text-[#4F2DD4] hover:underline">{text}</a>
+                      : <span className="text-off-black">{text}</span>}
+                  </dd>
+                </div>
+              )
+            })}
+          </dl>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Pick a race from the live Shopify catalog. A race not in the catalog stays selectable so old records still show. */
+function RacePicker({ value, onChange, catalog }: { value: string; onChange: (v: string) => void; catalog: CatalogRace[] | null }) {
+  if (!catalog) return <div className={`${fieldCls} text-off-black/40 inline-flex items-center gap-2`}><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading races from Shopify</div>
+  const known = catalog.some(c => c.race === value)
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} className={fieldCls}>
+      <option value="">Choose a race</option>
+      {value && !known && <option value={value}>{value} (not in the store)</option>}
+      {catalog.map(c => <option key={c.race} value={c.race}>{c.race}</option>)}
+    </select>
+  )
+}
+
+/**
+ * Send a creator a sample: the first one or another (a second race, a
+ * reshoot, a replacement). Goes into the Standard queue as CREATOR-XXXXXX
+ * (then -2, -3...), to the address on file. Server: api/creators/sample.js.
+ */
+function SendSample({ creator, catalog, hasSample, onDone }: { creator: Creator; catalog: CatalogRace[] | null; hasSample: boolean; onDone: () => void | Promise<void> }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const blank = () => ({
+    raceName: hasSample ? '' : creator.raceName || '',
+    raceYear: String(hasSample ? new Date().getFullYear() : creator.raceYear || new Date().getFullYear()),
+    bibNumber: hasSample ? '' : creator.bibNumber || '',
+    finishTime: hasSample ? '' : creator.finishTime || '',
+    productSize: creator.productSize || '12x18',
+    frameType: creator.frameType || 'Black Oak',
+  })
+  const [f, setF] = useState(blank)
+  const inCatalog = !!catalog?.some(c => c.race === f.raceName)
+  const submit = async () => {
+    setBusy(true); setErr(null)
+    try {
+      const res = await apiFetch('/api/creators/sample', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ creatorId: creator.id, ...f, raceYear: Number(f.raceYear) }) })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || 'Could not create the sample')
+      setOpen(false)
+      await onDone()
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not create the sample') } finally { setBusy(false) }
+  }
+  if (!open) {
+    return (
+      <button onClick={() => { setF(blank()); setOpen(true) }} className="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium border border-dashed border-border-gray rounded-md text-off-black/70 bg-white hover:bg-subtle-gray">
+        <Plus className="w-3.5 h-3.5" /> {hasSample ? 'Send another sample' : 'Send a sample'}
+      </button>
+    )
+  }
+  return (
+    <div className="mt-3 border border-border-gray rounded-md p-3 space-y-2.5 bg-white">
+      <div className={cardLabel}>{hasSample ? 'Another sample' : 'New sample'}</div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2 sm:col-span-1"><RacePicker value={f.raceName} onChange={v => setF({ ...f, raceName: v })} catalog={catalog} /></div>
+        <input value={f.raceYear} onChange={e => setF({ ...f, raceYear: e.target.value })} placeholder="Year" inputMode="numeric" className={`${fieldCls} col-span-2 sm:col-span-1`} />
+        <input value={f.bibNumber} onChange={e => setF({ ...f, bibNumber: e.target.value })} placeholder="Bib # (optional)" className={fieldCls} />
+        <input value={f.finishTime} onChange={e => setF({ ...f, finishTime: e.target.value })} placeholder="Finish time (optional)" className={fieldCls} />
+        <select value={f.productSize} onChange={e => setF({ ...f, productSize: e.target.value })} className={fieldCls}>{SIZES.map(s => <option key={s}>{s}</option>)}</select>
+        <select value={f.frameType} onChange={e => setF({ ...f, frameType: e.target.value })} className={fieldCls}>{FRAMES.map(s => <option key={s}>{s}</option>)}</select>
+      </div>
+      <p className="text-[11px] text-off-black/50">Goes into the Standard queue for Eli, shipped to the address on file.</p>
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      <div className="flex gap-2">
+        <button onClick={submit} disabled={busy || !inCatalog || !/^\d{4}$/.test(f.raceYear)} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-dark-fill text-white rounded-md disabled:opacity-50">
+          {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Create sample
+        </button>
+        <button onClick={() => setOpen(false)} className="px-3 py-2 text-sm text-off-black/60">Cancel</button>
       </div>
     </div>
   )
@@ -1135,50 +1188,6 @@ function socialHandle(raw: string | null): string | null {
   if (!match) return v
   const seg = match[1].replace(/^@/, '')
   return `@${seg}`
-}
-
-// Card with a title row and an Edit/Done toggle in the corner. Children
-// decide what to render in each mode — the card just owns the chrome.
-function EditableCard({ title, isEditing, onToggle, children, collapsible = false, defaultCollapsed = false }: {
-  title: string
-  isEditing: boolean
-  onToggle: () => void
-  children: React.ReactNode
-  // When collapsible, the card starts closed (if defaultCollapsed) and the
-  // title row toggles open/closed. Used for low-priority sections like Sample
-  // Details / Shipping that are rarely needed once a creator is set up.
-  collapsible?: boolean
-  defaultCollapsed?: boolean
-}) {
-  const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed)
-  return (
-    <div className="bg-white border border-border-gray rounded-md p-4">
-      <div className={`flex items-center justify-between ${collapsed ? '' : 'mb-3'}`}>
-        {collapsible ? (
-          <button
-            type="button"
-            onClick={() => setCollapsed(c => !c)}
-            className="flex items-center gap-1.5 flex-1 text-left group"
-          >
-            <ChevronDown className={`w-3.5 h-3.5 text-off-black/40 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
-            <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider group-hover:text-off-black/70">{title}</h4>
-          </button>
-        ) : (
-          <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider">{title}</h4>
-        )}
-        {!collapsed && (
-          <button
-            type="button"
-            onClick={onToggle}
-            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors"
-          >
-            {isEditing ? <><Check className="w-3 h-3" /> Done</> : <><Pencil className="w-3 h-3" /> Edit</>}
-          </button>
-        )}
-      </div>
-      {!collapsed && children}
-    </div>
-  )
 }
 
 // Color-tinted dropdown — background reflects the currently selected value.
@@ -1215,191 +1224,6 @@ function StatusSelect<T extends string>({
   )
 }
 
-function AddressBlock({ name, address1, address2, city, state, zip, country }: {
-  name: string | null
-  address1: string | null
-  address2: string | null
-  city: string | null
-  state: string | null
-  zip: string | null
-  country: string | null
-}) {
-  const cityLine = [city, state].filter(Boolean).join(', ') + (zip ? ` ${zip}` : '')
-  const hasAny = name || address1 || address2 || cityLine.trim() || country
-  if (!hasAny) {
-    return <div className="text-sm text-off-black/30 italic">No address on file</div>
-  }
-  return (
-    <div className="text-sm text-off-black/80 leading-relaxed">
-      {name && <div className="font-medium text-off-black">{name}</div>}
-      {address1 && <div>{address1}</div>}
-      {address2 && <div>{address2}</div>}
-      {cityLine.trim() && <div>{cityLine}</div>}
-      {country && country !== 'US' && <div>{country}</div>}
-    </div>
-  )
-}
-
-function ProfileRow({
-  label, value, display, href, icon,
-}: {
-  label: string
-  value: string | null
-  display?: string | null     // optional friendlier rendering (e.g. handle vs URL)
-  href?: string | null
-  icon?: React.ReactNode
-}) {
-  const text = display ?? value
-  return (
-    <div className="flex items-baseline gap-3 text-sm">
-      <span className="text-off-black/50 text-xs w-20 shrink-0">{label}</span>
-      {text ? (
-        href ? (
-          <a
-            href={href}
-            target={href.startsWith('mailto:') ? undefined : '_blank'}
-            rel={href.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
-            className="inline-flex items-center gap-1.5 text-off-black hover:text-[#4F2DD4] hover:underline break-all"
-          >
-            {icon && <span className="text-off-black/40">{icon}</span>}
-            <span>{text}</span>
-          </a>
-        ) : (
-          <span className="text-off-black/80 break-all">{text}</span>
-        )
-      ) : (
-        <span className="text-off-black/30 italic">-</span>
-      )}
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h4 className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-2">{title}</h4>
-      <div className="space-y-2.5">{children}</div>
-    </div>
-  )
-}
-
 function Label({ children }: { children: React.ReactNode }) {
   return <div className="text-xs text-off-black/60 mb-1">{children}</div>
-}
-
-function TextField({ label, value, onChange, type = 'text', placeholder, multiline }: {
-  label: string
-  value: string | null
-  onChange: (v: string) => void
-  type?: string
-  placeholder?: string
-  multiline?: boolean
-}) {
-  return (
-    <div>
-      <Label>{label}</Label>
-      {multiline ? (
-        <textarea
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={2}
-          className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none"
-        />
-      ) : (
-        <input
-          type={type}
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-        />
-      )}
-    </div>
-  )
-}
-
-function NumberField({ label, value, onChange, suffix }: {
-  label: string
-  value: number | null
-  onChange: (v: number | null) => void
-  suffix?: string
-}) {
-  return (
-    <div>
-      <Label>{label}</Label>
-      <div className="relative">
-        <input
-          type="number"
-          value={value ?? ''}
-          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-          className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-        />
-        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-off-black/40">{suffix}</span>}
-      </div>
-    </div>
-  )
-}
-
-// Inline tracking-number editor in the creator drawer. Saving a non-empty
-// number sets `shippedAt` server-side and lights up the "Shipped" stage in
-// the creator portal. Clearing the number reverts to "Approved".
-
-/**
- * Admin: send this creator another sample. Prefilled from their current one;
- * goes into the Standard queue as CREATOR-XXXXXX-2 (and up), to the address
- * on file. Server: api/creators/sample.js.
- */
-function AnotherSample({ creator, onDone }: { creator: Creator; onDone: () => void }) {
-  const [open, setOpen] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [f, setF] = useState({
-    raceName: creator.raceName || '',
-    raceYear: creator.raceYear ? String(creator.raceYear) : String(new Date().getFullYear()),
-    bibNumber: creator.bibNumber || '',
-    finishTime: creator.finishTime || '',
-    productSize: creator.productSize || '',
-    frameType: creator.frameType || '',
-  })
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(v => ({ ...v, [k]: e.target.value }))
-  const submit = async () => {
-    setBusy(true); setErr(null)
-    try {
-      const res = await apiFetch('/api/creators/sample', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ creatorId: creator.id, ...f, raceYear: Number(f.raceYear) }) })
-      const d = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(d.error || 'Could not create the sample')
-      setOpen(false)
-      onDone()
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not create the sample') } finally { setBusy(false) }
-  }
-  const field = 'w-full px-2.5 py-2 text-sm border border-border-gray rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-off-black/10'
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium border border-dashed border-border-gray rounded-md text-off-black/70 hover:bg-subtle-gray">
-        <Plus className="w-3.5 h-3.5" /> {creator.sampleOrder ? 'Send another sample' : 'Send a sample'}
-      </button>
-    )
-  }
-  return (
-    <div className="border border-border-gray rounded-md p-3 space-y-2.5 bg-white">
-      <div className="text-xs font-semibold text-off-black uppercase tracking-wider">Another sample</div>
-      <div className="grid grid-cols-2 gap-2">
-        <input value={f.raceName} onChange={set('raceName')} placeholder="Race" className={field} />
-        <input value={f.raceYear} onChange={set('raceYear')} placeholder="Year" inputMode="numeric" className={field} />
-        <input value={f.bibNumber} onChange={set('bibNumber')} placeholder="Bib #" className={field} />
-        <input value={f.finishTime} onChange={set('finishTime')} placeholder="Finish time" className={field} />
-        <input value={f.productSize} onChange={set('productSize')} placeholder="Size, e.g. 12x18" className={field} />
-        <input value={f.frameType} onChange={set('frameType')} placeholder="Frame" className={field} />
-      </div>
-      <p className="text-[11px] text-off-black/50">Goes into the Standard queue for Eli, shipped to the address on file.</p>
-      {err && <p className="text-xs text-red-600">{err}</p>}
-      <div className="flex gap-2">
-        <button onClick={submit} disabled={busy || !f.raceName.trim() || !f.raceYear} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-dark-fill text-white rounded-md disabled:opacity-50">
-          {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Create sample
-        </button>
-        <button onClick={() => setOpen(false)} className="px-3 py-2 text-sm text-off-black/60">Cancel</button>
-      </div>
-    </div>
-  )
 }

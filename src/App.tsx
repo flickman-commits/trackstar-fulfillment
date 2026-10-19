@@ -15,7 +15,6 @@ import CreatorPortal from '@/pages/CreatorPortal'
 import CreatorApply from '@/pages/CreatorApply'
 import Monopoly from '@/pages/Monopoly'
 import MonopolyModel from '@/pages/MonopolyModel'
-import ProductsBulkEdit from '@/pages/ProductsBulkEdit'
 import Sales from '@/pages/Sales'
 import SalesWorkspace from '@/pages/SalesWorkspace'
 import Support from '@/pages/Support'
@@ -242,8 +241,12 @@ export default function App() {
                     fulfillment work. */}
                 <Route path="/creators" element={<RequireCap cap="creators"><CreatorsHome /></RequireCap>} />
                 <Route path="/creators/:creatorId" element={<RequireCap cap="creators"><CreatorsHome /></RequireCap>} />
-                <Route path="/products" element={<RequireAdmin><ProductsBulkEdit /></RequireAdmin>} />
+                {/* The products editor is a Settings section now. */}
+                <Route path="/products" element={<Navigate to="/settings/products" replace />} />
+                <Route path="/settings" element={<Dashboard />} />
+                <Route path="/settings/:panel" element={<Dashboard />} />
                 <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
+                <Route path="/briefs/:briefId" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
                 {/* Sales is for reps: anyone signed in whose email is on the Attio
                     workspace, or an admin. The API decides; the page shows why not. */}
                 {/* Rendered by SalesKeepAlive below, so it survives leaving the page.

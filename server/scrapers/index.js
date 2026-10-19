@@ -475,6 +475,11 @@ function explicitYearsOf(obj) {
  * eventTypes, e.g. the Army Ten-Miler's 10 Miler). Halves and side races at a
  * marathon are not; their prints are made by hand.
  */
+/** Events at a race that each have their own design (see BaseScraper.namedEvent). */
+export function namedEventsFor(raceName) {
+  return findConfigForRace(raceName)?.namedEvents || []
+}
+
 export function isMainEvent(raceName, eventType) {
   const e = String(eventType || '').trim().toLowerCase()
   if (!e || e === 'marathon') return true

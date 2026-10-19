@@ -122,7 +122,7 @@ function buildAustinFallbackUrl(runnerName, raceName, year, eventType) {
   if (!runnerName || !/austin/i.test(raceName)) return null
   const ids = AUSTIN_EVENT_IDS[year]
   if (!ids) return null
-  const isHalf = eventType === 'Half Marathon'
+  const isHalf = /half/i.test(eventType || '')
   const eventId = isHalf ? ids.halfMarathon : ids.marathon
   const parts = runnerName.trim().split(/\s+/)
   const fname = parts[0] || ''

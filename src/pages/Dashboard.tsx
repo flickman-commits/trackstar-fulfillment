@@ -4,7 +4,7 @@ import CustomCounter from '@/components/CustomCounter'
 import RenderTemplatesPanel from '@/components/RenderTemplatesPanel'
 import { ToastDot } from '@/components/BrandToaster'
 import { toastCard, toastStyle } from '@/lib/ui'
-import { Hash, Sparkles, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound, Mail } from 'lucide-react'
+import { Hash, Sparkles, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ChevronRight, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound, Mail } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
@@ -27,6 +27,7 @@ import { useSearchParams, useParams, useNavigate, useLocation } from 'react-rout
 import { useAuth } from '@/lib/auth'
 import EmailCustomerModal from '@/components/support/EmailCustomerModal'
 import OrderConversations from '@/components/support/OrderConversations'
+import ProductsBulkEdit from '@/pages/ProductsBulkEdit'
 import PageHeader from '@/components/PageHeader'
 import ProofShowcase from '@/components/ProofShowcase'
 import PhotoCropper from '@/components/PhotoCropper'
@@ -795,7 +796,7 @@ function greetingName(user: { firstName?: string | null; email?: string | null }
 // Pace: X:XX / mi (e.g., "7:15 / mi")
 
 
-type SettingsPanel = 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'roles' | 'apikeys' | 'assignments' | 'activity' | 'counter' | 'designs' | 'diagnostics' | 'maintenance'
+type SettingsPanel = 'products' | 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'roles' | 'apikeys' | 'assignments' | 'activity' | 'counter' | 'designs' | 'diagnostics' | 'maintenance'
 
 /**
  * Settings navigation. Grouped rather than a flat list because the panels do
@@ -840,6 +841,7 @@ const SETTINGS_NAV: {
     group: 'Admin',
     adminOnly: true,
     items: [
+      { id: 'products', label: 'Products & Prices', blurb: 'Change prices across every Shopify product at once', icon: DollarSign },
       { id: 'people', label: 'People', blurb: 'Who can sign in and what they are allowed to do', icon: Users },
       { id: 'roles', label: 'Roles', blurb: 'What each role can see and use', icon: ShieldCheck },
       { id: 'apikeys', label: 'API Keys', blurb: 'Keys for Claude and other integrations', icon: KeyRound },
@@ -923,12 +925,15 @@ export default function Dashboard() {
   const [bulkCreating, setBulkCreating] = useState(false)
   const [isResearching, setIsResearching] = useState(false)
 
-  const [showSettings, setShowSettings] = useState(false)
-  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>('pricing')
-  // Open on a panel this role can see (a designer has no Pricing Calculator).
-  useEffect(() => {
-    if (!visibleItems.some((i) => i.id === settingsPanel) && visibleItems[0]) setSettingsPanel(visibleItems[0].id)
-  }, [visibleItems, settingsPanel])
+  // Settings is a page: /settings, and /settings/<panel> for one section.
+  const goToSettings = useNavigate()
+  const { pathname: currentPath } = useLocation()
+  const showSettings = currentPath === '/settings' || currentPath.startsWith('/settings/')
+  const settingsPanelInUrl = (showSettings && visibleItems.find(i => i.id === currentPath.split('/')[2])?.id) || null
+  // A phone opens on the list of sections; a desktop opens on the first one this role can see.
+  const isPhone = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  const settingsPanel: SettingsPanel = settingsPanelInUrl || visibleItems[0]?.id || 'account'
+  const setSettingsPanel = (id: SettingsPanel) => goToSettings(`/settings/${id}`)
   const [settingsQuery, setSettingsQuery] = useState('')
   const [settingsAction, setSettingsAction] = useState<string | null>(null)
   type HealthCheck = { status: 'ok' | 'warn' | 'error'; detail?: string | null; latency?: string }
@@ -1439,7 +1444,6 @@ export default function Dashboard() {
       setToast({ message: error instanceof Error ? error.message : 'Action failed', type: 'error' })
     } finally {
       setSettingsAction(null)
-      setShowSettings(false)
     }
   }
 
@@ -1495,14 +1499,11 @@ export default function Dashboard() {
   // settings modal is Dashboard's and lifting it into the shell is a far bigger
   // change than making the rail persist. Consume the flag so a refresh or a
   // back-button press does not reopen the panel.
+  // Old links with ?settings=1 land on the Settings page.
   useEffect(() => {
-    if (searchParams.get('settings') !== '1') return
-    setShowSettings(true)
-    fetchCustomersServedCount()
-    const next = new URLSearchParams(searchParams)
-    next.delete('settings')
-    setSearchParams(next, { replace: true })
-  }, [searchParams, setSearchParams])
+    if (searchParams.get('settings') === '1') goToSettings('/settings', { replace: true })
+  }, [searchParams, goToSettings])
+  useEffect(() => { if (showSettings) fetchCustomersServedCount() }, [showSettings])
 
 
   // Accept a suggested match for an ambiguous result
@@ -3870,89 +3871,86 @@ Thank you!`
         )}
 
         {/* Settings Modal */}
+        {/* Settings is its own page now (/settings/<panel>), drawn over the
+            content area so the rail and the phone's tool bar stay put. On a
+            phone it opens on a list of sections; picking one opens it alone. */}
         {showSettings && (
-          <div
-            className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowSettings(false) }}
-          >
-            {/* Sidebar shell. Settings used to be one scrolling column of cards,
-                which stopped working once panels grew their own controls - the
-                pricing calculator alone is a full workspace. A fixed nav on the
-                left and one panel on the right means a panel can be as complex
-                as it needs to be without burying everything below it. */}
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md md:max-w-5xl h-[85vh] overflow-hidden flex">
-
-              {/* Nav */}
-              <aside className="hidden md:flex w-48 flex-shrink-0 flex-col border-r border-border-gray bg-subtle-gray">
-                <div className="h-[68px] flex items-center px-3 border-b border-border-gray">
-                  <div className="relative w-full">
-                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-off-black/30" />
-                    <input
-                      value={settingsQuery}
-                      onChange={(e) => setSettingsQuery(e.target.value)}
-                      placeholder="Search settings"
-                      className="w-full pl-8 pr-2.5 py-1.5 text-sm bg-white border border-border-gray rounded-md focus:outline-none focus:ring-2 focus:ring-off-black/15"
-                    />
-                  </div>
+          <div className="fixed top-0 right-0 left-0 md:left-[92px] bottom-[calc(92px+env(safe-area-inset-bottom))] md:bottom-0 z-40 bg-[#f3f3f3] flex flex-col">
+            <div className="px-3 md:px-5 w-full flex flex-col h-full min-h-0">
+              {(!settingsPanelInUrl || !isPhone) && (
+                <PageHeader title="Settings" subtitle={currentUser?.email || undefined} />
+              )}
+              <div className="pt-4 md:pt-5 pb-3 hidden md:flex items-center justify-between gap-4 flex-shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-auto shrink-0 object-contain" />
+                  <h1 className="text-2xl md:text-[28px] font-bold text-off-black leading-none">Settings</h1>
                 </div>
-                <nav className="flex-1 overflow-y-auto p-2">
-                  {visibleNav.map((group) => {
-                    const items = group.items.filter((i) =>
-                      !settingsQuery.trim() ||
-                      (i.label + ' ' + i.blurb).toLowerCase().includes(settingsQuery.trim().toLowerCase())
-                    )
-                    if (!items.length) return null
-                    return (
-                      <div key={group.group} className="mb-3">
-                        <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/35">{group.group}</p>
-                        {items.map((item) => {
-                          const Icon = item.icon
-                          const active = settingsPanel === item.id
-                          return (
-                            <button
-                              key={item.id}
-                              onClick={() => setSettingsPanel(item.id)}
-                              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-sm transition-colors ${active ? 'bg-white text-off-black shadow-sm font-medium' : 'text-off-black/65 hover:bg-white/70'}`}
-                            >
-                              <Icon className="w-4 h-4 flex-shrink-0 text-off-black/45" />
-                              <span className="truncate">{item.label}</span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )
-                  })}
-                </nav>
-              </aside>
-
-              {/* Panel */}
-              <div className="flex-1 min-w-0 flex flex-col">
-                <div className="h-[68px] flex items-center justify-between px-5 border-b border-border-gray flex-shrink-0">
-                  <div className="min-w-0">
-                    <h2 className="text-base font-semibold text-off-black truncate">
-                      {visibleItems.find((i) => i.id === settingsPanel)?.label ?? 'Settings'}
-                    </h2>
-                    <p className="text-xs text-off-black/45 truncate">
-                      {visibleItems.find((i) => i.id === settingsPanel)?.blurb ?? ''}
-                    </p>
-                  </div>
-                  <button onClick={() => setShowSettings(false)} className="text-off-black/40 hover:text-off-black/70 text-xl leading-none flex-shrink-0 ml-4">×</button>
+                <div className="relative w-full max-w-[420px]">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-off-black/40" />
+                  <input
+                    value={settingsQuery}
+                    onChange={(e) => setSettingsQuery(e.target.value)}
+                    placeholder="Search settings"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30"
+                  />
                 </div>
+              </div>
 
-                <div className="flex-1 overflow-y-auto p-5">
-                  {/* Mobile nav — the sidebar is hidden under md. */}
-                  <div className="md:hidden mb-4 flex flex-wrap gap-1.5">
-                    {visibleItems.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => setSettingsPanel(item.id)}
-                        className={`px-2.5 py-1 text-xs rounded-md border ${settingsPanel === item.id ? 'bg-dark-fill text-white border-dark-fill' : 'bg-white text-off-black/60 border-border-gray'}`}
-                      >
-                        {item.label}
+              <section className="flex-1 min-h-0 pb-3">
+                <div className="h-full bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex">
+                  {/* Sections. On a phone this is the whole page until one is picked. */}
+                  <aside className={`${settingsPanelInUrl ? 'hidden md:flex' : 'flex'} w-full md:w-56 flex-shrink-0 flex-col md:border-r border-border-gray md:bg-subtle-gray`}>
+                    <nav className="flex-1 overflow-y-auto p-2 md:p-2">
+                      {visibleNav.map((group) => {
+                        const items = group.items.filter((i) =>
+                          !settingsQuery.trim() ||
+                          (i.label + ' ' + i.blurb).toLowerCase().includes(settingsQuery.trim().toLowerCase())
+                        )
+                        if (!items.length) return null
+                        return (
+                          <div key={group.group} className="mb-3">
+                            <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/35">{group.group}</p>
+                            {items.map((item) => {
+                              const Icon = item.icon
+                              const active = settingsPanel === item.id
+                              return (
+                                <button
+                                  key={item.id}
+                                  onClick={() => setSettingsPanel(item.id)}
+                                  className={`w-full flex items-center gap-3 md:gap-2 px-2 py-3 md:py-1.5 rounded-md text-left text-sm transition-colors border-b md:border-0 border-border-gray/60 ${active ? 'md:bg-white md:text-off-black md:shadow-sm md:font-medium' : 'text-off-black/80 md:text-off-black/65 md:hover:bg-white/70'}`}
+                                >
+                                  <Icon className="w-4 h-4 flex-shrink-0 text-off-black/45" />
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate">{item.label}</span>
+                                    <span className="md:hidden block text-xs text-off-black/45 truncate">{item.blurb}</span>
+                                  </span>
+                                  <ChevronRight className="md:hidden w-4 h-4 text-off-black/30" />
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
+                    </nav>
+                  </aside>
+
+                  {/* The open section. */}
+                  <div className={`${settingsPanelInUrl ? 'flex' : 'hidden md:flex'} flex-1 min-w-0 flex-col`}>
+                    <div className="flex items-center gap-2 px-3 md:px-5 py-3 md:py-0 md:h-[64px] border-b border-border-gray flex-shrink-0">
+                      <button onClick={() => goToSettings('/settings')} className="md:hidden inline-flex items-center gap-1 -ml-1 px-1.5 py-1 text-sm text-off-black/60 hover:text-off-black rounded">
+                        <ChevronLeft className="w-4 h-4" /> Settings
                       </button>
-                    ))}
-                  </div>
+                      <div className="min-w-0">
+                        <h2 className="text-base font-semibold text-off-black truncate">
+                          {visibleItems.find((i) => i.id === settingsPanel)?.label ?? 'Settings'}
+                        </h2>
+                        <p className="hidden md:block text-xs text-off-black/45 truncate">
+                          {visibleItems.find((i) => i.id === settingsPanel)?.blurb ?? ''}
+                        </p>
+                      </div>
+                    </div>
 
+                    <div className="flex-1 overflow-auto p-3 md:p-5">
                   {settingsPanel === 'pricing' && can('settings.pricing') && <PricingCalculator />}
                   {settingsPanel === 'stats' && can('settings.stats') && <StatsPanel />}
                   {settingsPanel === 'account' && <AccountPanel />}
@@ -4198,8 +4196,11 @@ Thank you!`
                 </div>
                     </div>
                   )}
+                  {settingsPanel === 'products' && isAdmin && <ProductsBulkEdit embedded />}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </section>
             </div>
           </div>
         )}

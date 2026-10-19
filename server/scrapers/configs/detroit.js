@@ -49,6 +49,13 @@ export default {
     half: /half-?marathon$/i,
   },
   distances: { marathon: 26.2, half: 13.1 },
+  // Two half courses, two designs. The course a runner ran picks the file:
+  // "Detroit Marathon / International Half Marathon" crosses into Canada; the
+  // U.S.-only course was renamed Motor City in 2024 and uses that design.
+  namedEvents: [
+    { match: /international/i, label: 'International Half Marathon' },
+    { match: /motor city|u\.?s\.?-?\s*only/i, label: 'Motor City Half Marathon' },
+  ],
   distanceMiles: 26.2,
   aliases: [
     'Detroit Marathon',

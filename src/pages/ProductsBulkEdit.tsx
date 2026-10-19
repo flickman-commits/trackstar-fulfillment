@@ -94,7 +94,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-export default function ProductsBulkEdit() {
+/** `embedded`: shown as a Settings panel, which has its own title. */
+export default function ProductsBulkEdit({ embedded = false }: { embedded?: boolean } = {}) {
   const [variants, setVariants] = useState<Variant[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -319,13 +320,15 @@ export default function ProductsBulkEdit() {
   }
 
   return (
-    <div className="min-h-screen bg-off-white">
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8">
-        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-off-black/50 hover:text-off-black mb-4">
-          <ArrowLeft className="w-4 h-4" /> Orders
-        </Link>
+    <div className={embedded ? '' : 'min-h-screen bg-off-white'}>
+      <div className={embedded ? '' : 'max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8'}>
+        {!embedded && (
+          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-off-black/50 hover:text-off-black mb-4">
+            <ArrowLeft className="w-4 h-4" /> Orders
+          </Link>
+        )}
         <div className="flex items-baseline justify-between mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-off-black">Bulk Product Editor</h1>
+          {embedded ? <span /> : <h1 className="text-2xl md:text-3xl font-bold text-off-black">Bulk Product Editor</h1>}
           {!loading && (
             <p className="text-sm text-off-black/40">{variants.length} variants</p>
           )}

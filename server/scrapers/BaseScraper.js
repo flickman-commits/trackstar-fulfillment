@@ -186,6 +186,17 @@ export class BaseScraper {
     return null
   }
 
+  /**
+   * A race with more than one design for the same distance (Detroit's
+   * International and Motor City halves) lists them in config.namedEvents as
+   * { match: /course name/, label }. The label becomes the event type, and the
+   * production file is picked by it (spec.js templateFor).
+   */
+  namedEvent(courseName, fallback) {
+    const hit = (this.config?.namedEvents || []).find(e => e.match.test(String(courseName || '')))
+    return hit ? hit.label : fallback
+  }
+
   calculatePace(time, distanceMiles = 26.2) {
     if (!time) return null
 

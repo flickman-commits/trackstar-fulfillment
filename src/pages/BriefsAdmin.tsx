@@ -1,6 +1,9 @@
+import CreatorsTabs from '@/components/CreatorsTabs'
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import { Loader2, Plus, X, FileText, Archive, Users, Link as LinkIcon } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Loader2, Plus, X, FileText, Users, Search, ChevronLeft, Link as LinkIcon } from 'lucide-react'
+import PageHeader from '@/components/PageHeader'
+import { pageShell, sectionLabel, infoCard } from '@/lib/ui'
 import { apiFetch } from '@/lib/api'
 
 type BriefStatus = 'active' | 'archived'
@@ -41,7 +44,11 @@ export default function BriefsAdmin() {
   const [briefs, setBriefs] = useState<Brief[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [editing, setEditing] = useState<Brief | 'new' | null>(null)
+  const [query, setQuery] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
+  // The open brief lives in the address: /briefs/<id>, or /briefs/new.
+  const { briefId = null } = useParams<{ briefId: string }>()
+  const navigate = useNavigate()
 
   const load = useCallback(async () => {
     try {
@@ -58,118 +65,125 @@ export default function BriefsAdmin() {
 
   useEffect(() => { load() }, [load])
 
+  const close = useCallback(() => navigate('/briefs'), [navigate])
+  useEffect(() => {
+    if (!briefId) return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement
+      if (e.key === 'Escape' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) close()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [briefId, close])
+
+  const q = query.trim().toLowerCase()
+  const matches = (b: Brief) => !q || [b.title, b.description, b.styleOfVideo, b.angle].some(v => String(v || '').toLowerCase().includes(q))
   const activeBriefs = briefs.filter(b => b.status === 'active')
   const archivedBriefs = briefs.filter(b => b.status === 'archived')
+  const list = (showArchived ? archivedBriefs : activeBriefs).filter(matches)
+  const open = briefId === 'new' ? 'new' : briefs.find(b => b.id === briefId) || null
 
   return (
-    <div className="min-h-screen bg-off-white">
-      <div className="max-w-5xl mx-auto px-4 md:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-end justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-8 md:h-10" />
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-off-black">Briefs</h1>
-              <p className="text-sm text-off-black/50">Content direction Matt assigns to creators</p>
-            </div>
+    <div className={pageShell}>
+      <div className="px-3 md:px-5 w-full flex flex-col h-full">
+        {!open && (
+          <PageHeader
+            title="Briefs"
+            subtitle="Content direction for creators"
+            pill={`${activeBriefs.length} active`}
+            control={<button onClick={() => navigate('/briefs/new')} className="inline-flex items-center gap-1 text-xs font-medium bg-dark-fill text-white rounded-full px-3 py-1.5"><Plus className="w-3.5 h-3.5" /> New</button>}
+          />
+        )}
+        <div className="pt-4 md:pt-5 pb-3 hidden md:flex items-center justify-between gap-4 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/trackstar-stars-transparent.png" alt="Trackstar" className="h-7 md:h-8 w-auto shrink-0 object-contain" />
+            <h1 className="text-2xl md:text-[28px] font-bold text-off-black leading-none">Creators</h1>
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              to="/creators"
-              className="px-3 py-2 text-xs md:text-sm text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors"
-            >
-              ← Creators
-            </Link>
-            <button
-              onClick={() => setEditing('new')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 transition-opacity"
-            >
-              <Plus className="w-4 h-4" />
-              New Brief
+          <div className="flex-1 flex items-center justify-end gap-2 md:gap-3 min-w-0">
+            <div className="relative flex-1 max-w-[640px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-off-black/40" />
+              <input
+                value={query}
+                onChange={e => { setQuery(e.target.value); if (open) close() }}
+                placeholder="Search briefs"
+                className="w-full pl-9 pr-3 py-2 bg-white border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30"
+              />
+            </div>
+            <CreatorsTabs active="briefs" />
+            <button onClick={() => navigate('/briefs/new')} className="inline-flex items-center gap-1.5 px-3 py-2 bg-dark-fill text-white text-sm font-medium rounded-md hover:opacity-90 transition-opacity whitespace-nowrap">
+              <Plus className="w-4 h-4" /> New brief
             </button>
           </div>
         </div>
 
-        {isLoading && (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 className="w-8 h-8 animate-spin text-off-black/40" />
-          </div>
-        )}
         {error && !isLoading && (
-          <div className="bg-red-50 border border-red-200 rounded p-4 text-red-800 text-sm">{error}</div>
+          <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 mb-3 text-sm text-red-800 flex-shrink-0">{error}</div>
         )}
 
-        {!isLoading && !error && briefs.length === 0 && (
-          <div className="bg-white border border-dashed border-off-black/20 rounded-md p-10 text-center">
-            <FileText className="w-8 h-8 text-off-black/30 mx-auto mb-3" />
-            <p className="text-sm text-off-black/60 mb-1">No briefs yet.</p>
-            <p className="text-xs text-off-black/40">Click "New Brief" to create your first.</p>
+        {open ? (
+          <div className="flex-1 min-h-0 overflow-y-auto pb-36 md:pb-8">
+            <BriefEditor
+              key={open === 'new' ? 'new' : open.id}
+              brief={open === 'new' ? null : open}
+              onClose={close}
+              onSaved={async (id) => { await load(); navigate(id ? `/briefs/${id}` : '/briefs', { replace: true }) }}
+            />
           </div>
-        )}
-
-        {!isLoading && activeBriefs.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-xs font-semibold text-off-black/50 uppercase tracking-wider">Active</h2>
-            {activeBriefs.map(b => <BriefCard key={b.id} brief={b} onClick={() => setEditing(b)} />)}
-          </div>
-        )}
-
-        {!isLoading && archivedBriefs.length > 0 && (
-          <div className="space-y-3 mt-10">
-            <h2 className="text-xs font-semibold text-off-black/50 uppercase tracking-wider inline-flex items-center gap-1">
-              <Archive className="w-3 h-3" /> Archived
-            </h2>
-            {archivedBriefs.map(b => <BriefCard key={b.id} brief={b} onClick={() => setEditing(b)} muted />)}
-          </div>
+        ) : briefId && isLoading ? (
+          <div className="flex-1 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-off-black/30" /></div>
+        ) : (
+          <section className="flex-1 min-h-0 pb-3">
+            <div className="h-full bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex flex-col">
+              <div className="flex items-center gap-1 px-3 py-2.5 border-b border-border-gray flex-shrink-0">
+                {([['Active', false, activeBriefs.length], ['Archived', true, archivedBriefs.length]] as const).map(([label, arch, n]) => (
+                  <button
+                    key={label}
+                    onClick={() => setShowArchived(arch)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${showArchived === arch ? 'bg-dark-fill text-white' : 'text-off-black/70 hover:bg-subtle-gray'}`}
+                  >
+                    {label} <span className={`text-xs ${showArchived === arch ? 'text-white/70' : 'text-off-black/40'}`}>{n}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-24"><Loader2 className="w-6 h-6 animate-spin text-off-black/30" /></div>
+                ) : list.length === 0 ? (
+                  <div className="text-center py-20 px-6">
+                    <FileText className="w-8 h-8 text-off-black/25 mx-auto mb-2" />
+                    <p className="text-sm text-off-black/50">{q ? `No briefs match "${query}".` : showArchived ? 'Nothing archived.' : 'No briefs yet. Click New brief to write the first.'}</p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-border-gray">
+                    {list.map(b => <BriefCard key={b.id} brief={b} onClick={() => navigate(`/briefs/${b.id}`)} muted={b.status === 'archived'} />)}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </section>
         )}
       </div>
-
-      {editing && (
-        <BriefEditor
-          brief={editing === 'new' ? null : editing}
-          onClose={() => setEditing(null)}
-          onSaved={async () => {
-            setEditing(null)
-            await load()
-          }}
-        />
-      )}
     </div>
   )
 }
 
 function BriefCard({ brief, onClick, muted = false }: { brief: Brief; onClick: () => void; muted?: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left bg-white border rounded-md p-4 md:p-5 hover:shadow-sm transition-all ${
-        muted ? 'border-off-black/10 opacity-70' : 'border-border-gray shadow-sm'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className={`text-base font-semibold ${muted ? 'text-off-black/50' : 'text-off-black'}`}>{brief.title}</h3>
-            {(brief._count?.assignments ?? 0) > 0 && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-off-black/50 bg-off-black/5 px-1.5 py-0.5 rounded">
-                <Users className="w-3 h-3" />
-                {brief._count?.assignments}
-              </span>
-            )}
-          </div>
-          {brief.description && (
-            <p className={`text-sm line-clamp-2 ${muted ? 'text-off-black/40' : 'text-off-black/60'}`}>
-              {brief.description}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {brief.styleOfVideo && <Chip label={brief.styleOfVideo} />}
-            {brief.targetLength && <Chip label={brief.targetLength} />}
-            {brief.angle && <Chip label={brief.angle} />}
-          </div>
+    <li onClick={onClick} className={`px-4 py-3.5 hover:bg-subtle-gray cursor-pointer transition-colors flex items-center gap-4 ${muted ? 'opacity-60' : ''}`}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold text-off-black">{brief.title}</span>
+          {brief.styleOfVideo && <Chip label={brief.styleOfVideo} />}
+          {brief.targetLength && <Chip label={brief.targetLength} />}
+          {brief.angle && <Chip label={brief.angle} />}
         </div>
+        {brief.description && <p className="text-xs text-off-black/60 mt-1 line-clamp-2 max-w-[90ch]">{brief.description}</p>}
       </div>
-    </button>
+      <span className="inline-flex items-center gap-1 text-xs text-off-black/50 shrink-0" title="Creators assigned">
+        <Users className="w-3.5 h-3.5" /> {brief._count?.assignments ?? 0}
+      </span>
+    </li>
   )
 }
 
@@ -184,7 +198,8 @@ function Chip({ label }: { label: string }) {
 function BriefEditor({ brief, onClose, onSaved }: {
   brief: Brief | null
   onClose: () => void
-  onSaved: () => void
+  /** Called with the brief's id once it is saved. */
+  onSaved: (id: string | null) => void | Promise<void>
 }) {
   const isNew = brief === null
   const [draft, setDraft] = useState(brief || { ...EMPTY_BRIEF, id: '', createdAt: '', updatedAt: '' } as Brief)
@@ -235,11 +250,9 @@ function BriefEditor({ brief, onClose, onSaved }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || `Save failed: ${res.status}`)
-      }
-      onSaved()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || `Save failed: ${res.status}`)
+      await onSaved(data.brief?.id || draft.id || null)
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to save')
     } finally {
@@ -247,85 +260,83 @@ function BriefEditor({ brief, onClose, onSaved }: {
     }
   }
 
+  const dirty = isNew || JSON.stringify(draft) !== JSON.stringify(brief)
+  const set = (k: keyof Brief) => (v: string) => setDraft({ ...draft, [k]: v })
+
   return (
-    <div
-      className="fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="bg-white rounded-md max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-semibold text-off-black">
-              {isNew ? 'New Brief' : 'Edit Brief'}
-            </h3>
-            <button onClick={onClose} className="text-off-black/40 hover:text-off-black">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+    <div className="bg-white border border-border-gray rounded-md w-full">
+      {/* Header, as on an order: back, status, title, and Save. */}
+      <div className="sticky top-0 z-30 px-4 md:px-6 py-3 md:py-4 bg-white/95 backdrop-blur border-b border-border-gray rounded-t-md flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          <button onClick={onClose} title="Back to briefs (Esc)" className="inline-flex items-center gap-1 -ml-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors">
+            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
+            <span className="text-sm hidden md:inline">Briefs</span>
+          </button>
+          {!isNew && (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${draft.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-off-black/5 text-off-black/50'}`}>
+              {draft.status === 'active' ? 'Active' : 'Archived'}
+            </span>
+          )}
+          <h3 className="text-lg md:text-xl font-semibold text-off-black truncate">{isNew ? 'New brief' : brief?.title}</h3>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={isSaving || !draft.title.trim() || !dirty}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-40 transition-opacity"
+        >
+          {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          {isSaving ? 'Saving' : isNew ? 'Create brief' : dirty ? 'Save changes' : 'Saved'}
+        </button>
+      </div>
 
-          {/* Philosophy reminder — framing for how to write a good brief. */}
-          <div className="bg-subtle-gray border border-border-gray rounded-md p-3 mb-5">
-            <p className="text-xs text-off-black/70 leading-relaxed">
-              <span className="font-semibold text-off-black">Guardrails, not scripts.</span>{' '}
-              Show what's worked, explain the framework (hook → emotion → FOMO), then let creators find their own voice. Paste your top-performing reference videos below so they have examples to study - don't hand them a line-by-line script.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <FieldText label="Title *" value={draft.title} onChange={(v) => setDraft({ ...draft, title: v })} placeholder="e.g. Unboxing reveal, marathon finisher" autoFocus />
-            <FieldText label="Description" value={draft.description} onChange={(v) => setDraft({ ...draft, description: v })} multiline placeholder="Overall goal or context of this brief" />
-
-            {/* ——— Information Framework ——— */}
-            <div className="pt-2">
-              <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-2">Information Framework</div>
-              <div className="space-y-3">
-                <FieldText label="Hook - opening line options" value={draft.hooks} onChange={(v) => setDraft({ ...draft, hooks: v })} multiline placeholder={`I trained 6 months for this moment…\nThe one thing no runner talks about…`} />
-                <FieldText label="Emotion - what feeling should the video land?" value={draft.emotion} onChange={(v) => setDraft({ ...draft, emotion: v })} multiline placeholder="e.g. pride, nostalgia, validation - the lever that makes the viewer lean in" />
-                <FieldText label="FOMO - why should they act now?" value={draft.fomo} onChange={(v) => setDraft({ ...draft, fomo: v })} multiline placeholder="e.g. only marathon finishers get this, limited edition, race is over soon" />
-              </div>
-            </div>
-
-            {/* ——— Production details ——— */}
-            <div className="pt-2">
-              <div className="text-[10px] font-semibold text-off-black/50 uppercase tracking-wider mb-2">Production Details</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FieldText label="Style of Video" value={draft.styleOfVideo} onChange={(v) => setDraft({ ...draft, styleOfVideo: v })} placeholder="e.g. POV reveal, talking head" />
-                <FieldText label="Target Length" value={draft.targetLength} onChange={(v) => setDraft({ ...draft, targetLength: v })} placeholder="e.g. 15-30s, 60-90s" />
-                <FieldText label="Angle" value={draft.angle} onChange={(v) => setDraft({ ...draft, angle: v })} placeholder="e.g. emotional payoff, nostalgia" />
-                <FieldText label="Persona" value={draft.persona} onChange={(v) => setDraft({ ...draft, persona: v })} placeholder="Who they're speaking to" />
-              </div>
-            </div>
-
-            <ReferencesField
-              value={draft.examplesNotes}
-              onChange={(v) => setDraft({ ...draft, examplesNotes: v })}
-            />
-
-            <div>
-              <Label>Status</Label>
-              <select
-                value={draft.status}
-                onChange={(e) => setDraft({ ...draft, status: e.target.value as BriefStatus })}
-                className="w-full px-3 py-2 border border-border-gray rounded text-sm focus:outline-none focus:ring-2 focus:ring-off-black/20"
-              >
-                <option value="active">Active (visible to creators)</option>
-                <option value="archived">Archived (hidden)</option>
-              </select>
+      <div className="p-4 md:p-6 grid lg:grid-cols-[minmax(0,1fr)_340px] gap-5">
+        {/* Left: what the creator reads. */}
+        <div className="space-y-5 min-w-0">
+          <FieldText label="Title" value={draft.title} onChange={set('title')} placeholder="e.g. Unboxing reveal, marathon finisher" autoFocus={isNew} />
+          <FieldText label="Description" value={draft.description} onChange={set('description')} multiline placeholder="Overall goal or context of this brief" />
+          <div>
+            <div className={sectionLabel}>Information framework</div>
+            <div className={`${infoCard} mt-2 space-y-3`}>
+              <FieldText label="Hook: opening line options" value={draft.hooks} onChange={set('hooks')} multiline placeholder={`I trained 6 months for this moment…\nThe one thing no runner talks about…`} />
+              <FieldText label="Emotion: what feeling should the video land?" value={draft.emotion} onChange={set('emotion')} multiline placeholder="e.g. pride, nostalgia, validation" />
+              <FieldText label="FOMO: why should they act now?" value={draft.fomo} onChange={set('fomo')} multiline placeholder="e.g. only marathon finishers get this" />
             </div>
           </div>
+          <div>
+            <div className={sectionLabel}>Top-performing references</div>
+            <div className={`${infoCard} mt-2`}>
+              <ReferencesField value={draft.examplesNotes} onChange={set('examplesNotes')} />
+            </div>
+          </div>
+        </div>
 
-          <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-border-gray">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-off-black/60 hover:bg-off-black/5 rounded transition-colors">
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving || !draft.title.trim()}
-              className="px-4 py-2 bg-dark-fill text-white text-sm font-medium rounded hover:opacity-90 disabled:opacity-40 transition-opacity inline-flex items-center gap-2"
+        {/* Right: the details and the status. */}
+        <div className="space-y-4">
+          <div>
+            <div className={sectionLabel}>Status</div>
+            <select
+              value={draft.status}
+              onChange={(e) => setDraft({ ...draft, status: e.target.value as BriefStatus })}
+              className="mt-2 w-full px-3 py-2 border border-border-gray rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-off-black/20"
             >
-              {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {isSaving ? 'Saving…' : (isNew ? 'Create Brief' : 'Save Changes')}
-            </button>
+              <option value="active">Active (creators see it)</option>
+              <option value="archived">Archived (hidden)</option>
+            </select>
+          </div>
+          <div>
+            <div className={sectionLabel}>Production details</div>
+            <div className={`${infoCard} mt-2 space-y-3`}>
+              <FieldText label="Style of video" value={draft.styleOfVideo} onChange={set('styleOfVideo')} placeholder="e.g. POV reveal, talking head" />
+              <FieldText label="Target length" value={draft.targetLength} onChange={set('targetLength')} placeholder="e.g. 15-30s" />
+              <FieldText label="Angle" value={draft.angle} onChange={set('angle')} placeholder="e.g. emotional payoff" />
+              <FieldText label="Persona" value={draft.persona} onChange={set('persona')} placeholder="Who they're speaking to" />
+            </div>
+          </div>
+          {!isNew && (
+            <p className="text-xs text-off-black/50 inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Assigned to {brief?._count?.assignments ?? 0} creator{(brief?._count?.assignments ?? 0) === 1 ? '' : 's'}</p>
+          )}
+          <div className="text-xs text-off-black/55 leading-relaxed border-t border-border-gray pt-3">
+            <span className="font-semibold text-off-black">Guardrails, not scripts.</span> Show what has worked, explain the framework (hook, emotion, FOMO), then let creators find their own voice.
           </div>
         </div>
       </div>

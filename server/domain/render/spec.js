@@ -12,7 +12,7 @@
 import { formatRaceDate, formatTemp, formatTime, formatPace, formatCondition } from '../../lib/printFormat.js'
 import { unpaidPhotoRows } from '../orders/photoPayment.js'
 import { printBlockers } from '../races/verification.js'
-import { isMainEvent, getCanonicalRaceName } from '../../scrapers/index.js'
+import { isMainEvent, getCanonicalRaceName, namedEventsFor } from '../../scrapers/index.js'
 
 export const SIZES = ['8x10', '12x18', '16x24']
 
@@ -72,7 +72,9 @@ export function resolveTemplate(order, raceName, eventType, has) {
 
 export function templateFor(order, raceName, eventType) {
   const edition = editionOf(order)
-  const ev = eventType && !isMainEvent(raceName, eventType) ? eventLabel(eventType) : null
+  // A named event (Detroit's International / Motor City halves) keeps its own name, so each gets its own file.
+  const named = namedEventsFor(raceName).some(e => e.label === eventType)
+  const ev = eventType && !isMainEvent(raceName, eventType) ? (named ? eventType : eventLabel(eventType)) : null
   return templateKey(raceName, [edition, ev].filter(Boolean).join(' / ') || null)
 }
 

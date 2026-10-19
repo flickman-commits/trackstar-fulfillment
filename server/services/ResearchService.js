@@ -11,7 +11,7 @@
  */
 import { BaseScraper } from '../scrapers/BaseScraper.js'
 import { PrismaClient } from '@prisma/client'
-import { getScraperForRace, hasScraperForRace, getCanonicalRaceName } from '../scrapers/index.js'
+import { getScraperForRace, hasScraperForRace, getCanonicalRaceName, namedEventsFor } from '../scrapers/index.js'
 import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
 import WeatherService from './WeatherService.js'
 
@@ -60,6 +60,9 @@ export function derivePace(officialTime, eventType) {
 }
 
 const weatherService = new WeatherService()
+
+/** The marathon itself, which never has a named variant. */
+const isMainEventType = (e) => /^marathon$/i.test(String(e || '').trim())
 
 export class ResearchService {
 
@@ -695,6 +698,24 @@ export class ResearchService {
           }
         } catch (e) {
           console.warn(`[ResearchService] Could not refill the time for ${order.orderNumber}: ${e.message}`)
+        }
+      }
+      // A race whose same-distance events have their own designs (Detroit's
+      // International and Motor City halves): a result saved before that split
+      // says only "Half Marathon". Look again for which one, same bib only.
+      const named = namedEventsFor(raceName)
+      if (existingResearch.bibNumber && named.length && !named.some(e => e.label === existingResearch.eventType) && existingResearch.eventType && !isMainEventType(existingResearch.eventType)) {
+        try {
+          const bib = String(existingResearch.bibNumber)
+          const fresh = await this.findRunner(raceName, raceYear, runnerName, { bib })
+          // Two runners can share a name; the saved bib says which one this is.
+          const hit = fresh?.found ? { bib: fresh.bibNumber, eventType: fresh.eventType } : (fresh?.matches || []).find(m => String(m.bib || '') === bib)
+          if (hit && String(hit.bib || '') === bib && named.some(e => e.label === hit.eventType)) {
+            console.log(`[ResearchService] ${order.orderNumber}: ${existingResearch.eventType} is the ${hit.eventType}`)
+            return prisma.runnerResearch.update({ where: { id: existingResearch.id }, data: { eventType: hit.eventType } })
+          }
+        } catch (e) {
+          console.warn(`[ResearchService] Could not tell which event ${order.orderNumber} ran: ${e.message}`)
         }
       }
       console.log(`[ResearchService] Runner data found in cache for order ${order.orderNumber}`)

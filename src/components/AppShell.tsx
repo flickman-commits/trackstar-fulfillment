@@ -41,12 +41,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   const path = location.pathname
-  const settingsOpen = new URLSearchParams(location.search).get('settings') === '1'
+  const settingsOpen = path === '/settings' || path.startsWith('/settings/')
   const activeId =
     settingsOpen ? 'settings'
     : railPanel === 'discounts' ? 'discounts'
     : railPanel === 'pace' ? 'pace'
-    : path.startsWith('/creators') ? 'creators'
+    : path.startsWith('/creators') || path.startsWith('/briefs') ? 'creators'
     : path.startsWith('/sales') || path.startsWith('/send') ? 'sales'
     : path.startsWith('/support') ? 'support'
     : 'fulfillment'
@@ -58,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     setRailPanel(null)
     // `replace` so Settings does not stack history entries you have to
     // click back through.
-    navigate('/?settings=1', { replace: path === '/' })
+    navigate('/settings')
   }
 
   return (

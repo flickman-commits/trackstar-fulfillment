@@ -370,6 +370,7 @@ export class ChronoTrackScraper extends BaseScraper {
       distanceMiles = this.config.distances?.[key] || distanceMiles
       eventType = this.config.eventLabels?.[key] || eventType
     }
+    eventType = this.namedEvent(res.data?.race?.name, eventType)
 
     return {
       name: res.data?.displayName || entry.displayName,
