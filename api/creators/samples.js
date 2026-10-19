@@ -28,9 +28,11 @@ export default async function handler(req, res) {
     // Sent to Shopify but not imported yet: shown from what we recorded when it was sent.
     const sentCosts = await prisma.sampleCost.findMany({ where: { creatorId: id }, orderBy: { createdAt: 'desc' } })
     for (const sc of sentCosts) {
-      if (!sc.orderName?.startsWith('#') || samples.some(s => `#${s.orderNumber}` === sc.orderName)) continue
+      // Shopify order names are stored without "#"; old CREATOR- rows are already listed above.
+      const name = String(sc.orderName || '').replace(/^#/, '')
+      if (!name || name.startsWith('CREATOR-') || samples.some(s => s.orderNumber === name)) continue
       const it = Array.isArray(sc.items) ? sc.items[0] || {} : {}
-      samples.unshift({ orderNumber: sc.orderName.replace('#', ''), status: 'sent', raceName: it.title || null, raceYear: null, productSize: it.size || null, frameType: it.frame || null, createdAt: sc.createdAt, trackingNumber: null, trackingCarrier: null, shippedAt: null, pending: true })
+      samples.unshift({ orderNumber: name, status: 'sent', raceName: it.title || null, raceYear: null, productSize: it.size || null, frameType: it.frame || null, createdAt: sc.createdAt, trackingNumber: null, trackingCarrier: null, shippedAt: null, pending: true })
     }
     return res.status(200).json({ samples })
   } catch (error) {
