@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     const base = `CREATOR-${creator.id.slice(-6).toUpperCase()}`
     const existing = await prisma.order.count({ where: { orderNumber: { startsWith: base } } })
     let orderNumber = existing ? `${base}-${existing + 1}` : base
-    while (await prisma.order.findUnique({ where: { orderNumber }, select: { id: true } })) {
+    while (await prisma.order.findFirst({ where: { OR: [{ orderNumber }, { parentOrderNumber: orderNumber }] }, select: { id: true } })) {
       orderNumber = `${base}-${Number(orderNumber.split('-').pop()) + 1 || 2}`
     }
 
