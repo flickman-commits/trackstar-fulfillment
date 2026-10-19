@@ -358,7 +358,7 @@ export default function Support() {
                   <div className="text-center max-w-[40ch] px-6">
                     <Inbox className="w-8 h-8 mx-auto text-off-black/25 mb-2" />
                     <div className="text-lg font-semibold text-off-black">{threads.length ? 'Pick a conversation' : (view === 'all' && inbox?.counts.all === 0 ? 'Inbox zero' : 'Nothing here')}</div>
-                    <p className="text-sm text-off-black/55 mt-1">{threads.length ? 'j and k move through the list.' : empty}</p>
+                    <p className="text-sm text-off-black/55 mt-1">{threads.length ? <>Use <kbd className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 mx-0.5 rounded-md border border-border-gray border-b-2 bg-white text-xs font-semibold text-off-black/70 font-sans align-middle">J</kbd> and <kbd className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 mx-0.5 rounded-md border border-border-gray border-b-2 bg-white text-xs font-semibold text-off-black/70 font-sans align-middle">K</kbd> to move through the list.</> : empty}</p>
                   </div>
                 )}
               </div>
