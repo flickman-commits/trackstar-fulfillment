@@ -773,9 +773,13 @@ function ApprovalEmailField({ order, onSaved }: { order: Order; onSaved: (email:
 function OnTimeStat({ pct, n }: { pct: number; n: number }) {
   const color = pct >= 90 ? 'bg-green-500' : pct >= 75 ? 'bg-amber-400' : 'bg-red-400'
   return (
-    <div className="ml-5 flex items-center gap-2.5" title={`Past 7 days: ${pct}% of ${n} standard orders were completed within 2 days of the order (or race day). Goal: 100%.`}>
-      <div className="w-32 h-2 rounded-full bg-off-black/10 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>
-      <span className="text-xs text-off-black/60 whitespace-nowrap"><span className="font-semibold text-off-black tabular-nums">{pct}%</span> out in 2 days · 7d</span>
+    <div className="ml-5 flex flex-col gap-1" title={`Past 7 days: ${pct}% of ${n} standard orders were completed within 2 days of the order (or race day).`}>
+      <span className="text-xs text-off-black/60 whitespace-nowrap">% of orders fulfilled in 2 days or less</span>
+      <div className="flex items-center gap-2.5">
+        <div className="w-32 h-2 rounded-full bg-off-black/10 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>
+        <span className="text-sm font-semibold text-off-black tabular-nums">{pct}%</span>
+      </div>
+      <span className="text-[11px] text-off-black/45 whitespace-nowrap">Goal is 100% (past 7d)</span>
     </div>
   )
 }
