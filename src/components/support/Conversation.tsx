@@ -482,7 +482,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
       {/* Timeline */}
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 bg-[#fcfcfc]">
         {timeline.map(it => it.kind === 'note' && it.n.kind === 'draft'
-          ? <DraftCard key={it.n.id} n={it.n} latest={it.n.id === latestDraftId} onRedraft={onRedraft}
+          ? <DraftCard key={it.n.id} n={it.n} latest={it.n.id === latestDraftId} answered={thread.messages.some(m => m.direction === 'out' && new Date(m.sentAt) > new Date(it.n.createdAt))} onRedraft={onRedraft}
               onApprove={p => approveProposal(it.n, p)} onDismiss={p => dismissProposal(it.n, p)}
               onUse={body => { setMode('reply'); setText(tagStoreLinks(body.replace(/\{\{rep\}\}/g, me.firstName).replace(/\[CODE\]/g, c => madeCode || c), thread.channel)); requestAnimationFrame(() => replyRef.current?.focusLine(0, 'start')) }} />
           : it.kind === 'message'

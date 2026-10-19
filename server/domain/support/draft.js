@@ -154,6 +154,19 @@ export async function orderEmailByName(name) {
 }
 
 /** Gather everything the draft needs. Exported for a dry run. */
+/** Every design we print, one line per race: "Atlantic City Marathon: Marathon, Half Marathon". */
+async function designsBrief() {
+  const rows = await prisma.printTemplate.findMany({ where: { enabled: true }, select: { key: true } })
+  const byRace = new Map()
+  for (const { key } of rows) {
+    const [race, ...rest] = key.split(' / ')
+    const ev = rest.filter(x => x !== 'World Majors').join(' / ') || 'Marathon'
+    if (!byRace.has(race)) byRace.set(race, new Set())
+    byRace.get(race).add(ev)
+  }
+  return [...byRace.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([r, evs]) => `${r}: ${[...evs].join(', ')}`).join('\n')
+}
+
 export async function gatherFacts(threadId) {
   const t = await prisma.supportThread.findUnique({
     where: { id: threadId },
@@ -188,6 +201,7 @@ export async function gatherFacts(threadId) {
   const name = (t.customerName || '').trim().replace(/^@/, '')
   const first = name.split(/\s+/)[0]
   const realName = first && /^[A-Za-z][A-Za-z'.-]{1,}$/.test(first) && !/\d/.test(name)
+  const designs = await designsBrief()
   const facts = [
     `Today is ${new Date().toDateString()}.`,
     `Customer: ${name || 'unknown name'}${realName ? ` (greet as "${first}")` : ' (no clear first name: use the name they sign with, or "Hey there,")'}, ${t.channel === 'instagram' ? `Instagram @${t.igUsername}` : t.customerEmail}.`,
@@ -199,6 +213,9 @@ export async function gatherFacts(threadId) {
     '',
     'The conversation, oldest first:',
     conversation,
+    '',
+    'Designs we have (race: events). Use this to answer whether we make a race or its half; anything not listed is a custom print:',
+    designs,
   ].join('\n')
   return { thread: t, facts, context, lastInbound: [...t.messages].reverse().find(m => m.direction === 'in') || null }
 }

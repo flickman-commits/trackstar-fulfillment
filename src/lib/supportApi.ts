@@ -59,6 +59,9 @@ export const supportApi = {
   saveForwarders: (emails: string[]) => post<{ forwarders: string[] }>('/api/support/settings', { action: 'forwarders', emails }),
   savePlaybook: (text: string) => post<{ playbook: { text: string; edited: boolean } }>('/api/support/settings', { action: 'playbook', text }),
   resetPlaybook: () => post<{ playbook: { text: string; edited: boolean } }>('/api/support/settings', { action: 'playbookReset' }),
+  /** Turn a correction to a draft into playbook rules, then save the approved ones. */
+  proposeLessons: (noteId: string, feedback: string) => post<{ lessons: string[] }>('/api/support/teach', { action: 'propose', noteId, feedback }),
+  saveLessons: (lessons: string[]) => post<{ playbook: { text: string; edited: boolean } }>('/api/support/teach', { action: 'save', lessons }),
   redraft: (id: string, instruction: string) => act<Note>(id, 'redraft', { instruction }),
   setProposal: (id: string, noteId: string, proposalId: string, status: 'done' | 'dismissed') => act<Note>(id, 'proposal', { noteId, proposalId, status }),
   merge: (id: string, sourceIds: string[]) => act<ThreadDetail>(id, 'merge', { sourceIds }),

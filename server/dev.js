@@ -153,6 +153,7 @@ const routes = [
   { method: 'get',    path: '/api/support/instagram',          handler: '../api/support/instagram.js' },
   { method: 'get',    path: '/api/support/settings',           handler: '../api/support/settings.js' },
   { method: 'post',   path: '/api/support/settings',           handler: '../api/support/settings.js' },
+  { method: 'post',   path: '/api/support/teach',              handler: '../api/support/teach.js' },
   { method: 'post',   path: '/api/support/actions',            handler: '../api/support/actions.js' },
   { method: 'get',    path: '/api/support/filters',            handler: '../api/support/filters.js' },
   { method: 'post',   path: '/api/support/filters',            handler: '../api/support/filters.js' },
