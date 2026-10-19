@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { nameCase } from '@/lib/nameCase'
 import { ArrowUpRight, Loader2, Mail, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supportApi } from '@/lib/supportApi'
@@ -31,7 +32,7 @@ const ASKS: { label: string; text: string }[] = [
 
 function firstName(name?: string | null) {
   const f = String(name || '').trim().split(/\s+/)[0] || ''
-  return f ? f[0].toUpperCase() + f.slice(1) : ''
+  return f ? nameCase(f) : ''
 }
 
 function template(o: EmailCustomerOrder, rep: string) {

@@ -8,6 +8,7 @@ import { fillMacro, tagStoreLinks } from '@/lib/supportStatus'
 import AssigneePicker, { Avatar } from '@/components/AssigneePicker'
 import { ChannelMark, CustomerAvatar } from './ConversationList'
 import DraftCard from './DraftCard'
+import { nameCase } from '@/lib/nameCase'
 import RichReply, { type RichReplyHandle } from './RichReply'
 import Attachments from './Attachments'
 import type { Macro, Message, Mockup, Note, Proposal, Teammate, ThreadDetail, ThreadStatus } from '@/types/support'
@@ -109,7 +110,7 @@ function NoteCard({ n, team, meId, isAdmin, onDelete }: { n: Note; team: Teammat
 /** The reply, as the playbook opens and closes one, with the rest to write. A DM starts empty. */
 function starter(thread: ThreadDetail, me: Teammate) {
   if (thread.channel === 'instagram') return ''
-  const first = (thread.customerName || '').trim().split(/\s+/)[0] || ''
+  const first = nameCase((thread.customerName || '').trim().split(/\s+/)[0] || '')
   return `Hey${first ? ` ${first}` : ''},\n\n\n\nThanks,\n${me.firstName} from Trackstar`
 }
 /** True when nothing has been written between the greeting and the sign-off. */
@@ -395,6 +396,9 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
         setText(t => (t.includes('[CODE]') ? t.replace(/\[CODE\]/g, out.code) : t))
         try { await navigator.clipboard.writeText(out.code) } catch { /* it is in the reply or the draft */ }
         toast.success(`${out.code} created${text.includes('[CODE]') ? ' and put in the reply' : '; it goes in when you use the draft'}`)
+      } else if (p.type === 'changeItem') {
+        const out = await supportApi.action<{ number: string; now: string; invoiced: boolean; owed: number }>('changeItem', { id: thread.id, shopifyOrderId: p.shopifyOrderId, size: p.size, frame: p.frame })
+        toast.success(`#${out.number} is now ${out.now}${out.invoiced ? `; invoice sent for $${out.owed.toFixed(2)}` : ''}`)
       } else if (p.type === 'orderNote') {
         await supportApi.action('orderNote', { id: thread.id, orderId: p.orderId, text: p.text })
         toast.success(`Note left on #${p.orderNumber}`)
@@ -496,7 +500,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
         <div className="px-4 pt-2 flex items-center gap-1 text-[13px]">
           <button onClick={() => { setMode('reply'); requestAnimationFrame(() => replyRef.current?.focus()) }} className={`px-3 py-1.5 rounded-t-md border-b-2 ${mode === 'reply' ? 'border-dark-fill text-off-black font-semibold' : 'border-transparent text-off-black/50 hover:text-off-black'}`}>Reply</button>
           <button data-note-tab onClick={() => { setMode('note'); requestAnimationFrame(() => noteRef.current?.focus()) }} className={`px-3 py-1.5 rounded-t-md border-b-2 inline-flex items-center gap-1.5 ${mode === 'note' ? 'border-amber-500 text-amber-900 font-semibold' : 'border-transparent text-off-black/50 hover:text-off-black'}`}><StickyNote className="w-3.5 h-3.5" />Note</button>
-          <span className="ml-auto text-[11px] text-off-black/40 truncate">{mode === 'reply' ? (ig ? `Reply as @${expectedHandle} to ${thread.igUsername ? `@${thread.igUsername}` : 'them'} on Instagram` : `to ${thread.customerEmail}`) : 'Only the team sees notes. @ to mention someone.'}</span>
+          <span className="ml-auto text-[11px] text-off-black/40 truncate">{mode === 'reply' ? (ig ? `Reply as @${expectedHandle} to ${thread.igUsername ? `@${thread.igUsername}` : 'them'} on Instagram` : '') : 'Only the team sees notes. @ to mention someone.'}</span>
         </div>
         {mode === 'reply' && window && (window.mode === 'closed' || window.mode === 'none' || window.mode === 'human_agent') && (
           <div className={`mx-4 mt-2 rounded-md border px-3 py-2 text-xs inline-flex items-start gap-2 ${windowClosed ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-border-gray bg-subtle-gray text-off-black/70'}`}>
@@ -510,8 +514,26 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
         )}
         {mode === 'reply' ? (
           <div className="px-4 pb-3">
-            <div className="relative">
+            <div className="relative rounded-md border border-border-gray bg-white focus-within:ring-2 focus-within:ring-off-black/10 focus-within:border-off-black/30">
+              {/* Formatting, attach and macros sit on the reply box itself. */}
+              <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 border-b border-border-gray">
+              {!ig && (
+                <span className="inline-flex items-center rounded-md border border-border-gray overflow-hidden" title="Formatting: **bold**, _italic_, [text](link). Links are made from bare addresses too.">
+                  <button type="button" onClick={() => wrapSelection('bold')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black" title="Bold (⌘B)"><Bold className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => wrapSelection('italic')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black border-l border-border-gray" title="Italic (⌘I)"><Italic className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => wrapSelection('link')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black border-l border-border-gray" title="Link (⌘K)"><LinkIcon className="w-3.5 h-3.5" /></button>
+                </span>
+              )}
+              <input ref={fileInput} type="file" multiple accept={ig ? 'image/*' : 'image/*,application/pdf'} className="hidden"
+                onChange={e => { const fs = Array.from(e.target.files || []); e.target.value = ''; if (fs.length) upload(fs) }} />
+              <button type="button" onClick={() => fileInput.current?.click()} disabled={attached.length >= 6} className={`${btnGhost} text-xs`} title={ig ? 'Attach pictures (or paste or drop them in the reply)' : 'Attach images or a PDF (or paste or drop them in the reply)'}><Paperclip className="w-3.5 h-3.5" /> Attach</button>
+              <div className="relative" ref={macro.ref}>
+                <button data-macro-button onClick={() => macro.setOpen(v => !v)} className={`${btnGhost} text-xs`} title="Insert a saved reply (m), or type / in the reply"><Zap className="w-3.5 h-3.5" /> Macro</button>
+                {macro.open && <MacroMenu macros={macros} onPick={insertMacro} onClose={() => macro.setOpen(false)} />}
+              </div>
+              </div>
               <RichReply
+                bare
                 ref={replyRef} value={text} onChange={onReplyChange} plain={ig} minHeight={ig ? 96 : 176} disabled={sending || windowClosed}
                 onFiles={files => upload(files)}
                 placeholder={ig ? (windowClosed ? 'Replies are held until they write again' : 'Write the DM. Keep it short, like a text. / for a macro.') : 'Write the reply. / for a macro.'}
@@ -566,30 +588,18 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
                 ))}
               </div>
             )}
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {!ig && (
-                <span className="inline-flex items-center rounded-md border border-border-gray overflow-hidden" title="Formatting: **bold**, _italic_, [text](link). Links are made from bare addresses too.">
-                  <button type="button" onClick={() => wrapSelection('bold')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black" title="Bold (⌘B)"><Bold className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => wrapSelection('italic')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black border-l border-border-gray" title="Italic (⌘I)"><Italic className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => wrapSelection('link')} className="px-2 py-1.5 text-off-black/60 hover:bg-subtle-gray hover:text-off-black border-l border-border-gray" title="Link (⌘K)"><LinkIcon className="w-3.5 h-3.5" /></button>
-                </span>
-              )}
-              <input ref={fileInput} type="file" multiple accept={ig ? 'image/*' : 'image/*,application/pdf'} className="hidden"
-                onChange={e => { const fs = Array.from(e.target.files || []); e.target.value = ''; if (fs.length) upload(fs) }} />
-              <button type="button" onClick={() => fileInput.current?.click()} disabled={attached.length >= 6} className={btnSecondary} title={ig ? 'Attach pictures (or paste or drop them in the reply)' : 'Attach images or a PDF (or paste or drop them in the reply)'}><Paperclip className="w-3.5 h-3.5" /> Attach</button>
-              <div className="relative" ref={macro.ref}>
-                <button data-macro-button onClick={() => macro.setOpen(v => !v)} className={btnSecondary} title="Insert a saved reply (m), or type / in the reply"><Zap className="w-3.5 h-3.5" /> Macro</button>
-                {macro.open && <MacroMenu macros={macros} onPick={insertMacro} onClose={() => macro.setOpen(false)} />}
-              </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 empty:hidden">
               {hasEmDash && <span className="text-[11px] text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" />No em dashes in anything a customer sees</span>}
               {ig && window?.open && window.mode === 'standard' && window.closesAt && <span className="text-[11px] text-off-black/45 inline-flex items-center gap-1" title="Instagram allows a reply within 24 hours of their last message"><Clock className="w-3 h-3" />Window closes {when(window.closesAt)}</span>}
-              <span className="flex-1" />
-              {statusActions}
-              <span className="hidden md:block w-px h-6 bg-border-gray mx-1" />
-              <button onClick={() => send(true)} disabled={!canSend} className={btnSecondary}>Send and close <Kbd>⌘↵</Kbd></button>
-              <button onClick={() => send(false)} disabled={!canSend} className={btnPrimary}>
-                {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send <Kbd>⌘⇧↵</Kbd>
+            </div>
+            {/* One row, left to right: Send, Send and close (the usual), Escalate, Close. */}
+            <div className="mt-2 flex items-center gap-2">
+              <button onClick={() => send(false)} disabled={!canSend} className={btnSecondary} title="Send and keep it open (⌘⇧↵)">
+                {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send
               </button>
+              <button onClick={() => send(true)} disabled={!canSend} className={`${btnPrimary} whitespace-nowrap`}>Send and close <Kbd>⌘↵</Kbd></button>
+              <span className="w-px h-6 bg-border-gray mx-0.5 shrink-0" />
+              {statusActions}
             </div>
           </div>
         ) : (

@@ -32,9 +32,11 @@ interface Props {
   placeholder?: string
   plain?: boolean
   minHeight?: number
+  /** No border of its own: it sits inside a box that has the toolbar. */
+  bare?: boolean
 }
 
-const RichReply = forwardRef<RichReplyHandle, Props>(function RichReply({ value, onChange, onKeyDown, onFiles, disabled, placeholder, plain, minHeight = 160 }, ref) {
+const RichReply = forwardRef<RichReplyHandle, Props>(function RichReply({ value, onChange, onKeyDown, onFiles, disabled, placeholder, plain, minHeight = 160, bare = false }, ref) {
   const el = useRef<HTMLDivElement>(null)
   const shown = useRef<string | null>(null)
   const saved = useRef<Range | null>(null)
@@ -159,7 +161,7 @@ const RichReply = forwardRef<RichReplyHandle, Props>(function RichReply({ value,
       }}
       onClick={e => { const a = (e.target as HTMLElement).closest('a'); if (a && (e.metaKey || e.ctrlKey)) window.open(a.getAttribute('href') || '', '_blank', 'noopener') }}
       style={{ minHeight }}
-      className={`w-full max-h-[45vh] overflow-y-auto px-3 py-2.5 text-sm bg-white border border-border-gray rounded-md focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 leading-relaxed whitespace-pre-wrap break-words
+      className={`w-full max-h-[45vh] overflow-y-auto px-3 py-2.5 text-sm bg-white ${bare ? 'rounded-b-md focus:outline-none' : 'border border-border-gray rounded-md focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30'} leading-relaxed whitespace-pre-wrap break-words
         [&_a]:text-blue-600 [&_a]:underline [&_a]:underline-offset-2
         empty:before:content-[attr(data-placeholder)] empty:before:text-off-black/40
         ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}

@@ -6,6 +6,8 @@
  *   orderNote           { id, orderId, text }
  *   fixPersonalization  { id, orderId, runnerName?, year? }
  *   slackMatt           { id, text }
+ *   changeItemPrep      { id, shopifyOrderId }  -> the prints on the order and their sizes/frames
+ *   changeItem          { id, shopifyOrderId, lineItemId?, size, frame }  size/frame swap before production
  *   shippingAddress     { id, shopifyOrderId, address: { name, address1, address2, city, province, zip, country, phone } }
  *   refundable          { id, shopifyOrderId }                  -> what is left to refund, and the $150 line
  *   refund              { id, shopifyOrderId, cents, reason }   over $150 refused unless admin (re-read from the database)
@@ -19,6 +21,7 @@ import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
 import { can } from '../_lib/roles.js'
 import prisma from '../_lib/prisma.js'
+import { changeItemPrep, changeItem } from '../../server/domain/support/changeItem.js'
 import { discount15, lookupCode, orderNote, fixPersonalization, slackMatt, shippingAddress, refundable, refund, cancelOrder, REFUND_LIMIT_CENTS } from '../../server/domain/support/actions.js'
 
 export default async function handler(req, res) {
@@ -53,6 +56,12 @@ export default async function handler(req, res) {
       case 'fixPersonalization': {
         const out = await fixPersonalization({ thread, orderId: body.orderId, runnerName: body.runnerName, year: body.year, actor: user })
         await audit(`Changed #${out.number}: ${out.what}`, { orderId: body.orderId })
+        return res.status(200).json(out)
+      }
+      case 'changeItemPrep': return res.status(200).json(await changeItemPrep({ shopifyOrderId: body.shopifyOrderId }))
+      case 'changeItem': {
+        const out = await changeItem({ thread, shopifyOrderId: body.shopifyOrderId, lineItemId: body.lineItemId, size: body.size, frame: body.frame, actor: user })
+        await audit(`Changed #${out.number} from ${out.was} to ${out.now}${out.invoiced ? `, invoiced $${out.owed.toFixed(2)}` : ''}`, { shopifyOrderId: body.shopifyOrderId })
         return res.status(200).json(out)
       }
       case 'shippingAddress': {

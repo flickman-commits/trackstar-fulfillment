@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Ban, BadgePercent, Repeat, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Search, Star, Truck, X } from 'lucide-react'
+import { Ban, BadgePercent, Repeat, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Ruler, Search, Star, Truck, X } from 'lucide-react'
 import { reviewAsk, reviewLinkFor } from '@/lib/reviewLinks'
 import { toast } from 'sonner'
 import { supportApi } from '@/lib/supportApi'
@@ -332,12 +332,66 @@ function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: Customer
   )
 }
 
+/**
+ * Change a print's size or frame, before production: Shopify swaps the item,
+ * the personalization goes into the order note, and any balance is invoiced.
+ */
+function ChangeItemForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread: ThreadDetail; onDone: () => void; onCancel: () => void }) {
+  type Item = { lineItemId: string; title: string; size: string; frame: string | null; sizes: string[]; frames: string[] }
+  const [items, setItems] = useState<Item[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [pick, setPick] = useState(0)
+  const [size, setSize] = useState('')
+  const [frame, setFrame] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    supportApi.action<{ items: Item[] }>('changeItemPrep', { id: thread.id, shopifyOrderId: o.shopifyOrderId })
+      .then(d => { setItems(d.items); if (d.items[0]) { setSize(d.items[0].size); setFrame(d.items[0].frame || '') } })
+      .catch(e => setErr((e as Error).message))
+  }, [o.shopifyOrderId, thread.id])
+  const it = items?.[pick]
+  const changed = it && (size !== it.size || (frame || '') !== (it.frame || ''))
+  const go = async () => {
+    if (!it) return
+    setBusy(true)
+    try {
+      const out = await supportApi.action<{ number: string; now: string; invoiced: boolean; owed: number }>('changeItem', { id: thread.id, shopifyOrderId: o.shopifyOrderId, lineItemId: it.lineItemId, size, frame })
+      toast.success(`#${out.number} is now ${out.now}${out.invoiced ? `; invoice sent for $${out.owed.toFixed(2)}` : ''}`)
+      onDone(); onCancel()
+    } catch (e) { toast.error((e as Error).message) } finally { setBusy(false) }
+  }
+  return (
+    <div className={formBox}>
+      {err ? <div className="text-red-700">{err}</div> : !items ? <div className="text-off-black/50 inline-flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" />Reading the order from Shopify</div> : !items.length ? <div className="text-off-black/50">No print on this order to change.</div> : (
+        <>
+          {items.length > 1 && (
+            <select value={pick} onChange={e => { const i = Number(e.target.value); setPick(i); setSize(items[i].size); setFrame(items[i].frame || '') }} className={field}>
+              {items.map((x, i) => <option key={x.lineItemId} value={i}>{x.title} ({[x.size, x.frame].filter(Boolean).join(' ')})</option>)}
+            </select>
+          )}
+          <div className="text-off-black/60">Now {[it!.size, it!.frame].filter(Boolean).join(' ')}. Change to:</div>
+          <div className="flex gap-1.5">
+            <select value={size} onChange={e => setSize(e.target.value)} className={field}>{it!.sizes.map(x => <option key={x}>{x}</option>)}</select>
+            {it!.frames.length > 0 && <select value={frame} onChange={e => setFrame(e.target.value)} className={field}>{it!.frames.map(x => <option key={x}>{x}</option>)}</select>}
+          </div>
+          <div className="text-[11px] text-off-black/50">Swaps the item on the Shopify order, copies the personalization into the order note, and emails Shopify's invoice if the new one costs more. Artelo follows Shopify.</div>
+          <div className="flex items-center gap-2 justify-end">
+            <button onClick={onCancel} className="text-off-black/60 px-2">Cancel</button>
+            <button onClick={go} disabled={!changed || busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-dark-fill text-white font-medium disabled:opacity-40">{busy && <Loader2 className="w-3 h-3 animate-spin" />}Change it</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function OrderActions({ o, thread, multiple, isAdmin, onInsert, onAttach, onChanged }: { o: CustomerOrder; thread: ThreadDetail; multiple: boolean; isAdmin: boolean; onInsert: (text: string) => void; onAttach: (m: Mockup) => void; onChanged: () => void }) {
   const [picking, setPicking] = useState(false)
   const [money, setMoney] = useState<null | 'refund' | 'cancel'>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [editingAddress, setEditingAddress] = useState(false)
   const [reordering, setReordering] = useState(false)
+  const [changing, setChanging] = useState(false)
   const run = async (key: string, fn: () => Promise<string | void>) => {
     setBusy(key)
     try { const msg = await fn(); if (msg) toast.success(msg); onChanged() }
@@ -397,6 +451,9 @@ function OrderActions({ o, thread, multiple, isAdmin, onInsert, onAttach, onChan
         {o.shopifyOrderId && !shipped && (editingAddress
           ? <AddressForm o={o} thread={thread} onDone={onChanged} onCancel={() => setEditingAddress(false)} />
           : <ActionLink icon={MapPin} onClick={() => setEditingAddress(true)} title={o.shipToLine || 'No address on file'}>Edit shipping address</ActionLink>)}
+        {o.shopifyOrderId && !shipped && editable.length > 0 && editable.length === o.items.length && (changing
+          ? <ChangeItemForm o={o} thread={thread} onDone={onChanged} onCancel={() => setChanging(false)} />
+          : <ActionLink icon={Ruler} onClick={() => setChanging(true)} title="Before production only: swaps the item in Shopify, keeps the personalization in the order note, invoices any difference">Change size or frame</ActionLink>)}
         {editable[0] && (
           <ActionLink icon={Pencil} busy={busy === 'fix'} title="Before production only. After that it is a reprint." onClick={() => {
             const it = editable[0]

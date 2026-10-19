@@ -88,7 +88,7 @@ export interface DraftData {
 /** A suggested action on Claude's draft, filled in and waiting for a person's Approve. */
 export interface Proposal {
   id: string
-  type: 'shippingAddress' | 'discount' | 'orderNote'
+  type: 'shippingAddress' | 'discount' | 'orderNote' | 'changeItem'
   label: string
   orderNumber?: string
   shopifyOrderId?: string
@@ -96,6 +96,8 @@ export interface Proposal {
   address?: Address
   percent?: number
   text?: string
+  size?: string | null
+  frame?: string | null
   status?: 'done' | 'dismissed'
   by?: string | null
 }
