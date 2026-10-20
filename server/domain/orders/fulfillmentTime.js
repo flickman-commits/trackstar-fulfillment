@@ -130,7 +130,8 @@ export function startOfTodayNY(now = new Date()) {
  * keeps up with what comes in.
  */
 export async function sentToProductionToday() {
-  const since = startOfTodayNY()
+  // Rolling 24 hours, not the calendar day, so the morning count isn't empty.
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
   const events = await prisma.auditEvent.findMany({
     where: { action: 'order.complete', createdAt: { gte: since } },
     orderBy: { createdAt: 'asc' },

@@ -196,10 +196,10 @@ export function PersonFilter({ team, value, meId, onChange }: {
 }
 
 /**
- * Current Team on Standard Orders: two rows, what each person sent to
- * production today (who pressed the button) and what is still waiting on
- * their approval, each with a total. Clicking a name on the approve row
- * shows only their orders, as the old team chips did.
+ * Team grid on Standard Orders: one row per person with what they sent to
+ * production in the last 24 hours (who pressed the button) and the orders
+ * still left for them to fulfill, plus a total row when there is more than
+ * one person. Clicking a person shows only their orders.
  */
 export function TeamPanel({ team, sent, toApprove, selected, onSelect }: {
   team: Teammate[]
@@ -208,33 +208,54 @@ export function TeamPanel({ team, sent, toApprove, selected, onSelect }: {
   selected?: string
   onSelect?: (userId: string) => void
 }) {
-  const byName = (name: string) => team.find(u => u.firstName === name)
-  const chip = (key: string, user: Teammate | undefined, label: string, count: number, active = false, onClick?: () => void) => (
-    <span key={key} onClick={onClick} className={`inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full border text-xs ${active ? 'border-off-black bg-off-black/5' : 'border-border-gray bg-white'} ${onClick ? 'cursor-pointer hover:border-off-black/40' : ''}`}>
-      {user ? <Avatar user={user} size={18} /> : <span className="w-[18px]" />}
-      <span className="font-semibold text-off-black tabular-nums">{count}</span>
-      <span className="text-off-black/60">{label}</span>
-    </span>
-  )
-  const total = (n: number) => <span className="text-xs text-off-black/50 pl-1.5"><span className="text-sm font-semibold text-off-black tabular-nums">{n}</span> total</span>
-  const sentTotal = (sent || []).reduce((n, p) => n + p.count, 0)
-  const approveTotal = toApprove.reduce((n, p) => n + p.count, 0)
+  type Row = { key: string; user?: Teammate; name: string; userId?: string; sent: number; left: number }
+  const rows: Row[] = []
+  for (const p of toApprove) {
+    const user = team.find(u => u.id === p.userId)
+    rows.push({ key: `u-${p.userId}`, user, name: user?.firstName || 'Unassigned', userId: user ? p.userId : undefined, sent: 0, left: p.count })
+  }
+  for (const p of sent || []) {
+    const row = rows.find(r => r.name === p.name)
+    if (row) row.sent += p.count
+    else rows.push({ key: `s-${p.name}`, user: team.find(u => u.firstName === p.name), name: p.name, sent: p.count, left: 0 })
+  }
+  const sentTotal = rows.reduce((n, r) => n + r.sent, 0)
+  const leftTotal = rows.reduce((n, r) => n + r.left, 0)
+  const num = 'text-right tabular-nums'
   return (
-    <div className="hidden md:grid grid-cols-[auto_auto] items-center gap-x-3 gap-y-1.5 whitespace-nowrap">
-      <span className="col-span-2 text-right text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Current Team</span>
-      <span className="text-[11px] text-off-black/50 text-right">Sent to production today</span>
-      <span className="flex items-center justify-end gap-1.5">
-        {(sent || []).map(p => chip(`s-${p.name}`, byName(p.name), p.name, p.count))}
-        {total(sentTotal)}
-      </span>
-      <span className="text-[11px] text-off-black/50 text-right">Still left to approve</span>
-      <span className="flex items-center justify-end gap-1.5">
-        {toApprove.map(p => {
-          const user = team.find(u => u.id === p.userId)
-          return chip(`a-${p.userId}`, user, user?.firstName || 'Unassigned', p.count, selected === p.userId, onSelect && user ? () => onSelect(p.userId) : undefined)
+    <table className="hidden md:table text-xs whitespace-nowrap border-separate border-spacing-x-0 border-spacing-y-0.5">
+      <thead>
+        <tr className="text-[11px] text-off-black/50">
+          <th />
+          <th className="font-normal text-right pl-4">Sent to production in last 24h</th>
+          <th className="font-normal text-right pl-4">Orders still left to fulfill</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(r => {
+          const active = !!r.userId && selected === r.userId
+          const click = onSelect && r.userId ? () => onSelect(r.userId!) : undefined
+          return (
+            <tr key={r.key} onClick={click} className={`${click ? 'cursor-pointer hover:bg-off-black/5' : ''} ${active ? 'bg-off-black/5' : ''}`}>
+              <td className="py-0.5 pr-2 rounded-l-md">
+                <span className="inline-flex items-center gap-1.5 pl-1">
+                  {r.user ? <Avatar user={r.user} size={18} /> : <span className="w-[18px]" />}
+                  <span className={active ? 'font-semibold text-off-black' : 'text-off-black/70'}>{r.name}</span>
+                </span>
+              </td>
+              <td className={`${num} pl-4 font-semibold text-off-black`}>{r.sent}</td>
+              <td className={`${num} pl-4 pr-1 font-semibold text-off-black rounded-r-md`}>{r.left}</td>
+            </tr>
+          )
         })}
-        {total(approveTotal)}
-      </span>
-    </div>
+        {rows.length > 1 && (
+          <tr className="text-off-black">
+            <td className="pt-1 pl-1 border-t border-border-gray text-off-black/50">Total</td>
+            <td className={`${num} pt-1 pl-4 border-t border-border-gray text-sm font-semibold`}>{sentTotal}</td>
+            <td className={`${num} pt-1 pl-4 pr-1 border-t border-border-gray text-sm font-semibold`}>{leftTotal}</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
   )
 }
