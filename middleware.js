@@ -10,7 +10,7 @@ import { next, rewrite } from '@vercel/edge'
  * a browser, because React replaces the title the moment it mounts, and very
  * visible in a text message: iMessage, Slack and LinkedIn read the raw HTML
  * and never execute the JavaScript, so every shared link previewed as
- * "Trackstar Fulfillment" with the Trackstar logo.
+ * "TrackstarOS" with the Trackstar logo.
  *
  * Middleware runs ahead of the filesystem, so it wins.
  *

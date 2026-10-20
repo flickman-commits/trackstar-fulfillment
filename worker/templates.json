@@ -1,5 +1,5 @@
 {
-  "_comment": "Race name as the fulfillment tool knows it -> production file, relative to the Races folder (RACES_DIR). A plain string is the file; an object adds rules for picking the artboard: 'artboard' (a word its name must contain, for a file with two colorways), 'artboardExclude' (a word it must not contain, e.g. 'copy'), 'photoArtboard' (a word marking the variant with a photo window, used for orders with a photo). A key like 'Chicago Marathon / World Majors' is that race's World Majors edition. Only races listed here can be rendered; run worker/check-template.mjs before adding one.",
+  "_comment": "Race name as TrackstarOS knows it -> production file, relative to the Races folder (RACES_DIR). A plain string is the file; an object adds rules for picking the artboard: 'artboard' (a word its name must contain, for a file with two colorways), 'artboardExclude' (a word it must not contain, e.g. 'copy'), 'photoArtboard' (a word marking the variant with a photo window, used for orders with a photo). A key like 'Chicago Marathon / World Majors' is that race's World Majors edition. Only races listed here can be rendered; run worker/check-template.mjs before adding one.",
   "Chicago Marathon": {
     "file": "Chicago Marathon/Illustrator Files/Chicago_Production_retired 261010.ai",
     "artboard": "Red"

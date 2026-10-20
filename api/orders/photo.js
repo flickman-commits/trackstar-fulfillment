@@ -88,7 +88,7 @@ export default async function handler(req, res) {
       if (body.charge && rows[0].source === 'shopify') {
         try {
           await addVariantToOrder(rows[0].parentOrderNumber, PHOTO_ADDON_VARIANT_ID, ids.length,
-            `Photo Add-On x${ids.length} added from the fulfillment tool by ${admin.firstName || 'an admin'}`)
+            `Photo Add-On x${ids.length} added from TrackstarOS by ${admin.firstName || 'an admin'}`)
           charged = true
         } catch (error) {
           console.error('[API /orders/photo] Shopify order edit failed:', error.message)

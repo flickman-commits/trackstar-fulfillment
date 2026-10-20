@@ -49,7 +49,7 @@ export const REPAIR_TOOLS = [
   {
     name: 'run_sweep',
     description:
-      'Start a nightly run: sweeps the fulfillment tool and returns what it found, ' +
+      'Start a nightly run: sweeps TrackstarOS and returns what it found, ' +
       'keeping the full report server-side as the "before" state. Call finish_sweep ' +
       'when the repairs are done. Returns a summary plus the findings worth acting on.',
     inputSchema: { type: 'object', properties: {} },

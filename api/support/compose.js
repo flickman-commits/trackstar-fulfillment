@@ -1,5 +1,5 @@
 /**
- * /api/support/compose - Support, seen from an order in the fulfillment tool.
+ * /api/support/compose - Support, seen from an order in TrackstarOS.
  *
  *   GET  ?orderId=                    the customer's conversations that are not closed
  *   POST { orderId, subject, text }   "Email customer": sends from fast@; returns { threadId, to, subject }

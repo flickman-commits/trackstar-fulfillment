@@ -5,7 +5,7 @@
  *
  *   node worker/render-worker.mjs      (or: npm run worker)
  *
- * Every few seconds it asks the fulfillment tool for a job. For each one it
+ * Every few seconds it asks TrackstarOS for a job. For each one it
  * copies the race's production file to a scratch folder (the live file is
  * never opened), writes the order's details next to the Illustrator script,
  * runs the script through AppleScript, uploads the PDF and preview straight

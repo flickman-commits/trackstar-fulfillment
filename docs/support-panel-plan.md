@@ -1,6 +1,6 @@
 # Support panel: plan
 
-A shared inbox for fast@trackstar.art inside the fulfillment tool, with Claude doing the investigation and the first draft on every ticket, and a person doing the send. Written 2026-10-16 from the call with Daniela Monroy (Wispr Flow, "Trackstar AI Support Integration") and the Notion playbook "How to Handle Trackstar Customer Service Inquiries". Nothing here is built yet.
+A shared inbox for fast@trackstar.art inside TrackstarOS, with Claude doing the investigation and the first draft on every ticket, and a person doing the send. Written 2026-10-16 from the call with Daniela Monroy (Wispr Flow, "Trackstar AI Support Integration") and the Notion playbook "How to Handle Trackstar Customer Service Inquiries". Nothing here is built yet.
 
 ## What the call said, and what we take from it
 

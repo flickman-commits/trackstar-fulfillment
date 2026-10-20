@@ -3,7 +3,7 @@
  *
  * iMessage, Slack and LinkedIn read the raw HTML and never run the JavaScript,
  * so every shared portal link previewed as the app's own shell: the Trackstar
- * logo and the words "Trackstar Fulfillment". A partner sees a link to a
+ * logo and the words "TrackstarOS". A partner sees a link to a
  * dashboard rather than a link to their designs.
  *
  * This serves the same single-page app with the same bundle, having swapped
@@ -20,7 +20,7 @@
 import { shellUrl } from '../../server/lib/shellOrigin.js'
 import prisma from '../_lib/prisma.js'
 
-const DEFAULT_TITLE = 'Trackstar Fulfillment'
+const DEFAULT_TITLE = 'TrackstarOS'
 
 /**
  * The built shell, cached for the life of the warm function.

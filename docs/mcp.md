@@ -1,6 +1,6 @@
 # Trackstar MCP
 
-The fulfillment tool as an MCP server, so Claude (on a phone, on the web, in a
+TrackstarOS as an MCP server, so Claude (on a phone, on the web, in a
 scheduled routine) and other tools can ask it questions and do a few things.
 
 - **Endpoint:** `https://fast.trackstar.art/api/mcp` (Streamable HTTP, JSON responses, stateless)

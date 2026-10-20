@@ -6,7 +6,7 @@ import { ago } from '@/lib/supportDates'
 import { chip } from '@/lib/ui'
 
 /**
- * Under an order's actions in the fulfillment tool: the customer's Support
+ * Under an order's actions in TrackstarOS: the customer's Support
  * conversations that are still going, each opening in Support. Shows
  * nothing when there are none, or for someone without Support.
  */

@@ -196,10 +196,10 @@ export function PersonFilter({ team, value, meId, onChange }: {
 }
 
 /**
- * Team grid on Standard Orders: one row per person with what they sent to
- * production in the last 24 hours (who pressed the button) and the orders
- * still left for them to fulfill, plus a total row when there is more than
- * one person. Clicking a person shows only their orders.
+ * The team on Standard Orders, in the same chip row as the other views'
+ * Current Team: one chip per person with what they sent to production in the
+ * last 24 hours and what is still left for them, and the totals in the
+ * label. Clicking a person shows only their orders.
  */
 export function TeamPanel({ team, sent, toApprove, selected, onSelect }: {
   team: Teammate[]
@@ -219,43 +219,31 @@ export function TeamPanel({ team, sent, toApprove, selected, onSelect }: {
     if (row) row.sent += p.count
     else rows.push({ key: `s-${p.name}`, user: team.find(u => u.firstName === p.name), name: p.name, sent: p.count, left: 0 })
   }
+  if (!rows.length) return null
   const sentTotal = rows.reduce((n, r) => n + r.sent, 0)
   const leftTotal = rows.reduce((n, r) => n + r.left, 0)
-  const num = 'text-right tabular-nums'
   return (
-    <table className="hidden md:table text-xs whitespace-nowrap border-separate border-spacing-x-0 border-spacing-y-0.5">
-      <thead>
-        <tr className="text-[11px] text-off-black/50">
-          <th />
-          <th className="font-normal text-right pl-4">Sent to production in last 24h</th>
-          <th className="font-normal text-right pl-4">Orders still left to fulfill</th>
-        </tr>
-      </thead>
-      <tbody>
+    <div className="hidden md:flex flex-col items-end gap-1 whitespace-nowrap">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40">
+        Current Team · {sentTotal} sent in 24h · {leftTotal} left
+      </span>
+      <div className="flex items-center gap-1.5">
         {rows.map(r => {
-          const active = !!r.userId && selected === r.userId
           const click = onSelect && r.userId ? () => onSelect(r.userId!) : undefined
           return (
-            <tr key={r.key} onClick={click} className={`${click ? 'cursor-pointer hover:bg-off-black/5' : ''} ${active ? 'bg-off-black/5' : ''}`}>
-              <td className="py-0.5 pr-2 rounded-l-md">
-                <span className="inline-flex items-center gap-1.5 pl-1">
-                  {r.user ? <Avatar user={r.user} size={18} /> : <span className="w-[18px]" />}
-                  <span className={active ? 'font-semibold text-off-black' : 'text-off-black/70'}>{r.name}</span>
-                </span>
-              </td>
-              <td className={`${num} pl-4 font-semibold text-off-black`}>{r.sent}</td>
-              <td className={`${num} pl-4 pr-1 font-semibold text-off-black rounded-r-md`}>{r.left}</td>
-            </tr>
+            <span
+              key={r.key}
+              onClick={click}
+              className={`inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border text-xs ${r.userId && selected === r.userId ? 'border-off-black bg-off-black/5' : 'border-border-gray bg-white'} ${click ? 'cursor-pointer hover:border-off-black/40' : ''}`}
+              title={`${r.name}: ${r.sent} sent to production in the last 24 hours, ${r.left} still left to fulfill`}
+            >
+              {r.user ? <Avatar user={r.user} size={20} /> : <span className="w-5" />}
+              <span className="font-medium text-off-black">{r.name}</span>
+              <span className="text-off-black/45 tabular-nums">{r.sent} sent · {r.left} left</span>
+            </span>
           )
         })}
-        {rows.length > 1 && (
-          <tr className="text-off-black">
-            <td className="pt-1 pl-1 border-t border-border-gray text-off-black/50">Total</td>
-            <td className={`${num} pt-1 pl-4 border-t border-border-gray text-sm font-semibold`}>{sentTotal}</td>
-            <td className={`${num} pt-1 pl-4 pr-1 border-t border-border-gray text-sm font-semibold`}>{leftTotal}</td>
-          </tr>
-        )}
-      </tbody>
-    </table>
+      </div>
+    </div>
   )
 }

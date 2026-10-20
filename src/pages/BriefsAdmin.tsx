@@ -52,7 +52,7 @@ export default function BriefsAdmin() {
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/orders/actions?action=list-briefs')
+      const res = await apiFetch('/api/creators/manage?action=list-briefs')
       if (!res.ok) throw new Error(`Request failed: ${res.status}`)
       const { briefs } = await res.json()
       setBriefs(briefs)
@@ -245,7 +245,7 @@ function BriefEditor({ brief, onClose, onSaved }: {
             }
           }
 
-      const res = await apiFetch('/api/orders/actions', {
+      const res = await apiFetch('/api/creators/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

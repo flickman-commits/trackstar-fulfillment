@@ -27,6 +27,8 @@ const routes = [
   { method: 'post', path: '/api/creators/sample',             handler: '../api/creators/sample.js' },
   { method: 'get',  path: '/api/samples', handler: '../api/samples.js' },
   { method: 'post', path: '/api/samples', handler: '../api/samples.js' },
+  { method: 'get', path: '/api/creators/manage', handler: '../api/creators/manage.js' },
+  { method: 'post', path: '/api/creators/manage', handler: '../api/creators/manage.js' },
   { method: 'get', path: '/api/creators/ads', handler: '../api/creators/ads.js' },
   { method: 'get', path: '/api/creators/catalog', handler: '../api/creators/catalog.js' },
   { method: 'get', path: '/api/creators/samples', handler: '../api/creators/samples.js' },

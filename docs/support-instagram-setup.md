@@ -17,7 +17,7 @@ Meta posts every DM to `/api/support/instagram-webhook` within seconds; that is 
 7. **Live mode.** Meta only delivers webhooks to an app that is Live (toggle at the top of the dashboard). Going Live asks for a privacy policy URL under App settings > Basic (any page on trackstar.art will do) and may ask for Business Verification of the portfolio. Until the app is Live, DMs are not delivered.
 8. **Instagram app setting.** On the phone, in the Instagram app for @trackstar_art: Settings > Messages and story replies > Message controls > "Allow access to messages" must be on, or the API sees nothing.
 
-## In the fulfillment tool
+## In TrackstarOS
 
 9. Set the four env vars (`INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`, `INSTAGRAM_WEBHOOK_VERIFY_TOKEN`, `INSTAGRAM_HANDLE=trackstar_art`) in Vercel and redeploy. `.env.example` documents them.
 10. On /support, in the Instagram card on the right, press **Connect @trackstar_art** and sign in as the account. Any other account is refused. If the login flow gives trouble, the dashboard's "Generate token" button (step 1 of the Instagram product screen, signed in as the account) produces a long-lived token you can paste with **Paste a token** instead.

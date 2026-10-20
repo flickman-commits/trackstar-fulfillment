@@ -1,6 +1,6 @@
 # Render worker
 
-Turns the fulfillment tool's render jobs into print files, using Illustrator
+Turns TrackstarOS's render jobs into print files, using Illustrator
 on the Mac it runs on. The tool queues a job when someone clicks Create Design
 on an order; this script picks it up, fills the race's production template,
 and uploads the PDF and a preview for review.

@@ -6,7 +6,7 @@ import { supportApi } from '@/lib/supportApi'
 import { btnPrimary, btnSecondary } from '@/lib/ui'
 
 /**
- * "Email customer" from an order in the fulfillment tool. Usually it is the
+ * "Email customer" from an order in TrackstarOS. Usually it is the
  * same note: we need one more detail (a bib number, the last name they
  * registered under, a finish time). It sends from fast@ through the support
  * mailbox, so the conversation and their reply live in Support.

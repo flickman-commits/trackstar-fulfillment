@@ -120,7 +120,7 @@ function OrderCard({ o, onUnlink }: { o: CustomerOrder; onUnlink?: () => void })
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Open in</div>
           <div className="grid grid-cols-3 gap-1.5">
-            {fulfillmentUrl && <OpenIn href={fulfillmentUrl} icon={<img src="/trackstar-stars-transparent.png" alt="" className="w-4 h-4 object-contain" />} label="Fulfillment" title="This order in the fulfillment tool" />}
+            {fulfillmentUrl && <OpenIn href={fulfillmentUrl} icon={<img src="/trackstar-stars-transparent.png" alt="" className="w-4 h-4 object-contain" />} label="Fulfillment" title="This order in TrackstarOS" />}
             {o.adminUrl && <OpenIn href={o.adminUrl} icon={<img src="/shopify-icon.png" alt="" className="w-4 h-4" />} label="Shopify" />}
             {o.arteloUrl && <OpenIn href={o.arteloUrl} icon={<img src="/artelo-icon.png" alt="" className="w-4 h-4 rounded-[3px]" />} label="Artelo" />}
           </div>

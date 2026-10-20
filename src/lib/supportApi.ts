@@ -40,7 +40,7 @@ export interface OrderConversation { id: string; subject: string; status: Thread
 
 export const supportApi = {
   status: () => request<MailboxStatus>('/api/support/gmail?action=status'),
-  // The fulfillment tool's "Email customer": a new conversation about one order.
+  // TrackstarOS's "Email customer": a new conversation about one order.
   orderConversations: (orderId: string) => request<{ threads: OrderConversation[] }>(`/api/support/compose?orderId=${encodeURIComponent(orderId)}`),
   // A place to PUT one attachment from the rep's computer; the reply names it by ref.
   uploadSlot: (filename: string, contentType: string, size: number) => post<{ ref: string; uploadUrl: string; filename: string }>('/api/support/upload', { filename, contentType, size }),

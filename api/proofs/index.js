@@ -20,7 +20,7 @@ import prisma from '../_lib/prisma.js'
 import { ensureApprovalToken, touchApprovalToken } from '../_lib/approvalToken.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { alertError } from '../_lib/alerts.js'
-import { recordAudit } from '../_lib/users.js'
+import { recordAudit, requireAdminRole } from '../_lib/users.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
 import { postSlack, slackText } from '../../server/lib/slack.js'
 import { createClient } from '@supabase/supabase-js'
@@ -667,6 +667,37 @@ export default async function handler(req, res) {
     // uploaded before anyone decides how they group, and because the label is
     // the thing that decides what competes with what - getting it wrong after
     // the fact should not mean deleting and re-uploading the artwork.
+    // An admin correcting which option the customer approved. Customers
+    // sometimes click Approve on the wrong option and then email to say so;
+    // this records the right one without sending them back through the
+    // portal. The proof that was approved becomes rejected, the chosen one
+    // approved, within the same round and group. Admins only, and audited.
+    if (req.method === 'POST' && body.action === 'override-approval') {
+      const admin = await requireAdminRole(req, res, actor)
+      if (!admin) return
+      const proof = await prisma.proof.findUnique({ where: { id: String(body.proofId || '') }, include: { order: { select: { id: true, orderNumber: true, designStatus: true } } } })
+      if (!proof) return res.status(404).json({ error: 'Proof not found' })
+      if (proof.status === 'approved') return res.status(400).json({ error: 'That one is already the approved option.' })
+      const sameGroup = { orderId: proof.orderId, batch: proof.batch, groupLabel: proof.groupLabel ?? null }
+      const wasApproved = await prisma.proof.findMany({ where: { ...sameGroup, status: 'approved' }, select: { id: true, version: true } })
+      await prisma.$transaction([
+        prisma.proof.updateMany({ where: { ...sameGroup, status: 'approved' }, data: { status: 'rejected' } }),
+        prisma.proof.update({ where: { id: proof.id }, data: { status: 'approved' } }),
+        ...(proof.order.designStatus === 'sent_to_production' ? [] : [
+          prisma.order.update({ where: { id: proof.orderId }, data: { designStatus: 'approved_by_customer' } }),
+        ]),
+      ])
+      const from = wasApproved.map(p => `v${p.version}`).join(', ') || 'none'
+      await recordAudit({
+        action: 'proof.override',
+        summary: `Changed the approved option on ${proof.order.orderNumber} from ${from} to v${proof.version}`,
+        detail: { orderId: proof.orderId, proofId: proof.id, previouslyApproved: wasApproved.map(p => p.id) },
+        actor: admin,
+      })
+      const proofs = await prisma.proof.findMany({ where: { orderId: proof.orderId }, orderBy: { version: 'asc' } })
+      return res.status(200).json({ success: true, proofs, inProduction: proof.order.designStatus === 'sent_to_production' })
+    }
+
     if (req.method === 'POST' && body.action === 'set-group-label') {
       const { proofId, groupLabel } = body
       if (!proofId) return res.status(400).json({ error: 'proofId is required' })

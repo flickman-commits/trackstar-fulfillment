@@ -90,7 +90,7 @@ export async function sendSample(input, actor) {
     shippingLines: [{ title: atCost ? 'Shipping (at cost)' : 'Free sample shipping', priceSet: { shopMoney: { amount: shipping.toFixed(2), currencyCode: 'USD' } } }],
     financialStatus: atCost ? 'PENDING' : 'PAID',
     tags: [...(atCost ? ['sample', 'sample-at-cost'] : ['sample']), ...(input.source === 'creator' ? ['creator-sample'] : [])],
-    note: [`Sample sent by ${by} from the fulfillment tool${atCost ? ', at cost' : ', free'}.`, String(input.note || '').trim()].filter(Boolean).join('\n'),
+    note: [`Sample sent by ${by} from TrackstarOS${atCost ? ', at cost' : ', free'}.`, String(input.note || '').trim()].filter(Boolean).join('\n'),
     sourceName: 'trackstar-samples',
   }
   // Send once. A timeout after Shopify accepted the order, a double click, or

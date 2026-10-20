@@ -1988,8 +1988,8 @@ export default function Dashboard() {
     if (urlOrderRef && selectedRef !== urlOrderRef) resolve(urlOrderRef)
   }, [selectedRef, urlOrderRef, orders, activeView, setActiveView, navigate, urlSearch])
   useEffect(() => {
-    document.title = selectedOrder ? `Order ${orderRefOf(selectedOrder)} · Trackstar` : 'Trackstar'
-    return () => { document.title = 'Trackstar' }
+    document.title = selectedOrder ? `Order ${orderRefOf(selectedOrder)} · TrackstarOS` : 'TrackstarOS'
+    return () => { document.title = 'TrackstarOS' }
   }, [selectedOrder])
 
   // The inline order view scrolls on its own; each order starts at the top.

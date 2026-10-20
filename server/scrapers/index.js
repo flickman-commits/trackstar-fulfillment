@@ -416,7 +416,7 @@ export function hasScraperForRace(raceName) {
  *
  * The failure we are actually avoiding is the second-order one. Sustained
  * public traffic could get the Vercel egress IPs blocked, which would take out
- * Sydney research in the fulfillment tool as well - a thing that works today,
+ * Sydney research in TrackstarOS as well - a thing that works today,
  * spent to add a storefront lookup that could never return a finish time
  * anyway, because the detail pages are walled off.
  *

@@ -1,7 +1,7 @@
 /**
  * Per-route <title>, description, Open Graph and robots tags.
  *
- * The app has no head management — every route inherits "Trackstar Fulfillment"
+ * The app has no head management — every route inherits "TrackstarOS"
  * and the fulfillment-dashboard OG description from index.html. That's fine for
  * an internal tool and wrong for a page Matt texts to a race director, where the
  * link preview is the first thing they see.

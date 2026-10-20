@@ -1,5 +1,5 @@
 /**
- * Render jobs: the queue between the fulfillment tool and the render workers.
+ * Render jobs: the queue between TrackstarOS and the render workers.
  *
  * The tool creates a job; a worker claims it, renders, uploads and completes
  * it; a person reviews the result. Workers check in every 30 seconds with the

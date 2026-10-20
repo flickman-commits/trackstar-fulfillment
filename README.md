@@ -1,4 +1,4 @@
-# Trackstar Fulfillment
+# TrackstarOS
 
 Internal operations app for [Trackstar](https://trackstar.art), personalized race-result prints. One place for order fulfillment and the tools around it, built to grow into the rest of the business over time.
 

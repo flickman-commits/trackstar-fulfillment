@@ -726,7 +726,7 @@ model ProductEditBatch {
 }
 
 /**
- * A person who can sign in to the fulfillment tool.
+ * A person who can sign in to TrackstarOS.
  *
  * Replaces the single shared ADMIN_PASSWORD. The shared password could not be
  * revoked for one person without rotating it for everyone, and it made every

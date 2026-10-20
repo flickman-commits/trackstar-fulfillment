@@ -3,6 +3,7 @@ import Linkify from '@/components/Linkify'
 import { Upload, Copy, Loader2, Check, ImagePlus, RefreshCw, Link2, CheckCircle2, AlertTriangle, X, Send, RotateCcw, MessageSquare, ExternalLink, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
+import { useIsAdmin } from '@/lib/auth'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -122,6 +123,8 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   const [filePreviews, setFilePreviews] = useState<{ name: string; preview: string }[]>([])
   const [copied, setCopied] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [overridingId, setOverridingId] = useState<string | null>(null)
+  const isAdmin = useIsAdmin()
   const [isSending, setIsSending] = useState(false)
   const [sendNote, setSendNote] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
@@ -333,6 +336,29 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
     }
   }
 
+  // Admin: the customer approved the wrong option; record the right one.
+  const overrideApproval = async (proof: Proof) => {
+    if (!confirm(`Make option v${proof.version} the approved one? The option they approved becomes rejected. The customer is not emailed.`)) return
+    setOverridingId(proof.id)
+    try {
+      const res = await apiFetch(`${API_BASE}/api/proofs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'override-approval', proofId: proof.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(data.error || 'That did not work'); return }
+      setProofs(data.proofs)
+      toast.success(data.inProduction
+        ? `v${proof.version} is now the approved option. This order is already in production, so check the file Artelo has.`
+        : `v${proof.version} is now the approved option`)
+    } catch {
+      toast.error('Could not reach the server')
+    } finally {
+      setOverridingId(null)
+    }
+  }
+
   const deleteProof = async (proofId: string) => {
     setDeletingId(proofId)
     try {
@@ -344,6 +370,9 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
       if (res.ok) {
         setProofs(prev => prev.filter(p => p.id !== proofId))
         toast.success('Proof deleted')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || 'Delete failed')
       }
     } catch {
       toast.error('Delete failed')
@@ -814,6 +843,16 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                   className="w-full !px-1 !py-0.5 !text-[9px]"
                 />
               </div>
+            )}
+            {isAdmin && (proof.status === 'rejected' || proof.status === 'revision_requested') && (
+              <button
+                onClick={() => overrideApproval(proof)}
+                disabled={overridingId === proof.id}
+                className="mt-1 w-14 text-[9px] text-center text-off-black/45 hover:text-off-black underline decoration-dotted disabled:opacity-50"
+                title="The customer meant this one: make it the approved option"
+              >
+                {overridingId === proof.id ? 'Saving…' : 'Make approved'}
+              </button>
             )}
             {allowGroups && proof.status !== 'pending' && proof.groupLabel && (
               <p className="mt-1 w-14 text-[9px] text-center text-off-black/40 truncate" title={proof.groupLabel}>{proof.groupLabel}</p>

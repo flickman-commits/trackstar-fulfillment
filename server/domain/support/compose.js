@@ -1,5 +1,5 @@
 /**
- * "Email customer" from the fulfillment tool: one email from fast@ about one
+ * "Email customer" from TrackstarOS: one email from fast@ about one
  * order, usually asking for what we cannot find (a bib number, a last name,
  * a finish time). It goes out through the support mailbox, so it is a
  * Support conversation from the start: assigned to whoever sent it, waiting
@@ -61,7 +61,7 @@ export async function emailCustomer({ orderId, subject, text, actor }) {
 
 /**
  * The Support conversations still going with an order's customer (anything
- * not closed), for the order view in the fulfillment tool. Matched on the
+ * not closed), for the order view in TrackstarOS. Matched on the
  * order's email; filtered and merged-away threads never show.
  */
 export async function conversationsForOrder(orderId) {

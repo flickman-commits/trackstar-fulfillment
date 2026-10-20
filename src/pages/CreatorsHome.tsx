@@ -165,9 +165,9 @@ export default function CreatorsHome() {
   const loadAll = useCallback(async () => {
     try {
       const [metricsRes, creatorsRes, briefsRes, adsRes] = await Promise.all([
-        apiFetch('/api/orders/actions?action=creator-home-metrics'),
-        apiFetch('/api/orders/actions?action=list-creators'),
-        apiFetch('/api/orders/actions?action=list-briefs'),
+        apiFetch('/api/creators/manage?action=home-metrics'),
+        apiFetch('/api/creators/manage?action=list-creators'),
+        apiFetch('/api/creators/manage?action=list-briefs'),
         apiFetch('/api/creators/ads'),
       ])
       if (!metricsRes.ok) throw new Error(`Metrics failed: ${metricsRes.status}`)
@@ -232,7 +232,7 @@ export default function CreatorsHome() {
     if (!confirm(`Decline ${creator.name || 'this creator'}? They'll be marked denied and no sample is made. You can un-deny them later from the Denied view.`)) return
     setDecliningId(creator.id)
     try {
-      const res = await apiFetch('/api/orders/actions', {
+      const res = await apiFetch('/api/creators/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'decline-creator-sample', creatorId: creator.id }),
@@ -252,7 +252,7 @@ export default function CreatorsHome() {
   const handleApproveSample = async (creator: Creator) => {
     setApprovingId(creator.id)
     try {
-      const res = await apiFetch('/api/orders/actions', {
+      const res = await apiFetch('/api/creators/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'approve-creator-sample', creatorId: creator.id }),
@@ -566,7 +566,7 @@ function InviteModal({ briefs, onClose, onCreated }: {
   const handleCreate = async () => {
     setIsCreating(true)
     try {
-      const res = await apiFetch('/api/orders/actions', {
+      const res = await apiFetch('/api/creators/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -794,7 +794,7 @@ function CreatorDetail({ creator, onBack, decide, onChanged, onDeleted, catalog 
   useEffect(() => { loadSamples() }, [loadSamples])
 
   const save = async (updates: Partial<Creator>) => {
-    const res = await apiFetch('/api/orders/actions', {
+    const res = await apiFetch('/api/creators/manage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update-creator', creatorId: creator.id, updates }),
@@ -811,7 +811,7 @@ function CreatorDetail({ creator, onBack, decide, onChanged, onDeleted, catalog 
     const note = creator.sampleOrder && !creator.sampleOrder.shippedAt && creator.sampleOrder.status !== 'completed'
       ? `\n\nTheir sample ${creator.sampleOrder.orderNumber} has not shipped and will be deleted too.` : ''
     if (!confirm(`Delete ${creator.name || 'this creator'}? This can't be undone.${note}`)) return
-    const res = await apiFetch('/api/orders/actions', {
+    const res = await apiFetch('/api/creators/manage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'delete-creator', creatorId: creator.id }),

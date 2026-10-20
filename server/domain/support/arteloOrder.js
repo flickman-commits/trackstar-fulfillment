@@ -86,7 +86,7 @@ async function itemsFor(shopifyOrderId) {
     select: { id: true, lineItemIndex: true, runnerName: true, raceName: true, raceYear: true, arteloOrderData: true, shopifyOrderData: true,
       renderJobs: { where: { status: 'done', review: 'approved', arteloUploadId: { not: null } }, orderBy: { version: 'desc' }, take: 1, select: { arteloUploadId: true, version: true } } },
   })
-  if (!rows.length) throw new UserError('That order is not in the fulfillment tool, so there is nothing to copy. Build it in Artelo.')
+  if (!rows.length) throw new UserError('That order is not in TrackstarOS, so there is nothing to copy. Build it in Artelo.')
   const stored = rows[0].arteloOrderData
   let live = null
   if (stored?.id) {

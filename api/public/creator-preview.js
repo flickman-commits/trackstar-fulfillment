@@ -1,7 +1,7 @@
 /**
  * /apply served with its own link-preview tags, so a shared link reads
  * "Trackstar Creator Program" with the creator photos instead of the app's
- * shell ("Trackstar Fulfillment"). Same approach and fallbacks as
+ * shell ("TrackstarOS"). Same approach and fallbacks as
  * approval-preview.js. The image is public/og-creator-program.jpg.
  */
 import { shellUrl } from '../../server/lib/shellOrigin.js'

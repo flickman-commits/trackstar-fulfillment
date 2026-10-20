@@ -1,7 +1,7 @@
 {
-  "name": "Trackstar Fulfillment",
-  "short_name": "Trackstar",
-  "description": "Order fulfillment for Trackstar race prints.",
+  "name": "TrackstarOS",
+  "short_name": "TrackstarOS",
+  "description": "Orders, design, support, sales and creators for Trackstar race prints.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
