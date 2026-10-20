@@ -12,7 +12,7 @@
  * Folder: CUSTOM_GALLERY_FOLDER_ID, defaulting to the one Matt set up.
  * Best effort: a failure is logged and never blocks the customer's approval.
  */
-import { google } from 'googleapis'
+import { google } from '../lib/google.js'
 import { Readable } from 'node:stream'
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
 import { driveClientForAnyone } from '../domain/sales/gmail.js'

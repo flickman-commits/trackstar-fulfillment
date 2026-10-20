@@ -18,8 +18,11 @@ export async function launchBrowser() {
     })
   }
 
-  // Local: use the Chrome that puppeteer downloaded
-  const { default: puppeteerFull } = await import('puppeteer')
+  // Local: use the Chrome that puppeteer downloaded. The name is held in a
+  // variable on purpose: Vercel copies every literally imported package into
+  // each function, and full puppeteer is never used there.
+  const LOCAL_ONLY = 'puppeteer'
+  const { default: puppeteerFull } = await import(LOCAL_ONLY)
   return puppeteerFull.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],

@@ -6,7 +6,7 @@
  * is the print's filename; a name already in the folder gets " (2)".
  */
 import { Readable } from 'node:stream'
-import { google } from 'googleapis'
+import { google } from '../../lib/google.js'
 import prisma from '../../db.js'
 import { driveClientForAnyone } from '../sales/gmail.js'
 import { signedFiles } from './jobs.js'

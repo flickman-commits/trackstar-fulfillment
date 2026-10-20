@@ -31,7 +31,7 @@
  * and the sent message is read back and stored like any other, tagged with
  * who pressed Send.
  */
-import { google } from 'googleapis'
+import { google } from '../../lib/google.js'
 import prisma from '../../db.js'
 import { unwrapForward } from './forwards.js'
 import { isForwarder } from './forwarders.js'

@@ -28,7 +28,7 @@
  *   4. Open Sales, press Connect Gmail.
  */
 import crypto from 'crypto'
-import { google } from 'googleapis'
+import { google } from '../../lib/google.js'
 import prisma from '../../db.js'
 import { UserError } from './errors.js'
 import { requireConnection } from '../../lib/connections.js'

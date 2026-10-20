@@ -8,7 +8,7 @@
  * Every test returns { ok, detail }. The detail is a short sentence for an
  * admin; an upstream error is trimmed to its first line, never a stack.
  */
-import { google } from 'googleapis'
+import { google } from './google.js'
 import { fetchWithTimeout } from './fetchWithTimeout.js'
 import { requireConnection } from './connections.js'
 

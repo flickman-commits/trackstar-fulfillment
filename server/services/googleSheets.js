@@ -9,7 +9,7 @@
  * The sheet itself must be shared with that service account email (Viewer access).
  * Used by the Marathon Monopoly board (monopolyBoard.js).
  */
-import { google } from 'googleapis'
+import { google } from '../lib/google.js'
 import { requireConnection } from '../lib/connections.js'
 
 // Hardcoded — the sheet ID isn't sensitive and only one tracker exists.
