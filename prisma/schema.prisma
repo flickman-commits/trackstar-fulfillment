@@ -160,6 +160,8 @@ model Order {
   @@index([isRushOrder])
   @@index([designStatus])
   @@index([assigneeId])
+  // The order list: open orders of a type, newest first (api/orders/index.js).
+  @@index([status, trackstarOrderType, createdAt])
 }
 
 model Race {
@@ -1208,6 +1210,8 @@ model SupportMessage {
 
   @@index([threadId, sentAt])
   @@index([sentAt])
+  // Last import time on the Support page (mailbox status()).
+  @@index([channel, createdAt])
 }
 
 // What the team says to each other on a thread, and what happened to it.

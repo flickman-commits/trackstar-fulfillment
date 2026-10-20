@@ -12,7 +12,7 @@
  */
 import { setCors, isCronRequest } from '../_lib/auth.js'
 import { requireCapability } from '../_lib/users.js'
-import { sync, status } from '../../server/domain/support/mailbox.js'
+import { sync, isConnected } from '../../server/domain/support/mailbox.js'
 import { refreshTokenIfDue, ensureSubscribed, catchUpIfDue } from '../../server/domain/support/instagram.js'
 import { draftPending } from '../../server/domain/support/draft.js'
 
@@ -36,8 +36,7 @@ export default async function handler(req, res) {
     } catch (err) {
       console.warn(`[support.instagram] upkeep: ${err.message}`)
     }
-    const s = await status()
-    if (!s.connected) return res.status(200).json({ skipped: 'not_connected' })
+    if (!(await isConnected())) return res.status(200).json({ skipped: 'not_connected' })
     const out = await sync()
     if (out.imported || out.failed) console.log(`[support.sync] ${out.mode}: imported ${out.imported}, failed ${out.failed}`)
     // Claude's drafts for what just came in (and anything still waiting on one). Never fails the sync.

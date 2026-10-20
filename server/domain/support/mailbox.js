@@ -148,13 +148,25 @@ export async function status() {
   }
 }
 
+// Kept for the life of a warm instance: a new OAuth client per run meant a
+// fresh token exchange with Google every five minutes. googleapis refreshes
+// the access token itself when it expires.
+let cachedClient = null
+
 async function client() {
   await requireConnection('support_gmail')
   const refresh = await getConfig(KEY_REFRESH)
   if (!refresh) throw new UserError('The support mailbox is not connected. An admin connects it from the Support page.')
+  if (cachedClient?.refresh === refresh) return cachedClient.gmail
   const auth = oauthClient()
   auth.setCredentials({ refresh_token: refresh })
-  return google.gmail({ version: 'v1', auth })
+  cachedClient = { refresh, gmail: google.gmail({ version: 'v1', auth }) }
+  return cachedClient.gmail
+}
+
+/** One read: whether the mailbox is connected. What the sync cron needs; status() is for the page. */
+export async function isConnected() {
+  return Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET) && Boolean(await getConfig(KEY_REFRESH))
 }
 
 /**
@@ -566,17 +578,21 @@ export async function backfill({ pages = 2, pageSize = 100 } = {}) {
   return { done, imported, failed, total }
 }
 
-/** How far back every sync double-checks that nothing was missed. */
+/** How far back the sweep double-checks that nothing was missed. */
 const SWEEP_DAYS = 7
+/** The sweep runs hourly, or at once when history could not be read. */
+const SWEEP_EVERY_MS = 60 * 60_000
+const KEY_LAST_SWEEP = 'support_gmail_last_sweep'
 
 /**
  * Catch up with whatever changed since the last sync. history.list from the
  * saved id is one call when nothing happened. Gmail only keeps history for a
  * week or so; when the id is too old (404) it starts fresh from now.
  *
- * Every run also lists the last week of mail and fetches anything the
- * mirror does not have: one cheap list call, and it is what heals a message
- * lost to a quota error or a failed run. The history id only moves forward
+ * Once an hour (and whenever history could not be read) it also lists the
+ * last week of mail and fetches anything the mirror does not have: what heals
+ * a message lost to a quota error or a failed run. Every five minutes was
+ * twelve times the Gmail reads for a mailbox that gets a few emails a day. The history id only moves forward
  * when every message was stored, so a failure is retried on the next run.
  */
 export async function sync() {
@@ -610,18 +626,26 @@ export async function sync() {
     }
   }
 
-  // The sweep: the last week, whatever history said.
-  let sweepToken
-  let swept = 0
-  do {
-    const res = await withRetry(() => gmail.users.messages.list({ userId: 'me', q: `${MAIL_QUERY} newer_than:${SWEEP_DAYS}d`, maxResults: 500, pageToken: sweepToken }), { label: 'sweep list' })
-    for (const m of res.data.messages || []) { ids.add(m.id); swept++ }
-    sweepToken = res.data.nextPageToken
-  } while (sweepToken && swept < 2000)
+  // The sweep: the last week, whatever history said. Hourly, or now when
+  // history did not cover the gap.
+  const lastSweep = Number(await getConfig(KEY_LAST_SWEEP) || 0)
+  const sweep = mode !== 'history' || Date.now() - lastSweep > SWEEP_EVERY_MS
+  if (sweep) {
+    let sweepToken
+    let swept = 0
+    do {
+      const res = await withRetry(() => gmail.users.messages.list({ userId: 'me', q: `${MAIL_QUERY} newer_than:${SWEEP_DAYS}d`, maxResults: 500, pageToken: sweepToken }), { label: 'sweep list' })
+      for (const m of res.data.messages || []) { ids.add(m.id); swept++ }
+      sweepToken = res.data.nextPageToken
+    } while (sweepToken && swept < 2000)
+  }
 
   const out = await importIds(gmail, [...ids], { mailbox })
-  if (!out.failed) await setConfig(KEY_HISTORY, current)
-  return { ...out, mode, seen: ids.size }
+  if (!out.failed) {
+    await setConfig(KEY_HISTORY, current)
+    if (sweep) await setConfig(KEY_LAST_SWEEP, String(Date.now()))
+  }
+  return { ...out, mode, seen: ids.size, swept: sweep }
 }
 
 // ---------------------------------------------------------------------------
