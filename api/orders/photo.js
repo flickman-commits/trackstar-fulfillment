@@ -18,11 +18,11 @@
  * paid, and the print cannot be completed before then (photoPayment.js).
  */
 import crypto from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireAdminRole, requireCapability, recordAudit } from '../_lib/users.js'
 import prisma from '../_lib/prisma.js'
 import { addVariantToOrder, PHOTO_ADDON_VARIANT_ID } from '../../server/services/shopifyOrderEdit.js'
+import { storage } from '../../server/lib/storage.js'
 
 const BUCKET = 'personalization-photos'
 const EXTS = new Set(['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp'])
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       if (ext === 'jpeg') ext = 'jpg'
       // Same shape as checkout uploads, so the viewer and retention sweep treat it alike.
       const path = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${ext}`
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+      const supabase = storage()
       const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path)
       if (error) return res.status(500).json({ error: 'Could not start the upload. Try again.' })
       return res.status(200).json({ path, uploadUrl: data.signedUrl })

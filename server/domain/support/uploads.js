@@ -8,8 +8,8 @@
  * Instagram DM a signed link Meta fetches once.
  */
 import { randomUUID } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
 import { UserError } from './errors.js'
+import { storage as sharedStorage } from '../../lib/storage.js'
 
 export const UPLOAD_BUCKET = 'support-attachments'
 // Gmail takes 25 MB a message, all attachments together.
@@ -25,7 +25,7 @@ function storage() {
   const url = process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) throw new UserError('Storage is not configured')
-  return createClient(url, key, { auth: { persistSession: false } })
+  return sharedStorage()
 }
 
 let bucketReady = false

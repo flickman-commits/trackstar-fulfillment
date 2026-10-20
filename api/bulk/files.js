@@ -13,11 +13,11 @@
 import fs from 'fs'
 import { randomUUID } from 'crypto'
 import formidable from 'formidable'
-import { createClient } from '@supabase/supabase-js'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { matchFileToRunner, checkUrl } from '../../server/domain/bulk/bulkOrders.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
+import { storage } from '../../server/lib/storage.js'
 
 export const config = { api: { bodyParser: false } }
 
@@ -116,7 +116,7 @@ export default async function handler(req, res) {
     const safeName = original.replace(/[^A-Za-z0-9._-]/g, '_')
     const path = `bulk/${bulk.number}/${randomUUID()}/${safeName}`
 
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    const supabase = storage()
     const { error } = await supabase.storage.from(BUCKET).upload(path, buffer, { contentType, upsert: false })
     if (error) return res.status(500).json({ error: 'Upload failed. Try again.' })
     const url = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl

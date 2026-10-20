@@ -9,9 +9,9 @@
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { loadActiveUser, recordAudit, fullName } from '../_lib/users.js'
-import { createClient } from '@supabase/supabase-js'
 import { fetchWithTimeout } from '../../server/lib/fetchWithTimeout.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
+import { storage } from '../../server/lib/storage.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS' })) return
@@ -44,10 +44,7 @@ export default async function handler(req, res) {
       // Upload image to Supabase Storage if provided (server-side with service role key)
       let imageUrl = null
       if (imageData) {
-        const supabase = createClient(
-          process.env.SUPABASE_URL,
-          process.env.SUPABASE_SERVICE_ROLE_KEY
-        )
+        const supabase = storage()
         // Raster images only: the bucket is public, and an SVG (or anything a
         // browser sniffs as HTML) served from it would run script.
         const ext = String((imageName || 'image.png').split('.').pop() || 'png').toLowerCase()
@@ -131,10 +128,7 @@ export default async function handler(req, res) {
       // Clean up image from Supabase Storage if present
       if (comment.imageUrl) {
         try {
-          const supabase = createClient(
-            process.env.SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
-          )
+          const supabase = storage()
           const match = comment.imageUrl.match(/\/storage\/v1\/object\/public\/order-comments\/(.+)$/)
           if (match?.[1]) {
             await supabase.storage.from('order-comments').remove([decodeURIComponent(match[1])])

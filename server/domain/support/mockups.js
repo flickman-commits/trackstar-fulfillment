@@ -12,14 +12,14 @@
  * picture never round-trips through the browser and nothing the browser
  * sends can make the server fetch an arbitrary URL.
  */
-import { createClient } from '@supabase/supabase-js'
 import { readUpload } from './uploads.js'
 import prisma from '../../db.js'
 import { BUCKET } from '../render/jobs.js'
 import { UserError } from './errors.js'
+import { storage as sharedStorage } from '../../lib/storage.js'
 
 function storage() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  return sharedStorage()
 }
 
 /** Every mockup for these order rows, newest first, with a short-lived thumbnail to show. */

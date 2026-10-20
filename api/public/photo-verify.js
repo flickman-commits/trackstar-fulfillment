@@ -18,11 +18,11 @@
  * Defends against type spoofing and decompression bombs; see
  * server/lib/imageValidation.js for the specifics.
  */
-import { createClient } from '@supabase/supabase-js'
 import { setCors } from '../_lib/auth.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
 import { validateImageBytes } from '../../server/lib/imageValidation.js'
 import { stripMetadata } from '../../server/lib/photoSanitize.js'
+import { storage } from '../../server/lib/storage.js'
 
 const BUCKET = 'personalization-photos'
 
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'bad_path' })
   }
 
-  const supabase = createClient(url, key, { auth: { persistSession: false } })
+  const supabase = storage()
 
   /** Remove a file that failed verification so bad bytes never linger. */
   async function purge(reason) {

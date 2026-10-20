@@ -30,9 +30,9 @@
  *   bored visitor cannot fill the bucket. Gated behind PHOTO_UPLOAD_ENABLED
  *   so it stays dark until we turn it on.
  */
-import { createClient } from '@supabase/supabase-js'
 import { setCors } from '../_lib/auth.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
+import { storage } from '../../server/lib/storage.js'
 
 const BUCKET = 'personalization-photos'
 
@@ -133,7 +133,7 @@ export default async function handler(req, res) {
   const path = buildPath(ext)
 
   try {
-    const supabase = createClient(url, key, { auth: { persistSession: false } })
+    const supabase = storage()
     const { data, error } = await supabase
       .storage
       .from(BUCKET)

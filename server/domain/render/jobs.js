@@ -6,18 +6,18 @@
  * races they have templates for, which is how the tool knows which orders can
  * offer "Create Design" at all.
  */
-import { createClient } from '@supabase/supabase-js'
 import prisma from '../../db.js'
 import { buildSpec, SPEC_SELECT } from './spec.js'
 import { availableTemplateKeys, noTimeGaps, onlineWorkers as onlineWorkersList } from './templates.js'
 import { getCanonicalRaceName } from '../../scrapers/index.js'
+import { storage as sharedStorage } from '../../lib/storage.js'
 
 export const BUCKET = 'production-files'
 const ONLINE_MS = 90_000
 const STALE_CLAIM_MS = 10 * 60_000
 
 function storage() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  return sharedStorage()
 }
 
 /** Workers seen in the last minute and a half. */

@@ -23,13 +23,13 @@ import { alertError } from '../_lib/alerts.js'
 import { recordAudit, requireAdminRole } from '../_lib/users.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
 import { postSlack, slackText } from '../../server/lib/slack.js'
-import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import crypto from 'crypto'
 import formidable from 'formidable'
 import fs from 'fs'
 import { requireConnection } from '../../server/lib/connections.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
+import { storage } from '../../server/lib/storage.js'
 // sharp loaded dynamically in processImage() — top-level import crashes Vercel cold start
 
 // Disable Vercel's default body parser for multipart support
@@ -735,7 +735,7 @@ export default async function handler(req, res) {
       const ext = String(filename || 'proof.png').split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'
       if (!PROOF_EXTS.has(ext)) return res.status(400).json({ error: 'Proofs are PNG, JPG, GIF, WebP or PDF.' })
       const path = `${orderId}/raw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+      const supabase = storage()
       const { data, error } = await supabase.storage.from('order-proofs').createSignedUploadUrl(path)
       if (error) return res.status(500).json({ error: 'Could not start the upload. Try again.' })
       return res.status(200).json({
@@ -776,7 +776,7 @@ export default async function handler(req, res) {
         batch = hasPending ? maxBatch : maxBatch + 1
       }
 
-      const supabaseClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+      const supabaseClient = storage()
       let publicUrl = imageUrl || null
       let thumbnailUrl = null
 
@@ -942,7 +942,7 @@ export default async function handler(req, res) {
 
       if (proof.imageUrl) {
         try {
-          const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+          const supabase = storage()
           const match = proof.imageUrl.match(/\/storage\/v1\/object\/public\/order-proofs\/(.+)$/)
           if (match?.[1]) {
             await supabase.storage.from('order-proofs').remove([decodeURIComponent(match[1])])

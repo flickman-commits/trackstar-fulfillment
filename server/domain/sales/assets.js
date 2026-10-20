@@ -15,8 +15,8 @@
  * Images attach inline (they render in the body, where they do the selling)
  * and everything else attaches as a file.
  */
-import { createClient } from '@supabase/supabase-js'
 import { UserError } from './errors.js'
+import { storage } from '../../lib/storage.js'
 
 const BUCKET = 'sales-assets'
 /** The bucket the tool used before it took decks. Read for as long as it has files. */
@@ -38,7 +38,7 @@ function client() {
   const url = process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) throw new UserError('Storage is not configured: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
-  return createClient(url, key)
+  return storage()
 }
 
 export function isAssetStorageConfigured() {

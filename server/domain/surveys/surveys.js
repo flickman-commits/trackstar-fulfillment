@@ -7,14 +7,14 @@
  * again changes the vote rather than adding one.
  */
 import crypto from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
 import prisma from '../../../api/_lib/prisma.js'
+import { storage } from '../../lib/storage.js'
 
 const BUCKET = 'order-proofs'
 const MAX_OPTIONS = 12
 const MAX_COMMENT = 500
 
-const supabase = () => createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+const supabase = () => storage()
 const newToken = () => crypto.randomBytes(9).toString('base64url')
 
 /** Open means not closed by hand and not past its end time. */

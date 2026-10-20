@@ -24,8 +24,8 @@
  *   we mint keeps this from being a general-purpose oracle for probing the
  *   bucket for other objects.
  */
-import { createClient } from '@supabase/supabase-js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { storage } from '../../server/lib/storage.js'
 
 const BUCKET = 'personalization-photos'
 
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     : DEFAULT_TTL_SECONDS
 
   try {
-    const supabase = createClient(url, key, { auth: { persistSession: false } })
+    const supabase = storage()
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, ttl)
 
     if (error || !data?.signedUrl) {
