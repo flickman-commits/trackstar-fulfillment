@@ -555,6 +555,7 @@ export function extractEtsyPersonalization(transaction) {
     needsAttention: false,
     rawPersonalization: null,
     productTitle: null,
+    bibNumberCustomer: null,
     timeCustomer: null,
     creativeDirection: null
   }
@@ -623,11 +624,15 @@ export function extractEtsyPersonalization(transaction) {
     const parsed = parseEtsyPersonalization(personalization.formatted_value)
     result.raceYear = parsed.raceYear
     result.needsAttention = parsed.needsAttention
+    // A bib the buyer typed ("Bib: 54772"), kept so a person can see it
+    result.bibNumberCustomer = parsed.bib
+    // "leave off the time" anywhere in the box, not only next to the name
+    result.hadNoTime = parsed.hadNoTime
     // Clean the runner name (detect "no time" and customer-provided times)
     if (parsed.runnerName) {
       const cleaned = cleanRunnerName(parsed.runnerName)
       result.runnerName = cleaned.cleaned
-      result.hadNoTime = cleaned.hadNoTime
+      result.hadNoTime = parsed.hadNoTime || cleaned.hadNoTime
       result.customerTime = cleaned.customerTime
     }
   } else {
@@ -1089,6 +1094,8 @@ export async function processOrders(options = {}) {
                   updateData.raceName = canonicalizeRaceName(extracted.raceName) || existing.raceName
                   updateData.runnerName = extracted.runnerName || existing.runnerName
                   updateData.raceYear = extracted.raceYear || existing.raceYear
+                  if (extracted.hadNoTime) updateData.hadNoTime = true
+                  if (extracted.bibNumberCustomer && !existing.bibNumberCustomer) updateData.bibNumberCustomer = extracted.bibNumberCustomer
                   updateData.etsyOrderData = etsyReceipt
 
                   // Classify custom orders (e.g. "Any Race - Custom Trackstar Print")
@@ -1306,6 +1313,9 @@ export async function processOrders(options = {}) {
                   runnerName = extracted.runnerName || runnerName
                   raceYear = extracted.raceYear || raceYear
                   hadNoTime = extracted.hadNoTime || false
+                  // Display only: not customerBib, which would make the
+                  // customer-results step record a bib-only "found" and skip research
+                  bibNumberCustomer = extracted.bibNumberCustomer || bibNumberCustomer
                   lineItemEtsyData = etsyReceipt
 
                   // Classify custom orders (e.g. "Any Race - Custom Trackstar Print")

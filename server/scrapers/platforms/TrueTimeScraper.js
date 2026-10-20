@@ -61,6 +61,16 @@ function decode(s) {
     .trim()
 }
 
+/**
+ * TrueTime's search box matches accents literally against names stored without
+ * them: "Jesús Lizárraga" (and "Lizárraga" alone) return "Sorry, your search
+ * returned no matches" for Des Moines 2026 while "Jesus Lizarraga" finds bib
+ * 7141. NFD splits an accented letter into base + combining mark; drop the marks.
+ */
+export function stripDiacritics(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 function toSeconds(t) {
   const m = String(t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})/)
   return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : null
@@ -154,7 +164,8 @@ export class TrueTimeScraper extends BaseScraper {
     }
     form.set('__EVENTTARGET', 'ctl00$edtSearch')
     form.set('__EVENTARGUMENT', '')
-    form.set('ctl00$edtSearch', term)
+    // Every search (full name, surname retry, bib) goes out without accents.
+    form.set('ctl00$edtSearch', stripDiacritics(term))
     const { text } = await this.fetchText(url, {
       method: 'POST',
       body: form.toString(),

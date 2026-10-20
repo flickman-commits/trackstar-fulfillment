@@ -64,7 +64,97 @@ const weatherService = new WeatherService()
 /** The marathon itself, which never has a named variant. */
 const isMainEventType = (e) => /^marathon$/i.test(String(e || '').trim())
 
+// What a timeout, a dropped connection or a sick server looks like in an error
+// message or a scraper's note. A 4xx other than 408/429 is left alone: that is
+// a config problem (wrong event id), which the scrapers already call not_found.
+const NETWORK_FAILURE = /\b(?:timed?\s?out|timeout|aborted|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|UND_ERR_\w+|fetch failed|socket hang up|network error|HTTP (?:5\d\d|408|429))\b/i
+
+/**
+ * Was this "not found" really a failed search?
+ *
+ * Several scrapers catch their own errors and hand back notFoundResult() with
+ * the message in the notes ("Error: fetch failed"), and some report a 5xx or a
+ * timeout in the notes of a not_found. Research used to store those as "Runner
+ * not found", which sends a person off to check the spelling of a name that
+ * was never searched. A real no-match has no error in its notes; a result with
+ * candidates is an answer, whatever its notes say.
+ * @param {Object} result - a scraper result
+ * @returns {boolean}
+ */
+export function isFailedSearch(result) {
+  if (!result || result.found || result.ambiguous) return false
+  if (result.researchStatus === 'upstream_error') return true
+  if (result.researchStatus && result.researchStatus !== 'not_found') return false
+  if (Array.isArray(result.possibleMatches) && result.possibleMatches.length > 0) return false
+  const notes = String(result.researchNotes || '')
+  return /^Error:/i.test(notes) || NETWORK_FAILURE.test(notes)
+}
+
+/** A thrown error that means the site did not answer, not a bug in our code. */
+function isNetworkError(err) {
+  if (!err) return false
+  if (err.name === 'AbortError' || err.name === 'TimeoutError') return true
+  return NETWORK_FAILURE.test(`${err.message || ''} ${err.code || ''} ${err.cause?.code || ''} ${err.cause?.message || ''}`)
+}
+
+/**
+ * The result research records when the results site could not be searched:
+ * upstream_error, which the order shows as "Timing site down, run research
+ * again", never "Runner not found".
+ */
+function upstreamError(raceName, year, detail) {
+  return {
+    found: false,
+    bibNumber: null,
+    officialTime: null,
+    officialPace: null,
+    eventType: null,
+    yearFound: year,
+    researchStatus: 'upstream_error',
+    researchNotes: `The ${raceName} ${year} results site could not be reached${detail ? ` (${detail})` : ''}, so the runner was not looked up. Run research again.`,
+    possibleMatches: null,
+  }
+}
+
+/** A short reason from a scraper note or an error, for upstreamError(). */
+function failureDetail(text) {
+  const t = String(text || '').replace(/^Error:\s*/i, '').trim()
+  const m = t.match(NETWORK_FAILURE)
+  return (m ? m[0] : t).slice(0, 80) || null
+}
+
 export class ResearchService {
+
+  /** The scraper for a race. A method so a test can hand in a stub. */
+  scraperFor(raceName, year) {
+    return getScraperForRace(raceName, year)
+  }
+
+  /** Load dashboard event-id overrides. A method so a test can skip the database. */
+  loadOverrides() {
+    return ensureOverridesLoaded()
+  }
+
+  /**
+   * One scraper search that never reports a failed search as a no-match: a
+   * thrown network error, or a not_found that is really an error, comes back
+   * as upstream_error. Any other throw (a bug) still throws.
+   */
+  async searchOnce(scraper, raceName, year, query) {
+    let result
+    try {
+      result = await scraper.searchRunner(query)
+    } catch (err) {
+      if (!isNetworkError(err)) throw err
+      console.warn(`[ResearchService] ${raceName} ${year} search failed: ${err.message}`)
+      return upstreamError(raceName, year, failureDetail(err.message || err.name))
+    }
+    if (isFailedSearch(result) && result.researchStatus !== 'upstream_error') {
+      console.warn(`[ResearchService] ${raceName} ${year} search failed, not a no-match: ${result.researchNotes}`)
+      return upstreamError(raceName, year, failureDetail(result.researchNotes))
+    }
+    return result
+  }
 
   /**
    * Main entry point - research an order
@@ -493,9 +583,9 @@ export class ResearchService {
     // someone loaded it. Until this call was here, only the repair tools
     // loaded it, so a fix made in the UI never reached order research or the
     // storefront lookup. Cached for 60s; cheap on a warm instance.
-    await ensureOverridesLoaded()
-    const scraper = getScraperForRace(raceName, year)
-    let results = await scraper.searchRunner(runnerName)
+    await this.loadOverrides()
+    const scraper = this.scraperFor(raceName, year)
+    let results = await this.searchOnce(scraper, raceName, year, runnerName)
 
     // Candidates that did not pass namesMatch are SUGGESTIONS, not matches.
     //
@@ -536,8 +626,8 @@ export class ResearchService {
       if (nameParts.length >= 2) {
         const lastName = nameParts[nameParts.length - 1]
         console.log(`[ResearchService] Full name not found, trying last name only: "${lastName}"`)
-        const fallbackScraper = getScraperForRace(raceName, year)
-        const fallbackResults = await fallbackScraper.searchRunner(lastName)
+        const fallbackScraper = this.scraperFor(raceName, year)
+        const fallbackResults = await this.searchOnce(fallbackScraper, raceName, year, lastName)
 
         if (fallbackResults.found) {
           // Single exact match found by last name — use it but note the fallback
@@ -556,6 +646,12 @@ export class ResearchService {
           results.ambiguous = false
           results.researchStatus = 'not_found'
           results.researchNotes = `No match for "${runnerName}". Found ${fallbackResults.possibleMatches?.length || 'multiple'} runner(s) sharing the last name "${lastName}" - confirm before accepting.`
+        } else if (fallbackResults.researchStatus === 'upstream_error') {
+          // The site stopped answering partway through. The search is not
+          // finished, so this is not a "not found": record the failure and
+          // let research run again rather than settle on a half-done answer.
+          console.log(`[ResearchService] Last name fallback could not reach the results site`)
+          results = fallbackResults
         } else {
           console.log(`[ResearchService] Last name fallback also returned no results`)
         }

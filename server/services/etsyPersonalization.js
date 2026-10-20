@@ -86,17 +86,70 @@ export function parseEtsyRaceName(listingTitle) {
   return name || null
 }
 
+const MONTH = '(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\\.?'
+const ORDINAL = '\\d{1,2}(?:st|nd|rd|th)?'
+// "August 30", "Aug 30th,", "October 15th" and "30 August", "11 July", "15th of June".
+// The day and month may sit on different lines ("30\nAugust 2026").
+const MONTH_DAY = new RegExp(`\\b${MONTH}\\s+${ORDINAL}\\b,?`, 'gi')
+const DAY_MONTH = new RegExp(`\\b${ORDINAL}\\s+(?:of\\s+)?${MONTH}(?=\\s|,|$)`, 'gi')
+const LONE_ORDINAL = /\b\d{1,2}(?:st|nd|rd|th)\b/gi
+// 04-26-2026, 10/11/2026, 26.04.26
+const NUMERIC_DATE = /\b\d{1,2}[-/.]\d{1,2}[-/.](?:\d{4}|\d{2})\b/g
+// "Bib: 54772", "bib #54772", "Bib 54772", "bib# 30625", "Bib Number : 14808"
+const BIB = /\bbib\s*(?:number|num|no\.?)?\s*[:#]?\s*#?\s*(\d{1,6})\b/i
+// "leave off the time", "no time", "without the time", "don't include my time"
+const NO_TIME = [
+  /\bleav(?:e|ing)\s+(?:off|out)\s+(?:the\s+|my\s+)?(?:finish(?:ing)?\s+)?time\b/i,
+  /\bno\s+(?:finish(?:ing)?\s+)?time\b/i,
+  /\bwithout\s+(?:the\s+|a\s+|my\s+)?(?:finish(?:ing)?\s+)?time\b/i,
+  /\b(?:don'?t|do\s+not)\s+(?:include|add|put|show|print)\s+(?:the\s+|my\s+)?(?:finish(?:ing)?\s+)?time\b/i,
+  /\bomit\s+(?:the\s+|my\s+)?(?:finish(?:ing)?\s+)?time\b/i,
+]
+// Where the name stops: a bracket, the end of a sentence (not an initial like
+// "Darci L. Thompson"), a field label, or a request to us.
+const NAME_STOPS = [
+  /[([{]/,
+  /(?<!\b(?:[A-Z]|St|Mr|Mrs|Ms|Dr|Jr|Sr))[.!?](?=\s|$)/,
+  /\b(?:finish(?:ing)?\s+)?(?:time|pace|race|miles|distance|background|year|event)\s*:/i,
+  /\b(?:finish(?:ing)?\s+)?(?:time|pace)\s+\d/i,
+  /\b(?:please|pls|plz|i\s+would|i'?d|i\s+want|we\s+would|thank(?:s|\s+you)|can\s+you|could\s+you|if\s+possible|no\s+time|leave\s+off|leave\s+out|without\s+the)\b/i,
+]
+
+/**
+ * Pull the name out of a numbered answer list like the custom listings ask for:
+ *   "1. Coast Guard Marathon 2026  2. Lori Tucker  3. 1003  4. 5:53:57  5. notes"
+ * (1 = race, 2 = name, 3 = bib). Returns null when the text is not one.
+ */
+function numberedAnswers(text) {
+  if (!/^\s*1[.)]\s/.test(text) || !/\s2[.)]\s/.test(text)) return null
+  const parts = {}
+  const re = /(?:^|\s)([1-9])[.)]\s+/g
+  const marks = []
+  let m
+  while ((m = re.exec(text))) marks.push({ n: m[1], start: m.index, end: re.lastIndex })
+  marks.forEach((mk, i) => {
+    parts[mk.n] = text.slice(mk.end, i + 1 < marks.length ? marks[i + 1].start : text.length).trim()
+  })
+  return parts
+}
+
 /**
  * Parse buyer personalization text to extract runner name and race year
  * @param {string} rawText - Freeform buyer text, e.g. "John Smith, 2024"
- * @returns {{ runnerName: string|null, raceYear: number|null, rawText: string, needsAttention: boolean }}
+ * @returns {{ runnerName: string|null, raceYear: number|null, bib: string|null, hadNoTime: boolean, rawText: string, needsAttention: boolean, nameNeedsReview: boolean }}
+ *   needsAttention is set when the name or year is missing, or when the name
+ *   left over still looks wrong (more than 4 words, or digits in it);
+ *   nameNeedsReview says it was the name.
  */
 export function parseEtsyPersonalization(rawText) {
   const result = {
     runnerName: null,
     raceYear: null,
+    bib: null,
+    hadNoTime: false,
     rawText: rawText || '',
-    needsAttention: false
+    needsAttention: false,
+    nameNeedsReview: false,
   }
 
   if (!rawText || !rawText.trim()) {
@@ -106,15 +159,39 @@ export function parseEtsyPersonalization(rawText) {
 
   let text = rawText.trim()
 
-  // 1. Extract 4-digit year (20XX) — most reliable pattern
+  // A request to leave the time off the poster
+  result.hadNoTime = NO_TIME.some(re => re.test(text))
+
+  // Numbered answers: the name is answer 2 and the bib answer 3
+  const numbered = numberedAnswers(text)
+  if (numbered) {
+    const yearInList = text.match(/\b(20\d{2})\b/)
+    if (yearInList) result.raceYear = parseInt(yearInList[1], 10)
+    if (/^#?\d{1,6}$/.test(numbered['3'] || '')) result.bib = numbered['3'].replace('#', '')
+    text = numbered['2'] || ''
+  }
+
+  // 1. Bib number, when the buyer labels it
+  const bibMatch = text.match(BIB)
+  if (bibMatch) {
+    result.bib = bibMatch[1]
+    text = text.replace(bibMatch[0], ' ')
+  }
+
+  // 2. Extract 4-digit year (20XX) - most reliable pattern
   const yearMatch = text.match(/\b(20\d{2})\b/)
   if (yearMatch) {
     result.raceYear = parseInt(yearMatch[1], 10)
-    // Remove the year from the text
-    text = text.replace(yearMatch[0], '').trim()
+    // Numeric dates go whole ("04-26-2026"), then the year itself
+    text = text.replace(NUMERIC_DATE, ' ')
+    text = text.replace(yearMatch[0], '')
   }
 
-  // 2. Strip common label prefixes
+  // 3. Date fragments: a month with a day number, and ordinal days
+  text = text.replace(MONTH_DAY, ' ').replace(DAY_MONTH, ' ').replace(LONE_ORDINAL, ' ')
+  text = text.replace(/[ \t]+/g, ' ').trim()
+
+  // 4. Strip common label prefixes
   const labelPrefixes = [
     /^runner\s*:\s*/i,
     /^name\s*:\s*/i,
@@ -126,12 +203,27 @@ export function parseEtsyPersonalization(rawText) {
     text = text.replace(prefix, '').trim()
   }
 
-  // Also strip inline labels (e.g. "Runner: John Year: 2024" → after year removal: "Runner: John Year:")
+  // Also strip inline labels (e.g. "Runner: John Year: 2024" -> after year removal: "Runner: John Year:")
   text = text.replace(/\byear\s*:\s*/gi, '').trim()
   text = text.replace(/\brunner\s*(name)?\s*:\s*/gi, '').trim()
   text = text.replace(/\bname\s*:\s*/gi, '').trim()
 
-  // 3. Strip common event type words that buyers sometimes include
+  // 5. Cut the name where it ends: the first line with a letter in it, then
+  // the first bracket, sentence end, label or request, then a comma once at
+  // least two words are in hand ("Teresa Duff, #1709, 3:17:05").
+  // A line naming the race ("Eugene Marathon") is skipped when another line has words.
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => /[a-zA-Z]/.test(l))
+  text = lines.find(l => !/\b(?:marathon|half|10k|5k|ultra)\b/i.test(l)) || lines[0] || ''
+  for (const stop of NAME_STOPS) {
+    const m = text.match(stop)
+    if (m) text = text.slice(0, m.index)
+  }
+  const comma = text.indexOf(',')
+  if (comma > 0 && text.slice(0, comma).trim().split(/\s+/).length >= 2) {
+    text = text.slice(0, comma)
+  }
+
+  // 6. Strip common event type words that buyers sometimes include
   const eventTypes = [
     /\bmarathon\b/gi,
     /\bhalf\s+marathon\b/gi,
@@ -148,25 +240,28 @@ export function parseEtsyPersonalization(rawText) {
     }
   }
 
-  // 4. Strip month names (buyers sometimes include race date)
+  // 7. Strip month names (buyers sometimes include race date)
   const months = /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b/gi
   text = text.replace(months, '').trim()
 
-  // 5. Clean up separators
+  // 8. Clean up separators. A hyphen inside a name stays ("Scarbeary-Simmons").
   text = text
-    .replace(/[,/|–-]+/g, ' ')  // Replace separators with spaces
+    .replace(/(?<![a-zA-Z])-+|-+(?![a-zA-Z])/g, ' ')
+    .replace(/[,/|–]+/g, ' ')    // Replace separators with spaces
     .replace(/\s+/g, ' ')        // Collapse multiple spaces
     .trim()
 
-  // 6. Remove leading/trailing non-alpha chars
+  // 9. Remove leading/trailing non-alpha chars
   text = text.replace(/^[^a-zA-Z]+/, '').replace(/[^a-zA-Z]+$/, '').trim()
 
   if (text) {
     result.runnerName = text
+    // Still carrying a note, a date or a number: a person reads it before it prints
+    result.nameNeedsReview = text.split(/\s+/).length > 4 || /\d/.test(text)
   }
 
-  // Flag if we couldn't extract both fields
-  if (!result.runnerName || !result.raceYear) {
+  // Flag if we couldn't extract both fields, or the name looks wrong
+  if (!result.runnerName || !result.raceYear || result.nameNeedsReview) {
     result.needsAttention = true
   }
 

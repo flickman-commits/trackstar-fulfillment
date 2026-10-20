@@ -1,0 +1,130 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import http from 'node:http'
+import { BaseScraper } from '../scrapers/BaseScraper.js'
+import { ResearchService, isFailedSearch } from './ResearchService.js'
+
+// A results site that takes the connection and never answers, like the
+// Athlinks search endpoint did for Miami 2025.
+async function hangingSite() {
+  const sockets = new Set()
+  const server = http.createServer(() => { /* never respond */ })
+  server.on('connection', s => { sockets.add(s); s.on('close', () => sockets.delete(s)) })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const url = `http://127.0.0.1:${server.address().port}/Search`
+  const close = () => new Promise(resolve => { for (const s of sockets) s.destroy(); server.close(resolve) })
+  return { url, close }
+}
+
+/** Searches the hanging site and handles the timeout the way most scrapers do. */
+class TimingOutScraper extends BaseScraper {
+  constructor(url, { rethrow = false } = {}) {
+    super('Miami Marathon', 2025)
+    this.url = url
+    this.rethrow = rethrow
+    this.calls = []
+  }
+  async searchRunner(name) {
+    this.calls.push(name)
+    try {
+      await fetch(`${this.url}?search=${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(50) })
+      return this.notFoundResult()
+    } catch (error) {
+      if (this.rethrow) throw error
+      return { ...this.notFoundResult(), researchNotes: `Error: ${error.message}` }
+    }
+  }
+}
+
+/** Answers from a script: one result per search, in order. */
+class ScriptedScraper extends BaseScraper {
+  constructor(results) {
+    super('Miami Marathon', 2025)
+    this.results = results
+    this.calls = []
+  }
+  async searchRunner(name) {
+    this.calls.push(name)
+    const next = this.results.shift()
+    return typeof next === 'function' ? next.call(this) : next
+  }
+}
+
+function serviceWith(scraper) {
+  const service = new ResearchService()
+  service.loadOverrides = async () => {}
+  service.scraperFor = () => scraper
+  return service
+}
+
+test('a search that times out is recorded as upstream_error, not runner not found', async () => {
+  const site = await hangingSite()
+  try {
+    const scraper = new TimingOutScraper(site.url)
+    const r = await serviceWith(scraper).findRunner('Miami Marathon', 2025, 'Pat Example')
+    assert.equal(r.found, false)
+    assert.equal(r.researchStatus, 'upstream_error')
+    assert.match(r.researchNotes, /results site could not be reached/)
+    assert.match(r.researchNotes, /Run research again/)
+    assert.doesNotMatch(r.researchNotes, /not found/i)
+    // A failed search is not a reason to go ask a worse question by surname
+    assert.deepEqual(scraper.calls, ['Pat Example'])
+  } finally {
+    await site.close()
+  }
+})
+
+test('a scraper that lets the timeout throw is recorded as upstream_error too', async () => {
+  const site = await hangingSite()
+  try {
+    const r = await serviceWith(new TimingOutScraper(site.url, { rethrow: true })).findRunner('Miami Marathon', 2025, 'Pat Example')
+    assert.equal(r.researchStatus, 'upstream_error')
+  } finally {
+    await site.close()
+  }
+})
+
+test('a site that answers the name search and then times out on the surname search is upstream_error', async () => {
+  const scraper = new ScriptedScraper([
+    function () { return this.notFoundResult() },
+    function () { return this.upstreamErrorResult('timed out after retry') },
+  ])
+  const r = await serviceWith(scraper).findRunner('Miami Marathon', 2025, 'Pat Example')
+  assert.deepEqual(scraper.calls, ['Pat Example', 'Example'])
+  assert.equal(r.researchStatus, 'upstream_error')
+  assert.match(r.researchNotes, /unreachable or slow/)
+})
+
+test('a 5xx reported in a not_found note is upstream_error', async () => {
+  const scraper = new ScriptedScraper([function () { return this.notFoundResult('Search returned HTTP 503') }])
+  const r = await serviceWith(scraper).findRunner('Miami Marathon', 2025, 'Pat Example')
+  assert.equal(r.researchStatus, 'upstream_error')
+})
+
+test('a clean no-match is still not_found', async () => {
+  const scraper = new ScriptedScraper([
+    function () { return this.notFoundResult() },
+    function () { return this.notFoundResult() },
+  ])
+  const r = await serviceWith(scraper).findRunner('Miami Marathon', 2025, 'Pat Example')
+  assert.equal(r.researchStatus, 'not_found')
+  assert.match(r.researchNotes, /Runner not found/)
+})
+
+test('a 404 (wrong event id) stays not_found, and a bug in a scraper still throws', async () => {
+  const notFound = new ScriptedScraper([
+    function () { return this.notFoundResult('Search returned HTTP 404') },
+    function () { return this.notFoundResult() },
+  ])
+  assert.equal((await serviceWith(notFound).findRunner('Miami Marathon', 2025, 'Pat Example')).researchStatus, 'not_found')
+  const buggy = new ScriptedScraper([() => { throw new TypeError("Cannot read properties of undefined (reading 'courses')") }])
+  await assert.rejects(serviceWith(buggy).findRunner('Miami Marathon', 2025, 'Pat Example'), TypeError)
+})
+
+test('isFailedSearch: candidates are an answer whatever the note says', () => {
+  assert.equal(isFailedSearch({ found: false, researchStatus: 'not_found', researchNotes: 'Error: fetch failed' }), true)
+  assert.equal(isFailedSearch({ found: false, researchStatus: 'not_found', researchNotes: 'Error: x', possibleMatches: [{ name: 'A' }] }), false)
+  assert.equal(isFailedSearch({ found: true, researchNotes: 'Error: x' }), false)
+  assert.equal(isFailedSearch({ found: false, researchStatus: 'year_not_configured', researchNotes: 'timed out' }), false)
+  assert.equal(isFailedSearch({ found: false, researchStatus: 'not_found', researchNotes: 'Runner not found in Miami Marathon 2025 results' }), false)
+})

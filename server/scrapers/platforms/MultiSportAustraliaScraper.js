@@ -116,6 +116,39 @@ async function fetchViaBrowser(url) {
   }
 }
 
+/** Generational suffixes that are not the surname to search on. */
+const NAME_SUFFIX = /^(jr|sr|ii|iii|iv|v)\.?$/i
+
+function stripDiacritics(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+/**
+ * The search terms to try, in order, for a typed name: the name as typed, the
+ * name without accents (only if it had any), then the surname alone, with and
+ * without accents. Duplicates are dropped.
+ *
+ * nicknames.js exposes only firstNamesEquivalent, not the names in a group, so
+ * nickname variants cannot be queried directly. The surname-only query does
+ * the same job the way Mika and SVE use the table: every runner with that
+ * surname comes back and filterNameMatches applies the nickname table to them.
+ *
+ * The surname is the last word that is not a suffix ("William Cox IV" ->
+ * "Cox"). The site matches substrings, so a multi-word surname is still found
+ * by its last word ("PEREZ GARCIA" by "Garcia").
+ */
+export function searchQueries(runnerName) {
+  const typed = String(runnerName || '').trim().replace(/\s+/g, ' ')
+  if (!typed) return []
+  const words = typed.split(' ').filter(w => !NAME_SUFFIX.test(w))
+  const out = [typed, stripDiacritics(typed)]
+  if (words.length > 1) {
+    const surname = words[words.length - 1].replace(/[.,]+$/, '')
+    if (surname.length >= 2) out.push(surname, stripDiacritics(surname))
+  }
+  return [...new Set(out)]
+}
+
 export class MultiSportAustraliaScraper extends BaseScraper {
   /**
    * @param {number} year
@@ -159,31 +192,53 @@ export class MultiSportAustraliaScraper extends BaseScraper {
     console.log(`${'='.repeat(50)}`)
 
     try {
-      // Step 1: Search by name
-      const searchUrl = `${this.baseUrl}/races/${this.raceSlug}/search?search=${encodeURIComponent(runnerName)}`
-      console.log(`[${this.tag}] GET ${searchUrl}`)
-      let searchHtml
-      try {
-        searchHtml = await smartFetch(searchUrl)
-      } catch (err) {
-        console.log(`[${this.tag}] Search fetch failed: ${err.message}`)
-        if (err instanceof BlockedError) return this.upstreamErrorResult('search blocked by the site firewall')
-        return this.upstreamErrorResult(err.message)
-      }
-
       // Get marathon-specific event id (default to 1)
       const marathonEventId = this.config.eventIds?.[this.year]?.marathon
         ?? this.config.defaultMarathonEventId
         ?? 1
 
-      // Step 2: Extract candidate links — only those for the marathon event
-      const candidates = this._parseSearchResults(searchHtml, marathonEventId)
-      console.log(`[${this.tag}] Found ${candidates.length} marathon candidates`)
+      // Step 1: Search by name. The site matches the typed text literally, so
+      // "Bill Cox" finds nobody when he registered as William (Sydney 2026,
+      // bib 22082), and accents must agree both ways: "García" returns only
+      // rows stored as GARCÍA, "Garcia" only rows stored as GARCIA. So when a
+      // query yields no usable match, try the next one (see searchQueries)
+      // and let filterNameMatches, which knows nicknames and folds accents,
+      // pick among the rows. The first query with a strong (full first name)
+      // match wins. A query whose only matches are short forms keeps going to
+      // the surname query, so a Christopher found by one search cannot hide a
+      // Christian that only the surname search returns (London 2025).
+      const seen = new Map()
+      const weak = new Map()
+      let matches = []
+      for (const query of searchQueries(runnerName)) {
+        const searchUrl = `${this.baseUrl}/races/${this.raceSlug}/search?search=${encodeURIComponent(query)}`
+        console.log(`[${this.tag}] GET ${searchUrl}`)
+        let searchHtml
+        try {
+          searchHtml = await this._fetchPage(searchUrl)
+        } catch (err) {
+          console.log(`[${this.tag}] Search fetch failed: ${err.message}`)
+          if (err instanceof BlockedError) return this.upstreamErrorResult('search blocked by the site firewall')
+          return this.upstreamErrorResult(err.message)
+        }
 
+        // Step 2: Extract candidate links, only those for the marathon event
+        const candidates = this._parseSearchResults(searchHtml, marathonEventId)
+        for (const c of candidates) if (!seen.has(c.url)) seen.set(c.url, c)
+        const found = this.filterNameMatches(runnerName, candidates, c => c.name)
+        console.log(`[${this.tag}] "${query}": ${candidates.length} marathon candidates, ${found.length} name matches`)
+        if (found.length && this.nameMatchTier(runnerName, found[0].name) === 0) {
+          matches = found
+          break
+        }
+        for (const c of found) if (!weak.has(c.url)) weak.set(c.url, c)
+      }
+      // No strong match anywhere: re-rank every short-form or possible match
+      // from all the queries together, so the best tier across them is kept.
+      if (matches.length === 0) matches = this.filterNameMatches(runnerName, [...weak.values()], c => c.name)
+
+      const candidates = [...seen.values()]
       if (candidates.length === 0) return this.notFoundResult()
-
-      const matches = this.filterNameMatches(runnerName, candidates, c => c.name)
-      console.log(`[${this.tag}] Exact matches: ${matches.length}`)
 
       if (matches.length === 0) {
         console.log(`[${this.tag}] No name match. Surfacing ${Math.min(candidates.length, 10)} candidates.`)
@@ -217,7 +272,7 @@ export class MultiSportAustraliaScraper extends BaseScraper {
       console.log(`[${this.tag}] Fetching detail: ${detailUrl}`)
       let detailHtml
       try {
-        detailHtml = await smartFetch(detailUrl)
+        detailHtml = await this._fetchPage(detailUrl)
       } catch (err) {
         console.log(`[${this.tag}] Detail fetch failed: ${err.message}`)
         // We already matched this person by name on the search page and we
@@ -267,6 +322,11 @@ export class MultiSportAustraliaScraper extends BaseScraper {
       console.error(`[${this.tag}] Error: ${error.message}`)
       return { ...this.notFoundResult(), researchNotes: `Error: ${error.message}` }
     }
+  }
+
+  /** One page fetch; an instance method so tests can stand in for the site. */
+  _fetchPage(url) {
+    return smartFetch(url)
   }
 
   /**

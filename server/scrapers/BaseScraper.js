@@ -2,12 +2,90 @@
  * Base class for all race result scrapers
  * Provides common interface and shared utilities
  */
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { firstNamesEquivalent } from './nicknames.js'
+
+/** Generational suffixes, each mapped to one spelling so "Jnr" equals "Jr". */
+const GENERATIONAL_SUFFIXES = new Map([
+  ['jr', 'jr'], ['jnr', 'jr'],
+  ['sr', 'sr'], ['snr', 'sr'],
+  ['ii', 'ii'], ['iii', 'iii'], ['iv', 'iv'], ['v', 'v'],
+])
+
+/**
+ * Surname particles. A run made only of these ("de", "van der") is not
+ * evidence that two surnames are the same.
+ */
+const SURNAME_PARTICLES = new Set([
+  'de', 'del', 'della', 'der', 'den', 'di', 'da', 'das', 'do', 'dos', 'du',
+  'la', 'le', 'los', 'las', 'van', 'von', 'y', 'e', 'st', 'bin', 'al', 'el',
+])
+
+/**
+ * Per-searchRunner record of which name tier filterNameMatches returned, so
+ * a found result built on a tier-2 name can be held for a person to confirm.
+ * AsyncLocalStorage so concurrent searches on one instance do not mix.
+ */
+const nameSearchContext = new AsyncLocalStorage()
+
+/** True when `short` appears in `long` as consecutive whole words. */
+function isWordRun(short, long) {
+  if (short.length === 0 || short.length > long.length) return false
+  for (let i = 0; i + short.length <= long.length; i++) {
+    if (short.every((w, j) => long[i + j] === w)) return true
+  }
+  return false
+}
+
+/**
+ * Do two surname word lists name the same family? `rest1`/`rest2` are the
+ * words after the first name (they may include middle names). Hyphens split
+ * words, initials are ignored, and the overlap has to be at least one word
+ * that is not a particle. Tried both ways round, and also with each side's
+ * last word alone (the customer's surname when they typed a middle name).
+ */
+function surnameVariant(rest1, rest2) {
+  const words = rest => rest.flatMap(w => w.split('-')).filter(w => w.length > 1)
+  const a = words(rest1)
+  const b = words(rest2)
+  if (a.length === 0 || b.length === 0) return false
+  const meaningful = run => run.some(w => !SURNAME_PARTICLES.has(w))
+  const tries = [[a, b], [b, a], [a.slice(-1), b], [b.slice(-1), a]]
+  return tries.some(([short, long]) => meaningful(short) && isWordRun(short, long))
+}
+
+/**
+ * "Peter Maiers" and "G. Peter Maiers": `listed` starts with an initial and
+ * `typed`'s first name (exactly or by nickname) is one of `listed`'s middle
+ * names. Surnames are already known to be equal.
+ */
+function middleNameUsedAsFirst(typed, listed) {
+  if (listed.length < 3 || listed[0].length !== 1) return false
+  const first = typed[0]
+  if (first.length < 2) return false
+  return listed.slice(1, -1).some(m => m === first || firstNamesEquivalent(m, first))
+}
+
+/** The runner name a scraper put on a found result, if it put one. */
+function resultRunnerName(result) {
+  const raw = result.rawData || {}
+  const joined = `${raw.firstName || ''} ${raw.lastName || ''}`.trim()
+  return result.runnerName || result.officialName || raw.name || raw.fullName ||
+    raw.displayName || joined || null
+}
 
 export class BaseScraper {
   constructor(raceName, year) {
     this.raceName = raceName
     this.year = year
+
+    // Every platform's searchRunner runs inside a name-tier record, so a
+    // result found on a tier-2 ("possible") name is handed to a person to
+    // confirm instead of being accepted. See _confirmPossibleNameMatch.
+    const impl = this.searchRunner
+    if (typeof impl === 'function' && impl !== BaseScraper.prototype.searchRunner) {
+      this.searchRunner = (...args) => this._searchRunnerWithNameCheck(impl, args)
+    }
   }
 
   /**
@@ -225,41 +303,105 @@ export class BaseScraper {
   }
 
   /**
-   * Normalize runner name for comparison
-   * Handles "John Smith" vs "Smith, John" vs "JOHN SMITH"
+   * Split a runner name into a comparable base and its generational suffix.
+   *
+   * Handles "John Smith", "Smith, John", "JOHN SMITH", accents ("José" is
+   * "jose"), periods ("G. Peter" is "g peter") and generational suffixes in
+   * every position results pages put them: "William COX IV", "John M. Bland,
+   * Jr", "Bland Jr, John", "Cox, William IV". Sydney 2026 listed bib 22082 as
+   * "William COX IV"; the order said "William Cox", and comparing last words
+   * ("cox" with "iv") rejected the right runner.
+   *
+   * The suffix is kept apart rather than thrown away so that "William Cox Jr"
+   * is never matched to "William Cox Sr": when both names carry a suffix and
+   * they differ, they are different people (nameMatchTier checks this).
+   *
+   * A lone "V" after a first name in "Last, First V" form is read as a middle
+   * initial, not "the fifth": that form puts the suffix after the surname.
+   *
+   * @param {string} name
+   * @returns {{ base: string, suffix: string|null }}
    */
-  normalizeName(name) {
-    if (!name) return ''
+  parseRunnerName(name) {
+    if (!name) return { base: '', suffix: null }
 
-    // Convert to lowercase and trim
-    let normalized = name.toLowerCase().trim()
-
+    let s = String(name).toLowerCase().trim()
     // Fold accents/diacritics so "José" matches "Jose", "Müller" matches
     // "Muller", etc. NFD splits an accented char into base + combining mark,
     // then we strip the combining marks (U+0300–U+036F).
-    normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    s = s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+    s = s.replace(/\./g, ' ')
 
-    // Handle "Last, First" format
-    if (normalized.includes(',')) {
-      const [last, first] = normalized.split(',').map(s => s.trim())
-      normalized = `${first} ${last}`
+    let suffix = null
+    const takeSuffix = token => {
+      const canonical = GENERATIONAL_SUFFIXES.get(token)
+      if (canonical && !suffix) suffix = canonical
+      return Boolean(canonical)
+    }
+    const tokensOf = seg => seg.split(/\s+/).filter(Boolean)
+    // Drop one trailing suffix token, keeping at least `keep` tokens.
+    const dropTrailing = (tokens, keep, allowV = true) => {
+      const last = tokens[tokens.length - 1]
+      if (tokens.length > keep && (allowV || last !== 'v') && takeSuffix(last)) tokens.pop()
+      return tokens
     }
 
-    // Remove extra whitespace
-    normalized = normalized.replace(/\s+/g, ' ')
+    // A comma segment that is only a suffix ("..., Jr") is the suffix.
+    let segments = s.split(',').map(tokensOf).filter(t => t.length > 0)
+    if (segments.length > 1) segments = segments.filter(t => !(t.length === 1 && takeSuffix(t[0])))
 
-    return normalized
+    let tokens
+    if (segments.length >= 2) {
+      // "Last [Suffix], First [Middle] [Suffix]"
+      const last = dropTrailing(segments[0], 1)
+      const first = dropTrailing(segments.slice(1).flat(), 1, false)
+      tokens = [...first, ...last]
+    } else {
+      // "First [Middle] Last [Suffix]": keep at least first + last.
+      tokens = dropTrailing(segments[0] || [], 2)
+    }
+
+    return { base: tokens.join(' '), suffix }
+  }
+
+  /**
+   * Normalize runner name for comparison (see parseRunnerName). Returns
+   * "first [middle] last", lowercase, no accents, periods or generational
+   * suffix.
+   */
+  normalizeName(name) {
+    return this.parseRunnerName(name).base
   }
 
   /**
    * How strongly does a candidate name match the search query?
    *
    *   0 = STRONG. The first name matches outright (exact full string, or
-   *       first+last exact ignoring middle names).
+   *       first+last exact ignoring middle names and generational suffixes,
+   *       or the same words with a hyphen for a space: "Marks-Ball" and
+   *       "Marks Ball").
    *   1 = WEAK. The last name matches exactly but the first name only matches
-   *       as a SHORT FORM — either a curated nickname (Mike→Michael) or a
-   *       plain prefix (Chris→Christopher, Chris→Christian).
-   *   null = no match.
+   *       as a SHORT FORM: either a curated nickname (Mike→Michael) or a
+   *       plain prefix (Chris→Christopher, Chris→Christian). A sole weak
+   *       match is still accepted by the scrapers, as before.
+   *   2 = POSSIBLE. Probably the customer, but the names differ in a way only
+   *       a person should accept. Never auto-accepted: a found result that
+   *       rests on a tier-2 name is turned into a one-candidate confirmation
+   *       (see _confirmPossibleNameMatch). Two shapes:
+   *         a. Surname variant. First names agree (exactly or by nickname) and
+   *            one surname is a run of consecutive words in the other, with
+   *            hyphens read as word breaks: "Santiago Figueroa" and "Santiago
+   *            Figueroa De Leon" (Des Moines 2026, bib 2116), "Jane Ball" and
+   *            "Jane Marks-Ball". Whole words only, so "Ann Lee" never
+   *            matches "Ann Leeds", and a run of particles alone ("de", "van")
+   *            does not count.
+   *         b. Middle name used as the first name. Same surname, one side's
+   *            first token is an initial and the other's first name is one of
+   *            its middle names: "Peter Maiers" and "G. Peter Maiers" (Chicago
+   *            2003, bib 30212).
+   *   null = no match. Different first names on the same surname ("Matt
+   *       Murphy", "Paige Murphy") stay null, as do two different suffixes
+   *       ("William Cox Jr", "William Cox Sr").
    *
    * The prefix rule is what stops a repeat of the London 2025 "Chris Baxter"
    * incident. That page listed both Christopher Baxter and Christian Baxter.
@@ -267,7 +409,7 @@ export class BaseScraper {
    * not, so exactly one candidate survived the filter and the scraper
    * auto-accepted the wrong runner's finish time. A short first name that
    * prefixes a longer one is inherently ambiguous, and it is not the nickname
-   * table's job to enumerate every long form — the ambiguity has to be visible
+   * table's job to enumerate every long form; the ambiguity has to be visible
    * to the caller so a human can pick.
    *
    * Minimum 3 characters, so "Jo Smith" does not sweep in every Joseph,
@@ -275,14 +417,20 @@ export class BaseScraper {
    *
    * @param {string} query - what the customer entered
    * @param {string} candidate - a name from the results page
-   * @returns {0|1|null}
+   * @returns {0|1|2|null}
    */
   nameMatchTier(query, candidate) {
-    const n1 = this.normalizeName(query)
-    const n2 = this.normalizeName(candidate)
+    const q = this.parseRunnerName(query)
+    const c = this.parseRunnerName(candidate)
+    const n1 = q.base
+    const n2 = c.base
     if (!n1 || !n2) return null
 
+    // "William Cox Jr" and "William Cox Sr" are father and son.
+    if (q.suffix && c.suffix && q.suffix !== c.suffix) return null
+
     if (n1 === n2) return 0
+    if (n1.replace(/-/g, ' ').replace(/\s+/g, ' ') === n2.replace(/-/g, ' ').replace(/\s+/g, ' ')) return 0
 
     const parts1 = n1.split(' ')
     const parts2 = n2.split(' ')
@@ -293,12 +441,18 @@ export class BaseScraper {
     const first2 = parts2[0]
     const last2 = parts2[parts2.length - 1]
 
-    // Last name must match exactly no matter what.
-    if (last1 !== last2) return null
+    if (last1 === last2) {
+      if (first1 === first2) return 0
+      if (firstNamesEquivalent(first1, first2)) return 1
+      if (first1.length >= 3 && first2.startsWith(first1)) return 1
+      if (middleNameUsedAsFirst(parts1, parts2) || middleNameUsedAsFirst(parts2, parts1)) return 2
+      return null
+    }
 
-    if (first1 === first2) return 0
-    if (firstNamesEquivalent(first1, first2)) return 1
-    if (first1.length >= 3 && first2.startsWith(first1)) return 1
+    // Surnames differ as last words. Only a first-name agreement plus a
+    // whole-word surname overlap makes this worth showing a person.
+    const firstsAgree = first1 === first2 || firstNamesEquivalent(first1, first2)
+    if (firstsAgree && surnameVariant(parts1.slice(1), parts2.slice(1))) return 2
 
     return null
   }
@@ -307,7 +461,7 @@ export class BaseScraper {
    * Check if two names match (fuzzy comparison).
    *
    * Kept as a boolean convenience over nameMatchTier. Prefer
-   * filterNameMatches() when choosing among several candidates — this cannot
+   * filterNameMatches() when choosing among several candidates: this cannot
    * tell a confident match from an ambiguous short form.
    *
    * @param {string} name1 - the search query (what the customer entered)
@@ -324,8 +478,12 @@ export class BaseScraper {
    * Strong matches win outright: if the field contains a literal "Dan Smith"
    * then "Daniel Smith" is not a competing candidate and we should not make
    * the operator choose between them. Only when nothing matches strongly do
-   * the short-form matches come back — and if more than one of those survives,
-   * the caller's own "ambiguous" branch fires and a human decides.
+   * the short-form matches come back, and only when there are none of those
+   * do the tier-2 "possible" matches (surname variant, middle name as first
+   * name). If more than one survives, the caller's own "ambiguous" branch
+   * fires and a human decides. If a single possible match survives and the
+   * caller turns it into a found result, searchRunner's wrapper turns that
+   * back into a one-candidate confirmation, so it is never auto-accepted.
    *
    * @param {string} query - what the customer entered
    * @param {Array} items - candidate rows from the results page
@@ -333,14 +491,68 @@ export class BaseScraper {
    * @returns {Array} the surviving candidates (possibly empty)
    */
   filterNameMatches(query, items, nameOf) {
-    const strong = []
-    const weak = []
+    const byTier = [[], [], []]
     for (const item of items || []) {
       const tier = this.nameMatchTier(query, nameOf(item))
-      if (tier === 0) strong.push(item)
-      else if (tier === 1) weak.push(item)
+      if (tier !== null) byTier[tier].push(item)
     }
-    return strong.length > 0 ? strong : weak
+    const tier = byTier.findIndex(list => list.length > 0)
+    if (tier === -1) return []
+
+    const store = nameSearchContext.getStore()
+    if (store) {
+      store.bestTier = store.bestTier === null ? tier : Math.min(store.bestTier, tier)
+      if (tier === 2) store.possibleNames.push(...byTier[2].map(nameOf))
+    }
+    return byTier[tier]
+  }
+
+  /**
+   * Runs a subclass's searchRunner with a record of the name tiers its
+   * filterNameMatches calls returned (installed by the constructor).
+   */
+  async _searchRunnerWithNameCheck(impl, args) {
+    const store = { bestTier: null, possibleNames: [] }
+    const result = await nameSearchContext.run(store, () => impl.apply(this, args))
+    return this._confirmPossibleNameMatch(result, args[0], store)
+  }
+
+  /**
+   * A found (or identity-only) result whose name is only a tier-2 match is
+   * not accepted: it comes back as an ambiguous result with that one runner
+   * as the candidate, so the picker shows it and a person confirms. Ambiguous
+   * rather than not_found because ResearchService runs its surname-only
+   * fallback on not_found, which would replace this one good candidate with a
+   * list of everyone sharing the surname.
+   */
+  _confirmPossibleNameMatch(result, query, store) {
+    if (!result || typeof result !== 'object') return result
+    const accepted = result.found === true || result.researchStatus === 'time_unavailable'
+    if (!accepted) return result
+
+    const name = resultRunnerName(result)
+    const tier = name ? this.nameMatchTier(query, name) : null
+    // When the result does not carry a name we can read, fall back to what
+    // the filter returned during this search.
+    const possible = tier === 2 || (tier === null && store.bestTier === 2)
+    if (!possible) return result
+
+    const shownName = name || (store.possibleNames.length === 1 ? store.possibleNames[0] : null) || 'a runner'
+    const bib = result.bibNumber ? String(result.bibNumber) : null
+    const candidate = {
+      name: shownName,
+      bib,
+      time: result.officialTime || null,
+      pace: result.officialPace || null,
+      eventType: result.eventType || null,
+      resultsUrl: result.resultsUrl || null,
+    }
+    const out = this.ambiguousResult([candidate])
+    out.nameMatch = 'possible'
+    out.researchNotes = `Possible match for "${query}": ${shownName}${bib ? ` (bib ${bib})` : ''}. ` +
+      'The names are close but not the same (a longer or hyphenated surname, or a middle name used as the first name), ' +
+      'so confirm this is the customer before accepting.'
+    return out
   }
 
   /**

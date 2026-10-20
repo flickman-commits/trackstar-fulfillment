@@ -75,7 +75,6 @@ export class RaceRosterScraper extends BaseScraper {
       return this.yearNotConfiguredResult('missing eventCodes entry')
     }
 
-    // Search across all configured sub-events in order
     const eventOrder = this.config.eventSearchOrder || ['marathon', 'halfMarathon']
     const yearSubEvents = this.config.subEventIds?.[this.year] || {}
 
@@ -85,96 +84,69 @@ export class RaceRosterScraper extends BaseScraper {
       return this.yearNotConfiguredResult('missing subEventIds entry')
     }
 
-    for (const eventKey of eventOrder) {
-      const subEventId = yearSubEvents[eventKey]
-      if (!subEventId) continue
-
-      const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
-      console.log(`[${this.tag} ${this.year}] Searching ${eventLabel} (sub-event ${subEventId})...`)
-
-      const result = await this.searchEventType(runnerName, eventCode, subEventId, eventLabel, eventKey)
-      if (result.found) return result
-    }
-
-    console.log(`[${this.tag} ${this.year}] Runner not found in any event type`)
-    return this.notFoundResult()
-  }
-
-  /**
-   * Search for a runner in a specific sub-event
-   */
-  async searchEventType(runnerName, eventCode, subEventId, eventLabel, eventKey) {
+    // participant-search covers every sub-event of the event at once (each row
+    // carries its resultSubEventId), so one request serves all of them. This
+    // used to run once per configured sub-event: four identical requests per
+    // Newport lookup. Accents need no handling here: the API folds them
+    // ("José" and "Jose" return the same rows).
+    let allMatches
     try {
-      // Step 1: Search for participants
       const searchData = await this.fetchApi(
         `/v2/api/events/${eventCode}/participant-search?phrase=${encodeURIComponent(runnerName)}`
       )
-
       const exactMatches = searchData?.data?.exact || []
       const otherMatches = searchData?.data?.other || []
-      const allMatches = [...exactMatches, ...otherMatches]
-
+      allMatches = [...exactMatches, ...otherMatches]
       console.log(`[${this.tag} ${this.year}] Search returned ${allMatches.length} results (${exactMatches.length} exact, ${otherMatches.length} fuzzy)`)
+    } catch (error) {
+      console.error(`[${this.tag} ${this.year}] Error searching for ${runnerName}:`, error.message)
+      return this.upstreamErrorResult(error.message)
+    }
 
-      if (allMatches.length === 0) {
-        return this.notFoundResult()
-      }
+    // Sub-events in search order; the first one holding a name match decides.
+    for (const eventKey of eventOrder) {
+      const subEventId = yearSubEvents[eventKey]
+      if (!subEventId) continue
+      const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
 
-      // Filter to matches in this sub-event AND matching name
       const eventMatches = this.filterNameMatches(
         runnerName,
         allMatches.filter(m => String(m.resultSubEventId) === String(subEventId)),
         m => m.name
       )
+      console.log(`[${this.tag} ${this.year}] Matches in ${eventLabel} (sub-event ${subEventId}) with name match: ${eventMatches.length}`)
+      if (eventMatches.length === 0) continue
 
-      console.log(`[${this.tag} ${this.year}] Matches in ${eventLabel} with name match: ${eventMatches.length}`)
-
-      if (eventMatches.length === 0) {
-        // Surface close matches as possibleMatches so user can pick one
-        const closeMatches = allMatches.filter(m => String(m.resultSubEventId) === String(subEventId))
-        console.log(`[${this.tag} ${this.year}] No name match in ${eventLabel}. Surfacing ${Math.min(closeMatches.length, 10)} candidates.`)
-        return this.notFoundResult(null, closeMatches.slice(0, 10).map(m => ({
+      if (eventMatches.length > 1) {
+        // Two people with this name in one distance. Do not fall through to a
+        // later distance and hand back a third person's time.
+        eventMatches.forEach(m => console.log(`  - ${m.name}, Bib: ${m.bib}`))
+        return this.ambiguousResult(eventMatches.map(m => ({
           name: m.name,
           bib: m.bib,
           eventType: eventLabel,
         })))
       }
 
-      if (eventMatches.length > 1) {
-        console.log(`[${this.tag} ${this.year}] Multiple matches found:`)
-        eventMatches.forEach(m => console.log(`  - ${m.name}, Bib: ${m.bib}`))
-        return this.ambiguousResult(eventMatches.map(m => ({
-          name: m.name,
-          bib: m.bib,
-        })))
-      }
-
-      // Step 2: Fetch detailed result for the single match
       const match = eventMatches[0]
       console.log(`[${this.tag} ${this.year}] Found match: ${match.name} (bib ${match.bib}), fetching details...`)
-
-      const detailData = await this.fetchApi(
-        `/v2/api/events/${eventCode}/detail/${match.id}`
-      )
-
+      let detailData
+      try {
+        detailData = await this.fetchApi(`/v2/api/events/${eventCode}/detail/${match.id}`)
+      } catch (error) {
+        console.error(`[${this.tag} ${this.year}] Detail error for ${match.id}:`, error.message)
+        return this.upstreamErrorResult(`could not load detail ${match.id} for ${match.name}: ${error.message}`)
+      }
       const result = detailData?.data?.result
       if (!result) {
         console.log(`[${this.tag} ${this.year}] Could not fetch detail for result ${match.id}`)
-        return {
-          ...this.notFoundResult(),
-          researchNotes: 'Found runner but could not load detail'
-        }
+        return this.upstreamErrorResult(`could not load detail ${match.id} for ${match.name}`)
       }
-
       return this.extractRunnerData(result, eventLabel, eventCode, eventKey)
-
-    } catch (error) {
-      console.error(`[${this.tag} ${this.year}] Error searching for ${runnerName}:`, error.message)
-      return {
-        ...this.notFoundResult(),
-        researchNotes: `Error: ${error.message}`
-      }
     }
+
+    console.log(`[${this.tag} ${this.year}] Runner not found in any event type`)
+    return this.notFoundResult()
   }
 
   /**

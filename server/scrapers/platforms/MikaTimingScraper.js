@@ -1,8 +1,19 @@
 /**
  * Mika Timing Platform Scraper
  * Consolidates all races using Mika Timing results sites
- * Currently: Chicago Marathon (results.chicagomarathon.com)
- * Uses fetch + cheerio with <li> based result parsing
+ * (Boston, Chicago, Berlin, London).
+ * Uses fetch + cheerio. Two list layouts exist:
+ *   - <li class="list-group-item row"> rows (Boston 2018+, Chicago, Berlin)
+ *   - <table class="list-table"> rows (Boston 2010-2017, London 2015):
+ *     columns are read by their <th> label, so "Finish Net" (chip) is taken
+ *     and "Finish Gun" is never used.
+ *
+ * Years a site does not host: Mika answers /{year}/ for a missing year by
+ * redirecting to the live edition (boston.r.mikatiming.com/1999/ ends up on
+ * /1999/2026/), and the chicago-history archive answers an unknown
+ * event_main_group with the 2025 list. Both used to read as "runner not
+ * found". _shownEdition() catches them and the result is year_not_configured
+ * with a "results for that year are not available" note.
  */
 import { BaseScraper } from '../BaseScraper.js'
 import * as cheerio from 'cheerio'
@@ -23,7 +34,39 @@ export class MikaTimingScraper extends BaseScraper {
     super(config.raceName, year)
     this.config = config
     this.tag = config.tag || config.raceName
-    this.baseUrl = config.baseUrlPattern.replace('{year}', year)
+    // An archive instance (Chicago's chicago-history site) serves many
+    // editions from one base URL, picked by event_main_group.
+    const archive = config.archive
+    this.baseUrl = archive && year >= archive.fromYear && year <= archive.toYear
+      ? archive.baseUrl
+      : config.baseUrlPattern.replace('{year}', year)
+  }
+
+  /** The edition folder in the base URL (/2015, /2025), or null. */
+  _siteYear() {
+    const m = this.baseUrl.match(/\/(\d{4})\/?$/)
+    return m ? parseInt(m[1], 10) : null
+  }
+
+  /**
+   * The results site does not have this year. Same status as an unwired year
+   * (year_not_configured) so the order shows as a scraper/year problem, not a
+   * missing runner, with a note saying the results are not available.
+   */
+  yearNotAvailableResult(detail) {
+    return {
+      ...this.yearNotConfiguredResult(),
+      researchNotes: `Results for ${this.raceName} ${this.year} are not available on the results site` +
+        (detail ? ` (${detail})` : '') + '. Research the runner by hand from another source.',
+    }
+  }
+
+  /** A year the config says the site does not host, checked before any request. */
+  _configuredUnavailable() {
+    const first = this.config.firstResultsYear
+    if (first && this.year < first) return `${this.raceName} results on this site start in ${first}`
+    if ((this.config.missingYears || []).includes(this.year)) return `no ${this.year} edition on the results site`
+    return null
   }
 
   async getRaceInfo() {
@@ -99,13 +142,21 @@ export class MikaTimingScraper extends BaseScraper {
     console.log(`[${this.tag} ${this.year}] Searching for: "${runnerName}"`)
     console.log(`${'='.repeat(50)}`)
 
+    const unavailable = this._configuredUnavailable()
+    if (unavailable) return this.yearNotAvailableResult(unavailable)
+
     try {
       // A middle initial is not part of the surname: "Bill G. Schuette" sent
       // search[name]=G. Schuette and Mika found nobody. Drop initials between
       // the first name and the surname; multi-word surnames are kept whole.
-      const words = runnerName.trim().split(/\s+/)
+      // A leading initial ("G. Peter Maiers") is not a first name Mika can
+      // search on either: search[firstname]=G. finds nobody. Search on the
+      // next word; the full name still goes to filterNameMatches.
+      const isInitial = w => /^[A-Za-z]\.?$/.test(w)
+      let words = runnerName.trim().split(/\s+/)
+      if (words.length > 2 && isInitial(words[0])) words = words.slice(1)
       const nameParts = words.length > 2
-        ? [words[0], ...words.slice(1, -1).filter(w => !/^[A-Za-z]\.?$/.test(w)), words[words.length - 1]]
+        ? [words[0], ...words.slice(1, -1).filter(w => !isInitial(w)), words[words.length - 1]]
         : words
       const firstName = nameParts.length > 1 ? nameParts[0] : ''
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0]
@@ -124,13 +175,11 @@ export class MikaTimingScraper extends BaseScraper {
 
       const { searchUrl, results, yearMismatch } = page
 
-      // Safety check: verify the results page is showing the correct year
+      // Safety check: the site answered with another edition (a redirect to
+      // the live year, or an archive falling back to its newest year).
       if (yearMismatch) {
         console.error(`[${this.tag}] YEAR MISMATCH: Expected ${this.year}, got ${yearMismatch}`)
-        return {
-          ...this.notFoundResult(),
-          researchNotes: `Year mismatch: requested ${this.year} but results page shows ${yearMismatch}. Results may have been moved or the site structure changed.`
-        }
+        return this.yearNotAvailableResult(`requested ${this.year}, the site answered with ${yearMismatch}`)
       }
 
       console.log(`[${this.tag}] Found ${results.length} results in HTML`)
@@ -183,6 +232,8 @@ export class MikaTimingScraper extends BaseScraper {
   async searchRunnerByBib(bib) {
     const wanted = String(bib ?? '').trim()
     if (!wanted) return null
+    const unavailable = this._configuredUnavailable()
+    if (unavailable) return this.yearNotAvailableResult(unavailable)
     console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
     try {
       const eventCode = await this.resolveEventCode()
@@ -195,7 +246,7 @@ export class MikaTimingScraper extends BaseScraper {
       })
       if (!page.ok) return this.upstreamErrorResult(`Results site returned ${page.status}`)
       if (page.yearMismatch) {
-        return this.notFoundResult(`Year mismatch: requested ${this.year} but results page shows ${page.yearMismatch}`)
+        return this.yearNotAvailableResult(`requested ${this.year}, the site answered with ${page.yearMismatch}`)
       }
       const hits = page.results.filter(r => this.bibsEqual(r.bib, wanted))
       if (!hits.length) return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
@@ -221,8 +272,8 @@ export class MikaTimingScraper extends BaseScraper {
     console.log(`[${this.tag}] Response status: ${response.status}`)
     if (!response.ok) return { ok: false, status: response.status, searchUrl, results: [] }
     const html = await response.text()
-    const yearMismatch = this._checkYearMismatch(html)
-    return { ok: true, searchUrl, yearMismatch, results: yearMismatch ? [] : this._parseResultsHtml(html) }
+    const yearMismatch = this._shownEdition(html, response.url)
+    return { ok: true, searchUrl, yearMismatch, results: yearMismatch ? [] : this._parseResultsHtml(html, params.event) }
   }
 
   /** One list-page search. firstName may be empty for a surname-only search. */
@@ -241,9 +292,13 @@ export class MikaTimingScraper extends BaseScraper {
    * Parse Mika Timing HTML results
    * Each result row is an <li> with class "list-group-item row"
    */
-  _parseResultsHtml(html) {
+  _parseResultsHtml(html, eventCode = null) {
     const $ = cheerio.load(html)
     const runners = []
+    // The chicago-history archive does not filter on event=MAR: wheelchair
+    // rows (class event-WHL_...) come back mixed in. Rows carry their event in
+    // a class, so drop any whose event family differs from the one searched.
+    const family = code => String(code || '').split('_')[0]
 
     $('li.list-group-item.row').not('.list-group-header').each((_, el) => {
       try {
@@ -251,6 +306,9 @@ export class MikaTimingScraper extends BaseScraper {
 
         // Skip no-results alerts
         if ($row.find('.alert').length > 0) return
+
+        const rowEvent = (($row.attr('class') || '').match(/\bevent-([A-Za-z0-9_]+)/) || [])[1]
+        if (eventCode && rowEvent && family(rowEvent) !== family(eventCode)) return
 
         // Extract name from h4.type-fullname a
         const nameLink = $row.find('h4.type-fullname a, .type-fullname a')
@@ -336,6 +394,71 @@ export class MikaTimingScraper extends BaseScraper {
       }
     })
 
+    if (!runners.length) runners.push(...this._parseTableHtml($))
+    return runners
+  }
+
+  /**
+   * Older Mika list layout (Boston 2010-2017): a <table class="list-table">
+   * whose header cells name each column, e.g. Boston 2015:
+   *   Place Overall | Place Gender | Place Division | Name | BIB | HALF |
+   *   Finish Net | Finish Gun
+   * Boston 2010-2013 add "Prj. Finish" (a projection, never a result) and
+   * label the name column "Lastname". Columns are found by label, so
+   * "Finish Net" is the chip time and "Finish Gun" is skipped.
+   */
+  _parseTableHtml($) {
+    const runners = []
+    $('table.list-table').each((_, table) => {
+      const $table = $(table)
+      // Mika prefixes these labels with a hidden "aa " sort marker.
+      const headers = $table.find('thead th').map((_, th) =>
+        $(th).text().replace(/^\s*aa\s+/i, '').trim().toUpperCase()).get()
+      if (!headers.length) return
+      const col = test => headers.findIndex(test)
+      const nameCol = col(h => /NAME/.test(h))
+      const bibCol = col(h => /^BIB$|RUNNER\s*NO|START\s*NO/.test(h))
+      const halfCol = col(h => /HALF/.test(h))
+      const netCol = col(h => /FINISH/.test(h) && /NET|CHIP/.test(h))
+      // Plain "Finish" only; never gun, never a projected finish.
+      const plainFinishCol = col(h => /FINISH/.test(h) && !/NET|CHIP|GUN|PRJ|PROJ/.test(h))
+      const overallCol = col(h => /PLACE\s*OVERALL/.test(h))
+      const genderCol = col(h => /PLACE\s*GENDER/.test(h))
+      // The age group itself ("Category" on London 2015), not "Place Division"
+      // (Boston), which is a place.
+      const divisionCol = col(h => /^(DIVISION|CATEGORY|AGE\s*GROUP)$/.test(h))
+      const finishCol = netCol >= 0 ? netCol : plainFinishCol
+
+      $table.find('tbody tr').each((_, tr) => {
+        try {
+          const cells = $(tr).children('td').map((_, td) => $(td).text().replace(/\u00bb/g, '').trim()).get()
+          const cell = i => (i >= 0 && i < cells.length ? cells[i] : '')
+          const timeOf = i => (cell(i).match(/(\d{1,2}:\d{2}:\d{2})/) || [])[1] || ''
+          // Prefer the linked name; fall back to the header-indexed cell.
+          let fullName = $(tr).find('td a[href*="content=detail"]').first().text().trim() || cell(nameCol)
+          fullName = fullName.replace(/\s*\([A-Z]{2,3}\)\s*$/, '').trim()
+          if (!fullName) return
+          if (fullName.includes(',')) {
+            const [last, first] = fullName.split(',').map(x => x.trim())
+            fullName = `${first} ${last}`
+          }
+          const bib = cell(bibCol)
+          const finishTime = timeOf(finishCol)
+          if (!bib && !finishTime) return
+          runners.push({
+            name: fullName,
+            bib,
+            finishTime,
+            halfTime: timeOf(halfCol),
+            overallPlace: cell(overallCol),
+            genderPlace: cell(genderCol),
+            division: cell(divisionCol),
+          })
+        } catch (err) {
+          console.error(`[${this.tag}] Error parsing table row:`, err.message)
+        }
+      })
+    })
     return runners
   }
 
@@ -384,7 +507,34 @@ export class MikaTimingScraper extends BaseScraper {
   }
 
   /**
-   * Check if the results page is showing a different year than requested.
+   * Which edition the page actually shows, when it is not the one asked for.
+   * Returns that year (as a string) or null when the page is the right one.
+   *
+   *   1. Redirect: Mika sends a missing /{year}/ to the live edition, e.g.
+   *      boston.r.mikatiming.com/1999/ -> /1999/2026/ and
+   *      results.chicagomarathon.com/2003/ -> /2003/2026/.
+   *   2. Site edition: every Mika page carries "meeting_year":"YYYY" for the
+   *      instance it is. It must match the base URL's folder (/2015 for
+   *      Boston 2015, /2025 for the chicago-history archive).
+   *   3. Heading: "Results: YYYY / All" names the edition listed. The archive
+   *      falls back to 2025 for a year it lacks (1970, 2020) and says so here.
+   */
+  _shownEdition(html, finalUrl) {
+    const siteYear = this._siteYear()
+    if (siteYear && finalUrl) {
+      try {
+        const folders = [...new URL(finalUrl).pathname.matchAll(/\/(\d{4})(?=\/|$)/g)].map(m => parseInt(m[1], 10))
+        const last = folders[folders.length - 1]
+        if (last && last !== siteYear) return String(last)
+      } catch { /* unparseable URL: fall through to the page checks */ }
+    }
+    const meeting = String(html).match(/"meeting_year":"(\d{4})"/)
+    if (siteYear && meeting && parseInt(meeting[1], 10) !== siteYear) return meeting[1]
+    return this._checkYearMismatch(html)
+  }
+
+  /**
+   * Check if the results page heading names a different year than requested.
    * Returns the mismatched year string if found, or null if OK.
    */
   _checkYearMismatch(html) {
