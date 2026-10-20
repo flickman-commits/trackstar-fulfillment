@@ -200,7 +200,7 @@ export const DESIGN_STATUS_CONFIG: Record<DesignStatus, { icon: string; label: s
   awaiting_review: { icon: '🔶', label: 'Awaiting Review', color: 'text-amber-600', bgColor: 'bg-amber-50' },
   in_revision: { icon: '🟠', label: 'In Revision', color: 'text-orange-700', bgColor: 'bg-orange-50' },
   approved_by_customer: { icon: '🟣', label: 'Approved by Customer', color: 'text-purple-700', bgColor: 'bg-purple-50' },
-  final_pdf_uploaded: { icon: '🟤', label: 'Final PDF Uploaded', color: 'text-amber-800', bgColor: 'bg-amber-50' },
+  final_pdf_uploaded: { icon: '🟤', label: 'Attach in Artelo', color: 'text-[#4600D6]', bgColor: 'bg-[#4600D6]/[0.06]' },
   sent_to_production: { icon: '🟢', label: 'Sent to Production', color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
 }
 

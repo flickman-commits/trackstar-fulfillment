@@ -7,9 +7,12 @@
  *     customer's portal does not stay on the "approved" screen.
  *   - in_progress mints the approval token, so the customer can be messaged
  *     before any proof exists.
- *   - sent_to_production pings the proofs Slack channel and writes an
- *     "order.complete" line in the Activity Log, the same line a standard
- *     order gets, so the handling-time stats have an exact timestamp.
+ *   - sent_to_production writes an "order.complete" line in the Activity
+ *     Log, the same line a standard order gets, so the handling-time stats
+ *     have an exact timestamp. A partner order also pings Elí on the proofs
+ *     Slack channel to send it through. A custom order does not: its
+ *     designer uploads the final PDF here (customFinal.js), attaches it in
+ *     Artelo and sends it through themselves.
  */
 import prisma from '../../db.js'
 import { ensureApprovalToken } from '../../../api/_lib/approvalToken.js'
@@ -58,7 +61,7 @@ export async function setDesignStatus(existing, designStatus, completedById = nu
     })
   }
 
-  if (designStatus === 'sent_to_production' && process.env.SLACK_PROOF_WEBHOOK_URL) {
+  if (designStatus === 'sent_to_production' && existing.trackstarOrderType === 'race_partner' && process.env.SLACK_PROOF_WEBHOOK_URL) {
     const shopifyData = existing.shopifyOrderData
     const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
       ? String(shopifyData.name) : `#${existing.parentOrderNumber}`

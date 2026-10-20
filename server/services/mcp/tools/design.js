@@ -11,7 +11,7 @@ import { findOrdersByNumber, displayNumber, openWhere, shopifyNames, daysLate, m
 
 const LABEL = {
   not_started: 'Not started', in_progress: 'In progress', awaiting_review: 'Awaiting review', in_revision: 'In revision',
-  approved_by_customer: 'Approved', final_pdf_uploaded: 'Final PDF uploaded', sent_to_production: 'Sent to production',
+  approved_by_customer: 'Approved', final_pdf_uploaded: 'Final PDF uploaded, attach in Artelo', sent_to_production: 'Sent to production',
 }
 
 const SELECT = {

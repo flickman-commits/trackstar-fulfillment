@@ -7,6 +7,7 @@ import type { Design } from '@/lib/useDesign'
 import { raceNotRunYet, showsRaceNotRun } from '@/lib/raceStatus'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
+import CustomFinalPdf from '@/components/CustomFinalPdf'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
 import { DesignCard, DesignReview, DesignDetailsTags, DesignFileLinks } from '@/components/DesignPanel'
 import SourceLinks from '@/components/SourceLinks'
@@ -1402,8 +1403,26 @@ Thank you!`
 
                   {/* ═══ STAGE-SPECIFIC PRIMARY ACTION — always at the top ═══ */}
 
-                  {/* Customer approved → upload PDF & notify Eli */}
-                  {(ds === 'approved_by_customer' || ds === 'final_pdf_uploaded') && (
+                  {/* Customer approved: a custom order uploads its final PDF here (Drive + Artelo
+                      library), then Attach in Artelo and mark complete, like a standard order. */}
+                  {(ds === 'approved_by_customer' || ds === 'final_pdf_uploaded') && selectedOrder.trackstarOrderType === 'custom' && (
+                    <CustomFinalPdf
+                      orderId={selectedOrder.id}
+                      displayOrderNumber={selectedOrder.displayOrderNumber || selectedOrder.orderNumber}
+                      fileName={generateFilename(selectedOrder).replace(/\.pdf$/i, '')}
+                      designStatus={ds}
+                      arteloOrderUrl={selectedOrder.arteloUrl}
+                      onUploaded={() => {
+                        setSelectedOrder(prev => prev && prev.id === selectedOrder.id ? { ...prev, designStatus: 'final_pdf_uploaded' } : prev)
+                        setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, designStatus: 'final_pdf_uploaded' } : o))
+                        fetchOrders()
+                      }}
+                      onComplete={() => updateDesignStatus(selectedOrder.orderNumber, 'sent_to_production')}
+                    />
+                  )}
+
+                  {/* Partner order approved: upload the production file + photo to Drive and notify Eli */}
+                  {(ds === 'approved_by_customer' || ds === 'final_pdf_uploaded') && selectedOrder.trackstarOrderType !== 'custom' && (
                     <PostApprovalChecklist
                       orderId={selectedOrder.id}
                       orderNumber={selectedOrder.orderNumber}
