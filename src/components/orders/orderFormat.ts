@@ -95,6 +95,7 @@ export const getStatusDisplay = (order: Order) => {
   if (order.researchStatus === 'time_unavailable') return { icon: '⏱', label: 'Runner found, time needs manual entry' }
   if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site down, retry' }
   if (order.researchStatus === 'not_found') return { icon: '🕵️', label: 'Not found, look up by hand' }
+  if (order.researchStatus === 'year_not_configured' && /not available on the results site/.test(order.researchNotes || '')) return { icon: '📭', label: 'Results not online for this year' }
   if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Needs a scraper: this year is not wired up' }
   if (order.researchStatus === 'no_scraper' || !order.hasScraperAvailable) return { icon: '🛠️', label: 'Needs a scraper: research by hand' }
   return { icon: '🔍', label: 'Needs research' }
