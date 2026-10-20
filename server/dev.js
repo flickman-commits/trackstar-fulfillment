@@ -118,6 +118,8 @@ const routes = [
   { method: 'post',   path: '/api/public/photo-upload-url', handler: '../api/public/photo-upload-url.js' },
   { method: 'post',   path: '/api/public/photo-verify',    handler: '../api/public/photo-verify.js' },
   { method: 'post',   path: '/api/admin/preview-probe',    handler: '../api/admin/preview-probe.js' },
+  { method: 'get',    path: '/api/admin/connections',      handler: '../api/admin/connections.js' },
+  { method: 'post',   path: '/api/admin/connections',      handler: '../api/admin/connections.js' },
   { method: 'get',    path: '/api/cron/retention',         handler: '../api/cron/retention.js' },
   { method: 'get',    path: '/api/public/creator',         handler: '../api/public/creator.js' },
   { method: 'post',   path: '/api/public/creator',         handler: '../api/public/creator.js' },

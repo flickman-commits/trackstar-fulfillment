@@ -9,6 +9,7 @@ import { setCors } from '../_lib/auth.js'
 import { computeStats, RANGES, rangeWindow } from '../../server/services/shopifyStats.js'
 import { computeFulfillmentTime, sentToProductionToday } from '../../server/domain/orders/fulfillmentTime.js'
 import { requireCapability } from '../_lib/users.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
@@ -34,6 +35,6 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('[API /admin/stats] Error:', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

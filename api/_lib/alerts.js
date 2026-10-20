@@ -1,5 +1,6 @@
 
 import { fetchWithTimeout } from '../../server/lib/fetchWithTimeout.js'/**
+import { isConnectionOn } from '../../server/lib/connections.js'
  * Real-time error alerting to Slack.
  * Call alertError() when a critical operation fails — sends immediately to Slack.
  */
@@ -14,6 +15,11 @@ export async function alertError(context, error, meta = {}) {
   const webhookUrl = process.env.SLACK_PROOF_WEBHOOK_URL
   if (!webhookUrl) {
     console.error(`[alert] No Slack webhook configured. Error in ${context}:`, error)
+    return
+  }
+
+  if (!(await isConnectionOn('slack'))) {
+    console.error(`[alert] Slack is switched off. Error in ${context}:`, error)
     return
   }
 

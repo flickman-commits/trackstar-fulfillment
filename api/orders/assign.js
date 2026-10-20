@@ -26,6 +26,7 @@ import {
   getRaceRules, setRaceRules, applyRaceRule, moveOpenOrders } from '../../server/domain/orders/assignment.js'
 import { can } from '../_lib/roles.js'
 import { getCanonicalRaceName } from '../../server/scrapers/index.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -202,6 +203,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ orderId: order.id, assigneeId: order.assigneeId, assigneeName: order.assignee?.firstName || null })
   } catch (error) {
     console.error('[API /orders/assign]', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

@@ -16,11 +16,13 @@ import { google } from 'googleapis'
 import { Readable } from 'node:stream'
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
 import { driveClientForAnyone } from '../domain/sales/gmail.js'
+import { requireConnection } from '../lib/connections.js'
 
 const DEFAULT_FOLDER_ID = '1fypaQ9e7OderffveNyydacDcCZoY2d7S'
 
 let cachedDrive = null
 async function getDrive() {
+  await requireConnection('google_drive')
   const personal = await driveClientForAnyone().catch(() => null)
   if (personal) return personal
   if (cachedDrive) return cachedDrive

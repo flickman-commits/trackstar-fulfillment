@@ -24,6 +24,7 @@
 
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 /** Did the wizard put the gift question to this shopper? */
 function wasAsked(order) {
@@ -75,6 +76,6 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('[API /orders/gift-stats] Error:', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

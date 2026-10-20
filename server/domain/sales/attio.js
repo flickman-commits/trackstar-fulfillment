@@ -28,6 +28,7 @@
  */
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 import { UserError } from './errors.js'
+import { requireConnection } from '../../lib/connections.js'
 
 const BASE = process.env.ATTIO_BASE_URL || 'https://api.attio.com/v2'
 const PAGE = 500
@@ -55,6 +56,7 @@ export function isAttioConfigured() { return Boolean(process.env.ATTIO_API_KEY) 
  * burst of clicks slows down instead of failing in front of the rep.
  */
 async function attio(path, { method = 'GET', body } = {}) {
+  await requireConnection('attio')
   if (!isAttioConfigured()) throw new UserError('Attio is not connected: ATTIO_API_KEY is not set')
   let res
   for (let attempt = 0; ; attempt++) {

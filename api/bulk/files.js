@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { matchFileToRunner, checkUrl } from '../../server/domain/bulk/bulkOrders.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 export const config = { api: { bodyParser: false } }
 
@@ -125,6 +126,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ matched: true, how, orderNumber: runner.orderNumber, runnerName: runner.runnerName, url, replaced: Boolean(runner.productionFileUrl), reachable: reach.ok })
   } catch (error) {
     console.error('[API /bulk/files]', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

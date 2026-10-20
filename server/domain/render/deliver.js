@@ -11,6 +11,7 @@ import prisma from '../../db.js'
 import { driveClientForAnyone } from '../sales/gmail.js'
 import { signedFiles } from './jobs.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
+import { requireConnection } from '../../lib/connections.js'
 
 const ORDERS_FOLDER_ID = () => process.env.RENDER_ORDERS_FOLDER_ID || '1hvHh3F9Wdo8cpLPziSbIC1SUHe6Tq1OI'
 
@@ -27,6 +28,7 @@ function serviceDrive() {
  * must not stop prints reaching the folder when the service account can.
  */
 async function driveClients() {
+  await requireConnection('google_drive')
   const out = []
   const personal = await driveClientForAnyone().catch(() => null)
   if (personal) out.push({ name: 'the connected Google account', client: personal })

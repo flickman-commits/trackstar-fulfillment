@@ -13,6 +13,7 @@
  */
 import prisma from '../db.js'
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
+import { requireConnection } from '../lib/connections.js'
 
 const URL = 'https://www.artelo.com/api/open/orders/price-check'
 const FRAME = { black: 'BlackPremiumOak', natural: 'NaturalPremiumOak' }
@@ -75,6 +76,7 @@ export async function arteloPriceCheck({ items, address }) {
     items: items.map((it, i) => ({ orderItemId: `pc-${i}`, productInfo: productInfo(it.size, it.frame, imageId), quantity: Math.max(1, Number(it.quantity) || 1), unitPrice: 0 })),
     ...(branding ? { branding } : {}),
   }
+  await requireConnection('artelo')
   const res = await fetchWithTimeout(URL, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 20000)
   const text = await res.text()
   if (!res.ok) throw new Error(`Artelo price check ${res.status}: ${text.slice(0, 200)}`)

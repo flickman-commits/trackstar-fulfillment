@@ -31,6 +31,7 @@ import { requireAdminOnly } from '../_lib/users.js'
 import { agentActor } from '../_lib/agentToken.js'
 import { runNightlySweep, combineSweepPasses, NIGHTLY_REPORT_KEY } from '../../server/services/nightlySweep.js'
 import { formatSweepForSlack, formatSweepAsMarkdown, formatSweepBrief } from '../../server/services/nightlySweepReport.js'
+import { fetchWithTimeout } from '../../server/lib/fetchWithTimeout.js'
 
 /**
  * Park a rendered report where the morning digest reads it.
@@ -135,7 +136,7 @@ async function postToSlack(text) {
     console.warn('[nightly-sweep] no Slack webhook configured - skipping the report')
     return { sent: false, reason: 'no webhook configured' }
   }
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),

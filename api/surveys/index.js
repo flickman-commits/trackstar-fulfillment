@@ -13,6 +13,7 @@
  */
 import { setCors } from '../_lib/auth.js'
 import { requireAdminRole, requireCapability } from '../_lib/users.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 import {
   listSurveys, createSurvey, updateSurvey, deleteSurvey, startUpload,
   addOption, updateOption, removeOption, surveyResults,
@@ -58,6 +59,6 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('[API /surveys]', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

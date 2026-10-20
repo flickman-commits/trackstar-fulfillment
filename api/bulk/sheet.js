@@ -11,6 +11,7 @@ import XLSX from 'xlsx'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { sheetRows, sheetProblems, SHEET_COLUMNS } from '../../server/domain/bulk/bulkOrders.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
@@ -43,6 +44,6 @@ export default async function handler(req, res) {
     return res.status(200).send(buf)
   } catch (error) {
     console.error('[API /bulk/sheet]', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

@@ -31,6 +31,7 @@ import crypto from 'crypto'
 import { google } from 'googleapis'
 import prisma from '../../db.js'
 import { UserError } from './errors.js'
+import { requireConnection } from '../../lib/connections.js'
 
 /**
  * compose: create drafts and send. metadata: read message headers (From, Date)
@@ -198,6 +199,7 @@ export async function gmailStatus(userId) {
  * Drive, or null when nobody's does. Used by the custom gallery upload.
  */
 export async function driveClientForAnyone() {
+  await requireConnection('sales_gmail')
   const rows = await prisma.systemConfig.findMany({ where: { key: { startsWith: 'gmail_scopes:' } } })
   for (const row of rows) {
     if (!String(row.value).includes(SCOPE_DRIVE)) continue
@@ -212,6 +214,7 @@ export async function driveClientForAnyone() {
 }
 
 async function gmailClient(userId) {
+  await requireConnection('sales_gmail')
   const refresh = await refreshTokenFor(requireUser(userId))
   if (!refresh) throw new UserError('Gmail is not connected. Open Sales and press Connect Gmail.')
   const client = oauthClient()

@@ -1,4 +1,5 @@
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
+import { requireConnection } from '../lib/connections.js'
 // Shopify Client Credentials OAuth - Token Management
 // Tokens expire every 24 hours, so we cache with a 23-hour safety margin
 
@@ -64,6 +65,7 @@ export async function getShopifyToken() {
  * @param {object} options - Additional fetch options
  */
 export async function shopifyFetch(endpoint, options = {}) {
+  await requireConnection('shopify')
   const token = await getShopifyToken()
   const store = process.env.SHOPIFY_STORE
 
@@ -115,6 +117,7 @@ export async function shopifyFetch(endpoint, options = {}) {
  * @returns {object} the `data` object from the response
  */
 export async function shopifyGraphQL(query, variables = {}, { version = '2024-01' } = {}) {
+  await requireConnection('shopify')
   const token = await getShopifyToken()
   const store = process.env.SHOPIFY_STORE
 

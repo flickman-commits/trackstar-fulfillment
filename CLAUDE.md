@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Conventions for working in this repo. Read `README.md` first for what the app is.
+Conventions for working in this repo. Read `README.md` first for what the app is. The product is called TrackstarOS; the repo and folder keep the old `trackstar-fulfillment` name.
 
 ## Layout
 
@@ -19,6 +19,8 @@ Conventions for working in this repo. Read `README.md` first for what the app is
 - Keep `api/orders/actions.js` from growing. New features go in their own handler file (the Hobby-plan function cap that created it no longer applies).
 - No new template-style UI kits. Reuse `src/lib/ui.ts` and existing components.
 - Public endpoints (`api/public/*`) must use `checkRateLimitDurable` and never return `error.message`.
+- Outside services go through Connections (`server/lib/connections.js`): each service's client calls `await requireConnection('<id>')` before it calls out, so Settings > Connections can show it and switch it off. A new integration adds an entry to `CONNECTIONS` and a read-only test in `server/lib/connectionTests.js`; it does not mint its own client somewhere else. Endpoints answer unexpected errors with `sendPublicError(res, error)` (`server/lib/publicError.js`).
+- Every auth helper is async and must be awaited (`await requireAdmin(req, res)`); `scripts/check-auth-await.js` fails the build otherwise.
 - Sales: Attio is the CRM and the only source of truth for deals, people and stages. `server/domain/sales/attio.js` is the one file that talks to it. Never add a Postgres column that duplicates an Attio field; the `SalesSend`, `SalesSkip` and `SalesScheduled` tables hold machinery only. The tool moves a deal from Not Contacted to Reached Out on a send and never further; every other stage move is a person's. A `next_action` that does not start with `[auto]` was written by a human and is never overwritten. PR is worked from the people-based "PR Pipeline" list (`press_outreach`), not from deals: the tool moves an entry from To contact to Contacted on a send and never further. All email wording lives in the template library; a sequence (`sales_sequences`) is only the order of templates and the days between them, and custom variables live in `sales_variables` (see `server/domain/sales/sequences.js`). New templates start with a `[First line]` the person writes per email (the composer blocks sending until it is), and a template may leave it out; the tool never writes an opener itself.
 - MCP: `api/mcp/index.js` is the only route, on the official SDK; tools live in `server/services/mcp/tools/`. Every tool calls domain code, validates input with zod, returns a small explicit shape (never a raw Shopify/Artelo payload), and a write returns a `summary` for the Activity Log. Callers authenticate with API keys (`api/_lib/apiKeys.js`); a key acts as a person and never exceeds their role. Never return `error.message` from a tool; throw `ToolError` for anything the caller should read.
 - Where work lands: commit to `main` and push, in every session, including ones started with a `claude/*` branch name. No feature branches and no pull requests unless Matt asks for one; the branches were confusing and nobody reviews them. The only exception is the nightly routine's short-lived `sweep/*` preview branches below. Every change still has to pass the "Verify before you say it works" checks first.

@@ -39,6 +39,7 @@ import { oauthClient, originFor, isRevokedToken, buildMime, base64url, newMessag
 import { defaultAssigneeId } from './routing.js'
 import { isFiltered } from './filters.js'
 import { UserError } from './errors.js'
+import { requireConnection } from '../../lib/connections.js'
 
 const SCOPE_MODIFY = 'https://www.googleapis.com/auth/gmail.modify'
 const SCOPES = [SCOPE_MODIFY]
@@ -123,6 +124,13 @@ export async function disconnect() {
   await delConfig(KEY_REFRESH, KEY_EMAIL, KEY_SCOPES, KEY_HISTORY)
 }
 
+/** For Settings > Connections: one real Gmail call, returning the address. */
+export async function ping() {
+  const gmail = await client()
+  const profile = await gmail.users.getProfile({ userId: 'me' })
+  return String(profile.data.emailAddress || '')
+}
+
 export async function status() {
   const configured = Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET)
   const refresh = configured ? await getConfig(KEY_REFRESH) : null
@@ -141,6 +149,7 @@ export async function status() {
 }
 
 async function client() {
+  await requireConnection('support_gmail')
   const refresh = await getConfig(KEY_REFRESH)
   if (!refresh) throw new UserError('The support mailbox is not connected. An admin connects it from the Support page.')
   const auth = oauthClient()

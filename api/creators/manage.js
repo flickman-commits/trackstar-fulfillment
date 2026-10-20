@@ -16,6 +16,7 @@ import { setCors } from '../_lib/auth.js'
 import { requireCapability, requireAdminRole, recordAudit } from '../_lib/users.js'
 import { sendCreatorSample, linkCreatorSamples } from '../../server/domain/creators/creatorSample.js'
 import { makeInviteToken } from '../../server/domain/creators/portal.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 const GET_ACTIONS = {
   'home-metrics': res => handleCreatorHomeMetrics(res),
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('[API /creators/manage]', error)
     if (error.code === 'P2025') return res.status(404).json({ error: 'Not found' })
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }
 

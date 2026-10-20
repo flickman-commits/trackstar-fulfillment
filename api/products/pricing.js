@@ -40,6 +40,7 @@ import {
   WHOLESALE_EXCLUDED_SIZES,
 } from '../../server/services/pricing.js'
 import { requireCapability } from '../_lib/users.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
@@ -76,6 +77,6 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('[API /products/pricing] Error:', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

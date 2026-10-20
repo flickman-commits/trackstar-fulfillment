@@ -26,6 +26,7 @@ import { fetchWithTimeout } from './lib/fetchWithTimeout.js'
 import { buildShopifyMatchMap, buildEtsyMatchMap, isRushAddonLineItem, isRemovedLineItem, normalizeShopifyLines } from './lib/lineItemMatching.js'
 import { isBulkShopifyOrder } from './domain/bulk/shopifyBulk.js'
 import { assigneeForNewOrder, isAutoAssignee, endExpiredShifts } from './domain/orders/assignment.js'
+import { requireConnection } from './lib/connections.js'
 
 // Artelo API configuration
 // artelo.com, not artelo.io: the old host now redirects across domains and
@@ -706,6 +707,7 @@ export async function processOrders(options = {}) {
       throw new Error('ARTELO_API_KEY not configured')
     }
 
+    await requireConnection('artelo')
     const params = new URLSearchParams({ limit: '100', allOrders: 'true' })
     const response = await fetchWithTimeout(`${ARTELO_API_URL}?${params}`, {
       method: 'GET',
@@ -1399,7 +1401,7 @@ export async function processOrders(options = {}) {
                       `• Verify all personalization is complete\n` +
                       `• You can send this one to production yourself (no need to wait for Matt)\n` +
                       `• After submitting to production, ping Artelo via customer support: _"hey - we just submitted order ${displayNum} for production and the customer requested expedited shipping - please use 2-day air and charge to our account. thanks!"_`
-                    fetch(slackUrl, {
+                    fetchWithTimeout(slackUrl, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ text })

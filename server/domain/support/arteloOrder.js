@@ -19,12 +19,14 @@
 import prisma from '../../db.js'
 import { arteloOrderUrl } from '../../lib/links.js'
 import { UserError } from './errors.js'
+import { requireConnection } from '../../lib/connections.js'
 
 const BASE = 'https://www.artelo.com/api/open/'
 
 async function artelo(path, { method = 'GET', body, query } = {}) {
   const key = process.env.ARTELO_API_KEY
   if (!key) throw new UserError('Artelo is not connected (ARTELO_API_KEY)')
+  await requireConnection('artelo')
   const url = BASE + path + (query ? `?${new URLSearchParams(query)}` : '')
   const res = await fetch(url, { method, headers: { Authorization: `Bearer ${key}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()

@@ -6,6 +6,7 @@
  * open until its time limit.
  */
 import { fetchWithTimeout } from './fetchWithTimeout.js'
+import { isConnectionOn } from './connections.js'
 
 /**
  * Text someone outside the team typed (a customer, a creator applicant).
@@ -19,6 +20,8 @@ export function slackText(value, max = 500) {
 /** Post `text` to a webhook. Never throws; returns whether Slack accepted it. */
 export async function postSlack(webhookUrl, text, { timeoutMs = 5000 } = {}) {
   if (!webhookUrl) return false
+  // Slack switched off in Settings > Connections: drop the ping quietly.
+  if (!(await isConnectionOn('slack'))) return false
   try {
     const res = await fetchWithTimeout(webhookUrl, {
       method: 'POST',

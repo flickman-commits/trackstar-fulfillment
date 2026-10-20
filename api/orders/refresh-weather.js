@@ -14,6 +14,7 @@
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { loadActiveUser } from '../_lib/users.js'
 import { computeRaceWeather } from '../../server/domain/races/verification.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -51,6 +52,6 @@ export default async function handler(req, res) {
       return res.status(error.needsReason ? 409 : 400).json({ error: error.message, needsReason: Boolean(error.needsReason) })
     }
     console.error('[refresh-weather] Error:', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

@@ -12,6 +12,13 @@
 export const DEFAULT_FETCH_TIMEOUT_MS = 15_000
 
 export async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_FETCH_TIMEOUT_MS) {
+  // Slack webhooks are posted from a dozen places; switching Slack off in
+  // Settings > Connections stops every one of them here. Loaded lazily so a
+  // scraper's fetch never touches the database.
+  if (/^https:\/\/hooks\.slack\.com\//.test(String(url))) {
+    const { isConnectionOn } = await import('./connections.js')
+    if (!(await isConnectionOn('slack'))) return new Response('slack is switched off', { status: 200 })
+  }
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
   try {

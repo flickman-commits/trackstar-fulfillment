@@ -19,6 +19,7 @@
  */
 
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
+import { requireConnection } from '../lib/connections.js'
 
 const ARTELO_COSTS_URL = 'https://www.artelo.com/api/open/catalog/get-costs'
 const CATALOG_PRODUCT_ID = 'IndividualArtPrint'
@@ -81,6 +82,7 @@ export async function fetchArteloCost({ size, frameStyle, shippingDestination = 
 
   const framed = frameStyle !== 'Unframed'
 
+  await requireConnection('artelo')
   const res = await fetchWithTimeout(ARTELO_COSTS_URL, {
     method: 'POST',
     headers: {

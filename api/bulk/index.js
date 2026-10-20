@@ -27,6 +27,7 @@ import {
 } from '../../server/domain/bulk/bulkOrders.js'
 import { getCanonicalRaceName } from '../../server/scrapers/index.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 const RUNNER_SELECT = {
   id: true, orderNumber: true, lineItemIndex: true, runnerName: true, runnerNameOverride: true, customerEmail: true,
@@ -274,6 +275,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Unknown action' })
   } catch (error) {
     console.error('[API /bulk]', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

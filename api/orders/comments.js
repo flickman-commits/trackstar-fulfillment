@@ -10,6 +10,8 @@ import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { loadActiveUser, recordAudit, fullName } from '../_lib/users.js'
 import { createClient } from '@supabase/supabase-js'
+import { fetchWithTimeout } from '../../server/lib/fetchWithTimeout.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS' })) return
@@ -95,7 +97,7 @@ export default async function handler(req, res) {
         const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
           ? String(shopifyData.name) : `#${order.parentOrderNumber}`
         const truncated = text.length > 200 ? text.substring(0, 200) + '...' : text
-        fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
+        fetchWithTimeout(process.env.SLACK_PROOF_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -156,6 +158,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (error) {
     console.error('[comments] Error:', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

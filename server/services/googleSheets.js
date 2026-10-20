@@ -10,6 +10,7 @@
  * Used by the Marathon Monopoly board (monopolyBoard.js).
  */
 import { google } from 'googleapis'
+import { requireConnection } from '../lib/connections.js'
 
 // Hardcoded — the sheet ID isn't sensitive and only one tracker exists.
 // If Matt ever creates a new tracker file, change this one constant.
@@ -54,6 +55,7 @@ function getSheetsClient() {
  * @returns {Promise<any[][]>} 2D array of cell values
  */
 export async function readRange(a1, { spreadsheetId = FINANCIAL_TRACKER_SHEET_ID } = {}) {
+  await requireConnection('google_drive')
   const sheets = getSheetsClient()
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -80,6 +82,7 @@ export async function readRange(a1, { spreadsheetId = FINANCIAL_TRACKER_SHEET_ID
  * @returns {Promise<any[][][]>} one 2D array per requested range
  */
 export async function listTabTitles(spreadsheetId) {
+  await requireConnection('google_drive')
   const sheets = getSheetsClient()
   const res = await sheets.spreadsheets.get({
     spreadsheetId,
@@ -89,6 +92,7 @@ export async function listTabTitles(spreadsheetId) {
 }
 
 export async function readRanges(a1List, { spreadsheetId = FINANCIAL_TRACKER_SHEET_ID } = {}) {
+  await requireConnection('google_drive')
   const sheets = getSheetsClient()
   const res = await sheets.spreadsheets.values.batchGet({
     spreadsheetId,

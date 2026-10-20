@@ -15,12 +15,14 @@
 import prisma from '../../db.js'
 import { signedFiles } from './jobs.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
+import { requireConnection } from '../../lib/connections.js'
 
 const BASE = 'https://www.artelo.com/api/open/'
 const FOLDER_KEY = 'artelo_orders_folder_id'
 const folderName = () => process.env.ARTELO_UPLOAD_FOLDER || 'Orders'
 
 async function call(path, { method = 'GET', body, query } = {}) {
+  await requireConnection('artelo')
   const key = process.env.ARTELO_API_KEY
   if (!key) throw new Error('ARTELO_API_KEY is not set')
   const url = BASE + path + (query ? '?' + new URLSearchParams(query).toString() : '')

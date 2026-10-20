@@ -42,6 +42,9 @@ import { shopifyFetch, shopifyGraphQL } from '../../server/services/shopifyAuth.
 import { getRaceShorthands } from '../../server/scrapers/index.js'
 import WeatherService from '../../server/services/WeatherService.js'
 import { Resend } from 'resend'
+import { requireConnection } from '../../server/lib/connections.js'
+import { fetchWithTimeout } from '../../server/lib/fetchWithTimeout.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 // Build the customer-facing approval/portal URL. Prod uses the Vercel
 // production URL; falls back to APP_BASE_URL for other environments.
@@ -216,7 +219,7 @@ export default async function handler(req, res) {
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'Order not found' })
     }
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }
 
@@ -532,6 +535,7 @@ async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
   </table>
 </body></html>`
 
+  await requireConnection('resend')
   const resend = new Resend(process.env.RESEND_API_KEY)
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'Trackstar <proofs@orders.trackstar.art>'
 
@@ -564,7 +568,7 @@ async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
   if (slackUrl) {
     const dueDateText = originalDueDate ? ` (was due ${originalDueDate})` : ''
     const text = `⏰ *Custom-order delay notice sent* - order *${displayNum}* for ${existing.customerName || 'customer'} (${existing.raceName || 'custom design'}). Promised *${days} day${days === 1 ? '' : 's'}* late${dueDateText}. Email went to ${existing.customerEmail}.`
-    fetch(slackUrl, {
+    fetchWithTimeout(slackUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
@@ -646,6 +650,7 @@ async function handleMessageCustomer({ orderId, body }, res) {
   </table>
 </body></html>`
 
+  await requireConnection('resend')
   const resend = new Resend(process.env.RESEND_API_KEY)
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'Trackstar <proofs@orders.trackstar.art>'
 
@@ -670,7 +675,7 @@ async function handleMessageCustomer({ orderId, body }, res) {
   // actually sends proofs.
   const slackUrl = process.env.SLACK_PROOF_WEBHOOK_URL
   if (slackUrl) {
-    fetch(slackUrl, {
+    fetchWithTimeout(slackUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -908,7 +913,7 @@ async function handleFeatureRequest({ type, description }, res) {
   }
 
   try {
-    const slackResponse = await fetch(process.env.SLACK_WEBHOOK_URL, {
+    const slackResponse = await fetchWithTimeout(process.env.SLACK_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message)
@@ -983,7 +988,7 @@ async function handleMondayPipeline(res) {
       ]
     }
 
-    const slackResponse = await fetch(process.env.SLACK_WEBHOOK_URL, {
+    const slackResponse = await fetchWithTimeout(process.env.SLACK_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message)
@@ -995,7 +1000,7 @@ async function handleMondayPipeline(res) {
     return res.status(200).json({ success: true, total, urgentCount, revisionCount, awaitingCustomerCount })
   } catch (error) {
     console.error('[actions/monday-pipeline] Error:', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }
 
@@ -1104,7 +1109,7 @@ async function handleDailyDesignUpdate(res) {
       return res.status(200).json({ success: false, error: 'no webhook configured' })
     }
 
-    const slackResponse = await fetch(webhookUrl, {
+    const slackResponse = await fetchWithTimeout(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message),
@@ -1121,7 +1126,7 @@ async function handleDailyDesignUpdate(res) {
     })
   } catch (error) {
     console.error('[actions/daily-design-update] Error:', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }
 
@@ -1553,7 +1558,7 @@ async function handleHealthCheck(res, { sendSlack = false } = {}) {
     ].join('\n')
 
     try {
-      await fetch(slackHealthUrl, {
+      await fetchWithTimeout(slackHealthUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })

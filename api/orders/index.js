@@ -14,6 +14,7 @@ import { resolveEvent } from '../../server/lib/raceEvent.js'
 import { dateVerified } from '../../server/domain/races/verification.js'
 import { pipelineFor } from '../../server/domain/orders/pipeline.js'
 import { loadPipelineContext } from '../../server/domain/orders/pipelineStatus.js'
+import { sendPublicError } from '../../server/lib/publicError.js'
 
 
 /**
@@ -455,6 +456,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ orders: transformedOrders, ...(openOnly ? { completedCount } : {}) })
   } catch (error) {
     console.error('Error:', error)
-    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+    return sendPublicError(res, error)
   }
 }

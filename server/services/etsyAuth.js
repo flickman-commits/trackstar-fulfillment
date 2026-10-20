@@ -4,6 +4,7 @@
 
 import sharedPrisma from '../db.js'
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
+import { requireConnection } from '../lib/connections.js'
 
 let cachedToken = null
 let tokenExpiry = null
@@ -105,6 +106,7 @@ export async function getEtsyToken() {
  * @param {object} options - Additional fetch options
  */
 export async function etsyFetch(endpoint, options = {}) {
+  await requireConnection('etsy')
   const token = await getEtsyToken()
   const apiKey = process.env.ETSY_API_KEY
   const sharedSecret = process.env.ETSY_SHARED_SECRET

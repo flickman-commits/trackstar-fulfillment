@@ -36,6 +36,7 @@ import { originFor } from '../sales/gmail.js'
 import { refreshThread } from './mailbox.js'
 import { defaultAssigneeId } from './routing.js'
 import { UserError } from './errors.js'
+import { requireConnection } from '../../lib/connections.js'
 
 const GRAPH = 'https://graph.instagram.com'
 const SCOPES = ['instagram_business_basic', 'instagram_business_manage_messages']
@@ -90,6 +91,7 @@ async function delConfig(...keys) {
  * window.
  */
 async function graph(path, { method = 'GET', token, query = {}, body } = {}) {
+  await requireConnection('instagram')
   const url = new URL(/^https?:/.test(path) ? path : `${GRAPH}/${version()}/${path.replace(/^\//, '')}`)
   for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v))
   const headers = {}
@@ -244,6 +246,14 @@ export async function refreshTokenIfDue({ now = Date.now() } = {}) {
 
 export async function disconnect() {
   await delConfig(KEY_TOKEN, KEY_USERNAME, KEY_ACCOUNT_ID, KEY_APP_USER_ID, KEY_EXPIRES, KEY_REFRESHED)
+}
+
+/** For Settings > Connections: one real Graph call, returning the handle. */
+export async function ping() {
+  const token = await getConfig(KEY_TOKEN)
+  if (!token) throw new UserError('Instagram is not connected')
+  const me = await graph('me', { token, query: { fields: 'username' } })
+  return String(me.username || '')
 }
 
 export async function status() {

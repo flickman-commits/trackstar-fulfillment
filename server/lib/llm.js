@@ -38,6 +38,8 @@
  * `purpose` so cost can be attributed per feature. When a ModelRun table
  * exists this is the one place to persist it.
  */
+import { requireConnection } from './connections.js'
+
 
 const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5'
 const DEFAULT_OPENAI_MODEL = 'gpt-4o'
@@ -158,6 +160,7 @@ export async function complete({
   webSearch = false,
   maxSearches = 5,
 }) {
+  await requireConnection('claude')
   const provider = pickProvider()
   if (!provider) {
     throw new Error('No model configured. Set ANTHROPIC_API_KEY, or LLM_BASE_URL + LLM_API_KEY for an OpenAI-compatible endpoint.')
