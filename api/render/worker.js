@@ -14,12 +14,15 @@
  *   claim      { workerId }                   give me the next job, with upload slots and its template
  *   complete   { workerId, jobId, notes }     files are uploaded
  *   fail       { workerId, jobId, error }     could not render
+ *   relayClaim { workerId }                   page fetches the server cannot make (a timing site blocks it)
+ *   relayDone  { workerId, id, status, body, setCookies } or { id, error }   the page, fetched from this Mac
  *
  * Files go straight from the Mac to storage through signed upload URLs, so
  * the PDF never passes through this function.
  */
 import { setCors } from '../_lib/auth.js'
 import { resolveApiKey } from '../_lib/apiKeys.js'
+import { claimRelays, finishRelay } from '../../server/lib/fetchRelay.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
 import { heartbeat, claimNext, uploadSlots, completeJob, failJob } from '../../server/domain/render/jobs.js'
 import { templatesForWorker, recordCheck } from '../../server/domain/render/templates.js'
@@ -52,6 +55,13 @@ export default async function handler(req, res) {
     if (!workerId) return res.status(400).json({ error: 'workerId is required' })
 
     switch (body.action) {
+      case 'relayClaim': {
+        // Page fetches the server cannot make itself (server/lib/fetchRelay.js).
+        return res.status(200).json({ relays: await claimRelays(workerId) })
+      }
+      case 'relayDone': {
+        return res.status(200).json(await finishRelay({ id: body.id, workerId, status: body.status, body: body.body, setCookies: body.setCookies, error: body.error }))
+      }
       case 'templates': {
         return res.status(200).json({ templates: await templatesForWorker() })
       }

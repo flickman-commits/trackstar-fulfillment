@@ -83,6 +83,8 @@ export function pipelineFor({ order, research, race, render, hasScraper, templat
 
   // The runner's result.
   if (!research) return stage('needs_research', 'Needs research', { fix: 'No lookup has run for this order yet. It runs on the next import, or run it now.' })
+  // A site that refuses our server (not down) is looked up through the render worker on the Mac.
+  if (rs === 'upstream_error' && /blocks lookups from our server/.test(research.researchNotes || '')) return stage('action', 'Lookup blocked', { kind: 'setup', fix: 'This timing site blocks our server, so its lookups go through the render worker on the Mac. Start the worker, then run research again.' })
   if (rs === 'upstream_error') return stage('action', 'Timing site down', { kind: 'data', fix: 'The timing site was down when the lookup ran. Run research again.' })
   if (rs === 'ambiguous') return stage('action', 'Pick a match', { kind: 'data', fix: 'More than one finisher matches. Confirm which one on the results site, then accept the match.' })
   if (rs === 'time_unavailable') return stage('action', 'Enter the time', { kind: 'data', fix: 'The runner was found but the timing site hides the finish time. Open their result and enter the time by hand.' })

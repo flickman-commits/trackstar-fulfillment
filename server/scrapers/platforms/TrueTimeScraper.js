@@ -42,6 +42,7 @@
  */
 import { BaseScraper } from '../BaseScraper.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
+import { relayFetch, RelayUnavailableError } from '../../lib/fetchRelay.js'
 
 const BASE = 'https://results.truetimeracing.com'
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -95,17 +96,48 @@ export class TrueTimeScraper extends BaseScraper {
     }
   }
 
+  /** A refused or failed request, as the order should read it. */
+  failedLookup(err) {
+    if (/blocks lookups from our server/.test(err?.message || '')) {
+      return { ...this.upstreamErrorResult(), researchNotes: `${err.message}. Start the render worker on the Mac, then run research again.` }
+    }
+    return this.upstreamErrorResult(`TrueTime ${err.status ? `HTTP ${err.status}` : 'request failed'}`)
+  }
+
   async fetchText(url, init = {}) {
-    const res = await fetchWithTimeout(url, {
-      ...init,
-      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html', ...(init.headers || {}) },
-    })
-    if (!res.ok) {
-      const err = new Error(`HTTP ${res.status}`)
-      err.status = res.status
+    const headers = { 'User-Agent': USER_AGENT, Accept: 'text/html', ...(init.headers || {}) }
+    // Once this run has been refused, every later request goes through the relay
+    // too, so the page and its search postback come from the same address.
+    if (!this.viaRelay) {
+      const res = await fetchWithTimeout(url, { ...init, headers })
+      if (res.ok) return { text: await res.text(), res }
+      // TrueTime's Cloudflare refuses cloud addresses (403 from Vercel, 200 from a home
+      // connection): hand the request to the render worker on Matt's Mac.
+      if (res.status !== 403) {
+        const err = new Error(`HTTP ${res.status}`)
+        err.status = res.status
+        throw err
+      }
+      this.viaRelay = true
+    }
+    let out
+    try {
+      out = await relayFetch(url, { ...init, headers })
+    } catch (e) {
+      const err = new Error(e instanceof RelayUnavailableError
+        ? `TrueTime blocks lookups from our server; the render worker on Matt's Mac relays them, and ${e.message}`
+        : e.message)
+      err.status = 403
       throw err
     }
-    return { text: await res.text(), res }
+    if (out.status < 200 || out.status >= 300) {
+      const err = new Error(`HTTP ${out.status} (through the Mac relay)`)
+      err.status = out.status
+      throw err
+    }
+    // Shaped like a fetch Response where search() reads it (the cookies).
+    const res = { headers: { getSetCookie: () => out.setCookies, get: () => out.setCookies.join(', ') } }
+    return { text: out.text, res }
   }
 
   /** Run the page's own search postback; returns grid rows across all events. */
@@ -195,7 +227,7 @@ export class TrueTimeScraper extends BaseScraper {
       if (rows.length === 0 && last && last !== runnerName.trim()) rows = await this.search(last)
     } catch (err) {
       console.error(`[${this.tag} ${this.year}] TrueTime error: ${err.message}`)
-      return this.upstreamErrorResult(`TrueTime ${err.status ? `HTTP ${err.status}` : 'request failed'}`)
+      return this.failedLookup(err)
     }
 
     const inEvents = rows.map(r => ({ ...r, eventKey: this.eventKeyFor(r.eid) })).filter(r => r.eventKey)
@@ -235,7 +267,7 @@ export class TrueTimeScraper extends BaseScraper {
       rows = await this.search(wanted)
     } catch (err) {
       console.error(`[${this.tag} ${this.year}] TrueTime error: ${err.message}`)
-      return this.upstreamErrorResult(`TrueTime ${err.status ? `HTTP ${err.status}` : 'request failed'}`)
+      return this.failedLookup(err)
     }
     const hits = rows.filter(r => this.bibsEqual(r.bib, wanted))
     if (!hits.length) return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)

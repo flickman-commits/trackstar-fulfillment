@@ -17,7 +17,10 @@ function kindOf(contents) {
   if (/\d\s*°\s*[NSEW]\b/i.test(s)) return null;   // coordinates on the artwork, not weather
   if (/°/.test(s)) return 'weather';
   if (/^\d{1,6}$/.test(s) || /\bBIB\b/i.test(s)) return 'bib';
-  if (/^[A-Za-z][A-Za-z .'\-]*$/.test(s) && s.length <= 40 && !/\.$/.test(s) && s.split(/\s+/).length <= 5) return 'name';
+  // A name: letters (accents too: Jesús, Zoë), spaces, periods, apostrophes, hyphens,
+  // and a suffix ("John M. Bland, Jr", "Jr."); a comma only before that suffix, so "Burlington, VT" is not a name.
+  var bare = s.replace(/,?\s+(jr|sr|ii|iii|iv)\.?$/i, '');
+  if (/^[A-Za-z\u00C0-\u017F][A-Za-z\u00C0-\u017F .'\-]*$/.test(bare) && s.length <= 40 && !/\.$/.test(bare) && bare.split(/\s+/).length <= 5) return 'name';
   return null;
 }
 

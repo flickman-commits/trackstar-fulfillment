@@ -1305,3 +1305,31 @@ model SampleCost {
 
   @@index([createdAt])
 }
+
+/**
+ * A page fetch the server cannot make itself, handed to the render worker on
+ * Matt's Mac. Some timing sites sit behind Cloudflare rules that refuse cloud
+ * addresses (TrueTime answers Vercel with 403) but serve a home connection
+ * fine. The server queues the request here, the worker fetches it and posts
+ * the page back, and the lookup carries on. Only hosts in
+ * server/lib/fetchRelay.js RELAY_HOSTS; rows are short-lived (a day at most).
+ */
+model FetchRelay {
+  id             String    @id @default(cuid())
+  url            String
+  method         String    @default("GET")
+  headers        Json?
+  body           String?
+  // pending | claimed | done | failed | expired
+  status         String    @default("pending")
+  workerId       String?
+  claimedAt      DateTime?
+  responseStatus Int?
+  responseBody   String?
+  setCookies     Json?
+  error          String?
+  createdAt      DateTime  @default(now())
+  doneAt         DateTime?
+
+  @@index([status, createdAt])
+}

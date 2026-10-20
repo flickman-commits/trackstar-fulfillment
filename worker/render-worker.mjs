@@ -194,6 +194,8 @@ async function main() {
     try { list = await heartbeat(); break } catch (e) { log(`Cannot reach the tool yet (${e.message}); retrying`); await sleep(15000) }
   }
   log(`Renderable on this machine: ${list.length ? list.join(', ') : 'none'}`)
+  // Alongside the render queue: page fetches the tool cannot make itself.
+  relayLoop().catch(e => log(`Relay loop stopped: ${e.message}`))
   let lastBeat = Date.now(), idle = POLL_MS
   for (;;) {
     try {
@@ -214,6 +216,37 @@ async function main() {
       log(`Error: ${e.message}`)
       await sleep(POLL_MS * 2)
     }
+  }
+}
+
+/**
+ * Page fetches the tool cannot make itself: some timing sites refuse cloud
+ * addresses but serve this Mac fine (TrueTime). The tool queues the request,
+ * this loop fetches it and posts the page back. Only the hosts listed here,
+ * whatever the tool asks for.
+ */
+const RELAY_HOSTS = (process.env.RELAY_HOSTS || 'results.truetimeracing.com').split(',').map(h => h.trim()).filter(Boolean)
+const RELAY_POLL_MS = 3000
+async function relayLoop() {
+  for (;;) {
+    let relays = []
+    try { ({ relays = [] } = await api('relayClaim', {})) } catch { await sleep(15000); continue }
+    for (const r of relays) {
+      let host = ''
+      try { host = new URL(r.url).host } catch { /* refused below */ }
+      if (!RELAY_HOSTS.includes(host)) { await api('relayDone', { id: r.id, error: `not a relay host: ${host}` }).catch(() => {}); continue }
+      try {
+        const res = await fetch(r.url, { method: r.method || 'GET', headers: r.headers || {}, body: r.body || undefined, redirect: 'follow' })
+        const body = await res.text()
+        const setCookies = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : []
+        await api('relayDone', { id: r.id, status: res.status, body, setCookies })
+        log(`Relayed ${r.method || 'GET'} ${host}: ${res.status}`)
+      } catch (e) {
+        await api('relayDone', { id: r.id, error: e.message }).catch(() => {})
+        log(`Relay failed for ${host}: ${e.message}`)
+      }
+    }
+    await sleep(relays.length ? 300 : RELAY_POLL_MS)
   }
 }
 
