@@ -3,6 +3,7 @@
  * the first design, so the story link previews as the designs rather than as
  * the app's shell. Same approach and same fallbacks as approval-preview.js.
  */
+import { shellUrl } from '../../server/lib/shellOrigin.js'
 import prisma from '../_lib/prisma.js'
 import { injectMeta } from './approval-preview.js'
 
@@ -25,9 +26,8 @@ async function loadShell(url) {
 }
 
 export default async function handler(req, res) {
-  const proto = req.headers['x-forwarded-proto'] || 'https'
-  const host = req.headers['x-forwarded-host'] || req.headers.host
-  let html = await loadShell(`${proto}://${host}/index.html`)
+  const url = shellUrl(req)
+  let html = url ? await loadShell(url) : null
   if (!html) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     res.setHeader('Cache-Control', 'no-store')

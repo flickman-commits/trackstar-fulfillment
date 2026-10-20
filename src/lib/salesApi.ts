@@ -96,7 +96,7 @@ export const salesApi = {
   revise: (body: { dealId: string; subject: string; body: string; instruction: string }) =>
     post<{ subject: string; body: string; model: string }>('/api/sales/draft', { action: 'revise', ...body }),
   /** Sends through the connected Gmail. Final; the undo window is the caller's. */
-  send: (body: { dealId: string; personId: string; subject: string; body: string; assetIds: string[]; adhoc?: boolean }) =>
+  send: (body: { dealId: string; personId: string; subject: string; body: string; assetIds: string[]; adhoc?: boolean; idempotencyKey?: string }) =>
     post<{ send: { id: string; touchNumber: number; sentAt: string; gmailThreadId: string | null }; attached: string[]; sync: SyncResult }>('/api/sales/draft', { action: 'send', ...body }),
   /** A one-off to any address. No deal, nothing written to Attio. */
   /** Send later: check it now, send it from your Gmail at `sendAt`. */
@@ -104,7 +104,7 @@ export const salesApi = {
     post<{ scheduled: ScheduledEmail }>('/api/sales/scheduled', { action: 'schedule', ...body }),
   cancelScheduled: (id: string) => post<{ scheduled: ScheduledEmail }>('/api/sales/scheduled', { action: 'cancel', id }),
   sendScheduledNow: (id: string) => post<{ sync?: SyncResult }>('/api/sales/scheduled', { action: 'send-now', id }),
-  sendTo: (body: { to: string; subject: string; body: string; assetIds: string[] }) =>
+  sendTo: (body: { to: string; subject: string; body: string; assetIds: string[]; idempotencyKey?: string }) =>
     post<{ send: { id: string; touchNumber: number; sentAt: string; gmailThreadId: string | null }; attached: string[]; sync: SyncResult }>('/api/sales/draft', { action: 'send-to', ...body }),
 
   assets: (dealId?: string, refresh = false) => {

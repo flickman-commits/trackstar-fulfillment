@@ -38,6 +38,7 @@ import { isForwarder } from './forwarders.js'
 import { oauthClient, originFor, isRevokedToken, buildMime, base64url, newMessageId } from '../sales/gmail.js'
 import { defaultAssigneeId } from './routing.js'
 import { isFiltered } from './filters.js'
+import { UserError } from './errors.js'
 
 const SCOPE_MODIFY = 'https://www.googleapis.com/auth/gmail.modify'
 const SCOPES = [SCOPE_MODIFY]
@@ -80,11 +81,13 @@ export function redirectUriFor(req) {
   return `${originFor(req)}/api/support/gmail-callback`
 }
 
-export function getAuthUrl(redirectUri) {
+/** `state` is the round trip's check value (oauthState.js). */
+export function getAuthUrl(redirectUri, state) {
   return oauthClient(redirectUri).generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
     scope: SCOPES,
+    state,
     // Pre-fills the account chooser; Google still lets the person pick another, which completeConnection refuses.
     login_hint: mailboxEmail(),
   })
@@ -99,14 +102,15 @@ export async function completeConnection(code, redirectUri) {
   const client = oauthClient(redirectUri)
   const { tokens } = await client.getToken(code)
   if (!tokens.refresh_token) {
-    throw new Error('Google did not return a refresh token. Remove the app under Google Account > Security > Third-party access for the support account and connect again.')
+    throw new UserError('Google did not return a refresh token. Remove the app under Google Account > Security > Third-party access for the support account and connect again.', { reason: 'no_refresh_token' })
   }
   client.setCredentials(tokens)
   const gmail = google.gmail({ version: 'v1', auth: client })
   const profile = await gmail.users.getProfile({ userId: 'me' })
   const email = String(profile.data.emailAddress || '').toLowerCase()
   if (email !== mailboxEmail()) {
-    throw new Error(`That signed in as ${email}, not ${mailboxEmail()}. Sign in to Google as the support account and connect again.`)
+    await client.revokeCredentials().catch(() => {})
+    throw new UserError(`That signed in as ${email}, not ${mailboxEmail()}. Sign in to Google as the support account and connect again.`, { reason: 'wrong_account' })
   }
   await setConfig(KEY_REFRESH, tokens.refresh_token)
   await setConfig(KEY_SCOPES, String(tokens.scope || SCOPES.join(' ')))
@@ -138,7 +142,7 @@ export async function status() {
 
 async function client() {
   const refresh = await getConfig(KEY_REFRESH)
-  if (!refresh) throw new Error('The support mailbox is not connected. An admin connects it from the Support page.')
+  if (!refresh) throw new UserError('The support mailbox is not connected. An admin connects it from the Support page.')
   const auth = oauthClient()
   auth.setCredentials({ refresh_token: refresh })
   return google.gmail({ version: 'v1', auth })
@@ -176,11 +180,11 @@ export async function withRetry(fn, { tries = 5, label = 'gmail' } = {}) {
 /** A revoked grant is forgotten so the page offers Connect again, with the usual advice. */
 async function onGmailError(err) {
   if (isQuotaError(err)) {
-    throw new Error('Gmail is rate limiting us for a minute. The import picks up where it left off; press it again shortly, or just wait, it retries on its own.')
+    throw new UserError('Gmail is rate limiting us for a minute. The import picks up where it left off; press it again shortly, or just wait, it retries on its own.')
   }
   if (!isRevokedToken(err)) throw err
   await delConfig(KEY_REFRESH)
-  throw new Error(
+  throw new UserError(
     'The support mailbox disconnected: Google rejected the saved credential. An admin has to press Connect again. '
     + 'If this keeps happening weekly, the OAuth consent screen is still in Testing, which expires refresh tokens after 7 days.'
   )
@@ -427,7 +431,7 @@ async function noteForward(threadId, { note, by }) {
  * Instagram channel (instagram.js), which stores rows of the same shape:
  * `stored` is the SupportMessage row just written, whatever channel.
  */
-export async function refreshThread(thread, stored, { backfill = false, mailbox = '' } = {}) {
+export async function refreshThread(thread, stored, { backfill = false, mailbox = '', replay = false } = {}) {
   const [agg, newest, oldest, lastIn, lastOut] = await Promise.all([
     prisma.supportMessage.aggregate({ where: { threadId: thread.id }, _count: { _all: true }, _max: { sentAt: true } }),
     prisma.supportMessage.findFirst({ where: { threadId: thread.id }, orderBy: { sentAt: 'desc' }, select: { id: true, direction: true, bodyText: true, sentAt: true } }),
@@ -452,9 +456,11 @@ export async function refreshThread(thread, stored, { backfill = false, mailbox 
   }
 
   // Status moves only on the newest message, and only on the sync's rules:
-  // in -> open (unless escalated), out -> waiting (only from open).
+  // in -> open (unless escalated), out -> waiting (only from open). A
+  // message we already had (a replayed webhook, a backfill re-read) is not
+  // news, so it never reopens a closed thread.
   const isNewest = newest && newest.id === stored.id
-  const isNewer = isNewest && (!thread.lastMessageAt || new Date(stored.sentAt) >= new Date(thread.lastMessageAt))
+  const isNewer = !replay && isNewest && (!thread.lastMessageAt || new Date(stored.sentAt) >= new Date(thread.lastMessageAt))
   if (isNewer) {
     if (stored.direction === 'in' && thread.status !== 'escalated' && thread.status !== 'open') data.status = 'open'
     if (stored.direction === 'out' && thread.status === 'open') data.status = 'waiting'
@@ -547,7 +553,7 @@ export async function backfill({ pages = 2, pageSize = 100 } = {}) {
     await setConfig(KEY_BACKFILL_DONE, 'true')
     await delConfig(KEY_BACKFILL_PAGE)
   }
-  if (failed) throw new Error(`Gmail is rate limiting us for a minute (${failed} message${failed === 1 ? '' : 's'} waiting). The import picks up where it left off.`)
+  if (failed) throw new UserError(`Gmail is rate limiting us for a minute (${failed} message${failed === 1 ? '' : 's'} waiting). The import picks up where it left off.`)
   return { done, imported, failed, total }
 }
 
@@ -625,7 +631,7 @@ export async function sendReply({ userId, thread, html, text, attachments = [] }
   const last = await prisma.supportMessage.findFirst({ where: { threadId: thread.id }, orderBy: { sentAt: 'desc' } })
   const lastIn = await prisma.supportMessage.findFirst({ where: { threadId: thread.id, direction: 'in' }, orderBy: { sentAt: 'desc' } })
   const to = thread.customerEmail
-  if (!to) throw new Error('This thread has no customer address to reply to.')
+  if (!to) throw new UserError('This thread has no customer address to reply to.')
   const subject = last?.subject && /^\s*re:/i.test(last.subject) ? last.subject : `Re: ${thread.subject || last?.subject || ''}`.trim()
   const messageId = newMessageId()
   const raw = base64url(buildMime({ to, subject, html, inReplyTo: lastIn?.rfcMessageId || last?.rfcMessageId || undefined, messageId, attachments }))

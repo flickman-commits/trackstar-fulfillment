@@ -7,11 +7,13 @@
  *
  * Anyone on Support may ask whether it is connected; only an admin connects
  * or disconnects it, because the grant is the whole team's, not theirs.
- * Google returns the browser to /api/support/gmail-callback.
+ * Google returns the browser to /api/support/gmail-callback, which checks
+ * the one-time `state` set here.
  */
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireCapability, requireAdminRole } from '../_lib/users.js'
 import { getAuthUrl, redirectUriFor, status, disconnect } from '../../server/domain/support/mailbox.js'
+import { issueOAuthState } from '../../server/domain/support/oauthState.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -26,16 +28,19 @@ export default async function handler(req, res) {
     if (action === 'status') return res.status(200).json(await status())
 
     if (action === 'connect') {
-      if (!(await requireAdminRole(req, res, requireAdmin(req, res)))) return
+      const admin = await requireAdminRole(req, res, (await requireAdmin(req, res)))
+      if (!admin) return
       if (!process.env.GOOGLE_OAUTH_CLIENT_ID || !process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
         return res.status(400).json({ error: 'Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET first' })
       }
-      res.setHeader('Location', getAuthUrl(redirectUriFor(req)))
+      // The callback only accepts a code that comes back with this state, in this admin's browser.
+      const state = await issueOAuthState(req, res, { purpose: 'support_gmail', userId: admin.id })
+      res.setHeader('Location', getAuthUrl(redirectUriFor(req), state))
       return res.status(302).end()
     }
 
     if (action === 'disconnect' && req.method === 'POST') {
-      if (!(await requireAdminRole(req, res, requireAdmin(req, res)))) return
+      if (!(await requireAdminRole(req, res, (await requireAdmin(req, res))))) return
       await disconnect()
       return res.status(200).json({ success: true })
     }
@@ -43,6 +48,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Unknown action: ${action}` })
   } catch (error) {
     console.error('[API /support/gmail]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong with the mailbox connection' })
   }
 }

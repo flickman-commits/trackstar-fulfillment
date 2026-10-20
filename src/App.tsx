@@ -1,25 +1,45 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AppShell from '@/components/AppShell'
 import BrandToaster from '@/components/BrandToaster'
-import { useEffect, useState, Component } from 'react'
+import { useEffect, useState, Component, lazy, Suspense } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import Dashboard from '@/pages/Dashboard'
-import ApprovalPortal from '@/pages/ApprovalPortal'
-import BulkIntake from '@/pages/BulkIntake'
-import RunnerClaim from '@/pages/RunnerClaim'
-import SurveyVote from './pages/SurveyVote'
-import DesignSurveys from './pages/DesignSurveys'
-import CreatorsHome from '@/pages/CreatorsHome'
-import Samples from '@/pages/Samples'
-import BriefsAdmin from '@/pages/BriefsAdmin'
-import CreatorPortal from '@/pages/CreatorPortal'
-import CreatorApply from '@/pages/CreatorApply'
-import Monopoly from '@/pages/Monopoly'
-import MonopolyModel from '@/pages/MonopolyModel'
-import Sales from '@/pages/Sales'
-import SalesWorkspace from '@/pages/SalesWorkspace'
-import Support from '@/pages/Support'
 import { SignInGate, RequireAdmin, RequireCap, useAuth } from '@/lib/auth'
+
+/**
+ * Every page but the Dashboard loads on first visit, so the fulfillment team
+ * does not download Monopoly or the customer portals, and customers do not
+ * download the admin app. After a deploy an open tab can ask for a chunk that
+ * no longer exists; that reloads the page once instead of showing an error.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- any page's props
+function lazyPage<T extends React.ComponentType<any>>(load: () => Promise<{ default: T }>) {
+  const KEY = 'ts_chunk_reload'
+  return lazy(() => load().then((mod) => {
+    try { sessionStorage.removeItem(KEY) } catch { /* private mode */ }
+    return mod
+  }, (err) => {
+    let reloaded = false
+    try { reloaded = sessionStorage.getItem(KEY) === '1'; sessionStorage.setItem(KEY, '1') } catch { /* private mode */ }
+    if (!reloaded) { window.location.reload(); return new Promise<{ default: T }>(() => {}) }
+    throw err
+  }))
+}
+const ApprovalPortal = lazyPage(() => import('@/pages/ApprovalPortal'))
+const BulkIntake = lazyPage(() => import('@/pages/BulkIntake'))
+const RunnerClaim = lazyPage(() => import('@/pages/RunnerClaim'))
+const SurveyVote = lazyPage(() => import('@/pages/SurveyVote'))
+const DesignSurveys = lazyPage(() => import('@/pages/DesignSurveys'))
+const CreatorsHome = lazyPage(() => import('@/pages/CreatorsHome'))
+const Samples = lazyPage(() => import('@/pages/Samples'))
+const BriefsAdmin = lazyPage(() => import('@/pages/BriefsAdmin'))
+const CreatorPortal = lazyPage(() => import('@/pages/CreatorPortal'))
+const CreatorApply = lazyPage(() => import('@/pages/CreatorApply'))
+const Monopoly = lazyPage(() => import('@/pages/Monopoly'))
+const MonopolyModel = lazyPage(() => import('@/pages/MonopolyModel'))
+const Sales = lazyPage(() => import('@/pages/Sales'))
+const SalesWorkspace = lazyPage(() => import('@/pages/SalesWorkspace'))
+const Support = lazyPage(() => import('@/pages/Support'))
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -178,6 +198,7 @@ export default function App() {
     return (
       <ErrorBoundary>
         <BrowserRouter>
+          <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<CreatorApply />} />
             {/* Vercel redirects / to /apply here, so link previews get the creator card. */}
@@ -185,6 +206,7 @@ export default function App() {
             <Route path="/creator/:token" element={<CreatorPortal />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
           <BrandToaster />
         </BrowserRouter>
       </ErrorBoundary>
@@ -194,6 +216,7 @@ export default function App() {
     return (
       <ErrorBoundary>
         <BrowserRouter>
+          <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<Monopoly />} />
             {/* Same page, so an existing /monopoly link pasted at this host
@@ -218,6 +241,7 @@ export default function App() {
             {/* Anything else on this host is not a page we publish here. */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
           <BrandToaster />
         </BrowserRouter>
       </ErrorBoundary>
@@ -227,6 +251,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
+        <Suspense fallback={null}>
         <Routes>
           {/* Public routes — no password gate */}
           <Route path="/approve/:token" element={<ApprovalPortal />} />
@@ -248,6 +273,7 @@ export default function App() {
               {/* The rail and the tool panels live outside the route table so
                   they survive a page change. */}
               <AppShell>
+              <Suspense fallback={null}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 {/* An open order has its own address, so a reload or a shared link lands on it. */}
@@ -282,10 +308,12 @@ export default function App() {
               </Routes>
               <SalesKeepAlive />
               <SupportKeepAlive />
+              </Suspense>
               </AppShell>
             </SignInGate>
           } />
         </Routes>
+        </Suspense>
         <BrandToaster />
       </BrowserRouter>
     </ErrorBoundary>

@@ -6,6 +6,7 @@
 import { setCors } from '../_lib/auth.js'
 import { requireAdminOnly } from '../_lib/users.js'
 import { backfill } from '../../server/domain/support/mailbox.js'
+import { publicMessage, publicStatus } from '../../server/domain/support/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -18,6 +19,6 @@ export default async function handler(req, res) {
     return res.status(200).json(out)
   } catch (error) {
     console.error('[API /support/backfill]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'The mailbox import failed. Try again in a minute.') })
   }
 }

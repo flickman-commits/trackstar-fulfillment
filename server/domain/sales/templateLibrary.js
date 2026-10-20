@@ -14,6 +14,7 @@
 import crypto from 'node:crypto'
 import prisma from '../../db.js'
 import { NO_DASHES } from './guardrails.js'
+import { UserError } from './errors.js'
 
 export const LIBRARY_KEY = 'sales_template_library'
 const LOOM = 'https://www.loom.com/share/560a96f9b3ac409096445e264345bac3'
@@ -154,16 +155,16 @@ export async function saveTemplate({ id, name, motion, useFor, subject, body, as
     body: String(body || '').replace(/\r\n/g, '\n').replace(/\[One-liner\]/g, '[First line]').trim().slice(0, 6000),
     assetIds: [...new Set((Array.isArray(assetIds) ? assetIds : []).map(String).filter(Boolean))].slice(0, MAX_TEMPLATE_ASSETS),
   }
-  if (!clean.name) throw new Error('Give the template a name')
-  if (!clean.body) throw new Error('The template needs a body')
+  if (!clean.name) throw new UserError('Give the template a name')
+  if (!clean.body) throw new UserError('The template needs a body')
   for (const k of ['name', 'subject', 'body']) {
-    if (clean[k] && NO_DASHES.test(clean[k])) throw new Error(`The ${k} contains an em or en dash. Use a comma or a full stop.`)
+    if (clean[k] && NO_DASHES.test(clean[k])) throw new UserError(`The ${k} contains an em or en dash. Use a comma or a full stop.`)
   }
   const list = (await listTemplates({ force: true })).slice()
   const stamp = { updatedAt: new Date().toISOString(), updatedBy: actor?.email || null }
   if (id) {
     const i = list.findIndex(t => t.id === id)
-    if (i < 0) throw new Error('That template is gone. Reload Settings.')
+    if (i < 0) throw new UserError('That template is gone. Reload Settings.')
     list[i] = { ...list[i], ...clean, ...stamp }
   } else {
     list.push({ id: crypto.randomUUID(), ...clean, ...stamp })
@@ -182,12 +183,12 @@ const MAX_NOTES = 50
 
 export async function addTemplateNote(id, { text, from }, actor) {
   const clean = String(text || '').replace(/\r\n/g, '\n').trim().slice(0, 2000)
-  if (!clean) throw new Error('Write the note first')
+  if (!clean) throw new UserError('Write the note first')
   const list = (await listTemplates({ force: true })).slice()
   const i = list.findIndex(t => t.id === id)
-  if (i < 0) throw new Error('That template is gone. Reload the page.')
+  if (i < 0) throw new UserError('That template is gone. Reload the page.')
   const notes = Array.isArray(list[i].notes) ? list[i].notes : []
-  if (notes.length >= MAX_NOTES) throw new Error(`A template holds ${MAX_NOTES} notes at most. Remove an old one first.`)
+  if (notes.length >= MAX_NOTES) throw new UserError(`A template holds ${MAX_NOTES} notes at most. Remove an old one first.`)
   const note = {
     id: crypto.randomUUID(),
     text: clean,
@@ -203,7 +204,7 @@ export async function addTemplateNote(id, { text, from }, actor) {
 export async function deleteTemplateNote(id, noteId) {
   const list = (await listTemplates({ force: true })).slice()
   const i = list.findIndex(t => t.id === id)
-  if (i < 0) throw new Error('That template is gone. Reload the page.')
+  if (i < 0) throw new UserError('That template is gone. Reload the page.')
   list[i] = { ...list[i], notes: (list[i].notes || []).filter(n => n.id !== noteId) }
   await write(list)
   return list

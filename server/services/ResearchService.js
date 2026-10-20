@@ -14,6 +14,7 @@ import prisma from '../db.js'
 import { getScraperForRace, hasScraperForRace, getCanonicalRaceName, namedEventsFor } from '../scrapers/index.js'
 import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
 import WeatherService from './WeatherService.js'
+import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
 
 
 /**
@@ -944,7 +945,7 @@ export class ResearchService {
     ].join('\n')
 
     try {
-      await fetch(slackUrl, {
+      await fetchWithTimeout(slackUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),

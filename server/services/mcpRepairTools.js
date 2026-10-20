@@ -222,7 +222,7 @@ export const REPAIR_TOOLS = [
   {
     name: 'probe_preview',
     description:
-      'Test a pushed branch before it merges: finds the Vercel preview for ref, waits for it ' +
+      'Test a pushed sweep/* branch before it merges (no other branch is accepted): finds the Vercel preview for ref, waits for it ' +
       'briefly to build (call again while it returns retry: true), and probes every ' +
       'fixture-backed year of the given races with the branch\'s ' +
       'code against the live timing sites. Merge only when allPassing is true. Writes no ' +
@@ -230,7 +230,7 @@ export const REPAIR_TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        ref: { type: 'string', description: 'Branch name or commit sha you pushed.' },
+        ref: { type: 'string', maxLength: 120, description: 'The sweep/* branch you pushed, or the full 40-character sha of a commit on it.' },
         races: { type: 'array', items: { type: 'string' } },
         years: { type: 'array', items: { type: 'number' }, description: 'Optional subset; default is every year with a fixture.' },
       },

@@ -124,3 +124,10 @@ test('a long reply is cut into DMs Meta accepts, at paragraph boundaries first',
   const word = 'x'.repeat(2500)
   assert.equal(splitForInstagram(word).join(''), word)
 })
+
+test('only the connected account\'s entries are read', () => {
+  const ev = [{ sender: { id: THEM }, recipient: { id: OURS }, message: { mid: 'm1', text: 'hi' } }]
+  assert.equal(parseWebhook(delivery(ev), { accountIds: new Set([OURS]) }).length, 1)
+  assert.equal(parseWebhook(delivery(ev, '17841499999999999'), { accountIds: new Set([OURS]) }).length, 0)
+  assert.equal(parseWebhook(delivery(ev), { accountIds: new Set() }).length, 0)
+})

@@ -6,6 +6,7 @@
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, requireAdminOnly, recordAudit } from '../_lib/users.js'
 import { proposeLessons, addLessons } from '../../server/domain/support/teach.js'
+import { isUserError } from '../../server/domain/support/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
     }
     return res.status(400).json({ error: 'Unknown action' })
   } catch (error) {
-    const known = /Say what|draft is gone|Could not turn|No lesson|No model|too long|too short/.test(error.message)
+    const known = isUserError(error)
     if (!known) console.error('[API /support/teach]', error)
     return res.status(known ? 400 : 500).json({ error: known ? error.message : 'Could not update the playbook' })
   }

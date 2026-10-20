@@ -5,6 +5,7 @@ import { btnPrimary, btnSecondary, btnGhost, fieldLabel, inputBase, segment, seg
 import { useEscape } from '@/lib/useEscape'
 import { salesApi } from '@/lib/salesApi'
 import type { AttioCheck, SalesSettings, SalesStatus, Sender } from '@/types/sales'
+import { safeSignature } from './safeSignature'
 
 /**
  * Everything that is not today's work.
@@ -89,7 +90,7 @@ export default function SettingsModal({ status, aiOn, onAiChange, onClose }: {
                   </p>
                   <div className="mt-2 rounded-lg border border-border-gray bg-subtle-gray px-4 py-3">
                     <div className="font-mono text-[10px] tracking-wider uppercase text-off-black/40 mb-1">Preview</div>
-                    <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 14, color: '#333', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: me.signature }} />
+                    <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 14, color: '#333', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: safeSignature(me.signature) }} />
                   </div>
                 </div>
               </>

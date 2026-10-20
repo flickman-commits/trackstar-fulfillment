@@ -5,6 +5,10 @@
  * rep presses Refresh on the Support page. One history.list call when
  * nothing changed. See server/domain/support/mailbox.js. Then Claude drafts
  * replies for the conversations that need one (server/domain/support/draft.js).
+ *
+ * The cron calls it with GET (that is what Vercel sends). A person's Refresh
+ * is a POST: a GET from a browser, which any link or image tag can make,
+ * runs nothing.
  */
 import { setCors, isCronRequest } from '../_lib/auth.js'
 import { requireCapability } from '../_lib/users.js'
@@ -15,6 +19,7 @@ import { draftPending } from '../../server/domain/support/draft.js'
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
   if (!isCronRequest(req)) {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
     const user = await requireCapability(req, res, 'support')
     if (!user) return
   }
@@ -46,6 +51,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ...out, drafts })
   } catch (error) {
     console.error('[API /support/sync]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'The mailbox sync failed. Try again in a minute.' })
   }
 }

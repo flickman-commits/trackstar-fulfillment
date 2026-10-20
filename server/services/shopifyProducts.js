@@ -526,8 +526,11 @@ export async function syncProductCatalog() {
     })
   }
 
-  // Products deleted from Shopify should stop counting as gaps here.
+  // Products deleted from Shopify should stop counting as gaps here. An empty
+  // catalog is never real (it is a scope or API problem), and `notIn: []`
+  // would match every row, so refuse rather than wipe the table.
   const seen = products.map(p => p.productId)
+  if (!seen.length) throw new Error('Shopify returned no products; refusing to sync the catalog')
   const removed = await prisma.shopifyProduct.deleteMany({
     where: { productId: { notIn: seen } },
   })

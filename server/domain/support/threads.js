@@ -17,6 +17,7 @@ import { listMockups } from './mockups.js'
 import { stripQuoted } from './mailbox.js'
 import { can } from '../../../api/_lib/roles.js'
 import { replyWindow } from './instagram.js'
+import { UserError } from './errors.js'
 
 export const STATUSES = ['open', 'waiting', 'escalated', 'closed']
 export const SORTS = ['waiting', 'newest', 'oldest', 'priority']
@@ -222,7 +223,7 @@ async function event(threadId, body, actor) {
 const withAssignee = { include: { assignee: { select: TEAM_SELECT } } }
 
 export async function setStatus(id, status, actor) {
-  if (!STATUSES.includes(status)) throw new Error(`Unknown status: ${status}`)
+  if (!STATUSES.includes(status)) throw new UserError(`Unknown status: ${status}`)
   const before = await prisma.supportThread.findUnique({ where: { id }, select: { status: true } })
   const t = await prisma.supportThread.update({ where: { id }, data: { status, snoozedUntil: null }, ...withAssignee })
   if (before?.status !== status) {
@@ -237,7 +238,7 @@ export async function assign(id, assigneeId, actor) {
   let who = null
   if (assigneeId) {
     who = await prisma.user.findUnique({ where: { id: assigneeId }, select: { ...TEAM_SELECT, isActive: true } })
-    if (!who?.isActive) throw new Error('That teammate is not active')
+    if (!who?.isActive) throw new UserError('That teammate is not active')
   }
   const t = await prisma.supportThread.update({ where: { id }, data: { assigneeId: assigneeId || null }, ...withAssignee })
   const target = !who ? 'unassigned this' : who.id === actor?.id ? 'took this' : `assigned this to ${who.firstName}`
@@ -247,7 +248,7 @@ export async function assign(id, assigneeId, actor) {
 
 export async function snooze(id, until, actor) {
   const d = until ? new Date(until) : null
-  if (d && Number.isNaN(d.getTime())) throw new Error('Bad snooze time')
+  if (d && Number.isNaN(d.getTime())) throw new UserError('Bad snooze time')
   const t = await prisma.supportThread.update({ where: { id }, data: { snoozedUntil: d, status: 'open' }, ...withAssignee })
   await event(id, d ? `${actorName(actor)} snoozed this until ${d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : `${actorName(actor)} unsnoozed this`, actor)
   return row(t)
@@ -268,7 +269,7 @@ export async function setTags(id, tags) {
 /** An internal note. Mentions are teammate ids the client resolved from @names; only active ones are kept. */
 export async function addNote(id, { body, mentions = [] }, actor) {
   const text = String(body || '').trim()
-  if (!text) throw new Error('Write something first')
+  if (!text) throw new UserError('Write something first')
   const ids = [...new Set(mentions.map(String))]
   const valid = ids.length ? await prisma.user.findMany({ where: { id: { in: ids }, isActive: true }, select: { id: true } }) : []
   const n = await prisma.supportNote.create({
@@ -280,8 +281,8 @@ export async function addNote(id, { body, mentions = [] }, actor) {
 
 export async function deleteNote(noteId, actor) {
   const n = await prisma.supportNote.findUnique({ where: { id: noteId } })
-  if (!n || n.kind !== 'note') throw new Error('No such note')
-  if (n.authorId !== actor?.id && actor?.role !== 'admin') throw new Error('Only the author or an admin can delete a note')
+  if (!n || n.kind !== 'note') throw new UserError('No such note')
+  if (n.authorId !== actor?.id && actor?.role !== 'admin') throw new UserError('Only the author or an admin can delete a note')
   await prisma.supportNote.delete({ where: { id: noteId } })
   return { id: noteId }
 }
@@ -291,9 +292,9 @@ export async function deleteNote(noteId, actor) {
  * recorded on the draft so it is not offered, or run, again.
  */
 export async function setProposal(threadId, noteId, proposalId, status, actor) {
-  if (!['done', 'dismissed'].includes(status)) throw new Error('status is done or dismissed')
+  if (!['done', 'dismissed'].includes(status)) throw new UserError('status is done or dismissed')
   const n = await prisma.supportNote.findUnique({ where: { id: noteId } })
-  if (!n || n.kind !== 'draft' || n.threadId !== threadId) throw new Error('No such draft')
+  if (!n || n.kind !== 'draft' || n.threadId !== threadId) throw new UserError('No such draft')
   const data = n.data && typeof n.data === 'object' ? n.data : {}
   const proposals = (Array.isArray(data.proposals) ? data.proposals : []).map(p => p.id === proposalId ? { ...p, status, by: [actor?.firstName, actor?.lastName].filter(Boolean).join(' ') || null, at: new Date().toISOString() } : p)
   const row = await prisma.supportNote.update({ where: { id: noteId }, data: { data: { ...data, proposals } }, include: { author: { select: { id: true, firstName: true, lastName: true } } } })
@@ -427,7 +428,8 @@ export async function customerContext(email, { linked = [] } = {}) {
         shopify.push(node)
       }
     } catch (err) {
-      shopifyError = err.message.slice(0, 200)
+      // The page says Shopify did not answer; the detail stays in the log.
+      shopifyError = 'Shopify did not answer, so payment, fulfillment and tracking may be missing.'
       console.warn(`[support] Shopify orders for ${e || linked.join(',')}: ${err.message}`)
     }
   }
@@ -545,9 +547,7 @@ export async function linkedOrderNumbers(t) {
 }
 
 function userError(message) {
-  const err = new Error(message)
-  err.status = 400
-  return err
+  return new UserError(message)
 }
 
 /** "#4517", "4517" or "4517-2" (our per-item number) all mean order 4517. */
@@ -597,4 +597,42 @@ export async function unlinkOrder(threadId, raw, actor) {
   const { count } = await prisma.supportLinkedOrder.deleteMany({ where: { customerKey: key, orderNumber: number } })
   if (count) await event(threadId, `Unlinked order #${number}`, actor)
   return { number, removed: count }
+}
+
+// ---------------------------------------------------------------------------
+// Whose order is it? The quick actions take an order id from the page; they
+// may only act on an order this conversation is about.
+// ---------------------------------------------------------------------------
+
+const ORDER_OWNER = `query($id: ID!) { order(id: $id) { name email } }`
+
+/**
+ * Refuse unless the order is under the thread's email or is one a teammate
+ * linked to this customer. `shopifyOrderId` is Shopify's numeric id;
+ * `orderId` is one of our rows. Reads our table first and asks Shopify only
+ * for an order we have not imported.
+ */
+export async function assertOrderInThread(thread, { shopifyOrderId, orderId } = {}) {
+  const email = String(thread?.customerEmail || '').trim().toLowerCase()
+  const linked = new Set(await linkedOrderNumbers(thread))
+  const refuse = () => { throw userError('That order is not on this conversation. Link it to the customer first.') }
+  const mine = (orderEmail, number) => (email && String(orderEmail || '').trim().toLowerCase() === email) || (number && linked.has(String(number).replace(/^#/, '')))
+  const numberOf = r => String(r.shopifyOrderData?.name || r.parentOrderNumber || '').replace(/^#/, '')
+
+  if (orderId) {
+    const r = await prisma.order.findUnique({ where: { id: String(orderId) }, select: { customerEmail: true, parentOrderNumber: true, shopifyOrderData: true } })
+    if (!r || !mine(r.customerEmail, numberOf(r))) refuse()
+  }
+  if (shopifyOrderId !== undefined && shopifyOrderId !== null && shopifyOrderId !== '') {
+    const id = String(shopifyOrderId).trim().replace(/^gid:\/\/shopify\/Order\//, '')
+    if (!/^\d+$/.test(id)) refuse()
+    const rows = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: id }, select: { customerEmail: true, parentOrderNumber: true, shopifyOrderData: true } })
+    // Our rows first; Shopify's own email on the order when ours do not say
+    // (not imported yet, or imported without the address).
+    if (!rows.some(r => mine(r.customerEmail, numberOf(r)))) {
+      const data = await shopifyGraphQL(ORDER_OWNER, { id: `gid://shopify/Order/${id}` })
+      const o = data?.order
+      if (!o || !mine(o.email, o.name)) refuse()
+    }
+  }
 }

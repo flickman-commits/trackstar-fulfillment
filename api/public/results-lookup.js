@@ -19,7 +19,7 @@ import { researchService } from '../../server/services/ResearchService.js'
 import { isRacePublicSafe, raceNeedsBrowser, getCanonicalRaceName } from '../../server/scrapers/index.js'
 import { parseRaceNameFromTitle } from '../../server/scrapers/raceNameNormalization.js'
 import {
-  checkRateLimit,
+  checkRateLimitDurable,
   buildCacheKey,
   getCached,
   setCached,
@@ -102,8 +102,9 @@ export default async function handler(req, res) {
   // Marathon"). Used in logs so all observability rolls up by canonical name.
   const raceCanonical = getCanonicalRaceName(resolvedRace) || resolvedRace
 
-  // Rate limit before doing any work.
-  const limit = checkRateLimit(ip)
+  // Rate limit before doing any work. Durable: each lookup can be a live
+  // scrape, and a per-instance counter resets on every cold start.
+  const limit = await checkRateLimitDurable(ip, { bucket: 'lookup' })
   if (!limit.allowed) {
     res.setHeader('Retry-After', Math.ceil(limit.retryAfterMs / 1000))
     await observe({ outcome: 'rate_limited', status: 429, raceForLog: raceCanonical })

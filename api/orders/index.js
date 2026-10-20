@@ -133,7 +133,7 @@ function buildAustinFallbackUrl(runnerName, raceName, year, eventType) {
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -455,6 +455,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ orders: transformedOrders, ...(openOnly ? { completedCount } : {}) })
   } catch (error) {
     console.error('Error:', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

@@ -12,6 +12,7 @@
 import prisma from '../../db.js'
 import { RACE_TEMPLATES, CHARITY_TEMPLATES, PR_TEMPLATES, RACE_CADENCE, CHARITY_CADENCE, PR_CADENCE } from './angles.js'
 import { NO_DASHES } from './guardrails.js'
+import { UserError } from './errors.js'
 
 export const TEMPLATES_KEY = 'sales_templates'
 
@@ -55,11 +56,11 @@ export function templateSteps() {
  * same as in a draft, since a template with one would poison every email.
  */
 export async function setTemplate({ pipeline, angle, subject, body }) {
-  if (!DEFAULT_TEMPLATES[pipeline]) throw new Error('pipeline must be RACE, CHARITY or PR')
+  if (!DEFAULT_TEMPLATES[pipeline]) throw new UserError('pipeline must be RACE, CHARITY or PR')
   const def = DEFAULT_TEMPLATES[pipeline][angle]
-  if (!def) throw new Error(`No template for ${pipeline} / ${angle}`)
+  if (!def) throw new UserError(`No template for ${pipeline} / ${angle}`)
   for (const [k, v] of [['subject', subject], ['body', body]]) {
-    if (v !== undefined && NO_DASHES.test(String(v))) throw new Error(`The ${k} contains an em or en dash. Use a comma or a full stop.`)
+    if (v !== undefined && NO_DASHES.test(String(v))) throw new UserError(`The ${k} contains an em or en dash. Use a comma or a full stop.`)
   }
   const over = await overrides()
   over[pipeline] = over[pipeline] || {}

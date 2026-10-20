@@ -19,7 +19,7 @@
 import { setCors } from '../_lib/auth.js'
 import { isRacePublicSafe, getCanonicalRaceName, getCoveredYears } from '../../server/scrapers/index.js'
 import { parseRaceNameFromTitle } from '../../server/scrapers/raceNameNormalization.js'
-import { checkRateLimit } from '../../server/lib/publicRateLimit.js'
+import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
 
 function getClientIp(req) {
   const fwd = req.headers['x-forwarded-for']
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 
   // One product page view per shopper is the normal case; the ceiling only has
   // to stop somebody scripting it.
-  const limit = checkRateLimit(getClientIp(req), { bucket: 'race-status', max: 300 })
+  const limit = await checkRateLimitDurable(getClientIp(req), { bucket: 'race-status', max: 300 })
   if (!limit.allowed) {
     res.setHeader('Retry-After', Math.ceil(limit.retryAfterMs / 1000))
     return res.status(429).json({ error: 'Too many requests' })

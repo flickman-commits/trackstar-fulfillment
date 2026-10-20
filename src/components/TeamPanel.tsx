@@ -336,6 +336,15 @@ export function PeoplePanel() {
                             Reset password
                           </button>
                         )}
+                        {m.isActive && (
+                          <button
+                            className={btnGhost}
+                            disabled={busyId === m.id}
+                            onClick={() => post({ action: 'sign-out', id: m.id }, `Signed ${m.name} out everywhere`)}
+                          >
+                            Sign out everywhere
+                          </button>
+                        )}
                         <button
                           className={btnSecondary}
                           disabled={busyId === m.id}
@@ -378,6 +387,7 @@ export function AccountPanel() {
   }, [user?.firstName, user?.lastName])
 
   const [changingPassword, setChangingPassword] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [savingPassword, setSavingPassword] = useState(false)
@@ -416,13 +426,13 @@ export function AccountPanel() {
     try {
       const res = await api('/api/admin/users', {
         method: 'POST',
-        body: JSON.stringify({ action: 'set-password', password }),
+        body: JSON.stringify({ action: 'set-password', currentPassword, password }),
       })
       const data = await res.json()
       if (!res.ok) toast.error(data.error || 'That did not work')
       else {
-        toast.success('Password changed')
-        setChangingPassword(false); setPassword(''); setConfirm('')
+        toast.success('Password changed. Your other devices are signed out.')
+        setChangingPassword(false); setCurrentPassword(''); setPassword(''); setConfirm('')
       }
     } finally {
       setSavingPassword(false)
@@ -477,6 +487,15 @@ export function AccountPanel() {
 
       {changingPassword ? (
         <form onSubmit={savePassword} className="rounded-lg border border-border-gray bg-subtle-gray/40 p-4 space-y-3">
+          <div>
+            <label className={fieldLabel}>Current password</label>
+            <PasswordInput
+              className={inputBase}
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={setCurrentPassword}
+            />
+          </div>
           <div>
             <label className={fieldLabel}>New password</label>
             <PasswordInput

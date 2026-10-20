@@ -45,15 +45,44 @@ function summarize(hours) {
  * @returns per type: the summary, a weekly series (last 8 weeks, by completion week),
  *          and what was left out and why; plus the open backlog past the goal right now.
  */
-export async function computeFulfillmentTime({ since, until }) {
-  const [events, orders, races] = await Promise.all([
-    prisma.auditEvent.findMany({ where: { action: 'order.complete' }, orderBy: { createdAt: 'asc' }, select: { createdAt: true, detail: true } }),
-    prisma.order.findMany({
-      where: { status: 'completed', trackstarOrderType: { in: ['standard', 'custom'] } },
-      select: { orderNumber: true, trackstarOrderType: true, createdAt: true, researchedAt: true, designCompletedAt: true, raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true },
-    }),
+/**
+ * The header polls this every two minutes from every open tab, and the
+ * numbers barely move in that time, so a result is reused per instance for
+ * a minute.
+ */
+const CACHE_MS = 60_000
+const cache = new Map()
+
+export async function computeFulfillmentTime(range) {
+  const key = `${new Date(range.since).getTime()}|${Math.floor(new Date(range.until).getTime() / CACHE_MS)}`
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value
+  const value = await computeFulfillmentTimeFresh(range)
+  cache.clear()
+  cache.set(key, { at: Date.now(), value })
+  return value
+}
+
+async function computeFulfillmentTimeFresh({ since, until }) {
+  // Only what the window and the 8-week series can use. This used to read
+  // every completion event and every completed order ever, a little more
+  // each day, on every poll.
+  const floor = new Date(Math.min(new Date(since).getTime(), new Date(until).getTime() - 8 * 7 * 24 * HOUR))
+  const [events, races] = await Promise.all([
+    prisma.auditEvent.findMany({ where: { action: 'order.complete', createdAt: { gte: floor } }, orderBy: { createdAt: 'asc' }, select: { createdAt: true, detail: true } }),
     prisma.race.findMany({ select: { raceName: true, year: true, raceDate: true } }),
   ])
+  const loggedNumbers = [...new Set(events.map(e => e.detail?.orderNumber).filter(Boolean))]
+  const orders = await prisma.order.findMany({
+    where: {
+      status: 'completed',
+      OR: [
+        { trackstarOrderType: { in: ['standard', 'custom'] }, orderNumber: { in: loggedNumbers } },
+        { trackstarOrderType: 'custom', OR: [{ designCompletedAt: { gte: floor } }, { researchedAt: { gte: floor } }] },
+      ],
+    },
+    select: { orderNumber: true, trackstarOrderType: true, createdAt: true, researchedAt: true, designCompletedAt: true, raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true },
+  })
   const completedAt = new Map()
   for (const e of events) { const n = e.detail?.orderNumber; if (n && !completedAt.has(n)) completedAt.set(n, e.createdAt) }
   const raceDate = new Map(races.map(r => [`${r.raceName}|${r.year}`, r.raceDate]))

@@ -6,6 +6,7 @@
 import { z } from 'zod'
 import prisma from '../../../../api/_lib/prisma.js'
 import { ToolError } from '../server.js'
+import { can } from '../../../../api/_lib/roles.js'
 import { approvalUrl, shopifyAdminUrl } from '../../../lib/links.js'
 import { rosterFor } from '../../../domain/orders/assignment.js'
 import { pipelinesFor } from '../../../domain/orders/pipelineStatus.js'
@@ -99,6 +100,22 @@ export async function findOrdersByNumber(wanted) {
   })
 }
 
+/**
+ * Approval and intake links are bearer credentials: whoever has one can
+ * approve a proof or fill in a bulk run. A read key hands them out only when
+ * it acts as an admin, or as someone whose role creates and approves designs.
+ */
+export async function mayHoldLinks(principal) {
+  if (!principal?.user) return false
+  return principal.role === 'admin' || await can(principal.role, 'orders.render')
+}
+
+/** The link itself for someone who may hold it, else only whether there is one. */
+export function linkField(name, url, allowed) {
+  const has = `has${name[0].toUpperCase()}${name.slice(1)}`
+  return allowed ? { [name]: url || null } : { [has]: Boolean(url) }
+}
+
 /** The pipeline as a tool shows it: stage, the one-line reason, and what to do. */
 export function pipelineShape(p) {
   return p ? { stage: p.stage, reason: p.reason, fix: p.fix || undefined } : undefined
@@ -111,7 +128,7 @@ export function pickItem(rows, item) {
   return o
 }
 
-export function detail(o) {
+export function detail(o, { links = false } = {}) {
   const r = o.runnerResearch?.[0]
   const design = ['custom', 'race_partner'].includes(o.trackstarOrderType)
   const proofs = o.proofs || []
@@ -129,7 +146,7 @@ export function detail(o) {
     gift: o.isGift || undefined,
     creativeDirection: design && o.creativeDirection ? o.creativeDirection : undefined,
     proofs: design ? { total: proofs.length, approved: proofs.filter(p => p.status === 'approved').length, awaiting: proofs.filter(p => p.status === 'pending').length, lastSentAt: o.proofSentAt || null } : undefined,
-    approvalLink: design ? approvalUrl(o.approvalToken?.token) : undefined,
+    ...(design ? linkField('approvalLink', approvalUrl(o.approvalToken?.token), links) : {}),
     shopifyAdminUrl: shopifyAdminUrl(o.shopifyOrderData?.id) || undefined,
     bulkRun: o.bulkOrder ? `${o.bulkOrder.number} (${o.bulkOrder.partnerName})` : undefined,
     comments: (o.comments || []).map(c => ({ by: c.authorName || 'someone', at: c.createdAt, text: c.text })),
@@ -233,15 +250,16 @@ export const orderTools = [
   {
     name: 'get_order',
     title: 'Get order',
-    description: 'One order in full by its number (e.g. "4053"): every item on it, the runner, race, what prints, research, the pipeline stage and fix, comments, proofs and the approval link for design jobs.',
+    description: 'One order in full by its number (e.g. "4053"): every item on it, the runner, race, what prints, research, the pipeline stage and fix, comments, proofs and, for design jobs, the approval link (only for admins and people who approve designs; others see hasApprovalLink).',
     scope: 'read',
     readOnly: true,
     input: { orderNumber: z.string().max(40).describe('The Shopify order number, with or without #.') },
-    async handler({ orderNumber }) {
+    async handler({ orderNumber }, { principal }) {
       const rows = await findOrdersByNumber(orderNumber)
       if (!rows.length) throw new ToolError(`No order matching "${orderNumber}".`)
       const pipelines = await pipelinesFor(rows.filter(r => r.trackstarOrderType === 'standard').map(r => r.id))
-      return { orderNumber: displayNumber(rows[0]), items: rows.map(o => ({ ...detail(o), pipeline: pipelineShape(pipelines.get(o.id)) })) }
+      const links = await mayHoldLinks(principal)
+      return { orderNumber: displayNumber(rows[0]), items: rows.map(o => ({ ...detail(o, { links }), pipeline: pipelineShape(pipelines.get(o.id)) })) }
     },
   },
   {

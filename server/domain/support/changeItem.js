@@ -16,6 +16,7 @@
  */
 import prisma from '../../db.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
+import { UserError } from './errors.js'
 
 const ORDER = `query($id: ID!) { order(id: $id) {
   id name note displayFulfillmentStatus cancelledAt
@@ -32,14 +33,14 @@ async function gql(query, variables, path) {
   const data = d.data || d
   const node = path.split('.').reduce((x, k) => x?.[k], data)
   const errs = node?.userErrors || []
-  if (errs.length) throw new Error(`Shopify: ${errs.map(e => e.message).join('; ')}`)
+  if (errs.length) throw new UserError(`Shopify: ${errs.map(e => e.message).join('; ')}`)
   return node
 }
 
 /** The print line items on an order, with their size and frame, for the form. */
 export async function changeItemPrep({ shopifyOrderId }) {
   const order = await gql(ORDER, { id: gid(shopifyOrderId) }, 'order')
-  if (!order) throw new Error('No such Shopify order')
+  if (!order) throw new UserError('No such Shopify order')
   const items = order.lineItems.nodes.filter(li => li.quantity > 0 && opt(li.variant, 'size')).map(li => {
     const variants = li.variant.product.variants.nodes
     return {
@@ -61,23 +62,23 @@ export async function changeItem({ thread, shopifyOrderId, lineItemId, size, fra
   // Before production only. Once it is made, it is a reprint (Matt's call).
   const rows = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: numericId }, select: { id: true, lineItemIndex: true, status: true, designStatus: true, trackingNumber: true } })
   if (rows.some(r => r.status === 'completed' || r.designStatus === 'sent_to_production' || r.trackingNumber)) {
-    throw new Error('That order has already gone to production, so the size or frame cannot be changed now.')
+    throw new UserError('That order has already gone to production, so the size or frame cannot be changed now.')
   }
 
   const order = await gql(ORDER, { id }, 'order')
-  if (!order) throw new Error('No such Shopify order')
-  if (order.cancelledAt) throw new Error('That order is cancelled')
-  if (order.displayFulfillmentStatus === 'FULFILLED') throw new Error('Shopify says that order is fulfilled already')
+  if (!order) throw new UserError('No such Shopify order')
+  if (order.cancelledAt) throw new UserError('That order is cancelled')
+  if (order.displayFulfillmentStatus === 'FULFILLED') throw new UserError('Shopify says that order is fulfilled already')
   const prints = order.lineItems.nodes.filter(li => li.quantity > 0 && opt(li.variant, 'size'))
   const old = lineItemId ? prints.find(li => li.id === lineItemId) : prints.length === 1 ? prints[0] : null
-  if (!old) throw new Error(prints.length ? 'Pick which print on the order to change' : 'No print on that order to change')
-  if (old.unfulfilledQuantity < old.quantity) throw new Error('That print has been fulfilled, so it cannot be changed')
+  if (!old) throw new UserError(prints.length ? 'Pick which print on the order to change' : 'No print on that order to change')
+  if (old.unfulfilledQuantity < old.quantity) throw new UserError('That print has been fulfilled, so it cannot be changed')
 
   const fromSize = opt(old.variant, 'size'), fromFrame = opt(old.variant, 'frame')
   const toSize = String(size || fromSize).trim(), toFrame = String(frame || fromFrame || '').trim()
-  if (toSize === fromSize && (toFrame || null) === (fromFrame || null)) throw new Error('That is the size and frame it already is')
+  if (toSize === fromSize && (toFrame || null) === (fromFrame || null)) throw new UserError('That is the size and frame it already is')
   const target = old.variant.product.variants.nodes.find(v => opt(v, 'size') === toSize && (opt(v, 'frame') || '') === toFrame)
-  if (!target) throw new Error(`This print does not come in ${[toSize, toFrame].filter(Boolean).join(' ')}`)
+  if (!target) throw new UserError(`This print does not come in ${[toSize, toFrame].filter(Boolean).join(' ')}`)
 
   const was = [fromSize, fromFrame].filter(Boolean).join(' ')
   const now = [toSize, toFrame].filter(Boolean).join(' ')
@@ -87,7 +88,7 @@ export async function changeItem({ thread, shopifyOrderId, lineItemId, size, fra
   const calc = await gql(`mutation($id: ID!) { orderEditBegin(id: $id) { calculatedOrder { id lineItems(first: 20) { nodes { id quantity variant { id } } } } userErrors { field message } } }`, { id }, 'orderEditBegin')
   const calcId = calc.calculatedOrder.id
   const calcLine = calc.calculatedOrder.lineItems.nodes.find(l => l.variant?.id === old.variant.id && l.quantity > 0)
-  if (!calcLine) throw new Error('Could not find that print in the order edit')
+  if (!calcLine) throw new UserError('Could not find that print in the order edit')
   await gql(`mutation($id: ID!, $line: ID!) { orderEditSetQuantity(id: $id, lineItemId: $line, quantity: 0) { calculatedOrder { id } userErrors { field message } } }`, { id: calcId, line: calcLine.id }, 'orderEditSetQuantity')
   await gql(`mutation($id: ID!, $variant: ID!, $qty: Int!) { orderEditAddVariant(id: $id, variantId: $variant, quantity: $qty, allowDuplicates: true) { calculatedLineItem { id } userErrors { field message } } }`, { id: calcId, variant: target.id, qty: old.quantity }, 'orderEditAddVariant')
   const committed = await gql(`mutation($id: ID!, $note: String) { orderEditCommit(id: $id, notifyCustomer: false, staffNote: $note) { order { id totalOutstandingSet { shopMoney { amount currencyCode } } } userErrors { field message } } }`, { id: calcId, note: `${old.title}: ${was} to ${now} (support)` }, 'orderEditCommit')

@@ -20,6 +20,9 @@ import prisma from '../_lib/prisma.js'
 import { ensureApprovalToken, touchApprovalToken } from '../_lib/approvalToken.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { alertError } from '../_lib/alerts.js'
+import { recordAudit } from '../_lib/users.js'
+import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
+import { postSlack, slackText } from '../../server/lib/slack.js'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import crypto from 'crypto'
@@ -112,6 +115,36 @@ async function processImage(buffer, ext) {
   }
 }
 
+/**
+ * What a proof may be. SVG is out: the bucket is public, and an SVG served
+ * from it runs script.
+ */
+const PROOF_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'])
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+/** The portal token as one string; a repeated ?token= arrives as an array. */
+function publicToken(req, body) {
+  const raw = req.query?.token ?? body?.token
+  const token = Array.isArray(raw) ? raw[0] : raw
+  return typeof token === 'string' && token.length <= 80 ? token : ''
+}
+
+/**
+ * Per link, per hour. Generous for a customer going back and forth on a
+ * design, and a ceiling on what a leaked link can do to Slack and the thread.
+ */
+const PORTAL_LIMITS = { view: 300, answer: 30, message: 30 }
+async function withinPortalLimit(token, kind, res) {
+  const limit = await checkRateLimitDurable(token, { bucket: `proof_${kind}`, max: PORTAL_LIMITS[kind] })
+  if (limit.allowed) return true
+  res.setHeader('Retry-After', Math.ceil(limit.retryAfterMs / 1000))
+  res.status(429).json({ error: 'Too many requests from this link. Try again in a little while.' })
+  return false
+}
+
 function buildApprovalUrl(req, token) {
   // Use VERCEL_PROJECT_PRODUCTION_URL in prod, or origin header, or fallback
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
@@ -170,8 +203,10 @@ export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS', allowPublic: isPublicAction })) return
 
   // Public routes use token-based auth (checked below), merchant routes need admin secret
+  let actor = null
   if (!isPublicAction) {
-    if (!requireAdmin(req, res)) return
+    actor = (await requireAdmin(req, res))
+    if (!actor) return
   }
 
   // Now parse the full body (safe — auth is verified for merchant routes)
@@ -193,8 +228,9 @@ export default async function handler(req, res) {
   try {
     // ─── Customer Approval (public, token-based) ───
     if (resolvedAction === 'approve') {
-      const token = req.query.token || body.token
+      const token = publicToken(req, body)
       if (!token) return res.status(400).json({ error: 'Token is required' })
+      if (!(await withinPortalLimit(token, req.method === 'GET' ? 'view' : 'answer', res))) return
 
       const approvalToken = await prisma.approvalToken.findUnique({
         where: { token },
@@ -247,14 +283,20 @@ export default async function handler(req, res) {
       }
 
       if (req.method === 'POST') {
-        const { proofId, approval, feedback } = body
+        const { proofId, approval } = body
+        const feedback = body.feedback == null ? null : String(body.feedback).trim().slice(0, 2000) || null
 
         if (!proofId) return res.status(400).json({ error: 'proofId is required' })
+        // Once a design is in production an answer from the portal cannot
+        // move it back to revision; that conversation goes through support.
+        if (['sent_to_production'].includes(approvalToken.order.designStatus)) {
+          return res.status(409).json({ error: 'This design is already in production. Reply to your email and we will help.' })
+        }
         if (!approval || !['approve', 'request_revision'].includes(approval)) {
           return res.status(400).json({ error: 'approval must be "approve" or "request_revision"' })
         }
 
-        const proof = await prisma.proof.findUnique({ where: { id: proofId } })
+        const proof = await prisma.proof.findUnique({ where: { id: String(proofId) } })
         if (!proof || proof.orderId !== approvalToken.orderId) {
           return res.status(404).json({ error: 'Proof not found' })
         }
@@ -352,14 +394,8 @@ export default async function handler(req, res) {
             ? `approved Option ${proof.version}`
             : `requested revisions on Option ${proof.version}`
           const suffix = approval === 'approve' ? ' - the file is ready to upload to orders.' : ''
-          const slackMsg = {
-            text: `${emoji} <@U04KBDJH5C3> *${customerName}* ${action_text} for order *${displayNum}*${suffix}${feedback ? `\n> _"${feedback}"_` : ''}`
-          }
-          fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(slackMsg)
-          }).catch(e => console.warn('[approve] Slack notification failed:', e.message))
+          await postSlack(process.env.SLACK_PROOF_WEBHOOK_URL,
+            `${emoji} <@U04KBDJH5C3> *${slackText(customerName)}* ${action_text} for order *${slackText(displayNum)}*${suffix}${feedback ? `\n> _"${slackText(feedback)}"_` : ''}`)
         }
 
         return res.status(200).json({ success: true, proof: updatedProof })
@@ -372,8 +408,9 @@ export default async function handler(req, res) {
     if (resolvedAction === 'customer-message') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-      const token = req.query.token || body.token
+      const token = publicToken(req, body)
       if (!token) return res.status(400).json({ error: 'Token is required' })
+      if (!(await withinPortalLimit(token, 'message', res))) return
 
       const text = (body.body || '').toString().trim()
       if (!text) return res.status(400).json({ error: 'Message is required' })
@@ -403,13 +440,8 @@ export default async function handler(req, res) {
         const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
           ? String(shopifyData.name) : `#${approvalToken.order.parentOrderNumber}`
         const customerName = approvalToken.order.customerName || 'Customer'
-        fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: `💬 <@U04KBDJH5C3> *${customerName}* replied to your question on order *${displayNum}*:\n> _"${text}"_`
-          })
-        }).catch(e => console.warn('[customer-message] Slack notification failed:', e.message))
+        await postSlack(process.env.SLACK_PROOF_WEBHOOK_URL,
+          `💬 <@U04KBDJH5C3> *${slackText(customerName)}* replied to your question on order *${slackText(displayNum)}*:\n> _"${slackText(text)}"_`)
       }
 
       return res.status(200).json({ success: true, message })
@@ -442,6 +474,7 @@ export default async function handler(req, res) {
         const approvalToken = await ensureApprovalToken(orderId)
 
         console.log(`[approval-token] Issued token for order ${order.orderNumber}`)
+        await recordAudit({ action: 'proof.link', summary: `Got the approval link for ${order.orderNumber}`, detail: { orderId }, actor })
         return res.status(200).json({
           approvalToken,
           approvalUrl: buildApprovalUrl(req, approvalToken.token)
@@ -511,7 +544,7 @@ export default async function handler(req, res) {
         <!-- Body -->
         <tr><td style="padding:32px;background-color:#FFFFFF;border:1px solid #E8E6E1;">
           <h1 style="margin:0 0 16px;font-size:22px;color:#1A1A1A;font-weight:700;letter-spacing:0.02em;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">${headline}</h1>
-          <p style="margin:0 0 8px;font-size:15px;color:#666666;line-height:1.6;">Hi ${customerName},</p>
+          <p style="margin:0 0 8px;font-size:15px;color:#666666;line-height:1.6;">Hi ${escapeHtml(customerName)},</p>
           <p style="margin:0 0 ${note ? '16px' : '24px'};font-size:15px;color:#666666;line-height:1.6;">${bodyText}</p>${note ? `
           <p style="margin:0 0 24px;font-size:14px;color:#1A1A1A;line-height:1.6;padding:12px 16px;background-color:#F7F5F0;border-left:3px solid #4600D6;font-style:italic;">${note.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>` : ''}
 
@@ -576,15 +609,12 @@ export default async function handler(req, res) {
         data: { designStatus: 'awaiting_review', proofSentAt: new Date(), designerNote: note || null }
       })
 
-      console.log(`[send-to-customer] Proofs emailed to ${order.customerEmail} for order ${order.orderNumber}`)
+      console.log(`[send-to-customer] Proofs emailed for order ${order.orderNumber}`)
+      await recordAudit({ action: 'proof.send', summary: `Emailed proofs for ${order.orderNumber} to the customer`, detail: { orderId, orderNumber: order.orderNumber, proofs: order.proofs.length }, actor })
 
       // Slack notification (fire and forget)
       if (process.env.SLACK_PROOF_WEBHOOK_URL) {
-        fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: `📧 Proofs sent to *${order.customerName || 'customer'}* for order *${displayNum}*` })
-        }).catch(e => console.warn('[send-to-customer] Slack failed:', e.message))
+        await postSlack(process.env.SLACK_PROOF_WEBHOOK_URL, `📧 Proofs sent to *${slackText(order.customerName || 'customer')}* for order *${slackText(displayNum)}*`)
       }
 
       return res.status(200).json({ success: true, approvalUrl })
@@ -608,16 +638,9 @@ export default async function handler(req, res) {
       // file and a photo, and are named by the partner, not an order number.
       const isPartner = order.trackstarOrderType === 'race_partner'
       const text = isPartner
-        ? `📋 <@U09UVEP1N3Y> Production file + photo uploaded for *${order.raceName || displayNum}* - ready for production.`
+        ? `📋 <@U09UVEP1N3Y> Production file + photo uploaded for *${slackText(order.raceName || displayNum)}* - ready for production.`
         : `📋 <@U09UVEP1N3Y> Final PDF uploaded for order *${displayNum}* - ready for production.`
-      if (process.env.SLACK_PROOF_WEBHOOK_URL) {
-        const slackMsg = { text }
-        fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(slackMsg)
-        }).catch(e => console.warn('[notify-production] Slack failed:', e.message))
-      }
+      await postSlack(process.env.SLACK_PROOF_WEBHOOK_URL, text)
 
       console.log(`[notify-production] Eli notified for order ${order.orderNumber}`)
       return res.status(200).json({ success: true })
@@ -676,10 +699,11 @@ export default async function handler(req, res) {
       const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } })
       if (!order) return res.status(404).json({ error: 'Order not found' })
       const ext = String(filename || 'proof.png').split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'
+      if (!PROOF_EXTS.has(ext)) return res.status(400).json({ error: 'Proofs are PNG, JPG, GIF, WebP or PDF.' })
       const path = `${orderId}/raw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
       const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
       const { data, error } = await supabase.storage.from('order-proofs').createSignedUploadUrl(path)
-      if (error) return res.status(500).json({ error: `Could not start the upload: ${error.message}` })
+      if (error) return res.status(500).json({ error: 'Could not start the upload. Try again.' })
       return res.status(200).json({
         path,
         uploadUrl: data.signedUrl,
@@ -728,18 +752,21 @@ export default async function handler(req, res) {
       const rawMatch = imageUrl && !uploadedFile && !imageData
         ? String(imageUrl).match(/\/storage\/v1\/object\/public\/order-proofs\/(.+\/raw-[^/]+)$/)
         : null
+      if (rawMatch && !decodeURIComponent(rawMatch[1]).startsWith(`${orderId}/`)) {
+        return res.status(400).json({ error: 'That upload belongs to a different order.' })
+      }
       if (rawMatch) {
         const rawPath = decodeURIComponent(rawMatch[1])
         const ext = rawPath.split('.').pop()?.toLowerCase() || 'png'
         const timestamp = Date.now()
         const { data: blob, error: dlErr } = await supabaseClient.storage.from('order-proofs').download(rawPath)
-        if (dlErr || !blob) return res.status(400).json({ error: `The uploaded file could not be read back: ${dlErr?.message || 'empty'}` })
+        if (dlErr || !blob) return res.status(400).json({ error: 'The uploaded file could not be read back. Upload it again.' })
         const buffer = Buffer.from(await blob.arrayBuffer())
         const { compressed, thumbnail } = await processImage(buffer, ext)
         if (compressed) {
           const filePath = `${orderId}/v${version}-${timestamp}.jpg`
           const { error: upErr } = await supabaseClient.storage.from('order-proofs').upload(filePath, compressed, { contentType: 'image/jpeg', upsert: false })
-          if (upErr) return res.status(500).json({ error: `Image upload failed: ${upErr.message}` })
+          if (upErr) return res.status(500).json({ error: 'The image did not upload. Try again.' })
           publicUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(filePath).data.publicUrl
           await supabaseClient.storage.from('order-proofs').remove([rawPath]).catch(() => {})
         } else {
@@ -758,6 +785,7 @@ export default async function handler(req, res) {
       // File upload via FormData (small files; large ones use upload-url)
       if (uploadedFile) {
         const ext = (uploadedFile.originalFilename || 'proof.png').split('.').pop()?.toLowerCase() || 'png'
+        if (!PROOF_EXTS.has(ext)) return res.status(400).json({ error: 'Proofs are PNG, JPG, GIF, WebP or PDF.' })
         const timestamp = Date.now()
         const fileBuffer = fs.readFileSync(uploadedFile.filepath)
 
@@ -778,7 +806,7 @@ export default async function handler(req, res) {
 
         if (uploadErr) {
           console.error('[proofs] File upload failed:', uploadErr.message)
-          return res.status(500).json({ error: `File upload failed: ${uploadErr.message}` })
+          return res.status(500).json({ error: 'The file did not upload. Try again.' })
         }
 
         publicUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(filePath).data.publicUrl
@@ -800,6 +828,7 @@ export default async function handler(req, res) {
       // Base64 upload (legacy fallback)
       else if (imageData && !imageUrl) {
         const ext = (imageName || 'proof.png').split('.').pop()?.toLowerCase() || 'png'
+        if (!PROOF_EXTS.has(ext)) return res.status(400).json({ error: 'Proofs are PNG, JPG, GIF, WebP or PDF.' })
         const timestamp = Date.now()
 
         const buffer = Buffer.from(imageData, 'base64')
@@ -811,7 +840,7 @@ export default async function handler(req, res) {
         const uploadExt = useCompressed ? 'jpg' : ext
         const mimeTypes = {
           png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-          gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+          gif: 'image/gif', webp: 'image/webp',
           pdf: 'application/pdf'
         }
         const uploadContentType = useCompressed ? 'image/jpeg' : (mimeTypes[ext] || `image/${ext}`)
@@ -823,7 +852,7 @@ export default async function handler(req, res) {
 
         if (uploadErr) {
           console.error('[proofs] Image upload failed:', uploadErr.message)
-          return res.status(500).json({ error: `Image upload failed: ${uploadErr.message}` })
+          return res.status(500).json({ error: 'The image did not upload. Try again.' })
         }
 
         publicUrl = supabaseClient.storage.from('order-proofs').getPublicUrl(filePath).data.publicUrl
@@ -861,6 +890,7 @@ export default async function handler(req, res) {
 
       const approvalUrl = buildApprovalUrl(req, approvalToken.token)
       console.log(`[proofs] Uploaded v${version} for order ${order.orderNumber}`)
+      await recordAudit({ action: 'proof.upload', summary: `Uploaded proof v${version} for ${order.orderNumber}`, detail: { orderId, proofId: proof.id, version }, actor })
       return res.status(201).json({ success: true, proof, approvalToken, approvalUrl })
     }
 
@@ -869,8 +899,12 @@ export default async function handler(req, res) {
 
       if (!proofId) return res.status(400).json({ error: 'proofId is required' })
 
-      const proof = await prisma.proof.findUnique({ where: { id: proofId } })
+      const proof = await prisma.proof.findUnique({ where: { id: String(proofId) }, include: { order: { select: { orderNumber: true } } } })
       if (!proof) return res.status(404).json({ error: 'Proof not found' })
+      // The approved proof is the record of what the customer signed off on.
+      if (proof.status === 'approved') {
+        return res.status(409).json({ error: 'That proof was approved by the customer, so it stays. Upload a new version instead.' })
+      }
 
       if (proof.imageUrl) {
         try {
@@ -884,14 +918,15 @@ export default async function handler(req, res) {
         }
       }
 
-      await prisma.proof.delete({ where: { id: proofId } })
-      console.log(`[proofs] Deleted proof ${proofId}`)
+      await prisma.proof.delete({ where: { id: proof.id } })
+      console.log(`[proofs] Deleted proof ${proof.id}`)
+      await recordAudit({ action: 'proof.delete', summary: `Deleted proof v${proof.version} for ${proof.order?.orderNumber || 'an order'}`, detail: { orderId: proof.orderId, proofId: proof.id, version: proof.version }, actor })
       return res.status(200).json({ success: true })
     }
 
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (error) {
     console.error('[proofs] Error:', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

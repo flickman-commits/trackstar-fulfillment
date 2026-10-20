@@ -20,10 +20,10 @@ import { syncShopifyBulkOrders } from '../../server/domain/bulk/shopifyBulk.js'
 import { shopifyAdminUrl } from '../../server/lib/links.js'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { requireAdminRole } from '../_lib/users.js'
+import { requireAdminRole, recordAudit } from '../_lib/users.js'
 import {
   nextNumber, dueDateFor, verifiedRaceDate, parseRunnerList, addRunners, readiness, researchPending,
-  addressComplete, FRAME_OPTIONS, SIZE_OPTIONS, sheetProblems,
+  addressComplete, FRAME_OPTIONS, SIZE_OPTIONS, sheetProblems, isAllowedFileUrl,
 } from '../../server/domain/bulk/bulkOrders.js'
 import { getCanonicalRaceName } from '../../server/scrapers/index.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
@@ -85,9 +85,13 @@ const EDITABLE = ['partnerName', 'raceName', 'raceYear', 'quantity', 'frameType'
 
 let lastBulkSync = 0
 
+function isHttpsUrl(v) {
+  try { return new URL(v).protocol === 'https:' } catch { return false }
+}
+
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
 
   try {
@@ -147,6 +151,7 @@ export default async function handler(req, res) {
     if (!body.id) return res.status(400).json({ error: 'id is required' })
     const bulk = await prisma.bulkOrder.findUnique({ where: { id: String(body.id) } })
     if (!bulk) return res.status(404).json({ error: 'Bulk order not found' })
+    const audit = (summary, detail = {}) => recordAudit({ action: `bulk.${action}`, summary, detail: { bulkOrderId: bulk.id, ...detail }, actor })
 
     if (action === 'update') {
       const data = {}
@@ -159,6 +164,8 @@ export default async function handler(req, res) {
         if (k === 'productSize' && !SIZE_OPTIONS.includes(v)) continue
         if (k === 'status' && !['collecting', 'fulfillment', 'submitted'].includes(v)) continue
         if (typeof v === 'string') v = v.trim() || null
+        if (k === 'productionFileUrl' && v && !isAllowedFileUrl(v)) return res.status(400).json({ error: 'Use a Google Drive link or upload the file here.' })
+        if ((k === 'previewImageUrl' || k === 'stripeInvoiceUrl') && v && !isHttpsUrl(v)) return res.status(400).json({ error: 'Links must start with https://' })
         if (k === 'partnerName' && !v) continue
         if (k === 'raceName' && v) v = getCanonicalRaceName(v) || v
         if (k === 'assigneeId' && v) {
@@ -178,17 +185,22 @@ export default async function handler(req, res) {
       if (data.productSize) follow.productSize = data.productSize
       if ('dueDate' in data) follow.dueDate = data.dueDate
       if (Object.keys(follow).length) await prisma.order.updateMany({ where: { bulkOrderId: bulk.id }, data: follow })
+      await audit(`Edited bulk order ${bulk.number} (${Object.keys(data).join(', ') || 'nothing'})`, { fields: Object.keys(data) })
       return res.status(200).json({ bulkOrder: await loadOne(updated.id) })
     }
 
     if (action === 'paid') {
+      // Paid is what lets research and fulfillment start, so it is an admin's call.
+      if (!(await requireAdminRole(req, res, actor))) return
       await prisma.bulkOrder.update({ where: { id: bulk.id }, data: { paidAt: body.paid ? new Date() : null } })
+      await audit(`Marked bulk order ${bulk.number} ${body.paid ? 'paid' : 'unpaid'}`)
       return res.status(200).json({ bulkOrder: await loadOne(bulk.id) })
     }
 
     if (action === 'intake') {
       const { rows, problems } = parseRunnerList(body.text)
       const created = await addRunners(bulk, rows)
+      if (created.length) await audit(`Added ${created.length} runner${created.length === 1 ? '' : 's'} to bulk order ${bulk.number}`)
       if (created.length && bulk.status === 'collecting' && rows.every(r => addressComplete(r.address))) {
         // Leave status alone; "collecting" ends when the person says so.
       }
@@ -204,16 +216,23 @@ export default async function handler(req, res) {
         const a = body.address
         data.shippingAddress = { line1: String(a.line1 || '').trim(), line2: String(a.line2 || '').trim(), city: String(a.city || '').trim(), state: String(a.state || '').trim(), zip: String(a.zip || '').trim(), country: String(a.country || 'United States').trim() }
       }
-      if ('fileUrl' in body) data.productionFileUrl = body.fileUrl ? String(body.fileUrl) : null
+      if ('fileUrl' in body) {
+        if (body.fileUrl && !isAllowedFileUrl(String(body.fileUrl))) return res.status(400).json({ error: 'Use a Google Drive link or upload the file here.' })
+        data.productionFileUrl = body.fileUrl ? String(body.fileUrl) : null
+      }
       await prisma.order.update({ where: { id: runner.id }, data })
+      await audit(`Edited runner ${runner.orderNumber} on bulk order ${bulk.number}`, { orderNumber: runner.orderNumber, fields: Object.keys(data) })
       return res.status(200).json({ bulkOrder: await loadOne(bulk.id) })
     }
 
     if (action === 'remove-runner') {
       const runner = await prisma.order.findFirst({ where: { bulkOrderId: bulk.id, orderNumber: String(body.orderNumber || '') } })
       if (!runner) return res.status(404).json({ error: 'Runner not found' })
-      await prisma.runnerResearch.deleteMany({ where: { orderId: runner.id } })
-      await prisma.order.delete({ where: { id: runner.id } })
+      await prisma.$transaction([
+        prisma.runnerResearch.deleteMany({ where: { orderId: runner.id } }),
+        prisma.order.delete({ where: { id: runner.id } }),
+      ])
+      await audit(`Removed runner ${runner.runnerName || runner.orderNumber} from bulk order ${bulk.number}`, { orderNumber: runner.orderNumber, runnerName: runner.runnerName })
       return res.status(200).json({ bulkOrder: await loadOne(bulk.id) })
     }
 
@@ -228,12 +247,16 @@ export default async function handler(req, res) {
 
     if (action === 'submitted') {
       await prisma.bulkOrder.update({ where: { id: bulk.id }, data: { status: 'submitted', submittedAt: new Date() } })
+      await audit(`Marked bulk order ${bulk.number} submitted`)
       return res.status(200).json({ bulkOrder: await loadOne(bulk.id) })
     }
 
     if (action === 'new-intake-link') {
+      // Kills the link the partner already has, so it is an admin's call.
+      if (!(await requireAdminRole(req, res, actor))) return
       const { randomUUID } = await import('crypto')
       await prisma.bulkOrder.update({ where: { id: bulk.id }, data: { intakeToken: randomUUID() } })
+      await audit(`Replaced the partner intake link for bulk order ${bulk.number}`)
       return res.status(200).json({ bulkOrder: await loadOne(bulk.id) })
     }
 
@@ -244,12 +267,13 @@ export default async function handler(req, res) {
       await prisma.runnerResearch.deleteMany({ where: { orderId: { in: runners.map(r => r.id) } } })
       await prisma.order.deleteMany({ where: { bulkOrderId: bulk.id } })
       await prisma.bulkOrder.delete({ where: { id: bulk.id } })
+      await audit(`Deleted bulk order ${bulk.number} (${bulk.partnerName}, ${runners.length} runners)`, { partnerName: bulk.partnerName, runners: runners.length })
       return res.status(200).json({ success: true })
     }
 
-    return res.status(400).json({ error: `Unknown action: ${action}` })
+    return res.status(400).json({ error: 'Unknown action' })
   } catch (error) {
     console.error('[API /bulk]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

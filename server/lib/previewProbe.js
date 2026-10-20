@@ -25,6 +25,7 @@ import { fetchWithTimeout } from './fetchWithTimeout.js'
 import { loadProbeFixtures } from './scraperHealth.js'
 import { ensureOverridesLoaded, listOverrides } from '../scrapers/scraperOverrides.js'
 import { getCanonicalRaceName } from '../scrapers/index.js'
+import { ToolError } from '../services/mcp/errors.js'
 
 // The agent's MCP client abandons a tool call after 60s, and an abandoned call
 // returns nothing, not even "still building". So each wait stays well inside
@@ -53,7 +54,10 @@ async function listDeployments(cfg, { production = false } = {}) {
   const resp = await fetchWithTimeout(`https://api.vercel.com/v6/deployments?${qs}`, {
     headers: { Authorization: `Bearer ${cfg.token}` },
   })
-  if (!resp.ok) throw new Error(`Vercel API ${resp.status}: ${(await resp.text()).slice(0, 200)}`)
+  if (!resp.ok) {
+    console.error(`[previewProbe] Vercel API ${resp.status}:`, (await resp.text().catch(() => '')).slice(0, 500))
+    throw new Error(`Vercel API ${resp.status}`)
+  }
   const data = await resp.json()
   return data.deployments || []
 }
@@ -61,18 +65,39 @@ async function listDeployments(cfg, { production = false } = {}) {
 const looksLikeSha = ref => /^[0-9a-f]{7,40}$/i.test(ref)
 const stateOf = d => d.readyState || d.state
 
+/**
+ * The only previews probe_preview will hand production's fixtures and
+ * overrides to, and run: the nightly routine's own sweep/* branches. A full
+ * sha is accepted only when Vercel reports it built from a sweep/* branch.
+ */
+const SWEEP_BRANCH = /^sweep\/[A-Za-z0-9._-][A-Za-z0-9._/-]{0,99}$/
+const FULL_SHA = /^[0-9a-f]{40}$/i
+export const isSweepBranch = ref => SWEEP_BRANCH.test(String(ref || '')) && !String(ref).includes('..')
+export function previewRefKind(ref) {
+  if (isSweepBranch(ref)) return 'branch'
+  if (FULL_SHA.test(String(ref || ''))) return 'sha'
+  return null
+}
+
 function matchesRef(d, ref) {
   const meta = d.meta || {}
   if (looksLikeSha(ref)) return String(meta.githubCommitSha || '').toLowerCase().startsWith(ref.toLowerCase())
   return meta.githubCommitRef === ref
 }
 
+/** A preview for a sweep/* branch: by name, or by full sha whose deployment came from one. */
+function matchesPreviewRef(d, ref) {
+  const meta = d.meta || {}
+  if (previewRefKind(ref) === 'sha') return String(meta.githubCommitSha || '').toLowerCase() === ref.toLowerCase() && isSweepBranch(meta.githubCommitRef)
+  return meta.githubCommitRef === ref
+}
+
 /** Newest deployment for a branch or sha, waiting until it finishes building. */
-async function awaitDeployment(cfg, ref, { production = false, waitMs }) {
+async function awaitDeployment(cfg, ref, { production = false, waitMs, match = matchesRef }) {
   const deadline = Date.now() + waitMs
   let last = null
   while (Date.now() < deadline) {
-    const found = (await listDeployments(cfg, { production })).find(d => matchesRef(d, ref))
+    const found = (await listDeployments(cfg, { production })).find(d => match(d, ref))
     if (found) {
       last = found
       const state = stateOf(found)
@@ -97,6 +122,11 @@ function describe(d) {
  * Returns allPassing only when every probed year came back live.
  */
 export async function probePreview({ ref, races, years = null }) {
+  // Checked first: a preview of any other branch is code nobody vetted, and
+  // this would hand it production's probe secret and fixtures.
+  if (!previewRefKind(ref)) {
+    throw new ToolError('probe_preview only tests the nightly routine\'s sweep/* branches: pass a branch like "sweep/berlin-2025", or the full 40-character sha of a commit on one.')
+  }
   const cfg = vercelConfig()
   if (cfg.error) return { ok: false, error: cfg.error }
   if (!process.env.PREVIEW_PROBE_SECRET) {
@@ -104,10 +134,13 @@ export async function probePreview({ ref, races, years = null }) {
   }
   if (!ref || !Array.isArray(races) || !races.length) return { ok: false, error: 'Pass ref (branch or sha) and at least one race.' }
 
-  const deployment = await awaitDeployment(cfg, ref, { waitMs: PREVIEW_WAIT_MS })
+  const deployment = await awaitDeployment(cfg, ref, { waitMs: PREVIEW_WAIT_MS, match: matchesPreviewRef })
   const info = describe(deployment)
   if (!deployment) {
-    return { ok: false, deployment: info, error: `No Vercel deployment found for "${ref}" yet. Check the branch was pushed, then call again.` }
+    return { ok: false, deployment: info, error: `No Vercel preview of a sweep/* branch found for "${ref}" yet. Check the branch was pushed, then call again.` }
+  }
+  if (!isSweepBranch(info.branch)) {
+    throw new ToolError('That deployment was not built from a sweep/* branch, so it will not be probed.')
   }
   if (info.state === 'ERROR' || info.state === 'CANCELED') {
     return { ok: false, deployment: info, error: `The preview build ${info.state === 'ERROR' ? 'failed' : 'was cancelled'}. Run npm run build locally; it runs the same steps.` }
@@ -150,7 +183,8 @@ export async function probePreview({ ref, races, years = null }) {
       method: 'POST', headers, body: JSON.stringify({ targets, overrides: listOverrides() }),
     }, PROBE_CALL_TIMEOUT_MS)
   } catch (err) {
-    return { ok: false, deployment: info, error: `Could not reach the preview: ${err.message}` }
+    console.error(`[previewProbe] reaching ${info.url} failed:`, err)
+    return { ok: false, deployment: info, error: err?.name === 'TimeoutError' ? 'The preview did not answer in time. Call probe_preview again.' : 'Could not reach the preview. Call probe_preview again in a minute.' }
   }
   const text = await resp.text()
   if (!resp.ok) {
@@ -161,10 +195,16 @@ export async function probePreview({ ref, races, years = null }) {
         ? ' Vercel Deployment Protection blocked it; production needs VERCEL_AUTOMATION_BYPASS_SECRET.'
         : ' The preview refused the secret; PREVIEW_PROBE_SECRET must be set for Preview as well as Production.')
       : ''
-    return { ok: false, deployment: info, error: `Preview probe returned ${resp.status}.${hint}`, body: text.slice(0, 300) }
+    console.error(`[previewProbe] preview probe ${resp.status}:`, text.slice(0, 500))
+    return { ok: false, deployment: info, error: `Preview probe returned ${resp.status}.${hint}` }
   }
 
-  const { rows = [], sha = null } = JSON.parse(text)
+  let parsed
+  try { parsed = JSON.parse(text) } catch {
+    console.error('[previewProbe] preview probe answered with something other than JSON:', text.slice(0, 500))
+    return { ok: false, deployment: info, error: 'The preview answered with something other than a probe result. Check the branch builds api/admin/preview-probe.js.' }
+  }
+  const { rows = [], sha = null } = parsed
   const failing = rows.filter(r => r.status !== 'live')
   return {
     ok: true,

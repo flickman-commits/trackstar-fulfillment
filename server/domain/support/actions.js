@@ -20,6 +20,7 @@ import prisma from '../../db.js'
 import { shopifyGraphQL, shopifyFetch } from '../../services/shopifyAuth.js'
 import { appBaseUrl, arteloOrderUrl } from '../../lib/links.js'
 import { setStatus } from './threads.js'
+import { UserError } from './errors.js'
 
 function actorName(actor) {
   return [actor?.firstName, actor?.lastName].filter(Boolean).join(' ') || 'Someone'
@@ -46,10 +47,16 @@ const CREATE_CODE = `
   }`
 
 /** A personal code named after the customer, one use, 30 days: JANE-15, then JANE-15-2 if she has had one. */
+/** The most a rep can give without an admin: the playbook's Make-It-Right codes run 10 to 25. */
+export const DISCOUNT_LIMIT_PERCENT = 25
+
 export async function discount15({ thread, actor, percent = 15, days = 30 }) {
   // Whole percent, 1 to 100. Always one use, once per customer: a code is a gift to one person.
   percent = Number(percent)
-  if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new Error('The discount is a whole percent from 1 to 100.')
+  if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new UserError('The discount is a whole percent from 1 to 100.')
+  if (percent > DISCOUNT_LIMIT_PERCENT && actor?.role !== 'admin') {
+    throw new UserError(`Codes over ${DISCOUNT_LIMIT_PERCENT}% are Matt's call. Slack Matt with the details, or make it ${DISCOUNT_LIMIT_PERCENT}% or less.`)
+  }
   const first = String(thread.customerName || '').trim().split(/\s+/)[0] || ''
   const stem = (first.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'TRACKSTAR').slice(0, 20)
   const endsAt = new Date(Date.now() + days * 86400000).toISOString()
@@ -71,7 +78,7 @@ export async function discount15({ thread, actor, percent = 15, days = 30 }) {
     lastError = errs.map(e => e.message).join('; ')
     if (!/already|taken|exists|in use/i.test(lastError)) break
   }
-  throw new Error(`Shopify would not create the code: ${lastError || 'unknown error'}`)
+  throw new UserError(`Shopify would not create the code: ${lastError || 'unknown error'}`)
 }
 
 const CODE_BY_STRING = `
@@ -90,7 +97,7 @@ const CODE_BY_STRING = `
 /** What Shopify knows about a code, with the plain-words reason it would fail. */
 export async function lookupCode(code) {
   const c = String(code || '').trim().toUpperCase()
-  if (!c) throw new Error('Which code?')
+  if (!c) throw new UserError('Which code?')
   const data = await shopifyGraphQL(CODE_BY_STRING, { code: c })
   const node = data?.codeDiscountNodeByCode
   if (!node?.codeDiscount) return { code: c, found: false, verdict: 'No such code in Shopify. Check the spelling, or it was never created.' }
@@ -119,9 +126,9 @@ export async function lookupCode(code) {
 /** A comment on our order row, where fulfillment reads it. */
 export async function orderNote({ thread, orderId, text, actor }) {
   const t = String(text || '').trim()
-  if (!t) throw new Error('Write the note first')
+  if (!t) throw new UserError('Write the note first')
   const o = await prisma.order.findUnique({ where: { id: String(orderId || '') }, select: { id: true, parentOrderNumber: true, shopifyOrderData: true } })
-  if (!o) throw new Error('No such order')
+  if (!o) throw new UserError('No such order')
   await prisma.orderComment.create({ data: { orderId: o.id, text: `${t} (from support: ${threadUrl(thread.id)})`, authorId: actor?.id || null, authorName: actorName(actor) } })
   const number = String(o.shopifyOrderData?.name || o.parentOrderNumber).replace(/^#/, '')
   await event(thread.id, `${actorName(actor)} left a note on #${number}: ${t}`, actor)
@@ -131,14 +138,14 @@ export async function orderNote({ thread, orderId, text, actor }) {
 /** The runner's name or the race year on our row, before it is produced. */
 export async function fixPersonalization({ thread, orderId, runnerName, year, actor }) {
   const o = await prisma.order.findUnique({ where: { id: String(orderId || '') } })
-  if (!o) throw new Error('No such order')
-  if (o.status === 'completed' || o.designStatus === 'sent_to_production') throw new Error('That one has gone to production. It is a reprint now, not an edit; ask Matt.')
+  if (!o) throw new UserError('No such order')
+  if (o.status === 'completed' || o.designStatus === 'sent_to_production') throw new UserError('That one has gone to production. It is a reprint now, not an edit; ask Matt.')
   const data = {}
   const name = String(runnerName || '').trim()
   const y = Number(year)
   if (name && name !== (o.runnerNameOverride || o.runnerName)) data.runnerNameOverride = name
   if (Number.isFinite(y) && y >= 1990 && y <= 2100 && y !== (o.yearOverride || o.raceYear)) data.yearOverride = y
-  if (!Object.keys(data).length) throw new Error('Nothing changed')
+  if (!Object.keys(data).length) throw new UserError('Nothing changed')
   await prisma.order.update({ where: { id: o.id }, data })
   const what = [data.runnerNameOverride ? `name to ${data.runnerNameOverride}` : null, data.yearOverride ? `year to ${data.yearOverride}` : null].filter(Boolean).join(' and ')
   const number = String(o.shopifyOrderData?.name || o.parentOrderNumber).replace(/^#/, '')
@@ -165,15 +172,15 @@ export async function shippingAddress({ thread, shopifyOrderId, address, actor }
   for (const k of ADDRESS_FIELDS) a[k] = String(address?.[k] || '').trim()
   a.country = a.country.toUpperCase()
   a.province = a.province.toUpperCase()
-  for (const k of ['name', 'address1', 'city', 'zip', 'country']) if (!a[k]) throw new Error(`The address needs a ${k === 'address1' ? 'street' : k}`)
+  for (const k of ['name', 'address1', 'city', 'zip', 'country']) if (!a[k]) throw new UserError(`The address needs a ${k === 'address1' ? 'street' : k}`)
   const id = String(shopifyOrderId || '').trim()
-  if (!/^\d+$/.test(id)) throw new Error('That order has no Shopify id')
+  if (!/^\d+$/.test(id)) throw new UserError('That order has no Shopify id')
 
   const rows = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: id }, select: { id: true, status: true, designStatus: true, trackingNumber: true, arteloOrderData: true, shopifyOrderData: true } })
-  if (rows.some(r => r.trackingNumber)) throw new Error('That order has shipped. Ask Matt; it is a reship now, not an address change.')
+  if (rows.some(r => r.trackingNumber)) throw new UserError('That order has shipped. Ask Matt; it is a reship now, not an address change.')
 
   const { order } = await shopifyFetch(`/orders/${id}.json?fields=id,name,fulfillment_status`)
-  if (order.fulfillment_status === 'fulfilled') throw new Error('Shopify says that order is fulfilled already. Ask Matt; it is a reship now.')
+  if (order.fulfillment_status === 'fulfilled') throw new UserError('Shopify says that order is fulfilled already. Ask Matt; it is a reship now.')
   const [first, ...last] = a.name.split(/\s+/)
   await shopifyFetch(`/orders/${id}.json`, {
     method: 'PUT',
@@ -223,10 +230,10 @@ const money = cents => `$${toAmount(cents)}`
 /** What can still be refunded on a Shopify order, and the payment to refund it against. */
 export async function refundable(shopifyOrderId) {
   const id = String(shopifyOrderId || '').trim()
-  if (!/^\d+$/.test(id)) throw new Error('That order has no Shopify id')
+  if (!/^\d+$/.test(id)) throw new UserError('That order has no Shopify id')
   const data = await shopifyGraphQL(ORDER_MONEY, { id: `gid://shopify/Order/${id}` })
   const o = data?.order
-  if (!o) throw new Error('Shopify does not have that order')
+  if (!o) throw new UserError('Shopify does not have that order')
   const received = toCents(o.totalReceivedSet?.shopMoney?.amount)
   const refunded = toCents(o.totalRefundedSet?.shopMoney?.amount)
   const sale = (o.transactions || []).find(t => (t.kind === 'SALE' || t.kind === 'CAPTURE') && t.status === 'SUCCESS') || null
@@ -266,22 +273,31 @@ async function waitForCancel(id) {
   return null
 }
 
-function guardLimit(cents, actor) {
-  if (cents > REFUND_LIMIT_CENTS && actor?.role !== 'admin' && !actor?.isSystem) {
-    throw new Error(`${money(cents)} is over the ${money(REFUND_LIMIT_CENTS)} line. That one is Matt's call: Slack Matt with the details.`)
+/**
+ * The $150 line is per order, not per press: what has already been refunded
+ * on the order, by anyone, counts toward it, so three $100 refunds cannot
+ * walk past it.
+ */
+export function guardLimit(cents, actor, { alreadyCents = 0 } = {}) {
+  if (actor?.role === 'admin') return
+  const total = cents + Math.max(0, alreadyCents)
+  if (total <= REFUND_LIMIT_CENTS) return
+  if (alreadyCents > 0) {
+    throw new UserError(`${money(alreadyCents)} has already been refunded on this order, so ${money(cents)} more would make ${money(total)}, over the ${money(REFUND_LIMIT_CENTS)} line. That one is Matt's call: Slack Matt with the details.`)
   }
+  throw new UserError(`${money(cents)} is over the ${money(REFUND_LIMIT_CENTS)} line. That one is Matt's call: Slack Matt with the details.`)
 }
 
 /** Money back, all or part, against the order's payment. The order itself stays as it is. */
 export async function refund({ thread, shopifyOrderId, cents, reason, actor }) {
   const amount = Math.round(Number(cents))
-  if (!Number.isFinite(amount) || amount <= 0) throw new Error('How much? Enter an amount above zero.')
+  if (!Number.isFinite(amount) || amount <= 0) throw new UserError('How much? Enter an amount above zero.')
   const why = String(reason || '').trim()
-  if (!why) throw new Error('Say why, in a few words. It goes on the refund in Shopify.')
+  if (!why) throw new UserError('Say why, in a few words. It goes on the refund in Shopify.')
   const o = await refundable(shopifyOrderId)
-  if (!o.sale) throw new Error('No captured payment on that order to refund against.')
-  if (amount > o.availableCents) throw new Error(`Only ${money(o.availableCents)} is left to refund on #${o.name}.`)
-  guardLimit(amount, actor)
+  if (!o.sale) throw new UserError('No captured payment on that order to refund against.')
+  if (amount > o.availableCents) throw new UserError(`Only ${money(o.availableCents)} is left to refund on #${o.name}.`)
+  guardLimit(amount, actor, { alreadyCents: o.refundedCents })
 
   const data = await shopifyGraphQL(REFUND_CREATE, {
     input: {
@@ -292,7 +308,7 @@ export async function refund({ thread, shopifyOrderId, cents, reason, actor }) {
     },
   })
   const errs = data?.refundCreate?.userErrors || []
-  if (errs.length) throw new Error(`Shopify refused the refund: ${errs.map(e => e.message).join('; ')}`)
+  if (errs.length) throw new UserError(`Shopify refused the refund: ${errs.map(e => e.message).join('; ')}`)
 
   const rows = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: o.id }, select: { id: true } })
   if (rows.length) await prisma.orderComment.createMany({ data: rows.map(r => ({ orderId: r.id, text: `Refunded ${money(amount)} by support: ${why}`, authorId: actor?.id || null, authorName: actorName(actor) })) })
@@ -307,25 +323,25 @@ export async function refund({ thread, shopifyOrderId, cents, reason, actor }) {
  * has no API to cancel, so the thread says it still needs cancelling there.
  */
 export async function cancelOrder({ thread, shopifyOrderId, reason, customerConfirmed, actor }) {
-  if (!customerConfirmed) throw new Error('Only after the customer says yes to cancelling. Ask them first.')
+  if (!customerConfirmed) throw new UserError('Only after the customer says yes to cancelling. Ask them first.')
   const why = String(reason || '').trim() || 'Customer asked to cancel'
   const o = await refundable(shopifyOrderId)
-  if (o.cancelled) throw new Error(`#${o.name} is already cancelled in Shopify.`)
-  if (o.fulfillment === 'FULFILLED' || o.fulfillment === 'PARTIALLY_FULFILLED') throw new Error(`#${o.name} has shipped. It cannot be cancelled; a refund is Matt's call.`)
+  if (o.cancelled) throw new UserError(`#${o.name} is already cancelled in Shopify.`)
+  if (o.fulfillment === 'FULFILLED' || o.fulfillment === 'PARTIALLY_FULFILLED') throw new UserError(`#${o.name} has shipped. It cannot be cancelled; a refund is Matt's call.`)
 
   const rows = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: o.id }, select: { id: true, status: true, designStatus: true, trackingNumber: true, arteloOrderData: true } })
   const produced = rows.find(r => r.status === 'completed' || r.designStatus === 'sent_to_production' || r.trackingNumber)
-  if (produced) throw new Error(`#${o.name} has gone to production. Too late to cancel; see the playbook's "too late" reply.`)
-  guardLimit(o.availableCents, actor)
+  if (produced) throw new UserError(`#${o.name} has gone to production. Too late to cancel; see the playbook's "too late" reply.`)
+  guardLimit(o.availableCents, actor, { alreadyCents: o.refundedCents })
 
   // One call: cancel, and refund what was paid to the original payment. No
   // Shopify email; the reply says it. Shopify runs this as a job; wait a few
   // seconds for it so the rep hears the truth, not just "accepted".
   const data = await shopifyGraphQL(ORDER_CANCEL, { orderId: o.gid, staffNote: `Support: ${why}`.slice(0, 255) })
   const errs = data?.orderCancel?.orderCancelUserErrors?.length ? data.orderCancel.orderCancelUserErrors : data?.orderCancel?.userErrors || []
-  if (errs.length) throw new Error(`Shopify would not cancel #${o.name}: ${errs.map(e => e.message).join('; ')}`)
+  if (errs.length) throw new UserError(`Shopify would not cancel #${o.name}: ${errs.map(e => e.message).join('; ')}`)
   const cancelled = await waitForCancel(o.id)
-  if (!cancelled) throw new Error(`Shopify accepted the cancel for #${o.name} but has not finished it yet. Check the order in Shopify in a minute before trying again.`)
+  if (!cancelled) throw new UserError(`Shopify accepted the cancel for #${o.name} but has not finished it yet. Check the order in Shopify in a minute before trying again.`)
 
   const note = `Cancelled and refunded ${money(o.availableCents)} by support: ${why}. Cancel it in Artelo too.`
   if (rows.length) {
@@ -343,7 +359,7 @@ export async function cancelOrder({ thread, shopifyOrderId, reason, customerConf
 /** A line to Matt in Slack with the thread link, and the thread marked escalated. */
 export async function slackMatt({ thread, text, actor }) {
   const url = process.env.SLACK_DM_WEBHOOK_URL || process.env.SLACK_PROOF_WEBHOOK_URL
-  if (!url) throw new Error('No Slack webhook is set (SLACK_DM_WEBHOOK_URL)')
+  if (!url) throw new UserError('No Slack webhook is set (SLACK_DM_WEBHOOK_URL)')
   const who = thread.customerName || thread.customerEmail || 'a customer'
   const msg = `:rotating_light: *Support escalation* from ${actorName(actor)}\n*${who}*: ${thread.subject || '(no subject)'}\n${String(text || '').trim() || 'Needs your call.'}\n${threadUrl(thread.id)}`
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: msg }) })

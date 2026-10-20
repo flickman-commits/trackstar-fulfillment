@@ -17,6 +17,7 @@
  * down, HTML fetch failed - falls through to the untouched shell, which is
  * exactly what was served before this existed.
  */
+import { shellUrl } from '../../server/lib/shellOrigin.js'
 import prisma from '../_lib/prisma.js'
 
 const DEFAULT_TITLE = 'Trackstar Fulfillment'
@@ -115,11 +116,8 @@ export function injectMeta(html, { title, description, image }) {
 
 export default async function handler(req, res) {
   const token = req.query?.token
-  const proto = req.headers['x-forwarded-proto'] || 'https'
-  const host = req.headers['x-forwarded-host'] || req.headers.host
-  const shellUrl = `${proto}://${host}/index.html`
-
-  let html = await loadShell(shellUrl)
+  const url = shellUrl(req)
+  let html = url ? await loadShell(url) : null
   if (!html) {
     // Deliberately not a redirect to /index.html. That would change the URL,
     // and the router would then see "/index.html" instead of the approval path,

@@ -25,6 +25,10 @@ import {
 } from '../_lib/auth.js'
 import { verifyPassword, hashPassword, normalizeEmail, isValidEmail, touchLastSeen } from '../_lib/users.js'
 import { capsFor } from '../_lib/roles.js'
+import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
+
+/** A real scrypt hash of nothing in particular, for constant-ish timing. */
+const DUMMY_HASH = hashPassword(crypto.randomBytes(16).toString('hex'))
 
 function safeEqual(a, b) {
   const aBuf = Buffer.from(String(a))
@@ -39,17 +43,18 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const actor = readSessionToken(parseCookies(req)[SESSION_COOKIE])
     if (!actor) return res.status(401).json({ authenticated: false })
-    // Re-read so a deactivated account cannot keep browsing on a live token.
+    // Re-read so a deactivated or signed-out account cannot keep browsing on a live token.
     const user = await prisma.user.findUnique({
       where: { id: actor.id },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, sessionVersion: true },
     })
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.sessionVersion !== actor.version) {
       res.setHeader('Set-Cookie', buildSessionCookie(req, { clear: true }))
       return res.status(401).json({ authenticated: false })
     }
     touchLastSeen(user.id)
-    return res.status(200).json({ authenticated: true, user: { ...user, caps: await capsFor(user.role) } })
+    const { sessionVersion: _v, ...shown } = user
+    return res.status(200).json({ authenticated: true, user: { ...shown, caps: await capsFor(user.role) } })
   }
 
   if (req.method === 'DELETE') {
@@ -63,8 +68,17 @@ export default async function handler(req, res) {
 
   const email = normalizeEmail(req.body?.email)
   const password = req.body?.password
-  if (!email || !password) {
+  if (!email || !password || typeof password !== 'string') {
     return res.status(400).json({ error: 'Email and password are required' })
+  }
+
+  // Throttle guessing, per address and per account, durably (an in-memory
+  // counter resets on every new serverless instance).
+  const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim()
+  const byIp = await checkRateLimitDurable(ip, { bucket: 'login_ip', max: 30, windowMs: 15 * 60_000 })
+  const byEmail = byIp.allowed ? await checkRateLimitDurable(email, { bucket: 'login_email', max: 10, windowMs: 15 * 60_000 }) : byIp
+  if (!byIp.allowed || !byEmail.allowed) {
+    return res.status(429).json({ error: 'Too many sign-in attempts. Wait 15 minutes and try again.' })
   }
 
   const userCount = await prisma.user.count()
@@ -103,7 +117,9 @@ export default async function handler(req, res) {
   // One message for "no such user", "wrong password" and "no password set", so
   // the form cannot be used to discover which emails have accounts.
   const bad = () => res.status(401).json({ error: 'Incorrect email or password' })
-  if (!user || !user.passwordHash) return bad()
+  // Hash anyway when there is no account, so response time does not reveal
+  // which emails exist.
+  if (!user || !user.passwordHash) { verifyPassword(password, DUMMY_HASH); return bad() }
   if (!verifyPassword(password, user.passwordHash)) return bad()
 
   // Deactivation is a separate, honest message: they had the right password.
@@ -117,6 +133,6 @@ export default async function handler(req, res) {
     id: user.id, email: user.email, role: user.role,
     firstName: user.firstName, lastName: user.lastName,
   }
-  res.setHeader('Set-Cookie', buildSessionCookie(req, { token: createSessionToken(actor) }))
+  res.setHeader('Set-Cookie', buildSessionCookie(req, { token: createSessionToken({ ...actor, sessionVersion: user.sessionVersion }) }))
   return res.status(200).json({ ok: true, user: { ...actor, caps: await capsFor(actor.role) } })
 }

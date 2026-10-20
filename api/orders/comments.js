@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
 
   try {
@@ -46,7 +46,11 @@ export default async function handler(req, res) {
           process.env.SUPABASE_URL,
           process.env.SUPABASE_SERVICE_ROLE_KEY
         )
-        const ext = (imageName || 'image.png').split('.').pop() || 'png'
+        // Raster images only: the bucket is public, and an SVG (or anything a
+        // browser sniffs as HTML) served from it would run script.
+        const ext = String((imageName || 'image.png').split('.').pop() || 'png').toLowerCase()
+        const COMMENT_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic' }
+        if (!COMMENT_TYPES[ext]) return res.status(400).json({ error: 'Attach a PNG, JPG, GIF, WebP or HEIC image.' })
         const timestamp = Date.now()
         const randomSuffix = Math.random().toString(36).substring(2, 8)
         const filePath = `${orderId}/${timestamp}-${randomSuffix}.${ext}`
@@ -55,11 +59,11 @@ export default async function handler(req, res) {
         const buffer = Buffer.from(imageData, 'base64')
         const { error: uploadErr } = await supabase.storage
           .from('order-comments')
-          .upload(filePath, buffer, { contentType: `image/${ext}`, upsert: false })
+          .upload(filePath, buffer, { contentType: COMMENT_TYPES[ext], upsert: false })
 
         if (uploadErr) {
           console.error('[comments] Image upload failed:', uploadErr.message)
-          return res.status(500).json({ error: `Image upload failed: ${uploadErr.message}` })
+          return res.status(500).json({ error: 'The image did not upload. Try again.' })
         }
 
         const { data: { publicUrl } } = supabase.storage
@@ -152,6 +156,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (error) {
     console.error('[comments] Error:', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

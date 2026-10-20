@@ -16,13 +16,24 @@
  * Anyone on Support; a discount code also needs the Discount codes
  * capability, the same gate as the dashboard's discount tool. Every
  * action is audited. See server/domain/support/actions.js.
+ *
+ * An order named by shopifyOrderId or orderId has to be this conversation's:
+ * under the customer's email, or linked to them by a teammate. refund,
+ * cancelOrder and changeItem also carry an idempotencyKey the page makes per
+ * press, so a double click or a retry cannot do it twice.
  */
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
 import { can } from '../_lib/roles.js'
 import prisma from '../_lib/prisma.js'
 import { changeItemPrep, changeItem } from '../../server/domain/support/changeItem.js'
-import { discount15, lookupCode, orderNote, fixPersonalization, slackMatt, shippingAddress, refundable, refund, cancelOrder, REFUND_LIMIT_CENTS } from '../../server/domain/support/actions.js'
+import { discount15, lookupCode, orderNote, fixPersonalization, slackMatt, shippingAddress, refundable, refund, cancelOrder, REFUND_LIMIT_CENTS, DISCOUNT_LIMIT_PERCENT } from '../../server/domain/support/actions.js'
+import { assertOrderInThread } from '../../server/domain/support/threads.js'
+import { claimOnce } from '../../server/domain/support/idempotency.js'
+import { publicMessage, publicStatus } from '../../server/domain/support/errors.js'
+
+/** Actions that move money or change an order in Shopify: once per press. */
+const ONCE = new Set(['refund', 'cancelOrder', 'changeItem'])
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -38,6 +49,12 @@ export default async function handler(req, res) {
     const thread = await prisma.supportThread.findUnique({ where: { id: String(body.id || '') } })
     if (!thread) return res.status(404).json({ error: 'No such thread' })
     const audit = (summary, detail = {}) => recordAudit({ action: `support.${action}`, summary, detail: { threadId: thread.id, ...detail }, actor: user })
+
+    // The page names the order; it has to be one this conversation is about.
+    if (body.shopifyOrderId !== undefined || body.orderId !== undefined) {
+      await assertOrderInThread(thread, { shopifyOrderId: body.shopifyOrderId, orderId: body.orderId })
+    }
+    if (ONCE.has(action)) await claimOnce(`support.${action}`, body.idempotencyKey)
 
     switch (action) {
       case 'discount15': {
@@ -71,7 +88,7 @@ export default async function handler(req, res) {
       }
       case 'refundable': {
         const o = await refundable(body.shopifyOrderId)
-        return res.status(200).json({ number: o.name, availableCents: o.availableCents, refundedCents: o.refundedCents, currency: o.currency, cancelled: o.cancelled, fulfillment: o.fulfillment, limitCents: REFUND_LIMIT_CENTS, isAdmin: user.role === 'admin' })
+        return res.status(200).json({ number: o.name, availableCents: o.availableCents, refundedCents: o.refundedCents, currency: o.currency, cancelled: o.cancelled, fulfillment: o.fulfillment, limitCents: REFUND_LIMIT_CENTS, discountLimitPercent: DISCOUNT_LIMIT_PERCENT, isAdmin: user.role === 'admin' })
       }
       case 'refund': {
         const out = await refund({ thread, shopifyOrderId: body.shopifyOrderId, cents: body.cents, reason: body.reason, actor: user })
@@ -93,6 +110,6 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('[API /support/actions]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'That did not go through. Check Shopify before trying again.') })
   }
 }

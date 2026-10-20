@@ -15,6 +15,8 @@
 
 import prisma from '../_lib/prisma.js'
 import { setCors } from '../_lib/auth.js'
+import { requireAdminOnly, recordAudit } from '../_lib/users.js'
+import { fetchWithTimeout } from '../../server/lib/fetchWithTimeout.js'
 import crypto from 'crypto'
 
 function base64urlEncode(buffer) {
@@ -25,24 +27,17 @@ function base64urlEncode(buffer) {
 }
 
 export default async function handler(req, res) {
-  // This endpoint is intentionally public — it has to be browser-navigable so
-  // an admin can complete the Etsy OAuth consent flow. CSRF protection is
-  // handled by the PKCE code_verifier + state cookies (see step 2 below).
-  // The redirect_uri is locked to fast.trackstar.art at the Etsy app config
-  // level, so even if someone hits step 1, the code can only ever come back
-  // to our own callback. The worst an attacker could do is initiate a flow
-  // they can't complete (requires Matt's Etsy login to consent).
-  if (setCors(req, res, { allowPublic: true })) return
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
-
+  // Admin only, on both legs. This used to be public on the theory that only
+  // Matt's Etsy login could complete it; any Etsy account can consent to the
+  // app, so a stranger could replace our refresh token with their own shop's.
+  // Both legs are top-level navigations, so the session cookie (SameSite=Lax)
+  // is present. The token is also checked against ETSY_SHOP_ID before saving.
+  if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+  const admin = await requireAdminOnly(req, res)
+  if (!admin) return
 
   const apiKey = process.env.ETSY_API_KEY
   if (!apiKey) {
@@ -95,13 +90,23 @@ export default async function handler(req, res) {
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text()
         console.error('[etsy/auth] Token exchange failed:', errorText)
-        return res.status(400).json({
-          error: 'Token exchange failed',
-          details: errorText
-        })
+        return res.status(400).json({ error: 'Etsy did not accept the connection. Start again from Settings.' })
       }
 
       const tokenData = await tokenResponse.json()
+
+      // Whose shop is this? Refuse anything but ours.
+      const expectedShop = String(process.env.ETSY_SHOP_ID || '')
+      const me = await fetchWithTimeout('https://api.etsy.com/v3/application/users/me', {
+        headers: {
+          'x-api-key': `${apiKey}:${process.env.ETSY_SHARED_SECRET || ''}`,
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      }).then(r => (r.ok ? r.json() : null)).catch(() => null)
+      if (!expectedShop || !me || String(me.shop_id || '') !== expectedShop) {
+        console.warn(`[etsy/auth] refused a connection for shop ${me?.shop_id ?? 'unknown'} (expected ${expectedShop || 'ETSY_SHOP_ID unset'})`)
+        return res.status(403).json({ error: 'That Etsy account is not the Trackstar shop. Sign in to Etsy as the shop owner and try again.' })
+      }
 
       // Store the refresh token in the DB
       if (tokenData.refresh_token) {
@@ -111,6 +116,7 @@ export default async function handler(req, res) {
           create: { key: 'etsy_refresh_token', value: tokenData.refresh_token }
         })
         console.log('[etsy/auth] Refresh token stored in DB')
+        await recordAudit({ action: 'connection.etsy', summary: 'Reconnected Etsy', actor: admin })
       }
 
       // Clear the cookies
@@ -166,10 +172,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('[etsy/auth] Error:', error)
-    return res.status(500).json({
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    })
+    return res.status(500).json({ error: 'The Etsy connection failed. Start again from Settings.' })
   }
 }
 

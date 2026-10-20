@@ -38,20 +38,35 @@ export async function heartbeat({ workerId, name, templates, files }) {
   })
 }
 
-/** Whether an order can be rendered now, and the spec if so. */
-export async function checkOrder(orderId) {
-  const order = await prisma.order.findUnique({ where: { id: String(orderId) }, select: SPEC_SELECT })
+/**
+ * Whether an order can be rendered now, and the spec if so.
+ *
+ * `ctx` lets a caller checking many orders load the shared parts once: the
+ * order rows (selected with SPEC_SELECT), the templates, the no-time gaps,
+ * and a cache of Race rows. Checked one by one, each order cost five or six
+ * queries, every ten minutes, for every candidate.
+ */
+export async function checkOrder(orderId, ctx = {}) {
+  const order = ctx.order || await prisma.order.findUnique({ where: { id: String(orderId) }, select: SPEC_SELECT })
   if (!order) throw new Error('Order not found')
-  const templates = await availableTemplates()
-  const result = buildSpec(order, templates, await raceRowFor(order), await noTimeGaps())
+  const templates = ctx.templates || await availableTemplates()
+  const result = buildSpec(order, templates, await raceRowFor(order, ctx.raceCache), ctx.gaps || await noTimeGaps())
   if (!result.ok && !templates.length) result.reasons.unshift('No render worker is online')
   return { order, ...result }
 }
 
 /** The Race row by name and year, trying the canonical name too. */
-async function raceRowFor(order) {
+async function raceRowFor(order, cache) {
   const name = order.raceNameOverride ?? order.raceName, year = order.yearOverride ?? order.raceYear
   if (!name || !year) return null
+  const key = `${name}|${year}`
+  if (cache?.has(key)) return cache.get(key)
+  const row = await raceRowLookup(name, year)
+  cache?.set(key, row)
+  return row
+}
+
+async function raceRowLookup(name, year) {
   const canonical = getCanonicalRaceName(name) || name
   return await prisma.race.findUnique({ where: { raceName_year: { raceName: name, year } } })
     || (canonical !== name ? prisma.race.findUnique({ where: { raceName_year: { raceName: canonical, year } } }) : null)
@@ -197,12 +212,13 @@ export async function autoQueueRenders({ limit = 25 } = {}) {
     // not run, data missing), and a capped window of the oldest ones starved
     // the ready orders behind them. Checking an order is a cheap read.
     take: 1000,
-    select: { id: true, orderNumber: true },
+    select: SPEC_SELECT,
   })
+  const ctx = { templates, gaps: await noTimeGaps(), raceCache: new Map() }
   let queued = 0, skipped = 0
   for (const o of candidates) {
     if (queued >= limit) break
-    const { ok } = await checkOrder(o.id)
+    const { ok } = await checkOrder(o.id, { ...ctx, order: o })
     if (!ok) { skipped++; continue }
     await createJob({ orderId: o.id, requestedBy: 'system' })
     queued++

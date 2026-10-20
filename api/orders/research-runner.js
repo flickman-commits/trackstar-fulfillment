@@ -8,9 +8,11 @@ import { setCors, requireAdmin } from '../_lib/auth.js'
 import { researchService } from '../../server/services/ResearchService.js'
 import { hasScraperForRace, getSupportedRaces } from '../../server/scrapers/index.js'
 
+const MAX_BATCH = 25
+
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -21,6 +23,11 @@ export default async function handler(req, res) {
 
     // Batch mode - research multiple orders
     if (orderNumbers && Array.isArray(orderNumbers)) {
+      // Each order is a live scrape (often a browser launch); timing sites
+      // start refusing us after a burst, so one request is capped.
+      if (orderNumbers.length > MAX_BATCH) {
+        return res.status(400).json({ error: `Research at most ${MAX_BATCH} orders at a time.` })
+      }
       console.log(`[API] Batch research for ${orderNumbers.length} orders`)
       const results = await researchService.researchBatch(orderNumbers)
       return res.status(200).json({
@@ -83,7 +90,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(500).json({
-      error: error.message,
+      error: 'Something went wrong. Try again, and tell Matt if it keeps happening.',
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }

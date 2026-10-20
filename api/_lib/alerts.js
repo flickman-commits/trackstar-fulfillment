@@ -1,4 +1,5 @@
-/**
+
+import { fetchWithTimeout } from '../../server/lib/fetchWithTimeout.js'/**
  * Real-time error alerting to Slack.
  * Call alertError() when a critical operation fails — sends immediately to Slack.
  */
@@ -24,7 +25,7 @@ export async function alertError(context, error, meta = {}) {
   const text = `🚨 *System Alert - ${context}*\n\`${errorMsg}\`${metaStr}`
 
   try {
-    await fetch(webhookUrl, {
+    await fetchWithTimeout(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })

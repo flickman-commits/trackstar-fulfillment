@@ -13,7 +13,7 @@ import { requireAdminRole, fullName } from '../_lib/users.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
   if (!await requireAdminRole(req, res, actor)) return
 
@@ -47,6 +47,6 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('[admin/audit] Error:', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

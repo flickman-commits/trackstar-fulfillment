@@ -10,6 +10,7 @@ import { google } from 'googleapis'
 import prisma from '../../db.js'
 import { driveClientForAnyone } from '../sales/gmail.js'
 import { signedFiles } from './jobs.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const ORDERS_FOLDER_ID = () => process.env.RENDER_ORDERS_FOLDER_ID || '1hvHh3F9Wdo8cpLPziSbIC1SUHe6Tq1OI'
 
@@ -47,7 +48,7 @@ export async function deliverApproved(job) {
   try {
     const { pdfUrl } = await signedFiles(job)
     if (!pdfUrl) throw new Error('No PDF on this render')
-    const res = await fetch(pdfUrl)
+    const res = await fetchWithTimeout(pdfUrl, {}, 60_000)
     if (!res.ok) throw new Error(`Could not read the PDF (${res.status})`)
     const buf = Buffer.from(await res.arrayBuffer())
 

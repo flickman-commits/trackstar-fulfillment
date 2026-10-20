@@ -16,6 +16,7 @@
  * and everything else attaches as a file.
  */
 import { createClient } from '@supabase/supabase-js'
+import { UserError } from './errors.js'
 
 const BUCKET = 'sales-assets'
 /** The bucket the tool used before it took decks. Read for as long as it has files. */
@@ -36,7 +37,7 @@ let cache = { at: 0, files: [] }
 function client() {
   const url = process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Storage is not configured: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) throw new UserError('Storage is not configured: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
   return createClient(url, key)
 }
 
@@ -65,10 +66,28 @@ function typeFromName(name) {
 
 /** ids are "bucket:name" so legacy files stay addressable without a copy. */
 function idFor(bucket, name) { return `${bucket}:${name}` }
-function parseId(id) {
-  const i = String(id).indexOf(':')
-  if (i < 0) return { bucket: BUCKET, name: String(id) }
-  return { bucket: id.slice(0, i), name: id.slice(i + 1) }
+
+/**
+ * The only buckets an id may name. The id comes from the browser, and the
+ * service-role client can read every bucket the project has (order photos,
+ * proofs), so anything else is refused rather than trusted.
+ */
+const SALES_BUCKETS = new Set([BUCKET, LEGACY_BUCKET])
+
+export function parseId(id) {
+  const raw = String(id ?? '')
+  const i = raw.indexOf(':')
+  const bucket = i < 0 ? BUCKET : raw.slice(0, i)
+  const name = i < 0 ? raw : raw.slice(i + 1)
+  if (!SALES_BUCKETS.has(bucket)) throw new UserError('That file is not in the sales library.')
+  // A flat library: no folders, no walking up out of it.
+  if (!name || name.includes('/') || name.includes('\\') || name.startsWith('.')) throw new UserError('That file is not in the sales library.')
+  return { bucket, name }
+}
+
+/** Whether an id names a file in the sales library, without throwing. */
+export function isSalesAssetId(id) {
+  try { parseId(id); return true } catch { return false }
 }
 
 async function listBucket(supabase, bucket) {
@@ -110,7 +129,7 @@ export async function assetPreviewUrl(id, seconds = 900) {
 
 /** Where the browser should PUT the bytes. Valid for a couple of minutes. */
 export async function assetUploadUrl({ filename, contentType }) {
-  if (!KINDS[contentType]) throw new Error(`Unsupported file type: ${contentType}. Images, PDFs and slide decks only.`)
+  if (!KINDS[contentType]) throw new UserError(`Unsupported file type: ${contentType}. Images, PDFs and slide decks only.`)
   const safe = String(filename || 'asset')
     .replace(/[^\w.-]+/g, '_')
     .replace(/^_+|_+$/g, '')
@@ -143,12 +162,13 @@ export async function renameAsset(id, newName) {
   const ext = (name.match(/\.[a-z0-9]+$/i) || [''])[0]
   const base = String(newName || '').replace(/\.[a-z0-9]+$/i, '').trim()
     .replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 120)
-  if (!base) throw new Error('Give it a name')
+  if (!base) throw new UserError('Give it a name')
   const target = `${base}${ext}`
   if (target === name) return { id, filename: name }
   const supabase = client()
   const { error } = await supabase.storage.from(bucket).move(name, target)
-  if (error) throw new Error(/exists/i.test(error.message) ? `There is already a file called ${target}` : `Rename failed: ${error.message}`)
+  if (error && /exists/i.test(error.message)) throw new UserError(`There is already a file called ${target}`)
+  if (error) throw new Error(`Rename failed: ${error.message}`)
   cache = { at: 0, files: [] }
   return { id: idFor(bucket, target), filename: target }
 }

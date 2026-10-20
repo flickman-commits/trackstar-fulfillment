@@ -11,6 +11,7 @@
  * parent, so research, weather, the filename convention and the order modal
  * all work on them without knowing anything about this module.
  */
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 import prisma from '../../../api/_lib/prisma.js'
 import { getCanonicalRaceName, hasScraperForRace, getCoveredYears, getVerifiedRaceDates } from '../../scrapers/index.js'
 import { parseCsv } from '../../lib/csv.js'
@@ -214,10 +215,26 @@ export function matchFileToRunner(filename, runners) {
   return { runner: null, how: 'no match' }
 }
 
+/**
+ * Where a production file may live: our own storage (where api/bulk/files.js
+ * puts uploads) or a Google Drive link. The URL is what Artelo prints and what
+ * checkUrl fetches, so an arbitrary one is both a wrong print and a way to
+ * make the server fetch any address.
+ */
+export function isAllowedFileUrl(value) {
+  let u
+  try { u = new URL(String(value)) } catch { return false }
+  if (u.protocol !== 'https:' || (u.port && u.port !== '443')) return false
+  const storage = String(process.env.SUPABASE_URL || '').replace(/\/$/, '')
+  if (storage && String(value).startsWith(`${storage}/storage/v1/object/public/`)) return true
+  return ['drive.google.com', 'docs.google.com', 'drive.usercontent.google.com'].includes(u.hostname)
+}
+
 /** Does Artelo's fetcher see the file? A plain unauthenticated GET, like theirs. */
 export async function checkUrl(url) {
+  if (!isAllowedFileUrl(url)) return { ok: false, status: 0, error: 'Not a storage or Google Drive link' }
   try {
-    const res = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, redirect: 'follow' })
+    const res = await fetchWithTimeout(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, redirect: 'follow' }, 10_000)
     const ok = res.status === 200 || res.status === 206
     return { ok, status: res.status, contentType: res.headers.get('content-type') }
   } catch (err) {

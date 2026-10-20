@@ -17,12 +17,12 @@
  * returning 404 rather than 403 — an endpoint that isn't on shouldn't announce
  * that it exists.
  */
-import { setCors } from '../_lib/auth.js'
+import { setCors, safeEqual } from '../_lib/auth.js'
 import {
   getBoardData,
   resolvePersonalization,
 } from '../../server/services/monopolyBoard.js'
-import { checkRateLimit } from '../../server/lib/publicRateLimit.js'
+import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
 
 function getClientIp(req) {
   const fwd = req.headers['x-forwarded-for']
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
   // This is a 5-minute-cached read of a static payload, not a scrape, so it gets
   // its own generous budget. A race office behind one NAT IP passing the link
   // around must never hit a wall mid-pitch and silently drop to stale data.
-  const limit = checkRateLimit(getClientIp(req), { bucket: 'monopoly_view', max: 300 })
+  const limit = await checkRateLimitDurable(getClientIp(req), { bucket: 'monopoly_view', max: 300 })
   if (!limit.allowed) {
     res.setHeader('Retry-After', Math.ceil(limit.retryAfterMs / 1000))
     return res.status(429).json({ error: 'Too many requests' })
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     // would hammer the Sheets quota and take the page down with it.
     const accessKey = typeof req.query.key === 'string' ? req.query.key : ''
     const hasAccessKey = Boolean(
-      process.env.MONOPOLY_ACCESS_KEY && accessKey === process.env.MONOPOLY_ACCESS_KEY,
+      process.env.MONOPOLY_ACCESS_KEY && accessKey && safeEqual(accessKey, process.env.MONOPOLY_ACCESS_KEY),
     )
     const refresh = hasAccessKey && req.query.refresh === '1'
 

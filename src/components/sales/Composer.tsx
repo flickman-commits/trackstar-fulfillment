@@ -12,6 +12,7 @@ import { whenLabel } from '@/lib/salesDates'
 export interface TemplateLibrary { templates: LibraryTemplate[]; fill: TemplateFill }
 import { btnPrimary, btnSecondary, btnGhost, inputBase, cardLabel } from '@/lib/ui'
 import type { Asset, Deal, DraftResult, Person, Variant } from '@/types/sales'
+import { safeSignature } from './safeSignature'
 
 /** "today", "yesterday", "3 days ago", "2 weeks ago", "4 months ago". */
 function sinceLabel(iso: string) {
@@ -845,7 +846,7 @@ export function BodyEditor({ body, signature, onChange, onBlur, boxRef, minHeigh
         <RichBox boxRef={boxRef} value={parts.main} onChange={v => update(v, parts.ps)} onBlur={onBlur} minHeight={minHeight} />
         <div className="px-1 pt-3 pb-2 text-sm text-off-black" title="Your signature, added on send. Change it in Settings, under Me.">
           {signature
-            ? <div dangerouslySetInnerHTML={{ __html: signature }} />
+            ? <div dangerouslySetInnerHTML={{ __html: safeSignature(signature) }} />
             : <span className="text-xs text-off-black/40">No signature yet. Add one in Settings, under Me.</span>}
         </div>
         <RichBox value={parts.ps} onChange={v => update(parts.main, v)} onBlur={onBlur} minHeight={24} placeholder="P.S. (optional)" />

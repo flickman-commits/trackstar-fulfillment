@@ -13,7 +13,7 @@ import { ROLES, ROLE_LABEL, CAPABILITIES, DEFAULT_CAPS, loadRoleCaps, saveRoleCa
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, PUT, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
   const user = await requireAdminRole(req, res, actor)
   if (!user) return

@@ -2,6 +2,7 @@
  * Sender filters: mail that is not customer support, kept out of the inbox.
  *
  * A filter is an address (orders@artelo.com) or a whole domain (artelo.com).
+ * A domain is an admin's to add, and never a consumer provider (gmail.com).
  * A conversation from a filtered sender is marked `filtered` as it arrives,
  * goes to nobody, and shows in no inbox view, only under Filtered, where it
  * can be read and unfiltered. Nothing is deleted, in Gmail or here. Adding a
@@ -12,6 +13,7 @@
  * import checks it for every new conversation.
  */
 import prisma from '../../db.js'
+import { UserError } from './errors.js'
 
 const KEY = 'support_sender_filters'
 let cache = { at: 0, list: null }
@@ -62,12 +64,32 @@ function threadsFor(pattern) {
     : { OR: [{ customerEmail: { endsWith: `@${pattern}`, mode: 'insensitive' } }, { customerEmail: { endsWith: `.${pattern}`, mode: 'insensitive' } }] }
 }
 
+/**
+ * Domains millions of customers write from. Filtering one would file most of
+ * the inbox; filter the one address instead.
+ */
+export const CONSUMER_DOMAINS = new Set([
+  'gmail.com', 'googlemail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'aol.com',
+  'me.com', 'mac.com', 'live.com', 'msn.com', 'proton.me', 'protonmail.com', 'comcast.net', 'att.net', 'verizon.net',
+])
+
+/** Why this pattern may not be added by this person, or null when it may. */
+export function filterRefusal(pattern, actor) {
+  if (pattern.includes('@')) return null
+  const consumer = [...CONSUMER_DOMAINS].some(d => pattern === d || d.endsWith(`.${pattern}`))
+  if (consumer) return `${pattern} is where most customers write from. Filter the one address instead, like orders@${pattern}.`
+  if (actor?.role !== 'admin') return 'Filtering a whole domain is an admin\'s call. Filter the one address, or ask Matt.'
+  return null
+}
+
 /** Add a filter and file what is already here from that sender. */
 export async function addFilter(raw, actor) {
   const pattern = normalizePattern(raw)
-  if (!pattern) throw new Error('A filter is an email address or a domain, like artelo.com')
+  if (!pattern) throw new UserError('A filter is an email address or a domain, like artelo.com')
+  const refused = filterRefusal(pattern, actor)
+  if (refused) throw new UserError(refused)
   const ours = String(process.env.SUPPORT_MAILBOX_EMAIL || 'fast@trackstar.art').split('@')[1]
-  if (pattern === ours || pattern.endsWith(`@${ours}`)) throw new Error('That is our own domain. Filtering it would hide our replies.')
+  if (pattern === ours || pattern.endsWith(`@${ours}`)) throw new UserError('That is our own domain. Filtering it would hide our replies.')
   const list = await listFilters()
   if (!list.some(f => f.pattern === pattern)) {
     list.push({ pattern, addedBy: [actor?.firstName, actor?.lastName].filter(Boolean).join(' ') || null, addedAt: new Date().toISOString() })

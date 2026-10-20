@@ -50,7 +50,7 @@ const RUNNER_SELECT = { id: true, orderNumber: true, runnerName: true, runnerNam
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -117,7 +117,7 @@ export default async function handler(req, res) {
 
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
     const { error } = await supabase.storage.from(BUCKET).upload(path, buffer, { contentType, upsert: false })
-    if (error) return res.status(500).json({ error: `Upload failed: ${error.message}` })
+    if (error) return res.status(500).json({ error: 'Upload failed. Try again.' })
     const url = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 
     await prisma.order.update({ where: { id: runner.id }, data: { productionFileUrl: url } })
@@ -125,6 +125,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ matched: true, how, orderNumber: runner.orderNumber, runnerName: runner.runnerName, url, replaced: Boolean(runner.productionFileUrl), reachable: reach.ok })
   } catch (error) {
     console.error('[API /bulk/files]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

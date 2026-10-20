@@ -22,9 +22,9 @@
  */
 import crypto from 'crypto'
 import prisma from '../_lib/prisma.js'
-import { setCors, requireAdmin } from '../_lib/auth.js'
+import { setCors, requireAdmin, bumpSessionVersion, buildSessionCookie, createSessionToken } from '../_lib/auth.js'
 import {
-  ROLES, hashPassword, normalizeEmail, isValidEmail, fullName, roleLabel,
+  ROLES, hashPassword, verifyPassword, normalizeEmail, isValidEmail, fullName, roleLabel,
   loadActiveUser, requireAdminRole, recordAudit,
 } from '../_lib/users.js'
 
@@ -61,7 +61,7 @@ function inviteUrl(req, token) {
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, DELETE, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
 
   try {
@@ -107,11 +107,20 @@ export default async function handler(req, res) {
         if (password.length < MIN_PASSWORD) {
           return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters` })
         }
+        // The current password is required: a stolen session cookie alone
+        // must not be enough to take the account over for good.
+        const full = await prisma.user.findUnique({ where: { id: me.id }, select: { passwordHash: true } })
+        if (!full?.passwordHash || !verifyPassword(String(body.currentPassword || ''), full.passwordHash)) {
+          return res.status(400).json({ error: 'Your current password is not right.' })
+        }
         await prisma.user.update({
           where: { id: me.id },
           data: { passwordHash: hashPassword(password), inviteToken: null, inviteExpiresAt: null },
         })
-        await recordAudit({ action: 'user.password', summary: 'Changed their own password', actor: me })
+        // Sign out every other device, then keep this one signed in.
+        const sessionVersion = await bumpSessionVersion(me.id)
+        res.setHeader('Set-Cookie', buildSessionCookie(req, { token: createSessionToken({ ...me, sessionVersion }) }))
+        await recordAudit({ action: 'user.password', summary: 'Changed their own password and signed out their other devices', actor: me })
         return res.status(200).json({ ok: true })
       }
 
@@ -145,7 +154,7 @@ export default async function handler(req, res) {
       }
 
       const target = body.id
-        ? await prisma.user.findUnique({ where: { id: body.id }, select: PUBLIC_FIELDS })
+        ? await prisma.user.findUnique({ where: { id: String(body.id) }, select: PUBLIC_FIELDS })
         : null
       if (!target) return res.status(404).json({ error: 'No such user' })
 
@@ -175,6 +184,7 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'This is the only admin. Promote someone else first.' })
         }
         const user = await prisma.user.update({ where: { id: target.id }, data: { isActive }, select: PUBLIC_FIELDS })
+        if (!isActive) await bumpSessionVersion(target.id)
         await recordAudit({
           action: isActive ? 'user.reactivate' : 'user.deactivate',
           summary: `${isActive ? 'Reactivated' : 'Deactivated'} ${target.email}`,
@@ -190,6 +200,7 @@ export default async function handler(req, res) {
           where: { id: target.id },
           data: { ...invite, passwordHash: null },
         })
+        await bumpSessionVersion(target.id)
         await recordAudit({
           action: 'user.reset',
           summary: `Reset the password for ${target.email}`,
@@ -199,7 +210,18 @@ export default async function handler(req, res) {
         return res.status(200).json({ inviteUrl: inviteUrl(req, invite.inviteToken) })
       }
 
-      return res.status(400).json({ error: `Unknown action: ${action}` })
+      if (action === 'sign-out') {
+        await bumpSessionVersion(target.id)
+        await recordAudit({
+          action: 'user.sign_out',
+          summary: `Signed ${target.email} out on every device`,
+          detail: { userId: target.id },
+          actor: admin,
+        })
+        return res.status(200).json({ ok: true })
+      }
+
+      return res.status(400).json({ error: 'Unknown action' })
     }
 
     if (req.method === 'DELETE') {
@@ -207,7 +229,7 @@ export default async function handler(req, res) {
       const admin = await requireAdminRole(req, res, actor)
       if (!admin) return
 
-      const target = await prisma.user.findUnique({ where: { id: body.id || '' } })
+      const target = await prisma.user.findUnique({ where: { id: String(body.id || '') } })
       if (!target) return res.status(404).json({ error: 'No such user' })
       if (target.id === admin.id) {
         return res.status(400).json({ error: 'You cannot delete your own account. Ask another admin.' })
@@ -231,7 +253,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (error) {
     console.error('[admin/users] Error:', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again.' })
   }
 }
 

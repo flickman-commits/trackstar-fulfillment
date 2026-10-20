@@ -15,6 +15,8 @@
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { requireCapability, requireAdminRole, recordAudit } from '../_lib/users.js'
 import { getAuthUrl, redirectUriFor, status, disconnect, connectWithToken, backfill, isConfigured } from '../../server/domain/support/instagram.js'
+import { issueOAuthState } from '../../server/domain/support/oauthState.js'
+import { publicMessage, publicStatus } from '../../server/domain/support/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -28,12 +30,14 @@ export default async function handler(req, res) {
     if (action === 'status') return res.status(200).json(await status())
 
     // Everything below changes the team's connection: admin, re-read from the database.
-    const admin = await requireAdminRole(req, res, requireAdmin(req, res))
+    const admin = await requireAdminRole(req, res, (await requireAdmin(req, res)))
     if (!admin) return
 
     if (action === 'connect' && req.method === 'GET') {
       if (!isConfigured()) return res.status(400).json({ error: 'Set INSTAGRAM_APP_ID and INSTAGRAM_APP_SECRET first' })
-      res.setHeader('Location', getAuthUrl(redirectUriFor(req)))
+      // The callback only accepts a code that comes back with this state, in this admin's browser.
+      const state = await issueOAuthState(req, res, { purpose: 'support_instagram', userId: admin.id })
+      res.setHeader('Location', getAuthUrl(redirectUriFor(req), state))
       return res.status(302).end()
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -57,6 +61,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Unknown action: ${action}` })
   } catch (error) {
     console.error('[API /support/instagram]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'Something went wrong with the Instagram connection') })
   }
 }

@@ -21,6 +21,7 @@
  */
 import prisma from '../../db.js'
 import { can } from '../../../api/_lib/roles.js'
+import { UserError } from './errors.js'
 
 const KEY = 'support_routing'
 const LEGACY_KEY = 'support_default_assignee'
@@ -105,8 +106,8 @@ export async function saveRouting(input, { applyToOpen = false, actor } = {}) {
     const users = await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, isActive: true, role: true } })
     for (const id of ids) {
       const u = users.find(x => x.id === id)
-      if (!u?.isActive) throw new Error('One of those teammates is not active')
-      if (!(await can(u.role, 'support'))) throw new Error(`${u.firstName}'s role does not include Support`)
+      if (!u?.isActive) throw new UserError('One of those teammates is not active')
+      if (!(await can(u.role, 'support'))) throw new UserError(`${u.firstName}'s role does not include Support`)
     }
   }
   await prisma.systemConfig.upsert({ where: { key: KEY }, update: { value: JSON.stringify(rules) }, create: { key: KEY, value: JSON.stringify(rules) } })

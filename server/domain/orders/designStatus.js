@@ -15,6 +15,7 @@ import prisma from '../../db.js'
 import { ensureApprovalToken } from '../../../api/_lib/approvalToken.js'
 import { recordAudit } from '../../../api/_lib/users.js'
 import { describeOrder } from './complete.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 export const DESIGN_STATUSES = ['not_started', 'in_progress', 'awaiting_review', 'in_revision', 'approved_by_customer', 'final_pdf_uploaded', 'sent_to_production']
 
@@ -61,7 +62,7 @@ export async function setDesignStatus(existing, designStatus, completedById = nu
     const shopifyData = existing.shopifyOrderData
     const displayNum = (shopifyData && typeof shopifyData === 'object' && 'name' in shopifyData)
       ? String(shopifyData.name) : `#${existing.parentOrderNumber}`
-    fetch(process.env.SLACK_PROOF_WEBHOOK_URL, {
+    fetchWithTimeout(process.env.SLACK_PROOF_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: `🖨️ <@U09UVEP1N3Y> Final PDF ready for order *${displayNum}* - ready for production!` }),

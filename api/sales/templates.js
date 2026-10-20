@@ -13,6 +13,7 @@ import { getSenderFor, getSettings } from '../../server/domain/sales/settings.js
 import { saveTemplate, deleteTemplate, addTemplateNote, deleteTemplateNote, MOTIONS } from '../../server/domain/sales/templateLibrary.js'
 import { loadWorkspace, usedBy } from '../../server/domain/sales/sequences.js'
 import { DEFAULT_SOCIAL_PROOF, NEEDS_OPENER } from '../../server/domain/sales/angles.js'
+import { publicMessage, publicStatus } from '../../server/domain/sales/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -39,7 +40,7 @@ export default async function handler(req, res) {
         await recordAudit({ actor, action: 'sales.template_library', summary: `${body.id ? 'Edited' : 'Added'} the template "${String(body.name || '').slice(0, 80)}"` })
         return res.status(200).json({ templates })
       } catch (e) {
-        return res.status(400).json({ error: e.message })
+        return res.status(publicStatus(e)).json({ error: publicMessage(e, 'Could not save the template') })
       }
     }
     if (body.action === 'add-note' || body.action === 'delete-note') {
@@ -52,7 +53,7 @@ export default async function handler(req, res) {
         await recordAudit({ actor, action: 'sales.template_note', summary: `${body.action === 'add-note' ? 'Added a note to' : 'Removed a note from'} the template "${String(name).slice(0, 80)}"` })
         return res.status(200).json({ templates })
       } catch (e) {
-        return res.status(400).json({ error: e.message })
+        return res.status(publicStatus(e)).json({ error: publicMessage(e, 'Could not save the template') })
       }
     }
     if (body.action === 'delete') {

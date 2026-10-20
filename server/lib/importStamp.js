@@ -13,11 +13,29 @@ export async function getLastImport() {
   return row?.value || null
 }
 
-export async function runLockedImport(fn) {
-  const lock = await prisma.systemConfig.findUnique({ where: { key: LOCK_KEY } })
-  if (lock && Date.now() - new Date(lock.value).getTime() < LOCK_MS) return { skipped: 'already_running' }
+/**
+ * Take the lock, or report that someone holds it. Atomic: creating the row
+ * fails on the unique key if it exists, and a stale lock is taken over only
+ * by the one caller whose update still matches the stale value. The old
+ * read-then-write let a cron run and "Import now" both start.
+ */
+async function acquireLock() {
   const now = new Date().toISOString()
-  await prisma.systemConfig.upsert({ where: { key: LOCK_KEY }, update: { value: now }, create: { key: LOCK_KEY, value: now } })
+  try {
+    await prisma.systemConfig.create({ data: { key: LOCK_KEY, value: now } })
+    return true
+  } catch (err) {
+    if (err.code !== 'P2002') throw err
+  }
+  const held = await prisma.systemConfig.findUnique({ where: { key: LOCK_KEY } })
+  if (!held) return acquireLock()
+  if (Date.now() - new Date(held.value).getTime() < LOCK_MS) return false
+  const { count } = await prisma.systemConfig.updateMany({ where: { key: LOCK_KEY, value: held.value }, data: { value: now } })
+  return count === 1
+}
+
+export async function runLockedImport(fn) {
+  if (!(await acquireLock())) return { skipped: 'already_running' }
   try {
     const out = await fn()
     const done = new Date().toISOString()

@@ -24,6 +24,7 @@ import { RACE_CADENCE, CHARITY_CADENCE, PR_CADENCE, DEFAULT_SOCIAL_PROOF, setLiv
 import { getTemplates } from './templates.js'
 import { listTemplates, writeTemplates, withFirstLine } from './templateLibrary.js'
 import { getSettings } from './settings.js'
+import { UserError } from './errors.js'
 
 export const SEQUENCES_KEY = 'sales_sequences'
 export const VARIABLES_KEY = 'sales_variables'
@@ -136,15 +137,15 @@ function toCadences(sequences, templates) {
 
 /** Save one pipeline's steps. Each step names a template that exists. */
 export async function saveSequence(pipeline, steps) {
-  if (!PIPELINES.includes(pipeline)) throw new Error('Unknown sequence')
-  if (!Array.isArray(steps) || !steps.length) throw new Error('A sequence needs at least one step')
-  if (steps.length > 12) throw new Error('Twelve steps is the most a sequence can have')
+  if (!PIPELINES.includes(pipeline)) throw new UserError('Unknown sequence')
+  if (!Array.isArray(steps) || !steps.length) throw new UserError('A sequence needs at least one step')
+  if (steps.length > 12) throw new UserError('Twelve steps is the most a sequence can have')
   const { sequences, templates } = await loadWorkspace({ force: true })
   const ids = new Set(templates.map(t => t.id))
   const clean = steps.map((s, i) => {
-    if (!ids.has(s.templateId)) throw new Error(`Step ${i + 1} needs a template`)
+    if (!ids.has(s.templateId)) throw new UserError(`Step ${i + 1} needs a template`)
     const wait = Math.round(Number(s.waitDays))
-    if (i > 0 && (!Number.isFinite(wait) || wait < 1 || wait > 60)) throw new Error(`Step ${i + 1}: wait between 1 and 60 days`)
+    if (i > 0 && (!Number.isFinite(wait) || wait < 1 || wait > 60)) throw new UserError(`Step ${i + 1}: wait between 1 and 60 days`)
     return { templateId: s.templateId, waitDays: i === 0 ? 0 : wait, replyInThread: i > 0 && Boolean(s.replyInThread) }
   })
   const next = { ...sequences, [pipeline]: clean }
@@ -155,14 +156,14 @@ export async function saveSequence(pipeline, steps) {
 
 /** Save the custom variables. Names are plain words and cannot shadow a built-in one. */
 export async function saveVariables(list) {
-  if (!Array.isArray(list)) throw new Error('Variables must be a list')
+  if (!Array.isArray(list)) throw new UserError('Variables must be a list')
   const seen = new Set()
   const clean = list.map(v => {
     const name = String(v?.name || '').replace(/[[\]]/g, '').trim().slice(0, 40)
-    if (!name) throw new Error('Every variable needs a name')
-    if (!/^[A-Za-z][A-Za-z0-9 '-]*$/.test(name)) throw new Error(`"${name}": letters, numbers and spaces only`)
-    if (BUILT_IN_NAMES.has(name.toLowerCase())) throw new Error(`"${name}" is filled by the tool already`)
-    if (seen.has(name.toLowerCase())) throw new Error(`"${name}" is there twice`)
+    if (!name) throw new UserError('Every variable needs a name')
+    if (!/^[A-Za-z][A-Za-z0-9 '-]*$/.test(name)) throw new UserError(`"${name}": letters, numbers and spaces only`)
+    if (BUILT_IN_NAMES.has(name.toLowerCase())) throw new UserError(`"${name}" is filled by the tool already`)
+    if (seen.has(name.toLowerCase())) throw new UserError(`"${name}" is there twice`)
     seen.add(name.toLowerCase())
     return { name, value: String(v?.value || '').slice(0, 2000) }
   })

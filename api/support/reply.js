@@ -17,6 +17,7 @@ import { sendReply } from '../../server/domain/support/mailbox.js'
 import { sendReply as sendInstagramReply } from '../../server/domain/support/instagram.js'
 import { getThread, setStatus } from '../../server/domain/support/threads.js'
 import { resolveMockup } from '../../server/domain/support/mockups.js'
+import { publicMessage, publicStatus } from '../../server/domain/support/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
@@ -62,6 +63,6 @@ export default async function handler(req, res) {
     return res.status(200).json(fresh)
   } catch (error) {
     console.error('[API /support/reply]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'The reply did not go out. Check the conversation before sending again.') })
   }
 }

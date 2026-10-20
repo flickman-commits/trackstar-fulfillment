@@ -9,6 +9,7 @@
  * email from their race is still that customer writing to us.
  */
 import prisma from '../../db.js'
+import { UserError } from './errors.js'
 
 const KEY = 'support_forwarders'
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -22,8 +23,8 @@ export async function listForwarders() {
 export async function saveForwarders(list) {
   const clean = [...new Set((Array.isArray(list) ? list : []).map(e => String(e || '').trim().toLowerCase()).filter(Boolean))]
   const bad = clean.find(e => !EMAIL.test(e))
-  if (bad) throw new Error(`"${bad}" is not an email address`)
-  if (clean.length > 50) throw new Error('Fifty addresses at most')
+  if (bad) throw new UserError(`"${bad}" is not an email address`)
+  if (clean.length > 50) throw new UserError('Fifty addresses at most')
   await prisma.systemConfig.upsert({ where: { key: KEY }, update: { value: JSON.stringify(clean) }, create: { key: KEY, value: JSON.stringify(clean) } })
   cache = { at: 0, set: null }
   return clean

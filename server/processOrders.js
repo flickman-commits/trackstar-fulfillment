@@ -183,25 +183,6 @@ function cleanRunnerName(runnerName) {
 }
 
 /**
- * DEPRECATED: Old format parsing (kept for reference)
- * Parse runner name and year from combined string
- * OLD Format: "Runner Name 2024"
- */
-function parseRunnerNameAndYear_DEPRECATED(rawValue) {
-  if (!rawValue) return { runnerName: null, raceYear: null, needsAttention: true }
-  const trimmed = rawValue.trim()
-  const yearMatch = trimmed.match(/\s+(20\d{2})$/)
-  if (yearMatch) {
-    return {
-      runnerName: trimmed.slice(0, -yearMatch[0].length).trim(),
-      raceYear: parseInt(yearMatch[1], 10),
-      needsAttention: false
-    }
-  }
-  return { runnerName: trimmed, raceYear: null, needsAttention: true }
-}
-
-/**
  * Extract personalization data from a single Shopify line item
  * NEW FORMAT (as of 2025): Separate properties for each field
  * Also extracts custom order fields (bib, time, creative direction, gift)
@@ -347,6 +328,52 @@ function extractShopifyPersonalization(lineItem) {
   }
 
   return result
+}
+
+/** Runs per hour at the 10-minute cron; each order is fully re-read once in that many. */
+const FULL_REFRESH_EVERY = 6
+
+function refreshSlot(orderId) {
+  let h = 0
+  for (const c of String(orderId)) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return h % FULL_REFRESH_EVERY
+}
+
+/**
+ * The stored Shopify data for orders that have not changed since we stored
+ * it, keyed by Shopify order id: { shopifyOrderData, notes }. Anything not in
+ * the map (new, changed, due its hourly re-read, or unknown) is fetched as before.
+ * Never throws: on any failure it returns an empty map and the run fetches all.
+ */
+async function unchangedShopifyOrders(prisma, ids) {
+  const out = new Map()
+  if (!ids.length) return out
+  try {
+    const slot = Math.floor(Date.now() / (10 * 60_000)) % FULL_REFRESH_EVERY
+    const candidates = ids.filter(id => refreshSlot(id) !== slot)
+    if (!candidates.length) return out
+    const live = new Map()
+    for (let i = 0; i < candidates.length; i += 250) {
+      const chunk = candidates.slice(i, i + 250)
+      const data = await shopifyFetch(`/orders.json?ids=${chunk.join(',')}&status=any&limit=250&fields=id,updated_at`)
+      for (const o of data.orders || []) live.set(String(o.id), o.updated_at)
+    }
+    const stored = await prisma.order.findMany({
+      where: { parentOrderNumber: { in: candidates }, source: 'shopify' },
+      select: { parentOrderNumber: true, shopifyOrderData: true, notes: true },
+      distinct: ['parentOrderNumber'],
+    })
+    for (const row of stored) {
+      const was = row.shopifyOrderData?.updated_at
+      if (was && live.get(row.parentOrderNumber) === was && row.shopifyOrderData?.line_items?.length) {
+        out.set(row.parentOrderNumber, { shopifyOrderData: row.shopifyOrderData, notes: row.notes || null })
+      }
+    }
+  } catch (err) {
+    console.warn(`[processOrders] could not check which Shopify orders changed, fetching all: ${err.message}`)
+    return new Map()
+  }
+  return out
 }
 
 /**
@@ -628,7 +655,6 @@ export async function processOrders(options = {}) {
   // Always the shared client: a fresh PrismaClient per run opened a whole
   // extra pool, and enough of them exhausted the database's connections.
   const prisma = externalPrisma || sharedPrisma
-  const shouldDisconnect = false
 
   const log = verbose ? console.log.bind(console) : () => {}
 
@@ -748,49 +774,59 @@ export async function processOrders(options = {}) {
     results.total = actionableOrders.length
     log(`[processOrders] Found ${actionableOrders.length} actionable orders, ${completedOrders.length} completed/fulfilled`)
 
-    // 2a. First, check completed orders to mark any as fulfilled in our DB
-    for (const order of completedOrders) {
-      try {
-        // Find all line items for this parent order
-        const existingItems = await prisma.order.findMany({
-          where: { parentOrderNumber: order.orderId }
+    // 2a. Orders Artelo shows as fulfilled: mark their rows completed. One
+    // query for the lot rather than one per order (that was 50 to 90 queries
+    // a run, nearly all finding nothing to do).
+    try {
+      const fulfilledIds = completedOrders.map(o => String(o.orderId))
+      const stillOpen = fulfilledIds.length ? await prisma.order.findMany({
+        where: { parentOrderNumber: { in: fulfilledIds }, status: { not: 'completed' } },
+        select: { id: true, orderNumber: true },
+      }) : []
+      if (stillOpen.length) {
+        for (const o of stillOpen) log(`[processOrders] Marking order ${o.orderNumber} as completed (fulfilled in Artelo)`)
+        const { count } = await prisma.order.updateMany({
+          where: { id: { in: stillOpen.map(o => o.id) } },
+          data: { status: 'completed', researchedAt: new Date() },
         })
-
-        // Mark all line items as completed
-        for (const existing of existingItems) {
-          if (existing.status !== 'completed') {
-            log(`[processOrders] Marking order ${existing.orderNumber} as completed (fulfilled in Artelo)`)
-            await prisma.order.update({
-              where: { id: existing.id },
-              data: {
-                status: 'completed',
-                researchedAt: new Date()
-              }
-            })
-            results.updated++
-          }
-        }
-      } catch (error) {
-        log(`[processOrders] Error updating completed order ${order.orderId}: ${error.message}`)
+        results.updated += count
       }
+    } catch (error) {
+      log(`[processOrders] Error marking fulfilled orders completed: ${error.message}`)
     }
 
     // 2b. Mark any DB orders as completed if they no longer appear in Artelo at all
     // (Artelo stops returning orders once they're fully fulfilled and aged out of the 100-order window)
     // Only safe to run when we got back fewer than the 100-order limit — otherwise pending orders
     // past position 100 would be wrongly marked completed just because they fell out of the window.
+    //
+    // Fenced, because a short page is also what an Artelo outage looks like.
+    // Only standard Shopify/Etsy orders are ever in Artelo, so custom, partner,
+    // bulk and creator rows are never candidates. At most AGE_OUT_CAP orders
+    // age out per run; more than that means the response is wrong, not that
+    // a dozen orders shipped at once, so nothing is touched and we alert.
+    const AGE_OUT_CAP = 10
     if (allOrders.length > 0 && allOrders.length < 100) {
       const allArteloOrderIds = new Set(allOrders.map(o => o.orderId))
       const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
       const pendingDbOrders = await prisma.order.findMany({
         where: {
           status: { notIn: ['completed'] },
-          createdAt: { lt: threeDaysAgo }
+          createdAt: { lt: threeDaysAgo },
+          trackstarOrderType: 'standard',
+          source: { in: ['shopify', 'etsy'] },
+          bulkOrderId: null,
         },
         select: { id: true, orderNumber: true, parentOrderNumber: true }
       })
-      for (const dbOrder of pendingDbOrders) {
-        if (!allArteloOrderIds.has(dbOrder.parentOrderNumber)) {
+      const agedOut = pendingDbOrders.filter(o => !allArteloOrderIds.has(o.parentOrderNumber))
+      if (agedOut.length > AGE_OUT_CAP) {
+        log(`[processOrders] ${agedOut.length} open orders missing from a ${allOrders.length}-order Artelo page; over the cap of ${AGE_OUT_CAP}, so none were completed`)
+        import('../api/_lib/alerts.js')
+          .then(m => m.alertError('auto-import age-out', new Error(`${agedOut.length} open orders are missing from Artelo's response (${allOrders.length} orders returned). Nothing was marked completed. Check Artelo.`)))
+          .catch(() => {})
+      } else {
+        for (const dbOrder of agedOut) {
           log(`[processOrders] Order ${dbOrder.orderNumber} not in Artelo and >3 days old - marking completed`)
           await prisma.order.update({
             where: { id: dbOrder.id },
@@ -800,6 +836,17 @@ export async function processOrders(options = {}) {
         }
       }
     }
+
+    // 2c'. Which Shopify orders actually changed. Re-reading every open order
+    // from Shopify every 10 minutes (two REST calls each) was most of this
+    // job's cost, almost always to learn nothing. One call lists updated_at for
+    // up to 250 orders; an order whose updated_at matches what we stored reuses
+    // that copy. Each order still gets a full re-read about once an hour
+    // (timeline notes do not always move updated_at).
+    const shopifyFresh = await unchangedShopifyOrders(
+      prisma,
+      actionableOrders.filter(o => determineOrderSource(o) === 'shopify').map(o => String(o.orderId))
+    )
 
     // 2c. Process actionable orders (new or needing updates)
     for (const order of actionableOrders) {
@@ -815,7 +862,7 @@ export async function processOrders(options = {}) {
         // Fetch Shopify data once for the entire order (if Shopify)
         let shopifyData = null
         if (isShopify) {
-          shopifyData = await fetchShopifyOrderData(order.orderId)
+          shopifyData = shopifyFresh.get(String(order.orderId)) || await fetchShopifyOrderData(order.orderId)
         }
 
         // Fetch Etsy receipt data once for the entire order (if Etsy)
@@ -1094,12 +1141,13 @@ export async function processOrders(options = {}) {
               // Keep the stored Shopify order current while it is open: an edit
               // after purchase (a Photo Add-On we billed for, a rush) changes
               // the line items, and the customer paying changes the payment
-              // status. Both decide whether that extra is paid. Only written
-              // when one of them moved, so a quiet order costs nothing.
+              // status. Both decide whether that extra is paid. Also written when
+              // Shopify's updated_at moved, so the next run can tell the order
+              // is unchanged and skip re-reading it. A quiet order costs nothing.
               if (shopifyData?.shopifyOrderData && existing.shopifyOrderData && updateData.shopifyOrderData === undefined) {
                 const fresh = shopifyData.shopifyOrderData, stored = existing.shopifyOrderData
                 const lines = o => JSON.stringify((o.line_items || []).map(l => [l.id, l.current_quantity ?? l.quantity]))
-                if (fresh.financial_status !== stored.financial_status || lines(fresh) !== lines(stored)) {
+                if (fresh.financial_status !== stored.financial_status || lines(fresh) !== lines(stored) || fresh.updated_at !== stored.updated_at) {
                   updateData.shopifyOrderData = fresh
                   needsUpdate = true
                 }
@@ -1516,9 +1564,6 @@ export async function processOrders(options = {}) {
     console.error('[processOrders] Fatal error:', error)
     throw error
   } finally {
-    if (shouldDisconnect) {
-      await prisma.$disconnect()
-    }
     // Also disconnect research service if we used it
     if (runResearch) {
       await researchService.disconnect()

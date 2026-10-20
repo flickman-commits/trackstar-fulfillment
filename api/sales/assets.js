@@ -14,6 +14,7 @@ import { setCors } from '../_lib/auth.js'
 import { requireSalesRep, recordAudit } from '../_lib/users.js'
 import { listAssets, assetPreviewUrl, assetUploadUrl, deleteAsset, renameAsset, pickAssetFor, isAssetStorageConfigured } from '../../server/domain/sales/assets.js'
 import { getDeal } from '../../server/domain/sales/attio.js'
+import { publicMessage, publicStatus } from '../../server/domain/sales/errors.js'
 
 // Thumbnail links last 12 hours: Sales stays open in the background all day,
 // and a 15-minute link left the library showing broken images.
@@ -58,7 +59,7 @@ export default async function handler(req, res) {
           await recordAudit({ actor, action: 'sales.asset.rename', summary: `Renamed ${body.id} to ${out.filename} in the sales library`, detail: { from: body.id, to: out.id } })
           return res.status(200).json(out)
         } catch (e) {
-          return res.status(400).json({ error: e.message })
+          return res.status(publicStatus(e)).json({ error: publicMessage(e, 'Something went wrong with the sales library') })
         }
       }
       if (body.action === 'delete') {
@@ -72,6 +73,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (error) {
     console.error('[API /sales/assets]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'Something went wrong with the sales library') })
   }
 }

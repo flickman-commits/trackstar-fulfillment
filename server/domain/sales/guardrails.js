@@ -22,11 +22,13 @@ const NAMED_AS_PARTNER = /\ba few (?!partners\b|of our partners\b)[^.\n]{2,50}?\
 const GENERIC_INBOX = /^(info|hello|hi|contact|admin|office|team|events|race|support|press|media|marketing|donate|volunteer|noreply|no-reply|sponsorship|sponsorships|sponsors|partnerships|partners|development|sales|general|mail|disneysports|registration)@/i
 
 /**
+ * What every email has to pass, a one-off included: a subject and a body,
+ * no dashes, and no blank left in from a template.
+ *
  * @param {{ subject: string, body: string }} draft
- * @param {{ pipeline: 'RACE'|'CHARITY'|'PR', touchNumber: number }} ctx
  * @returns {string[]} problems; empty means it passes
  */
-export function draftProblems(draft, { pipeline, touchNumber, companyName }) {
+export function basicProblems(draft) {
   const problems = []
   const subject = String(draft?.subject || '')
   const body = String(draft?.body || '')
@@ -35,13 +37,27 @@ export function draftProblems(draft, { pipeline, touchNumber, companyName }) {
   if (!subject.trim()) problems.push('Subject is empty')
   if (!body.trim()) problems.push('Body is empty')
   if (DASHES.test(all)) problems.push('Contains an em or en dash. Use a comma or a full stop; never a dash in anything sent to a person.')
-  if (body.length > 1600) problems.push('Body is over 1,600 characters. These emails are under 120 words.')
 
   // A blank left in from a template ("[First Name]", "[Pick a story...]",
   // the write-one-specific-line marker) must never reach a person.
   // "[text](https://...)" is a link from the composer, not a blank.
   const blank = all.match(/\[[A-Z][^\]\n]{2,}\](?!\()/)
   if (blank) problems.push(`Still has a blank to fill in: ${blank[0].length > 60 ? `${blank[0].slice(0, 57)}...]` : blank[0]}`)
+  return problems
+}
+
+/**
+ * @param {{ subject: string, body: string }} draft
+ * @param {{ pipeline: 'RACE'|'CHARITY'|'PR', touchNumber: number }} ctx
+ * @returns {string[]} problems; empty means it passes
+ */
+export function draftProblems(draft, { pipeline, touchNumber, companyName }) {
+  const problems = basicProblems(draft)
+  const subject = String(draft?.subject || '')
+  const body = String(draft?.body || '')
+  const all = `${subject}\n${body}`
+
+  if (body.length > 1600) problems.push('Body is over 1,600 characters. These emails are under 120 words.')
 
   if (NAMED_AS_PARTNER.test(all)) problems.push('Presents the recipient\'s own team as an existing partner ("a few Team X partners use these"). They are not a partner yet. Say "a few partners", or name a real one.')
   if (companyName && new RegExp(`\\b${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+(partners|teams|chapters)\\b`, 'i').test(all)) {

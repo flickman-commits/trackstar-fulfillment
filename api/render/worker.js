@@ -2,7 +2,11 @@
  * The render worker's side of the queue (worker/render-worker.mjs).
  *
  * Authenticates with an API key (Authorization: Bearer ...) that has the
- * write or repair scope. Every call is a POST with an action:
+ * worker scope. A worker can put any file in front of a reviewer as a
+ * finished design, so this is not open to write or repair keys in general:
+ * the one exception, kept so the Mac already running does not stop, is a
+ * write key acting as an admin. Mint a worker key and move it over. Every
+ * call is a POST with an action:
  *
  *   templates  { workerId }                   the enabled templates: key, file, rules, last check
  *   heartbeat  { workerId, name, templates, files }  I am here; files I have and keys I can render
@@ -31,11 +35,15 @@ export default async function handler(req, res) {
 
   const presented = bearer(req.headers['authorization'])
   const principal = presented ? await resolveApiKey(presented) : null
-  if (!principal || !(principal.scopes.has('write') || principal.scopes.has('repair'))) {
+  const isWorker = principal && !principal.legacy && (
+    principal.scopes.has('worker') ||
+    (principal.scopes.has('write') && principal.role === 'admin')
+  )
+  if (!isWorker) {
     const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim()
     const limit = await checkRateLimitDurable(ip, { bucket: 'render-worker-auth', max: 20, windowMs: 10 * 60_000 })
     if (!limit.allowed) return res.status(429).json({ error: 'Too many bad keys from this address' })
-    return res.status(401).json({ error: 'A valid API key with the write or repair scope is required' })
+    return res.status(401).json({ error: 'A valid API key with the worker scope is required' })
   }
 
   try {
@@ -74,6 +82,6 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('[API /render/worker]', error)
-    return res.status(400).json({ error: error.message })
+    return res.status(400).json({ error: 'That did not work. Check the server log.' })
   }
 }

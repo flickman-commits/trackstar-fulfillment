@@ -29,7 +29,7 @@ const EXTS = new Set(['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp'])
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
       const path = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${ext}`
       const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
       const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path)
-      if (error) return res.status(500).json({ error: `Could not start the upload: ${error.message}` })
+      if (error) return res.status(500).json({ error: 'Could not start the upload. Try again.' })
       return res.status(200).json({ path, uploadUrl: data.signedUrl })
     }
 

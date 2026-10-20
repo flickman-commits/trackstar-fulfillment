@@ -9,11 +9,28 @@ import { ToolError } from '../server.js'
 import { acceptMatch, AcceptMatchError } from '../../../domain/research/acceptMatch.js'
 import { pipelinesFor } from '../../../domain/orders/pipelineStatus.js'
 import { findOrdersByNumber, displayNumber, pickItem, pipelineShape } from './orders.js'
+import { checkRateLimitDurable } from '../../../lib/publicRateLimit.js'
 
 const ITEM = z.number().int().min(1).optional().describe('Which item on a multi-item order; the first by default.')
 
 function candidates(list) {
   return (Array.isArray(list) ? list : []).slice(0, 15).map((m, i) => ({ candidate: i + 1, name: m.name || null, bib: m.bib || null, time: m.time || null, pace: m.pace || null, event: m.eventType || null, city: m.city || undefined }))
+}
+
+const PER_RACE_PER_HOUR = 10
+const HOUR = 60 * 60 * 1000
+
+/**
+ * A durable budget per race, shared by both tools and every key, so an agent
+ * working through a race's orders cannot hammer its timing site (Sydney's
+ * firewall blocked us after dozens of rapid loads).
+ */
+async function raceBudget(o) {
+  const race = String(o.raceNameOverride || o.raceName || 'unknown').trim().toLowerCase()
+  const limit = await checkRateLimitDurable(race, { bucket: 'mcp-research-race', max: PER_RACE_PER_HOUR, windowMs: HOUR })
+  if (!limit.allowed) {
+    throw new ToolError(`Research for ${o.raceNameOverride || o.raceName} has run ${PER_RACE_PER_HOUR} times this hour already. Try again in ${Math.max(1, Math.ceil(limit.retryAfterMs / 60000))} minute(s).`)
+  }
 }
 
 async function standardItem(orderNumber, item) {
@@ -34,6 +51,7 @@ export const researchTools = [
     input: { orderNumber: z.string().max(40), item: ITEM },
     async handler({ orderNumber, item }) {
       const { o, n } = await standardItem(orderNumber, item)
+      await raceBudget(o)
       // Loaded here, not at the top: it brings the scrapers (and Puppeteer) with it.
       const { researchService } = await import('../../../services/ResearchService.js')
       let out
@@ -86,6 +104,7 @@ export const researchTools = [
         pick = list[candidate - 1]
         if (!pick) throw new ToolError(`${n} has ${list.length} candidate(s); there is no number ${candidate}.`)
       }
+      await raceBudget(o)
       let r
       try { r = await acceptMatch({ orderNumber: o.orderNumber, match: pick }) }
       catch (err) {

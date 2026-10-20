@@ -30,15 +30,13 @@ import { unpaidPhotoRows } from '../../server/domain/orders/photoPayment.js'
 import { completeOrder, CompleteError } from '../../server/domain/orders/complete.js'
 import { noteWeatherChange } from '../../server/domain/races/verification.js'
 import { acceptMatch, AcceptMatchError } from '../../server/domain/research/acceptMatch.js'
-import { listWinningAds } from '../../server/domain/creators/winningAds.js'
 import { sendCreatorSample, linkCreatorSamples } from '../../server/domain/creators/creatorSample.js'
-import { publicPrintCatalog } from '../../server/domain/catalog/printCatalog.js'
 import prisma from '../_lib/prisma.js'
 import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
 import { setDesignStatus, DESIGN_STATUSES } from '../../server/domain/orders/designStatus.js'
 import { setCors, requireAdmin, isCronRequest } from '../_lib/auth.js'
-import { requireAdminRole, requireCapability, recordAudit } from '../_lib/users.js'
+import { requireAdminRole, requireAdminOnly, requireCapability, recordAudit } from '../_lib/users.js'
 import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
 import { shopifyFetch, shopifyGraphQL } from '../../server/services/shopifyAuth.js'
@@ -110,13 +108,13 @@ export default async function handler(req, res) {
       return await handleMondayPipeline(res)
     }
     if (action === 'daily-design-update') {
-      // Cron uses CRON_SECRET; manual runs (for debugging) use ADMIN_SECRET.
+      // Cron uses CRON_SECRET; a manual run (it posts to Slack) is admin only.
       const isCron = isCronRequest(req)
-      if (!isCron && !requireAdmin(req, res)) return
+      if (!isCron && !(await requireAdminOnly(req, res))) return
       return await handleDailyDesignUpdate(res)
     }
     if (action === 'race-shorthands') {
-      if (!requireAdmin(req, res)) return
+      if (!(await requireAdmin(req, res))) return
       // Merge user overrides over scraper-config defaults. Overrides win so
       // Matt can correct funky filename mappings without a code change.
       const defaults = getRaceShorthands()
@@ -141,20 +139,18 @@ export default async function handler(req, res) {
       if (!(await requireCapability(req, res, 'creators'))) return
       return await handleListBriefs(res)
     }
-    if (action === 'creator-portal-data') {
-      // Public — token-gated inside handler. Used by the creator's portal
-      // page to hydrate their view.
-      return await handleCreatorPortalData(req.query?.token, res)
-    }
     if (action === 'health-check') {
-      // Cron uses CRON_SECRET, manual uses ADMIN_SECRET
+      // Cron uses CRON_SECRET; a manual run is admin only (it runs every
+      // fixture against live timing sites).
       const isCron = isCronRequest(req)
-      if (!isCron && !requireAdmin(req, res)) return
+      if (!isCron && !(await requireAdminOnly(req, res))) return
       return await handleHealthCheck(res, { sendSlack: isCron })
     }
     if (action === 'test-connections') {
-      // Detailed Artelo / Shopify / Etsy step-by-step connection diagnostics
-      if (!requireAdmin(req, res)) return
+      // Detailed Artelo / Shopify / Etsy step-by-step connection diagnostics.
+      // Admin only: it names env vars, the store and the Etsy shop, and it
+      // rotates the Etsy refresh token.
+      if (!(await requireAdminOnly(req, res))) return
       return await handleTestConnections(res)
     }
     if (action === 'ping') {
@@ -169,7 +165,7 @@ export default async function handler(req, res) {
       }
     }
     if (action === 'shopify-products') {
-      if (!requireAdmin(req, res)) return
+      if (!(await requireAdmin(req, res))) return
       return await handleShopifyProducts(res)
     }
     return res.status(400).json({ error: 'Unknown GET action' })
@@ -185,14 +181,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'action is required' })
     }
 
-    // Public POST actions — auth'd by the caller's own token inside the
-    // handler, not by the admin secret. Everything else requires admin.
-    const PUBLIC_POST_ACTIONS = new Set(['creator-onboard', 'create-public-invite'])
-    let actor = null
-    if (!PUBLIC_POST_ACTIONS.has(action)) {
-      actor = requireAdmin(req, res)
-      if (!actor) return
-    }
+    // Every POST here needs a signed-in person. The creator program's public
+    // actions moved to api/public/creator.js, behind a durable rate limit.
+    const actor = (await requireAdmin(req, res))
+    if (!actor) return
 
     // Role gates (api/_lib/roles.js): the creator programme and discount codes
     // belong to some roles only. Read fresh from the database.
@@ -219,33 +211,48 @@ export default async function handler(req, res) {
       'customers-served-set',
       'set-race-shorthand',
     ])
+    // The audit line is written after the action succeeds, so the log never
+    // claims something happened that returned an error. A discount code is
+    // money, so it is logged too, though anyone with the capability may make one.
+    let auditAs = null
     if (ADMIN_ONLY_ACTIONS.has(action)) {
-      const admin = await requireAdminRole(req, res, actor)
-      if (!admin) return
-      await recordAudit({
-        action: `order.${action}`,
-        summary: describeAction(action, body),
-        detail: body,
-        actor: admin,
-      })
+      auditAs = await requireAdminRole(req, res, actor)
+      if (!auditAs) return
+    } else if (ADMIN_NO_AUDIT_ACTIONS.has(action)) {
+      if (!(await requireAdminRole(req, res, actor))) return
+    } else if (action === 'create-discount') {
+      auditAs = actor
     }
 
-    // Anyone on the team can comp a customer, but a discount code is money,
-    // so the log still names who made it.
-    if (action === 'create-discount') {
-      await recordAudit({
-        action: 'order.create-discount',
-        summary: describeAction(action, body),
-        detail: body,
-        actor,
-      })
+    const out = await dispatch(action, body, res, actor)
+    if (auditAs && res.statusCode < 400) {
+      await recordAudit({ action: `order.${action}`, summary: describeAction(action, body), detail: auditDetail(action, body, res), actor: auditAs })
     }
+    return out
+  } catch (error) {
+    console.error('[actions] Error:', error)
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Order not found' })
+    }
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
+  }
+}
 
+/** Admin-only, but routine enough that the log would only be noise. */
+const ADMIN_NO_AUDIT_ACTIONS = new Set(['health-check', 'customers-served-sync'])
+
+/** The request, plus the counts the handler reported, for the audit row. */
+function auditDetail(action, body, res) {
+  const counts = res.locals?.auditCounts
+  return counts ? { ...body, ...counts } : body
+}
+
+async function dispatch(action, body, res, actor) {
     switch (action) {
       case 'accept-match':
         return await handleAcceptMatch(body, res)
       case 'clear-race-cache':
-        return await handleClearRaceCache(res)
+        return await handleClearRaceCache(body, res)
       case 'clear-research':
         return await handleClearResearch(body, res)
       case 'complete':
@@ -284,10 +291,6 @@ export default async function handler(req, res) {
         return await handleUpdateBrief(body, res)
       case 'create-creator-invite':
         return await handleCreateCreatorInvite(body, res)
-      case 'create-public-invite':
-        return await handleCreatePublicInvite(body, res)
-      case 'creator-onboard':
-        return await handleCreatorOnboard(body, res)
       case 'approve-creator-sample':
         return await handleApproveCreatorSample(body, res)
       case 'decline-creator-sample':
@@ -301,15 +304,8 @@ export default async function handler(req, res) {
       case 'health-check':
         return await handleHealthCheck(res, { sendSlack: body.sendSlack || false })
       default:
-        return res.status(400).json({ error: `Unknown action: ${action}` })
+        return res.status(400).json({ error: 'Unknown action' })
     }
-  } catch (error) {
-    console.error('[actions] Error:', error)
-    if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Order not found' })
-    }
-    return res.status(500).json({ error: error.message })
-  }
 }
 
 // --- accept-match ---
@@ -324,49 +320,60 @@ async function handleAcceptMatch({ orderNumber, match }, res) {
 }
 
 // --- clear-race-cache ---
-async function handleClearRaceCache(res) {
-  const { count } = await prisma.race.updateMany({
-    data: { resultsUrl: null, resultsSiteType: null, location: null }
-  })
+// Clears the cached results URL every race resolved to, so the next lookup
+// finds it again. It used to null `location` too, which silently broke
+// weather for every race until someone re-entered all of them; a location is
+// data, not cache. Without confirm it only reports what it would clear.
+async function handleClearRaceCache({ confirm }, res) {
+  const where = { OR: [{ resultsUrl: { not: null } }, { resultsSiteType: { not: null } }] }
+  if (confirm !== true) {
+    const wouldClear = await prisma.race.count({ where })
+    return res.status(200).json({ dryRun: true, wouldClear })
+  }
+  const { count } = await prisma.race.updateMany({ where, data: { resultsUrl: null, resultsSiteType: null } })
   console.log(`[actions/clear-race-cache] Cleared cache for ${count} races`)
+  setAuditCounts(res, { cleared: count })
   return res.status(200).json({ success: true, cleared: count })
 }
 
+function setAuditCounts(res, counts) {
+  res.locals = { ...(res.locals || {}), auditCounts: counts }
+}
+
 // --- clear-research ---
-async function handleClearResearch({ raceName }, res) {
-  // Only clear research for orders that haven't shipped to production yet.
-  // Completed orders keep their cached result so the finished poster's data
-  // stays intact and auditable.
-  if (raceName) {
-    const race = await prisma.race.findFirst({ where: { raceName } })
-    if (!race) return res.status(404).json({ error: `Race not found: ${raceName}` })
+async function handleClearResearch({ raceName, confirm }, res) {
+  // Only clears research for orders that haven't gone to production yet.
+  // Completed orders keep their result so the finished poster stays auditable.
+  //
+  // A race is required. Clearing every race's research at once wiped weeks of
+  // work in one click with nothing to undo it, and nobody needs it: a broken
+  // scraper is always one race. Both the delete and the status reset match
+  // the race the same way (it used to delete by exact name but reset by
+  // "contains", so "Marathon" reset every marathon in the system).
+  // Without confirm it only reports what it would clear.
+  if (!raceName || typeof raceName !== 'string') {
+    return res.status(400).json({ error: 'Pick a race. Clearing research for every race at once is not allowed.' })
+  }
+  const race = await prisma.race.findFirst({ where: { raceName } })
+  if (!race) return res.status(404).json({ error: `Race not found: ${raceName}` })
 
-    const { count } = await prisma.runnerResearch.deleteMany({
-      where: { raceId: race.id, order: { status: { not: 'completed' } } }
-    })
-
-    await prisma.order.updateMany({
-      where: {
-        status: { in: ['ready', 'flagged'] },
-        raceName: { contains: raceName, mode: 'insensitive' }
-      },
-      data: { status: 'pending' }
-    })
-
-    console.log(`[actions/clear-research] Deleted ${count} research records for ${raceName} (excluding completed orders)`)
-    return res.status(200).json({ success: true, deleted: count, raceName })
+  const researchWhere = { raceId: race.id, order: { status: { not: 'completed' } } }
+  const orderWhere = { status: { in: ['ready', 'flagged'] }, runnerResearch: { some: { raceId: race.id } } }
+  if (confirm !== true) {
+    const [wouldDelete, wouldReset] = await Promise.all([
+      prisma.runnerResearch.count({ where: researchWhere }),
+      prisma.order.count({ where: orderWhere }),
+    ])
+    return res.status(200).json({ dryRun: true, raceName, wouldDelete, wouldReset })
   }
 
-  const { count } = await prisma.runnerResearch.deleteMany({
-    where: { order: { status: { not: 'completed' } } }
-  })
-  await prisma.order.updateMany({
-    where: { status: { in: ['ready', 'flagged'] } },
-    data: { status: 'pending' }
-  })
-
-  console.log(`[actions/clear-research] Deleted ${count} research records (all races, excluding completed orders)`)
-  return res.status(200).json({ success: true, deleted: count })
+  const [reset, deleted] = await prisma.$transaction([
+    prisma.order.updateMany({ where: orderWhere, data: { status: 'pending' } }),
+    prisma.runnerResearch.deleteMany({ where: researchWhere }),
+  ])
+  console.log(`[actions/clear-research] Deleted ${deleted.count} research records and reset ${reset.count} orders for ${raceName}`)
+  setAuditCounts(res, { deleted: deleted.count, reset: reset.count })
+  return res.status(200).json({ success: true, deleted: deleted.count, reset: reset.count, raceName })
 }
 
 // --- complete ---
@@ -813,7 +820,7 @@ async function handleCreateDiscount({ valueType, value, code, expiresInDays, usa
     })
   } catch (err) {
     console.error('[actions/create-discount] Failed:', err.message)
-    return res.status(500).json({ error: `Failed to create discount: ${err.message}` })
+    return res.status(500).json({ error: 'Failed to create discount. Try again.' })
   }
 }
 
@@ -839,7 +846,7 @@ async function handleCalculateWeather({ raceId, city, date, reason }, res, actor
     result = await weatherService.calculateRaceWeather(dateStr, cityStr, previous)
   } catch (err) {
     console.error('[actions/calculate-weather] Error:', err.message)
-    return res.status(500).json({ error: `Weather lookup failed: ${err.message}` })
+    return res.status(500).json({ error: 'Weather lookup failed. Try again.' })
   }
 
   if (!result.temp || !result.condition) {
@@ -1022,7 +1029,7 @@ async function handleMondayPipeline(res) {
     return res.status(200).json({ success: true, total, urgentCount, revisionCount, awaitingCustomerCount })
   } catch (error) {
     console.error('[actions/monday-pipeline] Error:', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }
 
@@ -1148,7 +1155,7 @@ async function handleDailyDesignUpdate(res) {
     })
   } catch (error) {
     console.error('[actions/daily-design-update] Error:', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }
 
@@ -1956,216 +1963,6 @@ async function handleCreateCreatorInvite({ name, email, instagramHandle, briefId
 
   console.log(`[actions/create-creator-invite] Created ${created.id} with ${briefIds?.length || 0} brief(s)`)
   return res.status(201).json({ success: true, creator: created })
-}
-
-// --- create-public-invite (PUBLIC) ---
-// Hit by the public /apply landing page. Mints a fresh Creator row and
-// returns the inviteToken so the client can redirect into the onboarding
-// wizard at /creator/<token>. Auto-assigns every currently-active brief so
-// the creator sees content directives during onboarding — no admin step
-// required between Apply Now and onboarding.
-async function handleCreatePublicInvite(_body, res) {
-  const created = await prisma.creator.create({
-    data: {
-      inviteToken: makeInviteToken(),
-      status: 'invited',
-      source: 'public_apply',
-    }
-  })
-
-  const activeBriefs = await prisma.brief.findMany({
-    where: { status: 'active' },
-    select: { id: true }
-  })
-  if (activeBriefs.length > 0) {
-    await prisma.briefAssignment.createMany({
-      data: activeBriefs.map(b => ({ creatorId: created.id, briefId: b.id })),
-      skipDuplicates: true,
-    })
-  }
-
-  console.log(`[actions/create-public-invite] Public apply → creator ${created.id} (token ${created.inviteToken})`)
-  // Don't leak the whole row — just the token the client needs to redirect.
-  return res.status(201).json({ success: true, inviteToken: created.inviteToken })
-}
-
-// --- creator-portal-data (PUBLIC) ---
-// Token-gated. Returns enough info for the creator's portal to render:
-// their own profile + assigned briefs (full detail) + sample status.
-async function handleCreatorPortalData(token, res) {
-  if (!token || typeof token !== 'string') {
-    return res.status(400).json({ error: 'token is required' })
-  }
-
-  const pending = await prisma.creator.findUnique({ where: { inviteToken: token }, select: { id: true, sampleOrderId: true, sampleShopifyOrderIds: true } })
-  if (pending) await linkCreatorSamples([pending])
-
-  const creator = await prisma.creator.findUnique({
-    where: { inviteToken: token },
-    include: {
-      briefAssignments: {
-        include: { brief: true },
-        orderBy: { assignedAt: 'asc' }
-      },
-      sampleOrder: {
-        select: {
-          id: true, orderNumber: true, status: true, createdAt: true,
-          trackingNumber: true, trackingCarrier: true, shippedAt: true,
-        }
-      }
-    }
-  })
-
-  if (!creator) {
-    return res.status(404).json({ error: 'Invite not found or revoked' })
-  }
-
-  // Filter assigned briefs to active ones only — archived briefs shouldn't
-  // surface to the creator even if they were assigned historically.
-  const briefs = creator.briefAssignments
-    .map(a => a.brief)
-    .filter(b => b.status === 'active')
-
-  // Race options for the onboarding dropdown. Sorted newest first so recent
-  // races appear at the top. Only expose the minimum fields the portal needs.
-  const races = await prisma.race.findMany({
-    orderBy: [{ year: 'desc' }, { raceName: 'asc' }],
-    select: { id: true, raceName: true, year: true },
-  })
-
-  // Don't leak admin-only fields (commission, notes, etc.) to the creator.
-  return res.status(200).json({
-    creator: {
-      id: creator.id,
-      name: creator.name,
-      email: creator.email,
-      instagramHandle: creator.instagramHandle,
-      tiktokHandle: creator.tiktokHandle,
-      bestContentLinks: creator.bestContentLinks,
-      whyWorkWithUs: creator.whyWorkWithUs,
-      raceName: creator.raceName,
-      raceYear: creator.raceYear,
-      bibNumber: creator.bibNumber,
-      finishTime: creator.finishTime,
-      productTitle: creator.productTitle,
-      productSize: creator.productSize,
-      frameType: creator.frameType,
-      shippingName: creator.shippingName,
-      shippingAddress1: creator.shippingAddress1,
-      shippingAddress2: creator.shippingAddress2,
-      shippingCity: creator.shippingCity,
-      shippingState: creator.shippingState,
-      shippingZip: creator.shippingZip,
-      shippingCountry: creator.shippingCountry,
-      status: creator.status,
-      onboardedAt: creator.onboardedAt,
-    },
-    briefs,
-    sampleOrder: creator.sampleOrder,
-    races,
-    // The store's prints, for "Which product do you want?" (names and pictures only).
-    catalog: await publicPrintCatalog().catch(() => []),
-    winningAds: await listWinningAds(),
-  })
-}
-
-// --- creator-onboard (PUBLIC) ---
-// Token-gated. Creator submits the application wizard — we save everything
-// to their Creator row and flip status → 'applied'.
-// Sample-order creation lands in the next commit (Elí's queue integration).
-const CREATOR_ONBOARD_FIELDS = [
-  'name', 'email', 'instagramHandle', 'tiktokHandle',
-  'bestContentLinks', 'whyWorkWithUs',
-  'raceName', 'raceYear', 'bibNumber', 'finishTime',
-  'productTitle', 'productSize', 'frameType',
-  'shippingName', 'shippingAddress1', 'shippingAddress2',
-  'shippingCity', 'shippingState', 'shippingZip', 'shippingCountry',
-]
-
-async function handleCreatorOnboard({ token, data }, res) {
-  if (!token || typeof token !== 'string') {
-    return res.status(400).json({ error: 'token is required' })
-  }
-  if (!data || typeof data !== 'object') {
-    return res.status(400).json({ error: 'data object is required' })
-  }
-
-  const creator = await prisma.creator.findUnique({ where: { inviteToken: token } })
-  if (!creator) return res.status(404).json({ error: 'Invite not found or revoked' })
-
-  // Build the update. Only allow-listed fields are accepted.
-  const updates = {}
-  for (const key of CREATOR_ONBOARD_FIELDS) {
-    if (key in data) updates[key] = data[key]
-  }
-  if (updates.raceYear != null) updates.raceYear = parseInt(updates.raceYear, 10) || null
-
-  // Flip status + stamp onboardedAt on first-pass application submit.
-  // Re-submits from an already-applied creator just update their profile
-  // fields — we don't reset onboardedAt (and don't re-create the sample
-  // order). The `onboardedAt` column name is preserved to avoid churning
-  // the schema; semantically it now records the time the application was
-  // submitted ("applied at").
-  const isFirstOnboard = !creator.onboardedAt
-  if (isFirstOnboard) {
-    updates.onboardedAt = new Date()
-    updates.status = 'applied'
-  }
-
-  const updated = await prisma.creator.update({
-    where: { id: creator.id },
-    data: updates,
-  })
-
-  // Onboarding no longer auto-creates the Order. The submission sits as a
-  // Sample Request on Matt's dashboard and only becomes a fulfillment order
-  // once he approves via `approve-creator-sample`.
-  console.log(`[actions/creator-onboard] ${creator.id} onboarded (or updated): ${Object.keys(updates).join(', ')}`)
-
-  // First-time onboard → ping Matt that there's a new sample request waiting
-  // for his approval. Best-effort; failures don't block the response.
-  if (isFirstOnboard) {
-    await pingSampleRequested(updated)
-  }
-
-  return res.status(200).json({ success: true, creator: { id: updated.id, status: updated.status } })
-}
-
-// --- Slack helpers ---
-// Best-effort POST. Webhook URLs are pre-bound to a destination channel/DM,
-// so the caller picks the audience by env var, not by message content.
-async function postSlack(webhookUrl, text) {
-  if (!webhookUrl) return
-  try {
-    await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    })
-  } catch (err) {
-    console.error('[slack] webhook post failed:', err.message)
-  }
-}
-
-// Sent to #trackstar-creators when a creator finishes onboarding. Matt sees
-// this (he's mentioned by user ID) and reviews the request on /creators.
-// Falls back to the general team webhook if the creators-specific one isn't
-// set so we don't lose the ping during transition.
-async function pingSampleRequested(creator) {
-  const webhookUrl = process.env.SLACK_CREATORS_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
-  if (!webhookUrl) return
-  const mention = process.env.SLACK_USER_ID_MATT ? `<@${process.env.SLACK_USER_ID_MATT}> ` : ''
-  const appUrl = process.env.APP_BASE_URL || ''
-  const reviewLink = appUrl ? `\n\nReview & approve → ${appUrl}/creators` : ''
-  const lines = [
-    `${mention}🎬 *New Creator Sample Request*`,
-    `Creator: *${creator.name || '(unnamed)'}*${creator.instagramHandle ? ` · ${creator.instagramHandle}` : ''}`,
-    `Race: ${creator.raceName || 'Unknown'}${creator.raceYear ? ` ${creator.raceYear}` : ''}`,
-    `Print: ${creator.productSize || '-'} · ${creator.frameType || '-'}`,
-    `Ships to: ${[creator.shippingCity, creator.shippingState].filter(Boolean).join(', ') || 'address on file'}`,
-    reviewLink,
-  ].filter(Boolean)
-  await postSlack(webhookUrl, lines.join('\n'))
 }
 
 // --- approve-creator-sample ---

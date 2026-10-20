@@ -37,7 +37,7 @@ const MAX_TTL_SECONDS = 60 * 60
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   // A signed URL is a credential. Never let a cache hand it to someone else,

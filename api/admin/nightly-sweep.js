@@ -26,7 +26,8 @@
  * do with this report is write a bad pull request.
  */
 import prisma from '../_lib/prisma.js'
-import { setCors, requireAdmin, isCronRequest } from '../_lib/auth.js'
+import { setCors, requireAdmin, isCronRequest, safeEqual } from '../_lib/auth.js'
+import { requireAdminOnly } from '../_lib/users.js'
 import { agentActor } from '../_lib/agentToken.js'
 import { runNightlySweep, combineSweepPasses, NIGHTLY_REPORT_KEY } from '../../server/services/nightlySweep.js'
 import { formatSweepForSlack, formatSweepAsMarkdown, formatSweepBrief } from '../../server/services/nightlySweepReport.js'
@@ -165,12 +166,14 @@ export default async function handler(req, res) {
   const reportToken = process.env.NIGHTLY_REPORT_READ_TOKEN
   const presented = req.headers['x-report-token']
   const isReportReader = Boolean(
-    wantsCached && reportToken && presented && presented === reportToken
+    wantsCached && reportToken && presented && safeEqual(presented, reportToken)
   )
 
   // The nightly agent carries its own narrowly-scoped token; see _lib/agentToken.
   const isAgent = Boolean(agentActor(req))
-  if (!isCron && !isReportReader && !isAgent && !requireAdmin(req, res)) return
+  // People need the admin role: a run overwrites the stored report and its
+  // baseline, and a POST files the report Matt reads in the morning.
+  if (!isCron && !isReportReader && !isAgent && !(await requireAdminOnly(req, res))) return
 
   const dryRun = req.query?.dryRun === '1' || req.query?.dryRun === 'true'
 
@@ -258,6 +261,6 @@ export default async function handler(req, res) {
         `No checks completed, so tonight's silence is not an all-clear.`
       ).catch(() => {})
     }
-    return res.status(500).json({ healthy: false, error: error.message })
+    return res.status(500).json({ healthy: false, error: 'The sweep failed. See the server log.' })
   }
 }

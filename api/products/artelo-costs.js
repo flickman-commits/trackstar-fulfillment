@@ -14,11 +14,13 @@
  */
 
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { requireCapability } from '../_lib/users.js'
 import { fetchArteloCostMatrix, SIZES, COLUMNS } from '../../server/services/arteloCosts.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  // Landed cost per variant: the same audience as the Pricing Calculator.
+  if (!(await requireCapability(req, res, 'settings.pricing'))) return
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
@@ -36,6 +38,6 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('[API /products/artelo-costs] Error:', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

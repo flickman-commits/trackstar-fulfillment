@@ -58,6 +58,6 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('[API /surveys]', error)
-    return res.status(500).json({ error: error.message || 'Survey request failed' })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

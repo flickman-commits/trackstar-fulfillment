@@ -1,127 +1,56 @@
 /**
- * API endpoint to force-refresh weather for all cached races
- * Clears weatherFetchedAt and re-fetches using WeatherService directly
- * (Avoids importing ResearchService which pulls in Puppeteer scrapers)
+ * POST /api/orders/refresh-weather { raceId, reason? }
+ *
+ * Recompute one race year's weather through computeRaceWeather, the same
+ * path the rest of the app treats as authoritative: it respects the print
+ * lock (a printed race needs a reason, and the change is audited) and clears
+ * the "confirmed" stamp when the numbers move.
+ *
+ * There used to be an all-races mode that blanked every race's weather and
+ * then refetched within one function's time limit, leaving any race it did
+ * not reach empty, stamping new numbers as already confirmed, and going
+ * around the print lock. It is gone; weather is one race at a time.
  */
-import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import WeatherService from '../../server/services/WeatherService.js'
-
-const weatherService = new WeatherService()
+import { loadActiveUser } from '../_lib/users.js'
+import { computeRaceWeather } from '../../server/domain/races/verification.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  const actor = (await requireAdmin(req, res))
+  if (!actor) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  console.log('[refresh-weather] Handler invoked, method:', req.method)
+  let body = {}
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {}) } catch { return res.status(400).json({ error: 'Bad request' }) }
+  const raceId = Number(body.raceId)
+  if (!Number.isInteger(raceId) || raceId <= 0) {
+    return res.status(400).json({ error: 'Pick a race. Weather is refreshed one race at a time.' })
+  }
+
+  const user = await loadActiveUser(actor)
+  if (!user) return res.status(401).json({ error: 'Sign in again.' })
 
   try {
-    // req.body may be undefined if Vercel didn't parse it
-    let body = {}
-    if (req.body) {
-      body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-    }
-    const { raceId } = body
-
-    if (raceId) {
-      // Refresh a single race
-      console.log(`[refresh-weather] Refreshing weather for race ${raceId}`)
-
-      const race = await prisma.race.findUnique({ where: { id: raceId } })
-      if (!race) return res.status(404).json({ error: `Race not found: ${raceId}` })
-
-      // Clear cached weather
-      await prisma.race.update({
-        where: { id: raceId },
-        data: { weatherTemp: null, weatherCondition: null, weatherFetchedAt: null }
-      })
-
-      const updated = await fetchWeatherForRace(race)
-
-      return res.status(200).json({
-        success: true,
-        race: {
-          id: updated.id,
-          raceName: updated.raceName,
-          year: updated.year,
-          weatherTemp: updated.weatherTemp,
-          weatherCondition: updated.weatherCondition,
-          weatherFetchedAt: updated.weatherFetchedAt,
-        }
-      })
-    }
-
-    // Refresh ALL races that have weather cached
-    console.log(`[refresh-weather] Refreshing weather for all cached races`)
-
-    const races = await prisma.race.findMany({
-      where: {
-        weatherFetchedAt: { not: null },
-        location: { not: null },
-        // raceDate is non-nullable in schema so no filter needed
-      }
+    const by = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email
+    const updated = await computeRaceWeather(raceId, { by, reason: body.reason, actor: user })
+    return res.status(200).json({
+      success: true,
+      race: {
+        id: updated.id,
+        raceName: updated.raceName,
+        year: updated.year,
+        weatherTemp: updated.weatherTemp,
+        weatherCondition: updated.weatherCondition,
+        weatherFetchedAt: updated.weatherFetchedAt,
+      },
     })
-
-    console.log(`[refresh-weather] Found ${races.length} races to refresh`)
-
-    // Clear all cached weather
-    if (races.length > 0) {
-      await prisma.race.updateMany({
-        where: { id: { in: races.map(r => r.id) } },
-        data: { weatherTemp: null, weatherCondition: null, weatherFetchedAt: null }
-      })
-    }
-
-    // Re-fetch each race
-    const results = []
-    for (const race of races) {
-      try {
-        const updated = await fetchWeatherForRace(race)
-        results.push({
-          id: updated.id,
-          raceName: updated.raceName,
-          year: updated.year,
-          weatherTemp: updated.weatherTemp,
-          weatherCondition: updated.weatherCondition,
-        })
-        console.log(`[refresh-weather] ✓ ${updated.raceName} ${updated.year}: ${updated.weatherTemp}, ${updated.weatherCondition}`)
-      } catch (err) {
-        console.error(`[refresh-weather] ✗ ${race.raceName} ${race.year}:`, err.message)
-        results.push({ id: race.id, raceName: race.raceName, year: race.year, error: err.message })
-      }
-    }
-
-    return res.status(200).json({ success: true, refreshed: results.length, results })
-
   } catch (error) {
+    // computeRaceWeather and the print lock throw plain-English reasons.
+    if (/not found|verify the date|needs a location|not happened|could not compute|printed|reason/i.test(error.message)) {
+      return res.status(error.needsReason ? 409 : 400).json({ error: error.message, needsReason: Boolean(error.needsReason) })
+    }
     console.error('[refresh-weather] Error:', error)
-    return res.status(500).json({ error: error.message })
-  }
-}
-
-/**
- * Fetch and save weather for a race using WeatherService directly
- */
-async function fetchWeatherForRace(race) {
-  if (!race.raceDate || !race.location) {
-    console.log(`[refresh-weather] Skipping ${race.raceName} - missing date or location`)
-    return race
-  }
-
-  try {
-    const weather = await weatherService.getHistoricalWeather(new Date(race.raceDate), race.location)
-
-    return await prisma.race.update({
-      where: { id: race.id },
-      data: {
-        weatherTemp: weather.temp,
-        weatherCondition: weather.condition,
-        weatherFetchedAt: new Date()
-      }
-    })
-  } catch (error) {
-    console.error(`[refresh-weather] Weather fetch failed for ${race.raceName}:`, error.message)
-    return race
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

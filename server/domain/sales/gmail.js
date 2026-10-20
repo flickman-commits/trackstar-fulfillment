@@ -30,6 +30,7 @@
 import crypto from 'crypto'
 import { google } from 'googleapis'
 import prisma from '../../db.js'
+import { UserError } from './errors.js'
 
 /**
  * compose: create drafts and send. metadata: read message headers (From, Date)
@@ -58,7 +59,7 @@ const keyEmail = userId => `gmail_account_email:${userId}`
 const keyScopes = userId => `gmail_scopes:${userId}`
 
 function requireUser(userId) {
-  if (!userId) throw new Error('A user id is required for Gmail: connections are per person.')
+  if (!userId) throw new UserError('A user id is required for Gmail: connections are per person.')
   return String(userId)
 }
 
@@ -68,7 +69,7 @@ export function isGmailConfigured() {
 
 /** Shared with the support mailbox (server/domain/support/mailbox.js). */
 export function oauthClient(redirectUri) {
-  if (!isGmailConfigured()) throw new Error('Gmail is not configured: set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET')
+  if (!isGmailConfigured()) throw new UserError('Gmail is not configured: set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET')
   return new google.auth.OAuth2(
     process.env.GOOGLE_OAUTH_CLIENT_ID,
     process.env.GOOGLE_OAUTH_CLIENT_SECRET,
@@ -123,30 +124,49 @@ export function redirectUriFor(req) {
   return `${originFor(req)}/api/sales/gmail-callback`
 }
 
-export function getAuthUrl(redirectUri) {
+/** `state` is the round trip's check value (server/domain/support/oauthState.js). */
+export function getAuthUrl(redirectUri, state) {
   return oauthClient(redirectUri).generateAuthUrl({
     access_type: 'offline',
     // Force the consent screen so Google returns a refresh token even when
     // the account has approved this app before.
     prompt: 'consent',
     scope: SCOPES,
+    state,
   })
 }
 
-/** Exchange the code Google sent back, persist the refresh token, record which account it is. */
+/** Why a connection was refused, as a short code the Sales page turns into words. */
+export class ConnectionRefused extends Error {
+  constructor(reason, message) { super(message); this.reason = reason }
+}
+
+/**
+ * Exchange the code Google sent back, check whose mailbox it is, then keep
+ * the refresh token. A rep connects their own Gmail and nobody else's: sends
+ * go out under that address and the replies it reads are that person's, so
+ * the address has to be the one they sign in to this app with.
+ */
 export async function completeConnection(code, redirectUri, userId) {
   const uid = requireUser(userId)
+  const user = await prisma.user.findUnique({ where: { id: uid }, select: { email: true } })
+  if (!user?.email) throw new ConnectionRefused('no_user', 'That person is not in the app')
   const client = oauthClient(redirectUri)
   const { tokens } = await client.getToken(code)
   if (!tokens.refresh_token) {
-    throw new Error('Google did not return a refresh token. Remove the app under Google Account > Security > Third-party access and connect again.')
+    throw new ConnectionRefused('no_refresh_token', 'Google did not return a refresh token. Remove the app under Google Account > Security > Third-party access and connect again.')
   }
-  await setConfig(keyRefresh(uid), tokens.refresh_token)
-  await setConfig(keyScopes(uid), String(tokens.scope || SCOPES.join(' ')))
   client.setCredentials(tokens)
   const gmail = google.gmail({ version: 'v1', auth: client })
   const profile = await gmail.users.getProfile({ userId: 'me' })
-  const email = profile.data.emailAddress || ''
+  const email = String(profile.data.emailAddress || '')
+  if (!email || email.trim().toLowerCase() !== String(user.email).trim().toLowerCase()) {
+    // Not theirs: hand the grant back rather than keep a token we will not use.
+    await client.revokeCredentials().catch(() => {})
+    throw new ConnectionRefused('wrong_account', `That signed in as ${email || 'an unknown account'}, not ${user.email}`)
+  }
+  await setConfig(keyRefresh(uid), tokens.refresh_token)
+  await setConfig(keyScopes(uid), String(tokens.scope || SCOPES.join(' ')))
   await setConfig(keyEmail(uid), email)
   return { email }
 }
@@ -193,7 +213,7 @@ export async function driveClientForAnyone() {
 
 async function gmailClient(userId) {
   const refresh = await refreshTokenFor(requireUser(userId))
-  if (!refresh) throw new Error('Gmail is not connected. Open Sales and press Connect Gmail.')
+  if (!refresh) throw new UserError('Gmail is not connected. Open Sales and press Connect Gmail.')
   const client = oauthClient()
   client.setCredentials({ refresh_token: refresh })
   return { gmail: google.gmail({ version: 'v1', auth: client }), uid: String(userId) }
@@ -215,7 +235,7 @@ export function isRevokedToken(err) {
 async function handleGmailError(err, uid) {
   if (!isRevokedToken(err)) throw err
   await prisma.systemConfig.deleteMany({ where: { key: keyRefresh(uid) } })
-  throw new Error(
+  throw new UserError(
     'Gmail disconnected: Google rejected the saved credential. Press Connect Gmail again. '
     + 'If this keeps happening weekly, the OAuth consent screen is still in Testing, which expires refresh tokens after 7 days - set it to Internal, or publish it.'
   )

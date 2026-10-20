@@ -12,6 +12,7 @@ import { requireCapability, requireAdminOnly, recordAudit } from '../_lib/users.
 import { defaultAssigneeId, setDefaultAssignee, getRouting, saveRouting } from '../../server/domain/support/routing.js'
 import { getPlaybook, savePlaybook, resetPlaybook } from '../../server/domain/support/playbook.js'
 import { listForwarders, saveForwarders } from '../../server/domain/support/forwarders.js'
+import { publicMessage, publicStatus } from '../../server/domain/support/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -46,6 +47,6 @@ export default async function handler(req, res) {
     return res.status(200).json(out)
   } catch (error) {
     console.error('[API /support/settings]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'Could not save the Support settings') })
   }
 }

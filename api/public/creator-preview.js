@@ -4,6 +4,7 @@
  * shell ("Trackstar Fulfillment"). Same approach and fallbacks as
  * approval-preview.js. The image is public/og-creator-program.jpg.
  */
+import { shellUrl } from '../../server/lib/shellOrigin.js'
 import { injectMeta } from './approval-preview.js'
 
 let cachedShell = null
@@ -25,9 +26,8 @@ async function loadShell(url) {
 }
 
 export default async function handler(req, res) {
-  const proto = req.headers['x-forwarded-proto'] || 'https'
-  const host = req.headers['x-forwarded-host'] || req.headers.host
-  let html = await loadShell(`${proto}://${host}/index.html`)
+  const url = shellUrl(req)
+  let html = url ? await loadShell(url) : null
   if (!html) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     res.setHeader('Cache-Control', 'no-store')

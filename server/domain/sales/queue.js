@@ -24,6 +24,7 @@ import { cadenceFor, looksLikeMailbox } from './angles.js'
 import { loadWorkspace } from './sequences.js'
 import { getSettings, startOfToday } from './settings.js'
 import { isGenericInbox } from './guardrails.js'
+import { UserError } from './errors.js'
 
 const OPEN_FOR_OUTREACH = ['Not Contacted']
 const OPEN_FOR_FOLLOW_UP = ['Reached Out']
@@ -289,7 +290,7 @@ export async function dealForWork(dealId, { fresh = false } = {}) {
   const settings = await getSettings()
   const dayStart = startOfToday(settings.timezone, new Date())
   const deal = await getDeal(dealId, { fresh })
-  if (!deal) throw new Error('That deal is not in Attio any more')
+  if (!deal) throw new UserError('That deal is not in Attio any more')
   const [sends, skip] = await Promise.all([
     prisma.salesSend.findMany({ where: { attioDealId: dealId }, orderBy: { sentAt: 'asc' } }),
     prisma.salesSkip.findUnique({ where: { attioDealId: dealId } }),

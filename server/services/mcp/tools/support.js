@@ -52,6 +52,8 @@ export const supportTools = [
         body,
         data: { summary: summary || null, forMessageId: lastIn?.id || null, source: `mcp:${principal.name}` },
         actor: principal.user,
+        // The draft is the key holder's, not the model's: it is their name a teammate sees.
+        authorName: `${principal.user.firstName || ''} ${principal.user.lastName || ''}`.trim() || principal.user.email,
       })
       return { summary: `Drafted a reply on "${t.subject || '(no subject)'}"`, threadId: t.id, draftId: note.id, sent: false, next: 'A person reviews and sends it from Support.' }
     },

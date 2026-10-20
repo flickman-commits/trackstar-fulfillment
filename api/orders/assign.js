@@ -29,7 +29,7 @@ import { getCanonicalRaceName } from '../../server/scrapers/index.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
 
   try {
@@ -202,6 +202,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ orderId: order.id, assigneeId: order.assigneeId, assigneeName: order.assignee?.firstName || null })
   } catch (error) {
     console.error('[API /orders/assign]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

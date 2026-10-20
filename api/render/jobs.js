@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const actor = requireAdmin(req, res)
+      const actor = (await requireAdmin(req, res))
       if (!actor) return
       if (!(await loadActiveUser(actor))) return res.status(401).json({ error: 'Your account is no longer active. Sign in again.' })
       const orderId = String(req.query?.orderId || '')

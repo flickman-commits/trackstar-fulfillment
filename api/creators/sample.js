@@ -15,7 +15,7 @@ import { sendCreatorSample } from '../../server/domain/creators/creatorSample.js
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
   const admin = await requireAdminRole(req, res, actor)
   if (!admin) return

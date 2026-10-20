@@ -14,11 +14,13 @@
  * pre-fill the inputs, and Matt layers hypotheticals on top of reality.
  */
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { requireAdminOnly } from '../_lib/users.js'
 import { getBoardData, getInternalEconomics } from '../../server/services/monopolyBoard.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  // Admin only: true unit cost and margin per tier.
+  if (!(await requireAdminOnly(req, res))) return
 
   res.setHeader('Cache-Control', 'private, no-store, max-age=0')
 

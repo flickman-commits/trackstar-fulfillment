@@ -7,7 +7,7 @@ import prisma from '../../../../api/_lib/prisma.js'
 import { ToolError } from '../server.js'
 import { approvalUrl } from '../../../lib/links.js'
 import { setDesignStatus, DESIGN_STATUSES } from '../../../domain/orders/designStatus.js'
-import { findOrdersByNumber, displayNumber, openWhere, shopifyNames, daysLate } from './orders.js'
+import { findOrdersByNumber, displayNumber, openWhere, shopifyNames, daysLate, mayHoldLinks, linkField } from './orders.js'
 
 const LABEL = {
   not_started: 'Not started', in_progress: 'In progress', awaiting_review: 'Awaiting review', in_revision: 'In revision',
@@ -23,7 +23,7 @@ const SELECT = {
   proofs: { select: { status: true } },
 }
 
-function job(o, name, type) {
+function job(o, name, type, links) {
   const proofs = o.proofs || []
   return {
     orderNumber: name ? String(name).replace(/^#/, '') : String(o.parentOrderNumber),
@@ -37,16 +37,17 @@ function job(o, name, type) {
     daysLate: o.dueDate ? daysLate(o.dueDate) : undefined,
     rush: o.isRushOrder || undefined,
     proofs: { total: proofs.length, awaiting: proofs.filter(p => p.status === 'pending').length, approved: proofs.filter(p => p.status === 'approved').length, lastSentAt: o.proofSentAt || null },
-    approvalLink: approvalUrl(o.approvalToken?.token),
+    ...linkField('approvalLink', approvalUrl(o.approvalToken?.token), links),
   }
 }
 
-async function statusTool(type) {
+async function statusTool(type, principal) {
+  const links = await mayHoldLinks(principal)
   const rows = await prisma.order.findMany({ where: openWhere(type), orderBy: type === 'custom' ? [{ dueDate: 'asc' }, { createdAt: 'desc' }] : { createdAt: 'desc' }, take: 200, select: SELECT })
   const names = await shopifyNames(rows.map(r => r.id))
   const grouped = {}
   for (const s of DESIGN_STATUSES) grouped[LABEL[s]] = []
-  for (const o of rows) grouped[LABEL[o.designStatus] || o.designStatus].push(job(o, names.get(o.id)?.name, type))
+  for (const o of rows) grouped[LABEL[o.designStatus] || o.designStatus].push(job(o, names.get(o.id)?.name, type, links))
   for (const k of Object.keys(grouped)) if (!grouped[k].length) delete grouped[k]
   return { open: rows.length, pastDue: rows.filter(o => o.dueDate && daysLate(o.dueDate) > 0).length || undefined, byStatus: grouped }
 }
@@ -55,38 +56,39 @@ export const designTools = [
   {
     name: 'custom_orders_status',
     title: 'Custom orders status',
-    description: 'Every open custom order grouped by design status, with who has it, the due date, how many proofs are out, and the customer approval link.',
+    description: 'Every open custom order grouped by design status, with who has it, the due date, how many proofs are out, and the customer approval link (admins and people who approve designs; others see hasApprovalLink).',
     scope: 'read',
     readOnly: true,
     input: {},
-    handler: () => statusTool('custom'),
+    handler: (_args, { principal }) => statusTool('custom', principal),
   },
   {
     name: 'partner_orders_status',
     title: 'Partner orders status',
-    description: 'Every open race-partner design order grouped by design status, with who has it, how many options are out, and the partner\'s approval link.',
+    description: 'Every open race-partner design order grouped by design status, with who has it, how many options are out, and the partner\'s approval link (admins and people who approve designs; others see hasApprovalLink).',
     scope: 'read',
     readOnly: true,
     input: {},
-    handler: () => statusTool('race_partner'),
+    handler: (_args, { principal }) => statusTool('race_partner', principal),
   },
   {
     name: 'approval_link',
     title: 'Approval link',
-    description: 'The customer or partner approval portal link for a custom or partner order, by order number.',
+    description: 'The customer or partner approval portal link for a custom or partner order, by order number. The link itself only for admins and people who approve designs; anyone else learns whether there is one.',
     scope: 'read',
     readOnly: true,
     input: { orderNumber: z.string().max(40) },
-    async handler({ orderNumber }) {
+    async handler({ orderNumber }, { principal }) {
       const rows = (await findOrdersByNumber(orderNumber)).filter(o => ['custom', 'race_partner'].includes(o.trackstarOrderType))
       if (!rows.length) throw new ToolError(`No custom or partner order matching "${orderNumber}".`)
       const o = rows[0]
       const link = approvalUrl(o.approvalToken?.token)
+      const links = await mayHoldLinks(principal)
       return {
         orderNumber: displayNumber(o),
         designStatus: o.designStatus,
-        approvalLink: link,
-        note: link ? undefined : 'No portal yet: it is created when design starts or the first proof is sent.',
+        ...linkField('approvalLink', link, links),
+        note: !link ? 'No portal yet: it is created when design starts or the first proof is sent.' : (links ? undefined : 'The link is a credential, so this key does not get it. Ask an admin or whoever approves designs.'),
       }
     },
   },

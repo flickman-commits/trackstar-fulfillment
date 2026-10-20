@@ -11,6 +11,7 @@
 import { setCors } from '../_lib/auth.js'
 import { requireSalesRep, recordAudit } from '../_lib/users.js'
 import { scheduleSend, listScheduled, cancelScheduled, sendHeldNow } from '../../server/domain/sales/scheduled.js'
+import { publicMessage, publicStatus } from '../../server/domain/sales/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -37,21 +38,21 @@ export default async function handler(req, res) {
         await recordAudit({ actor, action: 'sales.schedule', summary: `Scheduled an email to ${scheduled.toEmail} for ${new Date(scheduled.sendAt).toISOString()}`, detail: { id: scheduled.id } })
         return res.status(200).json({ scheduled })
       } catch (e) {
-        return res.status(400).json({ error: e.message, problems: e.problems })
+        return res.status(publicStatus(e)).json({ error: publicMessage(e, 'Something went wrong with scheduled emails'), problems: e.problems })
       }
     }
     if (body.action === 'cancel') {
       try {
         return res.status(200).json({ scheduled: await cancelScheduled(String(body.id || ''), actor) })
       } catch (e) {
-        return res.status(400).json({ error: e.message })
+        return res.status(publicStatus(e)).json({ error: publicMessage(e, 'Something went wrong with scheduled emails') })
       }
     }
     if (body.action === 'send-now') {
       try {
         return res.status(200).json(await sendHeldNow(String(body.id || ''), actor))
       } catch (e) {
-        return res.status(400).json({ error: e.message })
+        return res.status(publicStatus(e)).json({ error: publicMessage(e, 'Something went wrong with scheduled emails') })
       }
     }
     return res.status(400).json({ error: 'Unknown action' })

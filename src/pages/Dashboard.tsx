@@ -6,7 +6,7 @@ import { ToastDot } from '@/components/BrandToaster'
 import { toastCard, toastStyle } from '@/lib/ui'
 import { Hash, Sparkles, Search, Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, Settings, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ChevronRight, ImagePlus, MessageSquareText, Send, Star, Users, CloudSun, Download, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, ArrowUpRight, KeyRound, Mail } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
-import { btnPrimary, btnDanger, inputBase, segment, segmentGroup } from '@/lib/ui'
+import { btnPrimary, inputBase, segment, segmentGroup } from '@/lib/ui'
 import ProofManager from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import BulkView from '@/components/bulk/BulkView'
@@ -34,6 +34,7 @@ import PhotoCropper from '@/components/PhotoCropper'
 import Linkify from '@/components/Linkify'
 import type { Capability } from '@/lib/roles'
 import LookupHealthPanel from '@/components/LookupHealthPanel'
+import ClearResearchCard from '@/components/ClearResearchCard'
 import OrderTags, { HoverTip } from '@/components/OrderTags'
 import { raceNotRunYet, showsRaceNotRun } from '@/lib/raceStatus'
 
@@ -914,8 +915,8 @@ export default function Dashboard() {
   const [showCompleted, setShowCompleted] = useState(false)
   // Header stat: share of standard orders out within 2 days, past 7 days (goal 100%).
   const [onTime, setOnTime] = useState<{ pct: number; n: number } | null>(null)
-  // And standard orders sent to production since midnight (New York). Read
-  // again every two minutes, so it climbs through the day and resets overnight.
+  // And standard orders sent to production in the last 24 hours. Read again
+  // every five minutes while the tab is visible.
   const [sentToday, setSentToday] = useState<{ count: number; byPerson: { name: string; count: number }[] } | null>(null)
   useEffect(() => {
     if (!can('settings.stats')) return
@@ -925,7 +926,7 @@ export default function Dashboard() {
         if (typeof d?.sentToday?.count === 'number') setSentToday({ count: d.sentToday.count, byPerson: d.sentToday.byPerson || [] })
       }).catch(() => {})
     read()
-    const t = setInterval(read, 120000)
+    const t = setInterval(() => { if (document.visibilityState === 'visible') read() }, 300_000)
     return () => clearInterval(t)
   }, [can])
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -946,7 +947,6 @@ export default function Dashboard() {
   const settingsPanel: SettingsPanel = settingsPanelInUrl || visibleItems[0]?.id || 'account'
   const setSettingsPanel = (id: SettingsPanel) => goToSettings(`/settings/${id}`)
   const [settingsQuery, setSettingsQuery] = useState('')
-  const [settingsAction, setSettingsAction] = useState<string | null>(null)
   type HealthCheck = { status: 'ok' | 'warn' | 'error'; detail?: string | null; latency?: string }
   type HealthResults = { overall: string; checks: Record<string, HealthCheck>; error?: string }
   const [healthResults, setHealthResults] = useState<HealthResults | null>(null)
@@ -1425,38 +1425,10 @@ export default function Dashboard() {
       } catch { /* next tick */ }
     }
     check()
-    const t = setInterval(check, 60_000)
+    const t = setInterval(() => { if (document.visibilityState === 'visible') check() }, 60_000)
     return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const runSettingsAction = async (action: 'refresh-weather' | 'clear-research' | 'clear-race-cache') => {
-    setSettingsAction(action)
-    try {
-      // refresh-weather stays as its own endpoint; the others go through /actions
-      const isActionsEndpoint = action === 'clear-research' || action === 'clear-race-cache'
-      const url = isActionsEndpoint ? '/api/orders/actions' : `/api/orders/${action}`
-      const body = isActionsEndpoint ? { action } : {}
-      const response = await apiFetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      })
-      if (!response.ok) throw new Error(`Action failed (${response.status})`)
-      const data = await response.json()
-      const messages: Record<string, string> = {
-        'refresh-weather': `Weather refreshed for ${data.refreshed ?? 0} race(s)`,
-        'clear-research': `Cleared ${data.deleted ?? 0} research records - re-research to repopulate`,
-        'clear-race-cache': `Race info cache cleared for ${data.cleared ?? 0} race(s)`,
-      }
-      setToast({ message: messages[action], type: 'success' })
-      await fetchOrders()
-    } catch (error) {
-      setToast({ message: error instanceof Error ? error.message : 'Action failed', type: 'error' })
-    } finally {
-      setSettingsAction(null)
-    }
-  }
 
   // Fetch current customers served count
   const fetchCustomersServedCount = async () => {
@@ -2127,10 +2099,12 @@ export default function Dashboard() {
 
     // Poll to pick up external changes (customer approvals, etc.), but only
     // while someone is looking: a background tab polling all day was most of
-    // our Supabase egress. Coming back to the tab refreshes right away.
+    // our Supabase egress. Coming back to the tab refreshes right away, and
+    // new imports reload the list through the stamp check above, so this can
+    // be slow.
     const poll = setInterval(() => {
       if (document.visibilityState === 'visible') { fetchOrders() }
-    }, 60_000)
+    }, 120_000)
     const onVisible = () => { if (document.visibilityState === 'visible') { fetchOrders() } }
     document.addEventListener('visibilitychange', onVisible)
     return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
@@ -4198,24 +4172,7 @@ Thank you!`
                   {settingsPanel === 'maintenance' && isAdmin && (
                     <div className="space-y-4">
                 {/* Danger zone */}
-                <div>
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-red-700">Clear Runner Research</p>
-                        <p className="text-xs mt-0.5 text-red-500">Deletes cached bib, time, and pace data for orders that haven&apos;t been marked complete, sending them back to &quot;Ready to research&quot;. Completed orders keep their data. Use after fixing a scraper bug.</p>
-                      </div>
-                      <button
-                        onClick={() => runSettingsAction('clear-research')}
-                        disabled={settingsAction !== null}
-                        className={`${btnDanger} flex-shrink-0`}
-                      >
-                        {settingsAction === 'clear-research' && <Loader2 className="w-3 h-3 animate-spin" />}
-                        {settingsAction === 'clear-research' ? 'Running…' : 'Run'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <ClearResearchCard onDone={fetchOrders} />
                     </div>
                   )}
                   {settingsPanel === 'products' && isAdmin && <ProductsBulkEdit embedded />}

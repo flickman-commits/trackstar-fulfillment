@@ -10,7 +10,7 @@ import { btnPrimary, btnSecondary, btnGhost, inputBase, fieldLabel } from '@/lib
  * more than that person's role allows, narrowed by its scopes. Admin only;
  * every mint and revoke is in the Activity Log.
  */
-type Scope = 'read' | 'write' | 'admin' | 'repair'
+type Scope = 'read' | 'write' | 'admin' | 'repair' | 'worker'
 type ApiKey = {
   id: string; name: string; prefix: string; scopes: Scope[]; userId: string | null
   actsAs: { id: string; firstName: string; lastName: string; email: string; role: string; isActive: boolean } | null
@@ -19,6 +19,16 @@ type ApiKey = {
 type Person = { id: string; firstName: string; lastName: string }
 
 const MCP_URL = `${window.location.origin}/api/mcp`
+// What a key with no person may hold (SERVICE_SCOPES in api/_lib/apiKeys.js).
+const SERVICE_SCOPES: Scope[] = ['read', 'repair', 'worker']
+// New keys expire unless someone chooses otherwise; "never" is still a choice.
+const EXPIRY_CHOICES = [
+  { value: '30', label: '30 days' },
+  { value: '90', label: '90 days' },
+  { value: '180', label: '180 days' },
+  { value: '365', label: '1 year' },
+  { value: 'never', label: 'Never' },
+]
 
 function ago(iso: string | null) {
   if (!iso) return 'never'
@@ -157,7 +167,7 @@ function CreateKey({ people, scopes, onCancel, onCreated }: {
   const [name, setName] = useState('')
   const [userId, setUserId] = useState(people[0]?.id || '')
   const [picked, setPicked] = useState<Scope[]>(['read'])
-  const [expiresInDays, setExpiresInDays] = useState('')
+  const [expiresInDays, setExpiresInDays] = useState('90')
   const [busy, setBusy] = useState(false)
   const service = userId === ''
   const toggle = (s: Scope) => setPicked(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])
@@ -165,7 +175,7 @@ function CreateKey({ people, scopes, onCancel, onCreated }: {
   const create = async () => {
     setBusy(true)
     try {
-      const res = await apiFetch('/api/admin/api-keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, userId: userId || null, scopes: picked, expiresInDays: expiresInDays || null }) })
+      const res = await apiFetch('/api/admin/api-keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, userId: userId || null, scopes: picked, expiresInDays: expiresInDays === 'never' ? null : Number(expiresInDays) }) })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Could not create the key')
       onCreated(d)
@@ -181,9 +191,9 @@ function CreateKey({ people, scopes, onCancel, onCreated }: {
         </div>
         <div>
           <label className={fieldLabel}>Acts as</label>
-          <select value={userId} onChange={e => { setUserId(e.target.value); if (!e.target.value) setPicked(p => p.filter(s => s === 'read' || s === 'repair')) }} className={`${inputBase} w-full`}>
+          <select value={userId} onChange={e => { setUserId(e.target.value); if (!e.target.value) setPicked(p => p.filter(s => SERVICE_SCOPES.includes(s))) }} className={`${inputBase} w-full`}>
             {people.map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
-            <option value="">Service key (no person; read or repair only)</option>
+            <option value="">Service key (no person; read, repair or render worker only)</option>
           </select>
         </div>
       </div>
@@ -191,7 +201,7 @@ function CreateKey({ people, scopes, onCancel, onCreated }: {
         <label className={fieldLabel}>Scopes</label>
         <div className="space-y-1.5">
           {scopes.map(s => {
-            const off = service && s.id !== 'read' && s.id !== 'repair'
+            const off = service && !SERVICE_SCOPES.includes(s.id)
             return (
               <label key={s.id} className={`flex items-center gap-2 text-xs ${off ? 'opacity-40' : ''}`}>
                 <input type="checkbox" checked={picked.includes(s.id)} disabled={off} onChange={() => toggle(s.id)} className="accent-off-black" />
@@ -202,8 +212,11 @@ function CreateKey({ people, scopes, onCancel, onCreated }: {
         </div>
       </div>
       <div className="w-48">
-        <label className={fieldLabel}>Expires in (days, optional)</label>
-        <input type="number" min={1} max={730} value={expiresInDays} onChange={e => setExpiresInDays(e.target.value)} placeholder="Never" className={`${inputBase} w-full`} />
+        <label className={fieldLabel}>Expires</label>
+        <select value={expiresInDays} onChange={e => setExpiresInDays(e.target.value)} className={`${inputBase} w-full`}>
+          {EXPIRY_CHOICES.map(c => <option key={c.value} value={c.value}>{c.value === 'never' ? c.label : `In ${c.label}`}</option>)}
+        </select>
+        {expiresInDays === 'never' && <p className="mt-1 text-[11px] text-off-black/50">A key that never expires keeps working until someone revokes it here.</p>}
       </div>
       <div className="flex items-center gap-2">
         <button onClick={create} disabled={busy || !name.trim() || !picked.length} className={btnPrimary}>{busy && <Loader2 className="w-3 h-3 animate-spin" />} Create key</button>

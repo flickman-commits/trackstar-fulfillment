@@ -17,6 +17,7 @@
  * parser in a loop is exactly how that happens again.
  */
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { isIP } from 'node:net'
 import { getScraperForRace } from '../scrapers/index.js'
 import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
 import { checkRateLimitDurable } from './publicRateLimit.js'
@@ -45,11 +46,42 @@ const TRACE_TIMEOUT_MS = 60_000
 const BODY_LIMIT = 6000
 const FIND_WINDOW = 800
 const MAX_FIND_HITS = 5
+const MAX_REDIRECTS = 3
+const FETCH_TIMEOUT_MS = 20_000
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
 function allowedHost(hostname) {
-  const extra = String(process.env.TIMING_HOSTS_EXTRA || '').split(',').map(h => h.trim()).filter(Boolean)
+  const extra = String(process.env.TIMING_HOSTS_EXTRA || '').split(',').map(h => h.trim().toLowerCase()).filter(Boolean)
   const host = hostname.toLowerCase()
   return [...TIMING_HOSTS, ...extra].some(h => host === h || host.endsWith(`.${h}`))
+}
+
+/** Names that only ever mean a machine on our side of the network. */
+function privateName(host) {
+  return host === 'localhost' || /\.(localhost|internal|local|lan|home|corp)$/.test(host) || !host.includes('.')
+}
+
+/**
+ * Why a URL may not be fetched, or null when it may. Checked on the first URL
+ * and again on every redirect, so an allowed host cannot bounce the request
+ * somewhere else.
+ */
+export function urlRefusal(parsed) {
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return 'Only http(s) URLs.'
+  if (parsed.username || parsed.password) return 'URLs with credentials in them are refused.'
+  if (parsed.port && parsed.port !== '80' && parsed.port !== '443') return 'Only the standard ports (80 and 443).'
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '')
+  if (isIP(host)) return 'IP addresses are refused; use the timing site\'s host name.'
+  if (privateName(host)) return `${host} is a private name, not a timing site.`
+  if (!allowedHost(host)) return `${host} is not a known timing host. Add it to TIMING_HOSTS_EXTRA in Vercel if it is a new platform.`
+  return null
+}
+
+/** A short, fixed reason for a failed request. The error itself goes to the log. */
+function fetchFailure(err) {
+  if (err?.name === 'TimeoutError') return 'The request timed out.'
+  const code = err?.cause?.code || err?.code
+  return code && /^[A-Z_]{3,30}$/.test(code) ? `The request failed (${code}).` : 'The request failed.'
 }
 
 /** Shorten JSON by keeping the first few items of every array. */
@@ -142,7 +174,7 @@ function installRecorder() {
       })
       return resp
     } catch (err) {
-      log.push({ method, url, ms: Date.now() - started, error: err.message })
+      log.push({ method, url, ms: Date.now() - started, error: fetchFailure(err) })
       throw err
     }
   }
@@ -181,7 +213,8 @@ export async function traceScraper({ race, year, name, find = null }) {
   try {
     scraper = getScraperForRace(race, year)
   } catch (err) {
-    return { ok: false, error: `No scraper for ${race} ${year}: ${err.message}` }
+    console.warn(`[scraperTrace] no scraper for ${race} ${year}:`, err?.message)
+    return { ok: false, error: `No scraper is configured for ${race} ${year}.` }
   }
 
   const log = []
@@ -194,7 +227,10 @@ export async function traceScraper({ race, year, name, find = null }) {
         new Promise((_, reject) => setTimeout(() => reject(new Error(`search exceeded ${TRACE_TIMEOUT_MS}ms`)), TRACE_TIMEOUT_MS)),
       ])
     } catch (err) {
-      error = err.message
+      console.error(`[scraperTrace] ${race} ${year} search failed:`, err)
+      error = err?.name === 'TimeoutError' || /exceeded \d+ms/.test(String(err?.message))
+        ? `The search took longer than ${TRACE_TIMEOUT_MS / 1000}s.`
+        : `The scraper threw an error${err?.name && /^[A-Za-z]{1,40}$/.test(err.name) ? ` (${err.name})` : ''}; the details are in the server log. Read the exchanges for what the site sent back.`
     }
   })
 
@@ -225,27 +261,22 @@ export async function traceScraper({ race, year, name, find = null }) {
   }
 }
 
-/** Fetch one URL on a timing host and return a readable version of it. */
-export async function fetchTimingPage({ url, find = null, method = 'GET', body = null, contentType = null }) {
+/**
+ * Fetch one URL on a timing host and return a readable version of it.
+ * Redirects are followed by hand, at most MAX_REDIRECTS, and each hop is held
+ * to the same rules as the first URL. The second argument is for tests.
+ */
+export async function fetchTimingPage({ url, find = null, method = 'GET', body = null, contentType = null }, { fetchImpl = fetchWithTimeout, rateLimit = checkRateLimitDurable } = {}) {
   let parsed
   try {
     parsed = new URL(url)
   } catch {
     return { ok: false, error: 'Not a valid URL.' }
   }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return { ok: false, error: 'Only http(s) URLs.' }
-  if (!allowedHost(parsed.hostname)) {
-    return { ok: false, error: `${parsed.hostname} is not a known timing host. Add it to TIMING_HOSTS_EXTRA in Vercel if it is a new platform.` }
-  }
-  const verb = String(method).toUpperCase()
+  const refused = urlRefusal(parsed)
+  if (refused) return { ok: false, error: refused }
+  let verb = String(method).toUpperCase()
   if (verb !== 'GET' && verb !== 'POST') return { ok: false, error: 'Only GET and POST.' }
-
-  const limit = await checkRateLimitDurable(parsed.hostname, {
-    bucket: 'timing-fetch', max: PER_HOST_PER_HOUR, windowMs: HOUR,
-  })
-  if (!limit.allowed) {
-    return { ok: false, error: `${PER_HOST_PER_HOUR} fetches to ${parsed.hostname} this hour already. Back off this host; retry in ${Math.ceil(limit.retryAfterMs / 60000)} min.` }
-  }
 
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
@@ -253,18 +284,54 @@ export async function fetchTimingPage({ url, find = null, method = 'GET', body =
   }
   if (contentType) headers['Content-Type'] = contentType
 
+  const budgeted = new Set()
   const started = Date.now()
-  try {
-    const resp = await fetchWithTimeout(url, {
-      method: verb, headers, body: verb === 'POST' && body ? String(body) : undefined, redirect: 'follow',
-    }, 20_000)
-    const text = await resp.text()
-    const type = resp.headers.get('content-type') || ''
-    return {
-      ok: resp.ok, status: resp.status, finalUrl: resp.url, contentType: type,
-      ms: Date.now() - started, ...readableBody(text, type, { find }),
+  let sendBody = verb === 'POST' && body ? String(body) : undefined
+  for (let hop = 0; ; hop++) {
+    const host = parsed.hostname.toLowerCase()
+    if (!budgeted.has(host)) {
+      const limit = await rateLimit(host, { bucket: 'timing-fetch', max: PER_HOST_PER_HOUR, windowMs: HOUR })
+      if (!limit.allowed) {
+        return { ok: false, error: `${PER_HOST_PER_HOUR} fetches to ${host} this hour already. Back off this host; retry in ${Math.ceil(limit.retryAfterMs / 60000)} min.` }
+      }
+      budgeted.add(host)
     }
-  } catch (err) {
-    return { ok: false, ms: Date.now() - started, error: err.message }
+
+    let resp
+    try {
+      resp = await fetchImpl(parsed.href, { method: verb, headers, body: sendBody, redirect: 'manual' }, FETCH_TIMEOUT_MS)
+    } catch (err) {
+      console.warn(`[scraperTrace] fetch ${parsed.href} failed:`, err?.message)
+      return { ok: false, ms: Date.now() - started, error: fetchFailure(err) }
+    }
+
+    const location = REDIRECT_STATUSES.has(resp.status) ? resp.headers.get('location') : null
+    if (location) {
+      if (hop >= MAX_REDIRECTS) return { ok: false, status: resp.status, error: `More than ${MAX_REDIRECTS} redirects; stopped at ${parsed.href}.` }
+      let next
+      try { next = new URL(location, parsed) } catch { return { ok: false, status: resp.status, error: 'The site redirected to an invalid URL.' } }
+      const why = urlRefusal(next)
+      if (why) return { ok: false, status: resp.status, error: `The site redirected somewhere this will not follow: ${why}` }
+      // As browsers do: 303, and a 301 or 302 after a POST, become a GET with no body.
+      if (resp.status === 303 || ((resp.status === 301 || resp.status === 302) && verb === 'POST')) {
+        verb = 'GET'
+        sendBody = undefined
+        delete headers['Content-Type']
+      }
+      parsed = next
+      continue
+    }
+
+    try {
+      const text = await resp.text()
+      const type = resp.headers.get('content-type') || ''
+      return {
+        ok: resp.ok, status: resp.status, finalUrl: parsed.href, redirects: hop || undefined, contentType: type,
+        ms: Date.now() - started, ...readableBody(text, type, { find }),
+      }
+    } catch (err) {
+      console.warn(`[scraperTrace] reading ${parsed.href} failed:`, err?.message)
+      return { ok: false, status: resp.status, ms: Date.now() - started, error: fetchFailure(err) }
+    }
   }
 }

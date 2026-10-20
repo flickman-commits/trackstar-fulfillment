@@ -48,6 +48,21 @@ function SalesHead() {
 /** How old the queue can get, while you were on another page, before coming back reads it again (quietly). */
 const STALE_MS = 10 * 60_000
 
+/** A fresh key for one press of Send, so the server sends it once however often the request arrives. */
+function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
+/** The callback's fixed reason codes, in words. It never sends an error's own text. */
+const GMAIL_REASONS: Record<string, string> = {
+  state: 'the connection expired or was started in another browser. Press Connect Gmail again.',
+  wrong_account: 'that Google account is not the email you sign in here with. Connect the Gmail for your own address.',
+  no_refresh_token: 'Google did not give a lasting connection. Remove the app under Google Account > Security > Third-party access, then connect again.',
+  no_user: 'your account was not found. Sign in again.',
+  failed: 'something went wrong. Try again, and tell Matt if it keeps happening.',
+}
+
 /**
  * `active` is false while Sales is kept alive in the background (App.tsx):
  * it stays mounted so the queue, open drafts and selection survive a trip to
@@ -112,7 +127,7 @@ export default function Sales({ active = true }: { active?: boolean }) {
     if (!g) return
     if (g === 'connected') toast.success(`Gmail connected${params.get('account') ? ` as ${params.get('account')}` : ''}`)
     else if (g === 'denied') toast.error('Gmail connection was cancelled')
-    else toast.error(`Gmail connection failed: ${params.get('reason') || 'unknown error'}`)
+    else toast.error(`Gmail connection failed: ${GMAIL_REASONS[params.get('reason') || ''] || GMAIL_REASONS.failed}`, { duration: 10000 })
     navigate('/sales', { replace: true })
   }, [location.search, navigate])
 
@@ -274,7 +289,10 @@ export default function Sales({ active = true }: { active?: boolean }) {
     const assetIds = attachedAssets.map(a => a.id)
     const isAdhoc = Boolean(adhoc)
     const free = deal.id.startsWith('adhoc:')
-    const payload = { dealId: deal.id, personId: person.id, subject: v.subject, body: v.body, assetIds, adhoc: isAdhoc }
+    // One key per press of Send: a retry or a double fire of the same send is refused by the server.
+    const idempotencyKey = newIdempotencyKey()
+    const payload = { dealId: deal.id, personId: person.id, subject: v.subject, body: v.body, assetIds, adhoc: isAdhoc, idempotencyKey }
+    const freePayload = { to: person.email as string, subject: v.subject, body: v.body, assetIds, idempotencyKey }
     const id = deal.id
     const first = person.firstName || person.fullName
     const undo = today?.undoSeconds ?? 10
@@ -284,7 +302,7 @@ export default function Sales({ active = true }: { active?: boolean }) {
 
     const fire = async () => {
       try {
-        const r = free ? await salesApi.sendTo({ to: person.email as string, subject: v.subject, body: v.body, assetIds }) : await salesApi.send(payload)
+        const r = free ? await salesApi.sendTo(freePayload) : await salesApi.send(payload)
         toast.success(`Sent to ${first}`)
         noteSync(r.sync)
         setPrepared(prev => { const n = { ...prev }; delete n[id]; return n })

@@ -13,7 +13,7 @@ import { recordAudit } from '../_lib/users.js'
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
   // The person saving: race date and weather edits are logged under their name.
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
 
   if (req.method !== 'POST') {
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { orderNumber, yearOverride, raceNameOverride, runnerNameOverride, raceId, weatherTemp, weatherCondition, raceDate, raceAction, raceData,
+    const { orderNumber, yearOverride, raceNameOverride, runnerNameOverride, raceId: rawRaceId, weatherTemp, weatherCondition, raceDate, raceAction, raceData,
       // Manual corrections to the result itself. Elí sometimes needs to use the
       // runner's own watch time rather than the official one we scraped.
       bibNumber, officialTime, officialPace,
@@ -35,6 +35,9 @@ export default async function handler(req, res) {
       // A custom order's approval email: where the proof links go (the buyer
       // may want them sent to the runner, or used a typo'd address).
       approvalEmail } = req.body
+    // Race ids are integers; a string here used to surface as a Prisma error.
+    const raceId = rawRaceId == null || rawRaceId === '' ? rawRaceId : Number(rawRaceId)
+    if (raceId != null && raceId !== '' && !Number.isInteger(raceId)) return res.status(400).json({ error: 'raceId must be a number' })
 
     // Race-specific operations (no orderNumber required)
     if (raceAction === 'update' && raceId) {
@@ -278,7 +281,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(500).json({
-      error: error.message
+      error: 'Something went wrong. Try again, and tell Matt if it keeps happening.'
     })
   }
 }

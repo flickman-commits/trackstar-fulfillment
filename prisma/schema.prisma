@@ -754,6 +754,10 @@ model User {
   // before roles reads as designer.
   role         String    @default("designer")
   isActive     Boolean   @default(true)
+  // Bumped to sign this person out everywhere: on deactivation, a password
+  // change or reset, or an admin's "Sign out everywhere". Carried in the
+  // session cookie and compared on every request (api/_lib/auth.js).
+  sessionVersion Int     @default(0)
   // Invite flow: a single-use token that lets someone set their first password.
   inviteToken     String?   @unique
   inviteExpiresAt DateTime?

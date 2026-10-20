@@ -1,5 +1,7 @@
 // One-off: create a fake CUSTOM order for portal testing (matt@flickmanmedia.com)
-// Run: node --env-file=.env scripts/seed-fake-order.mjs
+// Run: node --env-file=.env scripts/seed-fake-order.mjs --apply
+// Without --apply it only says what it would do: .env points at the
+// production database, like every script here (scripts/README.md).
 import { PrismaClient } from '@prisma/client'
 import crypto from 'crypto'
 
@@ -8,7 +10,13 @@ const prisma = new PrismaClient()
 const PARENT = 'TEST-9001'
 const EMAIL = 'matt@flickmanmedia.com'
 
+const APPLY = process.argv.includes('--apply')
+
 async function main() {
+  if (!APPLY) {
+    console.log(`Dry run: would replace test order ${PARENT} (custom, for ${EMAIL}) in the database .env points at. Run again with --apply.`)
+    return
+  }
   // Clean up any prior run so this is idempotent
   const prior = await prisma.order.findFirst({ where: { parentOrderNumber: PARENT } })
   if (prior) {

@@ -13,6 +13,7 @@ import { getSettings, setSettings, DEFAULTS, getSenderFor, setSenderFor } from '
 import { checkAttio } from '../../server/domain/sales/attio.js'
 import { getTemplates, setTemplate, templateSteps, DEFAULT_TEMPLATES } from '../../server/domain/sales/templates.js'
 import { TEMPLATE_PLACEHOLDERS } from '../../server/domain/sales/angles.js'
+import { publicMessage, publicStatus } from '../../server/domain/sales/errors.js'
 
 const EDITABLE = ['dailyCap', 'sender', 'socialProof', 'signature', 'timezone', 'undoSeconds']
 
@@ -50,6 +51,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ settings })
   } catch (error) {
     console.error('[API /sales/settings]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'Could not save the Sales settings') })
   }
 }

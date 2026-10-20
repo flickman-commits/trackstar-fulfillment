@@ -17,12 +17,13 @@ import { complete, isLlmConfigured } from '../../lib/llm.js'
 import { cadenceFor, HOUSE_STYLE, CHARITY_RULES, DEFAULT_SOCIAL_PROOF, templateFor, fillTemplate, greetingName, RACE_ONE_LINERS } from './angles.js'
 import { loadWorkspace } from './sequences.js'
 import { sendMessage, gmailStatus, lineToHtml } from './gmail.js'
-import { readAsset, isAssetStorageConfigured } from './assets.js'
-import { getSettings, getSenderFor } from './settings.js'
+import { readAsset, isAssetStorageConfigured, isSalesAssetId } from './assets.js'
+import { getSettings, getSenderFor, startOfToday } from './settings.js'
 import { getTemplates } from './templates.js'
 import { recordSend } from './attio.js'
 import { dealForWork, nextStepFor, pipelineOf } from './queue.js'
-import { draftProblems, NO_DASHES } from './guardrails.js'
+import { draftProblems, basicProblems } from './guardrails.js'
+import { UserError } from './errors.js'
 
 const VARIANT_COUNT = 5
 
@@ -195,7 +196,7 @@ export async function draftVariants({ dealId, personId, useTemplate = false, act
   const library = workspace.templates
   const variables = workspace.variables
   const person = (personId && deal.people.find(p => p.id === personId)) || deal.person
-  if (!person) throw new Error('This deal has nobody to write to. Add a person to it in Attio.')
+  if (!person) throw new UserError('This deal has nobody to write to. Add a person to it in Attio.')
   const { touchNumber, step, exhausted } = nextStepFor(deal)
   // Social Proof is a variable now; the old setting is only a fallback.
   const socialProof = variables.find(v => v.name.toLowerCase() === 'social proof')?.value || settings.socialProof || DEFAULT_SOCIAL_PROOF
@@ -220,7 +221,7 @@ export async function draftVariants({ dealId, personId, useTemplate = false, act
     }))
   } catch (err) {
     console.warn(`[sales.draft] model failed (${err.message}); falling back to the template`)
-    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender, templates, library, variables })], model: 'template', source: 'template', warning: `Wrote this from the template: ${err.message}` }
+    return { ...base, variants: [buildTemplate(deal, person, step, { socialProof, sender, templates, library, variables })], model: 'template', source: 'template', warning: 'Wrote this from the template: the model did not answer.' }
   }
 
   const raw = Array.isArray(json?.variants) ? json.variants : Array.isArray(json) ? json : []
@@ -228,7 +229,7 @@ export async function draftVariants({ dealId, personId, useTemplate = false, act
     .map(v => ({ subject: String(v.subject || '').trim(), body: String(v.body || '').trim() }))
     .filter(v => v.subject && v.body)
     .slice(0, VARIANT_COUNT)
-  if (!variants.length) throw new Error('The model returned no usable variants')
+  if (!variants.length) throw new UserError('The model returned no usable variants')
   return { ...base, variants, model: `${provider}/${model}`, source: 'model' }
 }
 
@@ -238,7 +239,7 @@ export async function draftVariants({ dealId, personId, useTemplate = false, act
  * result the same as any other draft before it can go.
  */
 export async function reviseDraft({ dealId, subject, body, instruction, actor }) {
-  if (!isLlmConfigured()) throw new Error('No model is configured. Edit the draft by hand.')
+  if (!isLlmConfigured()) throw new UserError('No model is configured. Edit the draft by hand.')
   const deal = await dealForWork(dealId)
   const { touchNumber, step } = nextStepFor(deal)
   const sender = await getSenderFor(actor?.id, actor)
@@ -261,7 +262,7 @@ export async function reviseDraft({ dealId, subject, body, instruction, actor })
     purpose: 'sales.revise',
   })
   const out = { subject: String(json?.subject || subject).trim(), body: String(json?.body || '').trim() }
-  if (!out.body) throw new Error('The model returned nothing usable')
+  if (!out.body) throw new UserError('The model returned nothing usable')
   return { ...out, model: `${provider}/${model}` }
 }
 
@@ -272,6 +273,30 @@ export async function reviseDraft({ dealId, subject, body, instruction, actor })
  */
 export function requiresImage(pipeline, touchNumber) {
   return pipeline === 'CHARITY' && touchNumber === 1
+}
+
+/**
+ * The attachment ids the page sent, each one checked to be a file in the
+ * sales library. The ids come from the browser, and storage can read every
+ * bucket the project has, so anything else is refused, not skipped.
+ */
+export function libraryIds(assetIds) {
+  const ids = [...new Set((assetIds || []).map(String).filter(Boolean))]
+  if (ids.some(id => !isSalesAssetId(id))) throw new UserError('One of the attachments is not in the sales library. Remove it and drag it in from the library again.')
+  return ids
+}
+
+/**
+ * The daily cap, held here and not only on the page: how many emails this
+ * rep has sent today, against the workspace cap. Raise the cap in Settings
+ * to send more.
+ */
+export async function assertUnderDailyCap(actor) {
+  const settings = await getSettings()
+  const sent = await prisma.salesSend.count({ where: { sentById: actor.id, sentAt: { gte: startOfToday(settings.timezone) } } })
+  if (sent >= settings.dailyCap) {
+    throw new UserError(`That is ${settings.dailyCap} for today, the workspace cap. Raise it in Settings if you mean to send more.`)
+  }
 }
 
 /**
@@ -286,31 +311,32 @@ export function requiresImage(pipeline, touchNumber) {
  * a person chose to write and knows what comes next.
  */
 export async function sendDraft({ dealId, personId, subject, body, assetIds = [], actor, adhoc = false }) {
-  if (!actor?.id) throw new Error('Sending needs a signed-in person with a connected Gmail')
-  if (!subject?.trim() || !body?.trim()) throw new Error('Subject and body are required')
+  if (!actor?.id) throw new UserError('Sending needs a signed-in person with a connected Gmail')
+  if (!subject?.trim() || !body?.trim()) throw new UserError('Subject and body are required')
   const deal = await dealForWork(dealId, { fresh: true })
   const person = (personId && deal.people.find(p => p.id === personId)) || deal.person
-  if (!person) throw new Error('This deal has nobody to write to')
-  if (!person.email) throw new Error(`${person.fullName || 'This person'} has no email address in Attio`)
+  if (!person) throw new UserError('This deal has nobody to write to')
+  if (!person.email) throw new UserError(`${person.fullName || 'This person'} has no email address in Attio`)
   if (!adhoc && !['Not Contacted', 'Needs Enrichment', 'Reached Out'].includes(deal.stage)) {
-    throw new Error(`${deal.name} is at ${deal.stage}. The sequence only runs up to Reached Out; use New email to write to them.`)
+    throw new UserError(`${deal.name} is at ${deal.stage}. The sequence only runs up to Reached Out; use New email to write to them.`)
   }
 
   const status = await gmailStatus(actor.id)
-  if (!status.connected) throw new Error('Gmail is not connected. Open Settings and press Connect Gmail.')
+  if (!status.connected) throw new UserError('Gmail is not connected. Open Settings and press Connect Gmail.')
 
   const { touchNumber: nextTouch, step, exhausted } = nextStepFor(deal)
-  if (exhausted && !adhoc) throw new Error(`${deal.name} has finished its sequence. Change its stage in Attio instead of sending another touch.`)
+  if (exhausted && !adhoc) throw new UserError(`${deal.name} has finished its sequence. Change its stage in Attio instead of sending another touch.`)
   // Past the cadence, an ad hoc email still counts as one more touch.
   const touchNumber = exhausted ? deal.touchCount + 1 : nextTouch
   const pipeline = pipelineOf(deal)
 
   const problems = draftProblems({ subject, body }, { pipeline, touchNumber, companyName: deal.name })
-  if (problems.length) {
-    const err = new Error(problems[0])
-    err.problems = problems
-    throw err
-  }
+  if (problems.length) throw new UserError(problems[0], { problems })
+  const ids = libraryIds(assetIds)
+  // The cap is on starting conversations, as on the Sales page: the day's
+  // sends fill it, but only a first touch is held back by it. Follow-ups and
+  // one-off emails are never capped.
+  if (touchNumber === 1 && !adhoc) await assertUnderDailyCap(actor)
 
   // Follow-ups reply in the thread of the first send when the step says so.
   let threadId = null
@@ -327,7 +353,6 @@ export async function sendDraft({ dealId, personId, subject, body, assetIds = []
   const attachments = []
   const attached = []
   if (isAssetStorageConfigured()) {
-    const ids = [...new Set((assetIds || []).map(String).filter(Boolean))]
     for (const id of ids) {
       const a = await readAsset(id)
       attachments.push(a)
@@ -335,10 +360,10 @@ export async function sendDraft({ dealId, personId, subject, body, assetIds = []
     }
   }
   if (requiresImage(pipeline, touchNumber) && !attachments.some(a => a.inline)) {
-    throw new Error('A charity first touch has to carry a co-branded example. Drag one in from the library, then send again.')
+    throw new UserError('A charity first touch has to carry a co-branded example. Drag one in from the library, then send again.')
   }
   const total = attachments.reduce((n, a) => n + a.bytes.length, 0)
-  if (total > 18 * 1024 * 1024) throw new Error('Attachments add up to more than 18 MB, which Gmail will bounce. Drop one.')
+  if (total > 18 * 1024 * 1024) throw new UserError('Attachments add up to more than 18 MB, which Gmail will bounce. Drop one.')
 
   const sender = await getSenderFor(actor.id, actor)
   const html = composeHtml(body, { signature: sender.signature, senderName: sender.name })
@@ -385,25 +410,28 @@ export async function sendDraft({ dealId, personId, subject, body, assetIds = []
  * A one-off email to an address with no deal behind it. Same mailbox, same
  * signature, same attachments and undo; logged so "sent today" is right;
  * nothing written to Attio because there is nothing to write it to. The
- * house rule on dashes still holds; the pipeline rules do not, since this
- * is not a cadence email.
+ * basic rules still hold (no dashes, no blank left from a template) and so
+ * does the daily cap; the pipeline rules do not, since this is not a
+ * cadence email.
  */
 export async function sendFree({ to, subject, body, assetIds = [], actor }) {
-  if (!actor?.id) throw new Error('Sending needs a signed-in person with a connected Gmail')
+  if (!actor?.id) throw new UserError('Sending needs a signed-in person with a connected Gmail')
   const address = String(to || '').trim()
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new Error('That is not an email address')
-  if (!subject?.trim() || !body?.trim()) throw new Error('Subject and body are required')
-  if (NO_DASHES.test(subject) || NO_DASHES.test(body)) throw new Error('No em or en dashes. Use a comma or a full stop.')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new UserError('That is not an email address')
+  if (!subject?.trim() || !body?.trim()) throw new UserError('Subject and body are required')
+  const problems = basicProblems({ subject, body })
+  if (problems.length) throw new UserError(problems[0], { problems })
+  const ids = libraryIds(assetIds)
   const status = await gmailStatus(actor.id)
-  if (!status.connected) throw new Error('Gmail is not connected. Open Settings and press Connect Gmail.')
+  if (!status.connected) throw new UserError('Gmail is not connected. Open Settings and press Connect Gmail.')
 
   const attachments = []
   const attached = []
-  for (const id of [...new Set((assetIds || []).map(String).filter(Boolean))]) {
+  for (const id of ids) {
     if (!isAssetStorageConfigured()) break
     attachments.push(await readAsset(id)); attached.push(id)
   }
-  if (attachments.reduce((n, a) => n + a.bytes.length, 0) > 18 * 1024 * 1024) throw new Error('Attachments add up to more than 18 MB, which Gmail will bounce. Drop one.')
+  if (attachments.reduce((n, a) => n + a.bytes.length, 0) > 18 * 1024 * 1024) throw new UserError('Attachments add up to more than 18 MB, which Gmail will bounce. Drop one.')
 
   const sender = await getSenderFor(actor.id, actor)
   const html = composeHtml(body, { signature: sender.signature, senderName: sender.name })

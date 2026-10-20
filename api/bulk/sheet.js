@@ -14,7 +14,7 @@ import { sheetRows, sheetProblems, SHEET_COLUMNS } from '../../server/domain/bul
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -43,6 +43,6 @@ export default async function handler(req, res) {
     return res.status(200).send(buf)
   } catch (error) {
     console.error('[API /bulk/sheet]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: 'Something went wrong. Try again, and tell Matt if it keeps happening.' })
   }
 }

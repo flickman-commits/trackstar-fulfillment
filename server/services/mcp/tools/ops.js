@@ -4,6 +4,7 @@
  */
 import { z } from 'zod'
 import prisma from '../../../../api/_lib/prisma.js'
+import { ToolError } from '../server.js'
 import { buildCatalogCoverage, coveredYears } from '../../../lib/scraperHealth.js'
 import { getSupportedRaces, getVerifiedRaceDates, getRaceConfigSummaries } from '../../../scrapers/index.js'
 import { NIGHTLY_REPORT_KEY } from '../../nightlySweep.js'
@@ -112,6 +113,7 @@ export const opsTools = [
     title: 'Verify a race date',
     description: 'Record a race year\'s date with the evidence it was confirmed against: the official site, the results page, or a race-day report. Never a date worked out from a pattern. Also sets the location if the race has none and computes the weather for the date. Changing a date that has already been printed needs a reason.',
     scope: 'write',
+    adminOnly: true,
     readOnly: false,
     input: {
       raceId: z.number().int().describe('The Race row id, from race_data_blockers'),
@@ -122,12 +124,17 @@ export const opsTools = [
       reason: z.string().max(300).optional().describe('Required when changing a date that has already been printed'),
     },
     async handler({ raceId, date, sourceUrl, evidence, location, reason }, { principal }) {
+      // Dates are printed on every order for the race, so recording one is an admin call.
+      if (principal?.role !== 'admin' || !principal?.user) throw new ToolError('Only an admin can verify a race date.')
       const by = principal?.user ? principal.user.id : (principal?.name || 'nightly')
       const race = await setRaceDate({ raceId, date, source: 'researched', sourceUrl, evidence, by, reason, actor: principal?.user || null })
       if (location && !race.location) await prisma.race.update({ where: { id: race.id }, data: { location: String(location).slice(0, 80) } })
       let weather = null, weatherError = null
       try { const w = await computeRaceWeather(race.id, { by, reason, actor: principal?.user || null }); weather = `${w.weatherCondition} ${w.weatherTemp}` }
-      catch (e) { weatherError = e.message }
+      catch (e) {
+        console.error(`[mcp] verify_race_date: weather for race ${race.id} failed:`, e)
+        weatherError = 'The date is saved, but the weather could not be computed. Check the race has a location, then try confirm_weather or ask Matt to check the logs.'
+      }
       return { summary: `Verified ${race.raceName} ${race.year} as ${date} (${sourceUrl})${weather ? `; weather ${weather}` : ''}`, raceId: race.id, date, source: 'researched', weather, weatherError }
     },
   },

@@ -13,6 +13,7 @@
  */
 import prisma from '../../db.js'
 import { refreshThread, mailboxEmail } from './mailbox.js'
+import { UserError } from './errors.js'
 
 function actorName(actor) {
   return [actor?.firstName, actor?.lastName].filter(Boolean).join(' ') || 'Someone'
@@ -20,16 +21,16 @@ function actorName(actor) {
 
 export async function mergeThreads(targetId, sourceIds, actor) {
   const ids = [...new Set((sourceIds || []).map(String))].filter(id => id && id !== targetId)
-  if (!ids.length) throw new Error('Nothing to merge')
+  if (!ids.length) throw new UserError('Nothing to merge')
   const target = await prisma.supportThread.findUnique({ where: { id: targetId } })
-  if (!target) throw new Error('No such conversation')
-  if (target.mergedIntoId) throw new Error('This conversation was merged into another; open that one')
+  if (!target) throw new UserError('No such conversation')
+  if (target.mergedIntoId) throw new UserError('This conversation was merged into another; open that one')
   const sources = await prisma.supportThread.findMany({ where: { id: { in: ids } }, include: { _count: { select: { messages: true } } } })
-  if (sources.length !== ids.length) throw new Error('One of those conversations is gone')
+  if (sources.length !== ids.length) throw new UserError('One of those conversations is gone')
   for (const s of sources) {
-    if (s.mergedIntoId) throw new Error(`"${s.subject}" was already merged`)
-    if (s.channel !== 'email' || target.channel !== 'email') throw new Error('Only email conversations can be merged')
-    if ((s.customerEmail || '').toLowerCase() !== (target.customerEmail || '').toLowerCase()) throw new Error('Only conversations with the same customer can be merged')
+    if (s.mergedIntoId) throw new UserError(`"${s.subject}" was already merged`)
+    if (s.channel !== 'email' || target.channel !== 'email') throw new UserError('Only email conversations can be merged')
+    if ((s.customerEmail || '').toLowerCase() !== (target.customerEmail || '').toLowerCase()) throw new UserError('Only conversations with the same customer can be merged')
   }
 
   const by = actorName(actor)

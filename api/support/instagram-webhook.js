@@ -16,7 +16,7 @@
  */
 import crypto from 'crypto'
 import { safeEqual } from '../_lib/auth.js'
-import { parseWebhook, importMessage } from '../../server/domain/support/instagram.js'
+import { parseWebhook, importMessage, ourIds } from '../../server/domain/support/instagram.js'
 
 /** Vercel must hand us the raw bytes; the signature is over them, not over re-serialised JSON. */
 export const config = { api: { bodyParser: false } }
@@ -66,7 +66,10 @@ export default async function handler(req, res) {
   let body
   try { body = JSON.parse(raw.toString('utf8')) } catch { return res.status(400).json({ error: 'Bad JSON' }) }
 
-  const events = parseWebhook(body)
+  // Entries for any account other than the connected one are dropped.
+  let accountIds
+  try { accountIds = await ourIds() } catch (err) { console.error('[API /support/instagram-webhook] could not read the connected account', err); return res.status(200).json({ received: 0, imported: 0 }) }
+  const events = parseWebhook(body, { accountIds })
   let imported = 0
   for (const ev of events) {
     try {

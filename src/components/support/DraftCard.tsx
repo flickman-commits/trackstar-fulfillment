@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Check, ChevronDown, GraduationCap, Loader2, RefreshCw, Sparkles, X } from 'lucide-react'
-import { supportApi } from '@/lib/supportApi'
+import { newIdempotencyKey, supportApi } from '@/lib/supportApi'
 import { when } from '@/lib/supportDates'
-import type { Note, Proposal } from '@/types/support'
+import type { Address, Note, Proposal } from '@/types/support'
 
 /**
  * Claude's draft in the timeline: the reply it would send, and its working
@@ -11,18 +11,45 @@ import type { Note, Proposal } from '@/types/support'
  * Send. Every draft starts folded to one line, so the customer's message
  * stays readable; opened, the reply scrolls in a short box.
  */
-/** One suggested action: what it would do, Approve to run it, or dismiss it. */
-function ProposalRow({ p, onApprove, onDismiss }: { p: Proposal; onApprove: (p: Proposal) => Promise<void>; onDismiss: (p: Proposal) => Promise<void> }) {
+/** Everything an approved action will do, spelled out for the second look. */
+function proposalDetails(p: Proposal): string[] {
+  const addressLines = (a?: Address) => a ? [a.name, a.address1, a.address2, [a.city, a.province, a.zip].filter(Boolean).join(' '), a.country, a.phone ? `Phone ${a.phone}` : ''].filter(Boolean) : []
+  if (p.type === 'shippingAddress') return [`Order #${p.orderNumber}: the ship-to in Shopify becomes`, ...addressLines(p.address), 'Artelo still needs changing by hand.']
+  if (p.type === 'changeItem') return [`Order #${p.orderNumber}: the print becomes ${[p.size, p.frame].filter(Boolean).join(' ')}.`, 'The personalization is copied to the Shopify order note.', 'If the new one costs more, Shopify emails the customer an invoice for the difference.']
+  if (p.type === 'discount') return [`A ${p.percent}% code, one use, 30 days, made in Shopify now.`]
+  if (p.type === 'orderNote') return [`On #${p.orderNumber}, for fulfillment:`, p.text || '']
+  return [p.label]
+}
+
+/**
+ * One suggested action: what it would do, Approve to see exactly what will
+ * happen, then Yes to run it, or dismiss it. The key is made when the
+ * confirm step opens, so a double click on Yes runs it once.
+ */
+function ProposalRow({ p, onApprove, onDismiss }: { p: Proposal; onApprove: (p: Proposal, idempotencyKey: string) => Promise<void>; onDismiss: (p: Proposal) => Promise<void> }) {
   const [busy, setBusy] = useState(false)
+  const [confirmKey, setConfirmKey] = useState<string | null>(null)
   if (p.status) {
     return <div className={`flex items-start gap-1.5 text-xs ${p.status === 'done' ? 'text-emerald-700' : 'text-off-black/40 line-through'}`}>{p.status === 'done' ? <Check className="w-3.5 h-3.5 shrink-0 mt-px" /> : <X className="w-3.5 h-3.5 shrink-0 mt-px" />}<span>{p.label}{p.status === 'done' && p.by ? <span className="text-off-black/40"> · {p.by}</span> : null}</span></div>
   }
-  const go = async (fn: (p: Proposal) => Promise<void>) => { setBusy(true); try { await fn(p) } finally { setBusy(false) } }
+  const go = async (fn: () => Promise<void>) => { setBusy(true); try { await fn() } finally { setBusy(false) } }
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-[#4600D6]/20 bg-white px-2.5 py-2">
-      <span className="flex-1 text-xs text-off-black/80 leading-snug">{p.label}</span>
-      <button disabled={busy} onClick={() => go(onApprove)} className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-[#4600D6] text-white hover:bg-[#3a00b3] disabled:opacity-50">{busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}Approve</button>
-      <button disabled={busy} onClick={() => go(onDismiss)} className="shrink-0 p-0.5 text-off-black/35 hover:text-off-black" title="Not this one"><X className="w-3.5 h-3.5" /></button>
+    <div className="rounded-lg border border-[#4600D6]/20 bg-white px-2.5 py-2">
+      <div className="flex items-start gap-2">
+        <span className="flex-1 text-xs text-off-black/80 leading-snug">{p.label}</span>
+        {!confirmKey && <button disabled={busy} onClick={() => setConfirmKey(newIdempotencyKey())} className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-[#4600D6] text-white hover:bg-[#3a00b3] disabled:opacity-50"><Check className="w-3 h-3" />Approve</button>}
+        {!confirmKey && <button disabled={busy} onClick={() => go(() => onDismiss(p))} className="shrink-0 p-0.5 text-off-black/35 hover:text-off-black" title="Not this one"><X className="w-3.5 h-3.5" /></button>}
+      </div>
+      {confirmKey && (
+        <div className="mt-2 pt-2 border-t border-[#4600D6]/15 space-y-1.5 text-xs">
+          <div className="whitespace-pre-wrap break-words text-off-black/75 leading-snug">{proposalDetails(p).join('\n')}</div>
+          <div className="text-red-700 font-medium">Run this now? It changes the order in Shopify{p.type === 'discount' || p.type === 'orderNote' ? '' : ' and cannot be undone from here'}.</div>
+          <div className="flex items-center justify-end gap-2">
+            <button disabled={busy} onClick={() => setConfirmKey(null)} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">Back</button>
+            <button disabled={busy} onClick={() => go(async () => { await onApprove(p, confirmKey); setConfirmKey(null) })} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-[#4600D6] text-white hover:bg-[#3a00b3] disabled:opacity-50">{busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}Yes, do it</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -69,7 +96,7 @@ function Teach({ noteId, onDone, onCancel }: { noteId: string; onDone: (feedback
   )
 }
 
-export default function DraftCard({ n, latest, answered = false, onUse, onRedraft, onApprove, onDismiss }: { n: Note; latest: boolean; /** Someone has replied since this draft: it folds to one quiet line. */ answered?: boolean; onUse: (text: string) => void; onRedraft: (instruction: string) => Promise<void>; onApprove: (p: Proposal) => Promise<void>; onDismiss: (p: Proposal) => Promise<void> }) {
+export default function DraftCard({ n, latest, answered = false, verifiedNumbers = [], onUse, onRedraft, onApprove, onDismiss }: { n: Note; latest: boolean; /** Someone has replied since this draft: it folds to one quiet line. */ answered?: boolean; /** Order numbers on the conversation (under their email, or linked). */ verifiedNumbers?: string[]; onUse: (text: string) => void; onRedraft: (instruction: string) => Promise<void>; onApprove: (p: Proposal, idempotencyKey: string) => Promise<void>; onDismiss: (p: Proposal) => Promise<void> }) {
   const [open, setOpen] = useState(false)
   const [showWork, setShowWork] = useState(false)
   const [asking, setAsking] = useState(false)
@@ -89,6 +116,14 @@ export default function DraftCard({ n, latest, answered = false, onUse, onRedraf
     finally { setBusy(false) }
   }
   const hasWork = !!(d.summary || d.needsInfo || d.keyFacts?.length || d.steps?.length)
+  // The order was found by a number they quoted or by their name, not their
+  // email. Anyone can quote an order number, so it stays flagged until a
+  // person links the order to this customer.
+  const foundBy = d.foundBy
+  const unverified = !!foundBy && !(foundBy.orderNumbers || []).some(num => verifiedNumbers.includes(num))
+  const unverifiedText = foundBy?.by === 'name'
+    ? 'Matched by their name, not their email. Verify before sharing details.'
+    : 'Matched by the order number they quoted, not their email. Verify before sharing details.'
 
   if (!open) {
     // Closed by default, so the customer's message stays the thing you read first.
@@ -99,6 +134,7 @@ export default function DraftCard({ n, latest, answered = false, onUse, onRedraf
           <span className={`truncate ${active ? 'font-semibold' : ''}`}>{active ? "Claude's draft" : answered ? "Claude's draft · replied" : 'Earlier draft'}</span>
           {active && pending > 0 && <span className="shrink-0 px-1.5 py-px rounded bg-[#4600D6]/10 text-[10px] font-medium text-[#4600D6]">{pending} to approve</span>}
           {active && d.escalate?.needed && <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-px rounded bg-red-50 border border-red-200 text-[10px] font-medium text-red-700"><AlertTriangle className="w-3 h-3" />Flag for Matt</span>}
+          {active && unverified && <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-px rounded bg-amber-50 border border-amber-200 text-[10px] font-medium text-amber-800" title={unverifiedText}><AlertTriangle className="w-3 h-3" />Verify customer</span>}
           <ChevronDown className="w-3.5 h-3.5 ml-auto shrink-0" />
         </button>
         {active && <button onClick={() => onUse(n.body)} className="shrink-0 px-2 py-0.5 rounded text-[11px] font-medium bg-[#4600D6] text-white hover:bg-[#3a00b3]">Use</button>}
@@ -115,6 +151,11 @@ export default function DraftCard({ n, latest, answered = false, onUse, onRedraf
       {active && d.escalate?.needed && (
         <div className="mb-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-800 inline-flex items-start gap-1.5 w-full">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /><span><b>Flag for Matt.</b> {d.escalate.reason}</span>
+        </div>
+      )}
+      {unverified && (
+        <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 inline-flex items-start gap-1.5 w-full">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /><span>{unverifiedText}</span>
         </div>
       )}
       <div className="max-h-48 overflow-y-auto text-[13px] whitespace-pre-wrap break-words leading-relaxed text-off-black bg-white border border-border-gray rounded-lg px-3 py-2">{n.body.replace(/\{\{rep\}\}/g, '…')}</div>

@@ -18,12 +18,13 @@
  */
 import prisma from '../../db.js'
 import { arteloOrderUrl } from '../../lib/links.js'
+import { UserError } from './errors.js'
 
 const BASE = 'https://www.artelo.com/api/open/'
 
 async function artelo(path, { method = 'GET', body, query } = {}) {
   const key = process.env.ARTELO_API_KEY
-  if (!key) throw new Error('Artelo is not connected (ARTELO_API_KEY)')
+  if (!key) throw new UserError('Artelo is not connected (ARTELO_API_KEY)')
   const url = BASE + path + (query ? `?${new URLSearchParams(query)}` : '')
   const res = await fetch(url, { method, headers: { Authorization: `Bearer ${key}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
@@ -85,7 +86,7 @@ async function itemsFor(shopifyOrderId) {
     select: { id: true, lineItemIndex: true, runnerName: true, raceName: true, raceYear: true, arteloOrderData: true, shopifyOrderData: true,
       renderJobs: { where: { status: 'done', review: 'approved', arteloUploadId: { not: null } }, orderBy: { version: 'desc' }, take: 1, select: { arteloUploadId: true, version: true } } },
   })
-  if (!rows.length) throw new Error('That order is not in the fulfillment tool, so there is nothing to copy. Build it in Artelo.')
+  if (!rows.length) throw new UserError('That order is not in the fulfillment tool, so there is nothing to copy. Build it in Artelo.')
   const stored = rows[0].arteloOrderData
   let live = null
   if (stored?.id) {
@@ -113,7 +114,7 @@ async function itemsFor(shopifyOrderId) {
 /** What the form shows: each item, whether it can be copied, and the next order id. */
 export async function reorderPrep({ shopifyOrderId }) {
   const id = String(shopifyOrderId || '').trim()
-  if (!/^\d+$/.test(id)) throw new Error('That order has no Shopify id')
+  if (!/^\d+$/.test(id)) throw new UserError('That order has no Shopify id')
   const { items, number, rows } = await itemsFor(id)
   return {
     number,
@@ -133,20 +134,20 @@ const US_STATES = /^[A-Z]{2}$/
 
 export async function createReorder({ thread, shopifyOrderId, orderIds, address, email, instructions, test, actor }) {
   const id = String(shopifyOrderId || '').trim()
-  if (!/^\d+$/.test(id)) throw new Error('That order has no Shopify id')
+  if (!/^\d+$/.test(id)) throw new UserError('That order has no Shopify id')
   const a = {}
   for (const k of ['name', 'address1', 'address2', 'city', 'province', 'zip', 'country', 'phone']) a[k] = String(address?.[k] || '').trim()
   a.country = (a.country || 'US').toUpperCase()
-  for (const k of ['name', 'address1', 'city', 'province', 'zip']) if (!a[k]) throw new Error(`The address needs a ${k === 'address1' ? 'street' : k === 'province' ? 'state' : k}`)
-  if (a.country === 'US' && !US_STATES.test(a.province.toUpperCase())) throw new Error('Use the two-letter state code, like NY')
-  if (a.country !== 'US' && !a.phone) throw new Error('Artelo needs a phone number for an order outside the US')
+  for (const k of ['name', 'address1', 'city', 'province', 'zip']) if (!a[k]) throw new UserError(`The address needs a ${k === 'address1' ? 'street' : k === 'province' ? 'state' : k}`)
+  if (a.country === 'US' && !US_STATES.test(a.province.toUpperCase())) throw new UserError('Use the two-letter state code, like NY')
+  if (a.country !== 'US' && !a.phone) throw new UserError('Artelo needs a phone number for an order outside the US')
   const mail = String(email || '').trim()
 
   const { rows, items, stored, number } = await itemsFor(id)
   const picked = items.filter(i => (orderIds || []).includes(i.orderId))
-  if (!picked.length) throw new Error('Pick at least one item to send')
+  if (!picked.length) throw new UserError('Pick at least one item to send')
   const blocked = picked.find(i => !(i.product?.catalogProductId && i.product?.size && i.designs.length))
-  if (blocked) throw new Error(`${blocked.label} has no design in Artelo or an approved render to copy. Build that one in Artelo.`)
+  if (blocked) throw new UserError(`${blocked.label} has no design in Artelo or an approved render to copy. Build that one in Artelo.`)
 
   const orderId = await nextOrderId(number, rows.map(r => r.id))
   const body = {

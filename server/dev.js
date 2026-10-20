@@ -110,6 +110,15 @@ const routes = [
   { method: 'post',   path: '/api/bulk',                   handler: '../api/bulk/index.js' },
   { method: 'post',   path: '/api/bulk/files',             handler: '../api/bulk/files.js' },
   { method: 'get',    path: '/api/bulk/sheet',             handler: '../api/bulk/sheet.js' },
+  { method: 'get',    path: '/api/public/creator-preview', handler: '../api/public/creator-preview.js' },
+  { method: 'get',    path: '/api/public/survey-preview',  handler: '../api/public/survey-preview.js' },
+  { method: 'get',    path: '/api/public/race-status',     handler: '../api/public/race-status.js' },
+  { method: 'post',   path: '/api/public/photo-upload-url', handler: '../api/public/photo-upload-url.js' },
+  { method: 'post',   path: '/api/public/photo-verify',    handler: '../api/public/photo-verify.js' },
+  { method: 'post',   path: '/api/admin/preview-probe',    handler: '../api/admin/preview-probe.js' },
+  { method: 'get',    path: '/api/cron/retention',         handler: '../api/cron/retention.js' },
+  { method: 'get',    path: '/api/public/creator',         handler: '../api/public/creator.js' },
+  { method: 'post',   path: '/api/public/creator',         handler: '../api/public/creator.js' },
   { method: 'get',    path: '/api/public/bulk-intake',     handler: '../api/public/bulk-intake.js' },
   { method: 'post',   path: '/api/public/bulk-intake',     handler: '../api/public/bulk-intake.js' },
   // Marathon Monopoly proposal page (gated behind MONOPOLY_PAGE_ENABLED).
@@ -186,7 +195,9 @@ for (const route of routes) {
   app.options(route.path, (req, res) => {
     // Echo origin (not '*') + allow credentials so cookie-bearing requests
     // pass preflight when a developer points VITE_API_URL at this server.
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
+    // Local origins only: this server holds production credentials.
+    const origin = String(req.headers.origin || '')
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) res.setHeader('Access-Control-Allow-Origin', origin)
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret, Cookie')
     res.setHeader('Access-Control-Allow-Credentials', 'true')
@@ -195,6 +206,14 @@ for (const route of routes) {
 }
 
 const PORT = process.env.API_PORT || 3001
-app.listen(PORT, () => {
-  console.log(`\n  ⚡ API server running at http://localhost:${PORT}\n`)
+// Loopback only unless HOST says otherwise: with production keys loaded, a
+// server reachable from the coffee-shop wifi would run crons, imports and
+// admin endpoints for anyone who found it.
+const HOST = process.env.HOST || '127.0.0.1'
+app.listen(PORT, HOST, () => {
+  let dbHost = 'unknown'
+  try { dbHost = new URL(process.env.DATABASE_URL || '').hostname || 'unset' } catch { /* not a URL */ }
+  const prodLike = /supabase\.(com|co)$/.test(dbHost)
+  console.log(`\n  ⚡ API server running at http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`)
+  console.log(`  Database: ${dbHost}${prodLike ? '  <-- this is the PRODUCTION database; writes here are live' : ''}\n`)
 })

@@ -58,3 +58,31 @@ test('routing split: the person furthest below their share gets the next one', a
   assert.equal(pickByShare(weighted, { matt: 2, eli: 3 }), 'eli')
   assert.equal(pickByShare(weighted, { matt: 1, eli: 4 }), 'matt')
 })
+
+test('an order found by a quoted number or a name: no private details, no one-click changes', async () => {
+  const { ordersBrief, cleanProposals } = await import('./draft.js')
+  const order = {
+    number: '4855', shopifyOrderId: '111', createdAt: '2026-10-01T12:00:00Z', fulfillmentStatus: 'FULFILLED',
+    financialStatus: 'PAID', imported: true, lineItems: [], discountCodes: [],
+    tracking: [{ company: 'USPS', number: '9400111899223', url: 'https://tools.usps.com/x', deliveredAt: null }],
+    shipTo: { city: 'Brooklyn', province: 'NY', country: 'US' },
+    mockups: [{ label: 'Proof v2' }],
+    items: [{ orderId: 'row1', race: 'NYC Marathon', year: 2026, runner: 'Jane Doe', size: '12x18', frame: 'Black Oak', approvalUrl: 'https://fast.trackstar.art/approve/abc', type: 'standard' }],
+  }
+  const verified = ordersBrief([order])
+  assert.match(verified, /9400111899223/)
+  assert.match(verified, /approve\/abc/)
+
+  const brief = ordersBrief([order], { unverified: true })
+  assert.match(brief, /#4855/)
+  for (const leak of ['9400111899223', 'usps.com', 'approve/abc', 'Brooklyn', 'Proof v2', 'Jane Doe']) assert.ok(!brief.includes(leak), `leaked ${leak}`)
+
+  // Unverified, the draft passes no orders, so nothing that changes an order survives.
+  const proposals = [
+    { type: 'shippingAddress', orderNumber: '4855', address: { name: 'X', address1: '1 A St', city: 'B', zip: '00000' } },
+    { type: 'changeItem', orderNumber: '4855', size: '16x24' },
+    { type: 'orderNote', orderNumber: '4855', text: 'rush it' },
+  ]
+  assert.equal(cleanProposals(proposals, []).length, 0)
+  assert.ok(cleanProposals(proposals, [{ ...order, fulfillmentStatus: 'UNFULFILLED', tracking: [] }]).length > 0)
+})

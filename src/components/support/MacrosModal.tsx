@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { btnGhost, btnPrimary, btnSecondary, inputBase } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { useEscape } from '@/lib/useEscape'
+import { useAuth } from '@/lib/auth'
 import type { Macro } from '@/types/support'
 
 /**
@@ -11,11 +12,21 @@ import type { Macro } from '@/types/support'
  * playbook; edited here. {{first_name}} and {{rep}} fill in on insert;
  * [brackets] are for the rep to fill. The greeting and sign-off are not
  * part of a macro, the composer adds them.
+ *
+ * Anyone on Support adds one; only its author or an admin changes or
+ * deletes it (the server holds the same line). Names stay under 120
+ * characters and bodies under 2,000.
  */
+const TITLE_MAX = 120
+const BODY_MAX = 2000
+
 export default function MacrosModal({ macros, onChanged, onClose }: { macros: Macro[]; onChanged: () => void; onClose: () => void }) {
   const [editing, setEditing] = useState<Partial<Macro> | null>(null)
   const [saving, setSaving] = useState(false)
+  const { user, isAdmin } = useAuth()
   useEscape(onClose)
+  // A new macro is yours; an existing one is its author's or an admin's.
+  const canChange = !!editing && (!editing.id || isAdmin || (!!editing.createdBy && editing.createdBy.id === user?.id))
 
   const save = async () => {
     if (!editing) return
@@ -61,18 +72,19 @@ export default function MacrosModal({ macros, onChanged, onClose }: { macros: Ma
           </div>
           {editing && (
             <div className="flex-1 min-w-0 p-5 flex flex-col gap-3 overflow-y-auto">
-              <input value={editing.name || ''} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="Name, e.g. Order shipped" className={`${inputBase} w-full`} autoFocus />
+              {!canChange && <div className="text-xs text-off-black/55">Only {editing.createdBy?.firstName || 'an admin'}{editing.createdBy ? ' or an admin' : ''} can change this one. You can still use it in a reply.</div>}
+              <input value={editing.name || ''} disabled={!canChange} maxLength={TITLE_MAX} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="Name, e.g. Order shipped" className={`${inputBase} w-full`} autoFocus />
               <div className="flex items-center gap-2">
                 <span className="text-sm text-off-black/50 font-mono">/</span>
-                <input value={editing.shortcut || ''} onChange={e => setEditing({ ...editing, shortcut: e.target.value })} placeholder={editing.name ? editing.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').split('-').slice(0, 4).join('-') : 'shortcut'} className={`${inputBase} flex-1 font-mono`} />
+                <input value={editing.shortcut || ''} disabled={!canChange} onChange={e => setEditing({ ...editing, shortcut: e.target.value })} placeholder={editing.name ? editing.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').split('-').slice(0, 4).join('-') : 'shortcut'} className={`${inputBase} flex-1 font-mono`} />
                 <span className="text-[11px] text-off-black/45">Letters, digits, dashes. Blank uses the name.</span>
               </div>
-              <textarea value={editing.body || ''} onChange={e => setEditing({ ...editing, body: e.target.value })} rows={12} placeholder="The reply, without the greeting or the sign-off." className={`${inputBase} w-full resize-y leading-relaxed`} />
+              <textarea value={editing.body || ''} disabled={!canChange} maxLength={BODY_MAX} onChange={e => setEditing({ ...editing, body: e.target.value })} rows={12} placeholder="The reply, without the greeting or the sign-off." className={`${inputBase} w-full resize-y leading-relaxed`} />
               <div className="flex items-center gap-2">
-                {editing.id && <button onClick={() => remove(editing as Macro)} className={`${btnGhost} text-red-600 hover:text-red-700`}><Trash2 className="w-3.5 h-3.5" /> Delete</button>}
-                <span className="flex-1" />
+                {editing.id && canChange && <button onClick={() => remove(editing as Macro)} className={`${btnGhost} text-red-600 hover:text-red-700`}><Trash2 className="w-3.5 h-3.5" /> Delete</button>}
+                <span className="flex-1 text-right text-[11px] text-off-black/40 tabular-nums">{(editing.body || '').length.toLocaleString('en-US')} / {BODY_MAX.toLocaleString('en-US')}</span>
                 <button onClick={() => setEditing(null)} className={btnSecondary}>Cancel</button>
-                <button onClick={save} disabled={saving || !(editing.name || '').trim() || !(editing.body || '').trim()} className={btnPrimary}>{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save</button>
+                <button onClick={save} disabled={saving || !canChange || !(editing.name || '').trim() || !(editing.body || '').trim()} className={btnPrimary}>{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save</button>
               </div>
             </div>
           )}

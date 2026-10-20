@@ -36,7 +36,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         // The API's port, so a second dev pair can run beside the first.
-        target: `http://localhost:${process.env.API_PORT || 3001}`,
+        target: `http://127.0.0.1:${process.env.API_PORT || 3001}`,
         changeOrigin: true,
       },
     },

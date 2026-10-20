@@ -18,10 +18,12 @@
  */
 import prisma from '../../db.js'
 import { dealForWork, nextStepFor, pipelineOf } from './queue.js'
-import { sendDraft, sendFree, requiresImage } from './drafting.js'
+import { sendDraft, sendFree, requiresImage, libraryIds } from './drafting.js'
 import { draftProblems } from './guardrails.js'
 import { listAssets, isAssetStorageConfigured } from './assets.js'
 import { gmailStatus } from './gmail.js'
+import { can } from '../../../api/_lib/roles.js'
+import { UserError, publicMessage } from './errors.js'
 
 const MAX_AHEAD_MS = 60 * 86400000
 // Two cron runs past its time with the row still "sending" means a run died.
@@ -42,44 +44,44 @@ function view(row) {
  * a problem shows now, not on Monday morning.
  */
 export async function scheduleSend({ dealId, personId, to, subject, body, assetIds = [], adhoc = false, sendAt, actor }) {
-  if (!actor?.id) throw new Error('Scheduling needs a signed-in person')
-  if (!subject?.trim() || !body?.trim()) throw new Error('Subject and body are required')
+  if (!actor?.id) throw new UserError('Scheduling needs a signed-in person')
+  if (!subject?.trim() || !body?.trim()) throw new UserError('Subject and body are required')
   const when = new Date(sendAt)
-  if (Number.isNaN(when.getTime())) throw new Error('Pick a time to send it')
+  if (Number.isNaN(when.getTime())) throw new UserError('Pick a time to send it')
   // Up to the next 5-minute mark: the cron runs at :00, :05, :10...
   when.setUTCSeconds(0, 0)
   if (when.getUTCMinutes() % 5) when.setUTCMinutes(when.getUTCMinutes() + (5 - (when.getUTCMinutes() % 5)))
-  if (when.getTime() < Date.now() + 60_000) throw new Error('Pick a time at least a minute from now')
-  if (when.getTime() > Date.now() + MAX_AHEAD_MS) throw new Error('Pick a time within the next 60 days')
-  if (!(await gmailStatus(actor.id)).connected) throw new Error('Gmail is not connected. Open Settings and press Connect Gmail.')
+  if (when.getTime() < Date.now() + 60_000) throw new UserError('Pick a time at least a minute from now')
+  if (when.getTime() > Date.now() + MAX_AHEAD_MS) throw new UserError('Pick a time within the next 60 days')
+  if (!(await gmailStatus(actor.id)).connected) throw new UserError('Gmail is not connected. Open Settings and press Connect Gmail.')
 
-  const ids = [...new Set((assetIds || []).map(String).filter(Boolean))]
+  const ids = libraryIds(assetIds)
   const free = !dealId || String(dealId).startsWith('adhoc:')
   let row
 
   if (free) {
     const address = String(to || '').trim()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new Error('That is not an email address')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new UserError('That is not an email address')
     row = { attioDealId: null, attioPersonId: null, toEmail: address, adhoc: true, touchNumber: null }
   } else {
     const deal = await dealForWork(String(dealId), { fresh: true })
     const person = (personId && deal.people.find(p => p.id === personId)) || deal.person
-    if (!person?.email) throw new Error('This deal has nobody with an email address in Attio')
+    if (!person?.email) throw new UserError('This deal has nobody with an email address in Attio')
     if (!adhoc && !['Not Contacted', 'Needs Enrichment', 'Reached Out'].includes(deal.stage)) {
-      throw new Error(`${deal.name} is at ${deal.stage}. The sequence only runs up to Reached Out; use New email to write to them.`)
+      throw new UserError(`${deal.name} is at ${deal.stage}. The sequence only runs up to Reached Out; use New email to write to them.`)
     }
     const { touchNumber: next, exhausted } = nextStepFor(deal)
-    if (exhausted && !adhoc) throw new Error(`${deal.name} has finished its sequence. Change its stage in Attio instead.`)
+    if (exhausted && !adhoc) throw new UserError(`${deal.name} has finished its sequence. Change its stage in Attio instead.`)
     const touchNumber = exhausted ? deal.touchCount + 1 : next
     const pipeline = pipelineOf(deal)
     const problems = draftProblems({ subject, body }, { pipeline, touchNumber, companyName: deal.name })
-    if (problems.length) { const err = new Error(problems[0]); err.problems = problems; throw err }
+    if (problems.length) throw new UserError(problems[0], { problems })
     if (requiresImage(pipeline, touchNumber)) {
       const images = isAssetStorageConfigured() ? (await listAssets()).filter(a => a.kind === 'image').map(a => a.id) : []
-      if (!ids.some(id => images.includes(id))) throw new Error('A charity first touch has to carry a co-branded example. Drag one in from the library first.')
+      if (!ids.some(id => images.includes(id))) throw new UserError('A charity first touch has to carry a co-branded example. Drag one in from the library first.')
     }
     const already = await prisma.salesScheduled.findFirst({ where: { attioDealId: deal.id, status: { in: ['scheduled', 'sending'] } } })
-    if (already) throw new Error(`${deal.name} already has an email scheduled. Cancel that one first.`)
+    if (already) throw new UserError(`${deal.name} already has an email scheduled. Cancel that one first.`)
     row = { attioDealId: deal.id, attioPersonId: person.id, toEmail: person.email, adhoc: Boolean(adhoc), touchNumber }
   }
 
@@ -110,10 +112,10 @@ export async function scheduledDealIds() {
  */
 export async function cancelScheduled(id, actor) {
   const row = await prisma.salesScheduled.findUnique({ where: { id: String(id) } })
-  if (!row || !OPEN.includes(row.status)) throw new Error('That email is not waiting any more')
-  if (row.createdById !== actor.id && actor.role !== 'admin') throw new Error('That is someone else\'s scheduled email')
+  if (!row || !OPEN.includes(row.status)) throw new UserError('That email is not waiting any more')
+  if (row.createdById !== actor.id && actor.role !== 'admin') throw new UserError('That is someone else\'s scheduled email')
   const done = await prisma.salesScheduled.updateMany({ where: { id: row.id, status: { in: ['scheduled', 'held'] } }, data: { status: 'cancelled' } })
-  if (!done.count) throw new Error('It is sending right now')
+  if (!done.count) throw new UserError('It is sending right now')
   return view(row)
 }
 
@@ -154,7 +156,9 @@ export async function sendDue({ limit = 20 } = {}) {
     if (!claimed.count) continue
     try {
       const user = await prisma.user.findUnique({ where: { id: row.createdById }, select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true } })
-      if (!user?.isActive) throw new Error('The person who scheduled this is no longer active')
+      if (!user?.isActive) throw new UserError('The person who scheduled this is no longer active')
+      // Their role may have changed since they scheduled it; Sales has to still be theirs.
+      if (!(await can(user.role, 'sales'))) throw new UserError('Sales is no longer part of the role of the person who scheduled this')
       const actor = { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role }
 
       if (row.attioDealId) {
@@ -172,7 +176,7 @@ export async function sendDue({ limit = 20 } = {}) {
       out.sent++
     } catch (err) {
       console.error(`[sales.scheduled] ${row.id}: ${err.message}`)
-      await prisma.salesScheduled.update({ where: { id: row.id }, data: { status: 'held', error: `Not sent: ${err.message}` } })
+      await prisma.salesScheduled.update({ where: { id: row.id }, data: { status: 'held', error: `Not sent: ${publicMessage(err, 'something went wrong. Check your Gmail Sent folder before sending again.')}` } })
       out.held++
     }
   }
@@ -185,10 +189,10 @@ export async function sendDue({ limit = 20 } = {}) {
  */
 export async function sendHeldNow(id, actor) {
   const row = await prisma.salesScheduled.findUnique({ where: { id: String(id) } })
-  if (!row || row.status !== 'held') throw new Error('That email is not being held')
-  if (row.createdById !== actor.id) throw new Error('Only the person who scheduled it can send it')
+  if (!row || row.status !== 'held') throw new UserError('That email is not being held')
+  if (row.createdById !== actor.id) throw new UserError('Only the person who scheduled it can send it')
   const claimed = await prisma.salesScheduled.updateMany({ where: { id: row.id, status: 'held' }, data: { status: 'sending' } })
-  if (!claimed.count) throw new Error('It is already sending')
+  if (!claimed.count) throw new UserError('It is already sending')
   try {
     const r = row.attioDealId
       ? await sendDraft({ dealId: row.attioDealId, personId: row.attioPersonId, subject: row.subject, body: row.body, assetIds: row.assetIds, actor, adhoc: row.adhoc })
@@ -196,7 +200,7 @@ export async function sendHeldNow(id, actor) {
     await prisma.salesScheduled.update({ where: { id: row.id }, data: { status: 'sent', sentAt: new Date(), salesSendId: r.send?.id || null, error: null } })
     return r
   } catch (err) {
-    await prisma.salesScheduled.update({ where: { id: row.id }, data: { status: 'held', error: `Not sent: ${err.message}` } })
+    await prisma.salesScheduled.update({ where: { id: row.id }, data: { status: 'held', error: `Not sent: ${publicMessage(err, 'something went wrong. Check your Gmail Sent folder before sending again.')}` } })
     throw err
   }
 }

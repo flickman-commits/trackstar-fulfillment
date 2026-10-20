@@ -35,6 +35,7 @@ import prisma from '../../db.js'
 import { originFor } from '../sales/gmail.js'
 import { refreshThread } from './mailbox.js'
 import { defaultAssigneeId } from './routing.js'
+import { UserError } from './errors.js'
 
 const GRAPH = 'https://graph.instagram.com'
 const SCOPES = ['instagram_business_basic', 'instagram_business_manage_messages']
@@ -110,7 +111,7 @@ async function graph(path, { method = 'GET', token, query = {}, body } = {}) {
 
 async function requireToken() {
   const token = await getConfig(KEY_TOKEN)
-  if (!token) throw new Error('Instagram is not connected. An admin connects @' + expectedHandle() + ' from the Support page.')
+  if (!token) throw new UserError('Instagram is not connected. An admin connects @' + expectedHandle() + ' from the Support page.')
   return token
 }
 
@@ -122,17 +123,17 @@ async function requireToken() {
 async function onGraphError(err) {
   if (err?.code === 190) {
     await delConfig(KEY_TOKEN)
-    throw new Error('Instagram disconnected: Meta rejected the saved token. An admin has to press Connect again on the Support page. Long-lived tokens die after 60 days without a refresh.')
+    throw new UserError('Instagram disconnected: Meta rejected the saved token. An admin has to press Connect again on the Support page. Long-lived tokens die after 60 days without a refresh.')
   }
   if (err?.code === 10) {
-    throw new Error('Instagram refused the message: the 24-hour reply window after the customer\'s last message has passed. Wait for them to write again.')
+    throw new UserError('Instagram refused the message: the 24-hour reply window after the customer\'s last message has passed. Wait for them to write again.')
   }
   // Conversation routing: one app answers a thread at a time. ManyChat's follow
   // message makes ManyChat the owner; a reply typed in the Instagram app hands it
   // to Instagram's inbox. Control lapses after about 24 hours of quiet. Taking it
   // back needs the Page-based API, which an Instagram Login app does not have.
   if (err?.error_subcode === 2534037 || err?.subcode === 2534037 || /not the thread owner/i.test(err?.message || '')) {
-    throw new Error('Another app is in control of this conversation right now: ManyChat (its follow message takes it) or Instagram\'s own inbox (after a reply from the app). It usually lets go after a day of quiet. Your reply is copied and the conversation is open in Instagram to paste it.')
+    throw new UserError('Another app is in control of this conversation right now: ManyChat (its follow message takes it) or Instagram\'s own inbox (after a reply from the app). It usually lets go after a day of quiet. Your reply is copied and the conversation is open in Instagram to paste it.')
   }
   throw err
 }
@@ -167,7 +168,8 @@ export async function completeConnection(code, redirectUri) {
   const data = await res.json().catch(() => ({}))
   const first = Array.isArray(data.data) ? data.data[0] : data
   if (!first?.access_token) {
-    throw new Error(`Instagram did not return a token: ${data.error_message || data.error?.message || `HTTP ${res.status}`}`)
+    console.warn(`[support.instagram] token exchange: ${data.error_message || data.error?.message || `HTTP ${res.status}`}`)
+    throw new UserError('Instagram did not return a token. Connect again.', { reason: 'no_token' })
   }
   const long = await graph(`${GRAPH}/access_token`, { query: { grant_type: 'ig_exchange_token', client_secret: appSecret(), access_token: first.access_token } })
   return saveToken(long.access_token, Number(long.expires_in) || null)
@@ -179,16 +181,16 @@ export async function completeConnection(code, redirectUri) {
  */
 export async function connectWithToken(token) {
   const t = String(token || '').trim()
-  if (!t) throw new Error('Paste the access token first')
+  if (!t) throw new UserError('Paste the access token first')
   return saveToken(t, null)
 }
 
 async function saveToken(token, expiresIn) {
   const me = await graph('me', { token, query: { fields: 'id,user_id,username,name' } })
   const username = String(me.username || '').toLowerCase()
-  if (!username) throw new Error('That token does not belong to an Instagram professional account.')
+  if (!username) throw new UserError('That token does not belong to an Instagram professional account.')
   if (username !== expectedHandle()) {
-    throw new Error(`That signed in as @${username}, not @${expectedHandle()}. Sign in to Instagram as the Trackstar account and connect again.`)
+    throw new UserError(`That signed in as @${username}, not @${expectedHandle()}. Sign in to Instagram as the Trackstar account and connect again.`, { reason: 'wrong_account' })
   }
   const now = Date.now()
   await setConfig(KEY_TOKEN, token)
@@ -264,7 +266,8 @@ export async function status() {
 }
 
 /** The ids that mean "us" on a message: the professional account and the app-scoped user. */
-async function ourIds() {
+/** The ids Meta uses for the connected account; empty when nothing is connected. */
+export async function ourIds() {
   const [a, b] = await Promise.all([getConfig(KEY_ACCOUNT_ID), getConfig(KEY_APP_USER_ID)])
   return new Set([a, b].filter(Boolean))
 }
@@ -277,13 +280,16 @@ async function ourIds() {
  * Meta's webhook body as the messages it carries. Reads, reactions,
  * postbacks and deletions are not messages and are skipped. An echo is a
  * message our account sent (from the Instagram app, or from here and read
- * back); its customer is the recipient.
+ * back); its customer is the recipient. With `accountIds`, entries for any
+ * other account are dropped.
  */
-export function parseWebhook(body) {
+export function parseWebhook(body, { accountIds = null } = {}) {
   if (!body || body.object !== 'instagram') return []
   const out = []
   for (const entry of body.entry || []) {
     const accountId = String(entry.id || '')
+    // Only the connected account's DMs: anything else is not ours to store.
+    if (accountIds && !accountIds.has(accountId)) continue
     for (const ev of entry.messaging || []) {
       const msg = ev.message
       if (!msg || !msg.mid) continue
@@ -413,12 +419,15 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
     attachments: parsed.attachments || [],
     sentAt: parsed.sentAt,
   }
+  // A message we already stored (Meta retries, a replayed delivery, the echo
+  // of a reply sent from here) updates its row but is not news to the thread.
+  const existed = await prisma.supportMessage.findUnique({ where: { igMessageId: parsed.igMessageId }, select: { id: true } })
   const message = await prisma.supportMessage.upsert({
     where: { igMessageId: parsed.igMessageId },
     create: { ...row, igMessageId: parsed.igMessageId, sentById },
     update: sentById ? { ...row, sentById } : row,
   })
-  await refreshThread(thread, message, { backfill, mailbox: '' })
+  await refreshThread(thread, message, { backfill, mailbox: '', replay: Boolean(existed) })
   return message
 }
 
@@ -575,12 +584,12 @@ export function splitForInstagram(text, max = MAX_MESSAGE_BYTES) {
  * Meta refuse it with a code.
  */
 export async function sendReply({ userId, thread, text, images = [] }) {
-  if (thread?.channel !== 'instagram' || !thread.igUserId) throw new Error('This conversation is not an Instagram DM.')
+  if (thread?.channel !== 'instagram' || !thread.igUserId) throw new UserError('This conversation is not an Instagram DM.')
   const token = await requireToken()
   const window = replyWindow(thread)
-  if (!window.open) throw new Error(window.reason)
+  if (!window.open) throw new UserError(window.reason)
   const pieces = splitForInstagram(text)
-  if (!pieces.length) throw new Error('Write something first')
+  if (!pieces.length) throw new UserError('Write something first')
   let last = null
   // Pictures first, each its own message (Meta takes one attachment per message, by a URL it can fetch).
   for (const img of images) {

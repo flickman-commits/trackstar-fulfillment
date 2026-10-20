@@ -18,14 +18,15 @@ import prisma from './prisma.js'
 import { safeEqual } from './auth.js'
 import { normalizeRole } from './roles.js'
 
-export const SCOPES = ['read', 'write', 'admin', 'repair']
+export const SCOPES = ['read', 'write', 'admin', 'repair', 'worker']
 export const SCOPE_LABEL = {
-  read: 'Read: orders, statuses, links, reports',
-  write: 'Write: assign, comment, change a design status, run an import',
-  admin: 'Admin: help shifts and the order list (admins only)',
+  read: 'Read: orders, statuses, reports (approval and intake links only for admins and design approvers)',
+  write: 'Write: assign, comment, design status, research, race checks, Support drafts, run an import',
+  admin: 'Admin: help shifts, the order list, production files, samples (admins only)',
   repair: 'Repair: the nightly routine\'s scraper tools',
+  worker: 'Render worker: the Illustrator Mac that renders designs (nothing else)',
 }
-const SERVICE_SCOPES = new Set(['read', 'repair'])
+const SERVICE_SCOPES = new Set(['read', 'repair', 'worker'])
 const SECRET_PREFIX = 'tsk_'
 const SHOWN_PREFIX = 12
 const TOUCH_EVERY_MS = 5 * 60_000
@@ -79,7 +80,7 @@ export async function createApiKey({ name, userId, scopes, expiresInDays, actor 
     if (wanted.includes('repair') && normalizeRole(user.role) !== 'admin') throw new Error('Repair is for admins and service keys')
   } else {
     const bad = wanted.filter(s => !SERVICE_SCOPES.has(s))
-    if (bad.length) throw new Error(`A service key can only read or repair; ${bad.join(' and ')} needs a person behind it`)
+    if (bad.length) throw new Error(`A service key can only read, repair or run the render worker; ${bad.join(' and ')} needs a person behind it`)
   }
 
   let expiresAt = null

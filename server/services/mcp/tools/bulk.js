@@ -6,7 +6,7 @@ import prisma from '../../../../api/_lib/prisma.js'
 import { ToolError } from '../server.js'
 import { bulkIntakeUrl } from '../../../lib/links.js'
 import { addressComplete } from '../../../domain/bulk/bulkOrders.js'
-import { daysLate } from './orders.js'
+import { daysLate, mayHoldLinks, linkField } from './orders.js'
 
 const STATUS_LABEL = { collecting: 'Collecting runner info', fulfillment: 'In fulfillment', submitted: 'Sent to Artelo' }
 
@@ -20,7 +20,7 @@ function progress(runners) {
   }
 }
 
-function shape(b, runners) {
+function shape(b, runners, links) {
   return {
     number: b.number,
     partner: b.partnerName,
@@ -35,7 +35,7 @@ function shape(b, runners) {
     assignee: b.assignee?.firstName || null,
     hasProductionFile: Boolean(b.productionFileUrl),
     progress: progress(runners),
-    intakeLink: bulkIntakeUrl(b.intakeToken),
+    ...linkField('intakeLink', bulkIntakeUrl(b.intakeToken), links),
     notes: b.notes || undefined,
   }
 }
@@ -46,24 +46,25 @@ export const bulkTools = [
   {
     name: 'bulk_orders_status',
     title: 'Bulk orders status',
-    description: 'Every bulk run not yet sent to Artelo: partner, race, due date, paid or not, who runs it, and how far along the runners are (addresses, research, files). Pass a number for one run, sent ones included.',
+    description: 'Every bulk run not yet sent to Artelo: partner, race, due date, paid or not, who runs it, and how far along the runners are (addresses, research, files). The intake link only for admins and people who approve designs; others see hasIntakeLink. Pass a number for one run, sent ones included.',
     scope: 'read',
     readOnly: true,
     input: { number: z.string().max(20).optional().describe('A run number like BULK-0007 for one run in full.') },
-    async handler({ number } = {}) {
+    async handler({ number } = {}, { principal } = {}) {
+      const links = await mayHoldLinks(principal)
       if (number) {
         const b = await prisma.bulkOrder.findFirst({ where: { number: { equals: number.trim(), mode: 'insensitive' } }, include: { assignee: { select: { firstName: true } } } })
         if (!b) throw new ToolError(`No bulk run called "${number}".`)
         const runners = await prisma.order.findMany({ where: { bulkOrderId: b.id }, select: { ...RUNNER_SELECT, runnerName: true, runnerNameOverride: true, lineItemIndex: true }, orderBy: { lineItemIndex: 'asc' } })
         return {
-          ...shape(b, runners),
+          ...shape(b, runners, links),
           runnersMissingAddress: runners.filter(r => !addressComplete(r.shippingAddress)).map(r => r.runnerNameOverride || r.runnerName),
           runnersNotResearched: runners.filter(r => !r.researchedAt).map(r => r.runnerNameOverride || r.runnerName),
         }
       }
       const list = await prisma.bulkOrder.findMany({ where: { status: { not: 'submitted' } }, orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }], include: { assignee: { select: { firstName: true } } } })
       const all = list.length ? await prisma.order.findMany({ where: { bulkOrderId: { in: list.map(b => b.id) } }, select: { ...RUNNER_SELECT, bulkOrderId: true } }) : []
-      return { open: list.length, runs: list.map(b => shape(b, all.filter(r => r.bulkOrderId === b.id))) }
+      return { open: list.length, runs: list.map(b => shape(b, all.filter(r => r.bulkOrderId === b.id), links)) }
     },
   },
 ]

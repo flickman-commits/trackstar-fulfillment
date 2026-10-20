@@ -56,6 +56,16 @@ const SHORTCUTS: [string, string][] = [
   ['⌘↵', 'Send and close (just close, with nothing written)'], ['⌘⇧↵', 'Send, keep it open'], ['Esc', 'Leave the composer'], ['?', 'This list'],
 ]
 
+/** The connect callbacks' fixed reason codes, in words. They never send an error's own text. */
+const CONNECT_REASONS: Record<string, string> = {
+  state: 'the connection expired or was started in another browser. Press Connect again.',
+  wrong_account: 'that signed in as a different account. Sign in as the Trackstar support account and connect again.',
+  no_refresh_token: 'Google did not give a lasting connection. Remove the app under Google Account > Security > Third-party access, then connect again.',
+  no_token: 'Instagram did not return a token. Connect again.',
+  not_configured: 'the connection is not set up on the server yet. Ask Matt.',
+  failed: 'something went wrong. Try again, and tell Matt if it keeps happening.',
+}
+
 /**
  * `active` is false while another page is showing: Support stays mounted
  * (App.tsx SupportKeepAlive) so the open conversation, the list and a
@@ -104,10 +114,10 @@ export default function Support({ active = true }: { active?: boolean } = {}) {
     if (!active || (!g && !i)) return
     if (g === 'connected') toast.success(`Mailbox connected as ${params.get('account') || 'the support account'}`)
     else if (g === 'denied') toast.error('Mailbox connection was cancelled')
-    else if (g) toast.error(`Mailbox connection failed: ${params.get('reason') || 'unknown error'}`)
+    else if (g) toast.error(`Mailbox connection failed: ${CONNECT_REASONS[params.get('reason') || ''] || CONNECT_REASONS.failed}`, { duration: 10000 })
     if (i === 'connected') toast.success(`Instagram connected as ${params.get('account') || 'the Trackstar account'}`)
     else if (i === 'denied') toast.error('Instagram connection was cancelled')
-    else if (i) toast.error(`Instagram connection failed: ${params.get('reason') || 'unknown error'}`)
+    else if (i) toast.error(`Instagram connection failed: ${CONNECT_REASONS[params.get('reason') || ''] || CONNECT_REASONS.failed}`, { duration: 10000 })
     navigate('/support', { replace: true })
   }, [location.search, navigate, active])
 

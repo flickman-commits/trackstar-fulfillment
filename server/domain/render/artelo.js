@@ -14,6 +14,7 @@
  */
 import prisma from '../../db.js'
 import { signedFiles } from './jobs.js'
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
 const BASE = 'https://www.artelo.com/api/open/'
 const FOLDER_KEY = 'artelo_orders_folder_id'
@@ -23,7 +24,7 @@ async function call(path, { method = 'GET', body, query } = {}) {
   const key = process.env.ARTELO_API_KEY
   if (!key) throw new Error('ARTELO_API_KEY is not set')
   const url = BASE + path + (query ? '?' + new URLSearchParams(query).toString() : '')
-  const res = await fetch(url, { method, headers: { Authorization: `Bearer ${key}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
+  const res = await fetchWithTimeout(url, { method, headers: { Authorization: `Bearer ${key}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   let data = null; try { data = JSON.parse(text) } catch { /* html error page */ }
   if (!res.ok) throw new Error(`Artelo ${path} ${res.status}: ${data?.message || text.slice(0, 120)}`)

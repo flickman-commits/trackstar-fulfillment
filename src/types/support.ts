@@ -83,6 +83,8 @@ export interface DraftData {
   instruction?: string | null
   model?: string
   proposals?: Proposal[]
+  /** Set when the orders were matched by a quoted number or a name, not the thread's email. */
+  foundBy?: { by: 'orderNumber' | 'name'; orderNumbers?: string[] } | null
 }
 
 /** A suggested action on Claude's draft, filled in and waiting for a person's Approve. */

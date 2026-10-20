@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Ban, BadgePercent, Repeat, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Ruler, Search, Star, Truck, X } from 'lucide-react'
 import { reviewAsk, reviewLinkFor } from '@/lib/reviewLinks'
 import { toast } from 'sonner'
-import { supportApi } from '@/lib/supportApi'
+import { newIdempotencyKey, supportApi } from '@/lib/supportApi'
 import { useAuth } from '@/lib/auth'
 import { parseAddress } from '@/lib/parseAddress'
 import type { Address, CodeLookup, CustomerOrder, Mockup, ThreadDetail } from '@/types/support'
@@ -107,7 +107,7 @@ function AddressForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread
   )
 }
 
-type Refundable = { number: string; availableCents: number; refundedCents: number; cancelled: boolean; fulfillment: string | null; limitCents: number; isAdmin: boolean }
+type Refundable = { number: string; availableCents: number; refundedCents: number; cancelled: boolean; fulfillment: string | null; limitCents: number; discountLimitPercent?: number; isAdmin: boolean }
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`
 const formBox = 'w-full bg-subtle-gray border border-border-gray rounded-md p-2.5 space-y-1.5 text-xs'
 
@@ -129,17 +129,20 @@ function RefundForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  // One key per confirmed press: a second click on Yes, or a retry, is the same refund and the server refuses it.
+  const [pressKey, setPressKey] = useState('')
   const [failed, setFailed] = useState<string | null>(null)
   useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
   const cents = Math.round(Number(amount) * 100) || 0
-  const over = info ? cents > info.limitCents && !info.isAdmin : false
+  // The $150 line is per order: earlier refunds on it count.
+  const over = info ? (info.refundedCents || 0) + cents > info.limitCents && !info.isAdmin : false
   const tooMuch = info ? cents > info.availableCents : false
   const save = async () => {
     // Two clicks in the panel, not a browser dialog: a browser told to block dialogs answers "no" without showing one.
-    if (!confirming) { setConfirming(true); setFailed(null); return }
+    if (!confirming) { setConfirming(true); setPressKey(newIdempotencyKey()); setFailed(null); return }
     setBusy(true)
     try {
-      const out = await supportApi.action<{ display: string; leftCents: number }>('refund', { id: thread.id, shopifyOrderId: o.shopifyOrderId, cents, reason })
+      const out = await supportApi.action<{ display: string; leftCents: number }>('refund', { id: thread.id, shopifyOrderId: o.shopifyOrderId, cents, reason, idempotencyKey: pressKey })
       toast.success(`Refunded ${out.display} on #${o.number}`)
       onDone(); onCancel()
     } catch (e) { setFailed((e as Error).message); toast.error((e as Error).message) }
@@ -166,7 +169,7 @@ function RefundForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
             <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="0.00" className={`${field} w-24`} autoFocus />
           </div>
           <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Why (goes on the refund), e.g. Buy 2 promo missed" className={field} />
-          {over && <div className="text-red-700">Over {dollars(info.limitCents)} is Matt's call. Slack Matt instead.</div>}
+          {over && <div className="text-red-700">Over {dollars(info.limitCents)} on one order{info.refundedCents ? ', counting what was already refunded,' : ''} is Matt's call. Slack Matt instead.</div>}
           {tooMuch && <div className="text-red-700">That is more than is left.</div>}
           {failed && <div className="text-red-700">{failed}</div>}
           {confirming && <div className="text-red-700 font-medium">Refund {dollars(cents)} to the card they paid with? This cannot be undone.</div>}
@@ -189,15 +192,16 @@ function CancelForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<{ display: string; arteloUrl: string | null } | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [pressKey, setPressKey] = useState('')
   const [failed, setFailed] = useState<string | null>(null)
   useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
-  const over = info ? info.availableCents > info.limitCents && !info.isAdmin : false
+  const over = info ? (info.refundedCents || 0) + info.availableCents > info.limitCents && !info.isAdmin : false
   const save = async () => {
     if (!info) return
-    if (!confirming) { setConfirming(true); setFailed(null); return }
+    if (!confirming) { setConfirming(true); setPressKey(newIdempotencyKey()); setFailed(null); return }
     setBusy(true)
     try {
-      const out = await supportApi.action<{ display: string; arteloUrl: string | null }>('cancelOrder', { id: thread.id, shopifyOrderId: o.shopifyOrderId, reason, customerConfirmed: yes })
+      const out = await supportApi.action<{ display: string; arteloUrl: string | null }>('cancelOrder', { id: thread.id, shopifyOrderId: o.shopifyOrderId, reason, customerConfirmed: yes, idempotencyKey: pressKey })
       setDone(out)
       toast.success(`#${o.number} cancelled and ${out.display} refunded`)
       onDone()
@@ -256,6 +260,7 @@ function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: Customer
   const [instructions, setInstructions] = useState('')
   const [test, setTest] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [pressKey, setPressKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<{ orderId: string; url: string | null; test: boolean } | null>(null)
   useEffect(() => {
@@ -265,10 +270,10 @@ function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: Customer
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k: keyof Address) => (e: React.ChangeEvent<HTMLInputElement>) => setA({ ...a, [k]: e.target.value })
   const create = async () => {
-    if (!confirming) { setConfirming(true); return }
+    if (!confirming) { setConfirming(true); setPressKey(newIdempotencyKey()); return }
     setBusy(true)
     try {
-      const out = await supportApi.arteloOrder<{ orderId: string; url: string | null; test: boolean }>({ action: 'create', id: thread.id, shopifyOrderId: o.shopifyOrderId, orderIds: picked, address: a, email, instructions, test })
+      const out = await supportApi.arteloOrder<{ orderId: string; url: string | null; test: boolean }>({ action: 'create', id: thread.id, shopifyOrderId: o.shopifyOrderId, orderIds: picked, address: a, email, instructions, test: isAdmin && test, idempotencyKey: pressKey })
       setDone(out)
       toast.success(`${out.test ? 'Test order' : 'Artelo order'} ${out.orderId} created`)
       onDone()
@@ -344,6 +349,8 @@ function ChangeItemForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thr
   const [size, setSize] = useState('')
   const [frame, setFrame] = useState('')
   const [busy, setBusy] = useState(false)
+  // One key per attempt: a double click before the button disables is the same change.
+  const [pressKey, setPressKey] = useState(newIdempotencyKey)
   useEffect(() => {
     supportApi.action<{ items: Item[] }>('changeItemPrep', { id: thread.id, shopifyOrderId: o.shopifyOrderId })
       .then(d => { setItems(d.items); if (d.items[0]) { setSize(d.items[0].size); setFrame(d.items[0].frame || '') } })
@@ -355,10 +362,10 @@ function ChangeItemForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thr
     if (!it) return
     setBusy(true)
     try {
-      const out = await supportApi.action<{ number: string; now: string; invoiced: boolean; owed: number }>('changeItem', { id: thread.id, shopifyOrderId: o.shopifyOrderId, lineItemId: it.lineItemId, size, frame })
+      const out = await supportApi.action<{ number: string; now: string; invoiced: boolean; owed: number }>('changeItem', { id: thread.id, shopifyOrderId: o.shopifyOrderId, lineItemId: it.lineItemId, size, frame, idempotencyKey: pressKey })
       toast.success(`#${out.number} is now ${out.now}${out.invoiced ? `; invoice sent for $${out.owed.toFixed(2)}` : ''}`)
       onDone(); onCancel()
-    } catch (e) { toast.error((e as Error).message) } finally { setBusy(false) }
+    } catch (e) { toast.error((e as Error).message) } finally { setBusy(false); setPressKey(newIdempotencyKey()) }
   }
   return (
     <div className={formBox}>
@@ -533,7 +540,9 @@ export default function Actions({ thread, onInsert, onAttach, onChanged }: { thr
   const [codeOpen, setCodeOpen] = useState(false)
   const [pct, setPct] = useState('15')
   const pctNum = Number(pct)
-  const pctOk = Number.isInteger(pctNum) && pctNum >= 1 && pctNum <= 100
+  // Over 25% is an admin's; the server holds the same line.
+  const pctMax = isAdmin ? 100 : 25
+  const pctOk = Number.isInteger(pctNum) && pctNum >= 1 && pctNum <= pctMax
   const createCode = () => {
     if (!pctOk) return
     if (pctNum >= 50 && !window.confirm(`A ${pctNum}% code? That is a big one.`)) return
@@ -559,6 +568,7 @@ export default function Actions({ thread, onInsert, onAttach, onChanged }: { thr
                 {[10, 15, 20].map(n => <button key={n} onClick={() => setPct(String(n))} className={`px-1.5 py-0.5 rounded border ${pct === String(n) ? 'border-[#4600D6] text-[#4600D6]' : 'border-border-gray text-off-black/55 hover:text-off-black'}`}>{n}%</button>)}
               </div>
               <div className="text-[11px] text-off-black/45">One use, 30 days, named after {first || 'them'}: {(first || 'TRACKSTAR').toUpperCase().replace(/[^A-Z0-9]/g, '')}-{pctNum || '?'}. Added to your reply.</div>
+              {pctNum > pctMax && <div className="text-red-700">Over {pctMax}% is Matt's call. Slack Matt instead.</div>}
               <div className="flex items-center gap-2">
                 <span className="flex-1" />
                 <button onClick={() => setCodeOpen(false)} className="px-2 py-1 text-xs text-off-black/50 hover:text-off-black">Cancel</button>

@@ -14,11 +14,12 @@ import { confirmWeather, confirmRaceDate } from '../../server/domain/races/verif
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   try {
     const user = await loadActiveUser(actor)
+    if (!user) return res.status(401).json({ error: 'Sign in again.' })
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
     if (body.field === 'date') {
       const race = await confirmRaceDate({ raceId: body.raceId, user })

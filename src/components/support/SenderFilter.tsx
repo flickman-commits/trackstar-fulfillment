@@ -3,16 +3,19 @@ import { Filter, Loader2, Undo2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supportApi } from '@/lib/supportApi'
 import { filterFor } from '@/lib/senderFilters'
+import { useIsAdmin } from '@/lib/auth'
 import type { SenderFilter } from '@/types/support'
 
 const linkCls = 'self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2 disabled:opacity-50'
 
 /**
  * On a conversation: keep this sender out of the inbox, by address or by
- * their whole domain, or, when a filter already catches them, undo it.
+ * their whole domain, or, when a filter already catches them, undo it. A
+ * whole domain is an admin's (the server holds the same line).
  */
 export function FilterSender({ email, filters, onChanged }: { email: string; filters: SenderFilter[]; onChanged: () => void }) {
   const [busy, setBusy] = useState(false)
+  const isAdmin = useIsAdmin()
   const e = (email || '').toLowerCase()
   const domain = e.split('@')[1] || ''
   // Freemail is a person, not a vendor: offer the address only.
@@ -37,7 +40,7 @@ export function FilterSender({ email, filters, onChanged }: { email: string; fil
   }
   return (
     <div className="flex flex-col gap-1.5">
-      {!personal && domain && (
+      {isAdmin && !personal && domain && (
         <button disabled={busy} className={linkCls} title="Vendors, alerts, newsletters: kept, but out of the inbox" onClick={() => run(async () => { const out = await supportApi.addFilter(domain); return `Filtering ${out.pattern}: ${out.filed} conversation${out.filed === 1 ? '' : 's'} moved to Filtered` })}>
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}Filter all mail from {domain}
         </button>

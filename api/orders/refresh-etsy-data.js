@@ -7,13 +7,15 @@
 
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { requireAdminOnly } from '../_lib/users.js'
 import { Prisma } from '@prisma/client'
 import { etsyFetch } from '../../server/services/etsyAuth.js'
 import { parseEtsyRaceName, parseEtsyPersonalization } from '../../server/services/etsyPersonalization.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  // Admin only: it rewrites every Etsy order that is missing data.
+  if (!(await requireAdminOnly(req, res))) return
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -139,7 +141,7 @@ export default async function handler(req, res) {
     console.error('[refresh-etsy-data] Error:', error)
     return res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Something went wrong. Try again, and tell Matt if it keeps happening.'
     })
   }
 }

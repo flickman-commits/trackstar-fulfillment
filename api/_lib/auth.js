@@ -10,6 +10,7 @@
  */
 
 import crypto from 'crypto'
+import prisma from './prisma.js'
 
 export const SESSION_COOKIE = 'ts_session'
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -46,7 +47,7 @@ export function safeEqual(a, b) {
  */
 export function createSessionToken(user) {
   const expiry = Date.now() + SESSION_MAX_AGE_MS
-  const payload = [user.id, user.email, user.role, String(expiry)].join('|')
+  const payload = [user.id, user.email, user.role, String(user.sessionVersion || 0), String(expiry)].join('|')
   return `${payload}.${sign(payload)}`
 }
 
@@ -64,13 +65,69 @@ export function readSessionToken(token) {
   if (!safeEqual(mac, sign(payload))) return null
 
   const parts = payload.split('|')
-  // Anything shorter is a pre-identity token; treat it as invalid.
-  if (parts.length !== 4) return null
-  const [id, email, role, expiryRaw] = parts
-  const expiry = Number(expiryRaw)
+  // Four parts is a token from before session versions: it reads as version
+  // 0, so it keeps working until that person's version is first bumped.
+  // Anything else is a pre-identity token; treat it as invalid.
+  if (parts.length !== 4 && parts.length !== 5) return null
+  const [id, email, role] = parts
+  const version = parts.length === 5 ? Number(parts[3]) : 0
+  const expiry = Number(parts[parts.length - 1])
   if (!Number.isFinite(expiry) || Date.now() >= expiry) return null
+  if (!Number.isInteger(version)) return null
   if (!id || !email) return null
-  return { id, email, role: role || 'staff' }
+  return { id, email, role: role || 'staff', version }
+}
+
+// ---------------------------------------------------------------------------
+// Live session state
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether a signed token still names a live session, and the person's
+ * current role. The signature only proves we issued it; this is what makes
+ * signing someone out, deactivating them or changing their password actually
+ * end their sessions.
+ *
+ * Cached per instance for a minute, so an ordinary request costs nothing and
+ * a cold one costs one indexed read. A bump therefore takes up to a minute to
+ * reach every warm instance; the instance that bumped it forgets at once.
+ */
+const SESSION_CACHE_MS = 60_000
+const sessionCache = new Map()
+
+async function sessionState(userId) {
+  const hit = sessionCache.get(userId)
+  if (hit && Date.now() - hit.at < SESSION_CACHE_MS) return hit.value
+  const value = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isActive: true, role: true, sessionVersion: true },
+  })
+  sessionCache.set(userId, { at: Date.now(), value })
+  if (sessionCache.size > 500) sessionCache.delete(sessionCache.keys().next().value)
+  return value
+}
+
+/** The live actor behind a session token, or null when it no longer counts. */
+export async function liveSession(token) {
+  const claimed = readSessionToken(token)
+  if (!claimed) return null
+  const state = await sessionState(claimed.id)
+  if (!state || !state.isActive || state.sessionVersion !== claimed.version) return null
+  return { id: claimed.id, email: claimed.email, role: state.role, version: claimed.version }
+}
+
+/**
+ * End every session this person has, on every device. Returns the new
+ * version so the caller can re-issue a cookie for the session it wants to keep.
+ */
+export async function bumpSessionVersion(userId) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { sessionVersion: { increment: 1 } },
+    select: { sessionVersion: true },
+  })
+  sessionCache.delete(userId)
+  return user.sessionVersion
 }
 
 /** Back-compat boolean form, for callers that only need yes/no. */
@@ -132,9 +189,10 @@ export function setCors(req, res, { methods = 'GET, POST, OPTIONS', allowPublic 
   if (allowPublic) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*')
   } else {
-    // Match against allowed origins (also allow Vercel preview URLs)
+    // Match against allowed origins, plus this project's own Vercel preview
+    // URLs. Not any *.vercel.app: anyone can deploy there.
     const isAllowed = ALLOWED_ORIGINS.includes(origin)
-      || origin.endsWith('.vercel.app')
+      || /^https:\/\/trackstar-fulfillment(-[a-z0-9-]+)?\.vercel\.app$/.test(origin)
     res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : ALLOWED_ORIGINS[0])
   }
 
@@ -159,19 +217,18 @@ export function setCors(req, res, { methods = 'GET, POST, OPTIONS', allowPublic 
 /**
  * Require an authenticated caller and return WHO they are.
  *
- * Returns a truthy actor on success and false on failure, so the existing
- * `if (!requireAdmin(req, res)) return` call sites keep working unchanged
- * while newer code can use the return value for attribution:
+ * Async: it re-checks the session against the database (cached). Every call
+ * site must await it; a forgotten await yields a Promise, which is truthy, so
+ * scripts/check-auth-await.js fails the build on any bare call.
  *
- *   const actor = requireAdmin(req, res)
+ *   const actor = await requireAdmin(req, res)
  *   if (!actor) return
  *
- * The name is now a misnomer - it means "authenticated", not "admin". Role is
- * enforced separately by requireAdminRole in _lib/users.js, because a role
- * check worth having must re-read the database and this must stay synchronous
- * for the twenty-odd endpoints that only need to know someone is signed in.
+ * The name is a misnomer - it means "authenticated", not "admin". The role it
+ * returns is current, but enforcing it is the caller's job: requireAdminRole
+ * and requireCapability in _lib/users.js.
  */
-export function requireAdmin(req, res) {
+export async function requireAdmin(req, res) {
   const secret = process.env.ADMIN_SECRET
   if (!secret) {
     console.error('[auth] ADMIN_SECRET not configured - blocking request')
@@ -179,16 +236,22 @@ export function requireAdmin(req, res) {
     return false
   }
 
-  // Browser path: signed session cookie naming a user.
+  // Browser path: signed session cookie naming a user, checked against the
+  // database (cached for a minute) so a signed-out, deactivated or
+  // password-changed session stops working.
   const cookies = parseCookies(req)
-  const actor = readSessionToken(cookies[SESSION_COOKIE])
-  if (actor) return actor
+  if (cookies[SESSION_COOKIE]) {
+    const actor = await liveSession(cookies[SESSION_COOKIE])
+    if (actor) return actor
+  }
 
   // Server-to-server path: shared admin secret header (constant-time compare).
-  // Crons and internal tooling have no user row; they act as "system".
+  // It has no user row and acts as "system". It is deliberately NOT an admin:
+  // loadActiveUser refuses it, so it reaches only endpoints that need nothing
+  // more than a signed-in caller, never a role-gated or destructive one.
   const provided = req.headers['x-admin-secret']
   if (provided && safeEqual(provided, secret)) {
-    return { id: null, email: 'system', name: 'System', role: 'admin', isSystem: true }
+    return { id: null, email: 'system', name: 'System', role: 'system', isSystem: true }
   }
 
   res.status(401).json({ error: 'Unauthorized' })

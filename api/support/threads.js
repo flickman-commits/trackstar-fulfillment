@@ -8,6 +8,7 @@
 import { setCors } from '../_lib/auth.js'
 import { requireCapability } from '../_lib/users.js'
 import { listThreads, team, TAG_SUGGESTIONS } from '../../server/domain/support/threads.js'
+import { publicMessage, publicStatus } from '../../server/domain/support/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
@@ -26,6 +27,6 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('[API /support/threads]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'Could not load the inbox') })
   }
 }

@@ -5,12 +5,14 @@
  *   POST { action:'add', pattern }        an address or a domain; files existing conversations from it
  *   POST { action:'remove', pattern }     and brings them back
  *
- * Anyone on Support: it hides, never deletes, and is undone from the same
- * list. Audited. See server/domain/support/filters.js.
+ * Anyone on Support can filter one address: it hides, never deletes, and is
+ * undone from the same list. A whole domain is an admin's, and never a
+ * consumer provider like gmail.com. Audited. See server/domain/support/filters.js.
  */
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
 import { listFilters, addFilter, removeFilter } from '../../server/domain/support/filters.js'
+import { publicMessage, publicStatus } from '../../server/domain/support/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -33,6 +35,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Unknown action: ${body.action}` })
   } catch (error) {
     console.error('[API /support/filters]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'Could not change the filters') })
   }
 }

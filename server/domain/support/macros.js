@@ -8,6 +8,7 @@
  * is not in a macro; the composer already ends every reply with it.
  */
 import prisma from '../../db.js'
+import { UserError } from './errors.js'
 
 const SELECT = { id: true, name: true, shortcut: true, body: true, uses: true, updatedAt: true, createdBy: { select: { id: true, firstName: true } } }
 
@@ -35,21 +36,40 @@ export async function listMacros() {
   return prisma.supportMacro.findMany({ orderBy: [{ uses: 'desc' }, { name: 'asc' }], select: SELECT })
 }
 
+export const MACRO_TITLE_MAX = 120
+export const MACRO_BODY_MAX = 2000
+
+/**
+ * Anyone on Support may add a macro; only the person who wrote one, or an
+ * admin, may change or delete it. The seeded playbook macros have no author,
+ * so they are an admin's to change.
+ */
+async function assertCanChange(id, actor) {
+  const m = await prisma.supportMacro.findUnique({ where: { id: String(id) }, select: { createdById: true } })
+  if (!m) throw new UserError('That macro is gone. Reload the list.')
+  if (actor?.role === 'admin') return
+  if (!m.createdById || m.createdById !== actor?.id) throw new UserError('Only the person who wrote this macro, or an admin, can change it.')
+}
+
 export async function saveMacro({ id, name, shortcut, body }, actor) {
   const n = String(name || '').trim()
   const b = String(body || '').replace(/\r\n/g, '\n').trim()
-  if (!n) throw new Error('A macro needs a name')
-  if (!b) throw new Error('A macro needs a body')
-  if (/\u2014/.test(b)) throw new Error('No em dashes in anything a customer sees')
+  if (!n) throw new UserError('A macro needs a name')
+  if (!b) throw new UserError('A macro needs a body')
+  if (n.length > MACRO_TITLE_MAX) throw new UserError(`Keep the name under ${MACRO_TITLE_MAX} characters.`)
+  if (b.length > MACRO_BODY_MAX) throw new UserError(`Keep a macro under ${MACRO_BODY_MAX.toLocaleString('en-US')} characters. It is ${b.length.toLocaleString('en-US')}.`)
+  if (id) await assertCanChange(id, actor)
+  if (/\u2014/.test(b)) throw new UserError('No em dashes in anything a customer sees')
   const wanted = slugify(shortcut || n)
-  if (shortcut && !wanted) throw new Error('A shortcut is letters, digits and dashes')
+  if (shortcut && !wanted) throw new UserError('A shortcut is letters, digits and dashes')
   const clash = await prisma.supportMacro.findFirst({ where: { shortcut: wanted, ...(id ? { id: { not: id } } : {}) }, select: { name: true } })
-  if (clash) throw new Error(`/${wanted} is already "${clash.name}". Pick another shortcut.`)
+  if (clash) throw new UserError(`/${wanted} is already "${clash.name}". Pick another shortcut.`)
   if (id) return prisma.supportMacro.update({ where: { id }, data: { name: n, body: b, shortcut: wanted }, select: SELECT })
   return prisma.supportMacro.create({ data: { name: n, body: b, shortcut: wanted, createdById: actor?.id || null }, select: SELECT })
 }
 
-export async function deleteMacro(id) {
+export async function deleteMacro(id, actor) {
+  await assertCanChange(id, actor)
   await prisma.supportMacro.delete({ where: { id } })
   return { id }
 }

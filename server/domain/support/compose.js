@@ -9,6 +9,7 @@
 import prisma from '../../db.js'
 import { sendNew } from './mailbox.js'
 import { replyToHtml } from './format.js'
+import { UserError } from './errors.js'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -32,12 +33,12 @@ function actorName(actor) {
 
 export async function emailCustomer({ orderId, subject, text, actor }) {
   const order = await prisma.order.findUnique({ where: { id: String(orderId || '') }, select: { id: true, orderNumber: true, parentOrderNumber: true, shopifyOrderData: true, customerEmail: true, customerName: true } })
-  if (!order) throw new Error('No such order')
+  if (!order) throw new UserError('No such order')
   const to = String(order.customerEmail || '').trim().toLowerCase()
-  if (!EMAIL.test(to)) throw new Error('This order has no customer email to write to')
+  if (!EMAIL.test(to)) throw new UserError('This order has no customer email to write to')
   const body = String(text || '').replace(/\r\n/g, '\n').trim()
-  if (!body) throw new Error('Write the email first')
-  if (/\[[^\]\n]*what we need[^\]\n]*\]/i.test(body)) throw new Error('Fill in what we need from them first')
+  if (!body) throw new UserError('Write the email first')
+  if (/\[[^\]\n]*what we need[^\]\n]*\]/i.test(body)) throw new UserError('Fill in what we need from them first')
   const number = customerOrderNumber(order)
   // A page loaded before the fix filled in our internal id; the customer only knows the display number.
   let subj = String(subject || '').trim().slice(0, 200) || defaultSubject(number)

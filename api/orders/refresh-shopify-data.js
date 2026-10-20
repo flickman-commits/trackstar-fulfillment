@@ -24,7 +24,7 @@ import { resolveShopifyLineIndex, normalizeShopifyLines } from '../../server/lib
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -33,20 +33,20 @@ export default async function handler(req, res) {
   try {
     const { shopifyOrderId } = req.body || {}
 
-    // Single order mode — fetch personalization for one order
-    if (shopifyOrderId) {
-      return await handleSingleOrder(res, shopifyOrderId)
+    // One order at a time. A batch mode used to run on an empty body and
+    // rewrite every Shopify order in the database, resetting statuses and
+    // dropping photos attached by hand; nothing called it on purpose.
+    // The id goes into a Shopify Admin URL, so it must be the numeric id.
+    if (!/^\d{1,20}$/.test(String(shopifyOrderId || ''))) {
+      return res.status(400).json({ error: 'Send the numeric Shopify order id of one order.' })
     }
-
-    // Batch mode — refresh all orders
-    return await handleBatchRefresh(res)
+    return await handleSingleOrder(res, String(shopifyOrderId))
 
   } catch (error) {
     console.error('[API /orders/refresh-shopify-data] Error:', error)
     return res.status(500).json({
       success: false,
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: 'Something went wrong. Try again, and tell Matt if it keeps happening.',
     })
   }
 }
@@ -97,7 +97,9 @@ async function refreshOrderFromShopify(shopifyOrderId) {
         lookupVerified: lineItemData.lookupVerified,
         lookupOutcome: lineItemData.lookupOutcome,
         lookupMatchedName: lineItemData.lookupMatchedName,
-        photoPath: lineItemData.photoPath,
+        // A photo attached by hand (and charged for) has no line-item
+        // property in Shopify; keep it rather than nulling it.
+        photoPath: existing.photoAddedManually ? existing.photoPath : lineItemData.photoPath,
         isGift: lineItemData.isGift
       }
     })
@@ -134,45 +136,6 @@ async function handleSingleOrder(res, shopifyOrderId) {
       raceYear: parsed.rawRaceYear
     }
   })
-}
-
-/**
- * Re-fetch Shopify data for ALL Shopify orders in the database.
- * One Shopify order can be several rows (one per line item); fetch each
- * parent once and let refreshOrderFromShopify fan out to its rows.
- */
-async function handleBatchRefresh(res) {
-  console.log('[API /orders/refresh-shopify-data] Starting batch refresh...')
-
-  const parents = await prisma.order.findMany({
-    where: { source: 'shopify' },
-    select: { parentOrderNumber: true },
-    distinct: ['parentOrderNumber']
-  })
-
-  console.log(`[Refresh] Found ${parents.length} Shopify orders to refresh`)
-
-  const results = { total: parents.length, updated: 0, failed: 0, errors: [] }
-
-  for (const { parentOrderNumber } of parents) {
-    try {
-      const result = await refreshOrderFromShopify(parentOrderNumber)
-      if (!result) {
-        results.failed++
-        results.errors.push({ orderNumber: parentOrderNumber, error: 'No order data returned' })
-        continue
-      }
-      results.updated += result.updated
-      console.log(`[Refresh] Updated ${result.updated}/${result.rows} rows for order ${parentOrderNumber}: ${result.parsed.runnerName} - ${result.parsed.raceName} (${result.parsed.raceYear})`)
-    } catch (error) {
-      console.error(`[Refresh] Error processing order ${parentOrderNumber}:`, error.message)
-      results.failed++
-      results.errors.push({ orderNumber: parentOrderNumber, error: error.message })
-    }
-  }
-
-  console.log(`[Refresh] Complete: ${results.updated} rows updated, ${results.failed} orders failed`)
-  return res.status(200).json({ success: true, ...results })
 }
 
 /**

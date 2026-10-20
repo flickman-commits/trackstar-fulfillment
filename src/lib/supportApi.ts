@@ -24,6 +24,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T,>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 const act = <T,>(id: string, action: string, extra: Record<string, unknown> = {}) => post<T>('/api/support/thread', { id, action, ...extra })
 
+/**
+ * A fresh key for one press of a button that moves money or changes an
+ * order. Made when the confirm step opens and sent with the request, so a
+ * double click or a retry of the same press is refused by the server
+ * instead of running twice. A new press gets a new key.
+ */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
 /** A Support conversation with an order's customer, as the order view lists it. */
 export interface OrderConversation { id: string; subject: string; status: ThreadStatus; snippet: string; lastMessageAt: string; snoozed: boolean; channel: string; assignee: string | null }
 

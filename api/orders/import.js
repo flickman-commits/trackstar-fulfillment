@@ -14,7 +14,7 @@ import { runLockedImport, getLastImport } from '../../server/lib/importStamp.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
 
   // GET: when orders were last pulled in, for the "Last refreshed" line.
   if (req.method === 'GET') {
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     console.error('[API /orders/import] Error:', error)
     return res.status(500).json({
       success: false,
-      error: error.message,
+      error: 'Something went wrong. Try again, and tell Matt if it keeps happening.',
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }

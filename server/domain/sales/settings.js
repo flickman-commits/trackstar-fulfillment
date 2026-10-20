@@ -14,6 +14,8 @@
  */
 import prisma from '../../db.js'
 import { DEFAULT_SOCIAL_PROOF } from './angles.js'
+import { sanitizeSignatureHtml } from './signature.js'
+import { UserError } from './errors.js'
 
 export const SETTINGS_KEY = 'sales_settings'
 
@@ -67,6 +69,8 @@ export async function getSettings({ force = false } = {}) {
   try { over = row?.value ? JSON.parse(row.value) : {} } catch { over = {} }
   const env = process.env.SALES_DAILY_CAP ? { dailyCap: Number(process.env.SALES_DAILY_CAP) } : {}
   const value = merge(merge(DEFAULTS, over), env)
+  // Whatever was saved before the sanitizer existed is cleaned on the way out too.
+  value.signature = sanitizeSignatureHtml(value.signature)
   cache = { at: Date.now(), value }
   return value
 }
@@ -79,21 +83,21 @@ export async function setSettings(patch) {
   const next = merge(current, patch)
   if (next.dailyCap !== undefined) {
     const n = Number(next.dailyCap)
-    if (!Number.isInteger(n) || n < 1 || n > 50) throw new Error('dailyCap must be a whole number from 1 to 50')
+    if (!Number.isInteger(n) || n < 1 || n > 50) throw new UserError('dailyCap must be a whole number from 1 to 50')
     next.dailyCap = n
   }
   if (next.undoSeconds !== undefined) {
     const n = Number(next.undoSeconds)
-    if (!Number.isInteger(n) || n < 0 || n > 60) throw new Error('undoSeconds must be a whole number from 0 to 60')
+    if (!Number.isInteger(n) || n < 0 || n > 60) throw new UserError('undoSeconds must be a whole number from 0 to 60')
     next.undoSeconds = n
   }
   if (next.timezone !== undefined) {
     try { new Intl.DateTimeFormat('en-US', { timeZone: String(next.timezone) }) }
-    catch { throw new Error(`Unknown timezone: ${next.timezone}`) }
+    catch { throw new UserError(`Unknown timezone: ${next.timezone}`) }
   }
   if (next.signature !== undefined) {
-    next.signature = String(next.signature).slice(0, 4000)
-    if (/<script|javascript:/i.test(next.signature)) throw new Error('The signature cannot contain scripts')
+    // Only the tags and attributes a signature needs are kept (signature.js).
+    next.signature = sanitizeSignatureHtml(String(next.signature).slice(0, 4000))
   }
   await prisma.systemConfig.upsert({
     where: { key: SETTINGS_KEY },
@@ -132,11 +136,14 @@ export async function getSenderFor(userId, user = null) {
       ? `<p style="margin:0">Thanks,</p><p style="margin:0;font-weight:700">${escapeHtml(`${user.firstName} ${user.lastName || ''}`.trim())}</p><p style="margin:0">Trackstar</p>`
       : base.signature,
   }
-  return { ...fallback, ...over, isDefault: !row }
+  const merged = { ...fallback, ...over, isDefault: !row }
+  // Rendered as HTML in the app and sent as HTML: only the allowed tags and attributes, whenever it was saved.
+  merged.signature = sanitizeSignatureHtml(merged.signature)
+  return merged
 }
 
 export async function setSenderFor(userId, patch) {
-  if (!userId) throw new Error('No user')
+  if (!userId) throw new UserError('No user')
   const row = await prisma.systemConfig.findUnique({ where: { key: senderKey(userId) } })
   let current = {}
   try { current = row?.value ? JSON.parse(row.value) : {} } catch { current = {} }
@@ -148,9 +155,8 @@ export async function setSenderFor(userId, patch) {
     const sig = String(patch.signature)
     // Refuse an oversized signature rather than silently cutting it in half,
     // which is what happened to anyone pasting one with an inlined image.
-    if (sig.length > 20000) throw new Error(`That signature is ${sig.length} characters. Keep it under 20,000, and host images at a URL rather than pasting them in.`)
-    if (/<script|javascript:/i.test(sig)) throw new Error('The signature cannot contain scripts')
-    next.signature = sig
+    if (sig.length > 20000) throw new UserError(`That signature is ${sig.length} characters. Keep it under 20,000, and host images at a URL rather than pasting them in.`)
+    next.signature = sanitizeSignatureHtml(sig)
   }
   await prisma.systemConfig.upsert({
     where: { key: senderKey(userId) },

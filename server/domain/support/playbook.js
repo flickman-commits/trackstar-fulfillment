@@ -12,6 +12,7 @@
  * deploy. Keep the Notion page and this in step when either changes.
  */
 import prisma from '../../db.js'
+import { UserError } from './errors.js'
 
 const KEY = 'support_playbook'
 
@@ -99,8 +100,8 @@ export async function getPlaybook() {
 
 export async function savePlaybook(text) {
   const t = String(text || '').replace(/\r\n/g, '\n').trim()
-  if (t.length < 200) throw new Error('That is too short to be the playbook.')
-  if (t.length > 60000) throw new Error('That is too long; keep the playbook under 60,000 characters.')
+  if (t.length < 200) throw new UserError('That is too short to be the playbook.')
+  if (t.length > 60000) throw new UserError('That is too long; keep the playbook under 60,000 characters.')
   await prisma.systemConfig.upsert({ where: { key: KEY }, update: { value: t }, create: { key: KEY, value: t } })
   return getPlaybook()
 }

@@ -6,6 +6,7 @@
 import { z } from 'zod'
 import prisma from '../../../../api/_lib/prisma.js'
 import { ToolError } from '../server.js'
+import { can } from '../../../../api/_lib/roles.js'
 import { findOrdersByNumber, displayNumber } from './orders.js'
 import { rosterFor, getShifts, addShift, endShift, spreadQueue, openCounts, SHARE_WEIGHTS, businessDate } from '../../../domain/orders/assignment.js'
 import { processOrders } from '../../../processOrders.js'
@@ -26,6 +27,24 @@ export async function resolveTeammate(who, principal) {
   if (hits.length === 1) return hits[0]
   if (hits.length > 1) throw new ToolError(`More than one ${who}: ${hits.map(full).join(', ')}. Use the full name.`)
   throw new ToolError(`Nobody on the team is called "${who}". The team: ${users.map(u => u.firstName).join(', ')}.`)
+}
+
+const DESIGN_TYPES = new Set(['custom', 'race_partner'])
+
+/**
+ * The messages addShift, endShift and spreadQueue throw for a person to read
+ * (server/domain/orders/assignment.js throws plain Errors). Anything else is
+ * a server fault and goes out as the generic failure with a reference.
+ */
+const SHIFT_MESSAGES = [
+  /^Help is for standard or custom orders$/, /^Pick the first and last day$/, /^The last day is before the first$/,
+  /^Those dates are already over$/, /^Pick a share$/, /^Pick an active teammate$/, /^\S.* already gets every \w+ order$/,
+  /^\S.* already has a shift on those days$/, /^No such shift$/, /^That shift is not on today$/,
+]
+function shiftError(err) {
+  const msg = String(err?.message || '')
+  if (err && !err.expose && err.constructor === Error && SHIFT_MESSAGES.some(re => re.test(msg))) return new ToolError(msg)
+  return err
 }
 
 const TYPE_LABEL = { standard: 'Standard orders', custom: 'Custom orders', race_partner: 'Partner orders', bulk: 'Bulk orders' }
@@ -64,6 +83,11 @@ export const teamTools = [
     async handler({ orderNumber, to }, { principal }) {
       const rows = await findOrdersByNumber(orderNumber)
       if (!rows.length) throw new ToolError(`No order matching "${orderNumber}".`)
+      // Design jobs are handed out by whoever runs design (Head of Design, or an
+      // admin), the same rule as api/orders/assign.js.
+      if (rows.some(r => DESIGN_TYPES.has(r.trackstarOrderType)) && !(principal.role === 'admin' || await can(principal.role, 'orders.assign_custom'))) {
+        throw new ToolError('Only the Head of Design or an admin can assign custom and partner orders.')
+      }
       const who = await resolveTeammate(to, principal)
       await prisma.order.updateMany({ where: { id: { in: rows.map(r => r.id) } }, data: { assigneeId: who?.id || null } })
       const n = displayNumber(rows[0])
@@ -102,7 +126,7 @@ export const teamTools = [
       try {
         const shift = await addShift({ type, userId: user.id, weight: share, from, until })
         return { summary: `${user.firstName} helps on ${type} orders ${from} to ${until}`, shift }
-      } catch (err) { throw new ToolError(err.message) }
+      } catch (err) { throw shiftError(err) }
     },
   },
   {
@@ -116,7 +140,7 @@ export const teamTools = [
       try {
         const out = await endShift(id)
         return { summary: `Ended shift ${id}; ${out.handedBack} order(s) back to the regular`, ...out }
-      } catch (err) { throw new ToolError(err.message) }
+      } catch (err) { throw shiftError(err) }
     },
   },
   {
@@ -130,7 +154,7 @@ export const teamTools = [
       try {
         const out = await spreadQueue(shiftId)
         return { summary: `Moved ${out.moved} waiting order(s) to the helper`, moved: out.moved }
-      } catch (err) { throw new ToolError(err.message) }
+      } catch (err) { throw shiftError(err) }
     },
   },
 ]

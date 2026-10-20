@@ -384,11 +384,14 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
     if (!m.id.startsWith('builtin:')) onUseMacro(m.id)
   }
 
+  // The orders this conversation is about: under their email, or linked by a teammate.
+  const verifiedNumbers = useMemo(() => (thread.context?.orders || []).map(o => String(o.number)), [thread.context])
+
   /** Run a suggested action from Claude's draft, the same call the Actions panel makes, then mark it done. */
-  const approveProposal = async (n: Note, p: Proposal) => {
+  const approveProposal = async (n: Note, p: Proposal, idempotencyKey: string) => {
     try {
       if (p.type === 'shippingAddress') {
-        await supportApi.action('shippingAddress', { id: thread.id, shopifyOrderId: p.shopifyOrderId, address: p.address })
+        await supportApi.action('shippingAddress', { id: thread.id, shopifyOrderId: p.shopifyOrderId, address: p.address, idempotencyKey })
         toast.success(`#${p.orderNumber} ship-to changed in Shopify. Artelo still needs it.`)
       } else if (p.type === 'discount') {
         const out = await supportApi.action<{ code: string }>('discount15', { id: thread.id, percent: p.percent })
@@ -397,7 +400,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
         try { await navigator.clipboard.writeText(out.code) } catch { /* it is in the reply or the draft */ }
         toast.success(`${out.code} created${text.includes('[CODE]') ? ' and put in the reply' : '; it goes in when you use the draft'}`)
       } else if (p.type === 'changeItem') {
-        const out = await supportApi.action<{ number: string; now: string; invoiced: boolean; owed: number }>('changeItem', { id: thread.id, shopifyOrderId: p.shopifyOrderId, size: p.size, frame: p.frame })
+        const out = await supportApi.action<{ number: string; now: string; invoiced: boolean; owed: number }>('changeItem', { id: thread.id, shopifyOrderId: p.shopifyOrderId, size: p.size, frame: p.frame, idempotencyKey })
         toast.success(`#${out.number} is now ${out.now}${out.invoiced ? `; invoice sent for $${out.owed.toFixed(2)}` : ''}`)
       } else if (p.type === 'orderNote') {
         await supportApi.action('orderNote', { id: thread.id, orderId: p.orderId, text: p.text })
@@ -487,7 +490,7 @@ export default function Conversation({ thread, team, me, isAdmin, busy, macros, 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 bg-[#fcfcfc]">
         {timeline.map(it => it.kind === 'note' && it.n.kind === 'draft'
           ? <DraftCard key={it.n.id} n={it.n} latest={it.n.id === latestDraftId} answered={thread.messages.some(m => m.direction === 'out' && new Date(m.sentAt) > new Date(it.n.createdAt))} onRedraft={onRedraft}
-              onApprove={p => approveProposal(it.n, p)} onDismiss={p => dismissProposal(it.n, p)}
+              verifiedNumbers={verifiedNumbers} onApprove={(p, key) => approveProposal(it.n, p, key)} onDismiss={p => dismissProposal(it.n, p)}
               onUse={body => { setMode('reply'); setText(tagStoreLinks(body.replace(/\{\{rep\}\}/g, me.firstName).replace(/\[CODE\]/g, c => madeCode || c), thread.channel)); requestAnimationFrame(() => replyRef.current?.focusLine(0, 'start')) }} />
           : it.kind === 'message'
           ? <Bubble key={it.m.id} m={it.m} />

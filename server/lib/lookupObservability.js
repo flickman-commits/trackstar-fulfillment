@@ -15,6 +15,7 @@
  *                     buffer in one is invisible to the other.
  */
 import prisma from '../../api/_lib/prisma.js'
+import { fetchWithTimeout } from './fetchWithTimeout.js'
 
 const ALERT_DEDUPE_MS = 10 * 60 * 1000 // 10 minutes per race+errorType
 const lastAlertAt = new Map() // key `race::errorType` -> ms timestamp
@@ -152,7 +153,7 @@ export async function maybeAlertLookupError({ race, year, errorType, detail }) {
   ].filter(Boolean).join('\n')
 
   try {
-    await fetch(slackUrl, {
+    await fetchWithTimeout(slackUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),

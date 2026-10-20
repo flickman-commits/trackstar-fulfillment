@@ -34,10 +34,10 @@ export default function CreatorApply() {
     setIsStarting(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/api/orders/actions`, {
+      const res = await fetch(`${API_BASE}/api/public/creator`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create-public-invite' }),
+        body: JSON.stringify({ action: 'apply' }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))

@@ -13,6 +13,8 @@
  * so the import reads a sample exactly like a customer's order. Orders are
  * tagged "sample" (and "sample-at-cost").
  */
+import { createHash } from 'crypto'
+import prisma from '../../db.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { printCatalog } from '../catalog/printCatalog.js'
 import { arteloPriceCheck } from '../../services/arteloPriceCheck.js'
@@ -53,6 +55,8 @@ function cleanAddress(a = {}) {
  * Create the sample order in Shopify.
  * @param {{ email, address, source?, items: [{ variantId, quantity, title?, size?, frame?, runnerName, raceYear, bib, time, unitPrice? }], mode: 'free'|'cost', shipping?, note?, sendEmails? }} input
  */
+const SEND_ONCE_MS = 10 * 60_000
+
 export async function sendSample(input, actor) {
   const email = String(input.email || '').trim()
   if (!/^\S+@\S+\.\S+$/.test(email)) throw Object.assign(new Error('Add their email, so Shopify can send the order emails'), { status: 400 })
@@ -89,9 +93,32 @@ export async function sendSample(input, actor) {
     note: [`Sample sent by ${by} from the fulfillment tool${atCost ? ', at cost' : ', free'}.`, String(input.note || '').trim()].filter(Boolean).join('\n'),
     sourceName: 'trackstar-samples',
   }
-  const d = await shopifyGraphQL(ORDER_CREATE, { order, options: { sendReceipt: input.sendEmails !== false, sendFulfillmentReceipt: input.sendEmails !== false } }, { version: API })
+  // Send once. A timeout after Shopify accepted the order, a double click, or
+  // a retried call would otherwise create a second order and a second set of
+  // emails. The same recipient, prints and mode within ten minutes is refused;
+  // the claim is released if Shopify refuses, so a fixed retry still works.
+  const fingerprint = createHash('sha256').update(JSON.stringify({ email: email.toLowerCase(), mode: atCost, lineItems, shipping })).digest('hex').slice(0, 24)
+  const claimKey = `sample_sent:${fingerprint}`
+  await prisma.systemConfig.deleteMany({ where: { key: { startsWith: 'sample_sent:' }, updatedAt: { lt: new Date(Date.now() - SEND_ONCE_MS) } } }).catch(() => {})
+  try {
+    await prisma.systemConfig.create({ data: { key: claimKey, value: new Date().toISOString() } })
+  } catch (err) {
+    if (err.code === 'P2002') throw Object.assign(new Error('This exact sample was sent in the last 10 minutes. Check Shopify before sending it again.'), { status: 409 })
+    throw err
+  }
+  let d
+  try {
+    d = await shopifyGraphQL(ORDER_CREATE, { order, options: { sendReceipt: input.sendEmails !== false, sendFulfillmentReceipt: input.sendEmails !== false } }, { version: API })
+  } catch (err) {
+    // A timeout may still have created the order, so the claim stays.
+    if (err.name !== 'TimeoutError') await prisma.systemConfig.delete({ where: { key: claimKey } }).catch(() => {})
+    throw err
+  }
   const res = (d.data || d).orderCreate
-  if (res.userErrors?.length) throw Object.assign(new Error(`Shopify: ${res.userErrors.map(e => e.message).join('; ')}`), { status: 400 })
+  if (res.userErrors?.length) {
+    await prisma.systemConfig.delete({ where: { key: claimKey } }).catch(() => {})
+    throw Object.assign(new Error(`Shopify: ${res.userErrors.map(e => e.message).join('; ')}`), { status: 400 })
+  }
   const created = res.order
   let invoiced = false
   if (atCost && Number(created.totalPriceSet.shopMoney.amount) > 0) {

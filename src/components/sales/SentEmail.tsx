@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, Copy, ExternalLink, Lock, Paperclip, Loader2 } from 'lucide-react'
 import { btnSecondary, cardLabel, textLink } from '@/lib/ui'
 import type { Asset, Deal, Send } from '@/types/sales'
+import { safeSignature } from './safeSignature'
 
 /**
  * An email that already went out, shown as it was sent: read only, but the
@@ -93,7 +94,7 @@ export default function SentEmail({ deal, sentAt, signature, assets }: {
             </div>
             <div className="rounded-md bg-subtle-gray/60 border border-border-gray/70 px-4 py-3 text-sm text-off-black leading-relaxed space-y-3">
               {paragraphs(main).map((p, i) => <Paragraph key={i} text={p} />)}
-              {signature && <div className="text-off-black/70" dangerouslySetInnerHTML={{ __html: signature }} />}
+              {signature && <div className="text-off-black/70" dangerouslySetInnerHTML={{ __html: safeSignature(signature) }} />}
               {ps && paragraphs(ps).map((p, i) => <Paragraph key={`ps${i}`} text={p} />)}
             </div>
             {files.length > 0 && (

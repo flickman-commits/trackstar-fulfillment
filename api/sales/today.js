@@ -22,6 +22,7 @@ import { requireSalesRep } from '../_lib/users.js'
 import { getSettings, startOfToday } from '../../server/domain/sales/settings.js'
 import { morningQueue, dealForWork, progress, searchDeals } from '../../server/domain/sales/queue.js'
 import { setStage, noteOnDeal, isAttioConfigured, removeFromOutreach, restoreToOutreach } from '../../server/domain/sales/attio.js'
+import { publicMessage, publicStatus } from '../../server/domain/sales/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -89,6 +90,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (error) {
     console.error('[API /sales/today]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'Could not load the queue') })
   }
 }

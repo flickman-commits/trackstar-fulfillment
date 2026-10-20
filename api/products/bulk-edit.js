@@ -35,7 +35,7 @@ const MAX_BATCH = 1000
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return
 
   // The whole bulk editor is part of the admin view, reads included: the

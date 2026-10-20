@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js'
 import { readUpload } from './uploads.js'
 import prisma from '../../db.js'
 import { BUCKET } from '../render/jobs.js'
+import { UserError } from './errors.js'
 
 function storage() {
   return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
@@ -74,26 +75,26 @@ export async function resolveMockup(ref, { filenameStem = 'Your Trackstar print'
   if (kind === 'upload') return readUpload(String(ref).slice('upload:'.length))
   if (kind === 'render') {
     const j = await prisma.renderJob.findUnique({ where: { id: String(id) }, select: { previewPath: true, status: true } })
-    if (!j?.previewPath || j.status !== 'done') throw new Error('That design is not ready')
+    if (!j?.previewPath || j.status !== 'done') throw new UserError('That design is not ready')
     const sb = storage()
     const { data, error } = await sb.storage.from(BUCKET).download(j.previewPath)
-    if (error || !data) throw new Error('Could not read the design file')
+    if (error || !data) throw new UserError('Could not read the design file')
     const bytes = Buffer.from(await data.arrayBuffer())
     const url = (await sb.storage.from(BUCKET).createSignedUrl(j.previewPath, 86400)).data?.signedUrl || null
     return { bytes, contentType: 'image/png', filename: `${filenameStem}.png`, url }
   }
   if (kind === 'proof') {
     const p = await prisma.proof.findUnique({ where: { id: String(id) }, select: { imageUrl: true } })
-    if (!p?.imageUrl) throw new Error('That proof is gone')
+    if (!p?.imageUrl) throw new UserError('That proof is gone')
     // Only our own storage: the URL comes from our table, and is checked anyway.
     const host = new URL(p.imageUrl).host
     const ours = new URL(process.env.SUPABASE_URL || 'https://invalid').host
-    if (host !== ours) throw new Error('That proof is not in our storage')
+    if (host !== ours) throw new UserError('That proof is not in our storage')
     const res = await fetch(p.imageUrl)
     if (!res.ok) throw new Error(`Could not read the proof (${res.status})`)
     const type = (res.headers.get('content-type') || 'image/png').split(';')[0]
     const bytes = Buffer.from(await res.arrayBuffer())
     return { bytes, contentType: type, filename: `${filenameStem}.${extFor(type)}`, url: p.imageUrl }
   }
-  throw new Error('Unknown attachment')
+  throw new UserError('Unknown attachment')
 }

@@ -27,6 +27,7 @@
  * in JavaScript after a plain paged fetch.
  */
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
+import { UserError } from './errors.js'
 
 const BASE = process.env.ATTIO_BASE_URL || 'https://api.attio.com/v2'
 const PAGE = 500
@@ -54,7 +55,7 @@ export function isAttioConfigured() { return Boolean(process.env.ATTIO_API_KEY) 
  * burst of clicks slows down instead of failing in front of the rep.
  */
 async function attio(path, { method = 'GET', body } = {}) {
-  if (!isAttioConfigured()) throw new Error('Attio is not connected: ATTIO_API_KEY is not set')
+  if (!isAttioConfigured()) throw new UserError('Attio is not connected: ATTIO_API_KEY is not set')
   let res
   for (let attempt = 0; ; attempt++) {
     res = await fetchWithTimeout(`${BASE}${path}`, {
@@ -459,14 +460,14 @@ export async function recordSend(deal, { sentAt, touchNumber, nextAction, nextAc
 
 /** A person changed the stage from the tool. Written exactly. */
 export async function setStage(dealId, stage) {
-  if (!(await stageTitles()).includes(stage)) throw new Error(`Unknown stage: ${stage}`)
+  if (!(await stageTitles()).includes(stage)) throw new UserError(`Unknown stage: ${stage}`)
   await patchDeal(dealId, { stage })
   return getDeal(dealId, { fresh: true })
 }
 
 /** A PR contact's list status, set by a person from the tool. */
 async function setPrStatus(id, status) {
-  if (!PR_STAGE[status]) throw new Error(`Unknown PR status: ${status}`)
+  if (!PR_STAGE[status]) throw new UserError(`Unknown PR status: ${status}`)
   const entryId = String(id).slice(PR_PREFIX.length)
   await attio(`/lists/${PR_LIST}/entries/${entryId}`, { method: 'PATCH', body: { data: { entry_values: { status } } } })
   cache.delete(`deal:${id}`)
@@ -482,7 +483,7 @@ async function setPrStatus(id, status) {
  */
 export async function removeFromOutreach(id, { reason = null, byEmail = null } = {}) {
   const current = await getDeal(id, { fresh: true })
-  if (!current) throw new Error('That is not in Attio any more')
+  if (!current) throw new UserError('That is not in Attio any more')
   const previous = isPrId(id) ? current.prStatus : current.stage
   if (isPrId(id)) await setPrStatus(id, 'Not interested')
   else await patchDeal(id, { stage: 'Lost' })
@@ -504,7 +505,7 @@ export async function noteOnDeal(dealId, text, byEmail) {
   if (isPrId(dealId)) {
     const contact = await getPrContact(dealId)
     const person = contact?.people?.[0]
-    if (!person?.id) throw new Error('That press contact is not in Attio any more')
+    if (!person?.id) throw new UserError('That press contact is not in Attio any more')
     await addPersonNote(person.id, { title, content: text })
     return
   }

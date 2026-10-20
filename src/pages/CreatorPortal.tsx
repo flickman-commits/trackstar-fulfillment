@@ -86,7 +86,7 @@ export default function CreatorPortal() {
   const fetchData = useCallback(async () => {
     if (!token) return
     try {
-      const res = await fetch(`${API_BASE}/api/orders/actions?action=creator-portal-data&token=${token}`)
+      const res = await fetch(`${API_BASE}/api/public/creator?token=${encodeURIComponent(token)}`)
       if (res.status === 404) {
         setState('expired')
         return
@@ -227,11 +227,11 @@ function OnboardingWizard({ data, token, onDone }: {
   const handleSubmit = async () => {
     setIsSubmitting(true)
     try {
-      const res = await fetch(`${API_BASE}/api/orders/actions`, {
+      const res = await fetch(`${API_BASE}/api/public/creator`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'creator-onboard',
+          action: 'onboard',
           token,
           data: {
             name: draft.name.trim(),

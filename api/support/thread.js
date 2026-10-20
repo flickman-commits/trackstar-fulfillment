@@ -24,6 +24,7 @@ import { requireCapability, recordAudit } from '../_lib/users.js'
 import { getThread, assign, setStatus, snooze, setPriority, setTags, addNote, deleteNote, markRead, markUnread, noteRow, setProposal, linkOrder, unlinkOrder } from '../../server/domain/support/threads.js'
 import { draftThread } from '../../server/domain/support/draft.js'
 import { mergeThreads } from '../../server/domain/support/merge.js'
+import { publicMessage, publicStatus, isUserError } from '../../server/domain/support/errors.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -109,9 +110,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: `Unknown action: ${body.action}` })
     }
   } catch (error) {
-    // A 400 is the person's input ("We can't find order #1234"); say it as is.
-    if (error.status === 400) return res.status(400).json({ error: error.message })
+    // A UserError is the person's input ("We can't find order #1234"); say it as is.
+    if (isUserError(error)) return res.status(publicStatus(error)).json({ error: error.message })
     console.error('[API /support/thread]', error)
-    return res.status(500).json({ error: error.message })
+    return res.status(publicStatus(error)).json({ error: publicMessage(error, 'That did not work. Reload the conversation and try again.') })
   }
 }

@@ -90,9 +90,12 @@ export function isValidEmail(email) {
  */
 export async function loadActiveUser(actor) {
   if (!actor) return null
-  // Cron and internal tooling authenticate with the shared secret and have no
-  // user row. They are trusted at the admin level by definition.
-  if (actor.isSystem) return actor
+  // The shared x-admin-secret header has no user row. It used to pass as an
+  // admin here, which made one leaked env var a key to every destructive
+  // action. Nothing in the app sends it any more (crons use CRON_SECRET, the
+  // nightly agent its own token, people their own sign-in), so it is refused
+  // for anything that needs a person or a role.
+  if (actor.isSystem) return null
   if (!actor.id) return null
   const user = await prisma.user.findUnique({
     where: { id: actor.id },
@@ -130,7 +133,7 @@ export async function requireAdminRole(req, res, actor) {
  * failure; returns the user otherwise.
  */
 export async function requireCapability(req, res, capability) {
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return null
   const user = await loadActiveUser(actor)
   if (!user) {
@@ -150,11 +153,10 @@ export async function requireCapability(req, res, capability) {
  * both, and forgetting the second half is an easy mistake to make, so this
  * pairs them. Returns the actor, or null after responding 401/403.
  *
- * Cron and internal tooling authenticating with the shared secret pass, the
- * same as everywhere else - loadActiveUser treats them as admin by definition.
+ * The shared x-admin-secret header does not pass: loadActiveUser refuses it.
  */
 export async function requireAdminOnly(req, res) {
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return null
   return await requireAdminRole(req, res, actor)
 }
@@ -167,7 +169,7 @@ export async function requireAdminOnly(req, res) {
  * only admins get in, so the page can say what is missing.
  */
 export async function requireSalesRep(req, res) {
-  const actor = requireAdmin(req, res)
+  const actor = (await requireAdmin(req, res))
   if (!actor) return null
   const user = await loadActiveUser(actor)
   if (!user) {
