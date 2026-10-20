@@ -5,7 +5,7 @@ import { btnSecondary, chip } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { ago, day } from '@/lib/supportDates'
 import { STATUS_LABEL, STATUS_TONE } from '@/lib/supportStatus'
-import type { CustomerOrder, InstagramStatus, MailboxStatus, Mockup, SenderFilter, Teammate, ThreadDetail } from '@/types/support'
+import type { CustomerOrder, OrderItem, InstagramStatus, MailboxStatus, Mockup, SenderFilter, Teammate, ThreadDetail } from '@/types/support'
 import Actions from './Actions'
 import { FilterSender } from './SenderFilter'
 
@@ -39,22 +39,30 @@ function Attr({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
-/** Where the order is, in one chip: shipped, in production, being designed, or waiting. */
-function stage(o: CustomerOrder): { label: string; cls: string } | null {
-  if (o.financialStatus === 'REFUNDED') return { label: 'Refunded', cls: 'bg-red-50 border-red-200 text-red-700' }
-  if (o.fulfillmentStatus === 'FULFILLED' || o.tracking.length) return { label: 'Shipped', cls: 'bg-emerald-50 border-emerald-200 text-emerald-700' }
-  const it = o.items[0]
-  if (!it) return o.imported ? null : { label: 'Not imported yet', cls: 'bg-white border-border-gray text-off-black/55' }
+/** Where one print is: in production, being designed, or waiting. */
+function itemStage(it: OrderItem): { label: string; cls: string } {
   if (it.status === 'completed' || it.designStatus === 'sent_to_production') return { label: 'In production', cls: 'bg-blue-50 border-blue-200 text-blue-700' }
   if (it.designStatus && it.designStatus !== 'not_started') return { label: it.designStatus === 'approved_by_customer' ? 'Approved, not yet printed' : 'Being designed', cls: 'bg-purple-50 border-purple-200 text-purple-700' }
   return { label: 'In the queue', cls: 'bg-white border-border-gray text-off-black/60' }
 }
 
 /**
- * One order, compact: a small picture, then three short lines (number and
- * race; runner and what was bought; when and where it is), tracking and a
- * code only when there is one, then one "Open in" row: Fulfillment,
- * Shopify, Artelo.
+ * Where the order is, in one chip: shipped, in production, being designed,
+ * or waiting. With several prints, the one furthest behind sets it.
+ */
+function stage(o: CustomerOrder): { label: string; cls: string } | null {
+  if (o.financialStatus === 'REFUNDED') return { label: 'Refunded', cls: 'bg-red-50 border-red-200 text-red-700' }
+  if (o.fulfillmentStatus === 'FULFILLED' || o.tracking.length) return { label: 'Shipped', cls: 'bg-emerald-50 border-emerald-200 text-emerald-700' }
+  if (!o.items.length) return o.imported ? null : { label: 'Not imported yet', cls: 'bg-white border-border-gray text-off-black/55' }
+  const order = ['In the queue', 'Being designed', 'Approved, not yet printed', 'In production']
+  return o.items.map(itemStage).sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label))[0]
+}
+
+/**
+ * One order: the number, where it is and when it was placed, tracking and a
+ * code when there is one, then every print in it (picture, race, runner, what
+ * was bought, and its own stage when the prints are not all at the same
+ * point), then one "Open in" row: TrackstarOS, Shopify, Artelo.
  */
 function OpenIn({ href, icon, label, title }: { href: string; icon: ReactNode; label: string; title?: string }) {
   return (
@@ -65,32 +73,53 @@ function OpenIn({ href, icon, label, title }: { href: string; icon: ReactNode; l
   )
 }
 
+/** One print in an order: picture, race, runner and what it is, and where it is when that differs. */
+function PrintRow({ o, it, showStage }: { o: CustomerOrder; it: OrderItem; showStage: boolean }) {
+  const race = `${it.race}${it.year ? ` ${it.year}` : ''}`
+  const bought = [it.size, it.frame && !/^unframed$/i.test(it.frame) ? it.frame.replace(/([a-z])([A-Z])/g, '$1 $2') : null, it.hasPhoto ? 'photo' : null].filter(Boolean).join(' · ')
+  const st = showStage ? itemStage(it) : null
+  // Our own order view for this print (/orders/4446, -2 for a later item), in a new tab so Support keeps its place.
+  const href = o.imported ? `/orders/${o.number}${it.item > 1 ? `-${it.item}` : ''}` : null
+  return (
+    <div className="flex items-start gap-2.5">
+      {it.heroImageUrl ? (
+        <a href={it.heroImageUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 block w-11 h-11 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90" title="View full size">
+          <img src={it.heroImageUrl} alt={it.productLabel || race} className="w-full h-full object-cover" />
+        </a>
+      ) : (
+        <div className="flex-shrink-0 w-11 h-11 rounded border border-border-gray bg-white flex items-center justify-center text-off-black/25"><Package className="w-4 h-4" /></div>
+      )}
+      <div className="flex-1 min-w-0 text-xs leading-snug">
+        <div className="text-off-black truncate" title={race}>
+          {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="hover:underline" title="This print in TrackstarOS">{race}</a> : race}
+        </div>
+        {(it.runner || bought) && <div className="text-off-black/60 truncate" title={[it.runner, bought].filter(Boolean).join(' · ')}>{[it.runner, bought].filter(Boolean).join(' · ')}</div>}
+        {st && <span className={`mt-0.5 inline-flex items-center px-1.5 py-px border rounded text-[11px] font-medium ${st.cls}`}>{st.label}</span>}
+      </div>
+    </div>
+  )
+}
+
 function OrderCard({ o, onUnlink }: { o: CustomerOrder; onUnlink?: () => void }) {
-  const it = o.items[0]
   const age = Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 86400000)
   const late = o.fulfillmentStatus !== 'FULFILLED' && !o.tracking.length
   const ageCls = !late ? 'text-off-black/50' : age > 5 ? 'text-red-600 font-medium' : age >= 3 ? 'text-orange-600 font-medium' : 'text-off-black/50'
   const st = stage(o)
   const tracking = o.tracking.find(t => t.url) || o.tracking[0] || null
-  const race = it ? `${it.race}${it.year ? ` ${it.year}` : ''}` : o.lineItems[0]?.title || 'Order'
-  const bought = it ? [it.size, it.frame && !/^unframed$/i.test(it.frame) ? it.frame.replace(/([a-z])([A-Z])/g, '$1 $2') : null, it.hasPhoto ? 'photo' : null].filter(Boolean).join(' · ') : o.lineItems[0]?.variant || ''
   const placed = new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  // Our own order view (/orders/4446, -2 for a later item); every link opens a new tab so Support keeps its place.
-  const fulfillmentUrl = o.imported && it ? `/orders/${o.number}${it.item > 1 ? `-${it.item}` : ''}` : null
+  // A print gets its own chip only when the prints are not all in the same place.
+  const stages = new Set(o.items.map(it => itemStage(it)?.label))
+  const mixed = !o.tracking.length && o.financialStatus !== 'REFUNDED' && stages.size > 1
+  const first = o.items[0]
+  const fulfillmentUrl = o.imported && first ? `/orders/${o.number}${first.item > 1 ? `-${first.item}` : ''}` : null
   return (
     <div className="space-y-1.5">
-      <div className="bg-subtle-gray border border-border-gray rounded-md p-2.5 flex items-start gap-2.5">
-        {it?.heroImageUrl ? (
-          <a href={it.heroImageUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 block w-11 h-11 rounded border border-border-gray overflow-hidden bg-white hover:opacity-90" title="View full size">
-            <img src={it.heroImageUrl} alt={it.productLabel || race} className="w-full h-full object-cover" />
-          </a>
-        ) : (
-          <div className="flex-shrink-0 w-11 h-11 rounded border border-border-gray bg-white flex items-center justify-center text-off-black/25"><Package className="w-4 h-4" /></div>
-        )}
-        <div className="flex-1 min-w-0 text-xs leading-snug">
+      <div className="bg-subtle-gray border border-border-gray rounded-md p-2.5 space-y-2">
+        <div className="text-xs leading-snug">
           <div className="flex items-baseline gap-1.5 min-w-0">
             <span className="font-semibold text-off-black shrink-0">#{o.number}</span>
-            <span className="text-off-black truncate" title={race}>{race}</span>
+            {o.items.length > 1 && <span className="text-off-black/50 shrink-0">{o.items.length} prints</span>}
+            {!o.items.length && <span className="text-off-black truncate">{o.lineItems[0]?.title || 'Order'}</span>}
             {o.linked && (
               <span className="ml-auto shrink-0 inline-flex items-center gap-0.5 px-1.5 py-px rounded border border-blue-200 bg-blue-50 text-[10px] font-medium text-blue-700" title="Linked by hand: they ordered under a different email">
                 Linked
@@ -98,13 +127,8 @@ function OrderCard({ o, onUnlink }: { o: CustomerOrder; onUnlink?: () => void })
               </span>
             )}
           </div>
-          {(it?.runner || bought) && (
-            <div className="text-off-black/60 truncate" title={[it?.runner, bought].filter(Boolean).join(' · ')}>
-              {[it?.runner, bought].filter(Boolean).join(' · ')}{o.items.length > 1 ? ` · +${o.items.length - 1} more` : ''}
-            </div>
-          )}
           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-            {st && <span className={`inline-flex items-center px-1.5 py-px border rounded text-[11px] font-medium ${st.cls}`}>{st.label}</span>}
+            {st && !mixed && <span className={`inline-flex items-center px-1.5 py-px border rounded text-[11px] font-medium ${st.cls}`}>{st.label}</span>}
             <span className={`text-[11px] ${ageCls}`} title={new Date(o.createdAt).toLocaleString()}>Ordered {placed}{age > 0 ? `, ${age}d ago` : ', today'}</span>
           </div>
           {tracking && (
@@ -115,12 +139,21 @@ function OrderCard({ o, onUnlink }: { o: CustomerOrder; onUnlink?: () => void })
           )}
           {o.discountCodes.length > 0 && <div className="mt-0.5 text-[11px] text-yellow-900/70 truncate" title={o.discountCodes.join(', ')}>Code: {o.discountCodes.join(', ')}</div>}
         </div>
+        {o.items.length > 0 ? (
+          <div className="space-y-2">
+            {o.items.map(it => <PrintRow key={it.orderId} o={o} it={it} showStage={mixed} />)}
+          </div>
+        ) : o.lineItems.length > 0 ? (
+          <ul className="text-xs text-off-black/60 space-y-0.5">
+            {o.lineItems.map((l, i) => <li key={i} className="truncate">{l.quantity > 1 ? `${l.quantity} × ` : ''}{l.title}{l.variant ? ` · ${l.variant}` : ''}</li>)}
+          </ul>
+        ) : null}
       </div>
       {(fulfillmentUrl || o.adminUrl || o.arteloUrl) && (
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Open in</div>
           <div className="grid grid-cols-3 gap-1.5">
-            {fulfillmentUrl && <OpenIn href={fulfillmentUrl} icon={<img src="/trackstar-stars-transparent.png" alt="" className="w-4 h-4 object-contain" />} label="Fulfillment" title="This order in TrackstarOS" />}
+            {fulfillmentUrl && <OpenIn href={fulfillmentUrl} icon={<img src="/trackstar-stars-transparent.png" alt="" className="w-4 h-4 object-contain" />} label="TrackstarOS" title="This order in TrackstarOS" />}
             {o.adminUrl && <OpenIn href={o.adminUrl} icon={<img src="/shopify-icon.png" alt="" className="w-4 h-4" />} label="Shopify" />}
             {o.arteloUrl && <OpenIn href={o.arteloUrl} icon={<img src="/artelo-icon.png" alt="" className="w-4 h-4 rounded-[3px]" />} label="Artelo" />}
           </div>
