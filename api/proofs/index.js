@@ -23,13 +23,12 @@ import { alertError } from '../_lib/alerts.js'
 import { recordAudit, requireAdminRole } from '../_lib/users.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
 import { postSlack, slackText } from '../../server/lib/slack.js'
-import { Resend } from 'resend'
 import crypto from 'crypto'
 import formidable from 'formidable'
 import fs from 'fs'
-import { requireConnection } from '../../server/lib/connections.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
 import { storage } from '../../server/lib/storage.js'
+import { sendEmail } from '../../server/lib/email.js'
 // sharp loaded dynamically in processImage() — top-level import crashes Vercel cold start
 
 // Disable Vercel's default body parser for multipart support
@@ -583,12 +582,10 @@ export default async function handler(req, res) {
       if (!process.env.RESEND_API_KEY) {
         return res.status(500).json({ error: 'Email service not configured (RESEND_API_KEY missing)' })
       }
-      await requireConnection('resend')
-      const resend = new Resend(process.env.RESEND_API_KEY)
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'Trackstar <proofs@orders.trackstar.art>'
 
       try {
-        await resend.emails.send({
+        await sendEmail({
           from: fromEmail,
           to: [order.customerEmail],
           cc: ['fast@trackstar.art'],

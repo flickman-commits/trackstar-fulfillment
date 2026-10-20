@@ -41,10 +41,9 @@ import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServe
 import { shopifyFetch, shopifyGraphQL } from '../../server/services/shopifyAuth.js'
 import { getRaceShorthands } from '../../server/scrapers/index.js'
 import WeatherService from '../../server/services/WeatherService.js'
-import { Resend } from 'resend'
-import { requireConnection } from '../../server/lib/connections.js'
 import { fetchWithTimeout } from '../../server/lib/fetchWithTimeout.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
+import { sendEmail } from '../../server/lib/email.js'
 
 // Build the customer-facing approval/portal URL. Prod uses the Vercel
 // production URL; falls back to APP_BASE_URL for other environments.
@@ -535,12 +534,10 @@ async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
   </table>
 </body></html>`
 
-  await requireConnection('resend')
-  const resend = new Resend(process.env.RESEND_API_KEY)
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'Trackstar <proofs@orders.trackstar.art>'
 
   try {
-    await resend.emails.send({
+    await sendEmail({
       from: fromEmail,
       to: [existing.customerEmail],
       cc: ['fast@trackstar.art'],
@@ -650,12 +647,10 @@ async function handleMessageCustomer({ orderId, body }, res) {
   </table>
 </body></html>`
 
-  await requireConnection('resend')
-  const resend = new Resend(process.env.RESEND_API_KEY)
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'Trackstar <proofs@orders.trackstar.art>'
 
   try {
-    await resend.emails.send({
+    await sendEmail({
       from: fromEmail,
       to: [existing.customerEmail],
       subject: `A question about your Trackstar Order ${displayNum} (Action Required)`,
