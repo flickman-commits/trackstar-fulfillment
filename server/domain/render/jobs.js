@@ -11,6 +11,7 @@ import { buildSpec, SPEC_SELECT } from './spec.js'
 import { availableTemplateKeys, noTimeGaps, onlineWorkers as onlineWorkersList } from './templates.js'
 import { getCanonicalRaceName } from '../../scrapers/index.js'
 import { storage as sharedStorage } from '../../lib/storage.js'
+import { isConnectionOn } from '../../lib/connections.js'
 
 export const BUCKET = 'production-files'
 const ONLINE_MS = 90_000
@@ -89,6 +90,8 @@ export async function latestJob(orderId) {
 
 /** The oldest queued job, now owned by this worker. A claim left hanging is handed out again. */
 export async function claimNext(workerId) {
+  // Paused in Settings > Connections: the worker keeps checking in, gets nothing.
+  if (!(await isConnectionOn('render_worker'))) return null
   const stale = new Date(Date.now() - STALE_CLAIM_MS)
   await prisma.renderJob.updateMany({ where: { status: 'rendering', claimedAt: { lt: stale } }, data: { status: 'queued', workerId: null, claimedAt: null } })
   const worker = await prisma.renderWorker.findUnique({ where: { id: String(workerId) } })

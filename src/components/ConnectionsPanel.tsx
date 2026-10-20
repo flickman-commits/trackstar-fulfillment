@@ -15,7 +15,7 @@ import { btnSecondary, btnGhost, chip, chipTone } from '@/lib/ui'
 type Connection = {
   id: string; label: string; what: string; on: boolean; configured: boolean; missing: string[]
   connected: boolean; needsConnect: boolean; connectUrl: string | null; connectedAs: string | null
-  critical: boolean; lastUsedAt: string | null
+  critical: boolean; lastUsedAt: string | null; note: string | null
 }
 type TestResult = { ok: boolean; detail: string; ms?: number }
 
@@ -34,6 +34,7 @@ function StateChip({ c }: { c: Connection }) {
   if (!c.on) return <span className={`${chip} ${chipTone.rose}`}><CircleOff className="w-3 h-3" />Off</span>
   if (!c.configured) return <span className={`${chip} ${chipTone.amber}`}><AlertTriangle className="w-3 h-3" />Not set up</span>
   if (c.needsConnect) return <span className={`${chip} ${chipTone.amber}`}><AlertTriangle className="w-3 h-3" />Needs connecting</span>
+  if (!c.connected) return <span className={`${chip} ${chipTone.amber}`}><AlertTriangle className="w-3 h-3" />Offline</span>
   return <span className={`${chip} ${chipTone.teal}`}><CheckCircle2 className="w-3 h-3" />On</span>
 }
 
@@ -59,7 +60,10 @@ export default function ConnectionsPanel() {
 
   const flip = async (c: Connection) => {
     const on = !c.on
-    if (!on && !window.confirm(`Turn ${c.label} off? Everything that uses it stops until it is turned back on: ${c.what.toLowerCase()}.`)) return
+    const offText = c.id === 'render_worker'
+      ? 'Pause the render queue? Workers stop picking up jobs; new renders wait until you turn it back on.'
+      : `Turn ${c.label} off? Everything that uses it stops until it is turned back on: ${c.what.toLowerCase()}.`
+    if (!on && !window.confirm(offText)) return
     setBusy(c.id)
     try {
       let { res, data } = await post({ action: 'switch', id: c.id, on })
@@ -103,7 +107,8 @@ export default function ConnectionsPanel() {
                 <p className="text-xs text-off-black/50 mt-0.5">{c.what}</p>
                 <p className="text-[11px] text-off-black/45 mt-1 break-words">
                   {c.connectedAs ? <>Connected as <span className="text-off-black/70">{c.connectedAs}</span> · </> : null}
-                  Last used {ago(c.lastUsedAt)}
+                  {c.id === 'render_worker' ? 'Last checked in' : 'Last used'} {ago(c.lastUsedAt)}
+                  {c.note && <> · {c.note}</>}
                   {c.missing.length > 0 && <> · Missing in Vercel: <span className="font-mono">{c.missing.join(', ')}</span></>}
                 </p>
                 {t && (
@@ -116,7 +121,7 @@ export default function ConnectionsPanel() {
                 {c.connectUrl && c.configured && (
                   <a href={c.connectUrl} className={btnGhost}>{c.needsConnect ? 'Connect' : 'Reconnect'}</a>
                 )}
-                <button className={btnSecondary} disabled={busy !== null || !c.on || !c.configured} onClick={() => test(c)}>
+                <button className={btnSecondary} disabled={busy !== null || !c.configured || (!c.on && c.id !== 'render_worker')} onClick={() => test(c)}>
                   {busy === `test:${c.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <PlugZap className="w-3 h-3" />} Test
                 </button>
                 <button

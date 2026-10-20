@@ -75,6 +75,12 @@ const TESTS = {
     const verified = (data.data || []).filter(d => d.status === 'verified').map(d => d.name)
     return verified.length ? `Sending domains: ${verified.join(', ')}` : 'No verified sending domain'
   },
+  async render_worker() {
+    const { connectionStatus } = await import('./connections.js')
+    const row = (await connectionStatus()).find(c => c.id === 'render_worker')
+    if (!row?.connected) throw new Error(`No Mac is checking in (${row?.note || 'queue unknown'})`)
+    return `${row.connectedAs} online · ${row.note}`
+  },
   async slack() {
     await requireConnection('slack')
     const set = Object.keys(process.env).filter(k => /^SLACK_.*WEBHOOK_URL$/.test(k) && process.env[k])

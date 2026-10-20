@@ -48,7 +48,29 @@ export const CONNECTIONS = [
   { id: 'claude', label: 'Claude', what: 'Support drafts, sales drafts, teaching', envAny: ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'LLM_BASE_URL'] },
   { id: 'resend', label: 'Resend (email)', what: 'Proof emails and designer messages to customers', env: ['RESEND_API_KEY'] },
   { id: 'slack', label: 'Slack', what: 'Team pings and alerts', envAny: ['SLACK_PROOF_WEBHOOK_URL', 'SLACK_WEBHOOK_URL', 'SLACK_CREATORS_WEBHOOK_URL'] },
+  // Not a vendor: the Illustrator Mac(s) running worker/render-worker.mjs. It
+  // is started on the Mac (npm run worker); a web page cannot launch it. Off
+  // pauses the queue: workers keep checking in but are handed no jobs, and
+  // new renders wait in the queue until it is turned back on.
+  { id: 'render_worker', label: 'Render worker', what: 'The Illustrator Mac that renders designs. Off pauses the queue.', live: renderWorkerStatus },
 ]
+
+/** Which Macs are checking in, and how much is waiting for them. */
+async function renderWorkerStatus() {
+  const ONLINE_MS = 90_000
+  const [workers, queued, rendering] = await Promise.all([
+    prisma.renderWorker.findMany({ orderBy: { lastSeenAt: 'desc' }, select: { name: true, lastSeenAt: true }, take: 10 }),
+    prisma.renderJob.count({ where: { status: 'queued' } }),
+    prisma.renderJob.count({ where: { status: 'rendering' } }),
+  ])
+  const online = workers.filter(w => Date.now() - new Date(w.lastSeenAt).getTime() < ONLINE_MS)
+  return {
+    connected: online.length > 0,
+    connectedAs: online.length ? online.map(w => w.name).join(', ') : null,
+    lastUsedAt: workers[0]?.lastSeenAt?.toISOString?.() || null,
+    note: `${queued} waiting, ${rendering} rendering${online.length ? '' : ' · no Mac online: start it with npm run worker'}`,
+  }
+}
 const BY_ID = new Map(CONNECTIONS.map(c => [c.id, c]))
 
 /** A call to a service someone switched off. The message is fit to show. */
@@ -124,7 +146,17 @@ export async function connectionStatus() {
   const cfg = Object.fromEntries(rows.map(r => [r.key, r.value]))
   const people = await prisma.systemConfig.findMany({ where: { key: { startsWith: 'gmail_account_email:' } }, select: { value: true } })
 
+  const live = Object.fromEntries(await Promise.all(CONNECTIONS.filter(c => c.live).map(async c => [c.id, await c.live().catch(() => null)])))
+
   return CONNECTIONS.map(c => {
+    if (c.live) {
+      const l = live[c.id] || {}
+      return {
+        id: c.id, label: c.label, what: c.what, on: !off.has(c.id), configured: true, missing: [],
+        connected: Boolean(l.connected), needsConnect: false, connectUrl: null,
+        connectedAs: l.connectedAs || null, critical: Boolean(c.critical), lastUsedAt: l.lastUsedAt || null, note: l.note || null,
+      }
+    }
     const missing = (c.env || []).filter(k => !env(k))
     const envOk = c.envAny ? c.envAny.some(k => env(k)) : missing.length === 0
     const tokenOk = c.token ? Boolean(cfg[c.token]) : c.perPerson ? people.length > 0 : true
@@ -144,6 +176,7 @@ export async function connectionStatus() {
       connectedAs,
       critical: Boolean(c.critical),
       lastUsedAt: cfg[USED_PREFIX + c.id] || null,
+      note: null,
     }
   })
 }
