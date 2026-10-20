@@ -9,7 +9,8 @@
  * commas (e.g., "1,333") when synced to Shopify for display.
  */
 
-import { getShopifyToken } from './shopifyAuth.js'
+// Metaobjects are only reachable through GraphQL, not REST.
+import { shopifyGraphQL } from './shopifyAuth.js'
 
 const SYSTEM_CONFIG_KEY = 'customers_served_count'
 const COUNTED_IDS_KEY = 'customers_served_counted_ids'
@@ -20,37 +21,6 @@ const INITIAL_COUNT = 1333
  */
 function formatWithCommas(num) {
   return num.toLocaleString('en-US')
-}
-
-/**
- * Make a GraphQL request to Shopify Admin API
- * (Metaobjects are only available via GraphQL, not REST)
- */
-async function shopifyGraphQL(query, variables = {}) {
-  const token = await getShopifyToken()
-  const store = process.env.SHOPIFY_STORE
-
-  const response = await fetch(`https://${store}/admin/api/2024-01/graphql.json`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Shopify-Access-Token': token
-    },
-    body: JSON.stringify({ query, variables })
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Shopify GraphQL error (${response.status}): ${errorText}`)
-  }
-
-  const result = await response.json()
-
-  if (result.errors?.length > 0) {
-    throw new Error(`Shopify GraphQL error: ${result.errors.map(e => e.message).join(', ')}`)
-  }
-
-  return result.data
 }
 
 /**
