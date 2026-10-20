@@ -18,6 +18,7 @@ import { stripQuoted } from './mailbox.js'
 import { can } from '../../../api/_lib/roles.js'
 import { replyWindow } from './instagram.js'
 import { UserError } from './errors.js'
+import { getOrderTotalUsd, BIG_SPENDER_THRESHOLD_USD } from '../../lib/orderValue.js'
 
 export const STATUSES = ['open', 'waiting', 'escalated', 'closed']
 export const SORTS = ['waiting', 'newest', 'oldest', 'priority']
@@ -459,6 +460,7 @@ export async function customerContext(email, { linked = [] } = {}) {
       createdAt: s.createdAt,
       financialStatus: s.displayFinancialStatus,
       fulfillmentStatus: s.displayFulfillmentStatus,
+      totalUsd: s.totalPriceSet?.shopMoney?.currencyCode === 'USD' ? Number(s.totalPriceSet.shopMoney.amount) || 0 : null,
       discountCodes: s.discountCodes || [],
       shipTo,
       shipToLine: shipToLine(shipTo),
@@ -483,6 +485,7 @@ export async function customerContext(email, { linked = [] } = {}) {
       createdAt: first.shopifyOrderData?.created_at || first.createdAt,
       financialStatus: null,
       fulfillmentStatus: null,
+      totalUsd: getOrderTotalUsd(first),
       discountCodes: (first.shopifyOrderData?.discount_codes || []).map(d => d.code).filter(Boolean),
       shipTo,
       shipToLine: shipToLine(shipTo),
@@ -511,7 +514,10 @@ export async function customerContext(email, { linked = [] } = {}) {
     const ids = new Set(o.items.map(it => it.orderId))
     o.mockups = mockups.filter(m => ids.has(m.orderId))
   }
-  return { orders, shopifyError }
+  // What they have spent with us across these orders, refunds left out: the
+  // same Big Spender line the order view uses.
+  const spentUsd = Math.round(orders.filter(o => o.financialStatus !== 'REFUNDED').reduce((n, o) => n + (o.totalUsd || 0), 0) * 100) / 100
+  return { orders, shopifyError, spentUsd, bigSpender: spentUsd >= BIG_SPENDER_THRESHOLD_USD }
 }
 
 // ---------------------------------------------------------------------------

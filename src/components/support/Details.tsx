@@ -8,6 +8,7 @@ import { STATUS_LABEL, STATUS_TONE } from '@/lib/supportStatus'
 import type { CustomerOrder, OrderItem, InstagramStatus, MailboxStatus, Mockup, SenderFilter, Teammate, ThreadDetail } from '@/types/support'
 import Actions from './Actions'
 import { FilterSender } from './SenderFilter'
+import { TagChip } from '@/components/OrderTags'
 
 /**
  * The details panel, Intercom's right column: collapsible sections for the
@@ -419,7 +420,14 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
       {thread && (
         <>
           <Section title="Customer">
-            <Attr label="Name">{thread.customer.name || <span className="text-off-black/40">Unknown</span>}</Attr>
+            <Attr label="Name">
+              <span className="inline-flex items-center gap-1.5 flex-wrap">
+                {thread.customer.name || <span className="text-off-black/40">Unknown</span>}
+                {thread.context.bigSpender && thread.context.spentUsd != null && (
+                  <TagChip tag={{ key: 'big-spender', label: '💰 Big Spender', tone: 'amber', sublabel: `$${Math.round(thread.context.spentUsd).toLocaleString()}`, title: `This customer has spent $${Math.round(thread.context.spentUsd).toLocaleString()} with us across the orders below.` }} />
+                )}
+              </span>
+            </Attr>
             {thread.customer.email && <Attr label="Email"><span className="inline-flex items-start gap-1.5 min-w-0"><a href={`mailto:${thread.customer.email}`} className="text-blue-600 hover:text-blue-700 break-all">{thread.customer.email}</a><CopyButton text={thread.customer.email} /></span></Attr>}
             {thread.channel === 'instagram' && thread.igUsername && <Attr label="Instagram"><a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">@{thread.igUsername}</a></Attr>}
             <Attr label="First seen">{day(thread.customer.firstSeen)}</Attr>

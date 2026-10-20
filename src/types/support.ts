@@ -146,6 +146,8 @@ export interface CustomerOrder {
   createdAt: string
   financialStatus: string | null
   fulfillmentStatus: string | null
+  /** The order's total in dollars, when known. */
+  totalUsd?: number | null
   discountCodes: string[]
   shipTo: Address | null
   shipToLine: string
@@ -183,7 +185,8 @@ export interface ThreadDetail extends ThreadRow {
   /** Set on an Instagram thread; null for email, which has no window. */
   replyWindow: ReplyWindow | null
   customer: { email: string; name: string; instagram: string | null; firstSeen: string; conversations: number }
-  context: { orders: CustomerOrder[]; shopifyError: string | null }
+  /** spentUsd: what they have spent across these orders, refunds left out; bigSpender at $300 or more. */
+  context: { orders: CustomerOrder[]; shopifyError: string | null; spentUsd?: number; bigSpender?: boolean }
   pastThreads: PastThread[]
 }
 
