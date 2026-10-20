@@ -40,6 +40,7 @@ const MonopolyModel = lazyPage(() => import('@/pages/MonopolyModel'))
 const Sales = lazyPage(() => import('@/pages/Sales'))
 const SalesWorkspace = lazyPage(() => import('@/pages/SalesWorkspace'))
 const Support = lazyPage(() => import('@/pages/Support'))
+const Settings = lazyPage(() => import('@/pages/Settings'))
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -287,8 +288,8 @@ export default function App() {
                 <Route path="/creators/:creatorId" element={<RequireCap cap="creators"><CreatorsHome /></RequireCap>} />
                 {/* The products editor is a Settings section now. */}
                 <Route path="/products" element={<Navigate to="/settings/products" replace />} />
-                <Route path="/settings" element={<Dashboard />} />
-                <Route path="/settings/:panel" element={<Dashboard />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings/:panel" element={<Settings />} />
                 <Route path="/briefs" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
                 <Route path="/briefs/:briefId" element={<RequireAdmin><BriefsAdmin /></RequireAdmin>} />
                 {/* Sales is for reps: anyone signed in whose email is on the Attio
