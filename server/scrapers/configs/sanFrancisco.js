@@ -50,6 +50,16 @@ export default {
     half: /(1st|2nd|first|second)\s+half marathon/i,
   },
   distances: { marathon: 26.2, half: 13.1 },
+  // The two halves are different courses with different designs (artboards in
+  // the half production file): the 1st Half crosses the Golden Gate (the
+  // Bridge Half), the 2nd Half runs through the city (the City Half). Keep
+  // which one, or every half prints as whichever artboard comes last.
+  // ChronoTrack names them e.g. "CHINA AIRLINES BRIDGE HALF MARATHON";
+  // Athlinks "1st Half Marathon" / "2nd Half Marathon".
+  namedEvents: [
+    { match: /bridge\s+half|\b(1st|first)\s+half/i, label: 'Bridge Half Marathon' },
+    { match: /city\s+half|\b(2nd|second)\s+half/i, label: 'City Half Marathon' },
+  ],
   distanceMiles: 26.2,
   aliases: [
     'San Francisco Marathon',
