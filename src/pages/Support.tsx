@@ -47,8 +47,8 @@ const EMPTY: Record<string, string> = {
   snoozed: 'Nothing snoozed.',
   closed: 'Nothing closed yet.',
 }
-// Instagram DMs and email land in the database within seconds (webhook, and the mail sync every 5 minutes); this is how soon the page shows them.
-const POLL_MS = 20_000
+// Instagram DMs and email land in the database within seconds (webhook, and the mail sync every 5 minutes); this is how soon the page shows them. Each poll is a dozen queries, so not faster than this.
+const POLL_MS = 45_000
 
 const SHORTCUTS: [string, string][] = [
   ['j / k', 'Next and previous conversation'], ['r', 'Reply'], ['n', 'Add a note'], ['m', 'Insert a macro'],
