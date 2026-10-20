@@ -9,6 +9,7 @@
  * person can act on (start the worker), instead of hanging an import.
  */
 import prisma from '../db.js'
+import { isConnectionOn } from './connections.js'
 
 /** The only hosts the relay fetches. A worker refuses anything else too. */
 export const RELAY_HOSTS = ['results.truetimeracing.com']
@@ -34,6 +35,8 @@ export async function relayOnline() {
  */
 export async function relayFetch(url, init = {}, { waitMs = WAIT_MS } = {}) {
   if (!relayAllowed(url)) throw new Error(`${new URL(url).host} is not a relay host`)
+  // Settings > Connections: switching the render worker off pauses its relaying as well as its rendering.
+  if (!(await isConnectionOn('render_worker'))) throw new RelayUnavailableError('the render worker is switched off in Settings > Connections')
   if (!(await relayOnline())) throw new RelayUnavailableError('no render worker is online to relay the lookup')
   const row = await prisma.fetchRelay.create({
     data: { url, method: String(init.method || 'GET').toUpperCase(), headers: init.headers || {}, body: typeof init.body === 'string' ? init.body : null },
@@ -51,6 +54,7 @@ export async function relayFetch(url, init = {}, { waitMs = WAIT_MS } = {}) {
 
 /** The worker's side: up to `limit` waiting requests, each claimed by this worker alone. */
 export async function claimRelays(workerId, limit = 4) {
+  if (!(await isConnectionOn('render_worker'))) return []
   // Old rows go, whatever their state: nothing waits a day for a page.
   await prisma.fetchRelay.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 86400000) } } }).catch(() => {})
   const waiting = await prisma.fetchRelay.findMany({ where: { status: 'pending', createdAt: { gte: new Date(Date.now() - WAIT_MS) } }, orderBy: { createdAt: 'asc' }, take: limit, select: { id: true } })
