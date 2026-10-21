@@ -807,14 +807,15 @@ export default function Dashboard() {
         return
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return
-      // j = up (previous), k = down (next) — matches the on-screen chips.
+      // D = up (previous), S = down (next), on the left hand with A, R and F.
+      // Matches the on-screen chips.
       if (e.key === 'Escape') {
         e.preventDefault()
         closeModal()
-      } else if (e.key === 'j' || e.key === 'J') {
+      } else if (e.key === 'd' || e.key === 'D') {
         e.preventDefault()
         navigateOrder('prev')
-      } else if (e.key === 'k' || e.key === 'K') {
+      } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault()
         navigateOrder('next')
       }

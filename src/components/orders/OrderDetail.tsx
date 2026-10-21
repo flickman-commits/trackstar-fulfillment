@@ -47,7 +47,7 @@ export interface OrderDetailProps {
   /** Suggested runners per order number, for the Accept buttons. */
   possibleMatches: Record<string, PossibleMatch[]>
   setPossibleMatches: Dispatch<SetStateAction<Record<string, PossibleMatch[]>>>
-  /** The runner edit. The Dashboard holds it because J/K and Esc stop while it is open. */
+  /** The runner edit. The Dashboard holds it because D/S and Esc stop while it is open. */
   edit: {
     isEditing: boolean
     setIsEditing: Dispatch<SetStateAction<boolean>>
@@ -1172,7 +1172,7 @@ Thank you!`
                 )}
               </div>
               <div className="hidden md:flex items-center gap-1">
-                {/* j/k navigation — only shown when the open order is in the
+                {/* D/S navigation — only shown when the open order is in the
                     current visible queue (filteredOrders). Buttons reflect
                     the keyboard shortcuts so the affordance is discoverable. */}
                 {currentOrderIndex >= 0 && (
@@ -1180,19 +1180,19 @@ Thank you!`
                     <button
                       onClick={() => navigateOrder('prev')}
                       disabled={currentOrderIndex <= 0}
-                      title="Previous order (press J)"
+                      title="Previous order (press D)"
                       className="inline-flex items-center gap-1.5 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <ChevronUp className="w-3.5 h-3.5" />
-                      <kbd className="font-mono text-[10px] font-semibold w-5 h-5 inline-flex items-center justify-center bg-white border border-off-black/20 rounded shadow-[0_1px_0_0_rgba(0,0,0,0.15)] leading-none text-off-black/70">J</kbd>
+                      <kbd className="font-mono text-[10px] font-semibold w-5 h-5 inline-flex items-center justify-center bg-white border border-off-black/20 rounded shadow-[0_1px_0_0_rgba(0,0,0,0.15)] leading-none text-off-black/70">D</kbd>
                     </button>
                     <button
                       onClick={() => navigateOrder('next')}
                       disabled={currentOrderIndex >= navTotal - 1}
-                      title="Next order (press K)"
+                      title="Next order (press S)"
                       className="inline-flex items-center gap-1.5 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <kbd className="font-mono text-[10px] font-semibold w-5 h-5 inline-flex items-center justify-center bg-white border border-off-black/20 rounded shadow-[0_1px_0_0_rgba(0,0,0,0.15)] leading-none text-off-black/70">K</kbd>
+                      <kbd className="font-mono text-[10px] font-semibold w-5 h-5 inline-flex items-center justify-center bg-white border border-off-black/20 rounded shadow-[0_1px_0_0_rgba(0,0,0,0.15)] leading-none text-off-black/70">S</kbd>
                       <ChevronDownIcon className="w-3.5 h-3.5" />
                     </button>
                     <span className="text-[10px] text-off-black/40 px-1.5 tabular-nums">
