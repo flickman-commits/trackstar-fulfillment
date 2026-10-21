@@ -16,6 +16,7 @@ import crypto from 'crypto'
 import prisma from './prisma.js'
 import { requireAdmin } from './auth.js'
 import { ROLE_LABEL, normalizeRole, can } from './roles.js'
+import { inBackground } from '../../server/lib/background.js'
 
 const SEEN_EVERY_MS = 5 * 60_000
 const seenAt = new Map()
@@ -25,14 +26,22 @@ const seenAt = new Map()
  * password (sessions last 30 days, so that was weeks stale). Written at most
  * every five minutes per person per instance, and never in the way of the
  * request it rides on.
+ *
+ * One plain UPDATE (autocommit, no transaction) kept alive with waitUntil.
+ * It used to be a prisma.user.update nobody waited for: Vercel froze the
+ * function mid-write, the transaction stayed open holding the user's row,
+ * and every later write to that row queued behind it until the whole
+ * database stalled (2026-10-21).
  */
 export function touchLastSeen(userId) {
   if (!userId) return
   const now = Date.now()
   if (now - (seenAt.get(userId) || 0) < SEEN_EVERY_MS) return
   seenAt.set(userId, now)
-  prisma.user.update({ where: { id: userId }, data: { lastSeenAt: new Date(now) } })
-    .catch(err => console.warn(`[users] last seen not saved: ${err.message}`))
+  inBackground(
+    prisma.$executeRaw`UPDATE "User" SET "lastSeenAt" = ${new Date(now)} WHERE id = ${userId}`
+      .catch(err => console.warn(`[users] last seen not saved: ${err.message}`)),
+  )
 }
 
 export { ROLES } from './roles.js'
