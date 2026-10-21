@@ -2009,9 +2009,9 @@ Thank you!`
                   past the filename, which is too late to read. */}
               {commentsCallout()}
 
-              {/* Expedited shipping steps. The tag says it is expedited,
-                  this block exists only for the instructions and the exact
-                  message Eli sends to Artelo. */}
+              {/* Expedited shipping steps. The tag says it is expedited; this
+                  block is the instructions. Artelo lets us choose the label on
+                  the order now, under $40 (what the customer pays for it). */}
               {selectedOrder.isExpedited && (
                 <div className="bg-red-50 border-2 border-red-300 rounded-md p-4 mb-3">
                   <div className="flex items-center gap-2 mb-2">
@@ -2022,12 +2022,10 @@ Thank you!`
                     <p>The customer paid for <strong>{selectedOrder.shippingMethod || 'expedited'}</strong> shipping.</p>
                     <ol className="list-decimal list-inside space-y-1 pl-1">
                       <li>Double-check that all personalization fields are filled in correctly.</li>
-                      <li>Send it to production yourself. No need to wait for Matt's approval.</li>
+                      <li>Send it to production right away. No need to wait for Matt's approval.</li>
                       <li>
-                        After submitting to production, ping Artelo via customer support with this exact message:
-                        <div className="mt-1.5 p-2 bg-white border border-red-200 rounded text-xs text-off-black italic font-mono">
-                          "hey - we just submitted order #{selectedOrder.displayOrderNumber} for production and the customer requested expedited shipping - please use 2-day air and charge to our account. thanks!"
-                        </div>
+                        In the Artelo order, under <strong>Shipping</strong>, click <strong>Change shipping method</strong> and pick <strong>UPS Next Day Air Saver</strong>, as long as it is <strong>under $40</strong> (what the customer paid).
+                        If it is $40 or more, pick the fastest option under $40, and tell Matt if there is none.
                       </li>
                     </ol>
                   </div>
