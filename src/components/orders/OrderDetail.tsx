@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, CloudSun, Download, ArrowUpRight, Mail } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -311,18 +312,31 @@ export default function OrderDetail({
             </button>
           </div>
         </div>
-        {cropFile && (
-          <div className="mt-3 pt-3 border-t border-black/10">
-            <PhotoCropper file={cropFile} exportRef={cropExport} className="max-w-[320px]" />
-            <div className="mt-2 flex items-center gap-2">
-              <button type="button" onClick={cropAndRerender} disabled={cropBusy}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-dark-fill text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50">
-                {cropBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Crop &amp; re-render
-              </button>
-              <button type="button" onClick={() => setCropFile(null)} disabled={cropBusy} className="text-xs text-off-black/55 hover:text-off-black">Cancel</button>
+        {/* Cropping opens over the page, so the photo is big enough to frame and nothing below shifts. */}
+        {cropFile && createPortal(
+          <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
+            onClick={() => { if (!cropBusy) setCropFile(null) }}
+            onKeyDown={e => { e.stopPropagation(); if (e.key === 'Escape' && !cropBusy) setCropFile(null) }}>
+            <div role="dialog" aria-modal="true" aria-label="Crop the customer photo" tabIndex={-1} ref={el => el?.focus()}
+              className="bg-white rounded-lg shadow-2xl w-full max-w-[520px] max-h-full overflow-auto p-5 outline-none" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-off-black">Crop the customer photo</h3>
+                  <p className="text-xs text-off-black/55 mt-0.5">The square is what prints. The cropped photo replaces this one, and a new design renders with it.</p>
+                </div>
+                <button type="button" onClick={() => setCropFile(null)} disabled={cropBusy} className="p-1 -m-1 text-off-black/40 hover:text-off-black" aria-label="Close"><X className="w-4 h-4" /></button>
+              </div>
+              <PhotoCropper file={cropFile} exportRef={cropExport} />
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button type="button" onClick={() => setCropFile(null)} disabled={cropBusy} className="px-3 py-2 text-sm text-off-black/60 hover:text-off-black">Cancel</button>
+                <button type="button" onClick={cropAndRerender} disabled={cropBusy}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-dark-fill text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+                  {cropBusy && <Loader2 className="w-4 h-4 animate-spin" />} Crop &amp; re-render
+                </button>
+              </div>
             </div>
-            <p className="mt-1 text-[11px] text-off-black/50">The square is what prints. The cropped photo replaces this one, and a new design renders with it.</p>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     ) : null

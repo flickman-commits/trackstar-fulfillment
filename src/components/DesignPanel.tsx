@@ -31,9 +31,12 @@ export function DesignCard({ d }: { d: Design }) {
   const { job, state } = d
 
   if (job?.status === 'done' && job.previewUrl) {
+    // The box takes the print's shape (8x10 is 4:5, the rest 2:3), so an 8x10 has no bands above and below.
+    const m = /^(\d+)x(\d+)$/.exec(job.spec.size || '')
+    const ratio = m ? `${m[1]} / ${m[2]}` : '2 / 3'
     return (
       <div className="self-start w-full md:w-auto flex flex-col items-center gap-2">
-        <button onClick={() => setLightbox(true)} className="relative self-start w-full md:w-[347px] aspect-[2/3] md:aspect-auto md:h-[520px] rounded-md border border-border-gray bg-subtle-gray overflow-hidden" title="Open larger">
+        <button onClick={() => setLightbox(true)} style={{ aspectRatio: ratio }} className="relative self-start w-full md:w-[347px] rounded-md border border-border-gray bg-subtle-gray overflow-hidden" title="Open larger">
           <img src={job.previewUrl} alt={`Render of ${job.spec.file}`} className="w-full h-full object-contain block" />
           {job.review !== 'pending' && (
             <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold ${job.review === 'approved' ? 'bg-green-100 text-green-800' : job.review === 'closed' ? 'bg-off-black/10 text-off-black/70' : 'bg-red-100 text-red-800'}`}>
