@@ -539,15 +539,20 @@ export default function Actions({ thread, onInsert, onAttach, onChanged }: { thr
   const orders = thread.context.orders
   const [codeOpen, setCodeOpen] = useState(false)
   const [pct, setPct] = useState('15')
+  // The code's prefix: the first name by default, anything the rep types instead (VIP, BOSTON).
+  const defaultPrefix = (first || 'TRACKSTAR').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20)
+  const [prefix, setPrefix] = useState(defaultPrefix)
+  useEffect(() => { setPrefix(defaultPrefix) }, [thread.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cleanPrefix = prefix.toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 20)
   const pctNum = Number(pct)
   // Over 25% is an admin's; the server holds the same line.
   const pctMax = isAdmin ? 100 : 25
-  const pctOk = Number.isInteger(pctNum) && pctNum >= 1 && pctNum <= pctMax
+  const pctOk = Number.isInteger(pctNum) && pctNum >= 1 && pctNum <= pctMax && cleanPrefix.length !== 1
   const createCode = () => {
     if (!pctOk) return
     if (pctNum >= 50 && !window.confirm(`A ${pctNum}% code? That is a big one.`)) return
     run('code', async () => {
-      const out = await supportApi.action<{ code: string; percent: number }>('discount15', { id: thread.id, percent: pctNum })
+      const out = await supportApi.action<{ code: string; percent: number }>('discount15', { id: thread.id, percent: pctNum, prefix: cleanPrefix || defaultPrefix })
       onInsert(`Use code ${out.code} for ${out.percent}% off your next print (good for 30 days).`)
       setCodeOpen(false)
       return `${out.code} created (one use) and added to the reply`
@@ -567,7 +572,14 @@ export default function Actions({ thread, onInsert, onAttach, onChanged }: { thr
                 <span className="text-off-black/60">% off</span>
                 {[10, 15, 20].map(n => <button key={n} onClick={() => setPct(String(n))} className={`px-1.5 py-0.5 rounded border ${pct === String(n) ? 'border-[#4600D6] text-[#4600D6]' : 'border-border-gray text-off-black/55 hover:text-off-black'}`}>{n}%</button>)}
               </div>
-              <div className="text-[11px] text-off-black/45">One use, 30 days, named after {first || 'them'}: {(first || 'TRACKSTAR').toUpperCase().replace(/[^A-Z0-9]/g, '')}-{pctNum || '?'}. Added to your reply.</div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-off-black/60 shrink-0">Code</span>
+                <input value={prefix} onChange={e => setPrefix(e.target.value.toUpperCase().slice(0, 20))} onKeyDown={e => { if (e.key === 'Enter') createCode() }}
+                  className={`${field} w-28 font-mono uppercase`} title="The start of the code. Their first name by default; type your own (VIP, BOSTON)." />
+                <span className="font-mono text-off-black/60">-{pctNum || '?'}</span>
+                {cleanPrefix !== defaultPrefix && <button onClick={() => setPrefix(defaultPrefix)} className="text-[11px] text-off-black/45 hover:text-off-black">Use {defaultPrefix}</button>}
+              </div>
+              <div className="text-[11px] text-off-black/45">One use, 30 days: {cleanPrefix || defaultPrefix}-{pctNum || '?'}. Added to your reply.</div>
               {pctNum > pctMax && <div className="text-red-700">Over {pctMax}% is Matt's call. Slack Matt instead.</div>}
               <div className="flex items-center gap-2">
                 <span className="flex-1" />

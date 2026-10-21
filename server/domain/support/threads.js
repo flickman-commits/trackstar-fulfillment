@@ -37,9 +37,17 @@ const notSnoozed = () => ({ OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: 
 const OPENISH = { status: { in: ['open', 'waiting', 'escalated'] } }
 
 /** The where clause for a view. `teammate:<id>` is that person's open work. */
+/**
+ * An Instagram conversation where only we have spoken: the ManyChat
+ * welcome to a new follower, with no reply. It is not support yet, so it
+ * stays out of every list and count and sits under Filtered. The first
+ * message from the person (lastInboundAt) brings it into the inbox.
+ */
+const AUTOMATION_ONLY = { channel: 'instagram', lastInboundAt: null }
+
 export function viewWhere(view, userId) {
-  if (view === 'filtered') return { filtered: true, mergedIntoId: null }
-  return { filtered: false, mergedIntoId: null, ...baseView(view, userId) }
+  if (view === 'filtered') return { mergedIntoId: null, OR: [{ filtered: true }, AUTOMATION_ONLY] }
+  return { filtered: false, mergedIntoId: null, NOT: AUTOMATION_ONLY, ...baseView(view, userId) }
 }
 
 function baseView(view, userId) {
@@ -92,7 +100,7 @@ export async function listThreads({ view = 'all', userId, q = '', sort = 'waitin
     prisma.supportThread.count({ where: viewWhere('waiting') }),
     prisma.supportThread.count({ where: viewWhere('escalated') }),
     prisma.supportThread.count({ where: viewWhere('snoozed') }),
-    prisma.supportThread.groupBy({ by: ['assigneeId'], where: { ...OPENISH, filtered: false, mergedIntoId: null }, _count: { _all: true } }),
+    prisma.supportThread.groupBy({ by: ['assigneeId'], where: { ...OPENISH, filtered: false, mergedIntoId: null, NOT: AUTOMATION_ONLY }, _count: { _all: true } }),
   ])
   const reads = userId && threads.length
     ? await prisma.supportRead.findMany({ where: { userId, threadId: { in: threads.map(t => t.id) } } })

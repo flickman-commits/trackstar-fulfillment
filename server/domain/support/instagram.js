@@ -395,7 +395,8 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
         status: parsed.direction === 'in' ? 'open' : 'waiting',
         lastMessageAt: parsed.sentAt,
         backfilled: backfill,
-        assigneeId: backfill ? null : await defaultAssigneeId('instagram'),
+        // A thread our own message starts (the ManyChat welcome) is not anyone's work until they answer.
+        assigneeId: backfill || parsed.direction !== 'in' ? null : await defaultAssigneeId('instagram'),
       },
     })
   } else {
@@ -411,6 +412,8 @@ export async function importMessage(parsed, { sentById = null, backfill = false,
       if (p?.name) patch.customerName = p.name
       if (p?.username && !thread.igUsername) { patch.igUsername = p.username; patch.subject = subjectFor(p.username) }
     }
+    // Their first word back on a thread our automation started: now it is support, and it gets routed.
+    if (parsed.direction === 'in' && !backfill && !thread.assigneeId && !thread.lastInboundAt) patch.assigneeId = await defaultAssigneeId('instagram')
     if (Object.keys(patch).length) thread = await prisma.supportThread.update({ where: { id: thread.id }, data: patch })
   }
 

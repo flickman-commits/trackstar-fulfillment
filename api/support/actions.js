@@ -61,7 +61,7 @@ export default async function handler(req, res) {
         if (!(user.isSystem || user.role === 'admin' || await can(user.role, 'tools.discounts'))) {
           return res.status(403).json({ error: 'Discount codes are not part of your role. Ask Matt.', code: 'not_allowed' })
         }
-        const out = await discount15({ thread, actor: user, percent: body.percent ?? 15 })
+        const out = await discount15({ thread, actor: user, percent: body.percent ?? 15, prefix: body.prefix })
         await audit(`Created ${out.code} for ${thread.customerEmail}`, out)
         return res.status(200).json(out)
       }

@@ -27,7 +27,8 @@ const KEY = 'support_routing'
 const LEGACY_KEY = 'support_default_assignee'
 export const CHANNELS = ['email', 'instagram']
 const MODES = ['none', 'person', 'split']
-const OPENISH = { status: { in: ['open', 'waiting', 'escalated'] }, mergedIntoId: null, filtered: false }
+// An Instagram thread only our automation has written in is not work yet (threads.js AUTOMATION_ONLY): it neither counts toward a share nor gets handed out.
+const OPENISH = { status: { in: ['open', 'waiting', 'escalated'] }, mergedIntoId: null, filtered: false, NOT: { channel: 'instagram', lastInboundAt: null } }
 
 const emptyRule = () => ({ mode: 'none', people: [] })
 

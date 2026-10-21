@@ -52,15 +52,18 @@ const CREATE_CODE = `
 /** The most a rep can give without an admin: the playbook's Make-It-Right codes run 10 to 25. */
 export const DISCOUNT_LIMIT_PERCENT = 25
 
-export async function discount15({ thread, actor, percent = 15, days = 30 }) {
+export async function discount15({ thread, actor, percent = 15, prefix, days = 30 }) {
   // Whole percent, 1 to 100. Always one use, once per customer: a code is a gift to one person.
   percent = Number(percent)
   if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new UserError('The discount is a whole percent from 1 to 100.')
   if (percent > DISCOUNT_LIMIT_PERCENT && actor?.role !== 'admin') {
     throw new UserError(`Codes over ${DISCOUNT_LIMIT_PERCENT}% are Matt's call. Slack Matt with the details, or make it ${DISCOUNT_LIMIT_PERCENT}% or less.`)
   }
+  // The code's name: the rep's own prefix if they typed one (VIP, BOSTON), else the customer's first name.
+  const typed = String(prefix || '').trim().toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
+  if (prefix && String(prefix).trim() && typed.length < 2) throw new UserError('The prefix needs at least two letters or numbers.')
   const first = String(thread.customerName || '').trim().split(/\s+/)[0] || ''
-  const stem = (first.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'TRACKSTAR').slice(0, 20)
+  const stem = (typed || first.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'TRACKSTAR').slice(0, 20)
   const endsAt = new Date(Date.now() + days * 86400000).toISOString()
   let lastError = ''
   for (let i = 1; i <= 5; i++) {
