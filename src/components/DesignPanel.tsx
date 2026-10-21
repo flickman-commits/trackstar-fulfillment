@@ -126,20 +126,45 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [reviewable, compact, d.busy])
+  // Once approved, A opens the Artelo order to attach the file (F then marks it
+  // complete, from the order view: Dashboard.tsx).
+  const attachable = Boolean(d.visible && job?.status === 'done' && job.review === 'approved' && arteloOrderUrl)
+  const openArtelo = () => {
+    if (!job || !arteloOrderUrl) return
+    writeOpened(job.id); setOpened(true)
+  }
+  const openArteloRef = useRef(openArtelo)
+  openArteloRef.current = openArtelo
+  useEffect(() => {
+    if (!attachable || !arteloOrderUrl) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.repeat) return
+      const t = e.target as HTMLElement | null
+      if (t && (['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable)) return
+      if (window.matchMedia('(min-width: 768px)').matches === compact) return
+      if (e.key.toLowerCase() !== 'a') return
+      e.preventDefault()
+      window.open(arteloOrderUrl, '_blank', 'noopener,noreferrer')
+      openArteloRef.current()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [attachable, arteloOrderUrl, compact])
   // Approved, and the order is still open: attach the file in Artelo. Mark as
   // complete appears beside it only once Attach has been clicked, and Attach
   // stays, because a click is not proof the attaching got done.
   if (d.visible && job?.status === 'done' && job.review === 'approved' && arteloOrderUrl) {
     return (
       <div className={`grid gap-3 ${opened && onComplete ? (compact ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2') : 'grid-cols-1'}`}>
-        <a href={arteloOrderUrl} target="_blank" rel="noopener noreferrer" onClick={() => { writeOpened(job.id); setOpened(true) }}
+        <a href={arteloOrderUrl} target="_blank" rel="noopener noreferrer" onClick={openArtelo}
           className={`flex items-center justify-center gap-2 ${pad} rounded-md font-semibold transition-opacity ${opened ? 'bg-white border-2 border-[#4600D6]/30 text-[#4600D6] hover:bg-[#4600D6]/[0.04]' : 'bg-[#4600D6] text-white hover:opacity-90'}`}>
           <img src="/artelo-icon.png" alt="" className="w-5 h-5 rounded-[4px]" /> {compact && opened ? 'Attach' : 'Attach in Artelo'} <ArrowUpRight className="w-4 h-4 opacity-70" />
+          {!compact && <kbd className={`ml-1 inline-flex items-center px-1.5 py-0.5 rounded border text-[11px] font-medium opacity-70 font-sans ${opened ? 'border-[#4600D6]/30' : 'border-white/30'}`}>A</kbd>}
         </a>
         {opened && onComplete && (
           <button onClick={onComplete} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors`}>
             <Check className="w-5 h-5" /> {compact ? 'Complete' : 'Mark as complete'}
-            {!compact && <kbd className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">⌘↵</kbd>}
+            {!compact && <kbd className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">F</kbd>}
           </button>
         )}
       </div>

@@ -2823,7 +2823,7 @@ Thank you!`
                     className={`flex-1 px-5 py-3 rounded-md hover:opacity-90 transition-opacity font-medium text-white ${selectedOrder.pipeline?.stage === 'attach' ? 'bg-[#4600D6]' : 'bg-dark-fill'}`}
                   >
                     {selectedOrder.pipeline?.stage === 'attach' ? 'Attached in Artelo, mark done' : selectedOrder.trackstarOrderType === 'standard' && !standardDesignApproved ? 'Mark as Complete (Made by Hand)' : 'Mark as Completed'}
-                    {!(selectedOrder.trackstarOrderType === 'standard' && !standardDesignApproved) && <kbd className="ml-2 hidden md:inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">⌘↵</kbd>}
+                    {!(selectedOrder.trackstarOrderType === 'standard' && !standardDesignApproved) && <kbd className="ml-2 hidden md:inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">F</kbd>}
                   </button>
                 )}
                 {/* Re-open — only for already-completed orders. Sends the

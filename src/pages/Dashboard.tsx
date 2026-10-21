@@ -798,8 +798,8 @@ export default function Dashboard() {
         if (target.isContentEditable) return
       }
       if (isEditing) return
-      // Cmd+Enter (Ctrl+Enter elsewhere): Mark as complete.
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === 'Enter') {
+      // F: Mark as complete (after A approved the design and A attached it in Artelo).
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.repeat && (e.key === 'f' || e.key === 'F')) {
         if (selectedOrder.status === 'completed' || selectedOrder.status === 'flagged') return
         if (selectedOrder.trackstarOrderType === 'standard' && !standardDesignApprovedRef.current) return
         e.preventDefault()
