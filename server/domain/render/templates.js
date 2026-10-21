@@ -33,12 +33,21 @@ export async function templatesForWorker() {
   return rows.map(t => ({ key: t.key, file: t.file, rules: t.rules || {}, lastCheckMtime: t.lastCheckMtime, lastCheckOk: t.lastCheckOk }))
 }
 
+// A Mac that checked in this recently still counts for queueing: it is
+// asleep or closed, not gone, and its jobs wait in the queue until it is back.
+const KNOWN_MS = 30 * 24 * 60 * 60_000
+async function knownWorkers() {
+  return prisma.renderWorker.findMany({ where: { lastSeenAt: { gte: new Date(Date.now() - KNOWN_MS) } } })
+}
+
 /**
- * Keys a worker online right now can render: the template is enabled, its
- * last check passed, and that worker reports the file present.
+ * Keys a render can be queued for: the template is enabled, its last check
+ * passed, and a worker seen in the last 30 days reports the file present.
+ * The worker does not have to be online now; a job queued while every Mac is
+ * off waits and renders when one checks in (claimNext).
  */
 export async function availableTemplateKeys() {
-  const [workers, templates] = await Promise.all([onlineWorkers(), prisma.printTemplate.findMany({ where: { enabled: true, lastCheckOk: true }, select: { key: true } })])
+  const [workers, templates] = await Promise.all([knownWorkers(), prisma.printTemplate.findMany({ where: { enabled: true, lastCheckOk: true }, select: { key: true } })])
   const ok = new Set(templates.map(t => t.key))
   const out = new Set()
   for (const w of workers) {

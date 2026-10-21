@@ -24,7 +24,7 @@ function storage() {
 /** Workers seen in the last minute and a half. */
 export async function onlineWorkers() { return onlineWorkersList() }
 
-/** Template keys any online worker can render (enabled, check passed, file present). */
+/** Template keys a render can be queued for (enabled, check passed, a known worker has the file). */
 export async function availableTemplates() { return availableTemplateKeys() }
 
 export async function heartbeat({ workerId, name, templates, files }) {
@@ -52,7 +52,7 @@ export async function checkOrder(orderId, ctx = {}) {
   if (!order) throw new Error('Order not found')
   const templates = ctx.templates || await availableTemplates()
   const result = buildSpec(order, templates, await raceRowFor(order, ctx.raceCache), ctx.gaps || await noTimeGaps())
-  if (!result.ok && !templates.length) result.reasons.unshift('No render worker is online')
+  if (!result.ok && !templates.length) result.reasons.unshift('No render worker has checked in for 30 days')
   return { order, ...result }
 }
 
@@ -188,16 +188,16 @@ export async function reviewJob({ jobId, decision, note, reviewerId }) {
 /**
  * Queue renders for open orders that have everything and no render yet.
  * Runs on every auto-import, so a print is usually waiting for review by
- * the time anyone looks at the order. Only orders a worker online right now
- * can render are queued (createJob refuses the rest), so an order that comes
- * in while every Mac is asleep is picked up on a later run. A person still
- * approves every render.
+ * the time anyone looks at the order. Only orders a known worker has the
+ * template for are queued (createJob refuses the rest); one queued while
+ * every Mac is asleep renders when a Mac checks in. A person still approves
+ * every render.
  */
 export const AUTO_SINCE_KEY = 'render_auto_since'
 
 export async function autoQueueRenders({ limit = 25 } = {}) {
   const templates = await availableTemplates()
-  if (!templates.length) return { queued: 0, skipped: 0, reason: 'no render worker online' }
+  if (!templates.length) return { queued: 0, skipped: 0, reason: 'no render worker has checked in for 30 days' }
   // Only orders placed after the switch was turned on. The backlog is rendered
   // on purpose, later, once the automatic renders have earned trust.
   const since = await prisma.systemConfig.findUnique({ where: { key: AUTO_SINCE_KEY } })
