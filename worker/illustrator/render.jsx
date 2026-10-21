@@ -92,10 +92,21 @@ try {
   var nameFrame = frames.name;
   var before = nameFrame.geometricBounds;
   var align = alignmentOf(nameFrame), anchorRight = align == 'right', anchorLeft = align == 'left';
+  // With a photo, the photo window is a wall too: a long name grows only to
+  // a gap short of it (Detroit's Motor City half ran "Vishnuchakravarthi"
+  // over the photo, because the left margin guide is under the window).
+  var NAME_GAP = 9; // 1/8"
+  var photoRect = null;
+  if (spec.photo) { var pwName = photoWindowOf(doc, ab); if (pwName) photoRect = pwName.clip.geometricBounds; }
+  var photoInRow = photoRect && before[1] > photoRect[3] && before[3] < photoRect[1];
+  if (photoInRow) {
+    if (anchorRight && photoRect[2] <= before[2]) marginL = Math.max(marginL === null ? -1e9 : marginL, photoRect[2] + NAME_GAP);
+    if (anchorLeft && photoRect[0] >= before[0]) marginR = Math.min(marginR === null ? 1e9 : marginR, photoRect[0] - NAME_GAP);
+  }
   if (nameFrame.kind == TextType.AREATEXT) {
     var tp = nameFrame.textPath;
-    if (anchorRight && marginL !== null && tp.left > marginL) { tp.width = tp.width + (tp.left - marginL); tp.left = marginL; }
-    else if (anchorLeft && marginR !== null && tp.left + tp.width < marginR) { tp.width = marginR - tp.left; }
+    if (anchorRight && marginL !== null && (tp.left > marginL || (photoInRow && tp.left < marginL))) { tp.width = tp.width + (tp.left - marginL); tp.left = marginL; }
+    else if (anchorLeft && marginR !== null && (tp.left + tp.width < marginR || (photoInRow && tp.left + tp.width > marginR))) { tp.width = marginR - tp.left; }
   }
   nameFrame.contents = spec.name;
   if (nameFrame.kind == TextType.AREATEXT) {
@@ -111,6 +122,17 @@ try {
     if (anchorLeft && Math.abs(after[0] - before[0]) > 0.5) throw new Error('The name moved: its left edge shifted ' + Math.round(after[0] - before[0]) + 'pt');
     if (!anchorLeft && !anchorRight && Math.abs((after[0] + after[2]) - (before[0] + before[2])) > 1) throw new Error('The name moved: its center shifted');
     if (Math.abs(after[1] - before[1]) > 0.5) throw new Error('The name moved vertically by ' + Math.round(after[1] - before[1]) + 'pt');
+  }
+  // The letters themselves, not the box, must clear the photo window. Point
+  // text has no box to narrow, so this is its only guard. Step down the same
+  // 5% as above; a name that still touches the photo fails the render.
+  if (photoInRow) {
+    var size0 = nameFrame.textRange.characterAttributes.size, steps = 0;
+    while (overlaps(inkBounds(nameFrame), photoRect, NAME_GAP) && steps < 10) {
+      nameFrame.textRange.characterAttributes.size = nameFrame.textRange.characterAttributes.size - size0 * 0.05; steps++;
+    }
+    if (overlaps(inkBounds(nameFrame), photoRect, NAME_GAP)) throw new Error('The name runs into the photo even at ' + Math.round(nameFrame.textRange.characterAttributes.size) + 'pt');
+    if (steps) notes.push('name shrunk ' + steps + ' more to clear the photo');
   }
 
   stage = 'fields';

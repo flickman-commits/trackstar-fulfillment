@@ -201,3 +201,25 @@ function photoWindowOf(doc, ab) {
   for (var q = 0; q < group.pathItems.length; q++) if (group.pathItems[q].clipping) clip = group.pathItems[q];
   return clip ? { layer: photoLayer, group: group, clip: clip } : null;
 }
+
+// Where the letters of a text frame actually are, as [left, top, right, bottom]. A frame's own
+// bounds are its box, which for area text is wider than the words; outlining a copy and measuring
+// it gives the ink. The copy is removed. Falls back to the frame's bounds if outlining fails.
+function inkBounds(frame) {
+  var copy = null;
+  try {
+    copy = frame.duplicate();
+    var outlined = copy.createOutline();
+    var b = outlined.geometricBounds;
+    outlined.remove();
+    return b;
+  } catch (e) {
+    try { if (copy) copy.remove(); } catch (e2) {}
+    return frame.geometricBounds;
+  }
+}
+
+// Whether two [left, top, right, bottom] rects overlap, the first grown by pad on every side.
+function overlaps(a, b, pad) {
+  return a[0] - pad < b[2] && a[2] + pad > b[0] && a[1] + pad > b[3] && a[3] - pad < b[1];
+}

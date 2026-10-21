@@ -3,6 +3,10 @@
  * Render past orders on this Mac without the queue, to check a template.
  *
  *   node worker/render-local.mjs "NYC Marathon" 4294 4271 4250
+ *   node worker/render-local.mjs "Detroit Marathon" 5201 --name "Vishnuchakravarthi Nagarajan"
+ *
+ * --name renders a different runner name, to try a long one against the
+ * template.
  *
  * Builds each order's spec straight from the database (the same code the
  * tool uses), downloads the customer photo if there is one, runs the
@@ -31,7 +35,10 @@ for (const line of fs.existsSync(path.join(HERE, '.env')) ? fs.readFileSync(path
 const RACES_DIR = process.env.RACES_DIR
 const ORDERS_DIR = path.join(path.dirname(RACES_DIR), 'Orders')
 const templates = Object.fromEntries((await prisma.printTemplate.findMany()).map(t => [t.key, { file: t.file, ...(t.rules || {}) }]))
-const [race, ...numbers] = process.argv.slice(2)
+const argv = process.argv.slice(2)
+const nameAt = argv.indexOf('--name')
+const nameOverride = nameAt >= 0 ? argv.splice(nameAt, 2)[1] : null
+const [race, ...numbers] = argv
 if (!race || !numbers.length) { console.error('Usage: node worker/render-local.mjs "<race name>" <order number> ...'); process.exit(1) }
 const OUT = path.join(HERE, 'local-out', race.replace(/[^A-Za-z0-9]+/g, '_'))
 fs.mkdirSync(OUT, { recursive: true })
@@ -63,6 +70,7 @@ for (const n of numbers) {
   if (!order) { console.log(`${n}: not found`); continue }
   const raceRow = await prisma.race.findFirst({ where: { raceName: order.raceNameOverride ?? order.raceName, year: order.yearOverride ?? order.raceYear } })
   const { ok, reasons, spec } = buildSpec(order, Object.keys(templates), raceRow)
+  if (ok && nameOverride) spec.name = nameOverride
   if (!ok) { console.log(`${n}: not renderable (${reasons.join('; ')})`); continue }
   const tpl = templateFor(spec.template)
   if (!tpl) { console.log(`${n}: no template for ${spec.template}`); continue }
