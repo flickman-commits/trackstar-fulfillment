@@ -15,6 +15,7 @@ import { dateVerified } from '../../server/domain/races/verification.js'
 import { pipelineFor } from '../../server/domain/orders/pipeline.js'
 import { loadPipelineContext } from '../../server/domain/orders/pipelineStatus.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
+import { waitingOnCustomers } from '../../server/domain/support/compose.js'
 
 
 /**
@@ -442,6 +443,16 @@ export default async function handler(req, res) {
       for (const id of unpaidPhotoRows(rows, rows[0].shopifyOrderData)) unpaid.add(id)
     }
     for (const o of transformedOrders) o.photoUnpaid = unpaid.has(o.id)
+
+    // Waiting on a customer's reply to something we asked (Support, "waiting").
+    try {
+      const open = transformedOrders.filter(o => o.status !== 'completed' && o.customerEmail)
+      const waiting = await waitingOnCustomers(open.map(o => o.customerEmail))
+      for (const o of open) {
+        const since = waiting.get(String(o.customerEmail).trim().toLowerCase())
+        if (since) o.waitingOnCustomerSince = since
+      }
+    } catch (err) { console.warn('[orders] waiting-on-customer lookup failed:', err.message) }
 
     // One status per order, from everything above (server/domain/orders/pipeline.js).
     const byId = new Map(orders.map(o => [o.id, o]))

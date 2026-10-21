@@ -126,14 +126,14 @@ export default function Dashboard() {
   // The race and queue filters live in the address (?race=...&queue=review),
   // so a reload or a shared link keeps the view. Changing one replaces the
   // history entry; the back button is for orders, not filter clicks.
-  type StageFilter = '' | 'review' | 'attach' | 'action' | 'waiting' | 'not_run'
+  type StageFilter = '' | 'review' | 'attach' | 'action' | 'waiting' | 'not_run' | 'customer'
   const setUrlParam = useCallback((key: string, value: string) => {
     setSearchParams(prev => { const next = new URLSearchParams(prev); if (value) next.set(key, value); else next.delete(key); return next }, { replace: true })
   }, [setSearchParams])
   const raceFilter = searchParams.get('race') || ''  // empty = show all races
   const setRaceFilter = useCallback((v: string) => setUrlParam('race', v), [setUrlParam])
   // Standard orders: the queue to work. '' is everything open.
-  const stageFilter: StageFilter = (['review', 'attach', 'action', 'waiting', 'not_run'] as const).find(k => k === searchParams.get('queue')) || ''
+  const stageFilter: StageFilter = (['review', 'attach', 'action', 'waiting', 'not_run', 'customer'] as const).find(k => k === searchParams.get('queue')) || ''
   const setStageFilter = useCallback((v: StageFilter) => setUrlParam('queue', v), [setUrlParam])
   const [showCompleted, setShowCompleted] = useState(false)
   // Header stat: share of standard orders out within 2 days, past 7 days (goal 100%).
@@ -695,9 +695,10 @@ export default function Dashboard() {
   }, [fulfillable])
 
   const stageCounts = useMemo(() => {
-    const c = { review: 0, attach: 0, action: 0, waiting: 0, notRun: 0 }
+    const c = { review: 0, attach: 0, action: 0, waiting: 0, notRun: 0, customer: 0 }
     if (activeView !== 'standard') return c
     for (const o of ordersToFulfill) {
+      if (o.waitingOnCustomerSince) c.customer++
       const s = o.pipeline?.stage
       if (isNotRun(o)) c.notRun++
       else if (s === 'review') c.review++
@@ -714,7 +715,8 @@ export default function Dashboard() {
       base = base.filter(o => (o.effectiveRaceName || o.raceName) === raceFilter)
     }
     if (stageFilter && activeView === 'standard') {
-      base = base.filter(o => stageFilter === 'not_run' ? isNotRun(o)
+      base = base.filter(o => stageFilter === 'customer' ? !!o.waitingOnCustomerSince
+        : stageFilter === 'not_run' ? isNotRun(o)
         : stageFilter === 'waiting' ? ((o.pipeline?.stage === 'waiting' || o.pipeline?.stage === 'needs_research') && !isNotRun(o))
         : o.pipeline?.stage === stageFilter)
     } else if (activeView === 'standard') {
@@ -927,6 +929,14 @@ export default function Dashboard() {
               title="Orders for races that have not happened yet. Nothing to do until race day; they are not counted as orders to fulfill."
               className={`ml-0 md:ml-2 mt-1.5 md:mt-0 inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2.5 rounded-md border border-dashed text-xs md:text-sm font-medium whitespace-nowrap transition-colors ${stageFilter === 'not_run' ? 'bg-white border-off-black/30 text-off-black shadow-sm' : 'border-border-gray text-off-black/45 hover:text-off-black'}`}>
               Not run yet <span className="text-[11px] tabular-nums opacity-70">{stageCounts.notRun}</span>
+            </button>
+          )}
+          {/* Orders where we asked the customer something and they have not replied. Any stage. */}
+          {stageCounts.customer > 0 && (
+            <button onClick={() => setStageFilter(stageFilter === 'customer' ? '' : 'customer')}
+              title="Orders whose customer we emailed from Support and who has not replied yet. Clears when they reply or the conversation is closed."
+              className={`ml-0 md:ml-2 mt-1.5 md:mt-0 inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2.5 rounded-md border border-dashed text-xs md:text-sm font-medium whitespace-nowrap transition-colors ${stageFilter === 'customer' ? 'bg-white border-off-black/30 text-off-black shadow-sm' : 'border-border-gray text-off-black/45 hover:text-off-black'}`}>
+              Waiting on customer <span className="text-[11px] tabular-nums opacity-70">{stageCounts.customer}</span>
             </button>
           )}
         </div>

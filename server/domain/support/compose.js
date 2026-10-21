@@ -60,6 +60,27 @@ export async function emailCustomer({ orderId, subject, text, actor }) {
 }
 
 /**
+ * When we last wrote to each of these customers and are still waiting on a
+ * reply: the newest Support conversation in "waiting" (we sent the last
+ * message; a reply moves it to open, closing it ends the wait). Keyed by the
+ * lower-cased email, for the orders list's "Waiting on customer" tag.
+ * @param {string[]} emails
+ * @returns {Promise<Map<string, Date>>}
+ */
+export async function waitingOnCustomers(emails) {
+  const list = [...new Set(emails.map(e => String(e || '').trim().toLowerCase()).filter(Boolean))]
+  const out = new Map()
+  if (!list.length) return out
+  const rows = await prisma.$queryRaw`
+    SELECT lower("customerEmail") AS email, max("lastMessageAt") AS since
+    FROM "SupportThread"
+    WHERE status = 'waiting' AND "mergedIntoId" IS NULL AND filtered = false AND lower("customerEmail") = ANY(${list})
+    GROUP BY lower("customerEmail")`
+  for (const r of rows) out.set(r.email, r.since)
+  return out
+}
+
+/**
  * The Support conversations still going with an order's customer (anything
  * not closed), for the order view in TrackstarOS. Matched on the
  * order's email; filtered and merged-away threads never show.

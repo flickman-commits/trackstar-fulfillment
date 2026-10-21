@@ -49,6 +49,7 @@ export interface TaggableOrder {
   hadNoTime?: boolean
   timeFromName?: string | null
   isExpedited?: boolean
+  waitingOnCustomerSince?: string | null
   isBigSpender?: boolean
   isSample?: boolean
   photoPath?: string | null
@@ -135,6 +136,15 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
       title: o.orderTotalUsd ? `Customer spent $${Math.round(o.orderTotalUsd)}. Prioritize this order.` : 'High value order. Prioritize this order.' })
   }
 
+  // We asked the customer something in Support and they have not answered.
+  // Gray while it is fresh, amber from 3 days: time to chase.
+  if (o.waitingOnCustomerSince && o.status !== 'completed') {
+    const days = Math.floor((Date.now() - new Date(o.waitingOnCustomerSince).getTime()) / 86400000)
+    tags.push({ key: 'waiting-customer', label: 'Waiting on customer', sublabel: days < 1 ? 'today' : `${days}d`,
+      tone: days >= 3 ? 'amber' : 'gray', weight: days >= 3 ? 0.5 : 1.5,
+      title: `We emailed the customer ${days < 1 ? 'today' : `${days} day${days === 1 ? '' : 's'} ago`} and they have not replied. It clears when they reply or the conversation is closed in Support.` })
+  }
+
   // Photo add-on changes the artwork, so it ranks above ordinary flags.
   if (o.photoUnpaid) {
     tags.push({ key: 'photo-unpaid', label: 'Photo not paid', tone: 'red',
@@ -208,7 +218,7 @@ export function getOrderTags(o: TaggableOrder): OrderTag[] {
   // A race that has not happened has one thing to say: wait. Only the photo
   // and priority flags matter until race day; the Status column says the rest.
   const shown = showsRaceNotRun(o)
-    ? tags.filter(t => ['photo', 'photo-unpaid', 'expedited', 'big-spender'].includes(t.key))
+    ? tags.filter(t => ['photo', 'photo-unpaid', 'expedited', 'big-spender', 'waiting-customer'].includes(t.key))
     : tags
 
   return shown.sort((a, b) =>

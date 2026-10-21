@@ -44,7 +44,7 @@ function Attr({ label, children }: { label: string; children: React.ReactNode })
 function itemStage(it: OrderItem): { label: string; cls: string } {
   if (it.status === 'completed' || it.designStatus === 'sent_to_production') return { label: 'In production', cls: 'bg-blue-50 border-blue-200 text-blue-700' }
   if (it.designStatus && it.designStatus !== 'not_started') return { label: it.designStatus === 'approved_by_customer' ? 'Approved, not yet printed' : 'Being designed', cls: 'bg-purple-50 border-purple-200 text-purple-700' }
-  return { label: 'In the queue', cls: 'bg-white border-border-gray text-off-black/60' }
+  return { label: 'Not sent to production yet', cls: 'bg-white border-border-gray text-off-black/60' }
 }
 
 /**
@@ -55,7 +55,7 @@ function stage(o: CustomerOrder): { label: string; cls: string } | null {
   if (o.financialStatus === 'REFUNDED') return { label: 'Refunded', cls: 'bg-red-50 border-red-200 text-red-700' }
   if (o.fulfillmentStatus === 'FULFILLED' || o.tracking.length) return { label: 'Shipped', cls: 'bg-emerald-50 border-emerald-200 text-emerald-700' }
   if (!o.items.length) return o.imported ? null : { label: 'Not imported yet', cls: 'bg-white border-border-gray text-off-black/55' }
-  const order = ['In the queue', 'Being designed', 'Approved, not yet printed', 'In production']
+  const order = ['Not sent to production yet', 'Being designed', 'Approved, not yet printed', 'In production']
   return o.items.map(itemStage).sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label))[0]
 }
 

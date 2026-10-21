@@ -161,6 +161,8 @@ export interface Order {
   // Shipping
   shippingMethod?: string | null
   isExpedited?: boolean
+  // When we last wrote to this customer in Support and are still waiting on a reply.
+  waitingOnCustomerSince?: string | null
   // Big-spender flag — true if order total > $300 (configurable on backend)
   orderTotalUsd?: number | null
   isBigSpender?: boolean
@@ -328,6 +330,7 @@ export function mapOrder(order: Record<string, unknown>): Order {
     // Shipping (for expedited badge / callout)
     shippingMethod: order.shippingMethod as string | null | undefined,
     isExpedited: order.isExpedited as boolean | undefined,
+    waitingOnCustomerSince: order.waitingOnCustomerSince as string | null | undefined,
     // Big-spender (>= $300) badge + prioritize callout
     orderTotalUsd: order.orderTotalUsd as number | null | undefined,
     isBigSpender: order.isBigSpender as boolean | undefined,

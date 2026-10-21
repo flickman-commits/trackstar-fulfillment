@@ -1727,8 +1727,8 @@ Thank you!`
                   Shopify product_id so Eli can tell near-identical designs
                   apart at a glance (Chicago World Majors vs Chicago Race).
                   The ID drives the lookup but is not worth showing.
-                  Race, year, size, the photo add-on and the order date are
-                  all product facts, so they all live in this one card. */}
+                  The card is what gets printed (race, year, size, frame) and
+                  the links out; the photo, order date and discount are tags. */}
               <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                 <div className="flex items-start gap-3">
                   {selectedOrder.productInfo?.heroImageUrl ? (
@@ -1750,41 +1750,26 @@ Thank you!`
                     <div className="flex items-center justify-between gap-2 mb-0.5">
                       <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Order Details</div>
                     </div>
-                    {/* Race leads as the headline, year rides beside it. */}
-                    <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 min-w-0">
-                      <h3 className="text-lg font-bold text-off-black leading-tight">
-                        {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Unknown Race'}
-                      </h3>
-                      <span className={`flex-none inline-flex items-center px-2 py-0.5 border rounded text-xs font-semibold ${
+                    {/* Race leads as the headline, year rides inline after its last word. */}
+                    <h3 className="text-lg font-bold text-off-black leading-tight min-w-0">
+                      {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Unknown Race'}{' '}
+                      <span className={`inline-flex items-center px-2 py-0.5 border rounded text-xs font-semibold align-middle whitespace-nowrap ${
                         (selectedOrder.effectiveRaceYear || selectedOrder.raceYear)
                           ? 'bg-white border-border-gray text-off-black'
                           : 'bg-amber-50 border-amber-200 text-warning-amber'
                       }`}>
                         {selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'Year?'}
                       </span>
-                    </div>
-                    {/* Variant name, only when it says something the race
-                        name does not. */}
-                    {selectedOrder.productInfo && (() => {
-                      const label = selectedOrder.productInfo.label || ''
-                      const race = selectedOrder.effectiveRaceName || selectedOrder.raceName || ''
-                      const sameAsRace = label.trim().toLowerCase() === race.trim().toLowerCase()
-                      const notInCatalog = selectedOrder.productInfo.catalogRequired && !selectedOrder.productInfo.inCatalog
-                      if (sameAsRace && !notInCatalog) return null
-                      return (
-                        <div className="text-xs text-off-black/50 truncate mt-0.5">
-                          {sameAsRace ? null : (label || 'Unknown product')}
-                          {notInCatalog && (
-                            <span
-                              className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium align-middle"
-                              title="This Shopify product isn't in server/lib/productCatalog.js. Add it to lock in the design variant and hero image."
-                            >
-                              not in catalog
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })()}
+                    </h3>
+                    {/* A Shopify product the catalog does not know yet. */}
+                    {selectedOrder.productInfo?.catalogRequired && !selectedOrder.productInfo.inCatalog && (
+                      <span
+                        className="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium"
+                        title="This Shopify product isn't in server/lib/productCatalog.js. Add it to lock in the design variant and hero image."
+                      >
+                        not in catalog
+                      </span>
+                    )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">
                         {selectedOrder.productSize}
@@ -1800,96 +1785,88 @@ Thank you!`
                           </span>
                         )
                       })()}
-                      {/* The photo add-on changes what gets printed, so it
-                          belongs with the product facts. */}
-                      {selectedOrder.photoPath && (
-                        <span className="inline-flex items-center px-2 py-1 rounded border text-xs font-semibold bg-[#4600D6]/10 text-[#4600D6] border-[#4600D6]/25">
-                          Photo on print
-                        </span>
+                    </div>
+                  </div>
+                </div>
+                {(selectedOrder.shopifyAdminUrl || selectedOrder.etsyOrderUrl || selectedOrder.arteloUrl || selectedOrder.resultsUrl) && (
+                  <div className="mt-3 pt-3 border-t border-border-gray">
+                    <div className="flex gap-2">
+                      {selectedOrder.shopifyAdminUrl && (
+                        <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Shopify">
+                          <img src="/shopify-icon.png" alt="" className="w-4 h-4" /> Shopify <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0 opacity-40" />
+                        </a>
                       )}
-                      {selectedOrder.orderPlacedAt && (
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 border rounded text-xs ${(() => {
-                            // Same colors as the table: orange from 3 days workable, red after 5.
-                            const age = orderAge(selectedOrder)
-                            return age.days > 5 ? 'bg-red-50 border-red-200 text-red-700 font-medium' : age.days >= 3 ? 'bg-orange-50 border-orange-200 text-orange-700 font-medium' : 'bg-white border-border-gray text-off-black/60'
-                          })()}`}
-                          title={`Ordered on ${new Date(selectedOrder.orderPlacedAt).toLocaleString('en-US', { timeZone: TZ })}`}
-                        >
-                          <span>📅</span>
-                          <span>Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}</span>
-                        </span>
+                      {selectedOrder.etsyOrderUrl && (
+                        <a href={selectedOrder.etsyOrderUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Etsy">
+                          <span className="w-4 h-4 inline-flex items-center justify-center rounded-[3px] bg-[#F1641E] text-white text-[10px] font-bold leading-none">E</span> Etsy <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0 opacity-40" />
+                        </a>
+                      )}
+                      {selectedOrder.arteloUrl && (
+                        <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Artelo">
+                          <img src="/artelo-icon.png" alt="" className="w-4 h-4 rounded-[3px]" /> Artelo <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0 opacity-40" />
+                        </a>
+                      )}
+                      {selectedOrder.resultsUrl && (
+                        <a href={selectedOrder.resultsUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="The runner's result on the timing site">
+                          <span className="text-sm leading-none">🏁</span> Results <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0 opacity-40" />
+                        </a>
                       )}
                     </div>
-                    {/* Discounts get their own row rather than wrapping in
-                        with the size and order date. Those describe the
-                        product; a code describes how it was bought, and it
-                        is about to describe which design to print. One chip
-                        per code, since an order can carry a product
-                        discount and a shipping one at once. */}
-                    {(selectedOrder.discountCodes || []).length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                        {(selectedOrder.discountCodes || []).map((d) => (
-                          <span
-                            key={d.code}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium bg-yellow-50 text-yellow-900/70 border-yellow-200"
-                            title={
-                              d.amount
-                                ? `${d.code} - ${d.type === 'percentage' ? 'percentage' : d.type === 'shipping' ? 'shipping' : 'fixed amount'} discount, $${d.amount} off`
-                                : d.code
-                            }
-                          >
-                            Discount: {d.code}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
-                </div>
+                )}
               </div>
 
-              {(selectedOrder.shopifyAdminUrl || selectedOrder.etsyOrderUrl || selectedOrder.arteloUrl || selectedOrder.resultsUrl) && (
-                <div>
-                  <div className="flex gap-2">
-                    {selectedOrder.shopifyAdminUrl && (
-                      <a href={selectedOrder.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Shopify">
-                        <img src="/shopify-icon.png" alt="" className="w-4 h-4" /> Shopify <ArrowUpRight className="w-3.5 h-3.5 opacity-40" />
-                      </a>
-                    )}
-                    {selectedOrder.etsyOrderUrl && (
-                      <a href={selectedOrder.etsyOrderUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Etsy">
-                        <span className="w-4 h-4 inline-flex items-center justify-center rounded-[3px] bg-[#F1641E] text-white text-[10px] font-bold leading-none">E</span> Etsy <ArrowUpRight className="w-3.5 h-3.5 opacity-40" />
-                      </a>
-                    )}
-                    {selectedOrder.arteloUrl && (
-                      <a href={selectedOrder.arteloUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="Open this order in Artelo">
-                        <img src="/artelo-icon.png" alt="" className="w-4 h-4 rounded-[3px]" /> Artelo <ArrowUpRight className="w-3.5 h-3.5 opacity-40" />
-                      </a>
-                    )}
-                    {selectedOrder.resultsUrl && (
-                      <a href={selectedOrder.resultsUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-border-gray bg-white text-sm font-medium text-off-black hover:border-off-black/30 transition-colors" title="The runner's result on the timing site">
-                        <span className="text-sm leading-none">🏁</span> Results <ArrowUpRight className="w-3.5 h-3.5 opacity-40" />
-                      </a>
-                    )}
-                  </div>
+              {/* Every tag for the order, in one place: the photo add-on, when it
+                  was ordered (orange from 3 days, red after 5, like the table),
+                  and any discount code (one per code; an order can carry a
+                  product and a shipping discount at once). */}
+              <div>
+                <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Tags</h4>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <OrderTags order={selectedOrder} size="md" className="contents" />
+                  {selectedOrder.orderPlacedAt && (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-1 border rounded text-xs ${(() => {
+                        // Same colors as the table: orange from 3 days workable, red after 5.
+                        const age = orderAge(selectedOrder)
+                        return age.days > 5 ? 'bg-red-50 border-red-200 text-red-700 font-medium' : age.days >= 3 ? 'bg-orange-50 border-orange-200 text-orange-700 font-medium' : 'bg-white border-border-gray text-off-black/60'
+                      })()}`}
+                      title={`Ordered on ${new Date(selectedOrder.orderPlacedAt).toLocaleString('en-US', { timeZone: TZ })}`}
+                    >
+                      <span>📅</span>
+                      <span>Ordered {formatOrderPlacedAt(selectedOrder.orderPlacedAt)}</span>
+                    </span>
+                  )}
+                  {(selectedOrder.discountCodes || []).map((d) => (
+                    <span
+                      key={d.code}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium bg-yellow-50 text-yellow-900/70 border-yellow-200"
+                      title={
+                        d.amount
+                          ? `${d.code} - ${d.type === 'percentage' ? 'percentage' : d.type === 'shipping' ? 'shipping' : 'fixed amount'} discount, $${d.amount} off`
+                          : d.code
+                      }
+                    >
+                      Discount: {d.code}
+                    </span>
+                  ))}
                 </div>
-              )}
+              </div>
 
               {/* What the print was made from and what its PDF measured, as tags. */}
               <DesignDetailsTags d={design} />
 
-              <div>
-                <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-1">
-                  <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                </div>
+              {/* The filename is for a print made by hand; a rendered one is named by the tool. */}
+              {design.job?.status === 'done' ? (
                 <DesignFileLinks d={design} />
-              </div>
-
-              {/* Every tag for the order, in one place. */}
-              <div>
-                <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Tags</h4>
-              <OrderTags order={selectedOrder} size="md" exclude={['photo']} />
-              </div>
+              ) : (
+                <div>
+                  <div className="bg-subtle-gray border border-border-gray rounded-md px-3 py-1">
+                    <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
+                  </div>
+                  <DesignFileLinks d={design} />
+                </div>
+              )}
 
               {/* Smaller things you can do to an order. More will land here. */}
               {selectedOrder.trackstarOrderType === 'standard' && (

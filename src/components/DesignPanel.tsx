@@ -364,7 +364,11 @@ export function DesignDetailsTags({ d }: { d: Design }) {
           </>
         ) : <Tag title="Made before the PDF check">Not measured</Tag>}
       </div>
-      {job.notes && <p className="mt-1.5 text-xs text-amber-700">{job.notes}</p>}
+      {/* "photo placed" is already the Photo placed tag above; the rest of the notes are worth a look. */}
+      {(() => {
+        const notes = (job.notes || '').split('; ').filter(n => n && n !== 'photo placed').join('; ')
+        return notes ? <p className="mt-1.5 text-xs text-amber-700">{notes}</p> : null
+      })()}
       {job.reviewNote && <p className="mt-1 text-xs text-red-700">{job.review === 'closed' ? 'Closed' : 'Rejected'}: {job.reviewNote}</p>}
       {d.err && <p className="mt-1 text-xs text-red-600">{d.err}</p>}
     </div>
