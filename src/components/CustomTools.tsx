@@ -67,6 +67,15 @@ function PaceConverter() {
     setTimeout(() => setCopied(false), 1500)
   }
 
+  // A whole time pasted or typed into any box ("3:53:29", "53:29") fills all three.
+  const fillFromTime = (text: string) => {
+    const parts = text.trim().split(/[:.]/).map(p => p.trim())
+    if (parts.length < 2 || parts.length > 3 || parts.some(p => !/^\d{1,2}$/.test(p))) return false
+    const [hh, mm, ss] = parts.length === 3 ? parts : ['', ...parts]
+    setHours(hh.replace(/^0(?=\d)/, '')); setMinutes(mm); setSeconds(ss)
+    return true
+  }
+
   const fieldClass = `w-full px-2 py-2 border rounded-md text-sm text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-off-black/20 ${
     showError ? 'border-red-300' : 'border-border-gray'
   }`
@@ -108,7 +117,8 @@ function PaceConverter() {
                   type="text"
                   inputMode="numeric"
                   value={f.val}
-                  onChange={e => f.set(e.target.value.replace(/[^0-9]/g, ''))}
+                  onChange={e => { if (!fillFromTime(e.target.value)) f.set(e.target.value.replace(/[^0-9]/g, '')) }}
+                  onPaste={e => { if (fillFromTime(e.clipboardData.getData('text'))) e.preventDefault() }}
                   placeholder={f.placeholder}
                   autoFocus={f.label === 'HRS'}
                   className={fieldClass}
