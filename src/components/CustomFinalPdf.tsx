@@ -5,13 +5,14 @@ import { apiFetch } from '@/lib/api'
 import { btnGhost } from '@/lib/ui'
 
 /**
- * The end of a custom order, the same as a standard one. Once the customer
- * approves, the designer uploads the final PDF here; the server saves it to
- * the Drive Orders folder and the Artelo library (server/domain/orders/
- * customFinal.js). Then Attach in Artelo: open the Artelo order, check the
- * order number, attach the file to the item, send it to production, and come
- * back to mark it complete. Mark complete shows once Attach has been opened,
- * because the attaching is the one step the tool cannot do.
+ * The end of a custom order. Once the customer approves, the designer uploads
+ * the final PDF here; the server saves it to the Drive Orders folder and the
+ * Artelo library and pings Matt on Slack (server/domain/orders/customFinal.js).
+ * Designers have no Artelo login, so the designer's part ends there. An admin
+ * then sees Attach in Artelo: open the Artelo order, check the order number,
+ * attach the file, send it to production, and mark it complete. Mark complete
+ * shows once Attach has been opened, because the attaching is the one step
+ * the tool cannot do (until Artelo has an attach endpoint).
  */
 type FinalPdf = {
   id: string; fileName: string; uploadedAt: string; pdfUrl: string | null
@@ -22,13 +23,15 @@ const openedKey = (id: string) => `custom-final-attach:${id}`
 function readOpened(id: string) { try { return localStorage.getItem(openedKey(id)) === '1' } catch { return false } }
 function writeOpened(id: string) { try { localStorage.setItem(openedKey(id), '1') } catch { /* per visit only */ } }
 
-export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, designStatus, arteloOrderUrl, onUploaded, onComplete }: {
+export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, designStatus, arteloOrderUrl, canAttach, onUploaded, onComplete }: {
   orderId: string
   displayOrderNumber: string
   /** The shop's filename for this print, without .pdf */
   fileName: string
   designStatus: string
   arteloOrderUrl?: string | null
+  /** Admins attach in Artelo and complete; a designer's part ends at the upload. */
+  canAttach: boolean
   onUploaded: () => void
   onComplete: () => void
 }) {
@@ -68,7 +71,7 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
       setFinalPdf(data.finalPdf)
       setReplacing(false)
       const fp = data.finalPdf as FinalPdf | null
-      if (fp?.driveUrl && fp.inArtelo) toast.success('Saved to Drive and the Artelo library')
+      if (fp?.driveUrl && fp.inArtelo) toast.success('Saved to Drive and the Artelo library. Matt has been pinged to send it to production.')
       else toast.warning('Uploaded, but not everywhere yet. See below.')
       onUploaded()
     } catch (e) { toast.error((e as Error).message) } finally {
@@ -106,15 +109,50 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
         </button>
         {replacing && <button onClick={() => setReplacing(false)} className={`${btnGhost} w-full justify-center`}>Cancel</button>}
         {/* An order moved to Final PDF Uploaded under the old flow has no file here. */}
-        {!replacing && designStatus === 'final_pdf_uploaded' && (
+        {!replacing && canAttach && designStatus === 'final_pdf_uploaded' && (
           <button onClick={onComplete} className={`${btnGhost} w-full justify-center`}>Already attached in Artelo and sent to production? Mark complete</button>
         )}
       </div>
     )
   }
 
-  // Step 2: in the library, so attach it to the Artelo order and send it through.
+  // Step 2: in the library. Where the file went, for everyone.
   const placed = Boolean(finalPdf.driveUrl && finalPdf.inArtelo)
+  const where = (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {finalPdf.driveUrl
+        ? <a href={finalPdf.driveUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-green-700 hover:underline"><Check className="w-3 h-3" />Saved to Drive <ExternalLink className="w-3 h-3" /></a>
+        : <span className="inline-flex items-center gap-1 text-red-700 font-semibold" title={finalPdf.driveError || undefined}><X className="w-3 h-3" />Not in Drive{finalPdf.driveError ? `: ${finalPdf.driveError}` : ''}</span>}
+      {finalPdf.inArtelo
+        ? <span className="inline-flex items-center gap-1 text-green-700"><Check className="w-3 h-3" />In the Artelo library</span>
+        : <span className="inline-flex items-center gap-1 text-red-700 font-semibold" title={finalPdf.arteloError || undefined}><X className="w-3 h-3" />Not in Artelo{finalPdf.arteloError ? `: ${finalPdf.arteloError}` : ''}</span>}
+      {finalPdf.pdfUrl && <a href={finalPdf.pdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-off-black/55 hover:text-off-black">Open PDF <ExternalLink className="w-3 h-3" /></a>}
+      {!placed && (
+        <button onClick={retry} disabled={busy !== null} className="inline-flex items-center gap-1 text-off-black/70 hover:text-off-black font-medium disabled:opacity-50">
+          {busy === 'retry' ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCw className="w-3 h-3" />} Try again
+        </button>
+      )}
+    </div>
+  )
+
+  // A designer's part is done: Matt attaches it in Artelo and sends it through.
+  if (!canAttach) {
+    return (
+      <div className="space-y-2">
+        {picker}
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] leading-snug text-off-black space-y-2">
+          <p>
+            <span className="font-semibold text-emerald-700 mr-1.5">Final PDF uploaded.</span>
+            Matt has been pinged on Slack. He attaches <span className="font-mono">{finalPdf.fileName}</span> to the Artelo order and sends it to production. Nothing else to do here.
+          </p>
+          {where}
+        </div>
+        <button onClick={() => setReplacing(true)} disabled={busy !== null} className={`${btnGhost} w-full justify-center`}>Upload a different PDF</button>
+      </div>
+    )
+  }
+
+  // An admin: attach it to the Artelo order, send it through, mark it complete.
   return (
     <div className="space-y-2">
       {picker}
@@ -123,20 +161,7 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
           <span className="font-semibold text-[#4600D6] mr-1.5">Attach in Artelo.</span>
           Open the Artelo order and check it is order <span className="font-semibold">{orderNo}</span>. Attach <span className="font-mono">{finalPdf.fileName}</span> from the Orders folder of the library to the item, send it to production, then mark the order complete here.
         </p>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          {finalPdf.driveUrl
-            ? <a href={finalPdf.driveUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-green-700 hover:underline"><Check className="w-3 h-3" />Saved to Drive <ExternalLink className="w-3 h-3" /></a>
-            : <span className="inline-flex items-center gap-1 text-red-700 font-semibold" title={finalPdf.driveError || undefined}><X className="w-3 h-3" />Not in Drive{finalPdf.driveError ? `: ${finalPdf.driveError}` : ''}</span>}
-          {finalPdf.inArtelo
-            ? <span className="inline-flex items-center gap-1 text-green-700"><Check className="w-3 h-3" />In the Artelo library</span>
-            : <span className="inline-flex items-center gap-1 text-red-700 font-semibold" title={finalPdf.arteloError || undefined}><X className="w-3 h-3" />Not in Artelo{finalPdf.arteloError ? `: ${finalPdf.arteloError}` : ''}</span>}
-          {finalPdf.pdfUrl && <a href={finalPdf.pdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-off-black/55 hover:text-off-black">Open PDF <ExternalLink className="w-3 h-3" /></a>}
-          {!placed && (
-            <button onClick={retry} disabled={busy !== null} className="inline-flex items-center gap-1 text-off-black/70 hover:text-off-black font-medium disabled:opacity-50">
-              {busy === 'retry' ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCw className="w-3 h-3" />} Try again
-            </button>
-          )}
-        </div>
+        {where}
       </div>
 
       <div className={`grid gap-3 ${opened || !arteloOrderUrl ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>

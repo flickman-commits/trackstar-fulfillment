@@ -4,8 +4,10 @@
  * approved RenderJob (spec.kind 'custom_final'), so the Drive Orders folder
  * save (deliver.js) and the Artelo library upload (artelo.js) are the same
  * code, with the same retries on every auto-import. The order then reads
- * Final PDF uploaded: the designer attaches it to the Artelo order item and
- * marks the order done (sent_to_production). Nothing completes on its own.
+ * Final PDF uploaded and Matt is pinged on Slack: he attaches it to the
+ * Artelo order item (designers have no Artelo login), sends it to production
+ * and marks the order done (sent_to_production). Nothing completes on its
+ * own. Once Artelo has an attach endpoint, that step can be automatic.
  *
  * The file goes to the private production-files bucket, put there by the
  * browser through a signed upload URL (Vercel caps a request body at 4.5 MB).
@@ -16,6 +18,8 @@ import { BUCKET } from '../render/jobs.js'
 import { deliverEverywhere } from '../render/review.js'
 import { setDesignStatus } from './designStatus.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
+import { postSlack, slackText } from '../../lib/slack.js'
+import { arteloOrderUrl } from '../../lib/links.js'
 
 export class FinalPdfError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; this.expose = true }
@@ -89,7 +93,28 @@ export async function recordFinalPdf({ orderId, path, fileName, actor = null }) 
   if (order.designStatus !== 'final_pdf_uploaded') await setDesignStatus(order, 'final_pdf_uploaded', null, actor)
 
   await deliverEverywhere(job)
-  return finalPdfStatus(order.id)
+  const status = await finalPdfStatus(order.id)
+  await pingToAttach(order, status.finalPdf, actor)
+  return status
+}
+
+// Matt, who attaches custom prints in Artelo (Slack user id).
+const ATTACHER_SLACK_ID = 'U01CQFPL78E'
+
+/** Tell Matt the file is ready to attach in Artelo. Never throws. */
+async function pingToAttach(order, fp, actor) {
+  if (!fp) return
+  const num = `#${displayNumber(order)}${order.lineItemIndex ? `-${order.lineItemIndex + 1}` : ''}`
+  const person = actor?.id ? await prisma.user.findUnique({ where: { id: actor.id }, select: { firstName: true } }).catch(() => null) : null
+  const who = person?.firstName ? ` ${slackText(person.firstName)} uploaded the` : ' The'
+  const artelo = arteloOrderUrl(order.arteloOrderData?.id)
+  const lines = [
+    `📎 <@${ATTACHER_SLACK_ID}>${who} final PDF for custom order *${slackText(num)}*${order.runnerName ? ` (${slackText(order.runnerName)})` : ''}. Attach \`${slackText(fp.fileName)}\` in Artelo, send it to production, then mark it complete in the tool.`,
+    fp.inArtelo ? '• In the Artelo library (Orders folder)' : `• ⚠️ Not in the Artelo library yet${fp.arteloError ? `: ${slackText(fp.arteloError, 200)}` : ''}`,
+    fp.driveUrl ? `• <${fp.driveUrl}|Saved to Drive>` : `• ⚠️ Not in Drive yet${fp.driveError ? `: ${slackText(fp.driveError, 200)}` : ''}`,
+    artelo ? `• <${artelo}|Open the Artelo order>` : null,
+  ].filter(Boolean)
+  await postSlack(process.env.SLACK_PROOF_WEBHOOK_URL, lines.join('\n'))
 }
 
 /** The newest final PDF for the order: where it went, and a link to open it. */

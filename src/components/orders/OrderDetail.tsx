@@ -1403,8 +1403,9 @@ Thank you!`
 
                   {/* ═══ STAGE-SPECIFIC PRIMARY ACTION — always at the top ═══ */}
 
-                  {/* Customer approved: a custom order uploads its final PDF here (Drive + Artelo
-                      library), then Attach in Artelo and mark complete, like a standard order. */}
+                  {/* Customer approved: the designer uploads the custom order's final PDF here
+                      (Drive + Artelo library, Slack ping to Matt); an admin attaches it in Artelo
+                      and marks it complete. */}
                   {(ds === 'approved_by_customer' || ds === 'final_pdf_uploaded') && selectedOrder.trackstarOrderType === 'custom' && (
                     <CustomFinalPdf
                       orderId={selectedOrder.id}
@@ -1412,6 +1413,7 @@ Thank you!`
                       fileName={generateFilename(selectedOrder).replace(/\.pdf$/i, '')}
                       designStatus={ds}
                       arteloOrderUrl={selectedOrder.arteloUrl}
+                      canAttach={isAdmin}
                       onUploaded={() => {
                         setSelectedOrder(prev => prev && prev.id === selectedOrder.id ? { ...prev, designStatus: 'final_pdf_uploaded' } : prev)
                         setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, designStatus: 'final_pdf_uploaded' } : o))
