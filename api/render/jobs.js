@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     if (body.action === 'review') {
       // Drive and the Artelo library take several seconds; the person
       // reviewing does not wait for them (server/domain/render/review.js).
-      const { job, delivery } = await reviewRender({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, user })
+      const { job, delivery } = await reviewRender({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, user, designNeed: body.designNeed === true })
       if (delivery) inBackground(delivery)
       const files = await signedFiles(job)
       return res.status(200).json({ job: present(job, files) })

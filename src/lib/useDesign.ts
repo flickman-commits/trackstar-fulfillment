@@ -65,10 +65,11 @@ export function useDesign(orderId: string | null, canManage: boolean) {
     setState(s => s && s.job ? { ...s, job: { ...s.job, status: 'queued', previewUrl: null, pdfUrl: null, review: 'pending', output: null } } : s)
     try { await post({ action: 'create', orderId }); await load() } catch (e) { setErr(e instanceof Error ? e.message : 'Could not start') } finally { setBusy(false); setCreating(false) }
   }
-  const review = async (decision: 'approved' | 'rejected', note?: string) => {
+  // designNeed: a rejection for a problem in the production file, which goes on Settings > Design Needs.
+  const review = async (decision: 'approved' | 'rejected', note?: string, designNeed = false) => {
     if (!state?.job) return false
     setBusy(true); setErr(null)
-    try { await post({ action: 'review', jobId: state.job.id, decision, note }); await load(); return true }
+    try { await post({ action: 'review', jobId: state.job.id, decision, note, designNeed }); await load(); return true }
     catch (e) { setErr(e instanceof Error ? e.message : 'Could not save'); return false } finally { setBusy(false) }
   }
 

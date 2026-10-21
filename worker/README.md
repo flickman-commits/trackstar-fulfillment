@@ -66,6 +66,13 @@ copies, shows that layer, and fills it. Until a file has the layer, the
 template check marks that size "needs NO TIME layout" and no-time orders for
 it are held with that reason instead of rendering.
 
+The other way, which Dan uses: two whole personalize layers,
+`PERSONALIZE LAYER WITH TIME` and `PERSONALIZE LAYER NO TIME` (any layer whose
+name contains "NO TIME" counts). The NO TIME one is a full copy with name,
+bib, date and weather laid out without time and pace. On a no-time order the
+script shows it, hides the WITH TIME layer, and fills it like any print. On an
+order with a time it is always hidden, even if the file was saved with it on.
+
 ## Checking a file by hand
 
 ```bash

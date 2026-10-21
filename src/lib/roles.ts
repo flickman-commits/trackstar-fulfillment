@@ -10,7 +10,7 @@ export type Role = 'admin' | 'sales' | 'fulfillment' | 'support' | 'head_designe
 export type Capability =
   | 'sales' | 'support' | 'creators' | 'orders.assign_custom' | 'orders.render'
   | 'tools.discounts' | 'tools.pace' | 'tools.weather' | 'tools.surveys'
-  | 'settings.pricing' | 'settings.reviews' | 'settings.stats' | 'settings.data' | 'settings.admin'
+  | 'settings.pricing' | 'settings.reviews' | 'settings.stats' | 'settings.design_needs' | 'settings.data' | 'settings.admin'
 
 export type Caps = '*' | Capability[]
 
@@ -38,15 +38,16 @@ export const CAPABILITY_LABEL: Partial<Record<Capability, string>> = {
   'settings.pricing': 'Pricing',
   'settings.reviews': 'Reviews',
   'settings.stats': 'Stats',
+  'settings.design_needs': 'Design Needs',
 }
 
 const DEFAULT_CAPS: Record<Role, Caps> = {
   admin: '*',
   sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.pricing', 'settings.reviews', 'settings.stats'],
-  fulfillment: ['support', 'creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  fulfillment: ['support', 'creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats', 'settings.design_needs'],
   support: ['support', 'tools.discounts', 'tools.pace', 'tools.weather'],
-  head_designer: ['orders.assign_custom', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
-  designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
+  head_designer: ['orders.assign_custom', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats', 'settings.design_needs'],
+  designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats', 'settings.design_needs'],
 }
 
 /** "staff" (from before roles) and anything unknown read as designer, the narrowest. */

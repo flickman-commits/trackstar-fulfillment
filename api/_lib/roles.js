@@ -48,16 +48,17 @@ export const CAPABILITIES = [
   { id: 'settings.pricing', group: 'Settings', label: 'Pricing Calculator' },
   { id: 'settings.reviews', group: 'Settings', label: 'Request Reviews' },
   { id: 'settings.stats', group: 'Settings', label: 'Stats' },
+  { id: 'settings.design_needs', group: 'Settings', label: 'Design Needs' },
 ]
 const GRANTABLE = new Set(CAPABILITIES.map(c => c.id))
 const EDITABLE_ROLES = ROLES.filter(r => r !== 'admin')
 
 export const DEFAULT_CAPS = {
   sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.pricing', 'settings.reviews', 'settings.stats'],
-  fulfillment: ['support', 'creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats'],
+  fulfillment: ['support', 'creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats', 'settings.design_needs'],
   support: ['support', 'tools.discounts', 'tools.pace', 'tools.weather'],
-  head_designer: ['orders.assign_custom', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
-  designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats'],
+  head_designer: ['orders.assign_custom', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats', 'settings.design_needs'],
+  designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats', 'settings.design_needs'],
 }
 
 const KEY = 'role_capabilities'

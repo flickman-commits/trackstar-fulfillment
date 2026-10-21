@@ -51,6 +51,7 @@ const IDLE_POLL_MAX_MS = 60000
 const HEARTBEAT_MS = 30000
 const ILLUSTRATOR_TIMEOUT_MS = 180000
 const CHECK_TIMEOUT_MS = 600000
+const CHECK_BATCH = 12
 const SCRIPT = path.join(HERE, 'illustrator', 'render.jsx')
 const CHECK_SCRIPT = path.join(HERE, 'illustrator', 'check.jsx')
 const WORK = path.join(os.tmpdir(), 'trackstar-render')
@@ -92,7 +93,9 @@ function fileState(templates) {
 
 function runIllustrator(script, timeout) {
   return new Promise((resolve, reject) => {
-    const osa = `tell application "Adobe Illustrator" to do javascript file "${script}"`
+    // AppleScript gives up on an app after two minutes unless told otherwise,
+    // which is shorter than a long check run; the timeout here is the real one.
+    const osa = `with timeout of ${Math.ceil(timeout / 1000)} seconds\ntell application "Adobe Illustrator" to do javascript file "${script}"\nend timeout`
     execFile('osascript', ['-e', osa], { timeout }, (err, _stdout, stderr) => {
       if (err) return reject(new Error(err.killed ? 'Illustrator did not finish in time' : (stderr || err.message).trim()))
       resolve()
@@ -101,11 +104,13 @@ function runIllustrator(script, timeout) {
 }
 
 /**
- * Check every template whose file changed since it was last checked, in one
- * Illustrator run, and report each verdict.
+ * Check the templates whose file changed since they were last checked,
+ * CHECK_BATCH per Illustrator run, and report each verdict.
  */
 async function checkChanged(templates, files) {
-  const due = templates.filter(t => files[t.key]?.present && files[t.key].mtime !== t.lastCheckMtime)
+  // A few at a time: each heartbeat checks the next batch, so jobs keep
+  // flowing between batches and one run never outlasts the timeout.
+  const due = templates.filter(t => files[t.key]?.present && files[t.key].mtime !== t.lastCheckMtime).slice(0, CHECK_BATCH)
   if (!due.length) return
   const dir = path.join(WORK, 'check')
   fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true })

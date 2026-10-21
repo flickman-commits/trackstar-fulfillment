@@ -27,6 +27,9 @@ for (var i = 0; i < input.files.length; i++) {
     for (var pi = 0; pi < doc.placedItems.length; pi++) { var ln = layerNameOf(doc.placedItems[pi]); if (ln != 'LOCKED ASSETS' && ln != 'GUIDES') stray++; }
     for (var ri = 0; ri < doc.rasterItems.length; ri++) { var ln2 = layerNameOf(doc.rasterItems[ri]); if (ln2 != 'LOCKED ASSETS' && ln2 != 'GUIDES') stray++; }
     out.push('"strayImages":' + stray);
+    // Checked as an order with a time prints: the NO TIME layer off, as render.jsx does.
+    var ntOff = noTimeLayerOf(doc);
+    if (ntOff && ntOff.visible) { if (ntOff.locked) ntOff.locked = false; ntOff.visible = false; }
     var boards = [];
     for (var a = 0; a < doc.artboards.length; a++) {
       var abName = doc.artboards[a].name, size = sizeKey(abName), ab = doc.artboards[a].artboardRect;

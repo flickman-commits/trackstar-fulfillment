@@ -98,11 +98,20 @@ const attachKey = (jobId: string) => `trackstar:attach-opened:${jobId}`
 function readOpened(jobId: string) { try { return localStorage.getItem(attachKey(jobId)) === '1' } catch { return false } }
 function writeOpened(jobId: string) { try { localStorage.setItem(attachKey(jobId), '1') } catch { /* per visit only */ } }
 
+// Words that point at the production file rather than the order's data. Only
+// a first guess for the reject form's checkbox; the reviewer decides.
+const FILE_WORDS = /overlap|spill|runs? (into|over)|cut ?off|clipp|font|kern|spacing|align|layer|artboard|template|logo|course|route|map\b|colou?r|bleed|photo window|too (big|small|close|long)|position|placement|margin|wrap/i
+const DATA_WORDS = /wrong (name|bib|time|pace|date|year|race|weather|temp)|misspell|typo|spelled/i
+function looksLikeFileProblem(note: string) {
+  return FILE_WORDS.test(note) && !DATA_WORDS.test(note)
+}
+
 export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = false }: { d: Design; arteloOrderUrl?: string | null; onComplete?: () => void; compact?: boolean }) {
   // compact: the phone's bottom bar, shorter buttons in the same order.
   const pad = compact ? 'py-3 text-[15px]' : 'py-4 text-base'
   const [rejecting, setRejecting] = useState(false)
   const [note, setNote] = useState('')
+  const [fileProblem, setFileProblem] = useState<boolean | null>(null)
   const job = d.job
   const [opened, setOpened] = useState(false)
   useEffect(() => { setOpened(job ? readOpened(job.id) : false) }, [job?.id])  // eslint-disable-line react-hooks/exhaustive-deps
@@ -172,12 +181,22 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
   }
   if (!d.visible || !d.canManage || job?.status !== 'done' || job.review !== 'pending') return null
   if (rejecting) {
+    // A problem in the file goes on Dan's Design Needs; wrong data does not.
+    // The box follows the note until someone ticks or unticks it.
+    const isFile = fileProblem ?? looksLikeFileProblem(note)
+    const reject = () => d.review('rejected', note, isFile).then(ok => { if (ok) { setRejecting(false); setNote(''); setFileProblem(null) } })
     return (
-      <div className={compact ? 'grid grid-cols-[1fr,auto] gap-2' : 'flex gap-2'}>
-        <input value={note} onChange={e => setNote(e.target.value)} placeholder="What is wrong with it?" className={`${inputBase} flex-1`} autoFocus
-          onKeyDown={e => { if (e.key === 'Enter' && note.trim()) d.review('rejected', note).then(ok => { if (ok) { setRejecting(false); setNote('') } }) }} />
-        <button onClick={() => d.review('rejected', note).then(ok => { if (ok) { setRejecting(false); setNote('') } })} disabled={d.busy || !note.trim()} className="px-5 py-3 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-40">{compact ? 'Reject' : 'Reject with note'}</button>
-        <button onClick={() => { setRejecting(false); setNote('') }} className={`${btnGhost} ${compact ? 'col-span-2 justify-center' : ''}`}>Cancel</button>
+      <div className="space-y-2">
+        <div className={compact ? 'grid grid-cols-[1fr,auto] gap-2' : 'flex gap-2'}>
+          <input value={note} onChange={e => setNote(e.target.value)} placeholder="What is wrong with it?" className={`${inputBase} flex-1`} autoFocus
+            onKeyDown={e => { if (e.key === 'Enter' && note.trim()) reject() }} />
+          <button onClick={reject} disabled={d.busy || !note.trim()} className="px-5 py-3 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-40">{compact ? 'Reject' : 'Reject with note'}</button>
+          <button onClick={() => { setRejecting(false); setNote(''); setFileProblem(null) }} className={`${btnGhost} ${compact ? 'col-span-2 justify-center' : ''}`}>Cancel</button>
+        </div>
+        <label className="flex items-start gap-2 text-xs text-off-black/70 cursor-pointer">
+          <input type="checkbox" checked={isFile} onChange={e => setFileProblem(e.target.checked)} className="mt-0.5 accent-[#4600D6]" />
+          <span><span className="font-medium text-off-black">Design file problem</span>: the layout, a layer or the artboard needs Dan. Goes on Settings &gt; Design Needs. Leave it off for wrong data (name, bib, time, date, weather).</span>
+        </label>
       </div>
     )
   }

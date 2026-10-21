@@ -1083,6 +1083,42 @@ model PrintTemplate {
   @@index([raceName])
 }
 
+/**
+ * Settings > Design Needs: what the designer has to fix in a production file
+ * so the render script can make a print (server/domain/render/designNeeds.js).
+ * Found by the tool from the orders it is stuck on (source auto), added when
+ * a design is rejected for a file problem (reject), or written by a person
+ * (manual). Checked off by whoever fixed it.
+ */
+model DesignNeed {
+  id            String    @id @default(cuid())
+  // What it is, so the tool finds an auto need again: "notime|<template>|<size>", "reject|<jobId>"...
+  key           String    @unique
+  // production_file | no_time_layer | photo_window | file_problem | rejected | other
+  kind          String
+  title         String
+  template      String?
+  size          String?
+  detail        String?
+  // The orders waiting on it: [{ id, number }]
+  orders        Json?
+  source        String    // auto | reject | manual
+  status        String    @default("open") // open | done
+  // The latest word on it: how it closed, or why it reopened.
+  note          String?
+  renderJobId   String?
+  createdById   String?
+  createdByName String?
+  doneAt        DateTime?
+  doneById      String?
+  doneByName    String?
+  lastSeenAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+}
+
 // -----------------------------------------------------------------------------
 // Support: the shared inbox for fast@trackstar.art
 // -----------------------------------------------------------------------------

@@ -106,12 +106,12 @@ export const renderTools = [
     scope: 'write',
     cap: 'orders.render',
     readOnly: false,
-    input: { orderNumber: z.string().max(40), note: z.string().trim().min(3).max(2000).describe('What is wrong, for whoever fixes it.'), item: ITEM, version: VERSION },
-    async handler({ orderNumber, note, item, version }, { principal }) {
+    input: { orderNumber: z.string().max(40), note: z.string().trim().min(3).max(2000).describe('What is wrong, for whoever fixes it.'), designNeed: z.boolean().optional().describe('True when the problem is in the production file (layout, layer, artboard), so it goes on the designer\'s Design Needs list. False for wrong data (name, bib, time, date).'), item: ITEM, version: VERSION },
+    async handler({ orderNumber, note, designNeed, item, version }, { principal }) {
       const { n, job } = await itemAndJob(orderNumber, item)
       reviewable(job, n, version)
-      const { job: done } = await reviewRender({ jobId: job.id, decision: 'rejected', note, user: principal.user })
-      return { summary: `Rejected the design of ${n} (v${done.version}): ${note}`, orderNumber: n, version: done.version, review: 'rejected', note }
+      const { job: done } = await reviewRender({ jobId: job.id, decision: 'rejected', note, user: principal.user, designNeed: designNeed === true })
+      return { summary: `Rejected the design of ${n} (v${done.version}): ${note}${designNeed ? ' (added to Design Needs)' : ''}`, orderNumber: n, version: done.version, review: 'rejected', note, designNeed: designNeed === true }
     },
   },
   {

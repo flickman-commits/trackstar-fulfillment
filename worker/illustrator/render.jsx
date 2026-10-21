@@ -42,11 +42,30 @@ try {
   // Every text frame on this artboard that looks like a personalization field, whatever layer it is on
   // (lib.jsx collectFrames). A placeholder beats a past order's value; the loser is hidden, because a
   // leftover name or bib must never print.
+  // A no-time order on a file whose NO TIME layer is a whole copy of the
+  // personalization: show that layer, hide the one with time, and read the
+  // frames from it. Everything below then fills it like any other print.
+  var swappedNoTime = false;
+  if (!spec.noTime) {
+    // An order with a time never shows the NO TIME layer, even if the file was saved with it on.
+    var ntOff = noTimeLayerOf(doc);
+    if (ntOff && ntOff.visible) { if (ntOff.locked) ntOff.locked = false; ntOff.visible = false; }
+  }
+  if (spec.noTime) {
+    var ntl = noTimeLayerOf(doc);
+    if (ntl && noTimeLayerIsFull(doc, ntl, ab, spec.race)) {
+      var before0 = collectFrames(doc, ab, spec.race).frames;
+      for (var bk in before0) { var bl = layerOf(before0[bk]); if (bl && bl.name != ntl.name && bl.name != 'LOCKED ASSETS') { if (bl.locked) bl.locked = false; bl.visible = false; } }
+      if (ntl.locked) ntl.locked = false;
+      ntl.visible = true;
+      swappedNoTime = true;
+    }
+  }
   var got = collectFrames(doc, ab, spec.race);
   var frames = got.frames, dupes = got.dupes, hiddenLeftovers = got.leftovers.length;
   for (var hl = 0; hl < got.leftovers.length; hl++) got.leftovers[hl].hidden = true;
   var missing = [];
-  var need = ['name', 'bib', 'time'];
+  var need = swappedNoTime ? ['name', 'bib'] : ['name', 'bib', 'time'];
   for (var n = 0; n < need.length; n++) if (!frames[need[n]]) missing.push(need[n]);
   if (missing.length) throw new Error('Could not find the ' + missing.join(', ') + ' frame' + (missing.length > 1 ? 's' : '') + ' on the ' + spec.size + ' artboard');
   if (dupes.length) throw new Error('More than one ' + dupes.join(', ') + ' frame on the ' + spec.size + ' artboard');
@@ -149,7 +168,11 @@ try {
   }
   if (frames.weather) fillWeather(frames.weather);
 
-  if (spec.noTime) {
+  if (spec.noTime && swappedNoTime) {
+    if (frames.time) frames.time.hidden = true;
+    if (frames.pace) frames.pace.hidden = true;
+    notes.push('no time (NO TIME layer)');
+  } else if (spec.noTime) {
     // Never shift text to close the gap. Either pace is last in its row and hides cleanly, or the
     // designer's NO TIME layer replaces the row (lib.jsx noTimeFrames), or the render stops.
     var nt = noTimeFrames(doc, ab);

@@ -135,9 +135,26 @@ function paceInRow(frames) {
 
 // The designer's no-time version of this artboard's details: a layer named "NO TIME" (hidden on
 // the normal print), holding frames for the fields it re-lays out. Returns { layer, frames } or null.
+// The layer is "NO TIME", or a whole second personalize layer named with it
+// ("PERSONALIZE LAYER NO TIME" beside "PERSONALIZE LAYER WITH TIME"), which is
+// how Dan lays them out: a full copy of the personalization with no time or pace.
+function noTimeLayerOf(doc) {
+  for (var i = 0; i < doc.layers.length; i++) if (/(^|[^a-z])no\s*time([^a-z]|$)/i.test(doc.layers[i].name)) return doc.layers[i];
+  return null;
+}
+
+// Whether that layer is a whole copy (it has its own name frame on this artboard).
+function noTimeLayerIsFull(doc, layer, ab, raceName) {
+  for (var t = 0; t < doc.textFrames.length; t++) {
+    var tf = doc.textFrames[t], L = layerOf(tf);
+    if (!L || L.name != layer.name || !inside(tf.geometricBounds, ab)) continue;
+    if (kindOf(tf.contents) == 'name' && !notAName(tf.contents, raceName)) return true;
+  }
+  return false;
+}
+
 function noTimeFrames(doc, ab) {
-  var layer = null;
-  for (var i = 0; i < doc.layers.length; i++) if (/^\s*no\s*time\s*$/i.test(doc.layers[i].name)) layer = doc.layers[i];
+  var layer = noTimeLayerOf(doc);
   if (!layer) return null;
   var frames = {}, n = 0;
   for (var t = 0; t < doc.textFrames.length; t++) {
