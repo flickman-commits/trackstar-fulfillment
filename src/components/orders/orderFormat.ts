@@ -96,6 +96,8 @@ export const getStatusDisplay = (order: Order) => {
   if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site down, retry' }
   if (order.researchStatus === 'not_found') return { icon: '🕵️', label: 'Not found, look up by hand' }
   if (order.researchStatus === 'year_not_configured' && /not available on the results site/.test(order.researchNotes || '')) return { icon: '📭', label: 'Results not online for this year' }
+  // No scraper is built for a year before 2020 (SCRAPER_MIN_YEAR in server/domain/orders/pipeline.js).
+  if (order.researchStatus === 'year_not_configured' && (order.effectiveRaceYear || order.raceYear || 0) < 2020) return { icon: '🔎', label: 'Before 2020: research by hand' }
   if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Needs a scraper: this year is not wired up' }
   if (order.researchStatus === 'no_scraper' || !order.hasScraperAvailable) return { icon: '🛠️', label: 'Needs a scraper: research by hand' }
   return { icon: '🔍', label: 'Needs research' }

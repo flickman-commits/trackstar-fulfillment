@@ -12,7 +12,7 @@ Conventions for working in this repo. Read `README.md` first for what the app is
 ## Rules
 
 - Auth: every mutating `api/` handler calls `requireAdmin`. Destructive actions also call `requireAdminRole` (re-reads the database). Crons use `isCronRequest`. Never compare secrets with `===`; use `safeEqual`.
-- Scrapers: never claim a scraper works without the `add-race-scraper` skill's verification gates. Gun time and chip time look alike and are not.
+- Scrapers: never claim a scraper works without the `add-race-scraper` skill's verification gates. Gun time and chip time look alike and are not. Never build or wire up a scraper year before 2020; those orders are researched by hand.
 - Overrides: call `await ensureOverridesLoaded()` before `getScraperForRace` in any new code path.
 - Schema changes: `npx prisma db push`. Update `.env.example` when you add an env var.
 - Money is not modeled yet. Do not add float price columns; when finance work starts, use integer cents plus a currency.

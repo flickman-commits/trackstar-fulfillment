@@ -21,6 +21,8 @@ import { isTriathlon, triathlonMissing } from './triathlon.js'
 import { resolveTemplate, SIZES } from '../render/spec.js'
 
 const RESULT_STATES = new Set(['found'])
+// The oldest race year anyone builds a scraper for (Matt, 2026-10-21).
+export const SCRAPER_MIN_YEAR = 2020
 
 function raceRun(race, year) {
   if (!race?.raceDate) return year ? year < new Date().getUTCFullYear() : false
@@ -82,6 +84,9 @@ export function pipelineFor({ order, research, race, render, hasScraper, templat
   // The results site itself has no such year (Boston before 2010): nothing to
   // wire up, so this is research by hand or a question for the customer.
   if (rs === 'year_not_configured' && /not available on the results site/.test(research?.researchNotes || '')) return stage('action', 'Results not online', { kind: 'data', fix: `${raceName} ${year} results are not on the timing site. Check the year with the customer, or enter the result by hand from their bib, certificate or another source.` })
+  // Scrapers are never built for years before 2020: too few orders to justify
+  // one. Those runners are researched by hand.
+  if (rs === 'year_not_configured' && year < SCRAPER_MIN_YEAR) return stage('action', 'Research by hand', { kind: 'data', fix: `Scrapers only cover ${SCRAPER_MIN_YEAR} and later, so ${raceName} ${year} is researched by hand. Find the runner on the results site or ask the customer for their bib and time, then enter them under Runner > Edit.` })
   if (rs === 'year_not_configured') return stage('action', 'Needs a scraper', { kind: 'setup', fix: `The ${raceName} scraper is not wired up for ${year}. A developer adds this year's event id, or research the runner by hand.` })
 
   // The runner's result.

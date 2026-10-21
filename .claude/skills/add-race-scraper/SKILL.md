@@ -52,6 +52,10 @@ The rules below exist specifically to catch this class of bug. Do not skip them.
   `index.js` `PLATFORM_MAP`, then add the config.
 
 ### 1b. Cover the last 4 years by default — REQUIRED
+
+**Never configure a year before 2020.** Orders for older races are too few to
+justify a scraper; those runners are researched by hand (the order reads
+"Research by hand", `SCRAPER_MIN_YEAR` in `server/domain/orders/pipeline.js`).
 Customers order prints of races they ran years ago, not just the most recent
 edition. A config wired up for only the current year sends every older order to
 manual research.
