@@ -83,7 +83,7 @@ export default async function handler(req, res) {
   }
 }
 
-const DEAL_MONEY = ['discountKind', 'discountPercent', 'discountCents', 'discountDollars', 'discountNote', 'currency', 'invoiceUrl', 'shopifyDraftId', 'shopifyDraftName']
+const DEAL_MONEY = ['discountKind', 'discountPercent', 'discountCents', 'discountDollars', 'discountNote', 'currency', 'invoiceUrl', 'shopifyDraftId', 'shopifyDraftName', 'adminUrl']
 function withoutDealMoney(deal) {
   const out = { ...deal }
   for (const k of DEAL_MONEY) delete out[k]

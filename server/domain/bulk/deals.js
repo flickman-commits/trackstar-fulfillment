@@ -18,6 +18,7 @@
  */
 import { templateKey, uploadTemplateUrl, saveUploadedTemplate } from '../render/templates.js'
 import prisma from '../../db.js'
+import { shopifyAdminUrl, shopifyDraftAdminUrl } from '../../lib/links.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { getCanonicalRaceName } from '../../scrapers/index.js'
 import { nextNumber, dueDateFor, verifiedRaceDate, FRAME_OPTIONS, SIZE_OPTIONS } from './bulkOrders.js'
@@ -52,10 +53,23 @@ function cleanLine(l) {
   if (!raceName) throw new DealError('Every line needs a race')
   if (!Number.isInteger(raceYear) || raceYear < 2000 || raceYear > 2100) throw new DealError(`${raceName}: the year does not look right`)
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 5000) throw new DealError(`${raceName}: how many prints?`)
-  const eventType = EVENT_OPTIONS.includes(l?.eventType) ? l.eventType : 'Marathon'
+  // One line per race and year, whatever the events: the lookup finds which
+  // race each runner ran. Which events were sold is a note for us.
+  const eventNote = String(l?.eventNote || '').trim().slice(0, 300) || null
   const frameType = FRAME_OPTIONS.includes(l?.frameType) ? l.frameType : 'Unframed'
   const productSize = SIZE_OPTIONS.includes(l?.productSize) ? l.productSize : '8x10'
-  return { raceName: getCanonicalRaceName(raceName) || raceName, raceYear, quantity, eventType, frameType, productSize }
+  return { raceName: getCanonicalRaceName(raceName) || raceName, raceYear, quantity, eventNote, frameType, productSize }
+}
+
+/** The same print (race, year, size, frame) twice is one line with the quantities added. */
+function oneLinePerPrint(lines) {
+  const seen = new Set()
+  for (const l of lines) {
+    const k = [l.raceName, l.raceYear, l.productSize, l.frameType].join('|')
+    if (seen.has(k)) throw new DealError(`${l.raceName} ${l.raceYear} ${l.productSize} ${l.frameType} is on two lines. Put it on one and note the events.`)
+    seen.add(k)
+  }
+  return lines
 }
 
 function dealFields(input) {
@@ -86,7 +100,7 @@ function dealFields(input) {
 /** Create the deal and one run per line. */
 export async function createDeal(input, actor) {
   const fields = dealFields(input)
-  const lines = (Array.isArray(input?.lines) ? input.lines : []).map(cleanLine)
+  const lines = oneLinePerPrint((Array.isArray(input?.lines) ? input.lines : []).map(cleanLine))
   if (!lines.length) throw new DealError('Add at least one race')
   const lastDeal = await prisma.bulkDeal.findFirst({ orderBy: { createdAt: 'desc' }, select: { number: true } })
   const deal = await prisma.bulkDeal.create({ data: { ...fields, number: nextDealNumber(lastDeal?.number), createdById: actor?.id || null } })
@@ -101,7 +115,7 @@ async function createRun(dealId, partnerName, l, assigneeId) {
   await prisma.bulkOrder.create({
     data: {
       number: nextNumber(last?.number), dealId, partnerName,
-      raceName: l.raceName, raceYear: l.raceYear, eventType: l.eventType, quantity: l.quantity,
+      raceName: l.raceName, raceYear: l.raceYear, eventType: null, notes: l.eventNote, quantity: l.quantity,
       frameType: l.frameType, productSize: l.productSize, raceDate, dueDate: dueDateFor(raceDate), assigneeId,
     },
   })
@@ -112,7 +126,7 @@ async function createRun(dealId, partnerName, l, assigneeId) {
  * run, and a run left out is removed, unless its list already has names.
  */
 async function replaceLines(deal, input, partnerName) {
-  const lines = input.map(l => ({ id: l?.id ? String(l.id) : null, ...cleanLine(l) }))
+  const lines = oneLinePerPrint(input.map(l => ({ id: l?.id ? String(l.id) : null, ...cleanLine(l) })))
   if (!lines.length) throw new DealError('Add at least one race')
   const runs = await prisma.bulkOrder.findMany({ where: { dealId: deal.id }, select: { id: true, number: true, raceName: true, raceYear: true, _count: { select: { runners: true } } } })
   const keep = new Set(lines.map(l => l.id).filter(Boolean))
@@ -129,7 +143,7 @@ async function replaceLines(deal, input, partnerName) {
     await prisma.bulkOrder.update({
       where: { id: run.id },
       data: {
-        raceName: l.raceName, raceYear: l.raceYear, eventType: l.eventType, quantity: l.quantity,
+        raceName: l.raceName, raceYear: l.raceYear, eventType: null, notes: l.eventNote, quantity: l.quantity,
         frameType: l.frameType, productSize: l.productSize,
         ...(moved ? { raceDate, dueDate: dueDateFor(raceDate) } : {}),
       },
@@ -157,9 +171,11 @@ export async function updateDeal(id, input) {
 export async function loadDeal(id) {
   const deal = await prisma.bulkDeal.findUnique({
     where: { id: String(id || '') },
-    include: { runs: { orderBy: { number: 'asc' }, select: { id: true, number: true, raceName: true, raceYear: true, eventType: true, quantity: true, productSize: true, frameType: true, paidAt: true, status: true, _count: { select: { runners: true } } } } },
+    include: { runs: { orderBy: { number: 'asc' }, select: { id: true, number: true, raceName: true, raceYear: true, eventType: true, notes: true, quantity: true, productSize: true, frameType: true, paidAt: true, status: true, _count: { select: { runners: true } } } } },
   })
   if (!deal) throw new DealError('Deal not found', 404)
+  // Where to see the invoice ourselves: the draft (or the paid order) in Shopify admin. invoiceUrl is the customer's checkout.
+  deal.adminUrl = deal.shopifyOrderId ? shopifyAdminUrl(String(deal.shopifyOrderId).split('/').pop()) : shopifyDraftAdminUrl(deal.shopifyDraftId)
   if (deal.printKind !== 'cobranded') return deal
   // Each co-branded line's own production file and its check (render/templates.js).
   const keys = deal.runs.map(r => templateKey(r.raceName, r.number))
@@ -214,7 +230,7 @@ export async function quoteDeal(id) {
   for (const r of deal.runs) {
     const v = await variantFor(r.raceName, r.productSize, r.frameType)
     lines.push({
-      runId: r.id, number: r.number, raceName: r.raceName, raceYear: r.raceYear, eventType: r.eventType || 'Marathon',
+      runId: r.id, number: r.number, raceName: r.raceName, raceYear: r.raceYear, eventType: r.eventType || null,
       quantity: r.quantity, productSize: r.productSize, frameType: r.frameType,
       ...v, subtotalCents: v.unitCents ? v.unitCents * r.quantity : null,
     })
@@ -246,7 +262,7 @@ export function draftInput(q) {
     lineItems: lines.map(l => ({
       variantId: l.variantId, quantity: l.quantity,
       customAttributes: [
-        { key: 'Event', value: `${l.raceName} ${l.raceYear}, ${l.eventType}` },
+        { key: 'Event', value: `${l.raceName} ${l.raceYear}${l.eventType ? `, ${l.eventType}` : ''}` },
         { key: 'Prints', value: kindLabel },
         { key: 'Bulk run', value: l.number },
       ],

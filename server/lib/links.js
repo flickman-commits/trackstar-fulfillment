@@ -33,6 +33,14 @@ export function shopifyAdminUrl(shopifyOrderId) {
   return `https://admin.shopify.com/store/${handle}/orders/${shopifyOrderId}`
 }
 
+/** A draft order's page in Shopify admin, from its id or gid, or null. */
+export function shopifyDraftAdminUrl(draftId) {
+  const handle = String(process.env.SHOPIFY_STORE || '').replace(/\.myshopify\.com$/, '').trim()
+  const id = String(draftId || '').split('/').pop()
+  if (!id || !handle) return null
+  return `https://admin.shopify.com/store/${handle}/draft_orders/${id}`
+}
+
 /** The order's page in Artelo's dashboard, from the Artelo order id (a UUID). */
 export function arteloOrderUrl(arteloId) {
   return arteloId && /^[0-9a-f-]{36}$/i.test(String(arteloId)) ? `https://www.artelo.com/app/orders/${arteloId}` : null

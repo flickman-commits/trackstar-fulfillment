@@ -17,14 +17,14 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 
 type Address = { company: string; name: string; address1: string; address2: string; city: string; province: string; zip: string; country: string }
 const blankAddress = (): Address => ({ company: '', name: '', address1: '', address2: '', city: '', province: '', zip: '', country: 'US' })
-type Line = { id?: string; raceName: string; raceYear: string; eventType: string; quantity: string; productSize: string; frameType: string }
+type Line = { id?: string; raceName: string; raceYear: string; eventNote: string; quantity: string; productSize: string; frameType: string }
 /** Race, year, event, quantity, size, frame, remove: the columns of a line, header and rows alike. */
-const LINE_GRID = 'grid grid-cols-[minmax(0,1fr)_76px_150px_72px_96px_190px_32px] gap-2'
+const LINE_GRID = 'grid grid-cols-[minmax(0,1fr)_76px_72px_96px_190px_minmax(0,0.8fr)_32px] gap-2'
 type CatalogPrint = PrintOption & { race: string }
 
-const blankLine = (prev?: Line): Line => ({ raceName: prev?.raceName || '', raceYear: prev?.raceYear || String(new Date().getFullYear()), eventType: 'Marathon', quantity: '', productSize: prev?.productSize || '8x10', frameType: prev?.frameType || 'Unframed' })
+const blankLine = (prev?: Line): Line => ({ raceName: prev?.raceName || '', raceYear: prev?.raceYear || String(new Date().getFullYear()), eventNote: '', quantity: '', productSize: prev?.productSize || '8x10', frameType: prev?.frameType || 'Unframed' })
 
-export type DealRun = { id: string; number: string; raceName: string; raceYear: number; eventType: string | null; quantity: number; productSize: string; frameType: string; paidAt: string | null; status: string; _count?: { runners: number }
+export type DealRun = { id: string; number: string; raceName: string; raceYear: number; eventType: string | null; notes?: string | null; quantity: number; productSize: string; frameType: string; paidAt: string | null; status: string; _count?: { runners: number }
   /** Co-branded deals: the line's uploaded production file and its check. */
   template?: { uploadedAt: string | null; checkedAt: string | null; ok: boolean | null; problems: string[] } | null }
 export type Deal = {
@@ -32,7 +32,7 @@ export type Deal = {
   billingAddress: Address | null; printKind: 'standard' | 'cobranded'; discountKind: 'percent' | 'amount' | null; discountPercent: number | null; discountCents: number | null
   discountNote: string | null; shipping: 'runner' | 'organization'; shipToAddress: Address | null
   shopifyDraftId: string | null; shopifyDraftName: string | null; invoiceUrl: string | null; invoiceSentAt: string | null
-  shopifyOrderName: string | null; paidAt: string | null; notes: string | null; runs: DealRun[]
+  shopifyOrderName: string | null; paidAt: string | null; adminUrl?: string | null; notes: string | null; runs: DealRun[]
 }
 type Quote = { lines: { number: string; raceName: string; raceYear: number; eventType: string; quantity: number; productSize: string; frameType: string; unitCents?: number; subtotalCents?: number | null; missing?: string }[]; subtotalCents: number; discountCents: number; totalCents: number; missing: string[] }
 
@@ -72,7 +72,7 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
   const [billing, setBilling] = useState<Address>(() => ({ ...blankAddress(), ...(deal?.billingAddress || {}) }))
   const [shipTo, setShipTo] = useState<Address>(() => ({ ...blankAddress(), ...(deal?.shipToAddress || {}) }))
   const [lines, setLines] = useState<Line[]>(() => deal?.runs.length
-    ? deal.runs.map(r => ({ id: r.id, raceName: r.raceName, raceYear: String(r.raceYear), eventType: r.eventType || 'Marathon', quantity: String(r.quantity), productSize: r.productSize, frameType: r.frameType }))
+    ? deal.runs.map(r => ({ id: r.id, raceName: r.raceName, raceYear: String(r.raceYear), eventNote: r.notes || (r.eventType && r.eventType !== 'Marathon' ? r.eventType : ''), quantity: String(r.quantity), productSize: r.productSize, frameType: r.frameType }))
     : [blankLine()])
   const [busy, setBusy] = useState(false)
   useEffect(() => { apiFetch(`${API_BASE}/api/bulk/deals?options=1`).then(r => r.json()).then(setOpts).catch(() => {}) }, [])
@@ -128,25 +128,25 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
         </div>
 
         <div>
-          <div className="flex items-center justify-between">{label(`Races and events · ${units} print${units === 1 ? '' : 's'}`)}</div>
+          <div className="flex items-center justify-between">{label(`Races · ${units} print${units === 1 ? '' : 's'}`)}</div>
           <div className="space-y-1.5">
             <div className={`${LINE_GRID} text-[11px] font-semibold text-off-black/45 uppercase tracking-wider`}>
-              <span>Race</span><span>Year</span><span>Event</span><span>Qty</span><span>Size</span><span>Frame</span><span />
+              <span>Race</span><span>Year</span><span>Qty</span><span>Size</span><span>Frame</span><span title="Internal: which events were sold. The lookup finds the race each runner ran.">Events (note)</span><span />
             </div>
             {lines.map((l, i) => (
               <div key={i} className={`${LINE_GRID} items-center`}>
                 <PrintPicker<CatalogPrint> value={catalog?.find(c => c.race === l.raceName)?.title || null} options={catalog} placeholder={l.raceName || 'Choose the race'}
                   onChange={c => setLine(i, 'raceName', c.race)} />
                 <input required value={l.raceYear} onChange={e => setLine(i, 'raceYear', e.target.value.replace(/\D/g, '').slice(0, 4))} className={inputBase} aria-label="Year" />
-                <select value={l.eventType} onChange={e => setLine(i, 'eventType', e.target.value)} className={inputBase} aria-label="Event">{opts.events.map(o => <option key={o}>{o}</option>)}</select>
                 <input required value={l.quantity} onChange={e => setLine(i, 'quantity', e.target.value.replace(/\D/g, ''))} placeholder="Qty" className={inputBase} aria-label="Quantity" />
                 <select value={l.productSize} onChange={e => setLine(i, 'productSize', e.target.value)} className={inputBase} aria-label="Size">{opts.sizes.map(o => <option key={o}>{o}</option>)}</select>
                 <select value={l.frameType} onChange={e => setLine(i, 'frameType', e.target.value)} className={inputBase} aria-label="Frame">{opts.frames.map(o => <option key={o}>{o}</option>)}</select>
+                <input value={l.eventNote} onChange={e => setLine(i, 'eventNote', e.target.value)} placeholder="Full 5, Half 5, 10K 3" className={inputBase} aria-label="Events (internal note)" />
                 <button type="button" onClick={() => setLines(ls => ls.length === 1 ? ls : ls.filter((_, j) => j !== i))} disabled={lines.length === 1} className={`${btnGhost} disabled:opacity-30`} title="Remove line"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             ))}
           </div>
-          <button type="button" onClick={() => setLines(ls => [...ls, blankLine(ls[ls.length - 1])])} className={`${btnGhost} mt-1.5`}><Plus className="w-3.5 h-3.5" /> Add an event or race</button>
+          <button type="button" onClick={() => setLines(ls => [...ls, blankLine(ls[ls.length - 1])])} className={`${btnGhost} mt-1.5`}><Plus className="w-3.5 h-3.5" /> Add a race</button>
         </div>
 
         {/* The deal */}
@@ -211,7 +211,7 @@ function LineTemplate({ run, onChanged }: { run: DealRun; onChanged: () => void 
     : { text: `Check found problems: ${t.problems.slice(0, 2).join('; ') || 'see Settings > Print Templates'}`, cls: 'text-red-600' }
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="font-medium text-off-black min-w-0 truncate">{run.raceName} {run.raceYear} · {run.eventType || 'Marathon'}</span>
+      <span className="font-medium text-off-black min-w-0 truncate">{run.raceName} {run.raceYear}{run.eventType ? ` · ${run.eventType}` : ''}</span>
       <span className="font-mono text-[11px] text-off-black/40">{run.number}</span>
       <span className={`flex-1 min-w-0 truncate ${status.cls}`} title={status.text}>{status.text}</span>
       <label className={`${btnSecondary} cursor-pointer shrink-0 ${busy ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -294,7 +294,8 @@ export function DealCard({ dealId, currentRunId, onOpenRun, onChanged }: { dealI
             return (
               <tr key={r.id} className={`border-t border-border-gray/70 ${r.id === currentRunId ? 'bg-[#4600D6]/[0.04]' : ''}`}>
                 <td className="py-1.5">
-                  <button onClick={() => onOpenRun(r.id)} className="text-left hover:underline font-medium" disabled={r.id === currentRunId}>{r.raceName} {r.raceYear} · {r.eventType || 'Marathon'}</button>
+                  <button onClick={() => onOpenRun(r.id)} className="text-left hover:underline font-medium" disabled={r.id === currentRunId}>{r.raceName} {r.raceYear}{r.eventType ? ` · ${r.eventType}` : ''}</button>
+                  {r.notes && <span className="block text-[11px] text-off-black/45">{r.notes}</span>}
                   <span className="ml-1.5 font-mono text-[11px] text-off-black/40">{r.number}</span>
                 </td>
                 <td className="text-xs text-off-black/65">{r.quantity} × {r.productSize} {r.frameType === 'Unframed' ? 'unframed' : r.frameType.replace(' Premium', '')}</td>
@@ -331,8 +332,8 @@ export function DealCard({ dealId, currentRunId, onOpenRun, onChanged }: { dealI
               </button>
               {deal.invoiceUrl && (
                 <>
-                  <button onClick={() => navigator.clipboard.writeText(deal.invoiceUrl!).then(() => toast.success('Invoice link copied'))} className={btnSecondary}><Copy className="w-3.5 h-3.5" /> Copy link</button>
-                  <a href={deal.invoiceUrl} target="_blank" rel="noopener noreferrer" className={btnSecondary} title="Open the invoice"><ExternalLink className="w-3.5 h-3.5" /></a>
+                  {deal.adminUrl && <a href={deal.adminUrl} target="_blank" rel="noopener noreferrer" className={btnSecondary} title="The draft order in Shopify admin"><ExternalLink className="w-3.5 h-3.5" /> Open in Shopify</a>}
+                  <button onClick={() => navigator.clipboard.writeText(deal.invoiceUrl!).then(() => toast.success('Customer payment link copied'))} className={btnSecondary} title="The checkout page the customer pays on"><Copy className="w-3.5 h-3.5" /> Copy customer link</button>
                   <button onClick={send} disabled={busy !== null} className={btnPrimary}>{busy === 'send' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}{deal.invoiceSentAt ? 'Send again' : 'Email invoice'}</button>
                 </>
               )}
