@@ -244,7 +244,11 @@ function CancelForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread:
   )
 }
 
-type ReorderPrep = { number: string; nextOrderId: string; items: { orderId: string; label: string; productLabel: string; designFrom: string | null; copyable: boolean }[] }
+type Choice = { value: string; label: string }
+type ReorderPrep = {
+  number: string; nextOrderId: string; sizes: Choice[]; frames: Choice[]
+  items: { orderId: string; label: string; productLabel: string; designFrom: string | null; copyable: boolean; size: string | null; frame: string | null }[]
+}
 
 /**
  * A new Artelo order for this customer: the same print, their address and
@@ -255,6 +259,8 @@ function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: Customer
   const [prep, setPrep] = useState<ReorderPrep | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [picked, setPicked] = useState<string[]>([])
+  // Size and frame per print, starting as the original; a customer may want something new on the replacement.
+  const [changes, setChanges] = useState<Record<string, { size: string; frame: string }>>({})
   const [a, setA] = useState<Address>(o.shipTo || o.arteloAddress || { name: thread.customerName || '', address1: '', address2: '', city: '', province: '', zip: '', country: 'US', phone: '' })
   const [email, setEmail] = useState(thread.customerEmail || '')
   const [instructions, setInstructions] = useState('')
@@ -265,7 +271,7 @@ function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: Customer
   const [done, setDone] = useState<{ orderId: string; url: string | null; test: boolean } | null>(null)
   useEffect(() => {
     supportApi.arteloOrder<ReorderPrep>({ action: 'prep', id: thread.id, shopifyOrderId: o.shopifyOrderId })
-      .then(r => { setPrep(r); setPicked(r.items.filter(i => i.copyable).map(i => i.orderId)) })
+      .then(r => { setPrep(r); setPicked(r.items.filter(i => i.copyable).map(i => i.orderId)); setChanges(Object.fromEntries(r.items.map(i => [i.orderId, { size: i.size || '', frame: i.frame || 'Unframed' }]))) })
       .catch(e => setErr((e as Error).message))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k: keyof Address) => (e: React.ChangeEvent<HTMLInputElement>) => setA({ ...a, [k]: e.target.value })
@@ -273,7 +279,7 @@ function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: Customer
     if (!confirming) { setConfirming(true); setPressKey(newIdempotencyKey()); return }
     setBusy(true)
     try {
-      const out = await supportApi.arteloOrder<{ orderId: string; url: string | null; test: boolean }>({ action: 'create', id: thread.id, shopifyOrderId: o.shopifyOrderId, orderIds: picked, address: a, email, instructions, test: isAdmin && test, idempotencyKey: pressKey })
+      const out = await supportApi.arteloOrder<{ orderId: string; url: string | null; test: boolean }>({ action: 'create', id: thread.id, shopifyOrderId: o.shopifyOrderId, orderIds: picked, changes, address: a, email, instructions, test: isAdmin && test, idempotencyKey: pressKey })
       setDone(out)
       toast.success(`${out.test ? 'Test order' : 'Artelo order'} ${out.orderId} created`)
       onDone()
@@ -296,13 +302,35 @@ function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: Customer
       {!prep && !err && <div className="text-off-black/50 inline-flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" />Reading the order from Artelo</div>}
       {prep && (
         <>
-          <div className="text-off-black/70">New order <b>{prep.nextOrderId}</b> in Artelo, $0, the same print:</div>
+          <div className="text-off-black/70">New order <b>{prep.nextOrderId}</b> in Artelo, $0, the same design:</div>
           {prep.items.map(i => (
             <label key={i.orderId} className={`flex items-start gap-1.5 ${i.copyable ? 'cursor-pointer text-off-black/80' : 'text-off-black/40'}`} title={i.copyable ? `Design from ${i.designFrom}` : 'No approved render and no PDF named for this print in the Drive Orders folder. Build this one in Artelo.'}>
               <input type="checkbox" disabled={!i.copyable} checked={picked.includes(i.orderId)} onChange={e => setPicked(p => e.target.checked ? [...p, i.orderId] : p.filter(x => x !== i.orderId))} className="mt-0.5 accent-[#4600D6]" />
               <span>{i.label} <span className="text-off-black/45">· {i.productLabel}{i.copyable ? '' : ' · no design to copy'}</span>{i.copyable && i.designFrom && <span className="block text-[11px] text-off-black/45">Design: {i.designFrom}</span>}</span>
             </label>
           ))}
+          {/* What each picked print is made as: the original unless the customer wants something new. */}
+          {prep.items.filter(i => picked.includes(i.orderId)).map(i => {
+            const c = changes[i.orderId] || { size: i.size || '', frame: i.frame || 'Unframed' }
+            const changed = c.size !== i.size || c.frame !== (i.frame || 'Unframed')
+            const setC = (k: 'size' | 'frame', v: string) => setChanges(prev => ({ ...prev, [i.orderId]: { ...c, [k]: v } }))
+            return (
+              <div key={`p-${i.orderId}`} className="pl-5 space-y-1">
+                {prep.items.length > 1 && <div className="text-[11px] text-off-black/50">{i.label}</div>}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <select className={field} value={c.size} onChange={e => setC('size', e.target.value)} aria-label="Size">
+                    {!prep.sizes.some(s => s.value === c.size) && c.size && <option value={c.size}>{c.size.replace(/^x/, '')}</option>}
+                    {prep.sizes.map(s => <option key={s.value} value={s.value}>{s.label}{s.value === i.size ? ' (original)' : ''}</option>)}
+                  </select>
+                  <select className={field} value={c.frame} onChange={e => setC('frame', e.target.value)} aria-label="Frame">
+                    {!prep.frames.some(f => f.value === c.frame) && <option value={c.frame}>{c.frame}</option>}
+                    {prep.frames.map(f => <option key={f.value} value={f.value}>{f.label}{f.value === (i.frame || 'Unframed') ? ' (original)' : ''}</option>)}
+                  </select>
+                </div>
+                {changed && <div className="text-[11px] text-amber-700">Changed from the original. A different shape (8x10 vs 12x18 or 16x24) needs a design file in that size; the order stops if the file does not fit.</div>}
+              </div>
+            )
+          })}
           <div className="pt-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Ship to</div>
           <PasteAddress onParsed={p => setA({ ...a, ...p })} />
           <input className={field} value={a.name} onChange={set('name')} placeholder="Name" />

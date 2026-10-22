@@ -79,6 +79,58 @@ export function designsFromArtelo(item) {
   }))
 }
 
+/**
+ * What a replacement can be changed to, and Trackstar's normal Artelo
+ * settings for it (what nearly every order is made with): archival matte
+ * fine art paper, vertical, no mats; framed in premium oak with hanging pins
+ * and the framing service, unframed with neither.
+ */
+export const REPLACEMENT_SIZES = ['x8x10', 'x12x18', 'x16x24']
+export const REPLACEMENT_FRAMES = ['Unframed', 'BlackPremiumOak', 'NaturalPremiumOak']
+
+function standardProduct(size, frame) {
+  const framed = frame !== 'Unframed'
+  return {
+    catalogProductId: 'IndividualArtPrint', size, frameColor: frame, frameStyle: framed ? 'PremiumOak' : 'Unframed',
+    paperType: 'ArchivalMatteFineArt', paperStyle: 'FineArt', orientation: 'Vertical',
+    includeMats: false, includeHangingPins: framed, includeFramingService: framed,
+  }
+}
+
+/** The product a replacement is made as: the original, or the size and frame the customer asked for. */
+function productWithChange(original, change) {
+  const size = change?.size || original?.size
+  const frame = change?.frame || original?.frameColor || 'Unframed'
+  if (size === original?.size && frame === original?.frameColor) return original
+  if (!REPLACEMENT_SIZES.includes(size)) throw new UserError(`${sizeLabel(size)} is not a size a replacement can be made in`)
+  if (!REPLACEMENT_FRAMES.includes(frame)) throw new UserError(`${frame} is not a frame a replacement can be made with`)
+  return standardProduct(size, frame)
+}
+
+/** "x12x18" -> [12, 18] */
+function inches(size) {
+  const m = /^x?(\d+(?:dot\d+)?)x(\d+(?:dot\d+)?)$/.exec(String(size || ''))
+  return m ? [Number(m[1].replace('dot', '.')), Number(m[2].replace('dot', '.'))] : null
+}
+
+/**
+ * The design file must be the shape of the print: a 12x18 file on an 8x10
+ * would print stretched or cropped. Artelo reports each upload's pixel size;
+ * its shape is compared with the size, with or without the 1/4" bleed. 12x18
+ * and 16x24 share a shape, so one scales to the other.
+ */
+export async function checkDesignFits(design, size, label) {
+  if (!design?.imageId) return
+  const want = inches(size)
+  const up = await artelo('uploads/files/get-by-id', { query: { id: design.imageId } }).catch(() => null)
+  if (!want || !up?.width || !up?.height) return
+  const ratio = up.width / up.height
+  const shapes = [want[0] / want[1], (want[0] + 0.5) / (want[1] + 0.5)]
+  if (shapes.some(r => Math.abs(ratio - r) / r < 0.02)) return
+  const fileIn = `${Math.round((up.width / 300 - 0.5) * 2) / 2}x${Math.round((up.height / 300 - 0.5) * 2) / 2}`
+  throw new UserError(`${label}: the design file is ${fileIn} (${up.width}x${up.height} px) and the replacement is ${sizeLabel(size)}, so it would print stretched. Make ${/^8/.test(sizeLabel(size)) ? 'an' : 'a'} ${sizeLabel(size)} file first, or keep the original size.`)
+}
+
 /** "x12x18" -> "12x18". */
 const sizeLabel = s => String(s || '').replace(/^x/, '').replace(/dot/g, '.')
 function describe(product) {
@@ -175,7 +227,9 @@ export async function reorderPrep({ shopifyOrderId }) {
   return {
     number,
     nextOrderId: await nextOrderId(number, rows.map(r => r.id)),
-    items: items.map(i => ({ orderId: i.orderId, label: i.label, productLabel: i.productLabel, designFrom: i.designFrom, copyable: copyable(i) })),
+    items: items.map(i => ({ orderId: i.orderId, label: i.label, productLabel: i.productLabel, designFrom: i.designFrom, copyable: copyable(i), size: i.product?.size || null, frame: i.product?.frameColor || null })),
+    sizes: REPLACEMENT_SIZES.map(v => ({ value: v, label: sizeLabel(v) })),
+    frames: REPLACEMENT_FRAMES.map(v => ({ value: v, label: v === 'Unframed' ? 'Unframed' : v.replace(/([a-z])([A-Z])/g, '$1 $2') })),
   }
 }
 
@@ -188,7 +242,7 @@ async function nextOrderId(number, rowIds) {
 
 const US_STATES = /^[A-Z]{2}$/
 
-export async function createReorder({ thread, shopifyOrderId, orderIds, address, email, instructions, test, actor }) {
+export async function createReorder({ thread, shopifyOrderId, orderIds, changes, address, email, instructions, test, actor }) {
   const id = String(shopifyOrderId || '').trim()
   if (!/^\d+$/.test(id)) throw new UserError('That order has no Shopify id')
   const a = {}
@@ -204,12 +258,19 @@ export async function createReorder({ thread, shopifyOrderId, orderIds, address,
   if (!picked.length) throw new UserError('Pick at least one item to send')
   const blocked = picked.find(i => !copyable(i))
   if (blocked) throw new UserError(`${blocked.label} has no design to copy: no approved render and no PDF named for it in the Drive Orders folder. Build that one in Artelo.`)
+  // The size and frame the customer asked for, else the original's.
+  for (const i of picked) {
+    i.product = productWithChange(i.product, changes?.[i.orderId])
+    i.productLabel = describe(i.product)
+  }
   // Hand-made prints: their Drive PDF goes into the Artelo library first.
   for (const i of picked) {
     if (i.designs.length || !i.driveFile) continue
     try { i.designs = [{ imageId: await libraryUploadFromDrive(i.driveFile, i.orderId) }] }
     catch (err) { throw new UserError(`Could not copy ${i.driveFile.name} from Drive into Artelo: ${String(err.message).slice(0, 160)}`) }
   }
+  // Nothing goes to production on a file the wrong shape for its size.
+  for (const i of picked) for (const d of i.designs) await checkDesignFits(d, i.product?.size, i.label)
 
   const orderId = await nextOrderId(number, rows.map(r => r.id))
   const body = {
