@@ -400,8 +400,8 @@ export default function Support({ active = true }: { active?: boolean } = {}) {
             <ResizeHandle onDrag={dx => detailsCol.by(-dx)} onReset={detailsCol.reset} />
             <Details
               width={wide ? detailsCol.width : undefined}
-              thread={thread} team={inbox?.team || []} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread} onMerge={ids => { merge(ids) }}
-              onAssign={assign} onPriority={setPriority} onTags={setTags}
+              thread={thread} tagSuggestions={inbox?.tagSuggestions || []} onOpenThread={openThread} onMerge={ids => { merge(ids) }}
+              onPriority={setPriority} onTags={setTags}
               filters={filters} onFiltersChanged={() => { loadFilters(); loadInbox(true); if (selectedId) refreshThread(selectedId) }}
               onInsert={t => insertRef.current?.(t)} onAttach={m => attachRef.current?.(m)} onChanged={() => { if (selectedId) refreshThread(selectedId); loadInbox(true) }}
             />

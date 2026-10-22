@@ -5,7 +5,7 @@ import { btnSecondary, chip } from '@/lib/ui'
 import { supportApi } from '@/lib/supportApi'
 import { ago, day } from '@/lib/supportDates'
 import { STATUS_LABEL, STATUS_TONE } from '@/lib/supportStatus'
-import type { CustomerOrder, OrderItem, InstagramStatus, MailboxStatus, Mockup, SenderFilter, Teammate, ThreadDetail } from '@/types/support'
+import type { CustomerOrder, OrderItem, InstagramStatus, MailboxStatus, Mockup, SenderFilter, ThreadDetail } from '@/types/support'
 import Actions from './Actions'
 import { FilterSender } from './SenderFilter'
 import { TagChip } from '@/components/OrderTags'
@@ -17,12 +17,12 @@ import { TagChip } from '@/components/OrderTags'
  * rows beside them, their other conversations, and, for an admin, the
  * mailbox itself.
  */
-function Section({ title, count, children, open: initial = true }: { title: string; count?: number; children: React.ReactNode; open?: boolean }) {
+function Section({ title, count, badge, children, open: initial = true }: { title: string; count?: number; badge?: React.ReactNode; children: React.ReactNode; open?: boolean }) {
   const [open, setOpen] = useState(initial)
   return (
     <div className="border-b border-border-gray">
       <button onClick={() => setOpen(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 text-left">
-        <span className="text-[12px] font-semibold text-off-black">{title}{count !== undefined && count > 0 && <span className="ml-1.5 text-off-black/40 font-normal tabular-nums">{count}</span>}</span>
+        <span className="inline-flex items-center gap-2 text-[12px] font-semibold text-off-black">{title}{count !== undefined && count > 0 && <span className="text-off-black/40 font-normal tabular-nums">{count}</span>}{badge}</span>
         <ChevronDown className={`w-3.5 h-3.5 text-off-black/40 transition-transform ${open ? '' : '-rotate-90'}`} />
       </button>
       {open && <div className="px-4 pb-3 space-y-2">{children}</div>}
@@ -393,14 +393,12 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export default function Details({ thread, team, tagSuggestions, onOpenThread, onMerge, onAssign, onPriority, onTags, onInsert, onAttach, onChanged, width, filters, onFiltersChanged }: {
+export default function Details({ thread, tagSuggestions, onOpenThread, onMerge, onPriority, onTags, onInsert, onAttach, onChanged, width, filters, onFiltersChanged }: {
   thread: ThreadDetail | null
-  team: Teammate[]
   tagSuggestions: string[]
   onOpenThread: (id: string) => void
   /** Fold these other conversations of the customer into this one. */
   onMerge: (ids: string[]) => void
-  onAssign: (id: string | null) => void
   onPriority: (p: boolean) => void
   onTags: (tags: string[]) => void
   /** Drops a line into the reply box. */
@@ -419,19 +417,32 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
       {!thread && <div className="px-4 py-6 text-xs text-off-black/45">Pick a conversation to see the customer, their orders and the actions.</div>}
       {thread && (
         <>
-          <Section title="Customer">
-            <Attr label="Name">
+          {/* Who they are and where this conversation stands, in one place. The
+              assignee is on the conversation's header, so it is not repeated. */}
+          <Section title="Conversation" badge={<span className={`${chip} ${STATUS_TONE[thread.status]} font-semibold`}>{STATUS_LABEL[thread.status]}</span>}>
+            <Attr label="Name">{thread.customer.name || <span className="text-off-black/40">Unknown</span>}</Attr>
+            {thread.customer.email && <Attr label="Email"><span className="inline-flex items-start gap-1.5 min-w-0"><a href={`mailto:${thread.customer.email}`} className="text-blue-600 hover:text-blue-700 break-all">{thread.customer.email}</a><CopyButton text={thread.customer.email} /></span></Attr>}
+            {thread.channel === 'instagram' && thread.igUsername && <Attr label="Instagram"><a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">@{thread.igUsername}</a></Attr>}
+            {/* First seen and this conversation's start were the same date nearly always; the earlier one says it. */}
+            <Attr label="Since">{day([thread.customer.firstSeen, thread.createdAt].filter(Boolean).sort()[0] || thread.createdAt)}</Attr>
+            {thread.customer.conversations > 1 && <Attr label="Conversations">{thread.customer.conversations}</Attr>}
+            <Attr label="Tags">
               <span className="inline-flex items-center gap-1.5 flex-wrap">
-                {thread.customer.name || <span className="text-off-black/40">Unknown</span>}
                 {thread.context.bigSpender && thread.context.spentUsd != null && (
                   <TagChip tag={{ key: 'big-spender', label: '💰 Big Spender', tone: 'amber', sublabel: `$${Math.round(thread.context.spentUsd).toLocaleString()}`, title: `This customer has spent $${Math.round(thread.context.spentUsd).toLocaleString()} with us across the orders below.` }} />
                 )}
+                <Tags tags={thread.tags} suggestions={tagSuggestions} onChange={onTags} />
               </span>
             </Attr>
-            {thread.customer.email && <Attr label="Email"><span className="inline-flex items-start gap-1.5 min-w-0"><a href={`mailto:${thread.customer.email}`} className="text-blue-600 hover:text-blue-700 break-all">{thread.customer.email}</a><CopyButton text={thread.customer.email} /></span></Attr>}
-            {thread.channel === 'instagram' && thread.igUsername && <Attr label="Instagram"><a href={`https://instagram.com/${thread.igUsername}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">@{thread.igUsername}</a></Attr>}
-            <Attr label="First seen">{day(thread.customer.firstSeen)}</Attr>
-            <Attr label="Conversations">{thread.customer.conversations}</Attr>
+            <Attr label="Priority">
+              <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={thread.priority} onChange={e => onPriority(e.target.checked)} className="accent-amber-500" />{thread.priority ? 'Priority' : 'Normal'}</label>
+            </Attr>
+            {(thread.lastInboundAt || thread.lastOutboundAt) && (
+              <div className="grid grid-cols-2 gap-3 text-xs pt-0.5">
+                <div><div className="text-off-black/45">Their last message</div><div className="text-off-black">{thread.lastInboundAt ? `${ago(thread.lastInboundAt)} ago` : 'None yet'}</div></div>
+                <div><div className="text-off-black/45">Our last message</div><div className="text-off-black">{thread.lastOutboundAt ? `${ago(thread.lastOutboundAt)} ago` : 'None yet'}</div></div>
+              </div>
+            )}
             {thread.channel !== 'instagram' && thread.customer.email && (
               <div className="pt-1"><FilterSender email={thread.customer.email} filters={filters} onChanged={onFiltersChanged} /></div>
             )}
@@ -468,22 +479,6 @@ export default function Details({ thread, team, tagSuggestions, onOpenThread, on
             )}
           </Section>
           )}
-          <Section title="Conversation">
-            <Attr label="Status"><span className={`${chip} ${STATUS_TONE[thread.status]}`}>{STATUS_LABEL[thread.status]}</span></Attr>
-            <Attr label="Assignee">
-              <select value={thread.assignee?.id || ''} onChange={e => onAssign(e.target.value || null)} className="w-full text-xs bg-white border border-border-gray rounded px-1.5 py-1 focus:outline-none">
-                <option value="">Unassigned</option>
-                {team.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-              </select>
-            </Attr>
-            <Attr label="Priority">
-              <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={thread.priority} onChange={e => onPriority(e.target.checked)} className="accent-amber-500" />{thread.priority ? 'Priority' : 'Normal'}</label>
-            </Attr>
-            <Attr label="Tags"><Tags tags={thread.tags} suggestions={tagSuggestions} onChange={onTags} /></Attr>
-            <Attr label="Started">{day(thread.createdAt)}</Attr>
-            {thread.lastInboundAt && <Attr label="Last from them">{ago(thread.lastInboundAt)} ago</Attr>}
-            {thread.lastOutboundAt && <Attr label="Last from us">{ago(thread.lastOutboundAt)} ago</Attr>}
-          </Section>
           <Section title="Actions">
             <Actions thread={thread} onInsert={onInsert} onAttach={onAttach} onChanged={onChanged} />
           </Section>

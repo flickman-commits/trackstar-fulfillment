@@ -7,6 +7,8 @@ import { useIsAdmin } from '@/lib/auth'
 import type { SenderFilter } from '@/types/support'
 
 const linkCls = 'self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2 disabled:opacity-50'
+// Filtering someone out is rare and a little final, so it sits quietly at the bottom of the panel.
+const quietCls = 'self-start inline-flex items-center gap-1 text-[11px] text-off-black/40 hover:text-off-black/70 disabled:opacity-50'
 
 /**
  * On a conversation: keep this sender out of the inbox, by address or by
@@ -41,12 +43,12 @@ export function FilterSender({ email, filters, onChanged }: { email: string; fil
   return (
     <div className="flex flex-col gap-1.5">
       {isAdmin && !personal && domain && (
-        <button disabled={busy} className={linkCls} title="Vendors, alerts, newsletters: kept, but out of the inbox" onClick={() => run(async () => { const out = await supportApi.addFilter(domain); return `Filtering ${out.pattern}: ${out.filed} conversation${out.filed === 1 ? '' : 's'} moved to Filtered` })}>
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}Filter all mail from {domain}
+        <button disabled={busy} className={quietCls} title="Vendors, alerts, newsletters: kept, but out of the inbox" onClick={() => run(async () => { const out = await supportApi.addFilter(domain); return `Filtering ${out.pattern}: ${out.filed} conversation${out.filed === 1 ? '' : 's'} moved to Filtered` })}>
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Filter className="w-3 h-3" />}Filter out all mail from {domain}
         </button>
       )}
-      <button disabled={busy} className={linkCls} onClick={() => run(async () => { const out = await supportApi.addFilter(e); return `Filtering ${out.pattern}: ${out.filed} conversation${out.filed === 1 ? '' : 's'} moved to Filtered` })}>
-        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}Filter only {e}
+      <button disabled={busy} className={quietCls} title={`Keep mail from ${e} out of the inbox (it is kept, under Filtered)`} onClick={() => run(async () => { const out = await supportApi.addFilter(e); return `Filtering ${out.pattern}: ${out.filed} conversation${out.filed === 1 ? '' : 's'} moved to Filtered` })}>
+        {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Filter className="w-3 h-3" />}Filter out emails from this sender
       </button>
     </div>
   )
