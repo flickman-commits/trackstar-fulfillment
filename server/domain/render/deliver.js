@@ -13,7 +13,7 @@ import { signedFiles } from './jobs.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 import { requireConnection } from '../../lib/connections.js'
 
-const ORDERS_FOLDER_ID = () => process.env.RENDER_ORDERS_FOLDER_ID || '1hvHh3F9Wdo8cpLPziSbIC1SUHe6Tq1OI'
+export const ORDERS_FOLDER_ID = () => process.env.RENDER_ORDERS_FOLDER_ID || '1hvHh3F9Wdo8cpLPziSbIC1SUHe6Tq1OI'
 
 function serviceDrive() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
@@ -27,7 +27,7 @@ function serviceDrive() {
  * token can expire or be revoked (Google answers "invalid_grant"), and that
  * must not stop prints reaching the folder when the service account can.
  */
-async function driveClients() {
+export async function driveClients() {
   await requireConnection('google_drive')
   const out = []
   const personal = await driveClientForAnyone().catch(() => null)

@@ -298,9 +298,9 @@ function ArteloOrderForm({ o, thread, isAdmin, onDone, onCancel }: { o: Customer
         <>
           <div className="text-off-black/70">New order <b>{prep.nextOrderId}</b> in Artelo, $0, the same print:</div>
           {prep.items.map(i => (
-            <label key={i.orderId} className={`flex items-start gap-1.5 ${i.copyable ? 'cursor-pointer text-off-black/80' : 'text-off-black/40'}`} title={i.copyable ? `Design from ${i.designFrom}` : 'No design attached in Artelo and no approved render to copy. Build this one in Artelo.'}>
+            <label key={i.orderId} className={`flex items-start gap-1.5 ${i.copyable ? 'cursor-pointer text-off-black/80' : 'text-off-black/40'}`} title={i.copyable ? `Design from ${i.designFrom}` : 'No approved render and no PDF named for this print in the Drive Orders folder. Build this one in Artelo.'}>
               <input type="checkbox" disabled={!i.copyable} checked={picked.includes(i.orderId)} onChange={e => setPicked(p => e.target.checked ? [...p, i.orderId] : p.filter(x => x !== i.orderId))} className="mt-0.5 accent-[#4600D6]" />
-              <span>{i.label} <span className="text-off-black/45">· {i.productLabel}{i.copyable ? '' : ' · no design to copy'}</span></span>
+              <span>{i.label} <span className="text-off-black/45">· {i.productLabel}{i.copyable ? '' : ' · no design to copy'}</span>{i.copyable && i.designFrom && <span className="block text-[11px] text-off-black/45">Design: {i.designFrom}</span>}</span>
             </label>
           ))}
           <div className="pt-1 text-[10px] font-semibold uppercase tracking-wider text-off-black/40">Ship to</div>

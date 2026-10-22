@@ -8,9 +8,12 @@
  *
  * The product (size, paper, frame, mats, pins) comes from the Artelo order
  * we stored at import. The design comes from, in order: the live Artelo
- * order (once someone attached the file there), else the approved render we
- * uploaded to the Artelo library (render/artelo.js). An item with neither
- * cannot be copied; the form says so and the order is built in Artelo.
+ * order (Artelo's API does not return attached designs today, so in practice
+ * never), the approved render we uploaded to the Artelo library
+ * (render/artelo.js), else the print's PDF in the Drive Orders folder, where
+ * every hand-made print is saved as "<number>_..." ("<number>-2_..." for a
+ * second item). That PDF is uploaded to the Artelo library when the order is
+ * sent. An item with none of these cannot be copied; the form says so.
  *
  * Price and shipping are 0: this is a replacement, not a sale. The order id
  * reads "<number>-R1", "-R2", and so on. `test` makes an Artelo test order
@@ -20,6 +23,10 @@ import prisma from '../../db.js'
 import { arteloOrderUrl } from '../../lib/links.js'
 import { UserError } from './errors.js'
 import { requireConnection } from '../../lib/connections.js'
+import { driveClients, ORDERS_FOLDER_ID } from '../render/deliver.js'
+import { uploadPdfToLibrary } from '../render/artelo.js'
+import { storage } from '../../lib/storage.js'
+import { BUCKET } from '../render/jobs.js'
 
 const BASE = 'https://www.artelo.com/api/open/'
 
@@ -80,6 +87,43 @@ function describe(product) {
   return [sizeLabel(p.size), frame].filter(Boolean).join(' · ')
 }
 
+const escapeQ = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+
+/**
+ * The newest PDF in the Drive Orders folder for this print: named
+ * "<label>_..." where label is the order number, with "-2" etc. for a later
+ * item. Returns { id, name, client } or null.
+ */
+export async function drivePdfFor(label) {
+  const folder = ORDERS_FOLDER_ID()
+  for (const { client } of await driveClients().catch(() => [])) {
+    try {
+      const { data } = await client.files.list({
+        q: `'${folder}' in parents and name contains '${escapeQ(label)}_' and mimeType = 'application/pdf' and trashed = false`,
+        fields: 'files(id, name, modifiedTime)', orderBy: 'modifiedTime desc', pageSize: 20, supportsAllDrives: true, includeItemsFromAllDrives: true,
+      })
+      // "contains" also matches 14341_...; keep names that start with the label.
+      const hit = (data.files || []).find(f => f.name.startsWith(`${label}_`))
+      return hit ? { id: hit.id, name: hit.name, client } : null
+    } catch { /* try the next Google connection */ }
+  }
+  return null
+}
+
+/** Put a Drive PDF in the Artelo library: copied to our storage for a link Artelo can fetch, then uploaded. */
+export async function libraryUploadFromDrive(file, orderId) {
+  const res = await file.client.files.get({ fileId: file.id, alt: 'media', supportsAllDrives: true }, { responseType: 'arraybuffer' })
+  const buf = Buffer.from(res.data)
+  if (!buf.subarray(0, 4).toString('latin1').startsWith('%PDF')) throw new UserError(`${file.name} in Drive is not a PDF`)
+  const path = `replacements/${orderId}/${Date.now()}.pdf`
+  const sb = storage()
+  const up = await sb.storage.from(BUCKET).upload(path, buf, { contentType: 'application/pdf', upsert: true })
+  if (up.error) throw new Error(`Could not stage the PDF: ${up.error.message}`)
+  const { data } = await sb.storage.from(BUCKET).createSignedUrl(path, 900)
+  if (!data?.signedUrl) throw new Error('Could not link the staged PDF')
+  return uploadPdfToLibrary(data.signedUrl, file.name)
+}
+
 /** Our rows for a Shopify order, each with what Artelo has for its item. */
 async function itemsFor(shopifyOrderId) {
   const rows = await prisma.order.findMany({
@@ -102,6 +146,7 @@ async function itemsFor(shopifyOrderId) {
     const job = r.renderJobs[0]
     const designs = fromArtelo.length ? fromArtelo : job ? [{ imageId: job.arteloUploadId }] : []
     return {
+      row: r,
       orderId: r.id,
       label: `${r.runnerName || 'Item'} · ${[r.raceName, r.raceYear].filter(Boolean).join(' ')}`,
       product,
@@ -110,8 +155,17 @@ async function itemsFor(shopifyOrderId) {
       designFrom: fromArtelo.length ? 'the Artelo order' : job ? `the approved design (v${job.version})` : null,
     }
   })
-  return { rows, items, stored, live, number: String(rows[0].shopifyOrderData?.name || shopifyOrderId).replace(/^#/, '') }
+  const number = String(rows[0].shopifyOrderData?.name || shopifyOrderId).replace(/^#/, '')
+  // A print made by hand: its PDF in the Drive Orders folder.
+  await Promise.all(items.filter(i => !i.designs.length).map(async i => {
+    const label = i.row.lineItemIndex ? `${number}-${i.row.lineItemIndex + 1}` : number
+    const file = await drivePdfFor(label).catch(() => null)
+    if (file) { i.driveFile = file; i.designFrom = `${file.name} in the Drive Orders folder` }
+  }))
+  return { rows, items, stored, live, number }
 }
+
+const copyable = i => Boolean(i.product?.catalogProductId && i.product?.size && (i.designs.length || i.driveFile))
 
 /** What the form shows: each item, whether it can be copied, and the next order id. */
 export async function reorderPrep({ shopifyOrderId }) {
@@ -121,7 +175,7 @@ export async function reorderPrep({ shopifyOrderId }) {
   return {
     number,
     nextOrderId: await nextOrderId(number, rows.map(r => r.id)),
-    items: items.map(i => ({ orderId: i.orderId, label: i.label, productLabel: i.productLabel, designFrom: i.designFrom, copyable: Boolean(i.product?.catalogProductId && i.product?.size && i.designs.length) })),
+    items: items.map(i => ({ orderId: i.orderId, label: i.label, productLabel: i.productLabel, designFrom: i.designFrom, copyable: copyable(i) })),
   }
 }
 
@@ -148,8 +202,14 @@ export async function createReorder({ thread, shopifyOrderId, orderIds, address,
   const { rows, items, stored, number } = await itemsFor(id)
   const picked = items.filter(i => (orderIds || []).includes(i.orderId))
   if (!picked.length) throw new UserError('Pick at least one item to send')
-  const blocked = picked.find(i => !(i.product?.catalogProductId && i.product?.size && i.designs.length))
-  if (blocked) throw new UserError(`${blocked.label} has no design in Artelo or an approved render to copy. Build that one in Artelo.`)
+  const blocked = picked.find(i => !copyable(i))
+  if (blocked) throw new UserError(`${blocked.label} has no design to copy: no approved render and no PDF named for it in the Drive Orders folder. Build that one in Artelo.`)
+  // Hand-made prints: their Drive PDF goes into the Artelo library first.
+  for (const i of picked) {
+    if (i.designs.length || !i.driveFile) continue
+    try { i.designs = [{ imageId: await libraryUploadFromDrive(i.driveFile, i.orderId) }] }
+    catch (err) { throw new UserError(`Could not copy ${i.driveFile.name} from Drive into Artelo: ${String(err.message).slice(0, 160)}`) }
+  }
 
   const orderId = await nextOrderId(number, rows.map(r => r.id))
   const body = {

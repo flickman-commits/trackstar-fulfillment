@@ -48,6 +48,25 @@ export async function uploadFolderId() {
 }
 
 /**
+ * Upload a PDF the server can link to (a signed URL) into the library's
+ * Orders folder and wait briefly for Artelo to fetch it. Returns the upload
+ * id. Used for prints made by hand, whose PDF only exists in Drive.
+ */
+export async function uploadPdfToLibrary(pdfUrl, name) {
+  const parentFolderId = await uploadFolderId()
+  const created = await call('uploads/files/create', { method: 'POST', body: { imageUrl: pdfUrl, name, parentFolderId } })
+  if (!created?.id) throw new Error('Artelo did not return an upload id')
+  let status = created.status
+  for (let i = 0; i < 6 && status === 'Pending'; i++) {
+    await new Promise(r => setTimeout(r, 2000))
+    const got = await call('uploads/files/get-by-id', { query: { id: created.id } }).catch(() => null)
+    if (got?.status) status = got.status
+  }
+  if (status === 'Deleted') throw new Error('Artelo rejected the file')
+  return created.id
+}
+
+/**
  * Upload the job's PDF to the library. Records the upload on the job, or the
  * error. Safe to call again: a job already uploaded is left alone, and a
  * superseded version is skipped the same way Drive delivery skips it.
