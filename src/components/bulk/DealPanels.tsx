@@ -3,6 +3,7 @@ import { Plus, Loader2, X, Trash2, Copy, ExternalLink, Send, Receipt } from 'luc
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import PrintPicker, { type PrintOption } from '@/components/PrintPicker'
 import { btnPrimary, btnSecondary, btnGhost, inputBase, fieldLabel } from '@/lib/ui'
 
 /**
@@ -17,6 +18,10 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 type Address = { company: string; name: string; address1: string; address2: string; city: string; province: string; zip: string; country: string }
 const blankAddress = (): Address => ({ company: '', name: '', address1: '', address2: '', city: '', province: '', zip: '', country: 'US' })
 type Line = { raceName: string; raceYear: string; eventType: string; quantity: string; productSize: string; frameType: string }
+/** Race, year, event, quantity, size, frame, remove: the columns of a line, header and rows alike. */
+const LINE_GRID = 'grid grid-cols-[minmax(0,1fr)_76px_150px_72px_96px_190px_32px] gap-2'
+type CatalogPrint = PrintOption & { race: string }
+
 const blankLine = (prev?: Line): Line => ({ raceName: prev?.raceName || '', raceYear: prev?.raceYear || String(new Date().getFullYear()), eventType: 'Marathon', quantity: '', productSize: prev?.productSize || '8x10', frameType: prev?.frameType || 'Unframed' })
 
 export type DealRun = { id: string; number: string; raceName: string; raceYear: number; eventType: string | null; quantity: number; productSize: string; frameType: string; paidAt: string | null; status: string; _count?: { runners: number } }
@@ -63,12 +68,15 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [lines, setLines] = useState<Line[]>([blankLine()])
   const [busy, setBusy] = useState(false)
   useEffect(() => { apiFetch(`${API_BASE}/api/bulk/deals?options=1`).then(r => r.json()).then(setOpts).catch(() => {}) }, [])
+  const [catalog, setCatalog] = useState<CatalogPrint[] | null>(null)
+  useEffect(() => { apiFetch(`${API_BASE}/api/bulk/deals?catalog=1`).then(r => r.json()).then(d => setCatalog(d.products || [])).catch(() => setCatalog([])) }, [])
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF(v => ({ ...v, [k]: e.target.value }))
   const setLine = (i: number, k: keyof Line, v: string) => setLines(ls => ls.map((l, j) => j === i ? { ...l, [k]: v } : l))
   const units = lines.reduce((n, l) => n + (parseInt(l.quantity, 10) || 0), 0)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (lines.some(l => !l.raceName)) { toast.error('Choose the race on every line'); return }
     setBusy(true)
     try {
       const out = await dealApi<{ deal: Deal }>({
@@ -86,7 +94,7 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const label = (t: string) => <span className={fieldLabel}>{t}</span>
   return (
     <div className="fixed inset-0 z-50 bg-off-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={submit} onClick={e => e.stopPropagation()} className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-full overflow-y-auto p-5 space-y-4">
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-full overflow-y-auto p-6 space-y-4">
         <div className="flex items-center justify-between"><h3 className="text-base font-semibold">New bulk order</h3><button type="button" onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button></div>
 
         {/* Who */}
@@ -113,9 +121,13 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
         <div>
           <div className="flex items-center justify-between">{label(`Races and events · ${units} print${units === 1 ? '' : 's'}`)}</div>
           <div className="space-y-1.5">
+            <div className={`${LINE_GRID} text-[11px] font-semibold text-off-black/45 uppercase tracking-wider`}>
+              <span>Race</span><span>Year</span><span>Event</span><span>Qty</span><span>Size</span><span>Frame</span><span />
+            </div>
             {lines.map((l, i) => (
-              <div key={i} className="grid grid-cols-[1fr_64px_120px_60px_72px_140px_28px] gap-1.5 items-center">
-                <input required value={l.raceName} onChange={e => setLine(i, 'raceName', e.target.value)} placeholder="Philadelphia Marathon" className={inputBase} aria-label="Race" />
+              <div key={i} className={`${LINE_GRID} items-center`}>
+                <PrintPicker<CatalogPrint> value={catalog?.find(c => c.race === l.raceName)?.title || null} options={catalog} placeholder={l.raceName || 'Choose the race'}
+                  onChange={c => setLine(i, 'raceName', c.race)} />
                 <input required value={l.raceYear} onChange={e => setLine(i, 'raceYear', e.target.value.replace(/\D/g, '').slice(0, 4))} className={inputBase} aria-label="Year" />
                 <select value={l.eventType} onChange={e => setLine(i, 'eventType', e.target.value)} className={inputBase} aria-label="Event">{opts.events.map(o => <option key={o}>{o}</option>)}</select>
                 <input required value={l.quantity} onChange={e => setLine(i, 'quantity', e.target.value.replace(/\D/g, ''))} placeholder="Qty" className={inputBase} aria-label="Quantity" />

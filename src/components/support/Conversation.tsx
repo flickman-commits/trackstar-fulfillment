@@ -36,7 +36,24 @@ function macroMatches(macros: Macro[], query: string): Macro[] {
   const dashed = q.replace(/\s+/g, '-')
   const starts = macros.filter(m => (m.shortcut || '').startsWith(dashed))
   const rest = q ? macros.filter(m => !starts.includes(m) && (m.name.toLowerCase().includes(q) || (m.shortcut || '').includes(dashed))) : []
-  return [...starts, ...rest].slice(0, 8)
+  if (starts.length || rest.length || dashed.length < 4) return [...starts, ...rest].slice(0, 8)
+  // Nothing exact: a misspelling (/colombus) still finds the macro whose shortcut is a letter or two off.
+  const near = (m: Macro) => Math.min(...(m.shortcut || '').split('-').concat(m.shortcut || '').map(w => typoDistance(dashed, w.slice(0, dashed.length + 1))))
+  return macros.map(m => ({ m, d: near(m) })).filter(x => x.d <= (dashed.length >= 7 ? 2 : 1)).sort((a, b) => a.d - b.d).map(x => x.m).slice(0, 8)
+}
+
+/** Edit distance, for short words. */
+function typoDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]; row[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const cur = row[j]
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1))
+      prev = cur
+    }
+  }
+  return row[b.length]
 }
 
 function Bubble({ m }: { m: Message }) {

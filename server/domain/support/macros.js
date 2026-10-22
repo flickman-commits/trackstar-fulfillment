@@ -30,10 +30,46 @@ async function freeShortcut(candidate, exceptId) {
 
 export async function listMacros() {
   await seedDefaults()
+  await addProductLinks()
   // Macros from before shortcuts existed get one from their name, once.
   const bare = await prisma.supportMacro.findMany({ where: { shortcut: null }, select: { id: true, name: true } })
   for (const m of bare) await prisma.supportMacro.update({ where: { id: m.id }, data: { shortcut: await freeShortcut(m.name, m.id) } })
   return prisma.supportMacro.findMany({ orderBy: [{ uses: 'desc' }, { name: 'asc' }], select: SELECT })
+}
+
+/**
+ * "Link: Columbus Marathon" (/columbus): one link macro for every product the
+ * shop sells (ShopifyProduct, ACTIVE, kept fresh by the catalog sync), added
+ * for any product no macro links to yet, so a new race has one without anyone
+ * writing it. The URL carries no UTM; tagStoreLinks adds it on insert.
+ */
+export function productLinkMacro({ title, handle }) {
+  const t = String(title || '').replace(/\s+/g, ' ').trim()
+  const apple = t.match(/^catch me if you can framed poster \((.+)\)$/i)
+  if (apple) return { name: `Link: Catch Me If You Can poster (${apple[1]})`, shortcut: `catch-me-${apple[1]}` }
+  const base = t
+    .replace(/\bPersonalized\b/gi, '')
+    .replace(/\(\s*\+\s*Half Marathon\s*\)/gi, '')
+    .replace(/\b(?:Race\s+)?(?:Print|Poster)\b/gi, '')
+    .replace(/\s+/g, ' ').trim()
+  const worldMajor = /World Major/i.test(base)
+  return {
+    name: `Link: ${worldMajor ? base.replace(/World Major\s*Race/i, 'World Major') + ' poster' : base}`,
+    // The race, not the word Marathon: /columbus, /big-sur, /berlin-world-major.
+    shortcut: base.replace(/World Major\s*Race/i, 'World Major').replace(/\bMarathon\b/gi, '').replace(/[()]/g, ' ').trim() || handle,
+  }
+}
+
+async function addProductLinks() {
+  const products = await prisma.shopifyProduct.findMany({ where: { status: 'ACTIVE' }, select: { title: true, handle: true }, orderBy: { title: 'asc' } })
+  if (!products.length) return
+  const bodies = await prisma.supportMacro.findMany({ select: { body: true } })
+  const linked = new Set(bodies.flatMap(m => [...m.body.matchAll(/trackstar\.art\/products\/([a-z0-9-]+)/gi)].map(x => x[1].toLowerCase())))
+  for (const p of products) {
+    if (linked.has(p.handle.toLowerCase())) continue
+    const { name, shortcut } = productLinkMacro(p)
+    await prisma.supportMacro.create({ data: { name, shortcut: await freeShortcut(shortcut), body: `https://www.trackstar.art/products/${p.handle}` } })
+  }
 }
 
 export const MACRO_TITLE_MAX = 120
