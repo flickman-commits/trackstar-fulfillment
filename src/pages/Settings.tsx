@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Hash, Sparkles, Search, Copy, Loader2, FlaskConical, Check, Settings as SettingsIcon, ChevronLeft, ChevronRight, Star, Users, CloudSun, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, KeyRound, Plug, PencilRuler } from 'lucide-react'
+import { Hash, Sparkles, Search, Copy, Loader2, FlaskConical, Check, Settings as SettingsIcon, ChevronLeft, ChevronRight, Star, Users, CloudSun, DollarSign, UserCog, ScrollText, BarChart3, ShieldCheck, KeyRound, Plug, PencilRuler, Lightbulb } from 'lucide-react'
 import { REVIEW_PRODUCTS } from '@/lib/reviewLinks'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, inputBase } from '@/lib/ui'
@@ -9,6 +9,7 @@ import type { Capability } from '@/lib/roles'
 import CustomCounter from '@/components/CustomCounter'
 import RenderTemplatesPanel from '@/components/RenderTemplatesPanel'
 import DesignNeedsPanel from '@/components/DesignNeedsPanel'
+import FeatureRequestsPanel from '@/components/FeatureRequestsPanel'
 import PricingCalculator from '@/components/PricingCalculator'
 import { PeoplePanel, RolesPanel, ActivityPanel, AccountPanel } from '@/components/TeamPanel'
 import ApiKeysPanel from '@/components/ApiKeysPanel'
@@ -22,7 +23,7 @@ import LookupHealthPanel from '@/components/LookupHealthPanel'
 import ClearResearchCard from '@/components/ClearResearchCard'
 import Toast, { type ToastMessage } from '@/components/orders/Toast'
 
-export type SettingsPanel = 'design_needs' | 'products' | 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'roles' | 'apikeys' | 'connections' | 'assignments' | 'activity' | 'counter' | 'designs' | 'diagnostics' | 'maintenance'
+export type SettingsPanel = 'features' | 'design_needs' | 'products' | 'pricing' | 'reviews' | 'stats' | 'races' | 'lookup' | 'storefront' | 'account' | 'people' | 'roles' | 'apikeys' | 'connections' | 'assignments' | 'activity' | 'counter' | 'designs' | 'diagnostics' | 'maintenance'
 
 /**
  * Settings navigation. Grouped rather than a flat list because the panels do
@@ -47,6 +48,7 @@ const SETTINGS_NAV: {
       { id: 'pricing', label: 'Pricing Calculator', blurb: 'Costs, retail and margin across DTC and wholesale', icon: DollarSign, cap: 'settings.pricing' },
       { id: 'reviews', label: 'Request Reviews', blurb: 'Copy a review request message for any product', icon: Star, cap: 'settings.reviews' },
       { id: 'stats', label: 'Stats', blurb: 'Gifting rate, add-on take rate and more, from Shopify', icon: BarChart3, cap: 'settings.stats' },
+      { id: 'features', label: 'Feature Requests', blurb: 'What the team has asked to have built', icon: Lightbulb },
       { id: 'design_needs', label: 'Design Needs', blurb: 'What the production files need so the script can make the print', icon: PencilRuler, cap: 'settings.design_needs' },
     ],
   },
@@ -270,6 +272,7 @@ export default function Settings() {
               {settingsPanel === 'pricing' && can('settings.pricing') && <PricingCalculator />}
               {settingsPanel === 'stats' && can('settings.stats') && <StatsPanel />}
               {settingsPanel === 'design_needs' && can('settings.design_needs') && <DesignNeedsPanel />}
+              {settingsPanel === 'features' && <FeatureRequestsPanel />}
               {settingsPanel === 'account' && <AccountPanel />}
               {settingsPanel === 'people' && isAdmin && <PeoplePanel />}
               {settingsPanel === 'roles' && isAdmin && <RolesPanel />}

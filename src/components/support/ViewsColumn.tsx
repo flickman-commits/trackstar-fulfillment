@@ -1,4 +1,4 @@
-import { Inbox, Layers, Clock, AlertTriangle, Moon, Archive, Settings2, Zap, Filter } from 'lucide-react'
+import { Inbox, Layers, Clock, AlertTriangle, Moon, Archive, Settings2, Zap, Filter, Lightbulb } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Avatar } from '@/components/AssigneePicker'
 import type { InboxCounts, InboxView, Teammate } from '@/types/support'
@@ -27,7 +27,7 @@ function ViewRow({ row, active, onClick }: { row: Row; active: boolean; onClick:
   )
 }
 
-export default function ViewsColumn({ view, counts, team, me, onView, onMacros, onSettings }: {
+export default function ViewsColumn({ view, counts, team, me, onView, onMacros, onSettings, onRequestFeature }: {
   view: InboxView
   counts: InboxCounts | null
   team: Teammate[]
@@ -35,6 +35,7 @@ export default function ViewsColumn({ view, counts, team, me, onView, onMacros, 
   onView: (v: InboxView) => void
   onMacros: () => void
   onSettings: () => void
+  onRequestFeature: () => void
 }) {
   const c = counts
   const top: Row[] = [
@@ -78,6 +79,9 @@ export default function ViewsColumn({ view, counts, team, me, onView, onMacros, 
       <div className="mt-auto px-2 py-3 border-t border-border-gray">
         <button onClick={onMacros} className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] text-off-black/70 hover:bg-off-black/[0.04] hover:text-off-black transition-colors">
           <Zap className="w-4 h-4 text-off-black/45" /><span className="flex-1 text-left">Macros</span>
+        </button>
+        <button onClick={onRequestFeature} className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] text-off-black/70 hover:bg-off-black/[0.04] hover:text-off-black transition-colors">
+          <Lightbulb className="w-4 h-4 text-off-black/45" /><span className="flex-1 text-left">Request feature</span>
         </button>
         <button onClick={onSettings} className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] text-off-black/70 hover:bg-off-black/[0.04] hover:text-off-black transition-colors">
           <Settings2 className="w-4 h-4 text-off-black/45" /><span className="flex-1 text-left">Settings</span>

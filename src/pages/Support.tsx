@@ -13,6 +13,7 @@ import ConversationList from '@/components/support/ConversationList'
 import Conversation from '@/components/support/Conversation'
 import Details from '@/components/support/Details'
 import MacrosModal from '@/components/support/MacrosModal'
+import RequestFeatureModal from '@/components/support/RequestFeatureModal'
 import SettingsModal from '@/components/support/SettingsModal'
 import ResizeHandle from '@/components/support/ResizeHandle'
 import type { RichReplyHandle } from '@/components/support/RichReply'
@@ -93,6 +94,7 @@ export default function Support({ active = true }: { active?: boolean } = {}) {
   const [syncing, setSyncing] = useState(false)
   const [macros, setMacros] = useState<Macro[]>([])
   const [macrosOpen, setMacrosOpen] = useState(false)
+  const [featureOpen, setFeatureOpen] = useState(false)
   const [keysOpen, setKeysOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const replyRef = useRef<RichReplyHandle>(null)
@@ -365,7 +367,7 @@ export default function Support({ active = true }: { active?: boolean } = {}) {
 
         <section className="flex-1 min-h-0 pb-3">
           <div className="h-full bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex flex-col lg:flex-row">
-            <ViewsColumn view={view} counts={inbox?.counts || null} team={inbox?.team || []} me={me} onView={v => { setView(v); setSelectedId(null); setThread(null) }} onMacros={() => setMacrosOpen(true)} onSettings={() => setSettingsOpen(true)} />
+            <ViewsColumn view={view} counts={inbox?.counts || null} team={inbox?.team || []} me={me} onView={v => { setView(v); setSelectedId(null); setThread(null) }} onMacros={() => setMacrosOpen(true)} onSettings={() => setSettingsOpen(true)} onRequestFeature={() => setFeatureOpen(true)} />
             {/* On the phone the list and the conversation take turns: the list until one is picked, then the conversation alone. */}
             <div className={`${thread ? 'hidden lg:contents' : 'contents'}`}>
             <ConversationList title={title} threads={threads} selectedId={selectedId} onSelect={openThread} loading={loading && !inbox} emptyLabel={empty} sort={sort} onSort={setSort} width={wide ? listCol.width : undefined} />
@@ -408,6 +410,7 @@ export default function Support({ active = true }: { active?: boolean } = {}) {
       </div>
 
       {macrosOpen && <MacrosModal macros={macros} onChanged={loadMacros} onClose={() => setMacrosOpen(false)} />}
+      {featureOpen && <RequestFeatureModal onClose={() => setFeatureOpen(false)} />}
       {settingsOpen && <SettingsModal team={inbox?.team || []} unassignedCount={inbox?.counts.unassigned || 0} status={status} instagram={instagram} isAdmin={isAdmin} filters={filters} onChanged={() => { loadStatus(); loadFilters(); loadInbox(true) }} onClose={() => setSettingsOpen(false)} />}
       {keysOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setKeysOpen(false)}>

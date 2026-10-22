@@ -1119,6 +1119,31 @@ model DesignNeed {
   @@index([status])
 }
 
+/**
+ * Settings > Feature Requests: things the team asks to have built, sent from
+ * the Request feature button in Support (or added in Settings). Anyone signed
+ * in adds and reads them; an admin marks them done when they ship
+ * (server/domain/featureRequests.js).
+ */
+model FeatureRequest {
+  id            String    @id @default(cuid())
+  title         String
+  detail        String?
+  // Where it was asked from ("support", "settings")
+  source        String    @default("settings")
+  status        String    @default("open") // open | done
+  // How it was resolved, or why it will not be built
+  note          String?
+  createdById   String?
+  createdByName String?
+  doneAt        DateTime?
+  doneByName    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+}
+
 // -----------------------------------------------------------------------------
 // Support: the shared inbox for fast@trackstar.art
 // -----------------------------------------------------------------------------
