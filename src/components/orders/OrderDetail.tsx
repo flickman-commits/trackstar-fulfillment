@@ -30,7 +30,7 @@ import {
   generateFilename as filenameFor, orderItemCount, orderItemPosition,
 } from '@/components/orders/orderFormat'
 import {
-  CollapsibleSection, CopyableField, PartnerInfoFields, StaticField, PendingField,
+  CollapsibleSection, CopyableField, PartnerInfoFields, PendingField,
   MissingDateField, NotAvailableField, ApprovalEmailField,
 } from '@/components/orders/fields'
 
@@ -1384,7 +1384,7 @@ Thank you!`
                           className="inline-flex items-center px-2.5 py-1 rounded border border-dashed border-amber-300 text-sm font-medium text-amber-800 hover:bg-amber-50"
                           title="Admin: move this order to rush so it cuts the line"
                         >
-                          ⚡ Make rush
+                          ⚡ Expedite this order (4d turnaround)
                         </button>
                       )}
                       {isAdmin && rushEditing === selectedOrder.id && (() => {
@@ -1452,7 +1452,7 @@ Thank you!`
                       )}
                       {/* Emergency delay notice: findable, not the main action. */}
                       {selectedOrder.trackstarOrderType === 'custom' && selectedOrder.customerEmail && !isProductionStage && (
-                        <button onClick={openDelayDialog} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:underline underline-offset-2">
+                        <button onClick={openDelayDialog} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2">
                           <Clock className="w-3.5 h-3.5" /> Notify customer of a delay
                         </button>
                       )}
@@ -1503,6 +1503,32 @@ Thank you!`
 
                   {/* The work: notes from the team, the step it is on, the proofs, and what the customer asked for. */}
                   <div className="order-1 md:order-none md:col-start-1 md:row-start-1 min-w-0 flex flex-col gap-4">
+                  {/* What the customer gave the designer, first: what they asked for, and their photo beside it. */}
+                  {selectedOrder.trackstarOrderType === 'custom' && !isProductionStage && (
+                    <div className={`grid gap-3 ${selectedOrder.photoPath ? 'md:grid-cols-2' : ''}`}>
+                      <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
+                        <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Creative Direction</p>
+                        <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection?.trim() || "They didn't give any - do your thing!"}</p>
+                      </div>
+                      {selectedOrder.photoPath && (
+                        <div className="bg-[#4600D6]/5 border border-[#4600D6]/30 rounded-md p-4 flex gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-semibold text-[#4600D6] uppercase tracking-wider mb-1">Customer Photo</p>
+                            <p className="text-xs text-[#4600D6]/80">For the photo window on the design.</p>
+                            <button type="button" onClick={() => downloadPersonalizationPhoto(selectedOrder)} disabled={!photoUrl}
+                              className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded bg-dark-fill text-white hover:opacity-90 disabled:opacity-40">
+                              <Download className="w-3 h-3" /> Download
+                            </button>
+                          </div>
+                          {photoUrl && (
+                            <a href={photoUrl} target="_blank" rel="noopener noreferrer" className="shrink-0" title="Open full size">
+                              <img src={photoUrl} alt="Customer photo" className="h-28 w-28 object-cover rounded border border-border-gray" />
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {selectedOrder.trackstarOrderType === 'custom' && commentsCallout()}
 
                   {/* Delay-notice banner — shown when Dan has emailed the customer
@@ -1640,14 +1666,6 @@ Thank you!`
                     </div>
                   )}
 
-                  {/* What the customer asked for: the designer reads this at every stage before production. */}
-                  {!isProductionStage && selectedOrder.creativeDirection && (
-                    <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
-                      <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Creative Direction</p>
-                      <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
-                    </div>
-                  )}
-
                   {/* What goes on the print, to check the proofs against. */}
                   {!(isProductionStage && selectedOrder.trackstarOrderType === 'custom') && (
                     <div>
@@ -1669,7 +1687,7 @@ Thank you!`
                           <>
                             <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
                             <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
-                            <StaticField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
+                            <CopyableField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
                             {selectedOrder.bibNumberCustomer && (
                               <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
                             )}
@@ -1683,7 +1701,7 @@ Thank you!`
                   )}
 
 
-                  {photoCard}
+                  {selectedOrder.trackstarOrderType !== 'custom' && photoCard}
 
                   {selectedOrder.notes && !isProductionStage && (
                     <div>

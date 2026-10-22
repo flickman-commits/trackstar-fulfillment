@@ -836,7 +836,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                   src={big ? proof.imageUrl : (proof.thumbnailUrl || proof.imageUrl)}
                   alt={`Proof v${proof.version}`}
                   className={big
-                    ? 'w-36 aspect-[4/5] object-contain rounded-lg border border-border-gray bg-[#ece9e2] hover:opacity-90 transition-opacity cursor-zoom-in'
+                    ? 'h-48 w-auto max-w-[15rem] rounded-lg border border-border-gray hover:opacity-90 transition-opacity cursor-zoom-in'
                     : 'h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity cursor-pointer'}
                   loading="lazy"
                 />
