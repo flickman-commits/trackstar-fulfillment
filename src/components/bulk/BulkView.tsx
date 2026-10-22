@@ -752,7 +752,7 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
         </div>
       </div>
 
-      {b.deal && <DealCard dealId={b.deal.id} currentRunId={b.id} onOpenRun={onOpenRun} />}
+      {b.deal && <DealCard dealId={b.deal.id} currentRunId={b.id} onOpenRun={onOpenRun} onChanged={load} />}
       {collecting && <>{intakeCard}{runnersCard}</>}
       {fulfilling && <>{productionCard}{runnersCard}{filesCard}{arteloCard}{intakeCard}</>}
       {submitted && <>{arteloCard}{productionCard}{runnersCard}</>}

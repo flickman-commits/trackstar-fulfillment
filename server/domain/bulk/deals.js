@@ -90,25 +90,64 @@ export async function createDeal(input, actor) {
   const lastDeal = await prisma.bulkDeal.findFirst({ orderBy: { createdAt: 'desc' }, select: { number: true } })
   const deal = await prisma.bulkDeal.create({ data: { ...fields, number: nextDealNumber(lastDeal?.number), createdById: actor?.id || null } })
   const assigneeId = await defaultAssigneeFor('bulk')
-  for (const l of lines) {
-    const last = await prisma.bulkOrder.findFirst({ orderBy: { createdAt: 'desc' }, select: { number: true } })
-    const raceDate = verifiedRaceDate(l.raceName, l.raceYear)
-    await prisma.bulkOrder.create({
-      data: {
-        number: nextNumber(last?.number), dealId: deal.id, partnerName: fields.partnerName,
-        raceName: l.raceName, raceYear: l.raceYear, eventType: l.eventType, quantity: l.quantity,
-        frameType: l.frameType, productSize: l.productSize, raceDate, dueDate: dueDateFor(raceDate), assigneeId,
-      },
-    })
-  }
+  for (const l of lines) await createRun(deal.id, fields.partnerName, l, assigneeId)
   return loadDeal(deal.id)
 }
 
-/** Edit the agreed terms (not the lines; each run is edited where it lives). */
+async function createRun(dealId, partnerName, l, assigneeId) {
+  const last = await prisma.bulkOrder.findFirst({ orderBy: { createdAt: 'desc' }, select: { number: true } })
+  const raceDate = verifiedRaceDate(l.raceName, l.raceYear)
+  await prisma.bulkOrder.create({
+    data: {
+      number: nextNumber(last?.number), dealId, partnerName,
+      raceName: l.raceName, raceYear: l.raceYear, eventType: l.eventType, quantity: l.quantity,
+      frameType: l.frameType, productSize: l.productSize, raceDate, dueDate: dueDateFor(raceDate), assigneeId,
+    },
+  })
+}
+
+/**
+ * The lines as edited: a line with an id changes that run, one without adds a
+ * run, and a run left out is removed, unless its list already has names.
+ */
+async function replaceLines(deal, input, partnerName) {
+  const lines = input.map(l => ({ id: l?.id ? String(l.id) : null, ...cleanLine(l) }))
+  if (!lines.length) throw new DealError('Add at least one race')
+  const runs = await prisma.bulkOrder.findMany({ where: { dealId: deal.id }, select: { id: true, number: true, raceName: true, raceYear: true, _count: { select: { runners: true } } } })
+  const keep = new Set(lines.map(l => l.id).filter(Boolean))
+  const gone = runs.filter(r => !keep.has(r.id))
+  const named = gone.find(r => r._count.runners > 0)
+  if (named) throw new DealError(`${named.raceName} ${named.raceYear} (${named.number}) already has names on its list, so it cannot be removed here`)
+  if (gone.length) await prisma.bulkOrder.deleteMany({ where: { id: { in: gone.map(r => r.id) } } })
+  const assigneeId = await defaultAssigneeFor('bulk')
+  for (const l of lines) {
+    const run = l.id && runs.find(r => r.id === l.id)
+    if (!run) { await createRun(deal.id, partnerName, l, assigneeId); continue }
+    const moved = run.raceName !== l.raceName || run.raceYear !== l.raceYear
+    const raceDate = moved ? verifiedRaceDate(l.raceName, l.raceYear) : undefined
+    await prisma.bulkOrder.update({
+      where: { id: run.id },
+      data: {
+        raceName: l.raceName, raceYear: l.raceYear, eventType: l.eventType, quantity: l.quantity,
+        frameType: l.frameType, productSize: l.productSize,
+        ...(moved ? { raceDate, dueDate: dueDateFor(raceDate) } : {}),
+      },
+    })
+  }
+}
+
+/**
+ * Edit the deal after intake: the terms and, when `lines` is sent, its lines.
+ * Only until the invoice goes out; after that the customer has a price, and a
+ * change is a new conversation with them.
+ */
 export async function updateDeal(id, input) {
   const deal = await prisma.bulkDeal.findUnique({ where: { id: String(id || '') } })
   if (!deal) throw new DealError('Deal not found', 404)
+  if (deal.paidAt) throw new DealError('This deal is paid; it can no longer be edited')
+  if (deal.invoiceSentAt) throw new DealError('The invoice has been sent; it can no longer be edited here')
   const fields = dealFields({ ...deal, discountDollars: deal.discountCents != null ? deal.discountCents / 100 : undefined, ...input })
+  if (Array.isArray(input?.lines)) await replaceLines(deal, input.lines, fields.partnerName)
   await prisma.bulkDeal.update({ where: { id: deal.id }, data: fields })
   await prisma.bulkOrder.updateMany({ where: { dealId: deal.id }, data: { partnerName: fields.partnerName } })
   return loadDeal(deal.id)
@@ -174,7 +213,8 @@ export function draftInput(q) {
   const kindLabel = deal.printKind === 'cobranded' ? 'Co-branded' : 'Standard'
   const input = {
     email: deal.contactEmail || undefined,
-    note: [`Bulk order ${deal.number} for ${deal.partnerName}.`, deal.discountNote, deal.notes].filter(Boolean).join(' '),
+    // The discount note is ours: it stays in the tool, never on anything Shopify holds.
+    note: [`Bulk order ${deal.number} for ${deal.partnerName}.`, deal.notes].filter(Boolean).join(' '),
     tags: ['bulk', deal.number, ...lines.map(l => l.number)],
     lineItems: lines.map(l => ({
       variantId: l.variantId, quantity: l.quantity,
@@ -188,8 +228,8 @@ export function draftInput(q) {
     billingAddress: shopifyAddress(deal.billingAddress, deal.contactName),
     shippingAddress: shopifyAddress(deal.shipping === 'organization' ? deal.shipToAddress : deal.billingAddress, deal.contactName),
   }
-  if (deal.discountKind === 'percent') input.appliedDiscount = { valueType: 'PERCENTAGE', value: deal.discountPercent, title: deal.discountNote || 'Bulk discount' }
-  if (deal.discountKind === 'amount') input.appliedDiscount = { valueType: 'FIXED_AMOUNT', value: deal.discountCents / 100, title: deal.discountNote || 'Bulk discount' }
+  if (deal.discountKind === 'percent') input.appliedDiscount = { valueType: 'PERCENTAGE', value: deal.discountPercent, title: 'Bulk discount' }
+  if (deal.discountKind === 'amount') input.appliedDiscount = { valueType: 'FIXED_AMOUNT', value: deal.discountCents / 100, title: 'Bulk discount' }
   return input
 }
 

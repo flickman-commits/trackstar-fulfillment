@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Loader2, X, Trash2, Copy, ExternalLink, Send, Receipt } from 'lucide-react'
+import { Plus, Loader2, Pencil, X, Trash2, Copy, ExternalLink, Send, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -17,7 +17,7 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 
 type Address = { company: string; name: string; address1: string; address2: string; city: string; province: string; zip: string; country: string }
 const blankAddress = (): Address => ({ company: '', name: '', address1: '', address2: '', city: '', province: '', zip: '', country: 'US' })
-type Line = { raceName: string; raceYear: string; eventType: string; quantity: string; productSize: string; frameType: string }
+type Line = { id?: string; raceName: string; raceYear: string; eventType: string; quantity: string; productSize: string; frameType: string }
 /** Race, year, event, quantity, size, frame, remove: the columns of a line, header and rows alike. */
 const LINE_GRID = 'grid grid-cols-[minmax(0,1fr)_76px_150px_72px_96px_190px_32px] gap-2'
 type CatalogPrint = PrintOption & { race: string }
@@ -57,15 +57,21 @@ function AddressFields({ value, onChange, withCompany = false }: { value: Addres
   )
 }
 
-/** New bulk order: who, what we agreed, and one line per race and event. */
-export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreated: (deal: Deal) => void }) {
+/** New bulk order: who, what we agreed, and one line per race and event. With `deal`, the same form edits it (until the invoice is sent). */
+export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: () => void; onCreated: (deal: Deal) => void }) {
   // The discount is money: admins set it (api/bulk/deals.js ignores it from anyone else).
   const { isAdmin } = useAuth()
   const [opts, setOpts] = useState<{ events: string[]; sizes: string[]; frames: string[] }>({ events: ['Marathon', 'Half Marathon', '10 Miler', '10K', '8K', '5K'], sizes: ['8x10', '12x18', '16x24'], frames: ['Unframed', 'Natural Premium Oak', 'Black Premium Oak'] })
-  const [f, setF] = useState({ partnerName: '', contactName: '', contactEmail: '', contactPhone: '', printKind: 'standard', discountKind: '', discountPercent: '', discountDollars: '', discountNote: '', shipping: 'runner', notes: '' })
-  const [billing, setBilling] = useState<Address>(blankAddress())
-  const [shipTo, setShipTo] = useState<Address>(blankAddress())
-  const [lines, setLines] = useState<Line[]>([blankLine()])
+  const [f, setF] = useState(() => deal ? {
+    partnerName: deal.partnerName, contactName: deal.contactName || '', contactEmail: deal.contactEmail || '', contactPhone: deal.contactPhone || '',
+    printKind: deal.printKind, discountKind: deal.discountKind || '', discountPercent: deal.discountPercent != null ? String(deal.discountPercent) : '',
+    discountDollars: deal.discountCents != null ? String(deal.discountCents / 100) : '', discountNote: deal.discountNote || '', shipping: deal.shipping, notes: deal.notes || '',
+  } : { partnerName: '', contactName: '', contactEmail: '', contactPhone: '', printKind: 'standard', discountKind: '', discountPercent: '', discountDollars: '', discountNote: '', shipping: 'runner', notes: '' })
+  const [billing, setBilling] = useState<Address>(() => ({ ...blankAddress(), ...(deal?.billingAddress || {}) }))
+  const [shipTo, setShipTo] = useState<Address>(() => ({ ...blankAddress(), ...(deal?.shipToAddress || {}) }))
+  const [lines, setLines] = useState<Line[]>(() => deal?.runs.length
+    ? deal.runs.map(r => ({ id: r.id, raceName: r.raceName, raceYear: String(r.raceYear), eventType: r.eventType || 'Marathon', quantity: String(r.quantity), productSize: r.productSize, frameType: r.frameType }))
+    : [blankLine()])
   const [busy, setBusy] = useState(false)
   useEffect(() => { apiFetch(`${API_BASE}/api/bulk/deals?options=1`).then(r => r.json()).then(setOpts).catch(() => {}) }, [])
   const [catalog, setCatalog] = useState<CatalogPrint[] | null>(null)
@@ -80,12 +86,13 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
     setBusy(true)
     try {
       const out = await dealApi<{ deal: Deal }>({
-        action: 'create', ...f,
+        action: deal ? 'update' : 'create', ...(deal ? { id: deal.id } : {}), ...f,
         discountKind: f.discountKind || null,
         billingAddress: { ...billing, company: billing.company || f.partnerName, name: f.contactName },
         shipToAddress: f.shipping === 'organization' ? { ...shipTo, company: f.partnerName, name: f.contactName } : null,
         lines,
       })
+      if (deal) { toast.success(deal.shopifyDraftId ? `${out.deal.number} saved. Update the invoice so it matches.` : `${out.deal.number} saved`); onCreated(out.deal); return }
       toast.success(`${out.deal.number} created with ${out.deal.runs.length} line${out.deal.runs.length === 1 ? '' : 's'}`)
       onCreated(out.deal)
     } catch (err) { toast.error((err as Error).message) } finally { setBusy(false) }
@@ -95,7 +102,7 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
   return (
     <div className="fixed inset-0 z-50 bg-off-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <form onSubmit={submit} onClick={e => e.stopPropagation()} className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-full overflow-y-auto p-6 space-y-4">
-        <div className="flex items-center justify-between"><h3 className="text-base font-semibold">New bulk order</h3><button type="button" onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button></div>
+        <div className="flex items-center justify-between"><h3 className="text-base font-semibold">{deal ? `Edit ${deal.number}` : 'New bulk order'}</h3><button type="button" onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button></div>
 
         {/* Who */}
         <div className="grid grid-cols-2 gap-2">
@@ -149,7 +156,7 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
           </label>
           {f.discountKind === 'percent' && <label className="block">{label('Percent')}<input value={f.discountPercent} onChange={e => setF(v => ({ ...v, discountPercent: e.target.value.replace(/\D/g, '').slice(0, 3) }))} placeholder="15" className={`${inputBase} w-full`} /></label>}
           {f.discountKind === 'amount' && <label className="block">{label('Dollars off')}<input value={f.discountDollars} onChange={e => setF(v => ({ ...v, discountDollars: e.target.value.replace(/[^\d.]/g, '') }))} placeholder="100" className={`${inputBase} w-full`} /></label>}
-          {f.discountKind && <label className="col-span-2 block">{label('Discount name on the invoice')}<input value={f.discountNote} onChange={set('discountNote')} placeholder="Nonprofit rate" className={`${inputBase} w-full`} /></label>}
+          {f.discountKind && <label className="col-span-2 block">{label('Discount note (internal, never on the invoice)')}<input value={f.discountNote} onChange={set('discountNote')} placeholder="Why we gave it" className={`${inputBase} w-full`} /><span className="block text-[11px] text-off-black/45 mt-1">The customer sees "Bulk discount" on the invoice.</span></label>}
         </div>}
 
         <div>
@@ -174,7 +181,7 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} className={btnGhost}>Cancel</button>
-          <button type="submit" disabled={busy} className={btnPrimary}>{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create bulk order'}</button>
+          <button type="submit" disabled={busy} className={btnPrimary}>{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : deal ? 'Save changes' : 'Create bulk order'}</button>
         </div>
       </form>
     </div>
@@ -182,11 +189,12 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
 }
 
 /** The deal a run belongs to: the agreed terms, its lines, and the Shopify invoice. */
-export function DealCard({ dealId, currentRunId, onOpenRun }: { dealId: string; currentRunId: string; onOpenRun: (runId: string) => void }) {
+export function DealCard({ dealId, currentRunId, onOpenRun, onChanged }: { dealId: string; currentRunId: string; onOpenRun: (runId: string) => void; onChanged?: () => void }) {
   const { isAdmin } = useAuth()
   const [deal, setDeal] = useState<Deal | null>(null)
   const [quote, setQuote] = useState<Quote | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -231,6 +239,10 @@ export function DealCard({ dealId, currentRunId, onOpenRun }: { dealId: string; 
           <div className="text-xs text-off-black/60 mt-0.5">
             {[deal.contactName, deal.contactEmail].filter(Boolean).join(' · ') || 'No contact yet'}
           </div>
+          {/* Changes until the invoice goes out; after that the customer has a price. */}
+          {!deal.invoiceSentAt && !deal.paidAt && (
+            <button onClick={() => setEditing(true)} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2"><Pencil className="w-3 h-3" /> Edit order</button>
+          )}
         </div>
         <div className="flex flex-wrap gap-1.5 text-xs">
           <span className="inline-flex items-center px-2 py-1 rounded border border-border-gray font-semibold">{deal.printKind === 'cobranded' ? 'Co-branded' : 'Standard prints'}</span>
@@ -292,6 +304,7 @@ export function DealCard({ dealId, currentRunId, onOpenRun }: { dealId: string; 
       {!isAdmin && <p className="text-xs text-off-black/50 border-t border-border-gray pt-3">{deal.paidAt ? `Paid${deal.shopifyOrderName ? ` · ${deal.shopifyOrderName}` : ''}` : 'Matt handles the invoice'}</p>}
       {isAdmin && deal.invoiceSentAt && !deal.paidAt && <p className="text-[11px] text-off-black/45">Invoice emailed {new Date(deal.invoiceSentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. It turns paid here on its own once they pay.</p>}
       {deal.notes && <p className="text-xs text-off-black/60">{deal.notes}</p>}
+      {editing && <DealModal deal={deal} onClose={() => setEditing(false)} onCreated={() => { setEditing(false); load(); onChanged?.() }} />}
     </div>
   )
 }
