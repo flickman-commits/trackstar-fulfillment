@@ -14,6 +14,11 @@
  *             2026); before that, designCompletedAt or researchedAt, which the
  *             tool stamped at completion.
  * The two are reported apart: a custom design is a different job.
+ *
+ * Time spent waiting on the customer is not ours either: while a Support
+ * conversation with them was waiting on their reply (from one of our messages
+ * to their next), the clock is paused. Measured 2026-10-22, it moved the week
+ * from 57% to 58%: the misses are volume, not customers.
  */
 import prisma from '../../db.js'
 
@@ -81,8 +86,9 @@ async function computeFulfillmentTimeFresh({ since, until }) {
         { trackstarOrderType: 'custom', OR: [{ designCompletedAt: { gte: floor } }, { researchedAt: { gte: floor } }] },
       ],
     },
-    select: { orderNumber: true, trackstarOrderType: true, createdAt: true, researchedAt: true, designCompletedAt: true, raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true },
+    select: { orderNumber: true, trackstarOrderType: true, createdAt: true, researchedAt: true, designCompletedAt: true, raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true, customerEmail: true },
   })
+  const waits = await customerWaits(orders.map(o => o.customerEmail))
   const completedAt = new Map()
   for (const e of events) { const n = e.detail?.orderNumber; if (n && !completedAt.has(n)) completedAt.set(n, e.createdAt) }
   const raceDate = new Map(races.map(r => [`${r.raceName}|${r.year}`, r.raceDate]))
@@ -97,8 +103,8 @@ async function computeFulfillmentTimeFresh({ since, until }) {
     const rd = raceDate.get(`${o.raceNameOverride ?? o.raceName}|${o.yearOverride ?? o.raceYear}`) || null
     const preRace = Boolean(rd && rd > o.createdAt)
     const start = preRace ? rd : o.createdAt
-    const hours = (done - start) / HOUR
-    if (hours < 0) { leftOut[type].doneBeforeRace++; continue }
+    if (done - start < 0) { leftOut[type].doneBeforeRace++; continue }
+    const hours = (done - start - waitedWithin(waits, o.customerEmail, start, done)) / HOUR
     rows[type].push({ hours, done, preRace })
   }
 
@@ -142,6 +148,39 @@ async function computeFulfillmentTimeFresh({ since, until }) {
   out.openStandard = { workable, pastGoal }
   out.goalHours = GOAL_HOURS
   return out
+}
+
+/**
+ * The stretches each customer had our question and we had no answer: from a
+ * message we sent in Support to their next one (or now). Keyed by the
+ * lower-cased email.
+ */
+async function customerWaits(emails) {
+  const list = [...new Set(emails.map(e => String(e || '').trim().toLowerCase()).filter(Boolean))]
+  const out = new Map()
+  if (!list.length) return out
+  const msgs = await prisma.$queryRaw`
+    SELECT lower(t."customerEmail") AS email, m.direction, m."sentAt"
+    FROM "SupportMessage" m JOIN "SupportThread" t ON t.id = m."threadId"
+    WHERE lower(t."customerEmail") = ANY(${list}) AND t."mergedIntoId" IS NULL
+    ORDER BY m."sentAt" ASC`
+  for (const m of msgs) {
+    const spans = out.get(m.email) || []
+    out.set(m.email, spans)
+    const open = spans.find(w => !w.to)
+    if (m.direction === 'out' && !open) spans.push({ from: m.sentAt, to: null })
+    if (m.direction === 'in' && open) open.to = m.sentAt
+  }
+  return out
+}
+
+/** Milliseconds between start and end that the customer spent with our question unanswered. */
+function waitedWithin(waits, email, start, end) {
+  let ms = 0
+  for (const w of waits.get(String(email || '').trim().toLowerCase()) || []) {
+    ms += Math.max(0, Math.min(end.getTime(), (w.to || end).getTime()) - Math.max(start.getTime(), w.from.getTime()))
+  }
+  return ms
 }
 
 /** Midnight today in New York, as a Date. The team's day, whatever the server's zone. */
