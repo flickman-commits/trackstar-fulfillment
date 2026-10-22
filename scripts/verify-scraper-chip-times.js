@@ -35,7 +35,10 @@ async function main() {
     process.stdout.write(`  ${label.padEnd(60)} ... `)
     try {
       const scraper = getScraperForRace(fx.race, fx.year)
-      const result = await scraper.searchRunner(fx.runner)
+      // lookup: 'bib' tests a runner whose name is shared with someone else at
+      // the race (that name search is rightly ambiguous); the bib is how a
+      // person settles it, so the time and pace are checked through that path.
+      const result = fx.lookup === 'bib' ? await scraper.searchRunnerByBib(fx.expectedBib) : await scraper.searchRunner(fx.runner)
       const got = normalizeTime(result.officialTime)
       const want = normalizeTime(fx.expectedChipTime)
       const gotPace = normalizePace(result.officialPace)

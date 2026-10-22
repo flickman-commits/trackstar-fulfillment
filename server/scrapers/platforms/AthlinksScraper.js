@@ -73,8 +73,15 @@ export class AthlinksScraper extends BaseScraper {
   async _search(term) {
     const url = `${SEARCH_API}/event/${this.eventId}/results/search?from=0&limit=50&term=${encodeURIComponent(term)}`
     console.log(`[${this.tag}] GET ${url}`)
-    const got = await this._fetchJson(url)
+    let got = await this._fetchJson(url)
     if (got.error) return got
+    // An empty answer is asked once more: the search now and then returns
+    // nothing for a runner it finds a second later.
+    if (!Array.isArray(got.data) || !got.data.length) {
+      await new Promise(r => setTimeout(r, 700))
+      got = await this._fetchJson(url)
+      if (got.error) return got
+    }
     return { entries: Array.isArray(got.data) ? got.data : [] }
   }
 
@@ -85,10 +92,15 @@ export class AthlinksScraper extends BaseScraper {
    */
   async _courseNames() {
     if (this._courses) return this._courses
-    const got = await this._fetchJson(`${RESULTS_API}/event/${this.eventId}?eventCourseId=&divisionId=&intervalId=&from=0&limit=1`)
+    // Asked again when it comes back empty, and an empty list is never kept:
+    // without course names every runner would look like an unsold distance.
     const map = new Map()
-    for (const c of Array.isArray(got.data) ? got.data : []) if (c.eventCourseId) map.set(c.eventCourseId, c.eventCourseName || '')
-    this._courses = map
+    for (let attempt = 0; attempt < 3 && !map.size; attempt++) {
+      if (attempt) await new Promise(r => setTimeout(r, 700))
+      const got = await this._fetchJson(`${RESULTS_API}/event/${this.eventId}?eventCourseId=&divisionId=&intervalId=&from=0&limit=1`)
+      for (const c of Array.isArray(got.data) ? got.data : []) if (c.eventCourseId) map.set(c.eventCourseId, c.eventCourseName || '')
+    }
+    if (map.size) this._courses = map
     return map
   }
 
@@ -98,16 +110,19 @@ export class AthlinksScraper extends BaseScraper {
     // Athlinks sometimes answers with the entry half filled (no intervals, or
     // blank names) and the same request a moment later is complete. Ask up to
     // three times before treating a finisher as having no time.
+    // It also sometimes gives the time already rounded to the second
+    // (18307000 where it usually says 18306600, which prints 5:05:06): a
+    // whole-second time is asked once more and the precise one kept.
     let d = null, ms = 0
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt) await new Promise(r => setTimeout(r, 700))
       const got = await this._fetchJson(url)
       if (got.error || !got.data) continue
-      d = got.data
-      const intervals = Array.isArray(d.intervals) ? d.intervals : []
+      const intervals = Array.isArray(got.data.intervals) ? got.data.intervals : []
       const full = intervals.find(i => i.intervalFull) || intervals[intervals.length - 1] || null
-      ms = full?.chipTime?.timeInMillis || 0
-      if (ms > 0 || d.racerHasFinished === false) break
+      const t = full?.chipTime?.timeInMillis || 0
+      if (!d || (t > 0 && (!ms || ms % 1000 === 0))) { d = got.data; if (t > 0) ms = t }
+      if ((ms > 0 && ms % 1000 !== 0) || (ms > 0 && attempt >= 1) || d.racerHasFinished === false) break
     }
     if (!d) return null
     return {
@@ -162,19 +177,29 @@ export class AthlinksScraper extends BaseScraper {
       console.log(`[${this.tag}] ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} returned`)
 
       const matches = this.filterNameMatches(runnerName, entries, e => e.displayName || '')
-      const results = (await Promise.all(matches.slice(0, MAX_ENTRIES).map(e => this._entry(e)))).filter(Boolean)
-
-      // Marathon before half (eventSearchOrder); a course the race does not sell never counts.
-      for (const distKey of this.config.eventSearchOrder || ['marathon', 'half']) {
-        const here = results.filter(r => this._distKeyOf(r.courseName) === distKey)
-        if (!here.length) continue
-        const timed = here.filter(r => r.chipMs)
-        if (timed.length > 1) {
-          return this.ambiguousResult(timed.map(r => ({ name: r.displayName, bib: r.bib, time: this.formatTime(msToTime(r.chipMs)), eventType: this.config.eventLabels?.[distKey] || distKey })))
-        }
-        if (timed.length === 1) return this._found(timed[0], distKey)
-        console.log(`[${this.tag}] ${here[0].displayName} is in ${here[0].courseName} but has no finish time`)
+      // More name matches than we fetch: never guess among them, let a person pick.
+      if (matches.length > MAX_ENTRIES) {
+        return this.ambiguousResult(matches.slice(0, 15).map(e => ({ name: e.displayName, bib: e.bib, time: null })))
       }
+      const results = (await Promise.all(matches.map(e => this._entry(e)))).filter(Boolean)
+
+      // Every finisher in a course the race sells, deduped by bib. One bib is
+      // the runner; several bibs are different people sharing the name, and
+      // which event they ran never settles it (Denver Colfax 2026 had a Diego
+      // Garcia in the half and two in the marathon). A person picks.
+      const people = new Map()
+      for (const r of results) {
+        const distKey = this._distKeyOf(r.courseName)
+        if (!distKey || !r.chipMs || people.has(String(r.bib))) continue
+        people.set(String(r.bib), { r, distKey })
+      }
+      const order = this.config.eventSearchOrder || ['marathon', 'half']
+      const found = [...people.values()].sort((a, b) => order.indexOf(a.distKey) - order.indexOf(b.distKey))
+      if (found.length === 1) return this._found(found[0].r, found[0].distKey)
+      if (found.length > 1) {
+        return this.ambiguousResult(found.map(({ r, distKey }) => ({ name: r.displayName, bib: r.bib, time: this.formatTime(msToTime(r.chipMs)), eventType: this.config.eventLabels?.[distKey] || distKey })))
+      }
+      for (const r of results) if (this._distKeyOf(r.courseName)) console.log(`[${this.tag}] ${r.displayName} is in ${r.courseName} but has no finish time`)
 
       const candidates = entries.slice(0, 15).map(e => ({ name: e.displayName, bib: e.bib, time: null }))
       console.log(`[${this.tag}] No matching runner in a sold course. Surfacing ${candidates.length} candidates.`)

@@ -270,7 +270,8 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '3:08:30',
     expectedChipPace: '7:12',
     expectedBib: '1895',
-    notes: 'Detroit 2024 Marathon (event 1093379). 11310s ÷ 26.2 = 7:11.7 → 7:12. Athlinks prints 07:11 because it paces against the exact 42195m (26.2188mi); ours is correct for the 26.2 in the config, so do NOT "fix" this to 7:11. Same runner also has an International Half entry (2:36:47, bib 12158) - this fixture confirms eventSearchOrder picks the marathon.',
+    lookup: 'bib',
+    notes: 'Detroit 2024 Marathon (event 1093379). 11310s ÷ 26.2 = 7:11.7 → 7:12. Athlinks prints 07:11 because it paces against the exact 42195m (26.2188mi); ours is correct for the 26.2 in the config, so do NOT "fix" this to 7:11. A different David Wilson ran the International Half (2:36:47, bib 12158; both start the same morning), so the name search is rightly ambiguous and this fixture checks the time through the bib.',
   },
   {
     platform: 'athlinks',

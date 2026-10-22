@@ -111,42 +111,27 @@ export class XacteScraper extends BaseScraper {
         })))
       }
 
-      // If multiple matches, try to narrow by event search order
+      // Several matches. The search lists a runner once per row it has (the
+      // same bib can come back twice); different bibs are different people,
+      // and a shared name is never settled by which event they ran: Denver
+      // Colfax 2026 has a Diego Garcia in the half and two in the marathon,
+      // and the half one was printed for the customer whose Diego ran the
+      // marathon. A person picks.
       if (matches.length > 1) {
-        const eventSearchOrder = this.config.eventSearchOrder || ['marathon']
+        const byBib = new Map()
+        for (const m of matches) if (!byBib.has(String(m.bib))) byBib.set(String(m.bib), m)
+        const people = [...byBib.values()]
+        if (people.length === 1) return this._extractRunnerData(people[0])
+        const order = this.config.eventSearchOrder || ['marathon']
         const subEvents = this.config.subEvents?.[this.year] || {}
-
-        for (const eventKey of eventSearchOrder) {
-          const subEvent = subEvents[eventKey]
-          if (!subEvent) continue
-
-          const filtered = matches.filter(m => m.subeventId === subEvent.id)
-          if (filtered.length === 1) {
-            console.log(`[${this.tag}] Narrowed to single match via ${eventKey} subevent`)
-            return this._extractRunnerData(filtered[0])
-          }
-        }
-
-        // Still multiple — check if they're truly different people or same person in different events
-        const uniqueNames = new Set(matches.map(m => `${m.firstname} ${m.lastname}`.toLowerCase()))
-        if (uniqueNames.size === 1) {
-          // Same person, different events — pick by search order
-          for (const eventKey of (this.config.eventSearchOrder || ['marathon'])) {
-            const subEvent = (this.config.subEvents?.[this.year] || {})[eventKey]
-            if (!subEvent) continue
-            const match = matches.find(m => m.subeventId === subEvent.id)
-            if (match) return this._extractRunnerData(match)
-          }
-          // Fallback: pick the first one
-          return this._extractRunnerData(matches[0])
-        }
-
-        // Truly ambiguous — multiple different people
-        return this.ambiguousResult(matches.map(m => ({
+        const rank = m => { const i = order.findIndex(k => subEvents[k]?.id === m.subeventId); return i < 0 ? order.length : i }
+        people.sort((a, b) => rank(a) - rank(b))
+        return this.ambiguousResult(people.map(m => ({
           name: `${m.firstname} ${m.lastname}`,
           bib: m.bib,
           time: this._msToTime(m.chiptime),
-          event: m.subevent
+          event: m.subevent,
+          eventType: this._getEventType(m),
         })))
       }
 
