@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import PrintPicker from '@/components/PrintPicker'
-import { Loader2, AlertTriangle, ChevronRight, ChevronLeft, ChevronDown, ClipboardList, CheckCircle2, Truck, Home, ExternalLink } from 'lucide-react'
+import { Loader2, AlertTriangle, ChevronRight, ChevronLeft, ChevronDown, ClipboardList, CheckCircle2, Truck, Home, ExternalLink, Printer } from 'lucide-react'
 import { TRYBE_URL } from '@/lib/creatorLinks'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -48,6 +48,12 @@ interface PortalCreator {
   onboardedAt: string | null
 }
 
+/** Where their sample is, read live from Artelo and Shopify (server/domain/creators/portal.js). */
+interface PortalSampleStatus {
+  stage: 'approved' | 'in_production' | 'shipped' | 'delivered'
+  tracking: { url: string | null; carrier: string | null; number: string | null; shippedAt: string | null; deliveredAt: string | null; estimatedAt: string | null } | null
+}
+
 interface PortalCreatorSampleOrder {
   id: string
   orderNumber: string
@@ -71,6 +77,7 @@ interface PortalData {
   creator: PortalCreator
   briefs: PortalBrief[]
   sampleOrder: PortalCreatorSampleOrder | null
+  sampleStatus?: PortalSampleStatus | null
   races: RaceOption[]
   /** The store's prints, the same list every picker uses. */
   catalog?: CatalogPrint[]
@@ -608,7 +615,7 @@ function StepShipping({ draft, setDraft }: { draft: OnboardingDraft; setDraft: (
 // Post-onboarding Dashboard
 // ---------------------------------------------------------------------------
 function CreatorDashboard({ data }: { data: PortalData }) {
-  const { creator, briefs, sampleOrder } = data
+  const { creator, briefs, sampleOrder, sampleStatus } = data
   const winningAds = data.winningAds || []
   const firstName = creator.name?.split(' ')[0] || 'there'
 
@@ -650,16 +657,25 @@ function CreatorDashboard({ data }: { data: PortalData }) {
         {/* Sample tracker — Domino's-style */}
         <div className="bg-white border border-border-gray rounded-md p-5 mb-5">
           <h2 className="text-sm font-semibold text-off-black mb-4">Your Application</h2>
-          <SampleTracker order={sampleOrder} onboardedAt={creator.onboardedAt} />
-          {sampleOrder?.trackingNumber && (
-            <div className="mt-4 pt-4 border-t border-border-gray flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-              <span className="text-off-black/50 uppercase tracking-wider font-semibold">Tracking</span>
-              {sampleOrder.trackingCarrier && (
-                <span className="text-off-black/70">{sampleOrder.trackingCarrier}</span>
-              )}
-              <span className="font-mono text-off-black">{sampleOrder.trackingNumber}</span>
-            </div>
-          )}
+          <SampleTracker order={sampleOrder} status={sampleStatus || null} onboardedAt={creator.onboardedAt} />
+          {(() => {
+            // Live tracking once it ships; else the number we stored by hand, if any.
+            const t = sampleStatus?.tracking
+            const carrier = t?.carrier || sampleOrder?.trackingCarrier || null
+            const number = t?.number || sampleOrder?.trackingNumber || null
+            if (!number && !t?.url) return null
+            const when = t?.deliveredAt ? `Delivered ${fmtDay(t.deliveredAt)}` : t?.estimatedAt ? `Expected ${fmtDay(t.estimatedAt)}` : t?.shippedAt ? `Shipped ${fmtDay(t.shippedAt)}` : null
+            return (
+              <div className="mt-4 pt-4 border-t border-border-gray flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="text-off-black/50 uppercase tracking-wider font-semibold">Tracking</span>
+                {carrier && <span className="text-off-black/70">{carrier}</span>}
+                {t?.url
+                  ? <a href={t.url} target="_blank" rel="noopener noreferrer" className="font-mono text-[#4F2DD4] hover:underline break-all">{number || 'Track your package'}</a>
+                  : <span className="font-mono text-off-black break-all">{number}</span>}
+                {when && <span className="text-off-black/50">{when}</span>}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Briefs */}
@@ -754,22 +770,31 @@ function CreatorDashboard({ data }: { data: PortalData }) {
 //   Approved   → admin clicked Approve → fulfillment order exists
 //   Shipped    → admin entered a tracking number
 //   Delivered  → not wired yet (carrier API or manual, future)
+function fmtDay(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 function SampleTracker({
   order,
+  status,
   onboardedAt,
 }: {
   order: PortalCreatorSampleOrder | null
+  status: PortalSampleStatus | null
   onboardedAt: string | null
 }) {
   const stages = [
-    { key: 'applied',   label: 'Applied',   Icon: ClipboardList },
-    { key: 'approved',  label: 'Approved',  Icon: CheckCircle2 },
-    { key: 'shipped',   label: 'Shipped',   Icon: Truck },
-    { key: 'delivered', label: 'Delivered', Icon: Home },
+    { key: 'applied',       label: 'Applied',       Icon: ClipboardList },
+    { key: 'approved',      label: 'Approved',      Icon: CheckCircle2 },
+    { key: 'in_production', label: 'In production', Icon: Printer },
+    { key: 'shipped',       label: 'Shipped',       Icon: Truck },
+    { key: 'delivered',     label: 'Delivered',     Icon: Home },
   ] as const
 
   const stageIndex = (() => {
-    if (order?.trackingNumber) return 2 // shipped
+    // Live from Artelo and Shopify when we have it; else what the order row says.
+    if (status) return stages.findIndex(s => s.key === status.stage)
+    if (order?.trackingNumber) return 3 // shipped
     if (order) return 1                 // approved
     if (onboardedAt) return 0           // requested
     return -1                           // pre-onboarding

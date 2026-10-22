@@ -12,6 +12,7 @@ import { linkCreatorSamples } from './creatorSample.js'
 import { listWinningAds } from './winningAds.js'
 import { publicPrintCatalog } from '../catalog/printCatalog.js'
 import { postSlack, slackText } from '../../lib/slack.js'
+import { productionStatus } from '../orders/productionStatus.js'
 
 /** A mistake the applicant can fix; the message is safe to show them. */
 export class PortalError extends Error {
@@ -45,6 +46,32 @@ export async function createPublicInvite() {
   return created.inviteToken
 }
 
+/**
+ * Where their sample is, in the creator's words: approved, in production,
+ * shipped or delivered, with the tracking link once it ships. Read live from
+ * Artelo and Shopify (orders/productionStatus.js, the same view the team
+ * has). Only the stage and the tracking leave here; if either service is down
+ * the portal falls back to what it knew before.
+ */
+async function sampleStatus(orderId) {
+  try {
+    const st = await productionStatus(orderId)
+    if (!st) return null
+    const stage = st.stage === 'Delivered' ? 'delivered'
+      : /^(Shipped|In transit|Out for delivery)$/.test(st.stage || '') ? 'shipped'
+      : /^In production|^Sent to Artelo/.test(st.stage || '') ? 'in_production'
+      : 'approved'
+    const t = st.tracking.find(x => x.url) || st.tracking[0] || null
+    return {
+      stage,
+      tracking: t ? { url: t.url, carrier: t.company, number: t.number, shippedAt: t.shippedAt, deliveredAt: t.deliveredAt, estimatedAt: t.estimatedAt } : null,
+    }
+  } catch (err) {
+    console.warn(`[creators.portal] sample status: ${err.message}`)
+    return null
+  }
+}
+
 /** What the portal renders: their own profile, briefs, sample, and the pickers. */
 export async function portalData(token) {
   const pending = await prisma.creator.findUnique({ where: { inviteToken: token }, select: { id: true, sampleOrderId: true, sampleShopifyOrderIds: true } })
@@ -69,6 +96,7 @@ export async function portalData(token) {
     creator: Object.fromEntries([...PUBLIC_FIELDS, 'id', 'status', 'onboardedAt'].map(k => [k, creator[k]])),
     briefs,
     sampleOrder: creator.sampleOrder,
+    sampleStatus: creator.sampleOrder ? await sampleStatus(creator.sampleOrder.id) : null,
     races,
     catalog: await publicPrintCatalog().catch(() => []),
     winningAds: await listWinningAds(),
