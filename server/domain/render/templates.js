@@ -5,6 +5,7 @@
  * Settings panel shows the same list with volume and worker presence.
  */
 import prisma from '../../db.js'
+import { storage } from '../../lib/storage.js'
 
 const ONLINE_MS = 90_000
 export async function onlineWorkers() {
@@ -27,10 +28,58 @@ export async function listTemplates() {
   return prisma.printTemplate.findMany({ orderBy: [{ raceName: 'asc' }, { edition: 'asc' }] })
 }
 
-/** What the worker needs to render and to check: enabled templates with their files and rules. */
+/**
+ * What the worker needs to render and to check: enabled templates with their
+ * files and rules. An uploaded file (storagePath) comes with a download link
+ * and its version; the worker keeps a copy and fetches it again when the
+ * version changes.
+ */
 export async function templatesForWorker() {
   const rows = await prisma.printTemplate.findMany({ where: { enabled: true }, orderBy: { key: 'asc' } })
-  return rows.map(t => ({ key: t.key, file: t.file, rules: t.rules || {}, lastCheckMtime: t.lastCheckMtime, lastCheckOk: t.lastCheckOk }))
+  return Promise.all(rows.map(async t => ({
+    key: t.key, file: t.file, rules: t.rules || {}, lastCheckMtime: t.lastCheckMtime, lastCheckOk: t.lastCheckOk,
+    ...(t.storagePath ? { url: await templateDownloadUrl(t.storagePath), version: t.fileVersion } : {}),
+  })))
+}
+
+// Production files uploaded in the tool: private, read by the worker through a signed link.
+export const TEMPLATE_BUCKET = 'print-templates'
+
+async function templateDownloadUrl(path) {
+  const { data, error } = await storage().storage.from(TEMPLATE_BUCKET).createSignedUrl(path, 3600)
+  if (error) return null
+  return data.signedUrl
+}
+
+async function ensureTemplateBucket() {
+  const sb = storage().storage
+  const { data } = await sb.getBucket(TEMPLATE_BUCKET)
+  if (!data) await sb.createBucket(TEMPLATE_BUCKET, { public: false })
+}
+
+/**
+ * Where a co-branded line's production file goes: a signed upload link into
+ * the private bucket. The template's key is the race and the line's run
+ * number (e.g. "Philadelphia Marathon / BULK-0012"), which spec.js resolves
+ * for that run's runners.
+ */
+export async function uploadTemplateUrl(runNumber, fileName) {
+  if (!/\.ai$/i.test(String(fileName || ''))) throw Object.assign(new Error('Upload the Illustrator file (.ai)'), { expose: true, status: 400 })
+  await ensureTemplateBucket()
+  const path = `cobranded/${String(runNumber).replace(/[^A-Za-z0-9-]/g, '')}/${Date.now()}.ai`
+  const { data, error } = await storage().storage.from(TEMPLATE_BUCKET).createSignedUploadUrl(path)
+  if (error) throw new Error(error.message)
+  return { path, uploadUrl: data.signedUrl }
+}
+
+/** The uploaded file is in place: point the run's template at it and have it checked again. */
+export async function saveUploadedTemplate({ raceName, runNumber, path, notes }) {
+  const key = templateKey(raceName, runNumber)
+  const data = {
+    raceName, edition: runNumber, file: `Uploaded / ${runNumber}.ai`, storagePath: String(path), fileVersion: new Date().toISOString(),
+    lastCheckAt: null, lastCheckOk: null, lastCheckReport: null, lastCheckMtime: null, ...(notes ? { notes } : {}),
+  }
+  return prisma.printTemplate.upsert({ where: { key }, update: { ...data, enabled: true }, create: { key, ...data, enabled: true } })
 }
 
 // A Mac that checked in this recently still counts for queueing: it is

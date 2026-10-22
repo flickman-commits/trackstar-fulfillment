@@ -1114,6 +1114,11 @@ model PrintTemplate {
   raceName        String
   edition         String?
   file            String
+  // A file uploaded in the tool (a co-branded bulk design) instead of one in
+  // the Drive Races folder: its path in the private print-templates bucket,
+  // and when it was uploaded. The worker downloads it (render-worker.mjs).
+  storagePath     String?
+  fileVersion     String?
   // { artboard, artboardExclude, photoArtboard }: how to pick the artboard, see worker/README.md
   rules           Json?
   enabled         Boolean   @default(true)

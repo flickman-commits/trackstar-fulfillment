@@ -16,6 +16,7 @@
  * runs paid by the deal number (never by partner name). Prices are Shopify's,
  * read live; money here is integer cents (CLAUDE.md).
  */
+import { templateKey, uploadTemplateUrl, saveUploadedTemplate } from '../render/templates.js'
 import prisma from '../../db.js'
 import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { getCanonicalRaceName } from '../../scrapers/index.js'
@@ -159,7 +160,33 @@ export async function loadDeal(id) {
     include: { runs: { orderBy: { number: 'asc' }, select: { id: true, number: true, raceName: true, raceYear: true, eventType: true, quantity: true, productSize: true, frameType: true, paidAt: true, status: true, _count: { select: { runners: true } } } } },
   })
   if (!deal) throw new DealError('Deal not found', 404)
-  return deal
+  if (deal.printKind !== 'cobranded') return deal
+  // Each co-branded line's own production file and its check (render/templates.js).
+  const keys = deal.runs.map(r => templateKey(r.raceName, r.number))
+  const templates = await prisma.printTemplate.findMany({ where: { key: { in: keys } }, select: { key: true, fileVersion: true, lastCheckAt: true, lastCheckOk: true, lastCheckReport: true } })
+  return {
+    ...deal,
+    runs: deal.runs.map(r => {
+      const t = templates.find(x => x.key === templateKey(r.raceName, r.number))
+      return { ...r, template: t ? { uploadedAt: t.fileVersion, checkedAt: t.lastCheckAt, ok: t.lastCheckOk, problems: t.lastCheckReport?.problems || [] } : null }
+    }),
+  }
+}
+
+/** A co-branded line's production file: a signed upload link, then record it as the line's template. */
+export async function lineTemplateUpload(runId, fileName) {
+  const run = await prisma.bulkOrder.findUnique({ where: { id: String(runId || '') }, select: { number: true, deal: { select: { printKind: true } } } })
+  if (!run) throw new DealError('Line not found', 404)
+  if (run.deal?.printKind !== 'cobranded') throw new DealError('Only a co-branded line takes its own production file')
+  if (!/\.ai$/i.test(String(fileName || ''))) throw new DealError('Upload the Illustrator file (.ai)')
+  return uploadTemplateUrl(run.number, fileName)
+}
+
+export async function lineTemplateSaved(runId, path) {
+  const run = await prisma.bulkOrder.findUnique({ where: { id: String(runId || '') }, select: { number: true, raceName: true } })
+  if (!run) throw new DealError('Line not found', 404)
+  if (!String(path || '').startsWith(`cobranded/${run.number}/`)) throw new DealError('That upload is not for this line')
+  return saveUploadedTemplate({ raceName: run.raceName, runNumber: run.number, path })
 }
 
 /** The race's storefront product, and the variant for a size and frame. */

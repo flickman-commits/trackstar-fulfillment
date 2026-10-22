@@ -104,7 +104,7 @@ export async function claimNext(workerId) {
     if (claimed.count === 1) {
       const t = await prisma.printTemplate.findUnique({ where: { key: String(job.spec?.template || job.spec?.race) } })
       const fresh = await prisma.renderJob.findUnique({ where: { id: job.id } })
-      return { ...fresh, template: t ? { key: t.key, file: t.file, rules: t.rules || {} } : null }
+      return { ...fresh, template: t ? { key: t.key, file: t.file, rules: t.rules || {}, ...(t.storagePath ? { uploaded: true, version: t.fileVersion } : {}) } : null }
     }
   }
   return null
@@ -208,7 +208,8 @@ export async function autoQueueRenders({ limit = 25 } = {}) {
       // standard prints (deals.js): those render like shop orders.
       OR: [
         { trackstarOrderType: 'standard', createdAt: { gte: from } },
-        { trackstarOrderType: 'bulk', bulkOrder: { paidAt: { not: null }, deal: { printKind: 'standard' } } },
+        // Co-branded lines too: spec.js only lets one through once its uploaded file is checked.
+        { trackstarOrderType: 'bulk', bulkOrder: { paidAt: { not: null }, deal: { printKind: { in: ['standard', 'cobranded'] } } } },
       ],
       status: { notIn: ['completed', 'flagged'] },
       raceName: { in: [...new Set(templates.map(t => t.split(' / ')[0]))] },

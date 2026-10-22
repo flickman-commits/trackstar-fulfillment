@@ -17,7 +17,7 @@ import { requireAdminRole, recordAudit } from '../_lib/users.js'
 import { publicPrintCatalog } from '../../server/domain/catalog/printCatalog.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
 import { FRAME_OPTIONS, SIZE_OPTIONS } from '../../server/domain/bulk/bulkOrders.js'
-import { EVENT_OPTIONS, PRINT_KINDS, createDeal, updateDeal, loadDeal, quoteDeal, buildInvoice, sendInvoice } from '../../server/domain/bulk/deals.js'
+import { EVENT_OPTIONS, PRINT_KINDS, createDeal, updateDeal, loadDeal, quoteDeal, buildInvoice, sendInvoice, lineTemplateUpload, lineTemplateSaved } from '../../server/domain/bulk/deals.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -51,6 +51,15 @@ export default async function handler(req, res) {
         const deal = shown(await updateDeal(body.id, input(body)))
         await recordAudit({ action: 'bulk.deal_update', summary: `Edited bulk deal ${deal.number}`, detail: { dealId: deal.id }, actor })
         return res.status(200).json({ deal })
+      }
+      // A co-branded line's production file, for the render worker (render/templates.js).
+      case 'template-upload': {
+        return res.status(200).json(await lineTemplateUpload(body.runId, body.fileName))
+      }
+      case 'template-saved': {
+        const t = await lineTemplateSaved(body.runId, body.path)
+        await recordAudit({ action: 'bulk.template_upload', summary: `Uploaded the co-branded production file for ${t.edition}`, detail: { key: t.key }, actor })
+        return res.status(200).json({ ok: true, key: t.key })
       }
       case 'invoice': {
         const admin = await requireAdminRole(req, res, actor)

@@ -26,6 +26,12 @@
  *   WORKER_NAME       how this machine shows up in the tool (default: the hostname)
  *
  * Nothing here deletes or moves anything in RACES_DIR.
+ *
+ * A template uploaded in the tool (a co-branded bulk design) is not in
+ * RACES_DIR: it comes with a download link and a version, and is kept in
+ * worker/template-cache, fetched again when the version changes. Its copy's
+ * modification time is set to the upload time, so the check runs once per
+ * upload, like a Drive file that changed.
  */
 import fs from 'node:fs'
 import os from 'node:os'
@@ -55,10 +61,12 @@ const CHECK_BATCH = 12
 const SCRIPT = path.join(HERE, 'illustrator', 'render.jsx')
 const CHECK_SCRIPT = path.join(HERE, 'illustrator', 'check.jsx')
 const WORK = path.join(os.tmpdir(), 'trackstar-render')
+const CACHE = path.join(HERE, 'template-cache')
 
 if (!URL_BASE || !KEY || !RACES_DIR) { console.error('Set FULFILLMENT_URL, RENDER_API_KEY and RACES_DIR in worker/.env'); process.exit(1) }
 if (!fs.existsSync(RACES_DIR)) { console.error(`RACES_DIR does not exist: ${RACES_DIR}`); process.exit(1) }
 fs.mkdirSync(WORK, { recursive: true })
+fs.mkdirSync(CACHE, { recursive: true })
 
 function loadEnv(file) {
   if (!fs.existsSync(file)) return
@@ -80,11 +88,34 @@ async function api(action, body) {
   return data
 }
 
+/** Where a template's file is on this machine: the Races folder, or the cache for an uploaded one. */
+function localFile(t) {
+  if (t.url || t.uploaded) return path.join(CACHE, `${t.key.replace(/[^A-Za-z0-9-]+/g, '_')}.ai`)
+  return path.join(RACES_DIR, t.file)
+}
+
+/** Fetch an uploaded template when this machine has no copy of its current version. */
+async function syncUploaded(templates) {
+  for (const t of templates) {
+    if (!t.url || !t.version) continue
+    const file = localFile(t)
+    const at = new Date(t.version)
+    try { if (fs.statSync(file).mtime.getTime() === at.getTime()) continue } catch { /* not here yet */ }
+    try {
+      const res = await fetch(t.url)
+      if (!res.ok) throw new Error(`download failed (${res.status})`)
+      fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()))
+      fs.utimesSync(file, at, at)
+      log(`Fetched the uploaded template ${t.key}`)
+    } catch (e) { log(`Could not fetch ${t.key}: ${e.message}`) }
+  }
+}
+
 /** What is on this disk for each template the tool knows about. */
 function fileState(templates) {
   const files = {}
   for (const t of templates) {
-    const p = path.join(RACES_DIR, t.file)
+    const p = localFile(t)
     try { const st = fs.statSync(p); files[t.key] = { present: true, mtime: st.mtime.toISOString() } }
     catch { files[t.key] = { present: false, mtime: null } }
   }
@@ -116,7 +147,7 @@ async function checkChanged(templates, files) {
   fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true })
   const input = due.map((t, i) => {
     const copy = path.join(dir, `${i}.ai`)
-    fs.copyFileSync(path.join(RACES_DIR, t.file), copy)
+    fs.copyFileSync(localFile(t), copy)
     return { key: t.key, path: copy, race: t.key.split(' / ')[0], artboard: t.rules?.artboard || null, artboardExclude: t.rules?.artboardExclude || null, photoArtboard: t.rules?.photoArtboard || null }
   })
   log(`Checking ${due.length} template${due.length > 1 ? 's' : ''}: ${due.map(t => t.key).join(', ')}`)
@@ -136,6 +167,7 @@ async function checkChanged(templates, files) {
 /** Fetch templates, check what changed, tell the tool what this machine can render. */
 async function heartbeat() {
   const { templates } = await api('templates', {})
+  await syncUploaded(templates)
   const files = fileState(templates)
   try { await checkChanged(templates, files) } catch (e) { log(`Template check failed: ${e.message}`) }
   const renderable = templates.filter(t => files[t.key]?.present && t.lastCheckOk).map(t => t.key)
@@ -157,7 +189,7 @@ async function upload(url, file, contentType) {
 async function render(job) {
   const { spec, template: tpl } = job
   if (!tpl) throw new Error(`No template for ${spec.template || spec.race}`)
-  const src = path.join(RACES_DIR, tpl.file)
+  const src = localFile(tpl)
   const dir = path.join(WORK, job.id)
   fs.rmSync(dir, { recursive: true, force: true })
   fs.mkdirSync(dir, { recursive: true })

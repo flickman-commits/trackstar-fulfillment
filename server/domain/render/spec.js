@@ -22,6 +22,10 @@ export const SIZES = ['8x10', '12x18', '16x24']
  * rendered from its own template, so it is its own template key:
  * "Chicago Marathon / World Majors". Everything else is the race's standard print.
  */
+function isBulkCobranded(order) {
+  return order.trackstarOrderType === 'bulk' && order.bulkOrder?.deal?.printKind === 'cobranded' && Boolean(order.bulkOrder?.number)
+}
+
 export function editionOf(order) {
   const items = Array.isArray(order.shopifyOrderData?.line_items) ? order.shopifyOrderData.line_items : []
   // The row's position is in Artelo's item list; Artelo's item id is the Shopify
@@ -71,6 +75,8 @@ export function resolveTemplate(order, raceName, eventType, has) {
 }
 
 export function templateFor(order, raceName, eventType) {
+  // A co-branded bulk line renders from its own uploaded file, keyed by its run (templates.js).
+  if (isBulkCobranded(order)) return templateKey(raceName, order.bulkOrder.number)
   const edition = editionOf(order)
   // A named event (Detroit's International / Motor City halves) keeps its own name, so each gets its own file.
   const named = namedEventsFor(raceName).some(e => e.label === eventType)
@@ -84,7 +90,7 @@ export const SPEC_SELECT = {
   raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true,
   runnerName: true, runnerNameOverride: true, productSize: true, hadNoTime: true,
   photoPath: true, photoAddedManually: true, shopifyOrderData: true, arteloOrderData: true, lineItemIndex: true,
-  bulkOrder: { select: { paidAt: true, deal: { select: { printKind: true } } } },
+  bulkOrder: { select: { number: true, paidAt: true, deal: { select: { printKind: true } } } },
   runnerResearch: { orderBy: { id: 'desc' }, select: { researchStatus: true, bibNumber: true, officialTime: true, officialPace: true, eventType: true, race: { select: { id: true, raceDate: true, raceDateSource: true, raceDateSourceUrl: true, raceDateEvidence: true, raceDateVerifiedAt: true, raceDateConfirmedByPerson: true, location: true, weatherCondition: true, weatherTemp: true, weatherFetchedAt: true, weatherConfirmedAt: true, firstPrintedAt: true } } } },
 }
 
@@ -105,14 +111,15 @@ export function buildSpec(order, templates = [], raceRow = null, noTimeGaps = ne
 
   // A bulk deal of standard prints (our race design) renders like a shop order;
   // a co-branded one is the designer's (server/domain/bulk/deals.js).
-  const bulkStandard = order.trackstarOrderType === 'bulk' && order.bulkOrder?.deal?.printKind === 'standard'
+  // A co-branded one renders once its line has an uploaded production file (templates.js).
+  const bulkStandard = order.trackstarOrderType === 'bulk' && ['standard', 'cobranded'].includes(order.bulkOrder?.deal?.printKind)
   if (order.trackstarOrderType !== 'standard' && !bulkStandard) reasons.push('Only standard race prints are rendered')
   if (!SIZES.includes(order.productSize)) reasons.push(`No artboard for size "${order.productSize}"`)
   const edition = editionOf(order)
   const research0 = order.runnerResearch?.find(r => r.researchStatus === 'found') || order.runnerResearch?.[0]
   const template = resolveTemplate(order, raceName, research0?.eventType, k => templates.includes(k))
-  const eventTag = template.includes(' / ') && !edition ? eventLabel(research0?.eventType) : null
-  if (!templates.includes(template)) reasons.push(`No prepared template for ${template}`)
+  const eventTag = template.includes(' / ') && !edition && !isBulkCobranded(order) ? eventLabel(research0?.eventType) : null
+  if (!templates.includes(template)) reasons.push(isBulkCobranded(order) ? `No checked co-branded production file for ${order.bulkOrder.number} yet` : `No prepared template for ${template}`)
   if (!name) reasons.push('No runner name')
 
   const research = order.runnerResearch?.find(r => r.researchStatus === 'found') || order.runnerResearch?.[0]

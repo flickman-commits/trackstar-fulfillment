@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Loader2, Pencil, X, Trash2, Copy, ExternalLink, Send, Receipt } from 'lucide-react'
+import { Plus, Loader2, Pencil, Upload, X, Trash2, Copy, ExternalLink, Send, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -24,7 +24,9 @@ type CatalogPrint = PrintOption & { race: string }
 
 const blankLine = (prev?: Line): Line => ({ raceName: prev?.raceName || '', raceYear: prev?.raceYear || String(new Date().getFullYear()), eventType: 'Marathon', quantity: '', productSize: prev?.productSize || '8x10', frameType: prev?.frameType || 'Unframed' })
 
-export type DealRun = { id: string; number: string; raceName: string; raceYear: number; eventType: string | null; quantity: number; productSize: string; frameType: string; paidAt: string | null; status: string; _count?: { runners: number } }
+export type DealRun = { id: string; number: string; raceName: string; raceYear: number; eventType: string | null; quantity: number; productSize: string; frameType: string; paidAt: string | null; status: string; _count?: { runners: number }
+  /** Co-branded deals: the line's uploaded production file and its check. */
+  template?: { uploadedAt: string | null; checkedAt: string | null; ok: boolean | null; problems: string[] } | null }
 export type Deal = {
   id: string; number: string; partnerName: string; contactName: string | null; contactEmail: string | null; contactPhone: string | null
   billingAddress: Address | null; printKind: 'standard' | 'cobranded'; discountKind: 'percent' | 'amount' | null; discountPercent: number | null; discountCents: number | null
@@ -188,6 +190,38 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
   )
 }
 
+/** A co-branded line's production file: upload or replace it, and what the worker's check said. */
+function LineTemplate({ run, onChanged }: { run: DealRun; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const t = run.template
+  const upload = async (file: File) => {
+    setBusy(true)
+    try {
+      const { path, uploadUrl } = await dealApi<{ path: string; uploadUrl: string }>({ action: 'template-upload', runId: run.id, fileName: file.name })
+      const res = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'application/postscript', 'x-upsert': 'true' }, body: file })
+      if (!res.ok) throw new Error(`The upload failed (${res.status})`)
+      await dealApi({ action: 'template-saved', runId: run.id, path })
+      toast.success('Uploaded. The render worker checks it on its next check-in.')
+      onChanged()
+    } catch (err) { toast.error((err as Error).message) } finally { setBusy(false) }
+  }
+  const status = !t ? { text: 'No file yet', cls: 'text-off-black/45' }
+    : t.ok === null || !t.checkedAt ? { text: 'Waiting for the worker to check it', cls: 'text-amber-700' }
+    : t.ok ? { text: 'Checked, ready to render', cls: 'text-emerald-700' }
+    : { text: `Check found problems: ${t.problems.slice(0, 2).join('; ') || 'see Settings > Print Templates'}`, cls: 'text-red-600' }
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="font-medium text-off-black min-w-0 truncate">{run.raceName} {run.raceYear} · {run.eventType || 'Marathon'}</span>
+      <span className="font-mono text-[11px] text-off-black/40">{run.number}</span>
+      <span className={`flex-1 min-w-0 truncate ${status.cls}`} title={status.text}>{status.text}</span>
+      <label className={`${btnSecondary} cursor-pointer shrink-0 ${busy ? 'opacity-50 pointer-events-none' : ''}`}>
+        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}{t ? 'Replace .ai' : 'Upload .ai'}
+        <input type="file" accept=".ai" className="hidden" onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) upload(f) }} />
+      </label>
+    </div>
+  )
+}
+
 /** The deal a run belongs to: the agreed terms, its lines, and the Shopify invoice. */
 export function DealCard({ dealId, currentRunId, onOpenRun, onChanged }: { dealId: string; currentRunId: string; onOpenRun: (runId: string) => void; onChanged?: () => void }) {
   const { isAdmin } = useAuth()
@@ -271,6 +305,14 @@ export function DealCard({ dealId, currentRunId, onOpenRun, onChanged }: { dealI
           })}
         </tbody>
       </table>
+
+      {deal.printKind === 'cobranded' && (
+        <div className="border-t border-border-gray pt-3 space-y-1.5">
+          <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">Co-branded production files</div>
+          <p className="text-[11px] text-off-black/50">One Illustrator file per line, built like a race template (same layers and artboards). The render worker checks it, then makes every runner's print from it.</p>
+          {deal.runs.map(r => <LineTemplate key={r.id} run={r} onChanged={load} />)}
+        </div>
+      )}
 
       {quote && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-gray pt-3">
