@@ -210,8 +210,47 @@ export async function getThread(id, { userId, money = false } = {}) {
       conversations: t.customerEmail ? customerCount : 1,
     },
     context: money ? context : withoutSpend(context),
+    suggestedOrders: await mentionedOrders(t, context),
     pastThreads,
   }
+}
+
+/**
+ * Order numbers the customer wrote ("#4807", "order 4807", "order number: 4807")
+ * that are real orders and not already in the panel: offered with a Link button,
+ * so an Instagram DM or a message from another address finds its order.
+ */
+const MENTION = /(?:#\s?|\border\s*(?:number|no\.?|num|#)?\s*(?:is|:)?\s*#?)(\d{4,6})\b/gi
+async function mentionedOrders(t, context) {
+  const shown = new Set(context.orders.map(o => String(o.number)))
+  const numbers = []
+  for (const m of t.messages) {
+    if (m.direction !== 'in') continue
+    for (const hit of `${m.subject || ''} ${m.bodyText || ''}`.matchAll(MENTION)) {
+      const n = normalizeOrderNumber(hit[1])
+      if (n && !shown.has(n) && !numbers.includes(n)) numbers.push(n)
+    }
+  }
+  if (!numbers.length) return []
+  const out = []
+  for (const n of numbers.slice(0, 5)) {
+    const rows = await prisma.order.findMany({
+      where: { OR: orderNumberWhere(n) },
+      select: { raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true, runnerName: true, runnerNameOverride: true, createdAt: true },
+      orderBy: { lineItemIndex: 'asc' },
+    })
+    if (!rows.length) continue
+    out.push({
+      number: n,
+      orderedAt: rows[0].createdAt,
+      items: rows.map(r => ({
+        race: r.raceNameOverride || r.raceName || 'Print',
+        year: r.yearOverride || r.raceYear || null,
+        runner: r.runnerNameOverride || r.runnerName || null,
+      })),
+    })
+  }
+  return out
 }
 
 function withoutSpend(context) {

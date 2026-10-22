@@ -216,6 +216,29 @@ function AddOrder({ threadId, onChanged }: { threadId: string; onChanged: () => 
   )
 }
 
+/** An order number the customer wrote: what it is, and one click to link it. */
+function SuggestedOrder({ s, threadId, onChanged }: { s: NonNullable<ThreadDetail['suggestedOrders']>[number]; threadId: string; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const link = async () => {
+    setBusy(true)
+    try { await supportApi.linkOrder(threadId, s.number); toast.success(`Linked #${s.number}`); onChanged() }
+    catch (e) { toast.error((e as Error).message) } finally { setBusy(false) }
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-dashed border-[#4600D6]/30 bg-[#4600D6]/[0.03] px-2.5 py-2">
+      <div className="flex-1 min-w-0 text-xs">
+        <div className="font-semibold text-off-black">#{s.number} <span className="font-normal text-off-black/45">ordered {new Date(s.orderedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span></div>
+        {s.items.map((it, i) => (
+          <div key={i} className="text-off-black/65 truncate">{it.race}{it.year ? ` ${it.year}` : ''}{it.runner ? ` · ${it.runner}` : ''}</div>
+        ))}
+      </div>
+      <button onClick={link} disabled={busy} className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-[#4600D6] hover:underline underline-offset-2 disabled:opacity-50">
+        {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Link
+      </button>
+    </div>
+  )
+}
+
 async function unlinkOrder(threadId: string, number: string, onChanged: () => void) {
   if (!window.confirm(`Unlink order #${number} from this customer?`)) return
   try {
@@ -454,6 +477,14 @@ export default function Details({ thread, tagSuggestions, onOpenThread, onMerge,
               : <div className="space-y-3">{thread.context.orders.map(o => (
                   <OrderCard key={`${o.source}-${o.number}`} o={o} onUnlink={o.linked ? () => unlinkOrder(thread.id, o.number, onChanged) : undefined} />
                 ))}</div>}
+            {(thread.suggestedOrders || []).length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                <div className="text-[11px] font-semibold text-off-black/45 uppercase tracking-wider">Mentioned in the conversation</div>
+                {(thread.suggestedOrders || []).map(s => (
+                  <SuggestedOrder key={s.number} s={s} threadId={thread.id} onChanged={onChanged} />
+                ))}
+              </div>
+            )}
             <AddOrder threadId={thread.id} onChanged={onChanged} />
           </Section>
           {thread.pastThreads.length > 0 && (

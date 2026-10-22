@@ -188,6 +188,8 @@ export interface ThreadDetail extends ThreadRow {
   /** spentUsd: what they have spent across these orders, refunds left out; bigSpender at $300 or more. */
   context: { orders: CustomerOrder[]; shopifyError: string | null; spentUsd?: number; bigSpender?: boolean }
   pastThreads: PastThread[]
+  /** Order numbers the customer wrote that are real orders and not in the panel yet. */
+  suggestedOrders?: { number: string; orderedAt: string; items: { race: string; year: number | null; runner: string | null }[] }[]
 }
 
 export interface Macro { id: string; name: string; shortcut: string | null; body: string; uses: number; updatedAt: string; createdBy: { id: string; firstName: string } | null }
