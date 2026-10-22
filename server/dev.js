@@ -43,6 +43,7 @@ const routes = [
   { method: 'post', path: '/api/races/confirm-weather',      handler: '../api/races/confirm-weather.js' },
   { method: 'post', path: '/api/render/templates',           handler: '../api/render/templates.js' },
   { method: 'get',  path: '/api/render/needs',               handler: '../api/render/needs.js' },
+  { method: 'get',  path: '/api/orders/production',          handler: '../api/orders/production.js' },
   { method: 'post', path: '/api/render/needs',               handler: '../api/render/needs.js' },
   { method: 'post', path: '/api/orders/rush',                handler: '../api/orders/rush.js' },
   { method: 'get',  path: '/api/orders/final-pdf',           handler: '../api/orders/final-pdf.js' },

@@ -16,6 +16,7 @@ import AssigneePicker from '@/components/AssigneePicker'
 import OrderConversations from '@/components/support/OrderConversations'
 import ProofShowcase from '@/components/ProofShowcase'
 import PhotoCropper from '@/components/PhotoCropper'
+import OrderProduction from '@/components/orders/OrderProduction'
 import Linkify from '@/components/Linkify'
 import OrderTags, { HoverTip } from '@/components/OrderTags'
 import type { ToastMessage } from '@/components/orders/Toast'
@@ -1831,6 +1832,9 @@ Thank you!`
                   </div>
                 )}
               </div>
+
+              {/* Printed yet, shipped, delivered: checkable after the order is complete. */}
+              {(selectedOrder.arteloUrl || selectedOrder.shopifyAdminUrl) && <OrderProduction orderId={selectedOrder.id} />}
 
               {/* Every tag for the order, in one place: the photo add-on, when it
                   was ordered (orange from 3 days, red after 5, like the table),
