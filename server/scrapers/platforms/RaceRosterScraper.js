@@ -103,33 +103,43 @@ export class RaceRosterScraper extends BaseScraper {
       return this.upstreamErrorResult(error.message)
     }
 
-    // Sub-events in search order; the first one holding a name match decides.
-    for (const eventKey of eventOrder) {
+    // Every name match in a sold sub-event, pooled and deduped by bib (the
+    // same bib twice is one person). One bib is the runner. Several bibs are
+    // different people sharing the name, and which sub-event they ran never
+    // settles it (Denver Colfax 2026 had a Diego Garcia in the half and two in
+    // the marathon). A person picks; earlier sub-events in eventSearchOrder
+    // are listed first. Rows in sub-events the race does not sell stay out.
+    const rank = new Map()
+    eventOrder.forEach((eventKey, i) => {
       const subEventId = yearSubEvents[eventKey]
-      if (!subEventId) continue
+      if (subEventId && !rank.has(String(subEventId))) rank.set(String(subEventId), { i, eventKey })
+    })
+    const sold = allMatches.filter(m => rank.has(String(m.resultSubEventId)))
+    const nameMatches = this.filterNameMatches(runnerName, sold, m => m.name)
+    const people = new Map()
+    for (const m of nameMatches) {
+      const bib = String(m.bib ?? '').trim()
+      const key = bib ? `bib ${bib}` : `id ${m.id}`
+      if (!people.has(key)) people.set(key, m)
+    }
+    const found = [...people.values()]
+      .map(m => ({ m, ...rank.get(String(m.resultSubEventId)) }))
+      .sort((a, b) => a.i - b.i)
+    console.log(`[${this.tag} ${this.year}] Name matches in sold sub-events: ${found.length}`)
+
+    if (found.length > 1) {
+      found.forEach(({ m }) => console.log(`  - ${m.name}, Bib: ${m.bib}`))
+      return this.ambiguousResult(found.map(({ m, eventKey }) => ({
+        name: m.name,
+        bib: m.bib,
+        eventType: this.config.eventLabels?.[eventKey] || eventKey,
+      })))
+    }
+
+    if (found.length === 1) {
+      const { m: match, eventKey } = found[0]
       const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
-
-      const eventMatches = this.filterNameMatches(
-        runnerName,
-        allMatches.filter(m => String(m.resultSubEventId) === String(subEventId)),
-        m => m.name
-      )
-      console.log(`[${this.tag} ${this.year}] Matches in ${eventLabel} (sub-event ${subEventId}) with name match: ${eventMatches.length}`)
-      if (eventMatches.length === 0) continue
-
-      if (eventMatches.length > 1) {
-        // Two people with this name in one distance. Do not fall through to a
-        // later distance and hand back a third person's time.
-        eventMatches.forEach(m => console.log(`  - ${m.name}, Bib: ${m.bib}`))
-        return this.ambiguousResult(eventMatches.map(m => ({
-          name: m.name,
-          bib: m.bib,
-          eventType: eventLabel,
-        })))
-      }
-
-      const match = eventMatches[0]
-      console.log(`[${this.tag} ${this.year}] Found match: ${match.name} (bib ${match.bib}), fetching details...`)
+      console.log(`[${this.tag} ${this.year}] Found match: ${match.name} (bib ${match.bib}) in ${eventLabel}, fetching details...`)
       let detailData
       try {
         detailData = await this.fetchApi(`/v2/api/events/${eventCode}/detail/${match.id}`)

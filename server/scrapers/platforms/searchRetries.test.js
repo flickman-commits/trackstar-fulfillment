@@ -182,7 +182,7 @@ test('RaceRoster: a miss is one request, not one per sub-event', async () => {
   assert.equal(r.found, false)
 })
 
-test('RaceRoster: two same-name marathoners are ambiguous, not a later distance\'s runner', async () => {
+test('RaceRoster: same-name runners in every sold distance are one pick, never a later distance\'s runner', async () => {
   const s = raceRoster([
     { id: 'a', name: 'Sam Lee', bib: '1', resultSubEventId: 379159 },
     { id: 'b', name: 'Sam Lee', bib: '2', resultSubEventId: 379159 },
@@ -190,5 +190,25 @@ test('RaceRoster: two same-name marathoners are ambiguous, not a later distance\
   ])
   const r = await quiet(() => s.searchRunner('Sam Lee'))
   assert.equal(r.ambiguous, true)
-  assert.deepEqual(r.possibleMatches.map(m => m.bib), ['1', '2'])
+  assert.deepEqual(r.possibleMatches.map(m => m.bib), ['1', '2', '3'])
+})
+
+test('RaceRoster: one marathoner and one half runner with the same name are a pick (Denver Colfax 2026, Diego Garcia)', async () => {
+  const s = raceRoster([
+    { id: 'h', name: 'Diego Garcia', bib: '6840', resultSubEventId: 379160, chipTime: '2:00:00' },
+    { id: 'm', name: 'Diego Garcia', bib: '13291', resultSubEventId: 379159, chipTime: '4:00:00' },
+  ])
+  const r = await quiet(() => s.searchRunner('Diego Garcia'))
+  assert.equal(r.ambiguous, true)
+  assert.deepEqual(r.possibleMatches.map(m => m.bib), ['13291', '6840'])
+})
+
+test('RaceRoster: the same bib twice is one runner', async () => {
+  const s = raceRoster([
+    { id: 'm', name: 'Diego Garcia', bib: '13291', resultSubEventId: 379159, chipTime: '4:00:00' },
+    { id: 'm', name: 'Diego Garcia', bib: '13291', resultSubEventId: 379159, chipTime: '4:00:00' },
+  ])
+  const r = await quiet(() => s.searchRunner('Diego Garcia'))
+  assert.equal(r.found, true)
+  assert.equal(r.bibNumber, '13291')
 })

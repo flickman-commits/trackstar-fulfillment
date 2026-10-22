@@ -51,6 +51,12 @@ export class UltraSignupScraper extends BaseScraper {
   async searchRunner(runnerName) {
     console.log(`\n[${this.tag} ${this.year}] UltraSignup search for: "${runnerName}"`)
     if (!this.dids) return this.yearNotConfiguredResult('missing ultraSignup dids')
+    // Every sold distance is read before deciding. Name matches are pooled
+    // and deduped by bib (the same bib twice is one person; a bib-less row
+    // falls back to name, time and distance). One is the runner. Several are
+    // different people sharing the name, and which distance they ran never
+    // settles it (Denver Colfax 2026 had a Diego Garcia in the half and two
+    // in the marathon). A person picks, earlier distances listed first.
     const seen = []
     for (const key of this.order()) {
       const did = this.dids[key]
@@ -61,11 +67,16 @@ export class UltraSignupScraper extends BaseScraper {
         return this.upstreamErrorResult(`UltraSignup ${err.status ? `HTTP ${err.status}` : 'request failed'}`)
       }
       const label = this.config.eventLabels?.[key] || key
-      const matches = this.filterNameMatches(runnerName, rows, r => r.name)
-      if (matches.length > 1) return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: m.bib, time: m.time, eventType: label })))
-      if (matches.length === 1) return this.buildResult(matches[0], key, label, did)
-      seen.push(...rows.map(r => ({ ...r, eventType: label })))
+      seen.push(...rows.map(r => ({ ...r, eventType: label, key, did })))
     }
+    const people = new Map()
+    for (const m of this.filterNameMatches(runnerName, seen, r => r.name)) {
+      const key = m.bib ? `bib ${m.bib}` : `${m.name}|${m.time}|${m.key}`
+      if (!people.has(key)) people.set(key, m)
+    }
+    const found = [...people.values()]
+    if (found.length > 1) return this.ambiguousResult(found.map(m => ({ name: m.name, bib: m.bib, time: m.time, eventType: m.eventType })))
+    if (found.length === 1) return this.buildResult(found[0], found[0].key, found[0].eventType, found[0].did)
     const last = String(runnerName).trim().split(/\s+/).pop().toLowerCase()
     const same = seen.filter(r => r.name.toLowerCase().split(/\s+/).pop() === last).slice(0, 10)
     return this.notFoundResult(null, same.length ? same.map(r => ({ name: r.name, bib: r.bib, time: r.time, eventType: r.eventType })) : null)

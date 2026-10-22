@@ -73,6 +73,9 @@ export class LaurelTimingScraper extends BaseScraper {
 
     const order = this.config.eventSearchOrder || ['marathon', 'half']
     const allCandidates = []
+    // Every sold distance is searched before deciding: a namesake in a later
+    // distance makes it a pick, not the first distance's runner.
+    const pool = []
 
     for (const distKey of order) {
       const eventLabel = this.config.events?.[distKey]
@@ -94,13 +97,53 @@ export class LaurelTimingScraper extends BaseScraper {
         for (const r of rows.slice(0, 10)) {
           allCandidates.push({ name: r.fullName, bib: null, eventType: eventLabel })
         }
-        continue
       }
+      pool.push(...rows.map(r => ({ ...r, distKey, eventLabel })))
+    }
 
-      if (matches.length > 1) {
-        return this.ambiguousResult(matches.map(m => ({ name: m.fullName })))
+    // Name matches from every distance. Search rows carry no bib, only the
+    // result's pk, so they are deduped by pk first and then by the bib on
+    // each one's individual page (the same bib twice is one person). One is
+    // the runner. Several are different people sharing the name, and which
+    // distance they ran never settles it (Denver Colfax 2026 had a Diego
+    // Garcia in the half and two in the marathon). A person picks, earlier
+    // distances listed first.
+    const byPk = new Map()
+    for (const m of this.filterNameMatches(runnerName, pool, r => r.fullName)) {
+      if (!byPk.has(m.pk)) byPk.set(m.pk, m)
+    }
+    const matches = [...byPk.values()]
+
+    if (matches.length > 10) {
+      return this.ambiguousResult(matches.map(m => ({ name: m.fullName, eventType: m.eventLabel })))
+    }
+
+    if (matches.length > 1) {
+      // Each one's page gives the bib and time the picker shows. A page that
+      // fails to load still lists the runner, without them.
+      const details = await Promise.all(matches.map(m => this._fetchIndividual(slug, m.pk).catch(err => {
+        console.log(`[${this.tag}] individual fetch failed for pk ${m.pk}: ${err.message}`)
+        return null
+      })))
+      const people = new Map()
+      matches.forEach((m, i) => {
+        const bib = details[i]?.bib ? String(details[i].bib) : null
+        const key = bib ? `bib ${bib}` : `pk ${m.pk}`
+        if (!people.has(key)) people.set(key, { match: m, detail: details[i] })
+      })
+      if (people.size > 1) {
+        return this.ambiguousResult([...people.values()].map(({ match, detail }) => ({
+          name: match.fullName,
+          bib: detail?.bib ? String(detail.bib) : null,
+          time: detail?.chipTime ? this.formatTime(detail.chipTime) : null,
+          eventType: match.eventLabel,
+        })))
       }
+      const [only] = people.values()
+      return this._foundResult(only.match, only.detail, slug)
+    }
 
+    if (matches.length === 1) {
       // Single match → fetch the individual page for chip time, pace, bib.
       const match = matches[0]
       let detail
@@ -110,43 +153,47 @@ export class LaurelTimingScraper extends BaseScraper {
         console.log(`[${this.tag}] individual fetch failed: ${err.message}`)
         return this.upstreamErrorResult(err.message)
       }
-
-      if (!detail || !detail.chipTime) {
-        console.log(`[${this.tag}] Found row but couldn't parse Finish record`)
-        return this.notFoundResult('runner row found but Finish record missing')
-      }
-
-      const formattedTime = this.formatTime(detail.chipTime)
-      const distanceMiles = this.config.distances?.[distKey] || 26.2
-      // Always chip time over the matched distance. The page's own pace is
-      // truncated on the summary cards (3:21:59 shows 7:42, the real figure is
-      // 7:42.6), and older editions only have the cards.
-      const pace = this.formatPace(this.calculatePace(detail.chipTime, distanceMiles))
-
-      console.log(`\n[${this.tag}] FOUND RUNNER:`)
-      console.log(`  Name: ${match.fullName}`)
-      console.log(`  Bib: ${detail.bib || 'N/A'}`)
-      console.log(`  Chip Time: ${formattedTime}`)
-      console.log(`  Pace: ${pace}`)
-
-      return {
-        found: true,
-        bibNumber: detail.bib ? String(detail.bib) : null,
-        officialTime: formattedTime,
-        officialPace: pace,
-        eventType: eventLabel,
-        yearFound: this.year,
-        researchNotes: null,
-        resultsUrl: `${BASE}/${slug}/results?pk=${match.pk}`,
-        rawData: {
-          name: match.fullName,
-          pk: match.pk,
-        }
-      }
+      return this._foundResult(match, detail, slug)
     }
 
     console.log(`[${this.tag}] No name match across distances. Surfacing ${allCandidates.length} candidates.`)
     return this.notFoundResult(null, allCandidates.slice(0, 15))
+  }
+
+  /** The found result for one matched row and its individual page. */
+  _foundResult(match, detail, slug) {
+    if (!detail || !detail.chipTime) {
+      console.log(`[${this.tag}] Found row but couldn't parse Finish record`)
+      return this.notFoundResult('runner row found but Finish record missing')
+    }
+
+    const formattedTime = this.formatTime(detail.chipTime)
+    const distanceMiles = this.config.distances?.[match.distKey] || 26.2
+    // Always chip time over the matched distance. The page's own pace is
+    // truncated on the summary cards (3:21:59 shows 7:42, the real figure is
+    // 7:42.6), and older editions only have the cards.
+    const pace = this.formatPace(this.calculatePace(detail.chipTime, distanceMiles))
+
+    console.log(`\n[${this.tag}] FOUND RUNNER:`)
+    console.log(`  Name: ${match.fullName}`)
+    console.log(`  Bib: ${detail.bib || 'N/A'}`)
+    console.log(`  Chip Time: ${formattedTime}`)
+    console.log(`  Pace: ${pace}`)
+
+    return {
+      found: true,
+      bibNumber: detail.bib ? String(detail.bib) : null,
+      officialTime: formattedTime,
+      officialPace: pace,
+      eventType: match.eventLabel,
+      yearFound: this.year,
+      researchNotes: null,
+      resultsUrl: `${BASE}/${slug}/results?pk=${match.pk}`,
+      rawData: {
+        name: match.fullName,
+        pk: match.pk,
+      }
+    }
   }
 
   /**

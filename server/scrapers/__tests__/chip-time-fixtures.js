@@ -332,7 +332,8 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '3:23:06',
     expectedChipPace: '7:45',
     expectedBib: '477',
-    notes: 'Dallas 2025 Marathon (eID 16993). Gun 3:25:02 vs chip 3:23:06, so a gun-time regression fails here. POSITIVE SPLIT: held 7:38/mi through the 2:51:56 mark then faded, so the final-segment pace is well off the overall 7:45/mi - a split-interval pace regression also fails. Page prints 7:45/M as the overall pace.',
+    lookup: 'bib',
+    notes: 'Dallas 2025 Marathon (eID 16993). Gun 3:25:02 vs chip 3:23:06, so a gun-time regression fails here. POSITIVE SPLIT: held 7:38/mi through the 2:51:56 mark then faded, so the final-segment pace is well off the overall 7:45/mi - a split-interval pace regression also fails. Page prints 7:45/M as the overall pace. A different Michael Smith ran the half (2:15:54, bib 18016; both start the same morning), so the name search is rightly ambiguous and this fixture checks the time through the bib.',
   },
   {
     platform: 'mychiptime',
@@ -441,7 +442,8 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '1:13:06',
     expectedChipPace: '7:19',
     expectedBib: '21067',
-    notes: 'TC 10 Mile 2026, detail r6kgdmufpbmymfwc - Chip Time 1:13:06 (page pace 7:16; 4386s/10 = 7:19). Catches a marathon-distance pace on the 10 Mile',
+    lookup: 'bib',
+    notes: 'TC 10 Mile 2026, detail r6kgdmufpbmymfwc - Chip Time 1:13:06 (page pace 7:16; 4386s/10 = 7:19). Catches a marathon-distance pace on the 10 Mile. Three other Sam Johnsons ran the marathon (bibs 6977, 3761, 7758; both start the same morning), so the name search is rightly ambiguous and this fixture checks the time through the bib.',
   },
   {
     platform: 'raceroster',
@@ -451,7 +453,8 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '4:34:33',
     expectedChipPace: '10:29',
     expectedBib: '3931',
-    notes: 'Pittsburgh 2025 marathon - verifies sub-event filtering + chip time',
+    lookup: 'bib',
+    notes: 'Pittsburgh 2025 marathon - verifies sub-event filtering + chip time. A different Lori Smith ran the half (bib 21171; both start the same morning), so the name search is rightly ambiguous and this fixture checks the time through the bib.',
   },
   {
     platform: 'raceroster',
@@ -761,7 +764,8 @@ export const CHIP_TIME_FIXTURES = [
     expectedChipTime: '4:38:46',
     expectedChipPace: '10:38',
     expectedBib: '6278',
-    notes: 'San Antonio 2025 Marathon (race 167812). Chip 4:38:46, gun 4:50:59. Positive split: 10:08/mi through mile 13, ~11:09/mi after, final 0.2 interval 9:42/mi. 16726s ÷ 26.2 = 638.4 → 10:38; page overall pace 10:38. https://results.laurelt.com/sat/results?pk=8457335',
+    lookup: 'bib',
+    notes: 'San Antonio 2025 Marathon (race 167812). Chip 4:38:46, gun 4:50:59. Positive split: 10:08/mi through mile 13, ~11:09/mi after, final 0.2 interval 9:42/mi. 16726s ÷ 26.2 = 638.4 → 10:38; page overall pace 10:38. https://results.laurelt.com/sat/results?pk=8457335. A different Charles Garcia ran the half (1:52:48, bib 7008; both start the same morning), so the name search is rightly ambiguous and this fixture checks the time through the bib.',
   },
   {
     platform: 'brooksee',

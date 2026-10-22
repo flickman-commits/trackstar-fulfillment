@@ -171,74 +171,58 @@ export class ScoreThisScraper extends BaseScraper {
         })))
       }
 
-      // Try to find a match in preferred event order
+      // Name matches are deduped by bib (the same bib twice is one person).
+      // One bib is the runner. Several bibs are different people sharing the
+      // name, and which event they ran never settles it: Denver Colfax 2026
+      // had a Diego Garcia in the half and two in the marathon, and the half
+      // one was printed for a marathon customer. A person picks. Matches in
+      // the sold events (eventSearchOrder) are decided first, earlier events
+      // listed first; only when there are none does a match in another event
+      // (e.g. relay) count, as before.
       const eventSearchOrder = this.config.eventSearchOrder || ['marathon', 'half']
       const eventTypeMap = this.config.eventTypeMap || {}
-
-      for (const eventKey of eventSearchOrder) {
-        const possibleValues = eventTypeMap[eventKey] || []
-        const eventMatches = nameMatches.filter(r =>
-          possibleValues.some(v => r.eventType.toLowerCase() === v.toLowerCase())
-        )
-
-        if (eventMatches.length === 1) {
-          console.log(`[${this.tag}] Found single match in ${eventKey}`)
-          return this._buildResult(eventMatches[0], eventKey, raceId)
+      const soldKeyOf = r => eventSearchOrder.find(eventKey =>
+        (eventTypeMap[eventKey] || []).some(v => r.eventType.toLowerCase() === v.toLowerCase())
+      ) || null
+      const byBib = (rows) => {
+        const people = new Map()
+        for (const r of rows) {
+          const bib = String(r.bib ?? '').trim()
+          const key = bib ? `bib ${bib}` : `${r.firstName} ${r.lastName}|${r.chipTime}|${r.eventType}`.toLowerCase()
+          if (!people.has(key)) people.set(key, r)
         }
+        return [...people.values()]
+      }
+      const toCandidate = r => ({
+        name: `${r.firstName} ${r.lastName}`,
+        bib: r.bib,
+        time: r.chipTime,
+        event: r.eventType,
+        city: r.city,
+        state: r.state,
+      })
 
-        if (eventMatches.length > 1) {
-          // Multiple matches in same event — truly ambiguous (different people)
-          console.log(`[${this.tag}] Multiple matches in ${eventKey}: ${eventMatches.length}`)
-          return this.ambiguousResult(eventMatches.map(r => ({
-            name: `${r.firstName} ${r.lastName}`,
-            bib: r.bib,
-            time: r.chipTime,
-            event: r.eventType,
-            city: r.city,
-            state: r.state,
-          })))
-        }
+      const sold = byBib(nameMatches.filter(r => soldKeyOf(r))
+        .sort((a, b) => eventSearchOrder.indexOf(soldKeyOf(a)) - eventSearchOrder.indexOf(soldKeyOf(b))))
+      if (sold.length === 1) {
+        const eventKey = soldKeyOf(sold[0])
+        console.log(`[${this.tag}] Found single match in ${eventKey}`)
+        return this._buildResult(sold[0], eventKey, raceId)
+      }
+      if (sold.length > 1) {
+        console.log(`[${this.tag}] ${sold.length} different bibs share this name in the sold events`)
+        return this.ambiguousResult(sold.map(toCandidate))
       }
 
-      // No match in preferred events — check if there's a match in ANY event
-      if (nameMatches.length === 1) {
-        // Single match in a non-preferred event (e.g. relay)
-        const match = nameMatches[0]
+      // No match in the sold events: a match in any other event.
+      const others = byBib(nameMatches)
+      if (others.length === 1) {
+        const match = others[0]
         const eventKey = this._identifyEventKey(match.eventType)
         console.log(`[${this.tag}] Found single match in non-preferred event: ${match.eventType}`)
         return this._buildResult(match, eventKey, raceId)
       }
-
-      // Multiple matches across different events — pick by priority
-      if (nameMatches.length > 1) {
-        // Check if same person in different events
-        const uniqueNames = new Set(nameMatches.map(r =>
-          `${r.firstName} ${r.lastName}`.toLowerCase()
-        ))
-
-        if (uniqueNames.size === 1) {
-          // Same person, multiple events — pick first by search order
-          for (const eventKey of eventSearchOrder) {
-            const possibleValues = eventTypeMap[eventKey] || []
-            const match = nameMatches.find(r =>
-              possibleValues.some(v => r.eventType.toLowerCase() === v.toLowerCase())
-            )
-            if (match) return this._buildResult(match, eventKey, raceId)
-          }
-          // Fallback to first match
-          return this._buildResult(nameMatches[0], null, raceId)
-        }
-
-        // Different people — ambiguous
-        return this.ambiguousResult(nameMatches.map(r => ({
-          name: `${r.firstName} ${r.lastName}`,
-          bib: r.bib,
-          time: r.chipTime,
-          event: r.eventType,
-          city: r.city,
-          state: r.state,
-        })))
-      }
+      if (others.length > 1) return this.ambiguousResult(others.map(toCandidate))
 
       return this.notFoundResult()
 

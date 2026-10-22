@@ -188,16 +188,25 @@ export class RaceResultScraper extends BaseScraper {
       .filter(r => r.eventKey)
     const order = this.config.eventSearchOrder || Object.keys(this.rr.contests)
 
-    for (const eventKey of order) {
-      const pool = inContests.filter(r => r.eventKey === eventKey)
-      const matches = this.filterNameMatches(runnerName, pool, r => r.name)
-      if (matches.length === 0) continue
-      const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
-      if (matches.length > 1) {
-        return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: m.bib, eventType: eventLabel })))
-      }
-      return this.buildResult(ev, matches[0], eventKey, eventLabel)
+    // Every name match in a sold contest, pooled and deduped by bib (the same
+    // bib twice is one person; a list without a BIB column falls back to the
+    // participant id). One is the runner. Several are different people
+    // sharing the name, and which contest they ran never settles it (Denver
+    // Colfax 2026 had a Diego Garcia in the half and two in the marathon). A
+    // person picks; earlier contests in eventSearchOrder are listed first.
+    const people = new Map()
+    for (const m of this.filterNameMatches(runnerName, inContests, r => r.name)) {
+      const bib = String(m.bib ?? '').trim()
+      const key = bib ? `bib ${bib}` : `pid ${m.pid}`
+      if (!people.has(key)) people.set(key, m)
     }
+    const rank = m => { const i = order.indexOf(m.eventKey); return i < 0 ? order.length : i }
+    const found = [...people.values()].sort((a, b) => rank(a) - rank(b))
+    const labelOf = m => this.config.eventLabels?.[m.eventKey] || m.eventKey
+    if (found.length > 1) {
+      return this.ambiguousResult(found.map(m => ({ name: m.name, bib: m.bib, eventType: labelOf(m) })))
+    }
+    if (found.length === 1) return this.buildResult(ev, found[0], found[0].eventKey, labelOf(found[0]))
 
     const candidates = this.filterNameMatches(runnerName, rows, r => r.name)
     return this.notFoundResult(

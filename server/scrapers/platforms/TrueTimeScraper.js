@@ -244,16 +244,25 @@ export class TrueTimeScraper extends BaseScraper {
     const inEvents = rows.map(r => ({ ...r, eventKey: this.eventKeyFor(r.eid) })).filter(r => r.eventKey)
     const order = this.config.eventSearchOrder || Object.keys(this.tt.events)
 
-    for (const eventKey of order) {
-      const pool = inEvents.filter(r => r.eventKey === eventKey)
-      const matches = this.filterNameMatches(runnerName, pool, r => r.name)
-      if (matches.length === 0) continue
-      const eventLabel = this.config.eventLabels?.[eventKey] || eventKey
-      if (matches.length > 1) {
-        return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: m.bib, eventType: eventLabel })))
-      }
-      return this.buildResult(matches[0], eventKey, eventLabel)
+    // Every name match in a sold event, pooled and deduped by bib (the same
+    // bib twice is one person; a row without a bib falls back to name, net
+    // time and event). One is the runner. Several are different people
+    // sharing the name, and which event they ran never settles it (Denver
+    // Colfax 2026 had a Diego Garcia in the half and two in the marathon). A
+    // person picks; earlier events in eventSearchOrder are listed first.
+    const people = new Map()
+    const sold = inEvents.filter(r => order.includes(r.eventKey))
+    for (const m of this.filterNameMatches(runnerName, sold, r => r.name)) {
+      const bib = String(m.bib ?? '').trim()
+      const key = bib ? `bib ${bib}` : `${m.name}|${m.net}|${m.eventKey}`
+      if (!people.has(key)) people.set(key, m)
     }
+    const found = [...people.values()].sort((a, b) => order.indexOf(a.eventKey) - order.indexOf(b.eventKey))
+    const labelOf = m => this.config.eventLabels?.[m.eventKey] || m.eventKey
+    if (found.length > 1) {
+      return this.ambiguousResult(found.map(m => ({ name: m.name, bib: m.bib, time: this.cleanTime(m.net), eventType: labelOf(m) })))
+    }
+    if (found.length === 1) return this.buildResult(found[0], found[0].eventKey, labelOf(found[0]))
 
     const candidates = this.filterNameMatches(runnerName, rows, r => r.name)
     return this.notFoundResult(

@@ -14,6 +14,41 @@
 import { BaseScraper } from '../BaseScraper.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
+/**
+ * Decide a name search from every sold event's own answer. Each event comes
+ * back found, ambiguous or not found; the name matches from all of them are
+ * pooled and deduped by bib (the same bib twice is one person). One bib is
+ * the runner. Several bibs are different people sharing the name, and which
+ * event they ran never settles it: Denver Colfax 2026 had a Diego Garcia in
+ * the half and two in the marathon, and the half one was printed for a
+ * marathon customer. A person picks. `answers` is in eventSearchOrder, so the
+ * picker lists earlier events first. A strong name match in one event still
+ * outranks a short form in another, as it does within one event. Returns
+ * null when no event had a match.
+ */
+function poolEventAnswers(scraper, runnerName, answers) {
+  const people = new Map()
+  for (const { result, label } of answers) {
+    const rows = result.found
+      ? [{ candidate: { name: result.runnerName || result.rawData?.name || null, bib: result.bibNumber, time: result.officialTime, pace: result.officialPace, eventType: result.eventType || label }, result }]
+      : result.ambiguous
+        ? (result.matches || []).map(m => ({ candidate: { ...m, eventType: m.eventType || label } }))
+        : []
+    for (const row of rows) {
+      const c = row.candidate
+      const bib = String(c.bib ?? '').trim()
+      const key = bib ? `bib ${bib}` : `${c.name}|${c.time}|${c.eventType}`
+      if (!people.has(key)) people.set(key, row)
+    }
+  }
+  if (people.size === 0) return null
+  const all = [...people.values()]
+  const kept = scraper.filterNameMatches(runnerName, all, p => p.candidate.name || runnerName)
+  const list = kept.length ? kept : all
+  if (list.length === 1 && list[0].result) return list[0].result
+  return scraper.ambiguousResult(list.map(p => p.candidate))
+}
+
 export class BrookseeScraper extends BaseScraper {
   constructor(year, config) {
     super(config.raceName, year)
@@ -53,10 +88,12 @@ export class BrookseeScraper extends BaseScraper {
 
     const eventOrder = this.config.eventSearchOrder || ['Marathon', 'Half Marathon']
 
-    // Collect close-but-inexact candidates across every event type. Without
-    // this, an ambiguous/candidate result from one event was thrown away and
-    // the loop fell through to a bare "not found" — which made the multi-match
-    // picker impossible to ever reach for Brooksee races.
+    // Every sold event is searched, even after one has a match: a namesake in
+    // a later event makes it a pick, not the first event's runner. Name
+    // matches (found or ambiguous) are decided together below; close but
+    // inexact last-name candidates are collected across every event type for
+    // the not-found picker.
+    const answers = []
     let candidates = []
 
     for (const event of eventOrder) {
@@ -64,12 +101,14 @@ export class BrookseeScraper extends BaseScraper {
       console.log(`[${this.tag} ${this.year}] Searching ${eventLabel}...`)
 
       const result = await this.searchEventType(runnerName, raceId, event, eventLabel)
-      if (result.found) return result
-      // notFoundResult surfaces last-name candidates via possibleMatches;
-      // ambiguousResult surfaces exact-ish matches via matches.
-      if (Array.isArray(result.possibleMatches)) candidates = candidates.concat(result.possibleMatches)
-      if (Array.isArray(result.matches)) candidates = candidates.concat(result.matches)
+      answers.push({ result, label: eventLabel })
+      if (!result.found && !result.ambiguous && Array.isArray(result.possibleMatches)) {
+        candidates = candidates.concat(result.possibleMatches)
+      }
     }
+
+    const pooled = poolEventAnswers(this, runnerName, answers)
+    if (pooled) return pooled
 
     if (candidates.length > 0) {
       // De-dupe by name+bib and cap the list so the picker stays manageable.
@@ -91,6 +130,40 @@ export class BrookseeScraper extends BaseScraper {
 
     console.log(`[${this.tag} ${this.year}] Runner not found in any event type`)
     return this.notFoundResult()
+  }
+
+  /**
+   * Look a runner up by bib. The `search` param matches a bib number as well
+   * as a last name (San Antonio 2025 "6278" returns only bib 6278), so it is
+   * the same call per sold event, in eventSearchOrder, keeping only a row
+   * whose bib is exactly the one searched.
+   */
+  async searchRunnerByBib(bib) {
+    const wanted = String(bib ?? '').trim()
+    if (!wanted) return null
+    const raceId = this.config.raceIds?.[this.year]
+    if (!raceId) return this.yearNotConfiguredResult('missing raceIds entry')
+    console.log(`[${this.tag} ${this.year}] Bib lookup: ${wanted}`)
+
+    for (const event of (this.config.eventSearchOrder || ['Marathon', 'Half Marathon'])) {
+      const eventLabel = this.config.eventLabels?.[event] || event
+      const url = `${this.baseUrl}/results?race=${raceId}&event=${encodeURIComponent(event)}&search=${encodeURIComponent(wanted)}`
+      let html
+      try {
+        const response = await fetchWithTimeout(url, {
+          headers: { 'Accept': 'text/html', 'User-Agent': 'Mozilla/5.0 (compatible; TrackstarBot/1.0)' }
+        })
+        if (!response.ok) return this.upstreamErrorResult(`Brooksee returned HTTP ${response.status}`)
+        html = await response.text()
+      } catch (error) {
+        console.error(`[${this.tag} ${this.year}] Bib lookup error for ${wanted}:`, error.message)
+        return this.upstreamErrorResult(error.message)
+      }
+      const match = this.parseResultRows(html).find(r => this.bibsEqual(r.bib, wanted))
+      if (!match) continue
+      return { ...this.extractRunnerData(match, eventLabel), runnerName: `${match.firstName} ${match.lastName}`.trim() }
+    }
+    return this.notFoundResult(`No bib ${wanted} in ${this.raceName} ${this.year} results`)
   }
 
   async searchEventType(runnerName, raceId, event, eventLabel) {

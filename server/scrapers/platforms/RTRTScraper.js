@@ -315,37 +315,51 @@ export class RTRTScraper extends BaseScraper {
         matches = kept
       }
 
-      // For multi-course events (e.g. marathon + half at same race), resolve
-      // which event the runner is in via their `course` field.
-      // Picks based on eventSearchOrder preference.
-      let resolvedEventType = this.config.defaultEventType || 'Marathon'
-      let resolvedDistance = this.config.distanceMiles || 26.2
-      if (this.config.courseMap && this.config.eventSearchOrder) {
-        const eventOrder = this.config.eventSearchOrder
-        let foundKey = null
-        for (const eventKey of eventOrder) {
+      // For multi-course events (e.g. marathon + half at same race), each
+      // entrant's event comes from their `course` field: the first course in
+      // eventSearchOrder they are registered for.
+      const defaultEvent = {
+        key: null,
+        eventType: this.config.defaultEventType || 'Marathon',
+        distance: this.config.distanceMiles || 26.2,
+      }
+      const eventFor = (p) => {
+        if (!this.config.courseMap || !this.config.eventSearchOrder) return defaultEvent
+        // `course` is a comma list for anyone registered in more than one
+        // event ("5k,halfmarathon"), so an equality test missed them and
+        // silently fell through to the race's default distance.
+        const courses = String(p.course || '').toLowerCase().split(',').map(t => t.trim())
+        for (const eventKey of this.config.eventSearchOrder) {
           const courseId = (this.config.courseMap[eventKey] || '').toLowerCase()
-          if (!courseId) continue
-          // `course` is a comma list for anyone registered in more than one
-          // event ("5k,halfmarathon"), so an equality test missed them and
-          // silently fell through to the race's default distance.
-          const courseMatches = matches.filter(p =>
-            String(p.course || '').toLowerCase().split(',').map(t => t.trim()).includes(courseId)
-          )
-          if (courseMatches.length > 0) {
-            matches = courseMatches
-            foundKey = eventKey
-            break
+          if (courseId && courses.includes(courseId)) {
+            return {
+              key: eventKey,
+              eventType: this.config.eventLabels?.[eventKey] || eventKey,
+              distance: this.config.distances?.[eventKey] || defaultEvent.distance,
+            }
           }
         }
-        if (foundKey) {
-          resolvedEventType = this.config.eventLabels?.[foundKey] || foundKey
-          resolvedDistance = this.config.distances?.[foundKey] || resolvedDistance
-          console.log(`[${this.tag}] Resolved to event: ${resolvedEventType}`)
-        } else {
-          console.log(`[${this.tag}] No matches in any configured course`)
-        }
+        return defaultEvent
       }
+      // When some entrants are in a mapped course, the ones in none of them
+      // (a course token the config does not map) stay out, as they did when
+      // the first course with a hit decided.
+      if (matches.some(p => eventFor(p).key)) matches = matches.filter(p => eventFor(p).key)
+      const order = this.config.eventSearchOrder || []
+      matches.sort((a, b) => order.indexOf(eventFor(a).key) - order.indexOf(eventFor(b).key))
+
+      // The same bib twice is one person (a bib-less profile falls back to
+      // its pid). Several bibs are different people sharing the name, and
+      // which course they ran never settles it: Denver Colfax 2026 had a
+      // Diego Garcia in the half and two in the marathon, and the half one
+      // was printed for a marathon customer. A person picks.
+      const people = new Map()
+      for (const p of matches) {
+        const bib = String(p.bib ?? '').trim()
+        const key = bib ? `bib ${bib}` : `pid ${p.pid}`
+        if (!people.has(key)) people.set(key, p)
+      }
+      matches = [...people.values()]
 
       if (matches.length > 1) {
         // Same name, several entrants. This list is what the shopper picks
@@ -353,7 +367,7 @@ export class RTRTScraper extends BaseScraper {
         // every one of them look like a DNF. There are only ever a handful of
         // exact-name collisions, so resolving them in parallel is cheap.
         const resolved = await Promise.all(matches.map(async m => {
-          const { time, pace, label } = await this._resolveFinish(m.pid, resolvedDistance)
+          const { time, pace, label } = await this._resolveFinish(m.pid, eventFor(m).distance)
           return {
             name: m.name || `${m.fname || ''} ${m.lname || ''}`.trim(),
             bib: m.bib || null,
@@ -365,6 +379,12 @@ export class RTRTScraper extends BaseScraper {
         }))
         return this.ambiguousResult(resolved)
       }
+
+      const resolvedEvent = eventFor(matches[0])
+      let resolvedEventType = resolvedEvent.eventType
+      const resolvedDistance = resolvedEvent.distance
+      if (resolvedEvent.key) console.log(`[${this.tag}] Resolved to event: ${resolvedEventType}`)
+      else if (this.config.courseMap && this.config.eventSearchOrder) console.log(`[${this.tag}] No matches in any configured course`)
 
       const profile = matches[0]
       const fullName = profile.name || `${profile.fname || ''} ${profile.lname || ''}`.trim()

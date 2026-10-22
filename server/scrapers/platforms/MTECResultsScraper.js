@@ -81,6 +81,9 @@ export class MTECResultsScraper extends BaseScraper {
 
     const order = this.config.eventSearchOrder || ['marathon', 'half']
     const allCandidates = []
+    // Every sold distance is searched before deciding: a namesake in a later
+    // distance makes it a pick, not the first distance's runner.
+    const pool = []
 
     for (const distKey of order) {
       const raceId = yearRaceIds[distKey]
@@ -103,7 +106,6 @@ export class MTECResultsScraper extends BaseScraper {
 
       console.log(`[${this.tag}] ${eventLabel} (race ${raceId}): ${searchRows.length} search row(s)`)
 
-      // Name-match within this distance only.
       const matches = this.filterNameMatches(runnerName, searchRows, r => r.name)
       console.log(`[${this.tag}] ${eventLabel}: ${matches.length} name-match(es)`)
 
@@ -116,15 +118,31 @@ export class MTECResultsScraper extends BaseScraper {
             eventType: r.eventLabel || eventLabel,
           })
         }
-        continue
       }
+      pool.push(...searchRows.map(r => ({ ...r, distKey, raceId, distLabel: eventLabel })))
+    }
 
-      if (matches.length > 1) {
-        return this.ambiguousResult(matches.map(m => ({ name: m.name, bib: m.bib })))
-      }
+    // Name matches from every distance, deduped by bib (the same bib twice is
+    // one person; a bib-less row falls back to its runner id). One is the
+    // runner. Several are different people sharing the name, and which
+    // distance they ran never settles it (Denver Colfax 2026 had a Diego
+    // Garcia in the half and two in the marathon). A person picks, earlier
+    // distances listed first.
+    const people = new Map()
+    for (const m of this.filterNameMatches(runnerName, pool, r => r.name)) {
+      const bib = String(m.bib ?? '').trim()
+      const key = bib ? `bib ${bib}` : `rid ${m.rid}`
+      if (!people.has(key)) people.set(key, m)
+    }
+    const found = [...people.values()]
+    if (found.length > 1) {
+      return this.ambiguousResult(found.map(m => ({ name: m.name, bib: m.bib, eventType: m.distLabel })))
+    }
 
+    if (found.length === 1) {
       // Single match → fetch detail page for chip time + pace.
-      const match = matches[0]
+      const match = found[0]
+      const { distKey, raceId, distLabel: eventLabel } = match
       let detail
       try {
         detail = await this._fetchRunnerDetail(match.rid, raceId)
@@ -141,7 +159,7 @@ export class MTECResultsScraper extends BaseScraper {
 
       const formattedTime = this.formatTime(detail.chipTime)
       const distanceMiles = this.config.distances?.[distKey] || 26.2
-      // Always compute overall pace — the page only exposes per-segment pace
+      // Always compute overall pace: the page only exposes per-segment pace
       // (see file header). Computed pace == the page's headline "Pace" value.
       const pace = this.formatPace(this.calculatePace(detail.chipTime, distanceMiles))
 

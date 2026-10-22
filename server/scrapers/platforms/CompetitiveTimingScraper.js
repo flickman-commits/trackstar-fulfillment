@@ -23,6 +23,41 @@ import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 const API_BASE = 'https://liveplanit-api-461759013131.us-central1.run.app'
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
+/**
+ * Decide a name search from every sold event's own answer. Each event comes
+ * back found, ambiguous or not found; the name matches from all of them are
+ * pooled and deduped by bib (the same bib twice is one person). One bib is
+ * the runner. Several bibs are different people sharing the name, and which
+ * event they ran never settles it: Denver Colfax 2026 had a Diego Garcia in
+ * the half and two in the marathon, and the half one was printed for a
+ * marathon customer. A person picks. `answers` is in eventSearchOrder, so the
+ * picker lists earlier events first. A strong name match in one event still
+ * outranks a short form in another, as it does within one event. Returns
+ * null when no event had a match.
+ */
+function poolEventAnswers(scraper, runnerName, answers) {
+  const people = new Map()
+  for (const { result, label } of answers) {
+    const rows = result.found
+      ? [{ candidate: { name: result.runnerName || result.rawData?.name || null, bib: result.bibNumber, time: result.officialTime, pace: result.officialPace, eventType: result.eventType || label }, result }]
+      : result.ambiguous
+        ? (result.matches || []).map(m => ({ candidate: { ...m, eventType: m.eventType || label } }))
+        : []
+    for (const row of rows) {
+      const c = row.candidate
+      const bib = String(c.bib ?? '').trim()
+      const key = bib ? `bib ${bib}` : `${c.name}|${c.time}|${c.eventType}`
+      if (!people.has(key)) people.set(key, row)
+    }
+  }
+  if (people.size === 0) return null
+  const all = [...people.values()]
+  const kept = scraper.filterNameMatches(runnerName, all, p => p.candidate.name || runnerName)
+  const list = kept.length ? kept : all
+  if (list.length === 1 && list[0].result) return list[0].result
+  return scraper.ambiguousResult(list.map(p => p.candidate))
+}
+
 export class CompetitiveTimingScraper extends BaseScraper {
   constructor(year, config) {
     super(config.raceName, year)
@@ -86,7 +121,10 @@ export class CompetitiveTimingScraper extends BaseScraper {
     const eventOrder = this.config.eventSearchOrder || ['marathon', 'half']
     const distSlug = { marathon: 'marathon', half: 'half-marathon' }
 
+    // Every sold event is searched, even after one has a match: a namesake in
+    // a later event makes it a pick, not the first event's runner.
     let anyConfigured = false
+    const answers = []
     for (const eventKey of eventOrder) {
       const event = events[eventKey]
       if (!event) continue
@@ -95,14 +133,21 @@ export class CompetitiveTimingScraper extends BaseScraper {
       const distanceMiles = this.config.distances?.[eventKey] ?? (eventKey === 'half' ? 13.1 : 26.2)
 
       const result = await this.searchEvent(runnerName, event, eventLabel, distanceMiles, distSlug[eventKey] || 'marathon')
-      if (result.found) return result
-      // If we got candidates on the marathon, keep them as a fallback but still try half.
-      if (result.__hasCandidates && eventKey === eventOrder[eventOrder.length - 1]) return result
+      answers.push({ result, label: eventLabel, eventKey })
     }
 
     if (!anyConfigured) {
       return this.yearNotConfiguredResult('no Competitive Timing event found for this year')
     }
+    // An event whose results did not load could hold a namesake, so a match
+    // elsewhere cannot be called the runner until it does.
+    const failed = answers.find(a => a.result.researchStatus === 'upstream_error')
+    const pooled = poolEventAnswers(this, runnerName, answers)
+    if (pooled && failed) return failed.result
+    if (pooled) return pooled
+    // No match anywhere: the last event's candidates, as before.
+    const last = answers[answers.length - 1]
+    if (last?.result.__hasCandidates && last.eventKey === eventOrder[eventOrder.length - 1]) return last.result
     return this.notFoundResult()
   }
 
