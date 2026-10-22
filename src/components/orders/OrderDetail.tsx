@@ -6,7 +6,7 @@ import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import type { Design } from '@/lib/useDesign'
 import { raceNotRunYet, showsRaceNotRun } from '@/lib/raceStatus'
-import ProofManager from '@/components/ProofManager'
+import ProofManager, { type ProofActions } from '@/components/ProofManager'
 import PostApprovalChecklist from '@/components/PostApprovalChecklist'
 import CustomFinalPdf from '@/components/CustomFinalPdf'
 import AddPhotoPanel from '@/components/AddPhotoPanel'
@@ -351,6 +351,8 @@ export default function OrderDetail({
   // Comment composer stays collapsed until asked for. Auto-opens when the
   // order already has a thread worth replying to.
   const [showCommentBox, setShowCommentBox] = useState(false)
+  // Re-send and Message customer, handed up by the custom order's ProofManager for the sidebar.
+  const [proofActions, setProofActions] = useState<ProofActions | null>(null)
   // Custom order on the phone: the proofs lead; the rest opens on demand.
   const [customDetailsOpen, setCustomDetailsOpen] = useState(false)
   const [commentImageFile, setCommentImageFile] = useState<File | null>(null)
@@ -1160,7 +1162,28 @@ Thank you!`
                   </button>
                 )}
                 {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner')
-                  ? <span className={`w-3 h-3 rounded-full shrink-0 ${(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).dot}`} aria-hidden />
+                  ? (() => {
+                      // Where a standard order's status sits, and it is the control: pick a status from it.
+                      const cur = DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] ? selectedOrder.designStatus as DesignStatus : 'not_started'
+                      const cfg = DESIGN_STATUS_CONFIG[cur]
+                      return (
+                        <label className={`order-last md:order-none relative shrink-0 inline-flex items-center gap-1.5 pl-2 pr-1.5 py-0.5 rounded-full border border-border-gray text-[11px] md:text-xs font-medium whitespace-nowrap cursor-pointer ${cfg.bgColor} ${cfg.color}`} title="Change the design status">
+                          <span className={`w-2 h-2 rounded-full ${cfg.dot}`} aria-hidden />
+                          {designLabel(cur, selectedOrder.trackstarOrderType)}
+                          <ChevronDownIcon className="w-3 h-3 opacity-60" />
+                          <select
+                            value={cur}
+                            onChange={e => updateDesignStatus(selectedOrder.orderNumber, e.target.value as DesignStatus)}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            aria-label="Design status"
+                          >
+                            {selectableDesignStatuses(selectedOrder.trackstarOrderType, selectedOrder.designStatus).map(st => (
+                              <option key={st} value={st}>{designLabel(st, selectedOrder.trackstarOrderType)}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )
+                    })()
                   : (() => { const d = getStatusDisplay(selectedOrder); return (
                       <span className="order-last md:order-none shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-border-gray bg-white text-[11px] md:text-xs text-off-black/70 whitespace-nowrap" title={selectedOrder.pipeline?.fix || d.label}>
                         <span className={`w-2 h-2 rounded-full ${d.dot || 'bg-off-black/25'}`} />{d.label}
@@ -1251,17 +1274,8 @@ Thank you!`
                   {(() => {
                     // Stage-based collapse logic
                     const ds = selectedOrder.designStatus as DesignStatus
-                    const isDesigning = ['not_started', 'in_progress'].includes(ds)
-                    const isProofStage = ['awaiting_review', 'in_revision', 'approved_by_customer'].includes(ds)
                     const isProductionStage = ['final_pdf_uploaded', 'sent_to_production'].includes(ds)
 
-                    // Progress indicator step
-                    const progressSteps = [
-                      { label: 'Design', active: isDesigning || isProofStage || isProductionStage },
-                      { label: 'Review', active: ['awaiting_review', 'in_revision', 'approved_by_customer'].includes(ds) || isProductionStage },
-                      { label: 'Approved', active: ds === 'approved_by_customer' || isProductionStage },
-                      { label: 'Production', active: isProductionStage },
-                    ]
 
                     return (
                   <div className="space-y-4">
@@ -1270,10 +1284,7 @@ Thank you!`
                   {selectedOrder.trackstarOrderType === 'custom' && (
                     <div className="md:hidden space-y-3">
                       <ProofShowcase orderId={selectedOrder.id} />
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium ${(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).bgColor} ${(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).color}`}>
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).dot}`} aria-hidden />{designLabel(DESIGN_STATUS_CONFIG[ds] ? ds : 'not_started', selectedOrder.trackstarOrderType)}
-                        </span>
+                      <div className="flex items-center justify-end gap-2">
                         <button type="button" onClick={() => setCustomDetailsOpen(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-[#4600D6]">
                           {customDetailsOpen ? 'Hide details' : 'Details'} <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${customDetailsOpen ? 'rotate-180' : ''}`} />
                         </button>
@@ -1285,52 +1296,6 @@ Thank you!`
                       design details and the smaller actions. */}
                   <div className={`flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_340px] md:gap-6 md:items-start ${selectedOrder.trackstarOrderType === 'custom' && !customDetailsOpen ? 'hidden md:grid' : ''}`}>
                   <aside className="order-2 md:order-none md:col-start-2 md:row-start-1 md:sticky md:top-0 space-y-4 mt-6 md:mt-0">
-                  {/* Status: where it is in the design flow, and the control to move it. */}
-                  <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-3">
-                  <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Status</div>
-                  {/* Stage Progress Indicator */}
-                  <div className="flex items-center gap-1 px-1">
-                    {progressSteps.map((step, i) => (
-                      <div key={step.label} className="flex items-center gap-1 flex-1">
-                        <div className={`flex items-center gap-1.5 ${i < progressSteps.length - 1 ? 'flex-1' : ''}`}>
-                          <div className={`w-2 h-2 rounded-full shrink-0 ${step.active ? 'bg-dark-fill' : 'bg-off-black/15'}`} />
-                          <span className={`text-[10px] font-medium whitespace-nowrap ${step.active ? 'text-off-black' : 'text-off-black/30'}`}>
-                            {step.label}
-                          </span>
-                        </div>
-                        {i < progressSteps.length - 1 && (
-                          <div className={`flex-1 h-px ${step.active && progressSteps[i + 1].active ? 'bg-off-black/30' : 'bg-off-black/10'}`} />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {/* Design Status Dropdown — always visible */}
-                  <div>
-                    <div className="relative">
-                      <select
-                        value={DESIGN_STATUS_CONFIG[ds] ? ds : 'not_started'}
-                        onChange={(e) => updateDesignStatus(selectedOrder.orderNumber, e.target.value as DesignStatus)}
-                        className={`w-full appearance-none px-3 py-2.5 pr-8 rounded-md text-sm font-medium border transition-colors cursor-pointer ${
-                          (DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).bgColor
-                        } ${
-                          (DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).color
-                        } border-border-gray focus:outline-none focus:ring-2 focus:ring-off-black/20`}
-                      >
-                        {selectableDesignStatuses(selectedOrder.trackstarOrderType, selectedOrder.designStatus).map(status => (
-                          <option key={status} value={status}>
-                            {designLabel(status, selectedOrder.trackstarOrderType)}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                        <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                  </div>
-
                   {/* What is being made. No Shopify or Artelo links on a custom order: the designers work from the proofs, not the shop. */}
                   <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
                     <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-0.5">{selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Order' : 'Order Details'}</div>
@@ -1353,6 +1318,27 @@ Thank you!`
                         )}
                         {selectedOrder.photoPath && (
                           <span className="inline-flex items-center px-2 py-1 rounded border text-xs font-semibold bg-[#4600D6]/10 text-[#4600D6] border-[#4600D6]/25">Photo on print</span>
+                        )}
+                      </div>
+                    )}
+                    {/* The file's name and where approval emails go, with what is being made. */}
+                    {selectedOrder.trackstarOrderType === 'custom' && (
+                      <div className="mt-3 pt-2 border-t border-border-gray space-y-1">
+                        <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
+                        {selectedOrder.trackstarOrderType === 'custom' ? (
+                          <ApprovalEmailField
+                            order={selectedOrder}
+                            onSaved={(email) => {
+                              setSelectedOrder(prev => prev && prev.id === selectedOrder.id ? { ...prev, customerEmail: email } : prev)
+                              setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, customerEmail: email } : o))
+                              setToast({ message: `Approval emails now go to ${email}`, type: 'success' })
+                            }}
+                          />
+                        ) : selectedOrder.customerEmail && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-body-sm text-off-black/60">Email</span>
+                            <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
+                          </div>
                         )}
                       </div>
                     )}
@@ -1436,56 +1422,6 @@ Thank you!`
                     </div>
                   )}
 
-                  {/* Design details: what goes on the print, the filename, and where approval emails go. */}
-                  {!(isProductionStage && selectedOrder.trackstarOrderType === 'custom') && (
-                    <div>
-                      <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">{selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Info' : 'Design Details'}</h4>
-                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
-                        {selectedOrder.trackstarOrderType === 'race_partner' ? (
-                          <PartnerInfoFields
-                            key={selectedOrder.orderNumber}
-                            order={selectedOrder}
-                            onToast={setToast}
-                            onSaved={async () => {
-                              await fetchOrders()
-                              const refreshed = await apiFetch('/api/orders?type=race_partner').then(r => r.json())
-                              const updated = refreshed.orders?.find((o: { orderNumber: string }) => o.orderNumber === selectedOrder.orderNumber)
-                              if (updated) setSelectedOrder(prev => prev ? { ...prev, ...updated } : prev)
-                            }}
-                          />
-                        ) : (
-                          <>
-                            <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
-                            <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
-                            <StaticField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
-                            {selectedOrder.bibNumberCustomer && (
-                              <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
-                            )}
-                            {selectedOrder.timeCustomer && (
-                              <CopyableField label="Time" value={selectedOrder.timeCustomer} />
-                            )}
-                            <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                            {selectedOrder.trackstarOrderType === 'custom' ? (
-                              <ApprovalEmailField
-                                order={selectedOrder}
-                                onSaved={(email) => {
-                                  setSelectedOrder(prev => prev && prev.id === selectedOrder.id ? { ...prev, customerEmail: email } : prev)
-                                  setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, customerEmail: email } : o))
-                                  setToast({ message: `Approval emails now go to ${email}`, type: 'success' })
-                                }}
-                              />
-                            ) : selectedOrder.customerEmail && (
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Email</span>
-                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Smaller things you can do to the order. */}
                   <div>
                     <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Actions</h4>
@@ -1495,9 +1431,23 @@ Thank you!`
                           <Plus className="w-3.5 h-3.5" /> Add comment
                         </button>
                       )}
+                      {/* From the proofs (ProofManager onActions): send the proof email again, and the proof Q&A with the customer. */}
+                      {selectedOrder.trackstarOrderType === 'custom' && proofActions?.resend && (
+                        <button onClick={proofActions.resend} disabled={proofActions.resending} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2 disabled:opacity-50">
+                          {proofActions.resending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Re-send proofs to customer
+                        </button>
+                      )}
+                      {selectedOrder.trackstarOrderType === 'custom' && proofActions && !isProductionStage && (
+                        <button onClick={proofActions.openMessages} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2" title="Ask the customer a question about the design; their reply comes back here">
+                          <MessageSquareText className="w-3.5 h-3.5" /> Message customer
+                          {proofActions.newReply
+                            ? <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-100 text-purple-700 no-underline">New reply</span>
+                            : proofActions.messageCount > 0 ? <span className="text-off-black/40 font-normal">({proofActions.messageCount})</span> : null}
+                        </button>
+                      )}
                       {selectedOrder.customerEmail && can('support') && (
                         <button onClick={() => setEmailingOrder(selectedOrder)} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2" title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}>
-                          <Mail className="w-3.5 h-3.5" /> Email customer
+                          <Mail className="w-3.5 h-3.5" /> Email customer from Support
                         </button>
                       )}
                       {/* Emergency delay notice: findable, not the main action. */}
@@ -1685,6 +1635,7 @@ Thank you!`
                         onLatestFeedback={setLatestFeedback}
                         disableEmail={selectedOrder.trackstarOrderType === 'race_partner'}
                         allowGroups={selectedOrder.trackstarOrderType === 'race_partner'}
+                        onActions={selectedOrder.trackstarOrderType === 'custom' ? setProofActions : undefined}
                       />
                     </div>
                   )}
@@ -1696,6 +1647,41 @@ Thank you!`
                       <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
                     </div>
                   )}
+
+                  {/* What goes on the print, to check the proofs against. */}
+                  {!(isProductionStage && selectedOrder.trackstarOrderType === 'custom') && (
+                    <div>
+                      <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">{selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Info' : 'Design Details'}</h4>
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
+                        {selectedOrder.trackstarOrderType === 'race_partner' ? (
+                          <PartnerInfoFields
+                            key={selectedOrder.orderNumber}
+                            order={selectedOrder}
+                            onToast={setToast}
+                            onSaved={async () => {
+                              await fetchOrders()
+                              const refreshed = await apiFetch('/api/orders?type=race_partner').then(r => r.json())
+                              const updated = refreshed.orders?.find((o: { orderNumber: string }) => o.orderNumber === selectedOrder.orderNumber)
+                              if (updated) setSelectedOrder(prev => prev ? { ...prev, ...updated } : prev)
+                            }}
+                          />
+                        ) : (
+                          <>
+                            <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
+                            <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
+                            <StaticField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
+                            {selectedOrder.bibNumberCustomer && (
+                              <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
+                            )}
+                            {selectedOrder.timeCustomer && (
+                              <CopyableField label="Time" value={selectedOrder.timeCustomer} />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
 
                   {photoCard}
 

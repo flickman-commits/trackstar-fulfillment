@@ -55,7 +55,12 @@ interface ProofManagerProps {
   // only: a custom order is one design and the label would be a question with
   // one answer.
   allowGroups?: boolean
+  // The order view's sidebar carries Re-send and Message customer as actions:
+  // given this, they leave the proofs area and the messages open as a dialog.
+  onActions?: (a: ProofActions) => void
 }
+
+export type ProofActions = { resend: (() => void) | null; resending: boolean; openMessages: () => void; newReply: boolean; messageCount: number }
 
 /**
  * Compact picker for what a design is an option for. Existing labels on the
@@ -111,7 +116,7 @@ function LabelPicker({ value, options, onChange, disabled, className = '' }: {
   )
 }
 
-export default function ProofManager({ orderId, designStatus, customerEmail, onDesignStatusChange, onLatestFeedback, disableEmail, allowGroups }: ProofManagerProps) {
+export default function ProofManager({ orderId, designStatus, customerEmail, onDesignStatusChange, onLatestFeedback, disableEmail, allowGroups, onActions }: ProofManagerProps) {
   const [proofs, setProofs] = useState<Proof[]>([])
   const [approvalToken, setApprovalToken] = useState<ApprovalToken | null>(null)
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null)
@@ -485,6 +490,11 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   // Show note field when there are pending proofs to send, OR when files are selected (about to upload)
   const showNoteField = (showSendButton || selectedFiles.length > 0) && ['in_progress', 'in_revision'].includes(designStatus || '')
   const showResendButton = canSend && designStatus === 'awaiting_review'
+  const sendRef = useRef(sendToCustomer)
+  sendRef.current = sendToCustomer
+  useEffect(() => {
+    onActions?.({ resend: showResendButton ? () => sendRef.current() : null, resending: isSending, openMessages: () => setShowMessaging(true), newReply: awaitingDanReply, messageCount: messages.length })
+  }, [onActions, showResendButton, isSending, awaitingDanReply, messages.length])
   const isRevision = designStatus === 'in_revision'
 
   const statusBadge = (proof: Proof) => {
@@ -533,9 +543,10 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   // ═══ Designer ↔ customer Q&A — compose a question + see replies ═══
   // Rendered in both compact and full modes so Dan can always reach the
   // customer. Disabled (with a hint) when there's no email on the order.
-  const messagingOpen = showMessaging || awaitingDanReply
+  // In the sidebar layout a new reply shows as a badge on the action, not a dialog that opens by itself.
+  const messagingOpen = showMessaging || (!onActions && awaitingDanReply)
   const labelOptions = [...new Set(proofs.map(p => p.groupLabel).filter((l): l is string => !!l))]
-  const messagingBlock = (
+  const messagingInline = (
     <div className="border border-border-gray rounded-md bg-white">
       <button
         type="button"
@@ -594,6 +605,13 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
       )}
     </div>
   )
+  const messagingBlock = !onActions ? messagingInline : messagingOpen ? (
+    <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setShowMessaging(false)}>
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-full overflow-auto" onClick={e => e.stopPropagation()}>
+        {messagingInline}
+      </div>
+    </div>
+  ) : null
 
   // ═══ COMPACT MODE: just thumbnails for reference ═══
   if (isCompact && proofs.length > 0) {
@@ -639,53 +657,10 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
   }
 
   // ═══ FULL MODE: upload UI, approval link, proof history ═══
-  return (
-    <div className="space-y-3" onPaste={handlePaste}>
-      {lightbox}
-      {/* Approval Link — compact inline */}
-      {approvalUrl ? (
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            readOnly
-            value={approvalUrl}
-            className="flex-1 text-[10px] bg-blue-50 border border-blue-200 rounded px-2 py-1.5 text-blue-800 font-mono truncate"
-          />
-          <button
-            onClick={copyLink}
-            className="px-2 py-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 rounded transition-colors flex items-center gap-1"
-          >
-            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-          <a
-            href={approvalUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2 py-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 rounded transition-colors flex items-center gap-1"
-            title="Open the portal in a new tab"
-          >
-            <ExternalLink className="w-3 h-3" />
-            Open
-          </a>
-          <button
-            onClick={generateToken}
-            className="text-[10px] text-off-black/30 hover:text-off-black/50 transition-colors"
-            title="Regenerate link"
-          >
-            <RefreshCw className="w-3 h-3" />
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={generateToken}
-          className="w-full px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors flex items-center justify-center gap-1.5"
-        >
-          <Link2 className="w-3 h-3" />
-          Generate Approval Link
-        </button>
-      )}
-
+  const pendingCount = proofs.filter(p => p.status === 'pending').length
+  // Adding proofs sits under the current batch, where the next one joins it.
+  const uploadBlock = (
+    <>
       {/* Upload Proofs. Small until files are chosen; the label picker only
           shows once there is something to label. */}
       {filePreviews.length > 0 ? (
@@ -743,7 +718,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         <div className="flex items-center gap-2">
           <label className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-off-black/70 bg-white border border-border-gray rounded-md hover:bg-subtle-gray transition-colors">
             <ImagePlus className="w-3.5 h-3.5" />
-            Add proofs
+            {pendingCount > 0 ? 'Add proofs to this batch' : 'Add proofs'}
             <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" />
           </label>
           <span className="text-[10px] text-off-black/35">or paste from the clipboard</span>
@@ -778,7 +753,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         </div>
       )}
 
-      {showResendButton && (
+      {showResendButton && !onActions && (
         <button
           onClick={sendToCustomer}
           disabled={isSending}
@@ -792,12 +767,63 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
         </button>
       )}
 
+    </>
+  )
+
+  return (
+    <div className="space-y-3" onPaste={handlePaste}>
+      {lightbox}
+      {/* Approval Link — compact inline */}
+      {approvalUrl ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            readOnly
+            value={approvalUrl}
+            className="flex-1 text-[10px] bg-blue-50 border border-blue-200 rounded px-2 py-1.5 text-blue-800 font-mono truncate"
+          />
+          <button
+            onClick={copyLink}
+            className="px-2 py-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 rounded transition-colors flex items-center gap-1"
+          >
+            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+          <a
+            href={approvalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2 py-1.5 text-[10px] font-medium text-blue-600 hover:text-blue-800 rounded transition-colors flex items-center gap-1"
+            title="Open the portal in a new tab"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Open
+          </a>
+          <button
+            onClick={generateToken}
+            className="text-[10px] text-off-black/30 hover:text-off-black/50 transition-colors"
+            title="Regenerate link"
+          >
+            <RefreshCw className="w-3 h-3" />
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={generateToken}
+          className="w-full px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors flex items-center justify-center gap-1.5"
+        >
+          <Link2 className="w-3 h-3" />
+          Generate Approval Link
+        </button>
+      )}
+
       {/* Proof History — thumbnail grid grouped by batch */}
       {(() => {
         const currentBatch = proofs.filter(p => p.status === 'pending')
         const previousProofs = proofs.filter(p => p.status !== 'pending')
 
-        const renderThumbnail = (proof: Proof) => (
+        // The current batch is what the customer is looking at: big enough to judge, click to enlarge.
+        const renderThumbnail = (proof: Proof, big = false) => (
           <div key={proof.id} className="relative group">
             {proof.imageUrl.toLowerCase().includes('.pdf') ? (
               <a href={proof.imageUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-2.5 py-2 rounded-md border border-border-gray bg-white hover:bg-gray-50 transition-colors">
@@ -805,15 +831,18 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                 <span className="text-[10px] text-off-black/50 max-w-[80px] truncate">{proof.fileName || `v${proof.version}`}</span>
               </a>
             ) : (
-              <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block">
+              <button onClick={() => setLightboxUrl(proof.imageUrl)} className="block" title="Enlarge">
                 <img
-                  src={proof.thumbnailUrl || proof.imageUrl}
+                  src={big ? proof.imageUrl : (proof.thumbnailUrl || proof.imageUrl)}
                   alt={`Proof v${proof.version}`}
-                  className="h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity cursor-pointer"
+                  className={big
+                    ? 'w-36 aspect-[4/5] object-contain rounded-lg border border-border-gray bg-[#ece9e2] hover:opacity-90 transition-opacity cursor-zoom-in'
+                    : 'h-14 w-14 object-cover rounded-md border border-border-gray hover:opacity-90 transition-opacity cursor-pointer'}
+                  loading="lazy"
                 />
               </button>
             )}
-            <div className="absolute -top-1 -right-1">
+            <div className={big ? 'absolute top-1.5 right-1.5' : 'absolute -top-1 -right-1'}>
               {statusBadge(proof)}
             </div>
             {/* Always visible: a double upload has to be undoable without
@@ -834,7 +863,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
             {/* The label sits under the thumbnail, always visible, so what
                 each option is for can be read at a glance and changed in place. */}
             {allowGroups && proof.status === 'pending' && (
-              <div className="mt-1 w-14">
+              <div className={`mt-1 ${big ? 'w-36' : 'w-14'}`}>
                 <LabelPicker
                   value={proof.groupLabel || ''}
                   options={labelOptions}
@@ -911,20 +940,22 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                             )}
                             <span className="text-[10px] text-off-black/35">{items.length} option{items.length !== 1 ? 's' : ''}</span>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            {[...items].reverse().map(renderThumbnail)}
+                          <div className="flex flex-wrap gap-3">
+                            {[...items].reverse().map(p => renderThumbnail(p, true))}
                           </div>
                         </div>
                       ))
                     })()}
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {[...currentBatch].reverse().map(renderThumbnail)}
+                  <div className="flex flex-wrap gap-3">
+                    {[...currentBatch].reverse().map(p => renderThumbnail(p, true))}
                   </div>
                 )}
               </div>
             )}
+
+            {uploadBlock}
 
             {/* Previous batches — grouped by round */}
             {sortedBatches.map(([batchNum, batchProofs]) => {
@@ -944,7 +975,7 @@ export default function ProofManager({ orderId, designStatus, customerEmail, onD
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2 opacity-60">
-                    {[...batchProofs].reverse().map(renderThumbnail)}
+                    {[...batchProofs].reverse().map(p => renderThumbnail(p))}
                   </div>
                 </div>
               )
