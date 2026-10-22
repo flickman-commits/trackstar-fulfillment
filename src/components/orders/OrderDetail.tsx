@@ -1123,7 +1123,9 @@ Thank you!`
     <>
       <div
         ref={detailScrollRef}
-        className={inlineDetail ? 'flex-1 min-h-0 overflow-y-auto pb-36 md:pb-8' : 'fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50'}
+        // The order view only ever scrolls down: overflow-y alone would let anything
+        // too wide scroll it sideways too (and hide the left edge of the order).
+        className={inlineDetail ? 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-36 md:pb-8' : 'fixed inset-0 bg-off-black/60 flex items-center justify-center p-4 z-50'}
         onClick={(e) => {
           // Close modal when clicking on backdrop (not modal content)
           if (!inlineDetail && e.target === e.currentTarget && !isEditing) {
@@ -2294,7 +2296,7 @@ Thank you!`
                     With a finished render, the print sits to their left
                     so name, bib, time and weather can be checked at a glance. */}
                 {/* The values are big: this panel is for checking what the customer entered against the print. */}
-                <div className={`grid grid-cols-1 gap-3 ${design.reserved ? 'md:grid-cols-[minmax(0,1fr),auto]' : 'md:grid-cols-2'}`}>
+                <div className={`grid grid-cols-1 gap-3 ${design.reserved ? 'md:grid-cols-[minmax(0,1fr),minmax(0,347px)]' : 'md:grid-cols-2'}`}>
                   <div className={design.reserved ? 'flex flex-col gap-3 min-w-0' : 'contents'}>
                   <div className="bg-subtle-gray border border-border-gray rounded-md p-3 [&_span.font-medium:not(.rounded)]:!text-[19px] [&_span.font-medium:not(.rounded)]:!font-semibold [&_span.font-medium:not(.rounded)]:!leading-tight">
                     <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-gray min-h-[22px]">
@@ -2693,7 +2695,7 @@ Thank you!`
                   {design.reserved && photoCard}
                   </div>
                   {/* The print sits to the right of the details it was made from. */}
-                  {design.reserved && <div className="flex order-first md:order-none"><DesignCard d={design} /></div>}
+                  {design.reserved && <div className="flex min-w-0 order-first md:order-none"><DesignCard d={design} /></div>}
                 </div>
               </div>
 

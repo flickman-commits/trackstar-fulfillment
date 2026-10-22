@@ -26,7 +26,7 @@ function WorkerDot({ d }: { d: Design }) {
 /** Sits where the order's preview goes: the finished print, or its status and a Create Design button. */
 export function DesignCard({ d }: { d: Design }) {
   const [lightbox, setLightbox] = useState(false)
-  if (d.reserved && !d.state) return <div className="w-full md:w-[347px] aspect-[2/3] md:aspect-auto md:h-[520px] self-start rounded-md border border-border-gray bg-subtle-gray animate-pulse" />
+  if (d.reserved && !d.state) return <div className="w-full md:w-[347px] md:max-w-full aspect-[2/3] md:aspect-auto md:h-[520px] self-start rounded-md border border-border-gray bg-subtle-gray animate-pulse" />
   if (!d.visible || !d.state) return null
   const { job, state } = d
 
@@ -36,7 +36,7 @@ export function DesignCard({ d }: { d: Design }) {
     const ratio = m ? `${m[1]} / ${m[2]}` : '2 / 3'
     return (
       <div className="self-start w-full md:w-auto flex flex-col items-center gap-2">
-        <button onClick={() => setLightbox(true)} style={{ aspectRatio: ratio }} className="relative self-start w-full md:w-[347px] rounded-md border border-border-gray bg-subtle-gray overflow-hidden" title="Open larger">
+        <button onClick={() => setLightbox(true)} style={{ aspectRatio: ratio }} className="relative self-start w-full md:w-[347px] md:max-w-full rounded-md border border-border-gray bg-subtle-gray overflow-hidden" title="Open larger">
           <img src={job.previewUrl} alt={`Render of ${job.spec.file}`} className="w-full h-full object-contain block" />
           {job.review !== 'pending' && (
             <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold ${job.review === 'approved' ? 'bg-green-100 text-green-800' : job.review === 'closed' ? 'bg-off-black/10 text-off-black/70' : 'bg-red-100 text-red-800'}`}>
@@ -69,7 +69,7 @@ export function DesignCard({ d }: { d: Design }) {
 
   const inFlight = job && (job.status === 'queued' || job.status === 'rendering')
   return (
-    <div className="w-full md:w-[347px] aspect-[2/3] md:aspect-auto md:h-[520px] self-start rounded-md border border-dashed border-border-gray bg-subtle-gray flex flex-col items-center justify-center gap-3 p-4 text-center">
+    <div className="w-full md:w-[347px] md:max-w-full aspect-[2/3] md:aspect-auto md:h-[520px] self-start rounded-md border border-dashed border-border-gray bg-subtle-gray flex flex-col items-center justify-center gap-3 p-4 text-center">
       <span className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Design</span>
       {inFlight ? (
         <div className="flex flex-col items-center gap-2 text-sm text-off-black/70">
