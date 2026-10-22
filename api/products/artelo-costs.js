@@ -14,14 +14,14 @@
  */
 
 import { setCors, requireAdmin } from '../_lib/auth.js'
-import { requireCapability } from '../_lib/users.js'
+import { requireAdminOnly } from '../_lib/users.js'
 import { fetchArteloCostMatrix, SIZES, COLUMNS } from '../../server/services/arteloCosts.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
   // Landed cost per variant: the same audience as the Pricing Calculator.
-  if (!(await requireCapability(req, res, 'settings.pricing'))) return
+  if (!(await requireAdminOnly(req, res))) return
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {

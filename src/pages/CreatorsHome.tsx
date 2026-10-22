@@ -107,7 +107,7 @@ interface HomeMetrics {
     total: number
     shipped: number
     pending: number
-    costEstimatedUsd: number
+    costEstimatedUsd: number | null
     costIsPlaceholder: boolean
   }
   ads: { running: number; isPlaceholder: boolean }
@@ -292,7 +292,7 @@ export default function CreatorsHome() {
 
   const statsLine = metrics && (
     <span className="text-xs text-off-black/50 whitespace-nowrap">
-      {metrics.creators.appliedThisMonth} new this month · {metrics.samples.total} samples · {formatUsd(metrics.samples.costEstimatedUsd)} spent
+      {metrics.creators.appliedThisMonth} new this month · {metrics.samples.total} samples{metrics.samples.costEstimatedUsd != null ? ` · ${formatUsd(metrics.samples.costEstimatedUsd)} spent` : ''}
     </span>
   )
 

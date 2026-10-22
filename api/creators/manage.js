@@ -13,19 +13,20 @@
  */
 import prisma from '../_lib/prisma.js'
 import { setCors } from '../_lib/auth.js'
+import { seesMoney } from '../_lib/money.js'
 import { requireCapability, requireAdminRole, recordAudit } from '../_lib/users.js'
 import { sendCreatorSample, linkCreatorSamples } from '../../server/domain/creators/creatorSample.js'
 import { makeInviteToken } from '../../server/domain/creators/portal.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
 
 const GET_ACTIONS = {
-  'home-metrics': res => handleCreatorHomeMetrics(res),
-  'list-creators': res => handleListCreators(res),
+  'home-metrics': (res, money) => handleCreatorHomeMetrics(res, money),
+  'list-creators': (res, money) => handleListCreators(res, money),
   'list-briefs': res => handleListBriefs(res),
 }
 
 const POST_ACTIONS = {
-  'update-creator': (body, res) => handleUpdateCreator(body, res),
+  'update-creator': (body, res, actor) => handleUpdateCreator(body, res, seesMoney(actor)),
   'create-brief': (body, res) => handleCreateBrief(body, res),
   'update-brief': (body, res) => handleUpdateBrief(body, res),
   'create-creator-invite': (body, res) => handleCreateCreatorInvite(body, res),
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const run = GET_ACTIONS[String(req.query?.action || '')]
       if (!run) return res.status(400).json({ error: 'Unknown action' })
-      return await run(res)
+      return await run(res, seesMoney(user))
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -85,7 +86,7 @@ function sampleCostUsd(size, frame) {
   return isFramed ? sizeRow.framed : sizeRow.unframed
 }
 
-async function handleCreatorHomeMetrics(res) {
+async function handleCreatorHomeMetrics(res, money) {
   // Run aggregations in parallel
   const [
     activeCount,
@@ -136,7 +137,8 @@ async function handleCreatorHomeMetrics(res) {
       total: sampleOrders.length,
       shipped: samplesShipped,
       pending: samplesPending,
-      costEstimatedUsd: samplesCostEstimatedUsd,
+      // Sample cost is money: admins only (api/_lib/money.js).
+      costEstimatedUsd: money ? samplesCostEstimatedUsd : null,
       costIsPlaceholder: false,
     },
     // Placeholders for Week 3 when Meta + attribution land
@@ -149,7 +151,7 @@ async function handleCreatorHomeMetrics(res) {
 // --- list-creators ---
 // Returns all creators with their sample-order status joined in. Ordered by
 // invite date descending so the most recent shows up first.
-async function handleListCreators(res) {
+async function handleListCreators(res, money) {
   // Samples sent as Shopify orders: link each to its order once it has been imported.
   await linkCreatorSamples(await prisma.creator.findMany({ where: { NOT: { sampleShopifyOrderIds: { isEmpty: true } } }, select: { id: true, sampleOrderId: true, sampleShopifyOrderIds: true } }))
   const creators = await prisma.creator.findMany({
@@ -175,10 +177,12 @@ async function handleListCreators(res) {
   })
   // Attach internal-only sample cost per creator. Drives the COGS rollup
   // in the admin drawer; never surfaced in the creator-facing portal.
-  const enriched = creators.map(c => ({
-    ...c,
-    sampleCostUsd: sampleCostUsd(c.productSize, c.frameType),
-  }))
+  // Cost and commission terms are money: admins only (api/_lib/money.js).
+  const enriched = creators.map(c => {
+    if (money) return { ...c, sampleCostUsd: sampleCostUsd(c.productSize, c.frameType) }
+    const { commissionModel: _m, commissionConfig: _c, commissionNotes: _n, ...rest } = c
+    return rest
+  })
   return res.status(200).json({ creators: enriched })
 }
 
@@ -214,7 +218,8 @@ const CREATOR_SHIPPING_FIELDS = [
   'shippingCity', 'shippingState', 'shippingZip', 'shippingCountry',
 ]
 
-async function handleUpdateCreator({ creatorId, updates }, res) {
+const CREATOR_MONEY_FIELDS = new Set(['commissionModel', 'commissionConfig', 'commissionNotes'])
+async function handleUpdateCreator({ creatorId, updates }, res, money) {
   if (!creatorId) {
     return res.status(400).json({ error: 'creatorId is required' })
   }
@@ -224,6 +229,7 @@ async function handleUpdateCreator({ creatorId, updates }, res) {
 
   const data = {}
   for (const key of CREATOR_EDITABLE_FIELDS) {
+    if (!money && CREATOR_MONEY_FIELDS.has(key)) continue
     if (key in updates) data[key] = updates[key]
   }
 
@@ -283,6 +289,10 @@ async function handleUpdateCreator({ creatorId, updates }, res) {
   }
 
   console.log(`[actions/update-creator] Updated creator ${creatorId}: ${Object.keys(data).join(', ')}`)
+  if (!money) {
+    const { commissionModel: _m, commissionConfig: _c, commissionNotes: _n, ...rest } = updated
+    return res.status(200).json({ success: true, creator: rest })
+  }
   return res.status(200).json({ success: true, creator: updated })
 }
 

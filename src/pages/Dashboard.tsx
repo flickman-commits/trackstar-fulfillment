@@ -14,6 +14,7 @@ import EmailCustomerModal from '@/components/support/EmailCustomerModal'
 import PageHeader from '@/components/PageHeader'
 import OrderTags, { HoverTip } from '@/components/OrderTags'
 import OrderDetail from '@/components/orders/OrderDetail'
+import StatusPill from '@/components/orders/StatusPill'
 import {
   type ActiveView, type DesignStatus, type EditValues, type Order, type PossibleMatch,
   DESIGN_STATUS_CONFIG, designLabel, mapOrder, orderRefOf,
@@ -1105,9 +1106,7 @@ export default function Dashboard() {
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               <HoverTip text={statusDisplay.label} align="center">
-                                {statusDisplay.dot
-                                  ? <span className="inline-flex items-center gap-1.5 text-[11px] text-off-black/60 cursor-help"><span className={`w-2 h-2 rounded-full ${statusDisplay.dot}`} />{statusDisplay.label}</span>
-                                  : <span className="text-base cursor-help">{statusDisplay.icon}</span>}
+                                <span className="cursor-help"><StatusPill size="xs" label={statusDisplay.label} dot={statusDisplay.dot} color={statusDisplay.color} bg={statusDisplay.bg} /></span>
                               </HoverTip>
                               {(order.notes || (order.commentCount ?? 0) > 0) && (
                                 <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
@@ -1194,7 +1193,7 @@ export default function Dashboard() {
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${designConfig.bgColor} ${designConfig.color}`}>
-                                <span>{designConfig.icon}</span>
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${designConfig.dot}`} aria-hidden />
                                 {designLabel(order.designStatus, order.trackstarOrderType)}
                               </span>
                               {!isPartner && (
@@ -1271,7 +1270,7 @@ export default function Dashboard() {
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${designConfig.bgColor} ${designConfig.color}`}>
-                                    <span>{designConfig.icon}</span>
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${designConfig.dot}`} aria-hidden />
                                     {designLabel(order.designStatus, order.trackstarOrderType)}
                                   </span>
                                   <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
@@ -1358,8 +1357,7 @@ export default function Dashboard() {
                               <div className="flex items-center justify-center gap-1">
                                 <HoverTip text={order.pipeline?.fix || statusDisplay.label} align="center">
                                   <span className="inline-flex items-center gap-1.5 cursor-help whitespace-nowrap">
-                                    {statusDisplay.dot ? <span className={`w-2 h-2 rounded-full shrink-0 ${statusDisplay.dot}`} /> : <span className="text-base leading-none">{statusDisplay.icon}</span>}
-                                    <span className={`text-xs ${order.pipeline?.stage === 'action' ? 'text-red-700 font-medium' : order.pipeline?.stage === 'review' ? 'text-green-700 font-medium' : order.pipeline?.stage === 'attach' ? 'text-[#4600D6] font-medium' : 'text-off-black/60'}`}>{statusDisplay.label}</span>
+                                    <StatusPill label={statusDisplay.label} dot={statusDisplay.dot} color={statusDisplay.color} bg={statusDisplay.bg} />
                                   </span>
                                 </HoverTip>
                                 {(order.notes || (order.commentCount ?? 0) > 0) && (
@@ -1460,7 +1458,7 @@ export default function Dashboard() {
                           >
                             <td className="pl-6 pr-3 py-4">
                               <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
-                                <span>{designConfig.icon}</span>
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${designConfig.dot}`} aria-hidden />
                                 {designLabel(order.designStatus, order.trackstarOrderType)}
                               </span>
                             </td>
@@ -1537,7 +1535,7 @@ export default function Dashboard() {
                             </td>
                             <td className="px-3 py-4">
                               <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
-                                <span>{designConfig.icon}</span>
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${designConfig.dot}`} aria-hidden />
                                 {designLabel(order.designStatus, order.trackstarOrderType)}
                               </span>
                             </td>
@@ -1610,7 +1608,7 @@ export default function Dashboard() {
                                 </td>
                                 <td className="px-3 py-4">
                                   <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
-                                    <span>{designConfig.icon}</span>
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${designConfig.dot}`} aria-hidden />
                                     {designLabel(order.designStatus, order.trackstarOrderType)}
                                   </span>
                                 </td>
@@ -1753,7 +1751,7 @@ export default function Dashboard() {
                         >
                           <td className="pl-6 pr-3 py-4">
                             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${cfg.bgColor} ${cfg.color}`}>
-                              <span>{cfg.icon}</span>
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} aria-hidden />
                               {designLabel(order.designStatus, order.trackstarOrderType)}
                             </span>
                           </td>

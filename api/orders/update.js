@@ -6,6 +6,7 @@
 
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
+import { withoutRawOrderData } from '../_lib/money.js'
 import { getCanonicalRaceName } from '../../server/scrapers/index.js'
 import { setRaceDate, noteWeatherChange } from '../../server/domain/races/verification.js'
 import { recordAudit } from '../_lib/users.js'
@@ -266,7 +267,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      order
+      order: withoutRawOrderData(order)
     })
 
   } catch (error) {

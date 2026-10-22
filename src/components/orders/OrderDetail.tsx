@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, CloudSun, Download, ArrowUpRight, Mail, Shuffle } from 'lucide-react'
+import { Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, CloudSun, Download, ArrowUpRight, Mail, Shuffle, Clock, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import type { Design } from '@/lib/useDesign'
@@ -1160,7 +1160,7 @@ Thank you!`
                   </button>
                 )}
                 {(selectedOrder.trackstarOrderType === 'custom' || selectedOrder.trackstarOrderType === 'race_partner')
-                  ? <span className="text-xl">{(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).icon}</span>
+                  ? <span className={`w-3 h-3 rounded-full shrink-0 ${(DESIGN_STATUS_CONFIG[selectedOrder.designStatus as DesignStatus] || DESIGN_STATUS_CONFIG.not_started).dot}`} aria-hidden />
                   : (() => { const d = getStatusDisplay(selectedOrder); return (
                       <span className="order-last md:order-none shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-border-gray bg-white text-[11px] md:text-xs text-off-black/70 whitespace-nowrap" title={selectedOrder.pipeline?.fix || d.label}>
                         <span className={`w-2 h-2 rounded-full ${d.dot || 'bg-off-black/25'}`} />{d.label}
@@ -1272,7 +1272,7 @@ Thank you!`
                       <ProofShowcase orderId={selectedOrder.id} />
                       <div className="flex items-center justify-between gap-2">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium ${(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).bgColor} ${(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).color}`}>
-                          {(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).icon} {designLabel(DESIGN_STATUS_CONFIG[ds] ? ds : 'not_started', selectedOrder.trackstarOrderType)}
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${(DESIGN_STATUS_CONFIG[ds] || DESIGN_STATUS_CONFIG.not_started).dot}`} aria-hidden />{designLabel(DESIGN_STATUS_CONFIG[ds] ? ds : 'not_started', selectedOrder.trackstarOrderType)}
                         </span>
                         <button type="button" onClick={() => setCustomDetailsOpen(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-[#4600D6]">
                           {customDetailsOpen ? 'Hide details' : 'Details'} <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${customDetailsOpen ? 'rotate-180' : ''}`} />
@@ -1280,7 +1280,14 @@ Thank you!`
                       </div>
                     </div>
                   )}
-                  <div className={`space-y-4 ${selectedOrder.trackstarOrderType === 'custom' && !customDetailsOpen ? 'hidden md:block' : ''}`}>
+                  {/* Same shape as a standard order: the work on the left, and a
+                      sidebar with the status, what is being made, its tags, the
+                      design details and the smaller actions. */}
+                  <div className={`flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_340px] md:gap-6 md:items-start ${selectedOrder.trackstarOrderType === 'custom' && !customDetailsOpen ? 'hidden md:grid' : ''}`}>
+                  <aside className="order-2 md:order-none md:col-start-2 md:row-start-1 md:sticky md:top-0 space-y-4 mt-6 md:mt-0">
+                  {/* Status: where it is in the design flow, and the control to move it. */}
+                  <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-3">
+                  <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider">Status</div>
                   {/* Stage Progress Indicator */}
                   <div className="flex items-center gap-1 px-1">
                     {progressSteps.map((step, i) => (
@@ -1297,7 +1304,6 @@ Thank you!`
                       </div>
                     ))}
                   </div>
-
                   {/* Design Status Dropdown — always visible */}
                   <div>
                     <div className="relative">
@@ -1312,7 +1318,7 @@ Thank you!`
                       >
                         {selectableDesignStatuses(selectedOrder.trackstarOrderType, selectedOrder.designStatus).map(status => (
                           <option key={status} value={status}>
-                            {DESIGN_STATUS_CONFIG[status].icon} {designLabel(status, selectedOrder.trackstarOrderType)}
+                            {designLabel(status, selectedOrder.trackstarOrderType)}
                           </option>
                         ))}
                       </select>
@@ -1323,23 +1329,40 @@ Thank you!`
                       </div>
                     </div>
                   </div>
+                  </div>
 
-                  {/* Due date — compact inline, always visible (hidden for race_partner) */}
+                  {/* What is being made. No Shopify or Artelo links on a custom order: the designers work from the proofs, not the shop. */}
+                  <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+                    <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-0.5">{selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Order' : 'Order Details'}</div>
+                    <h3 className="text-lg font-bold text-off-black leading-tight min-w-0">
+                      {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'}{' '}
+                      {(selectedOrder.effectiveRaceYear || selectedOrder.raceYear) && (
+                        <span className="inline-flex items-center px-2 py-0.5 border rounded text-xs font-semibold align-middle whitespace-nowrap bg-white border-border-gray text-off-black">
+                          {selectedOrder.effectiveRaceYear || selectedOrder.raceYear}
+                        </span>
+                      )}
+                    </h3>
+                    {(selectedOrder.effectiveRunnerName || selectedOrder.runnerName) && selectedOrder.trackstarOrderType === 'custom' && (
+                      <div className="text-sm text-off-black/65 mt-0.5">{selectedOrder.effectiveRunnerName || selectedOrder.runnerName}</div>
+                    )}
+                    {/* The artboard size is what the designer builds to. */}
+                    {(selectedOrder.productSize || selectedOrder.photoPath) && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        {selectedOrder.productSize && (
+                          <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black" title="Artboard size">{selectedOrder.productSize}</span>
+                        )}
+                        {selectedOrder.photoPath && (
+                          <span className="inline-flex items-center px-2 py-1 rounded border text-xs font-semibold bg-[#4600D6]/10 text-[#4600D6] border-[#4600D6]/25">Photo on print</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Due, ordered, sent and rush, as tags. */}
                   {selectedOrder.trackstarOrderType !== 'race_partner' && (
-                    // Same chips as a standard order's Product Details, at a
-                    // size nobody misreads: the artboard size is what the
-                    // designer builds to.
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {!isProductionStage && selectedOrder.productSize && (
-                        <span className="inline-flex items-center px-2.5 py-1 bg-white border border-border-gray rounded text-sm font-semibold text-off-black" title="Artboard size">
-                          {selectedOrder.productSize}
-                        </span>
-                      )}
-                      {!isProductionStage && selectedOrder.photoPath && (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded border text-sm font-semibold bg-[#4600D6]/10 text-[#4600D6] border-[#4600D6]/25">
-                          Photo on print
-                        </span>
-                      )}
+                    <div>
+                      <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Tags</h4>
+                      <div className="flex flex-wrap items-center gap-1.5">
                       {!isProductionStage && <span className={`inline-flex items-center gap-1 px-2.5 py-1 bg-white border rounded text-sm ${isDueDateUrgent(selectedOrder.dueDate) ? 'border-red-200 text-red-600 font-medium' : 'border-border-gray text-off-black/70'}`}>
                         <span>⏳</span>
                         <span>Due {formatDueDate(selectedOrder.dueDate)}</span>
@@ -1409,10 +1432,127 @@ Thank you!`
                           Rush not paid
                         </span>
                       )}
+                      </div>
                     </div>
                   )}
 
-                  {photoCard}
+                  {/* Design details: what goes on the print, the filename, and where approval emails go. */}
+                  {!(isProductionStage && selectedOrder.trackstarOrderType === 'custom') && (
+                    <div>
+                      <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">{selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Info' : 'Design Details'}</h4>
+                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
+                        {selectedOrder.trackstarOrderType === 'race_partner' ? (
+                          <PartnerInfoFields
+                            key={selectedOrder.orderNumber}
+                            order={selectedOrder}
+                            onToast={setToast}
+                            onSaved={async () => {
+                              await fetchOrders()
+                              const refreshed = await apiFetch('/api/orders?type=race_partner').then(r => r.json())
+                              const updated = refreshed.orders?.find((o: { orderNumber: string }) => o.orderNumber === selectedOrder.orderNumber)
+                              if (updated) setSelectedOrder(prev => prev ? { ...prev, ...updated } : prev)
+                            }}
+                          />
+                        ) : (
+                          <>
+                            <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
+                            <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
+                            <StaticField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
+                            {selectedOrder.bibNumberCustomer && (
+                              <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
+                            )}
+                            {selectedOrder.timeCustomer && (
+                              <CopyableField label="Time" value={selectedOrder.timeCustomer} />
+                            )}
+                            <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
+                            {selectedOrder.trackstarOrderType === 'custom' ? (
+                              <ApprovalEmailField
+                                order={selectedOrder}
+                                onSaved={(email) => {
+                                  setSelectedOrder(prev => prev && prev.id === selectedOrder.id ? { ...prev, customerEmail: email } : prev)
+                                  setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, customerEmail: email } : o))
+                                  setToast({ message: `Approval emails now go to ${email}`, type: 'success' })
+                                }}
+                              />
+                            ) : selectedOrder.customerEmail && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-body-sm text-off-black/60">Email</span>
+                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Smaller things you can do to the order. */}
+                  <div>
+                    <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Actions</h4>
+                    <div className="flex flex-col items-stretch gap-1.5">
+                      {selectedOrder.trackstarOrderType === 'custom' && !isProductionStage && !showCommentBox && (
+                        <button onClick={() => setShowCommentBox(true)} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2">
+                          <Plus className="w-3.5 h-3.5" /> Add comment
+                        </button>
+                      )}
+                      {selectedOrder.customerEmail && can('support') && (
+                        <button onClick={() => setEmailingOrder(selectedOrder)} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2" title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}>
+                          <Mail className="w-3.5 h-3.5" /> Email customer
+                        </button>
+                      )}
+                      {/* Emergency delay notice: findable, not the main action. */}
+                      {selectedOrder.trackstarOrderType === 'custom' && selectedOrder.customerEmail && !isProductionStage && (
+                        <button onClick={openDelayDialog} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:underline underline-offset-2">
+                          <Clock className="w-3.5 h-3.5" /> Notify customer of a delay
+                        </button>
+                      )}
+                      {ds === 'sent_to_production' && (
+                        <button onClick={() => updateDesignStatus(selectedOrder.orderNumber, 'not_started')} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2">
+                          <RotateCcw className="w-3.5 h-3.5" /> Reopen order
+                        </button>
+                      )}
+                      {selectedOrder.trackstarOrderType === 'custom' && showCommentBox && (
+                        <div className="w-full bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
+                          <textarea
+                            value={newCommentText}
+                            onChange={(e) => setNewCommentText(e.target.value)}
+                            onPaste={handleCommentPaste}
+                            placeholder="Add a comment or paste an image..."
+                            className="w-full px-3 py-2 border border-border-gray rounded-md text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20 resize-none bg-white"
+                            rows={2}
+                          />
+                          {commentImagePreview && (
+                            <div className="relative inline-block">
+                              <img src={commentImagePreview} alt="Upload preview" className="max-h-32 rounded-md border border-border-gray" />
+                              <button onClick={clearCommentImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <label className="cursor-pointer px-3 py-1.5 text-xs border border-border-gray rounded-md hover:bg-white transition-colors text-off-black/60">
+                              <ImagePlus className="w-3 h-3 inline mr-1" />
+                              Image
+                              <input ref={commentFileInputRef} type="file" accept="image/*" onChange={handleCommentFileSelect} className="hidden" />
+                            </label>
+                            <span className="text-xs text-off-black/40 flex-1">or paste</span>
+                            <button onClick={() => { setShowCommentBox(false); setNewCommentText(''); clearCommentImage() }} className="px-2 py-1.5 text-xs text-off-black/50 hover:text-off-black">Cancel</button>
+                            <button
+                              onClick={submitComment}
+                              disabled={isSubmittingComment || (!newCommentText.trim() && !commentImageFile)}
+                              className="px-4 py-1.5 text-xs bg-dark-fill text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+                            >
+                              {isSubmittingComment ? 'Adding...' : 'Add'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  </aside>
+
+                  {/* The work: notes from the team, the step it is on, the proofs, and what the customer asked for. */}
+                  <div className="order-1 md:order-none md:col-start-1 md:row-start-1 min-w-0 flex flex-col gap-4">
                   {selectedOrder.trackstarOrderType === 'custom' && commentsCallout()}
 
                   {/* Delay-notice banner — shown when Dan has emailed the customer
@@ -1529,15 +1669,12 @@ Thank you!`
                     />
                   )}
 
-                  {/* ═══ DETAIL SECTIONS ═══ */}
-
-                  {/* Proofs & Approval — always at top (except sent_to_production) */}
+                  {/* Proofs & Approval: the main work until it is sent to production. */}
                   {ds !== 'sent_to_production' && (
-                    <CollapsibleSection
-                      title="Proofs & Approval"
-                      defaultOpen={true}
-                      badge={selectedOrder.proofCount ? <span className="text-[10px] font-medium text-off-black/30">({selectedOrder.proofCount})</span> : undefined}
-                    >
+                    <div>
+                      <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">
+                        Proofs &amp; Approval{selectedOrder.proofCount ? <span className="ml-1 text-off-black/30">({selectedOrder.proofCount})</span> : null}
+                      </h4>
                       <ProofManager
                         orderId={selectedOrder.id}
                         orderNumber={selectedOrder.orderNumber}
@@ -1549,75 +1686,30 @@ Thank you!`
                         disableEmail={selectedOrder.trackstarOrderType === 'race_partner'}
                         allowGroups={selectedOrder.trackstarOrderType === 'race_partner'}
                       />
-                    </CollapsibleSection>
+                    </div>
                   )}
 
-                  {/* Design Info — always visible, Dan needs filename at every stage */}
-                    {!(isProductionStage && selectedOrder.trackstarOrderType === 'custom') && (
-                    <CollapsibleSection title={selectedOrder.trackstarOrderType === 'race_partner' ? 'Partner Info' : 'Design Info'} defaultOpen={ds === 'not_started' || ds === 'in_progress'}>
-                      <div className="bg-subtle-gray border border-border-gray rounded-md p-3 space-y-2">
-                        {selectedOrder.trackstarOrderType === 'race_partner' ? (
-                          <PartnerInfoFields
-                            key={selectedOrder.orderNumber}
-                            order={selectedOrder}
-                            onToast={setToast}
-                            onSaved={async () => {
-                              await fetchOrders()
-                              const refreshed = await apiFetch('/api/orders?type=race_partner').then(r => r.json())
-                              const updated = refreshed.orders?.find((o: { orderNumber: string }) => o.orderNumber === selectedOrder.orderNumber)
-                              if (updated) setSelectedOrder(prev => prev ? { ...prev, ...updated } : prev)
-                            }}
-                          />
-                        ) : (
-                          <>
-                            <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
-                            <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
-                            <StaticField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
-                            {selectedOrder.bibNumberCustomer && (
-                              <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
-                            )}
-                            {selectedOrder.timeCustomer && (
-                              <CopyableField label="Time" value={selectedOrder.timeCustomer} />
-                            )}
-                            <CopyableField label="Filename" value={generateFilename(selectedOrder)} />
-                            {selectedOrder.trackstarOrderType === 'custom' ? (
-                              <ApprovalEmailField
-                                order={selectedOrder}
-                                onSaved={(email) => {
-                                  setSelectedOrder(prev => prev && prev.id === selectedOrder.id ? { ...prev, customerEmail: email } : prev)
-                                  setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, customerEmail: email } : o))
-                                  setToast({ message: `Approval emails now go to ${email}`, type: 'success' })
-                                }}
-                              />
-                            ) : selectedOrder.customerEmail && (
-                              <div className="flex justify-between items-center">
-                                <span className="text-body-sm text-off-black/60">Email</span>
-                                <span className="text-body-sm font-medium text-off-black">{selectedOrder.customerEmail}</span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      {selectedOrder.creativeDirection && (
-                        <div className="bg-purple-50 border border-purple-200 rounded-md p-4 mt-2">
-                          <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Creative Direction</p>
-                          <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
-                        </div>
-                      )}
-                    </CollapsibleSection>
-                    )}
+                  {/* What the customer asked for: the designer reads this at every stage before production. */}
+                  {!isProductionStage && selectedOrder.creativeDirection && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
+                      <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Creative Direction</p>
+                      <p className="text-body-sm text-purple-800 whitespace-pre-wrap">{selectedOrder.creativeDirection}</p>
+                    </div>
+                  )}
 
-                  {/* Notes — only if present, hide at production */}
+                  {photoCard}
+
                   {selectedOrder.notes && !isProductionStage && (
-                    <CollapsibleSection title="Notes" defaultOpen={false}>
+                    <div>
+                      <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Notes</h4>
                       <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                         <p className="text-body-sm text-blue-800 whitespace-pre-wrap">{selectedOrder.notes}</p>
                       </div>
-                    </CollapsibleSection>
+                    </div>
                   )}
 
-                  {/* Comments — hide at production */}
-                  {!isProductionStage && (
+                  {/* A partner order keeps its comment thread here; a custom order's notes are at the top. */}
+                  {selectedOrder.trackstarOrderType === 'race_partner' && !isProductionStage && (
                     <CollapsibleSection
                       title="Comments"
                       defaultOpen={false}
@@ -1663,10 +1755,6 @@ Thank you!`
                         <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin inline text-off-black/40" /></div>
                       ) : orderComments.length === 0 ? (
                         <p className="text-xs text-off-black/40 text-center py-3">No comments yet</p>
-                      ) : selectedOrder.trackstarOrderType === 'custom' ? (
-                        <p className="text-xs text-off-black/40">
-                          {orderComments.length === 1 ? 'The note is' : `All ${orderComments.length} notes are`} at the top of this order.
-                        </p>
                       ) : (
                         <div className="space-y-3 max-h-64 overflow-y-auto">
                           {orderComments.map(comment => (
@@ -1696,50 +1784,9 @@ Thank you!`
                     </CollapsibleSection>
                   )}
 
-                  {/* Emergency delay notice — custom orders only. Sits above
-                      the close row so Dan can find it but it's not the
-                      primary action. */}
-                  {selectedOrder.trackstarOrderType === 'custom' && selectedOrder.customerEmail && !isProductionStage && (
-                    <div className="pt-1">
-                      <button
-                        onClick={openDelayDialog}
-                        className="w-full px-3 py-2 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 rounded-md transition-colors text-xs font-medium inline-flex items-center justify-center gap-1.5"
-                      >
-                        <span>⏰</span>
-                        Notify Customer of Delay
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Bottom actions */}
-                  <div className="flex gap-3 pt-2">
-                    {selectedOrder.customerEmail && can('support') && (
-                      <button
-                        onClick={() => setEmailingOrder(selectedOrder)}
-                        className="inline-flex items-center gap-2 px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
-                        title={`Email ${selectedOrder.customerEmail} from fast@ (opens a Support conversation)`}
-                      >
-                        <Mail className="w-4 h-4" />
-                        Email customer
-                      </button>
-                    )}
-                    {ds === 'sent_to_production' && (
-                      <button
-                        onClick={() => updateDesignStatus(selectedOrder.orderNumber, 'not_started')}
-                        className="flex-1 px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
-                      >
-                        Reopen Order
-                      </button>
-                    )}
-                    <button
-                      onClick={closeModal}
-                      className="flex-1 px-5 py-3 bg-white border border-border-gray text-off-black rounded-md hover:bg-subtle-gray transition-colors font-medium"
-                    >
-                      Close
-                    </button>
-                  </div>
                   <OrderConversations orderId={selectedOrder.id} enabled={!!selectedOrder.customerEmail && can('support')} />
-                  </div>{/* end details (hidden on the phone until opened) */}
+                  </div>
+                  </div>
                   </div>
                     )
                   })()}{/* end custom detail */}

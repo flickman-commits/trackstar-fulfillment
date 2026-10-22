@@ -72,35 +72,45 @@ export const formatOrderPlacedAt = (dateStr?: string | null): string | null => {
   return withYear
 }
 
+/** Colors per pipeline stage, for StatusPill. */
+export const STAGE_TONE = {
+  review: { dot: 'bg-green-500', color: 'text-green-700', bg: 'bg-green-50' },
+  attach: { dot: 'bg-[#4600D6]', color: 'text-[#4600D6]', bg: 'bg-[#4600D6]/[0.06]' },
+  action: { dot: 'bg-red-500', color: 'text-red-700', bg: 'bg-red-50' },
+  needs_research: { dot: 'bg-off-black/30', color: 'text-off-black/60', bg: 'bg-off-black/5' },
+  waiting: { dot: 'bg-off-black/30', color: 'text-off-black/60', bg: 'bg-off-black/5' },
+  done: { dot: 'bg-emerald-500', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+} as const
+
 // Get status icon and color for table
 // The Status column: where this order is on the way to having a result.
 // One icon, chosen by what happens next. Where a result came from (our
 // research, the customer at checkout) is the Tags column's job.
 export const getStatusDisplay = (order: Order) => {
   // Completed right now beats the status from the last list refresh.
-  if (order.status === 'completed') return { icon: '', dot: 'bg-green-500', label: 'Completed', stage: 'done' as const }
+  if (order.status === 'completed') return { icon: '', ...STAGE_TONE.done, label: 'Completed', stage: 'done' as const }
   // The server's one status, when it has one (standard orders).
   const p = order.pipeline
   if (p) {
-    // A small colored dot, not an emoji: green = review, purple = attach, red = action, gray = waiting.
-    const dot = p.stage === 'review' ? 'bg-green-500' : p.stage === 'attach' ? 'bg-[#4600D6]' : p.stage === 'action' ? 'bg-red-500' : p.stage === 'done' ? 'bg-green-500' : 'bg-off-black/25'
-    return { icon: '', dot, label: p.reason, stage: p.stage }
+    // A colored dot on a matching tag, as custom orders show theirs (StatusPill):
+    // green = review, purple = attach, red = action, gray = waiting.
+    return { icon: '', ...(STAGE_TONE[p.stage as keyof typeof STAGE_TONE] || STAGE_TONE.waiting), label: p.reason, stage: p.stage }
   }
-  if (order.status === 'flagged') return { icon: '⚠️', label: 'Flagged' }
-  if (order.status === 'missing_year') return { icon: '📅', label: 'Missing year' }
+  if (order.status === 'flagged') return { icon: '', ...STAGE_TONE.action, label: 'Flagged' }
+  if (order.status === 'missing_year') return { icon: '', ...STAGE_TONE.action, label: 'Missing year' }
   const hasResult = !!(order.bibNumber || order.officialTime)
-  if (hasResult || order.status === 'ready') return { icon: '✅', label: 'Ready: result on file' }
-  if (showsRaceNotRun(order)) return { icon: '🗓️', label: 'Race not run yet' }
-  if (order.researchStatus === 'ambiguous') return { icon: '❓', label: 'Pick a match' }
-  if (order.researchStatus === 'time_unavailable') return { icon: '⏱', label: 'Runner found, time needs manual entry' }
-  if (order.researchStatus === 'upstream_error') return { icon: '🌐', label: 'Timing site down, retry' }
-  if (order.researchStatus === 'not_found') return { icon: '🕵️', label: 'Not found, look up by hand' }
-  if (order.researchStatus === 'year_not_configured' && /not available on the results site/.test(order.researchNotes || '')) return { icon: '📭', label: 'Results not online for this year' }
+  if (hasResult || order.status === 'ready') return { icon: '', ...STAGE_TONE.review, label: 'Ready: result on file' }
+  if (showsRaceNotRun(order)) return { icon: '', ...STAGE_TONE.waiting, label: 'Race not run yet' }
+  if (order.researchStatus === 'ambiguous') return { icon: '', ...STAGE_TONE.action, label: 'Pick a match' }
+  if (order.researchStatus === 'time_unavailable') return { icon: '', ...STAGE_TONE.action, label: 'Runner found, time needs manual entry' }
+  if (order.researchStatus === 'upstream_error') return { icon: '', ...STAGE_TONE.action, label: 'Timing site down, retry' }
+  if (order.researchStatus === 'not_found') return { icon: '', ...STAGE_TONE.action, label: 'Not found, look up by hand' }
+  if (order.researchStatus === 'year_not_configured' && /not available on the results site/.test(order.researchNotes || '')) return { icon: '', ...STAGE_TONE.action, label: 'Results not online for this year' }
   // No scraper is built for a year before 2020 (SCRAPER_MIN_YEAR in server/domain/orders/pipeline.js).
-  if (order.researchStatus === 'year_not_configured' && (order.effectiveRaceYear || order.raceYear || 0) < 2020) return { icon: '🔎', label: 'Before 2020: research by hand' }
-  if (order.researchStatus === 'year_not_configured') return { icon: '🛠️', label: 'Needs a scraper: this year is not wired up' }
-  if (order.researchStatus === 'no_scraper' || !order.hasScraperAvailable) return { icon: '🛠️', label: 'Needs a scraper: research by hand' }
-  return { icon: '🔍', label: 'Needs research' }
+  if (order.researchStatus === 'year_not_configured' && (order.effectiveRaceYear || order.raceYear || 0) < 2020) return { icon: '', ...STAGE_TONE.action, label: 'Before 2020: research by hand' }
+  if (order.researchStatus === 'year_not_configured') return { icon: '', ...STAGE_TONE.action, label: 'Needs a scraper: this year is not wired up' }
+  if (order.researchStatus === 'no_scraper' || !order.hasScraperAvailable) return { icon: '', ...STAGE_TONE.action, label: 'Needs a scraper: research by hand' }
+  return { icon: '', ...STAGE_TONE.waiting, label: 'Needs research' }
 }
 
 // Generate race shorthand for filename

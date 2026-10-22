@@ -35,7 +35,6 @@ export const CAPABILITY_LABEL: Partial<Record<Capability, string>> = {
   'tools.pace': 'Pace',
   'tools.weather': 'Weather',
   'tools.surveys': 'Design Survey',
-  'settings.pricing': 'Pricing',
   'settings.reviews': 'Reviews',
   'settings.stats': 'Stats',
   'settings.design_needs': 'Design Needs',
@@ -43,8 +42,8 @@ export const CAPABILITY_LABEL: Partial<Record<Capability, string>> = {
 
 const DEFAULT_CAPS: Record<Role, Caps> = {
   admin: '*',
-  sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.pricing', 'settings.reviews', 'settings.stats'],
-  fulfillment: ['support', 'creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.pricing', 'settings.stats', 'settings.design_needs'],
+  sales: ['sales', 'creators', 'tools.discounts', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.reviews', 'settings.stats'],
+  fulfillment: ['support', 'creators', 'orders.render', 'tools.discounts', 'tools.pace', 'tools.weather', 'settings.stats', 'settings.design_needs'],
   support: ['support', 'tools.discounts', 'tools.pace', 'tools.weather'],
   head_designer: ['orders.assign_custom', 'tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats', 'settings.design_needs'],
   designer: ['tools.pace', 'tools.weather', 'tools.surveys', 'settings.stats', 'settings.design_needs'],

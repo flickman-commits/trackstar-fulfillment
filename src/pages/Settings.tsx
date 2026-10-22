@@ -45,7 +45,6 @@ const SETTINGS_NAV: {
   {
     group: 'Tools',
     items: [
-      { id: 'pricing', label: 'Pricing Calculator', blurb: 'Costs, retail and margin across DTC and wholesale', icon: DollarSign, cap: 'settings.pricing' },
       { id: 'reviews', label: 'Request Reviews', blurb: 'Copy a review request message for any product', icon: Star, cap: 'settings.reviews' },
       { id: 'stats', label: 'Stats', blurb: 'Gifting rate, add-on take rate and more, from Shopify', icon: BarChart3, cap: 'settings.stats' },
       { id: 'features', label: 'Feature Requests', blurb: 'What the team has asked to have built', icon: Lightbulb },
@@ -70,6 +69,7 @@ const SETTINGS_NAV: {
     group: 'Admin',
     adminOnly: true,
     items: [
+      { id: 'pricing', label: 'Pricing Calculator', blurb: 'Costs, retail and margin across DTC and wholesale', icon: DollarSign },
       { id: 'products', label: 'Products & Prices', blurb: 'Change prices across every Shopify product at once', icon: DollarSign },
       { id: 'people', label: 'People', blurb: 'Who can sign in and what they are allowed to do', icon: Users },
       { id: 'roles', label: 'Roles', blurb: 'What each role can see and use', icon: ShieldCheck },
@@ -269,7 +269,7 @@ export default function Settings() {
                 </div>
 
                 <div className="flex-1 overflow-auto p-3 md:p-5">
-              {settingsPanel === 'pricing' && can('settings.pricing') && <PricingCalculator />}
+              {settingsPanel === 'pricing' && isAdmin && <PricingCalculator />}
               {settingsPanel === 'stats' && can('settings.stats') && <StatsPanel />}
               {settingsPanel === 'design_needs' && can('settings.design_needs') && <DesignNeedsPanel />}
               {settingsPanel === 'features' && <FeatureRequestsPanel />}

@@ -42,7 +42,7 @@ export default function ConvertToCustomModal({ order, onClose, onDone }: {
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => { if (!busy) onClose() }}
       onKeyDown={e => { e.stopPropagation(); if (e.key === 'Escape' && !busy) onClose() }}>
-      <div role="dialog" aria-modal="true" aria-label="Convert to a custom order" tabIndex={-1} ref={el => el?.focus()}
+      <div role="dialog" aria-modal="true" aria-label="Convert to a custom order" tabIndex={-1}
         className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-full overflow-auto p-5 space-y-3 outline-none" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>

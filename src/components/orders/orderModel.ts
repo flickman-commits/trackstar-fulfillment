@@ -196,14 +196,14 @@ export interface OrderComment {
 }
 
 // Design status display config
-export const DESIGN_STATUS_CONFIG: Record<DesignStatus, { icon: string; label: string; color: string; bgColor: string }> = {
-  not_started: { icon: '⚪', label: 'Not Started', color: 'text-off-black/50', bgColor: 'bg-off-black/5' },
-  in_progress: { icon: '🔵', label: 'In Progress', color: 'text-blue-700', bgColor: 'bg-blue-50' },
-  awaiting_review: { icon: '🔶', label: 'Awaiting Review', color: 'text-amber-600', bgColor: 'bg-amber-50' },
-  in_revision: { icon: '🟠', label: 'In Revision', color: 'text-orange-700', bgColor: 'bg-orange-50' },
-  approved_by_customer: { icon: '🟣', label: 'Approved by Customer', color: 'text-purple-700', bgColor: 'bg-purple-50' },
-  final_pdf_uploaded: { icon: '🟤', label: 'Attach in Artelo', color: 'text-[#4600D6]', bgColor: 'bg-[#4600D6]/[0.06]' },
-  sent_to_production: { icon: '🟢', label: 'Sent to Production', color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
+export const DESIGN_STATUS_CONFIG: Record<DesignStatus, { dot: string; label: string; color: string; bgColor: string }> = {
+  not_started: { dot: 'bg-off-black/30', label: 'Not Started', color: 'text-off-black/55', bgColor: 'bg-off-black/5' },
+  in_progress: { dot: 'bg-blue-500', label: 'In Progress', color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  awaiting_review: { dot: 'bg-amber-500', label: 'Awaiting Review', color: 'text-amber-700', bgColor: 'bg-amber-50' },
+  in_revision: { dot: 'bg-orange-500', label: 'In Revision', color: 'text-orange-700', bgColor: 'bg-orange-50' },
+  approved_by_customer: { dot: 'bg-purple-500', label: 'Approved by Customer', color: 'text-purple-700', bgColor: 'bg-purple-50' },
+  final_pdf_uploaded: { dot: 'bg-[#4600D6]', label: 'Attach in Artelo', color: 'text-[#4600D6]', bgColor: 'bg-[#4600D6]/[0.06]' },
+  sent_to_production: { dot: 'bg-emerald-500', label: 'Sent to Production', color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
 }
 
 /** Partner orders are approved by the partner, not a customer. Same status, different word. */

@@ -428,8 +428,8 @@ export default function Details({ thread, tagSuggestions, onOpenThread, onMerge,
             {thread.customer.conversations > 1 && <Attr label="Conversations">{thread.customer.conversations}</Attr>}
             <Attr label="Tags">
               <span className="inline-flex items-center gap-1.5 flex-wrap">
-                {thread.context.bigSpender && thread.context.spentUsd != null && (
-                  <TagChip tag={{ key: 'big-spender', label: '💰 Big Spender', tone: 'amber', sublabel: `$${Math.round(thread.context.spentUsd).toLocaleString()}`, title: `This customer has spent $${Math.round(thread.context.spentUsd).toLocaleString()} with us across the orders below.` }} />
+                {thread.context.bigSpender && (
+                  <TagChip tag={{ key: 'big-spender', label: '💰 Big Spender', tone: 'amber', sublabel: thread.context.spentUsd != null ? `$${Math.round(thread.context.spentUsd).toLocaleString()}` : undefined, title: thread.context.spentUsd != null ? `This customer has spent $${Math.round(thread.context.spentUsd).toLocaleString()} with us across the orders below.` : 'A high-value customer. Prioritize them.' }} />
                 )}
                 <Tags tags={thread.tags} suggestions={tagSuggestions} onChange={onTags} />
               </span>

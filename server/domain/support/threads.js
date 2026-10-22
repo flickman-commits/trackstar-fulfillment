@@ -147,7 +147,8 @@ export async function team() {
 }
 
 /** One thread: messages, notes and events, the customer's orders and other threads. */
-export async function getThread(id, { userId } = {}) {
+/** `money` (admins only, api/_lib/money.js): keep what the customer spent; otherwise only the Big Spender flag goes out. */
+export async function getThread(id, { userId, money = false } = {}) {
   const t = await prisma.supportThread.findUnique({
     where: { id },
     include: {
@@ -158,7 +159,7 @@ export async function getThread(id, { userId } = {}) {
     },
   })
   if (!t) return null
-  if (t.mergedIntoId && t.mergedIntoId !== id) return getThread(t.mergedIntoId, { userId })
+  if (t.mergedIntoId && t.mergedIntoId !== id) return getThread(t.mergedIntoId, { userId, money })
   const linked = await linkedOrderNumbers(t)
   const [context, pastThreads, customerSince, customerCount] = await Promise.all([
     customerContext(t.customerEmail, { linked }),
@@ -208,9 +209,14 @@ export async function getThread(id, { userId } = {}) {
       // An Instagram customer has one conversation, this one, for as long as the thread lives.
       conversations: t.customerEmail ? customerCount : 1,
     },
-    context,
+    context: money ? context : withoutSpend(context),
     pastThreads,
   }
+}
+
+function withoutSpend(context) {
+  const { spentUsd: _spent, ...rest } = context
+  return { ...rest, orders: rest.orders.map(({ totalUsd: _total, ...o }) => o) }
 }
 
 export function noteRow(n) {

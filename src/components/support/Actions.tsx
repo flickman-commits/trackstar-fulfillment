@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Ban, BadgePercent, Repeat, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Ruler, Search, Star, Truck, X } from 'lucide-react'
+import { Ban, BadgePercent, Palette, Repeat, Check, Copy, Image as ImageIcon, Link2, Loader2, MapPin, MessageSquareWarning, Pencil, Plus, Receipt, Ruler, Search, Star, Truck, X } from 'lucide-react'
 import { reviewAsk, reviewLinkFor } from '@/lib/reviewLinks'
 import { toast } from 'sonner'
 import { newIdempotencyKey, supportApi } from '@/lib/supportApi'
 import { useAuth } from '@/lib/auth'
+import ConvertToCustomModal from '@/components/orders/ConvertToCustomModal'
 import { parseAddress } from '@/lib/parseAddress'
 import type { Address, CodeLookup, CustomerOrder, Mockup, ThreadDetail } from '@/types/support'
 
@@ -426,6 +427,9 @@ function OrderActions({ o, thread, multiple, isAdmin, onInsert, onAttach, onChan
   const [busy, setBusy] = useState<string | null>(null)
   const [editingAddress, setEditingAddress] = useState(false)
   const [reordering, setReordering] = useState(false)
+  const [converting, setConverting] = useState<string | null>(null)
+  const [pickingConvert, setPickingConvert] = useState(false)
+  const { can } = useAuth()
   const [changing, setChanging] = useState(false)
   const run = async (key: string, fn: () => Promise<string | void>) => {
     setBusy(key)
@@ -506,6 +510,36 @@ function OrderActions({ o, thread, multiple, isAdmin, onInsert, onAttach, onChan
             run('note', async () => { await supportApi.action('orderNote', { id: thread.id, orderId: o.items[0].orderId, text }); return 'Note left on the order' })
           }}>Note for fulfillment</ActionLink>
         )}
+        {/* A runner who ran a race we do not carry: design it instead of refunding. */}
+        {can('orders.render') && (() => {
+          const convertible = o.items.filter(it => it.type === 'standard' && it.status !== 'completed')
+          if (!convertible.length) return null
+          const label = (it: typeof convertible[number]) => `${it.race || 'Print'}${it.year ? ` ${it.year}` : ''}, ${it.runner || 'runner'}`
+          return (
+            <>
+              <ActionLink icon={Palette} title="A runner who ran a race we do not carry: design it instead of refunding. Shopify is not changed."
+                onClick={() => convertible.length === 1 ? setConverting(convertible[0].orderId) : setPickingConvert(v => !v)}>Convert to custom order</ActionLink>
+              {pickingConvert && convertible.length > 1 && (
+                <div className="flex flex-col items-start gap-1 pl-5">
+                  {convertible.map(it => (
+                    <button key={it.orderId} onClick={() => { setPickingConvert(false); setConverting(it.orderId) }} className="text-xs text-left text-off-black/70 hover:text-[#4600D6]">{label(it)}</button>
+                  ))}
+                </div>
+              )}
+              {converting && (() => {
+                const it = convertible.find(x => x.orderId === converting)
+                if (!it) return null
+                return (
+                  <ConvertToCustomModal
+                    order={{ id: it.orderId, displayOrderNumber: `#${o.number}`, runnerName: it.runner, effectiveRaceName: it.race, effectiveRaceYear: it.year }}
+                    onClose={() => setConverting(null)}
+                    onDone={msg => { setConverting(null); toast.success(msg); onChanged() }}
+                  />
+                )
+              })()}
+            </>
+          )
+        })()}
         {/* A reprint or replacement: the same print to this customer, built in Artelo from here. */}
         {o.shopifyOrderId && o.items.length > 0 && (reordering
           ? <ArteloOrderForm o={o} thread={thread} isAdmin={isAdmin} onDone={onChanged} onCancel={() => setReordering(false)} />

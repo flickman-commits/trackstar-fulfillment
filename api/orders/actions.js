@@ -35,6 +35,7 @@ import { defaultAssigneeFor } from '../../server/domain/orders/assignment.js'
 import { ensureApprovalToken } from '../_lib/approvalToken.js'
 import { setDesignStatus, DESIGN_STATUSES } from '../../server/domain/orders/designStatus.js'
 import { setCors, requireAdmin, isCronRequest } from '../_lib/auth.js'
+import { withoutRawOrderData } from '../_lib/money.js'
 import { requireAdminRole, requireAdminOnly, requireCapability, recordAudit } from '../_lib/users.js'
 import { alertError } from '../_lib/alerts.js'
 import { getCustomersServedInfo, syncCustomersServedToShopify, setCustomersServedCount } from '../../server/services/customersServed.js'
@@ -360,7 +361,7 @@ async function handleComplete({ orderNumber }, res, actor) {
   try {
     const { order } = await completeOrder({ orderNumber, actor, via: 'manual' })
     console.log(`[actions/complete] Order ${orderNumber} marked as completed`)
-    return res.status(200).json({ success: true, order })
+    return res.status(200).json({ success: true, order: withoutRawOrderData(order) })
   } catch (e) {
     if (e instanceof CompleteError) return res.status(e.code === 'not_found' ? 404 : 409).json({ error: e.code, message: e.message })
     throw e
@@ -386,7 +387,7 @@ async function handlePhotoPlaced({ orderNumber, placed = true }, res) {
   })
 
   console.log(`[actions/photo-placed] Order ${orderNumber} photo ${placed ? 'confirmed placed' : 'unconfirmed'}`)
-  return res.status(200).json({ success: true, order })
+  return res.status(200).json({ success: true, order: withoutRawOrderData(order) })
 }
 
 // --- reopen ---
@@ -432,7 +433,7 @@ async function handleReopen({ orderNumber }, res, actor) {
     },
     actor,
   })
-  return res.status(200).json({ success: true, order })
+  return res.status(200).json({ success: true, order: withoutRawOrderData(order) })
 }
 
 // --- design-status ---
@@ -449,7 +450,7 @@ async function handleDesignStatus({ orderNumber, designStatus }, res, actor) {
   }
   const order = await setDesignStatus(existing, designStatus, actor?.id || null, actor)
   console.log(`[actions/design-status] Order ${orderNumber} design status → ${designStatus}`)
-  return res.status(200).json({ success: true, order })
+  return res.status(200).json({ success: true, order: withoutRawOrderData(order) })
 }
 
 // --- notify-custom-delay ---
@@ -573,7 +574,7 @@ async function handleNotifyCustomDelay({ orderNumber, daysLate }, res) {
   }
 
   console.log(`[actions/notify-custom-delay] Order ${orderNumber}: delay email sent (${days} days late)`)
-  return res.status(200).json({ success: true, order })
+  return res.status(200).json({ success: true, order: withoutRawOrderData(order) })
 }
 
 // --- message-customer ---

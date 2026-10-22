@@ -1,5 +1,6 @@
 import { isTriathlon } from '../../server/domain/orders/triathlon.js'
 import prisma from '../_lib/prisma.js'
+import { seesMoney } from '../_lib/money.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
 import { hasScraperForRace } from '../../server/scrapers/index.js'
 import { isExpeditedShipping, getShippingMethod } from '../../server/lib/shipping.js'
@@ -135,7 +136,9 @@ function buildAustinFallbackUrl(runnerName, raceName, year, eventType) {
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
-  if (!(await requireAdmin(req, res))) return
+  const actor = await requireAdmin(req, res)
+  if (!actor) return
+  const money = seesMoney(actor)
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -262,7 +265,8 @@ export default async function handler(req, res) {
         // customer verified or typed at checkout is a research record too
         // (source customer_verified / customer_supplied), written at import,
         // so there is nothing to fall back to and nothing to merge.
-        discountCodes: extractDiscountCodes(order),
+        // The code is the clue for fulfillment; its amount is money (admins only).
+        discountCodes: money ? extractDiscountCodes(order) : extractDiscountCodes(order).map(d => ({ ...d, amount: null })),
         bibNumber: research?.bibNumber || null,
         officialTime: formatTime(research?.officialTime),
         officialPace: formatPace(research?.officialPace),
@@ -368,7 +372,7 @@ export default async function handler(req, res) {
         shippingMethod: getShippingMethod(order.shopifyOrderData),
         isExpedited: isExpeditedShipping(order.shopifyOrderData),
         // Order total + big-spender flag — for the "💰 BIG SPENDER" prioritize callout
-        orderTotalUsd: getOrderTotalUsd(order),
+        orderTotalUsd: money ? getOrderTotalUsd(order) : null,
         isBigSpender: isBigSpender(order),
         // A sample: a creator's sample, or an order sent from Tools > Samples (Shopify tag "sample").
         isSample: order.source === 'creator_sample' || String(order.shopifyOrderData?.tags || '').split(',').some(t => t.trim().toLowerCase() === 'sample'),

@@ -19,6 +19,7 @@
  *
  * Every change leaves an event in the thread and a line in the audit log.
  */
+import { seesMoney } from '../_lib/money.js'
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
 import { getThread, assign, setStatus, snooze, setPriority, setTags, addNote, deleteNote, markRead, markUnread, noteRow, setProposal, linkOrder, unlinkOrder } from '../../server/domain/support/threads.js'
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const id = String(req.query?.id || '')
       if (!id) return res.status(400).json({ error: 'id is required' })
-      const t = await getThread(id, { userId: user.id })
+      const t = await getThread(id, { userId: user.id, money: seesMoney(user) })
       if (!t) return res.status(404).json({ error: 'No such thread' })
       await markRead(id, user.id)
       return res.status(200).json({ ...t, unread: false })
@@ -80,7 +81,7 @@ export default async function handler(req, res) {
       case 'merge': {
         const out = await mergeThreads(id, Array.isArray(body.sourceIds) ? body.sourceIds : [], user)
         await audit(`Merged ${out.merged} conversation${out.merged === 1 ? '' : 's'} into one`, { sourceIds: body.sourceIds })
-        return res.status(200).json(await getThread(id, { userId: user.id }))
+        return res.status(200).json(await getThread(id, { userId: user.id, money: seesMoney(user) }))
       }
       case 'redraft': {
         const out = await draftThread(id, { instruction: String(body.instruction || ''), actor: user })
@@ -95,12 +96,12 @@ export default async function handler(req, res) {
       case 'linkOrder': {
         const out = await linkOrder(id, body.number, user)
         await audit(`Linked order #${out.number} to a customer`, { number: out.number, orderEmail: out.orderEmail })
-        return res.status(200).json(await getThread(id, { userId: user.id }))
+        return res.status(200).json(await getThread(id, { userId: user.id, money: seesMoney(user) }))
       }
       case 'unlinkOrder': {
         const out = await unlinkOrder(id, body.number, user)
         await audit(`Unlinked order #${out.number}`, { number: out.number })
-        return res.status(200).json(await getThread(id, { userId: user.id }))
+        return res.status(200).json(await getThread(id, { userId: user.id, money: seesMoney(user) }))
       }
       case 'unread': {
         await markUnread(id, user.id)

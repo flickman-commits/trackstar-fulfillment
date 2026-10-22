@@ -9,6 +9,7 @@
  * thread goes out as a DM from @trackstar_art instead, inside Meta's
  * 24-hour window (server/domain/support/instagram.js says no otherwise).
  */
+import { seesMoney } from '../_lib/money.js'
 import { setCors } from '../_lib/auth.js'
 import { requireCapability, recordAudit } from '../_lib/users.js'
 import prisma from '../_lib/prisma.js'
@@ -59,7 +60,7 @@ export default async function handler(req, res) {
     })
     // Send and close: Intercom's one-click for a conversation that is done.
     if (body.close) await setStatus(id, 'closed', user)
-    const fresh = await getThread(id, { userId: user.id })
+    const fresh = await getThread(id, { userId: user.id, money: seesMoney(user) })
     return res.status(200).json(fresh)
   } catch (error) {
     console.error('[API /support/reply]', error)

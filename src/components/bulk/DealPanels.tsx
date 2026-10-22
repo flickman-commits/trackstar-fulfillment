@@ -54,6 +54,8 @@ function AddressFields({ value, onChange, withCompany = false }: { value: Addres
 
 /** New bulk order: who, what we agreed, and one line per race and event. */
 export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreated: (deal: Deal) => void }) {
+  // The discount is money: admins set it (api/bulk/deals.js ignores it from anyone else).
+  const { isAdmin } = useAuth()
   const [opts, setOpts] = useState<{ events: string[]; sizes: string[]; frames: string[] }>({ events: ['Marathon', 'Half Marathon', '10 Miler', '10K', '8K', '5K'], sizes: ['8x10', '12x18', '16x24'], frames: ['Unframed', 'Natural Premium Oak', 'Black Premium Oak'] })
   const [f, setF] = useState({ partnerName: '', contactName: '', contactEmail: '', contactPhone: '', printKind: 'standard', discountKind: '', discountPercent: '', discountDollars: '', discountNote: '', shipping: 'runner', notes: '' })
   const [billing, setBilling] = useState<Address>(blankAddress())
@@ -127,7 +129,7 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
         </div>
 
         {/* The deal */}
-        <div className="grid grid-cols-2 gap-2">
+        {isAdmin && <div className="grid grid-cols-2 gap-2">
           <label className="block">{label('Discount')}
             <select value={f.discountKind} onChange={set('discountKind')} className={`${inputBase} w-full`}>
               <option value="">None</option><option value="percent">Percent off</option><option value="amount">Dollars off the order</option>
@@ -136,7 +138,7 @@ export function DealModal({ onClose, onCreated }: { onClose: () => void; onCreat
           {f.discountKind === 'percent' && <label className="block">{label('Percent')}<input value={f.discountPercent} onChange={e => setF(v => ({ ...v, discountPercent: e.target.value.replace(/\D/g, '').slice(0, 3) }))} placeholder="15" className={`${inputBase} w-full`} /></label>}
           {f.discountKind === 'amount' && <label className="block">{label('Dollars off')}<input value={f.discountDollars} onChange={e => setF(v => ({ ...v, discountDollars: e.target.value.replace(/[^\d.]/g, '') }))} placeholder="100" className={`${inputBase} w-full`} /></label>}
           {f.discountKind && <label className="col-span-2 block">{label('Discount name on the invoice')}<input value={f.discountNote} onChange={set('discountNote')} placeholder="Nonprofit rate" className={`${inputBase} w-full`} /></label>}
-        </div>
+        </div>}
 
         <div>
           {label('Shipping')}
@@ -178,11 +180,12 @@ export function DealCard({ dealId, currentRunId, onOpenRun }: { dealId: string; 
     try {
       const [d, q] = await Promise.all([
         apiFetch(`${API_BASE}/api/bulk/deals?id=${encodeURIComponent(dealId)}`).then(r => r.json()),
-        apiFetch(`${API_BASE}/api/bulk/deals?id=${encodeURIComponent(dealId)}&quote=1`).then(r => r.ok ? r.json() : null).catch(() => null),
+        // Prices are admins' only.
+        isAdmin ? apiFetch(`${API_BASE}/api/bulk/deals?id=${encodeURIComponent(dealId)}&quote=1`).then(r => r.ok ? r.json() : null).catch(() => null) : null,
       ])
       setDeal(d.deal || null); setQuote(q)
     } catch { toast.error('Could not load the deal') }
-  }, [dealId])
+  }, [dealId, isAdmin])
   useEffect(() => { load() }, [load])
 
   const buildInvoice = async () => {
@@ -219,14 +222,14 @@ export function DealCard({ dealId, currentRunId, onOpenRun }: { dealId: string; 
         </div>
         <div className="flex flex-wrap gap-1.5 text-xs">
           <span className="inline-flex items-center px-2 py-1 rounded border border-border-gray font-semibold">{deal.printKind === 'cobranded' ? 'Co-branded' : 'Standard prints'}</span>
-          <span className="inline-flex items-center px-2 py-1 rounded border border-border-gray font-semibold">{discount}{deal.discountNote ? ` · ${deal.discountNote}` : ''}</span>
+          {isAdmin && <span className="inline-flex items-center px-2 py-1 rounded border border-border-gray font-semibold">{discount}{deal.discountNote ? ` · ${deal.discountNote}` : ''}</span>}
           <span className="inline-flex items-center px-2 py-1 rounded border border-border-gray font-semibold">{deal.shipping === 'organization' ? 'Ships to them' : 'Ships to each runner'}</span>
         </div>
       </div>
 
       {/* The lines: each is a run with its own list; open one to work it. */}
       <table className="w-full text-sm">
-        <thead className="text-[11px] uppercase tracking-wider text-off-black/45"><tr><th className="text-left font-semibold py-1">Line</th><th className="text-left font-semibold">Print</th><th className="text-right font-semibold">Names</th><th className="text-right font-semibold">Price</th></tr></thead>
+        <thead className="text-[11px] uppercase tracking-wider text-off-black/45"><tr><th className="text-left font-semibold py-1">Line</th><th className="text-left font-semibold">Print</th><th className="text-right font-semibold">Names</th>{isAdmin && <th className="text-right font-semibold">Price</th>}</tr></thead>
         <tbody>
           {deal.runs.map(r => {
             const q = quote?.lines.find(l => l.number === r.number)
@@ -238,7 +241,7 @@ export function DealCard({ dealId, currentRunId, onOpenRun }: { dealId: string; 
                 </td>
                 <td className="text-xs text-off-black/65">{r.quantity} × {r.productSize} {r.frameType === 'Unframed' ? 'unframed' : r.frameType.replace(' Premium', '')}</td>
                 <td className="text-right text-xs text-off-black/65">{r._count?.runners ?? 0} of {r.quantity}</td>
-                <td className="text-right text-xs">{q?.missing ? <span className="text-red-600" title={q.missing}>No price</span> : q?.subtotalCents != null ? money(q.subtotalCents) : '…'}</td>
+                {isAdmin && <td className="text-right text-xs">{q?.missing ? <span className="text-red-600" title={q.missing}>No price</span> : q?.subtotalCents != null ? money(q.subtotalCents) : '…'}</td>}
               </tr>
             )
           })}
@@ -274,7 +277,8 @@ export function DealCard({ dealId, currentRunId, onOpenRun }: { dealId: string; 
         </div>
       )}
       {quote && quote.missing.length > 0 && <p className="text-xs text-red-600">{quote.missing.join('; ')}</p>}
-      {deal.invoiceSentAt && !deal.paidAt && <p className="text-[11px] text-off-black/45">Invoice emailed {new Date(deal.invoiceSentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. It turns paid here on its own once they pay.</p>}
+      {!isAdmin && <p className="text-xs text-off-black/50 border-t border-border-gray pt-3">{deal.paidAt ? `Paid${deal.shopifyOrderName ? ` · ${deal.shopifyOrderName}` : ''}` : 'Matt handles the invoice'}</p>}
+      {isAdmin && deal.invoiceSentAt && !deal.paidAt && <p className="text-[11px] text-off-black/45">Invoice emailed {new Date(deal.invoiceSentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. It turns paid here on its own once they pay.</p>}
       {deal.notes && <p className="text-xs text-off-black/60">{deal.notes}</p>}
     </div>
   )
