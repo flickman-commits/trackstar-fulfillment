@@ -10,6 +10,7 @@ import { apiFetch } from '@/lib/api'
 import { parseAddress } from '@/lib/parseAddress'
 import PageHeader from '@/components/PageHeader'
 import PrintPicker from '@/components/PrintPicker'
+import GelatoSample from '@/components/samples/GelatoSample'
 import { btnSecondary, pageShell, sectionLabel, infoCard, cardLabel } from '@/lib/ui'
 
 interface Variant { variantId: string; size: string; frame: string | null; price: number }
@@ -27,6 +28,9 @@ const blankLine = (): Line => ({ key: nextKey++, product: null, size: '12x18', f
 
 export default function Samples() {
   const [products, setProducts] = useState<Product[] | null>(null)
+  // Artelo ships from the US through Shopify; Gelato prints overseas from a finished PDF.
+  const [provider, setProvider] = useState<'artelo' | 'gelato'>('artelo')
+  const [gelatoProducts, setGelatoProducts] = useState<{ uid: string; label: string }[]>([])
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
@@ -47,7 +51,7 @@ export default function Samples() {
   useEffect(() => { loadSpend() }, [])
 
   useEffect(() => {
-    apiFetch('/api/samples').then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Could not load the store'); setProducts(d.products) })
+    apiFetch('/api/samples').then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Could not load the store'); setProducts(d.products); setGelatoProducts(d.gelatoProducts || []) })
       .catch(e => setLoadErr((e as Error).message))
   }, [])
 
@@ -112,7 +116,14 @@ export default function Samples() {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto pb-36 md:pb-8">
-          {sent ? (
+          <div className="mb-3 inline-flex rounded-md border border-border-gray bg-white p-0.5">
+            {([['artelo', 'Artelo (US)'], ['gelato', 'Gelato (overseas)']] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setProvider(k)} className={`px-3 py-1.5 text-sm font-medium rounded ${provider === k ? 'bg-dark-fill text-white' : 'text-off-black/60 hover:text-off-black'}`}>{l}</button>
+            ))}
+          </div>
+          {provider === 'gelato' ? (
+            <GelatoSample products={gelatoProducts} onSent={loadSpend} />
+          ) : sent ? (
             <div className="bg-white border border-border-gray rounded-lg p-6 max-w-xl">
               <div className="text-lg font-semibold text-off-black">Sample {sent.name} is in Shopify</div>
               <p className="text-sm text-off-black/60 mt-1">{sent.invoiced ? `Shopify emailed the invoice for $${sent.total.toFixed(2)}. Artelo makes it once it is paid.` : 'Free, marked paid. Shopify sent the order confirmation and Artelo picks it up as usual.'}</p>
