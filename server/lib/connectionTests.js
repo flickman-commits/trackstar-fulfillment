@@ -33,6 +33,11 @@ const TESTS = {
     if (!res.ok) throw new Error(`Artelo answered ${res.status}`)
     return 'Orders API answering'
   },
+  async gelato() {
+    const { gelatoOrders } = await import('../services/gelato.js')
+    const orders = await gelatoOrders({ limit: 1 })
+    return orders.length ? `Order API answering (latest ${orders[0].orderReferenceId || orders[0].id})` : 'Order API answering, no orders yet'
+  },
   async support_gmail() {
     const { ping } = await import('../domain/support/mailbox.js')
     return `Signed in as ${await ping()}`

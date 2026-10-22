@@ -40,6 +40,7 @@ export const CONNECTIONS = [
   { id: 'shopify', label: 'Shopify', what: 'Orders, products, discount codes, refunds and samples', env: ['SHOPIFY_STORE', 'SHOPIFY_CLIENT_ID', 'SHOPIFY_CLIENT_SECRET'], as: () => env('SHOPIFY_STORE') || null, critical: true },
   { id: 'etsy', label: 'Etsy', what: 'Etsy orders and personalization', env: ['ETSY_API_KEY', 'ETSY_SHARED_SECRET', 'ETSY_SHOP_ID'], token: 'etsy_refresh_token', connect: '/api/etsy/auth', as: () => (env('ETSY_SHOP_ID') ? `Shop ${env('ETSY_SHOP_ID')}` : null) },
   { id: 'artelo', label: 'Artelo', what: 'Print orders, costs, price checks and the print library', env: ['ARTELO_API_KEY'], critical: true },
+  { id: 'gelato', label: 'Gelato', what: 'Overseas samples, printed and shipped near the recipient', env: ['GELATO_API_KEY'] },
   { id: 'support_gmail', label: 'Support Gmail', what: 'The shared inbox (fast@)', env: ['GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET'], token: 'support_gmail_refresh_token', asKey: 'support_gmail_email', connect: '/api/support/gmail?action=connect' },
   { id: 'sales_gmail', label: 'Sales Gmail', what: "Each rep's own Gmail, for sales email", env: ['GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET'], perPerson: 'gmail_refresh_token:', connect: '/api/sales/gmail?action=connect' },
   { id: 'instagram', label: 'Instagram', what: 'DMs to @trackstar_art in the shared inbox', env: ['INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET'], token: 'support_ig_access_token', asKey: 'support_ig_username', connect: '/api/support/instagram?action=connect' },
