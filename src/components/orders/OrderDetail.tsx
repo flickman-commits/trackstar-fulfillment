@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, CloudSun, Download, ArrowUpRight, Mail } from 'lucide-react'
+import { Plus, Copy, Loader2, FlaskConical, Pencil, Check, X, ChevronDown as ChevronDownIcon, ChevronUp, ChevronLeft, ImagePlus, MessageSquareText, Send, CloudSun, Download, ArrowUpRight, Mail, Shuffle } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import type { Design } from '@/lib/useDesign'
@@ -17,6 +17,7 @@ import OrderConversations from '@/components/support/OrderConversations'
 import ProofShowcase from '@/components/ProofShowcase'
 import PhotoCropper from '@/components/PhotoCropper'
 import OrderProduction from '@/components/orders/OrderProduction'
+import ConvertToCustomModal from '@/components/orders/ConvertToCustomModal'
 import Linkify from '@/components/Linkify'
 import OrderTags, { HoverTip } from '@/components/OrderTags'
 import type { ToastMessage } from '@/components/orders/Toast'
@@ -201,6 +202,7 @@ export default function OrderDetail({
   // Re-crop the customer's photo by hand and render the design again with it.
   const [cropFile, setCropFile] = useState<File | null>(null)
   const [cropBusy, setCropBusy] = useState(false)
+  const [converting, setConverting] = useState(false)
   const cropExport = useRef<(() => Promise<File>) | null>(null)
   useEffect(() => { setCropFile(null) }, [selectedOrder?.id])
   const openCrop = async () => {
@@ -1122,6 +1124,18 @@ Thank you!`
 
   return (
     <>
+      {converting && (
+        <ConvertToCustomModal
+          order={selectedOrder}
+          onClose={() => setConverting(false)}
+          onDone={async (message) => {
+            setConverting(false)
+            setToast({ message, type: 'success' })
+            closeModal()
+            await fetchOrders()
+          }}
+        />
+      )}
       <div
         ref={detailScrollRef}
         // The order view only ever scrolls down: overflow-y alone would let anything
@@ -1921,6 +1935,12 @@ Thank you!`
                         }}
                         className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2">
                         <X className="w-3.5 h-3.5" /> Remove photo &amp; re-render
+                      </button>
+                    )}
+                    {/* A runner who ran a race we do not carry: design it as a custom print instead of refunding. */}
+                    {design.canManage && selectedOrder.status !== 'completed' && !isEditing && (
+                      <button onClick={() => setConverting(true)} className="self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2" title="The runner ran a race we do not carry: make this print a custom design. Shopify is not changed.">
+                        <Shuffle className="w-3.5 h-3.5" /> Convert to custom order
                       </button>
                     )}
                     {selectedOrder.customerEmail && can('support') && !isEditing && (
