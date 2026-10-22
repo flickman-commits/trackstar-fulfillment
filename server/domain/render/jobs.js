@@ -204,11 +204,15 @@ export async function autoQueueRenders({ limit = 25 } = {}) {
   const from = since?.value ? new Date(since.value) : new Date()
   const candidates = await prisma.order.findMany({
     where: {
-      trackstarOrderType: 'standard',
+      // Shop orders since the switch, and runners in a paid bulk deal of
+      // standard prints (deals.js): those render like shop orders.
+      OR: [
+        { trackstarOrderType: 'standard', createdAt: { gte: from } },
+        { trackstarOrderType: 'bulk', bulkOrder: { paidAt: { not: null }, deal: { printKind: 'standard' } } },
+      ],
       status: { notIn: ['completed', 'flagged'] },
       raceName: { in: [...new Set(templates.map(t => t.split(' / ')[0]))] },
       renderJobs: { none: {} },
-      createdAt: { gte: from },
     },
     orderBy: { createdAt: 'asc' },
     // Every candidate, not a window: many open orders cannot render yet (race
@@ -245,7 +249,7 @@ export function printedDiffers(a, b) {
  */
 export async function rerenderChanged({ limit = 10 } = {}) {
   const rows = await prisma.order.findMany({
-    where: { trackstarOrderType: 'standard', status: { notIn: ['completed', 'flagged'] }, renderJobs: { some: {} } },
+    where: { trackstarOrderType: { in: ['standard', 'bulk'] }, status: { notIn: ['completed', 'flagged'] }, renderJobs: { some: {} } },
     select: { id: true, renderJobs: { orderBy: { version: 'desc' }, take: 1, select: { status: true, review: true, spec: true } } },
   })
   let queued = 0

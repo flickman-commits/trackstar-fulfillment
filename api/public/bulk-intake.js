@@ -11,7 +11,7 @@
 import prisma from '../_lib/prisma.js'
 import { setCors } from '../_lib/auth.js'
 import { checkRateLimitDurable } from '../../server/lib/publicRateLimit.js'
-import { addRunners, addressComplete } from '../../server/domain/bulk/bulkOrders.js'
+import { addRunners, addressComplete, orgShipTo } from '../../server/domain/bulk/bulkOrders.js'
 
 function clientIp(req) {
   const fwd = req.headers['x-forwarded-for']
@@ -63,6 +63,9 @@ export default async function handler(req, res) {
         entered: count,
         note: bulk.intakeNote || null,
         product: `${bulk.productSize} ${bulk.frameType === 'Unframed' ? 'unframed' : `framed in ${bulk.frameType.toLowerCase()}`}`,
+        event: bulk.eventType || null,
+        // Every print ships to the organization: the list is names only.
+        namesOnly: Boolean(await orgShipTo(bulk)),
         runnerLink: kind === 'partner' ? `/runner/${bulk.runnerToken}` : null,
       })
     }
@@ -83,6 +86,7 @@ export default async function handler(req, res) {
     }
 
     const list = Array.isArray(body.runners) ? body.runners.slice(0, kind === 'runner' ? 1 : MAX_PER_SUBMIT) : []
+    const namesOnly = Boolean(await orgShipTo(bulk))
     const rows = []
     const rejected = []
     for (const r of list) {
@@ -99,7 +103,7 @@ export default async function handler(req, res) {
       }
       const email = String(r?.email || '').trim().slice(0, 120) || null
       if (!first || !last) { rejected.push({ row: rows.length + rejected.length + 1, reason: 'name' }); continue }
-      if (!addressComplete(address)) { rejected.push({ row: rows.length + rejected.length + 1, reason: 'address', name: `${first} ${last}` }); continue }
+      if (!namesOnly && !addressComplete(address)) { rejected.push({ row: rows.length + rejected.length + 1, reason: 'address', name: `${first} ${last}` }); continue }
       rows.push({ runnerName: `${first} ${last}`, email, address })
     }
     const created = await addRunners(bulk, rows)

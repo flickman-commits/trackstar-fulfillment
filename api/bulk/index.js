@@ -57,7 +57,7 @@ function shapeRunner(r) {
 }
 
 async function loadOne(id) {
-  const bulk = await prisma.bulkOrder.findUnique({ where: { id } })
+  const bulk = await prisma.bulkOrder.findUnique({ where: { id }, include: { deal: { select: { id: true, number: true, printKind: true } } } })
   if (!bulk) return null
   const runners = await prisma.order.findMany({ where: { bulkOrderId: id }, orderBy: { lineItemIndex: 'asc' }, select: RUNNER_SELECT })
   const ready = await readiness(bulk, runners)
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
       }
       // One round trip for the list and one for every runner, then group in
       // memory. A query per order is what exhausts the pool on a busy morning.
-      const list = await prisma.bulkOrder.findMany({ orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }] })
+      const list = await prisma.bulkOrder.findMany({ orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }], include: { deal: { select: { id: true, number: true, printKind: true } } } })
       const all = list.length
         ? await prisma.order.findMany({ where: { bulkOrderId: { in: list.map(b => b.id) } }, select: { bulkOrderId: true, shippingAddress: true, researchedAt: true, productionFileUrl: true, status: true, runnerResearch: { select: { researchStatus: true }, take: 1, orderBy: { createdAt: 'desc' } } } })
         : []

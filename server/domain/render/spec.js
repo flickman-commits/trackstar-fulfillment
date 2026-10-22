@@ -84,6 +84,7 @@ export const SPEC_SELECT = {
   raceName: true, raceNameOverride: true, raceYear: true, yearOverride: true,
   runnerName: true, runnerNameOverride: true, productSize: true, hadNoTime: true,
   photoPath: true, photoAddedManually: true, shopifyOrderData: true, arteloOrderData: true, lineItemIndex: true,
+  bulkOrder: { select: { paidAt: true, deal: { select: { printKind: true } } } },
   runnerResearch: { orderBy: { id: 'desc' }, select: { researchStatus: true, bibNumber: true, officialTime: true, officialPace: true, eventType: true, race: { select: { id: true, raceDate: true, raceDateSource: true, raceDateSourceUrl: true, raceDateEvidence: true, raceDateVerifiedAt: true, raceDateConfirmedByPerson: true, location: true, weatherCondition: true, weatherTemp: true, weatherFetchedAt: true, weatherConfirmedAt: true, firstPrintedAt: true } } } },
 }
 
@@ -102,7 +103,10 @@ export function buildSpec(order, templates = [], raceRow = null, noTimeGaps = ne
   const raceYear = order.yearOverride ?? order.raceYear
   const name = (order.runnerNameOverride ?? order.runnerName ?? '').trim()
 
-  if (order.trackstarOrderType !== 'standard') reasons.push('Only standard race prints are rendered')
+  // A bulk deal of standard prints (our race design) renders like a shop order;
+  // a co-branded one is the designer's (server/domain/bulk/deals.js).
+  const bulkStandard = order.trackstarOrderType === 'bulk' && order.bulkOrder?.deal?.printKind === 'standard'
+  if (order.trackstarOrderType !== 'standard' && !bulkStandard) reasons.push('Only standard race prints are rendered')
   if (!SIZES.includes(order.productSize)) reasons.push(`No artboard for size "${order.productSize}"`)
   const edition = editionOf(order)
   const research0 = order.runnerResearch?.find(r => r.researchStatus === 'found') || order.runnerResearch?.[0]

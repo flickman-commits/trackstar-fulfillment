@@ -13,6 +13,10 @@
  *     bulk run, filled in from the order (partner, quantity, size and frame),
  *     to be completed here.
  *
+ * A third way, now the usual one: an invoice built from a deal here
+ * (deals.js) is tagged with the deal's number, which marks the deal and all
+ * its runs paid; no guessing by name.
+ *
  * Either way the run is marked paid when Shopify says paid. The order import
  * never turns a "bulk" order into a standard order (processOrders).
  */
@@ -21,6 +25,7 @@ import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { getCanonicalRaceName } from '../../scrapers/index.js'
 import { nextNumber, dueDateFor, verifiedRaceDate, FRAME_OPTIONS, SIZE_OPTIONS } from './bulkOrders.js'
 import { defaultAssigneeFor } from '../orders/assignment.js'
+import { markDealPaid } from './deals.js'
 
 const PAID = new Set(['PAID', 'PARTIALLY_REFUNDED'])
 
@@ -59,6 +64,14 @@ export async function syncShopifyBulkOrders({ days = 90 } = {}) {
     out.seen++
     const shopifyOrderId = String(o.legacyResourceId)
     const paid = PAID.has(o.displayFinancialStatus)
+
+    // An invoice built from a deal (deals.js) carries its number as a tag:
+    // that, not the partner's name, says which deal and runs it pays for.
+    const dealTag = (Array.isArray(o.tags) ? o.tags : String(o.tags || '').split(',')).map(t => String(t).trim()).find(t => /^DEAL-\d+$/i.test(t))
+    if (dealTag) {
+      if (paid) { const d = await markDealPaid(dealTag.toUpperCase(), { shopifyOrderId, shopifyOrderName: o.name }); if (d) out.paid++ }
+      continue
+    }
 
     let run = await prisma.bulkOrder.findUnique({ where: { shopifyOrderId } })
     const partner = o.billingAddress?.company || [o.customer?.firstName, o.customer?.lastName].filter(Boolean).join(' ') || o.billingAddress?.name || ''

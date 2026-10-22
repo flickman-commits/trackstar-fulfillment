@@ -41,8 +41,10 @@ function parsePaste(text: string): Row[] {
     if (hasHeader) {
       if (iF >= 0) { first = g(iF); last = g(iL) } else { const p = g(iN).split(/\s+/); first = p[0] || ''; last = p.slice(1).join(' ') }
     } else {
-      // No header: assume First, Last, Address, City, State, Zip
-      first = c[0] || ''; last = c[1] || ''
+      // No header: assume First, Last, Address, City, State, Zip. A plain list
+      // of full names (one column, "Jane Doe") is split on the first space.
+      if (c.length === 1) { const p = (c[0] || '').split(/\s+/); first = p[0] || ''; last = p.slice(1).join(' ') }
+      else { first = c[0] || ''; last = c[1] || '' }''
     }
     if (!first && !last) continue
     rows.push({
@@ -57,7 +59,7 @@ function parsePaste(text: string): Row[] {
 
 export default function BulkIntake() {
   const { token } = useParams<{ token: string }>()
-  const [info, setInfo] = useState<{ partnerName: string; raceName: string; raceYear: number; quantity: number; entered: number; note: string | null; product: string; runnerLink: string | null; previewImageUrl: string | null; received: { id: string; name: string; city: string | null; at: string }[] | null } | null>(null)
+  const [info, setInfo] = useState<{ partnerName: string; raceName: string; raceYear: number; quantity: number; entered: number; note: string | null; product: string; runnerLink: string | null; previewImageUrl: string | null; event?: string | null; namesOnly?: boolean; received: { id: string; name: string; city: string | null; at: string }[] | null } | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'gone' | 'sent'>('loading')
   const [rows, setRows] = useState<Row[]>([blank()])
   const [mode, setMode] = useState<'paste' | 'link'>('paste')
@@ -75,7 +77,8 @@ export default function BulkIntake() {
   }, [token])
 
   const usable = rows.filter(r => r.firstName.trim() && r.lastName.trim())
-  const incomplete = usable.filter(r => !r.line1.trim() || !r.city.trim() || !r.zip.trim()).length
+  // When every print ships to the organization, names are all we need.
+  const incomplete = info?.namesOnly ? 0 : usable.filter(r => !r.line1.trim() || !r.city.trim() || !r.zip.trim()).length
 
   const submit = async () => {
     setBusy(true); setErr(null)
@@ -143,9 +146,9 @@ export default function BulkIntake() {
       <div className="rounded-2xl p-6 mb-4" style={{ backgroundColor: T.card, border: `1px solid ${T.line}` }}>
         <div className="flex gap-5">
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap gap-1.5 mb-3">{tag(info.raceName)}{tag(String(info.raceYear))}</div>
+            <div className="flex flex-wrap gap-1.5 mb-3">{tag(info.raceName)}{tag(String(info.raceYear))}{info.event && info.event !== 'Marathon' ? tag(info.event) : null}</div>
             <h1 className="text-xl font-bold" style={{ color: '#1A1A1A' }}>Upload your list of runners</h1>
-            <p className="text-sm mt-1" style={{ color: '#666' }}>For each runner we need their first and last name and shipping address to be able to create and send their Trackstar print.</p>
+            <p className="text-sm mt-1" style={{ color: '#666' }}>{info.namesOnly ? `For each runner we need their first and last name. Every print ships to ${info.partnerName}, so no addresses are needed.` : 'For each runner we need their first and last name and shipping address to be able to create and send their Trackstar print.'}</p>
           </div>
           {info.previewImageUrl && (
             <button type="button" onClick={() => setPreviewOpen(true)} className="shrink-0 w-28 h-28 rounded-xl overflow-hidden" style={{ backgroundColor: '#E9EBEE', border: `1px solid ${T.line}` }} title="See your co-branded print full screen">
@@ -238,7 +241,7 @@ export default function BulkIntake() {
               </li>
               <li className="flex items-center gap-4">
                 <span className="text-xs font-bold w-14 shrink-0" style={{ color: '#999', letterSpacing: '0.06em' }}>STEP 2</span>
-                <span className="text-sm" style={{ color: '#1A1A1A' }}>Fill it out with each runner's name and shipping address</span>
+                <span className="text-sm" style={{ color: '#1A1A1A' }}>{info.namesOnly ? 'Fill it out with each runner\'s first and last name' : 'Fill it out with each runner\'s name and shipping address'}</span>
               </li>
               <li className="flex items-center gap-4">
                 <span className="text-xs font-bold w-14 shrink-0" style={{ color: '#999', letterSpacing: '0.06em' }}>STEP 3</span>
@@ -276,12 +279,12 @@ export default function BulkIntake() {
                 <table className="w-full text-sm">
                   <tbody>
                     {rows.map((r, i) => {
-                      const ok = r.firstName.trim() && r.lastName.trim() && r.line1.trim() && r.city.trim() && r.zip.trim()
+                      const ok = r.firstName.trim() && r.lastName.trim() && (info.namesOnly || (r.line1.trim() && r.city.trim() && r.zip.trim()))
                       if (!r.firstName.trim() && !r.lastName.trim()) return null
                       return (
                         <tr key={i} style={{ borderTop: i ? `1px solid ${T.line}` : undefined }}>
                           <td className="px-4 py-2 font-medium" style={{ color: '#1A1A1A' }}>{r.firstName} {r.lastName}</td>
-                          <td className="px-3 py-2 text-xs" style={{ color: ok ? '#666' : '#B45309' }}>{ok ? `${r.line1}${r.line2 ? `, ${r.line2}` : ''}, ${r.city} ${r.state} ${r.zip}` : 'Address incomplete, will be held back'}</td>
+                          <td className="px-3 py-2 text-xs" style={{ color: ok ? '#666' : '#B45309' }}>{info.namesOnly ? `Ships to ${info.partnerName}` : ok ? `${r.line1}${r.line2 ? `, ${r.line2}` : ''}, ${r.city} ${r.state} ${r.zip}` : 'Address incomplete, will be held back'}</td>
                           <td className="px-2 py-2 text-right"><button onClick={() => setRows(rs => rs.length === 1 ? [blank()] : rs.filter((_, j) => j !== i))} title="Remove" style={{ color: '#999' }}><Trash2 className="w-4 h-4" /></button></td>
                         </tr>
                       )

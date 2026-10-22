@@ -37,6 +37,7 @@ const EVENT_DISTANCE_MILES = {
   'half': 13.1,
   '10 miler': 10,
   '10k': 6.2137,
+  '8k': 4.9710,
   '5k': 3.1069,
 }
 
@@ -314,7 +315,7 @@ export class ResearchService {
     // their time and the event's distance, the same math as the pace tool and
     // the scrapers (time / distance, rounded to the second). Their time is used
     // exactly as given; only the missing pace is filled in.
-    const EVENT_MILES = { marathon: 26.2, 'half marathon': 13.1, half: 13.1, '10 mile': 10, '10k': 6.2137, '5k': 3.1069 }
+    const EVENT_MILES = { marathon: 26.2, 'half marathon': 13.1, half: 13.1, '10 mile': 10, '10 miler': 10, '10k': 6.2137, '8k': 4.9710, '5k': 3.1069 }
     const eventMiles = EVENT_MILES[String(order.customerEventType || 'marathon').trim().toLowerCase()] || null
     // Only a full H:MM:SS time, and only a pace a person could run (4:00 to
     // 20:00 a mile): "5:35" is ambiguous and 1:18:46 for a marathon is a typo

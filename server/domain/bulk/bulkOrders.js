@@ -99,8 +99,26 @@ export function addressComplete(a) {
   return Boolean(a && a.line1 && a.city && a.zip)
 }
 
-/** Create runner rows under a bulk order. Skips exact duplicate names already present. */
+/**
+ * The address a run's prints go to when its deal ships everything to the
+ * organization (deals.js), in the runner-address shape; null when each
+ * runner gets their own.
+ */
+export async function orgShipTo(bulk) {
+  if (!bulk.dealId) return null
+  const deal = await prisma.bulkDeal.findUnique({ where: { id: bulk.dealId }, select: { shipping: true, shipToAddress: true } })
+  const a = deal?.shipping === 'organization' ? deal.shipToAddress : null
+  return a ? { line1: a.address1 || '', line2: a.address2 || '', city: a.city || '', state: a.province || '', zip: a.zip || '', country: a.country === 'US' || !a.country ? 'United States' : a.country } : null
+}
+
+/**
+ * Create runner rows under a bulk order. Skips exact duplicate names already
+ * present. Each runner carries the run's event, so research searches that
+ * event; when the deal ships to the organization, that is every runner's
+ * address and the list needs names only.
+ */
 export async function addRunners(bulk, rows) {
+  const shipTo = await orgShipTo(bulk)
   const existing = await prisma.order.findMany({ where: { bulkOrderId: bulk.id }, select: { runnerName: true, lineItemIndex: true } })
   const seen = new Set(existing.map(e => e.runnerName.trim().toLowerCase()))
   let idx = existing.reduce((m, e) => Math.max(m, e.lineItemIndex), 0)
@@ -124,7 +142,8 @@ export async function addRunners(bulk, rows) {
         frameType: bulk.frameType,
         trackstarOrderType: 'bulk',
         bulkOrderId: bulk.id,
-        shippingAddress: row.address,
+        shippingAddress: shipTo || row.address,
+        customerEventType: bulk.eventType || null,
         customerEmail: row.email,
         customerName: row.runnerName.trim().split(/\s+/)[0],
         dueDate: bulk.dueDate,

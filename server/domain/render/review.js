@@ -9,6 +9,7 @@ import { uploadApprovedToArtelo } from './artelo.js'
 import { deliverApproved } from './deliver.js'
 import { markRacePrinted } from '../races/verification.js'
 import { needFromRejection } from './designNeeds.js'
+import { publishBulkPrint } from '../bulk/bulkRender.js'
 
 /** Copy an approved print to the Drive Orders folder, then upload it to the Artelo library. Never throws. */
 export async function deliverEverywhere(job) {
@@ -43,6 +44,9 @@ export async function reviewRender({ jobId, decision, note, user, designNeed = f
   if (job.review === 'approved') {
     if (job.spec?.raceId) await markRacePrinted(job.spec.raceId)
     delivery = deliverEverywhere(job)
+    // A bulk runner's approved print is their file on the Artelo bulk sheet.
+    const published = publishBulkPrint(job).catch(e => console.error('[render/review] bulk print', job.id, e.message))
+    delivery = Promise.all([delivery, published]).then(([d]) => d)
     await prisma.renderJob.updateMany({ where: { orderId: job.orderId, review: 'pending', id: { not: job.id } }, data: { review: 'closed', reviewNote: 'Another version was approved', reviewedAt: new Date() } })
   }
   await recordAudit({ action: `render.${job.review}`, summary: `${job.review === 'approved' ? 'Approved' : 'Rejected'} the render of ${job.spec?.file || job.orderId} (v${job.version})${job.reviewNote ? `: ${job.reviewNote}` : ''}`, detail: { jobId: job.id, orderId: job.orderId }, actor: user })

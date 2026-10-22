@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnSecondary, btnGhost, inputBase } from '@/lib/ui'
 import ProofFullscreen from '@/components/ProofFullscreen'
 import AssigneePicker, { Avatar, type Teammate } from '@/components/AssigneePicker'
+import { DealModal, DealCard } from '@/components/bulk/DealPanels'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -64,6 +65,10 @@ export interface BulkOrder {
   intakeNote: string | null
   notes: string | null
   partnerOrderId: string | null
+  /** The deal it is one line of (DealPanels), and the event at the race. */
+  dealId?: string | null
+  deal?: { id: string; number: string; printKind: 'standard' | 'cobranded' } | null
+  eventType?: string | null
   /** Who runs it; new ones go to the bulk default in Order Assignment. */
   assigneeId: string | null
   progress: { total: number; withAddress: number; researched: number; found: number; files: number; completed: number }
@@ -154,7 +159,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const setCreating = (v: boolean) => onCreatingChange?.(v)
   const q = search.trim().toLowerCase()
-  const shown = useMemo(() => !list || !q ? list : list.filter(b => [b.number, b.partnerName, b.raceName, String(b.raceYear)].some(v => String(v || '').toLowerCase().includes(q))), [list, q])
+  const shown = useMemo(() => !list || !q ? list : list.filter(b => [b.number, b.deal?.number, b.partnerName, b.raceName, b.eventType, String(b.raceYear)].some(v => String(v || '').toLowerCase().includes(q))), [list, q])
 
   const load = useCallback(async () => {
     try {
@@ -167,7 +172,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
   useEffect(() => { load() }, [load])
 
   if (selectedId) {
-    return <BulkDetail id={selectedId} onBack={() => { setSelectedId(null); load() }} onOpenRunner={onOpenRunner} refreshRunners={refreshRunners} team={team} meId={meId} />
+    return <BulkDetail key={selectedId} id={selectedId} onBack={() => { setSelectedId(null); load() }} onOpenRun={setSelectedId} onOpenRunner={onOpenRunner} refreshRunners={refreshRunners} team={team} meId={meId} />
   }
 
   return (
@@ -197,9 +202,9 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
                 const st = STATUS_STYLE[b.status] || STATUS_STYLE.collecting
                 return (
                   <tr key={b.id} onClick={() => setSelectedId(b.id)} className="border-t border-border-gray/70 hover:bg-subtle-gray cursor-pointer">
-                    <td className="px-4 py-3 font-mono text-[12px] text-off-black/70">{b.number}</td>
+                    <td className="px-4 py-3 font-mono text-[12px] text-off-black/70">{b.number}{b.deal && <span className="block text-[10px] text-off-black/40">{b.deal.number}</span>}</td>
                     <td className="px-3 py-3 font-semibold text-off-black">{b.partnerName}</td>
-                    <td className="px-3 py-3 text-off-black/80">{b.raceName} <span className="text-off-black/45">{b.raceYear}</span></td>
+                    <td className="px-3 py-3 text-off-black/80">{b.raceName} <span className="text-off-black/45">{b.raceYear}</span>{b.eventType && b.eventType !== 'Marathon' && <span className="ml-1.5 text-xs font-medium text-off-black/60">{b.eventType}</span>}</td>
                     <td className="px-3 py-3">
                       {b.dueDate ? (
                         <span className={d !== null && d < 0 ? 'text-red-600 font-semibold' : d !== null && d <= 3 ? 'text-amber-700 font-semibold' : 'text-off-black/80'}>
@@ -227,63 +232,14 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
           </table>
         )}
       </div>
-      {creating && <CreateModal onClose={() => setCreating(false)} onCreated={b => { setCreating(false); setList(prev => [b, ...(prev || [])]); onCount?.((list?.length || 0) + 1); setSelectedId(b.id) }} />}
-    </div>
-  )
-}
-
-// ─── Create ────────────────────────────────────────────────────────────────
-
-function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (b: BulkOrder) => void }) {
-  const [opts, setOpts] = useState<{ frames: string[]; sizes: string[] } | null>(null)
-  const [partners, setPartners] = useState<{ id: string; raceName: string; customerName: string | null }[]>([])
-  const [f, setF] = useState({ partnerName: '', raceName: '', raceYear: String(new Date().getFullYear()), quantity: '', frameType: 'Natural Premium Oak', productSize: '12x18', partnerOrderId: '' })
-  const [busy, setBusy] = useState(false)
-  useEffect(() => {
-    apiFetch(`${API_BASE}/api/bulk?options=1`).then(r => r.json()).then(setOpts).catch(() => setOpts({ frames: ['Unframed', 'Natural Premium Oak', 'Black Premium Oak'], sizes: ['8x10', '12x18', '16x24'] }))
-    apiFetch(`${API_BASE}/api/orders?type=race_partner`).then(r => r.json()).then(d => setPartners((d.orders || []).map((o: { id: string; raceName: string; customerName: string | null }) => ({ id: o.id, raceName: o.raceName, customerName: o.customerName })))).catch(() => {})
-  }, [])
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF(v => ({ ...v, [k]: e.target.value }))
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setBusy(true)
-    try {
-      const out = await api<{ bulkOrder: BulkOrder }>({ action: 'create', ...f })
-      toast.success(`${out.bulkOrder.number} created`)
-      onCreated(out.bulkOrder)
-    } catch (err) { toast.error((err as Error).message) } finally { setBusy(false) }
-  }
-  return (
-    <div className="fixed inset-0 z-50 bg-off-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={submit} onClick={e => e.stopPropagation()} className="bg-white rounded-lg shadow-xl w-full max-w-lg p-5 space-y-3">
-        <div className="flex items-center justify-between"><h3 className="text-base font-semibold">New bulk order</h3><button type="button" onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button></div>
-        <div>
-          <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Partner design</label>
-          <select value={f.partnerOrderId} onChange={e => { const p = partners.find(x => x.id === e.target.value); setF(v => ({ ...v, partnerOrderId: e.target.value, partnerName: p ? p.raceName : v.partnerName })) }} className={`${inputBase} w-full`}>
-            <option value="">None yet</option>
-            {partners.map(p => <option key={p.id} value={p.id}>{p.raceName}</option>)}
-          </select>
-          <p className="text-[11px] text-off-black/45 mt-1">Links the approved co-branded design so the preview and readiness follow it.</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="col-span-2"><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Partner</label><input required value={f.partnerName} onChange={set('partnerName')} placeholder="Release Recovery Foundation" className={`${inputBase} w-full`} /></div>
-          <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Race</label><input required value={f.raceName} onChange={set('raceName')} placeholder="NYC Marathon" className={`${inputBase} w-full`} /></div>
-          <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Year</label><input required inputMode="numeric" value={f.raceYear} onChange={set('raceYear')} className={`${inputBase} w-full`} /></div>
-          <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Units</label><input inputMode="numeric" value={f.quantity} onChange={set('quantity')} placeholder="100" className={`${inputBase} w-full`} /></div>
-          <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Frame</label>
-            <select value={f.frameType} onChange={e => setF(v => ({ ...v, frameType: e.target.value, productSize: e.target.value === 'Unframed' ? '8x10' : '12x18' }))} className={`${inputBase} w-full`}>{(opts?.frames || []).map(o => <option key={o}>{o}</option>)}</select></div>
-          <div><label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Size</label>
-            <select value={f.productSize} onChange={set('productSize')} className={`${inputBase} w-full`}>{(opts?.sizes || []).map(o => <option key={o}>{o}</option>)}</select></div>
-        </div>
-        <div className="flex justify-end gap-2 pt-1"><button type="button" onClick={onClose} className={btnGhost}>Cancel</button><button type="submit" disabled={busy} className={btnPrimary}>{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}</button></div>
-      </form>
+      {creating && <DealModal onClose={() => setCreating(false)} onCreated={deal => { setCreating(false); load(); if (deal.runs[0]) setSelectedId(deal.runs[0].id) }} />}
     </div>
   )
 }
 
 // ─── Detail ────────────────────────────────────────────────────────────────
 
-function BulkDetail({ id, onBack, onOpenRunner, refreshRunners, team, meId }: { id: string; onBack: () => void; onOpenRunner: (n: string) => void; refreshRunners: () => void; team: Teammate[]; meId?: string | null }) {
+function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team, meId }: { id: string; onBack: () => void; onOpenRun: (runId: string) => void; onOpenRunner: (n: string) => void; refreshRunners: () => void; team: Teammate[]; meId?: string | null }) {
   const [b, setB] = useState<BulkOrder | null>(null)
   const [intakeText, setIntakeText] = useState('')
   const [intakeOpen, setIntakeOpen] = useState(false)
@@ -457,7 +413,22 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners, team, meId }: { 
     </div>
   )
 
-  const productionCard = (
+  // A standard-print deal has no production file: each runner's print renders
+  // from the race design (render worker), is approved in their order, and its
+  // PDF becomes that runner's file for the Artelo sheet.
+  const standardCard = (
+    <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4">
+      <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">Standard prints</div>
+      <div className="text-lg font-bold text-off-black leading-tight mt-0.5">{b.raceName} {b.raceYear}{b.eventType && b.eventType !== 'Marathon' ? ` · ${b.eventType}` : ''}</div>
+      <p className="text-xs text-off-black/60 mt-1">Each runner's print renders from the race design once they are researched. Open a runner to approve their design; approved prints attach to the Artelo sheet on their own ({b.progress.files} of {runners.length} so far).</p>
+      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+        <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.productSize}</span>
+        <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.frameType}</span>
+      </div>
+    </div>
+  )
+
+  const productionCard = b.deal?.printKind === 'standard' ? standardCard : (
     <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4">
       <div className="flex gap-4">
         <button type="button" onClick={() => previewUrl && setPreview(true)} disabled={!previewUrl} className="shrink-0 w-24 h-24 rounded-md border border-border-gray bg-subtle-gray overflow-hidden flex items-center justify-center disabled:cursor-default" title={previewUrl ? 'Full screen' : undefined}>
@@ -711,7 +682,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners, team, meId }: { 
             </div>
             <div className="text-sm text-off-black/60 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="font-mono text-[12px]">{b.number}</span>
-              <span>{b.raceName} {b.raceYear}</span>
+              <span>{b.raceName} {b.raceYear}{b.eventType ? ` · ${b.eventType}` : ''}</span>
               {b.quantity ? <span>{b.quantity} units</span> : null}
             </div>
           </div>
@@ -765,7 +736,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners, team, meId }: { 
               </a>
             ) : (
               <p className="mt-1.5 text-[11px] text-off-black/50 leading-snug">
-                Billing in Shopify? Tag the draft order <span className="font-mono text-off-black/80">bulk</span> with this partner as the customer or company, and it marks itself paid here.
+                {b.deal ? 'Invoiced from the deal above; it turns paid here on its own once they pay.' : <>Billing in Shopify? Tag the draft order <span className="font-mono text-off-black/80">bulk</span> with this partner as the customer or company, and it marks itself paid here.</>}
               </p>
             )}
           </div>
@@ -781,6 +752,7 @@ function BulkDetail({ id, onBack, onOpenRunner, refreshRunners, team, meId }: { 
         </div>
       </div>
 
+      {b.deal && <DealCard dealId={b.deal.id} currentRunId={b.id} onOpenRun={onOpenRun} />}
       {collecting && <>{intakeCard}{runnersCard}</>}
       {fulfilling && <>{productionCard}{runnersCard}{filesCard}{arteloCard}{intakeCard}</>}
       {submitted && <>{arteloCard}{productionCard}{runnersCard}</>}
