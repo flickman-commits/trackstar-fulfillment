@@ -6,7 +6,6 @@ import {
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnSecondary, btnGhost, inputBase } from '@/lib/ui'
-import ProofFullscreen from '@/components/ProofFullscreen'
 import AssigneePicker, { Avatar, type Teammate } from '@/components/AssigneePicker'
 import { DealModal, DealCard } from '@/components/bulk/DealPanels'
 
@@ -103,9 +102,6 @@ const STAGES: { key: string; label: string }[] = [
 function fmtDate(s?: string | null) {
   return s ? new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
 }
-function toInputDate(s?: string | null) {
-  return s ? new Date(s).toISOString().slice(0, 10) : ''
-}
 function daysUntil(s?: string | null) {
   if (!s) return null
   return Math.round((new Date(s).getTime() - Date.now()) / 86400000)
@@ -159,7 +155,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const setCreating = (v: boolean) => onCreatingChange?.(v)
   const q = search.trim().toLowerCase()
-  const shown = useMemo(() => !list || !q ? list : list.filter(b => [b.number, b.deal?.number, b.partnerName, b.raceName, b.eventType, String(b.raceYear)].some(v => String(v || '').toLowerCase().includes(q))), [list, q])
+  const shown = useMemo(() => !list || !q ? list : list.filter(b => [b.number, b.partnerName, b.raceName, b.eventType, String(b.raceYear)].some(v => String(v || '').toLowerCase().includes(q))), [list, q])
 
   const load = useCallback(async () => {
     try {
@@ -190,7 +186,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
                 <th className="text-left px-4 py-2.5 font-semibold">Order</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Partner</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Race</th>
-                <th className="text-left px-3 py-2.5 font-semibold">Due</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Ships</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Payment</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Assignee</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Status</th>
@@ -202,7 +198,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
                 const st = STATUS_STYLE[b.status] || STATUS_STYLE.collecting
                 return (
                   <tr key={b.id} onClick={() => setSelectedId(b.id)} className="border-t border-border-gray/70 hover:bg-subtle-gray cursor-pointer">
-                    <td className="px-4 py-3 font-mono text-[12px] text-off-black/70">{b.number}{b.deal && <span className="block text-[10px] text-off-black/40">{b.deal.number}</span>}</td>
+                    <td className="px-4 py-3 font-mono text-[12px] text-off-black/70">{b.number}</td>
                     <td className="px-3 py-3 font-semibold text-off-black">{b.partnerName}</td>
                     <td className="px-3 py-3 text-off-black/80">{b.raceName} <span className="text-off-black/45">{b.raceYear}</span>{b.eventType && b.eventType !== 'Marathon' && <span className="ml-1.5 text-xs font-medium text-off-black/60">{b.eventType}</span>}</td>
                     <td className="px-3 py-3">
@@ -249,20 +245,8 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
   const [unmatched, setUnmatched] = useState<{ filename: string; candidates: { orderNumber: string; runnerName: string }[] }[]>([])
   const [checking, setChecking] = useState(false)
   const [reach, setReach] = useState<Record<string, boolean>>({})
-  const [preview, setPreview] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
-  const [detailsOpen, setDetailsOpen] = useState(false)
-  // The details form edits a draft and writes once on Save, so a half-typed
-  // Drive link never lands and Cancel really cancels.
-  type Draft = { productionFileUrl: string; previewImageUrl: string; raceDate: string; dueDate: string; frameType: string; productSize: string; quantity: string; notes: string }
-  const draftFrom = (x: BulkOrder | null): Draft | null => x ? ({ productionFileUrl: x.productionFileUrl || '', previewImageUrl: x.previewImageUrl || '', raceDate: toInputDate(x.raceDate), dueDate: toInputDate(x.dueDate), frameType: x.frameType, productSize: x.productSize, quantity: x.quantity ? String(x.quantity) : '', notes: x.notes || '' }) : null
-  const [draft, setDraft] = useState<Draft | null>(null)
-  const [saving, setSaving] = useState(false)
-  // Small dialog for pasting the Drive link from the production card.
-  const [linkOpen, setLinkOpen] = useState(false)
-  const [linkDraft, setLinkDraft] = useState('')
   const [intakeLinkOpen, setIntakeLinkOpen] = useState(false)
-  const [opts, setOpts] = useState<{ frames: string[]; sizes: string[] }>({ frames: ['Unframed', 'Natural Premium Oak', 'Black Premium Oak'], sizes: ['8x10', '12x18', '16x24'] })
   const fileInput = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -271,7 +255,7 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
     if (!res.ok) { toast.error(data.error || 'Not found'); onBack(); return }
     setB(data.bulkOrder)
   }, [id, onBack])
-  useEffect(() => { load(); apiFetch(`${API_BASE}/api/bulk?options=1`).then(r => r.json()).then(setOpts).catch(() => {}) }, [load])
+  useEffect(() => { load() }, [load])
 
   const act = async (body: Record<string, unknown>, ok?: string) => {
     try {
@@ -366,7 +350,6 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
 
   const intakeLink = useMemo(() => (b ? `${window.location.origin}/intake/${b.intakeToken}` : ''), [b])
   const runnerLink = useMemo(() => (b ? `${window.location.origin}/runner/${b.runnerToken}` : ''), [b])
-  const previewUrl = b?.previewImageUrl || b?.readiness?.design.approvedImageUrl || null
 
   if (!b) return <div className="flex items-center justify-center py-16 text-off-black/40"><Loader2 className="w-5 h-5 animate-spin" /></div>
   const r = b.readiness!
@@ -413,14 +396,14 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
     </div>
   )
 
-  // A standard-print deal has no production file: each runner's print renders
-  // from the race design (render worker), is approved in their order, and its
-  // PDF becomes that runner's file for the Artelo sheet.
+  // Each runner's print renders (render worker) from the race design, or for a
+  // co-branded order from its uploaded file, is approved in their order, and
+  // its PDF becomes that runner's file for the Artelo sheet.
   const standardCard = (
     <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4">
-      <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">Standard prints</div>
+      <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">{b.deal?.printKind === 'cobranded' ? 'Co-branded prints' : 'Standard prints'}</div>
       <div className="text-lg font-bold text-off-black leading-tight mt-0.5">{b.raceName} {b.raceYear}{b.eventType && b.eventType !== 'Marathon' ? ` · ${b.eventType}` : ''}</div>
-      <p className="text-xs text-off-black/60 mt-1">Each runner's print renders from the race design once they are researched. Open a runner to approve their design; approved prints attach to the Artelo sheet on their own ({b.progress.files} of {runners.length} so far).</p>
+      <p className="text-xs text-off-black/60 mt-1">Each runner's print renders from {b.deal?.printKind === 'cobranded' ? 'the uploaded co-branded file' : 'the race design'} once they are researched. Open a runner to approve their design; approved prints attach to the Artelo sheet on their own ({b.progress.files} of {runners.length} so far).</p>
       <div className="flex flex-wrap items-center gap-1.5 mt-2">
         <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.productSize}</span>
         <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.frameType}</span>
@@ -428,33 +411,7 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
     </div>
   )
 
-  const productionCard = b.deal?.printKind === 'standard' ? standardCard : (
-    <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4">
-      <div className="flex gap-4">
-        <button type="button" onClick={() => previewUrl && setPreview(true)} disabled={!previewUrl} className="shrink-0 w-24 h-24 rounded-md border border-border-gray bg-subtle-gray overflow-hidden flex items-center justify-center disabled:cursor-default" title={previewUrl ? 'Full screen' : undefined}>
-          {previewUrl ? <img src={previewUrl} alt="Co-branded design" className="w-full h-full object-cover" /> : <span className="text-[10px] text-off-black/40 px-2 text-center">No preview</span>}
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">Co-branded production file</div>
-          <div className="text-lg font-bold text-off-black leading-tight mt-0.5">{b.partnerName} x {b.raceName}</div>
-          <p className="text-xs text-off-black/60 mt-0.5">Every print in this order comes from this file, not the standard {b.raceName} artwork.</p>
-          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.productSize}</span>
-            <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.frameType}</span>
-            {b.productionFileUrl ? (
-              <a href={b.productionFileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#4600D6] hover:underline ml-1"><ExternalLink className="w-3 h-3" /> Open production file</a>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 ml-1 text-xs">
-                <span className="text-amber-700">No production file linked yet.</span>
-                <button onClick={() => { setLinkDraft(''); setLinkOpen(true) }} className="text-[#4600D6] font-semibold hover:underline">Add link</button>
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-
+  const productionCard = standardCard
   const runnersCard = (
     <div className="bg-white border border-border-gray rounded-lg shadow-sm">
       <div className="p-3 md:p-4 border-b border-border-gray flex flex-wrap items-center justify-between gap-2">
@@ -577,98 +534,8 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
     </div>
   )
 
-  const detailsCard = (
-    <div className={detailsOpen ? 'bg-white border border-border-gray rounded-lg shadow-sm' : ''}>
-      <button onClick={() => { setDetailsOpen(o => !o); setDraft(draftFrom(b)) }} className={`flex items-center gap-1.5 text-xs text-off-black/45 hover:text-off-black ${detailsOpen ? 'w-full justify-between px-4 py-3' : 'px-1 py-1'}`}>
-        <span>Update bulk order details</span>
-        {detailsOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-      </button>
-      {detailsOpen && draft && (
-        <div className="px-4 pb-4 border-t border-border-gray pt-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="col-span-2 md:col-span-4">
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Production file (Google Drive link to the Illustrator file)</label>
-              <input value={draft.productionFileUrl} onChange={e => setDraft({ ...draft, productionFileUrl: e.target.value })} placeholder="https://drive.google.com/…" className={`${inputBase} w-full`} />
-            </div>
-            <div className="col-span-2 md:col-span-4">
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Preview image</label>
-              <input value={draft.previewImageUrl} onChange={e => setDraft({ ...draft, previewImageUrl: e.target.value })} placeholder={r.design.approvedImageUrl ? 'Using the approved partner proof. Paste a URL to override.' : 'Image URL'} className={`${inputBase} w-full text-xs`} />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Race date</label>
-              <input type="date" value={draft.raceDate} onChange={e => setDraft({ ...draft, raceDate: e.target.value })} className={`${inputBase} w-full`} />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Due date</label>
-              <input type="date" value={draft.dueDate} onChange={e => setDraft({ ...draft, dueDate: e.target.value })} className={`${inputBase} w-full`} />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Frame</label>
-              <select value={draft.frameType} onChange={e => setDraft({ ...draft, frameType: e.target.value, productSize: e.target.value === 'Unframed' ? '8x10' : draft.productSize === '8x10' ? '12x18' : draft.productSize })} className={`${inputBase} w-full`}>{opts.frames.map(o => <option key={o}>{o}</option>)}</select>
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Size</label>
-              <select value={draft.productSize} onChange={e => setDraft({ ...draft, productSize: e.target.value })} className={`${inputBase} w-full`}>{opts.sizes.map(o => <option key={o}>{o}</option>)}</select>
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Units</label>
-              <input inputMode="numeric" value={draft.quantity} onChange={e => setDraft({ ...draft, quantity: e.target.value.replace(/[^0-9]/g, '') })} className={`${inputBase} w-full`} />
-            </div>
-            <div className="col-span-2 md:col-span-4">
-              <label className="block text-[11px] font-semibold text-off-black/50 uppercase tracking-wider mb-1">Notes</label>
-              <textarea value={draft.notes} onChange={e => setDraft({ ...draft, notes: e.target.value })} rows={2} className={`${inputBase} w-full text-xs`} />
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 mt-3">
-            <button onClick={() => { setDraft(draftFrom(b)); setDetailsOpen(false) }} className={btnGhost}>Cancel</button>
-            <button
-              onClick={async () => {
-                setSaving(true)
-                const out = await update({
-                  productionFileUrl: draft.productionFileUrl || null,
-                  previewImageUrl: draft.previewImageUrl || null,
-                  raceDate: draft.raceDate || null,
-                  dueDate: draft.dueDate || null,
-                  frameType: draft.frameType,
-                  productSize: draft.productSize,
-                  quantity: Number(draft.quantity) || 0,
-                  notes: draft.notes || null,
-                })
-                setSaving(false)
-                if (out) { toast.success('Saved'); setDetailsOpen(false) }
-              }}
-              disabled={saving}
-              className={btnPrimary}
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-
-
   return (
     <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pb-6">
-      {preview && previewUrl && (
-        <ProofFullscreen proofs={[{ id: 'preview', imageUrl: previewUrl }]} index={0} onIndexChange={() => {}} onClose={() => setPreview(false)} counterLabel="Co-branded design" />
-      )}
-      {linkOpen && (
-        <div className="fixed inset-0 z-50 bg-off-black/60 flex items-center justify-center p-4" onClick={() => setLinkOpen(false)}>
-          <form
-            onClick={e => e.stopPropagation()}
-            onSubmit={async e => { e.preventDefault(); const out = await update({ productionFileUrl: linkDraft.trim() || null }); if (out) { toast.success('Production file linked'); setLinkOpen(false) } }}
-            className="bg-white rounded-lg shadow-xl w-full max-w-md p-5 space-y-3"
-          >
-            <div className="flex items-center justify-between"><h3 className="text-base font-semibold">Link the production file</h3><button type="button" onClick={() => setLinkOpen(false)} className={btnGhost}><X className="w-4 h-4" /></button></div>
-            <p className="text-xs text-off-black/60">Paste the Google Drive link to the co-branded Illustrator file for {b.partnerName}. Eli opens this before personalizing every print in the run.</p>
-            <input autoFocus value={linkDraft} onChange={e => setLinkDraft(e.target.value)} placeholder="https://drive.google.com/file/d/…" className={`${inputBase} w-full`} />
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setLinkOpen(false)} className={btnGhost}>Cancel</button><button type="submit" disabled={!linkDraft.trim()} className={btnPrimary}>Save link</button></div>
-          </form>
-        </div>
-      )}
-
       {/* Header: the same shape as the order modal. Name, the stages, the
           status you can change in place, and the facts as chips. */}
       <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4 space-y-3">
@@ -687,9 +554,9 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] font-semibold text-off-black/45 uppercase tracking-wider">Due</div>
-            <div className={`text-lg font-bold ${d !== null && d < 0 ? 'text-red-600' : d !== null && d <= 3 ? 'text-amber-700' : 'text-off-black'}`}>{b.dueDate ? fmtDate(b.dueDate) : 'No race date'}</div>
-            {b.raceDate && <div className="text-[11px] text-off-black/45">Race day {fmtDate(b.raceDate)} + 3</div>}
+            <div className="text-[11px] font-semibold text-off-black/45 uppercase tracking-wider">Fulfillment date</div>
+            <div className={`text-lg font-bold ${d !== null && d < 0 ? 'text-red-600' : d !== null && d <= 3 ? 'text-amber-700' : 'text-off-black'}`}>{b.dueDate ? fmtDate(b.dueDate) : 'Not set'}</div>
+            {b.raceDate && <div className="text-[11px] text-off-black/45">Race day {fmtDate(b.raceDate)}</div>}
           </div>
         </div>
 
@@ -736,7 +603,7 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
               </a>
             ) : (
               <p className="mt-1.5 text-[11px] text-off-black/50 leading-snug">
-                {b.deal ? 'Invoiced from the deal above; it turns paid here on its own once they pay.' : <>Billing in Shopify? Tag the draft order <span className="font-mono text-off-black/80">bulk</span> with this partner as the customer or company, and it marks itself paid here.</>}
+                Invoiced from Customer &amp; invoice below; it turns paid here on its own once they pay.
               </p>
             )}
           </div>
@@ -756,7 +623,6 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
       {collecting && <>{intakeCard}{runnersCard}</>}
       {fulfilling && <>{productionCard}{runnersCard}{filesCard}{arteloCard}{intakeCard}</>}
       {submitted && <>{arteloCard}{productionCard}{runnersCard}</>}
-      {detailsCard}
     </div>
   )
 }

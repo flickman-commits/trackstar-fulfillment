@@ -25,7 +25,7 @@ import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { getCanonicalRaceName } from '../../scrapers/index.js'
 import { nextNumber, dueDateFor, verifiedRaceDate, FRAME_OPTIONS, SIZE_OPTIONS } from './bulkOrders.js'
 import { defaultAssigneeFor } from '../orders/assignment.js'
-import { markDealPaid } from './deals.js'
+import { markDealPaid, attachBilling } from './deals.js'
 
 const PAID = new Set(['PAID', 'PARTIALLY_REFUNDED'])
 
@@ -107,10 +107,12 @@ export async function syncShopifyBulkOrders({ days = 90 } = {}) {
           assigneeId: await defaultAssigneeFor('bulk'),
         },
       })
+      run = await attachBilling(run)
       out.created++
     }
     if (paid && !run.paidAt) {
       await prisma.bulkOrder.update({ where: { id: run.id }, data: { paidAt: new Date() } })
+      if (run.dealId) await prisma.bulkDeal.updateMany({ where: { id: run.dealId, paidAt: null }, data: { paidAt: new Date(), shopifyOrderId, shopifyOrderName: o.name } })
       out.paid++
     }
   }

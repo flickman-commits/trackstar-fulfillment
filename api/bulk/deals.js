@@ -17,7 +17,7 @@ import { requireAdminRole, recordAudit } from '../_lib/users.js'
 import { publicPrintCatalog } from '../../server/domain/catalog/printCatalog.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
 import { FRAME_OPTIONS, SIZE_OPTIONS } from '../../server/domain/bulk/bulkOrders.js'
-import { EVENT_OPTIONS, PRINT_KINDS, createDeal, updateDeal, loadDeal, quoteDeal, buildInvoice, sendInvoice, lineTemplateUpload, lineTemplateSaved } from '../../server/domain/bulk/deals.js'
+import { EVENT_OPTIONS, PRINT_KINDS, createDeal, updateDeal, loadDeal, quoteDeal, buildInvoice, sendInvoice, lineTemplateUpload, lineTemplateSaved, pastDetails } from '../../server/domain/bulk/deals.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -30,6 +30,8 @@ export default async function handler(req, res) {
   const input = body => money ? body : withoutDealMoney(body)
   try {
     if (req.method === 'GET') {
+      // Start a new order from an earlier one's details (the discount only for admins).
+      if (req.query?.past) return res.status(200).json({ past: (await pastDetails()).map(d => money ? d : withoutDealMoney(d)) })
       // The store's prints for the race picker: names and pictures, no prices.
       if (req.query?.catalog) return res.status(200).json({ products: await publicPrintCatalog() })
       if (req.query?.options) return res.status(200).json({ events: EVENT_OPTIONS, sizes: SIZE_OPTIONS, frames: FRAME_OPTIONS, printKinds: PRINT_KINDS })

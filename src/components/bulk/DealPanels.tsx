@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Loader2, Pencil, Upload, X, Trash2, Copy, ExternalLink, Send, Receipt } from 'lucide-react'
+import { Loader2, Pencil, Upload, X, Copy, ExternalLink, Send, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -24,7 +24,7 @@ type CatalogPrint = PrintOption & { race: string }
 
 const blankLine = (prev?: Line): Line => ({ raceName: prev?.raceName || '', raceYear: prev?.raceYear || String(new Date().getFullYear()), eventNote: '', quantity: '', productSize: prev?.productSize || '8x10', frameType: prev?.frameType || 'Unframed' })
 
-export type DealRun = { id: string; number: string; raceName: string; raceYear: number; eventType: string | null; notes?: string | null; quantity: number; productSize: string; frameType: string; paidAt: string | null; status: string; _count?: { runners: number }
+export type DealRun = { id: string; number: string; raceName: string; raceYear: number; eventType: string | null; notes?: string | null; dueDate?: string | null; raceDate?: string | null; quantity: number; productSize: string; frameType: string; paidAt: string | null; status: string; _count?: { runners: number }
   /** Co-branded deals: the line's uploaded production file and its check. */
   template?: { uploadedAt: string | null; checkedAt: string | null; ok: boolean | null; problems: string[] } | null }
 export type Deal = {
@@ -33,6 +33,11 @@ export type Deal = {
   discountNote: string | null; shipping: 'runner' | 'organization'; shipToAddress: Address | null
   shopifyDraftId: string | null; shopifyDraftName: string | null; invoiceUrl: string | null; invoiceSentAt: string | null
   shopifyOrderName: string | null; paidAt: string | null; adminUrl?: string | null; notes: string | null; runs: DealRun[]
+}
+type PastDetails = {
+  partnerName: string; contactName: string | null; contactEmail: string | null; contactPhone: string | null; billingAddress: Address | null
+  printKind: 'standard' | 'cobranded'; shipping: 'runner' | 'organization'; shipToAddress: Address | null
+  discountKind?: 'percent' | 'amount' | null; discountPercent?: number | null; discountCents?: number | null; discountNote?: string | null
 }
 type Quote = { lines: { number: string; raceName: string; raceYear: number; eventType: string; quantity: number; productSize: string; frameType: string; unitCents?: number; subtotalCents?: number | null; missing?: string }[]; subtotalCents: number; discountCents: number; totalCents: number; missing: string[] }
 
@@ -59,7 +64,11 @@ function AddressFields({ value, onChange, withCompany = false }: { value: Addres
   )
 }
 
-/** New bulk order: who, what we agreed, and one line per race and event. With `deal`, the same form edits it (until the invoice is sent). */
+/**
+ * New bulk order: who, the race, how many, when it ships, and the terms. With
+ * `deal` (the order's billing record), the same form edits it; once the
+ * invoice is out only the fulfillment date and the notes still change.
+ */
 export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: () => void; onCreated: (deal: Deal) => void }) {
   // The discount is money: admins set it (api/bulk/deals.js ignores it from anyone else).
   const { isAdmin } = useAuth()
@@ -74,6 +83,20 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
   const [lines, setLines] = useState<Line[]>(() => deal?.runs.length
     ? deal.runs.map(r => ({ id: r.id, raceName: r.raceName, raceYear: String(r.raceYear), eventNote: r.notes || (r.eventType && r.eventType !== 'Marathon' ? r.eventType : ''), quantity: String(r.quantity), productSize: r.productSize, frameType: r.frameType }))
     : [blankLine()])
+  const [due, setDue] = useState(() => (deal?.runs[0]?.dueDate || '').slice(0, 10))
+  const locked = Boolean(deal && (deal.invoiceSentAt || deal.paidAt))
+  // Start from an earlier order's details (same organization ordering again).
+  const [past, setPast] = useState<PastDetails[]>([])
+  useEffect(() => { if (!deal) apiFetch(`${API_BASE}/api/bulk/deals?past=1`).then(r => r.json()).then(d => setPast(d.past || [])).catch(() => {}) }, [deal])
+  const applyPast = (p: PastDetails) => {
+    setF(v => ({
+      ...v, partnerName: p.partnerName, contactName: p.contactName || '', contactEmail: p.contactEmail || '', contactPhone: p.contactPhone || '',
+      printKind: p.printKind, shipping: p.shipping,
+      ...(p.discountKind !== undefined ? { discountKind: p.discountKind || '', discountPercent: p.discountPercent != null ? String(p.discountPercent) : '', discountDollars: p.discountCents != null ? String(p.discountCents / 100) : '', discountNote: p.discountNote || '' } : {}),
+    }))
+    setBilling({ ...blankAddress(), ...(p.billingAddress || {}) })
+    setShipTo({ ...blankAddress(), ...(p.shipToAddress || {}) })
+  }
   const [busy, setBusy] = useState(false)
   useEffect(() => { apiFetch(`${API_BASE}/api/bulk/deals?options=1`).then(r => r.json()).then(setOpts).catch(() => {}) }, [])
   const [catalog, setCatalog] = useState<CatalogPrint[] | null>(null)
@@ -84,7 +107,8 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (lines.some(l => !l.raceName)) { toast.error('Choose the race on every line'); return }
+    if (!locked && lines.some(l => !l.raceName)) { toast.error('Choose the race'); return }
+    if (!due) { toast.error('Set the fulfillment date'); return }
     setBusy(true)
     try {
       const out = await dealApi<{ deal: Deal }>({
@@ -92,10 +116,11 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
         discountKind: f.discountKind || null,
         billingAddress: { ...billing, company: billing.company || f.partnerName, name: f.contactName },
         shipToAddress: f.shipping === 'organization' ? { ...shipTo, company: f.partnerName, name: f.contactName } : null,
-        lines,
+        ...(locked ? {} : { lines }),
+        fulfillmentDate: due,
       })
-      if (deal) { toast.success(deal.shopifyDraftId ? `${out.deal.number} saved. Update the invoice so it matches.` : `${out.deal.number} saved`); onCreated(out.deal); return }
-      toast.success(`${out.deal.number} created with ${out.deal.runs.length} line${out.deal.runs.length === 1 ? '' : 's'}`)
+      if (deal) { toast.success(deal.shopifyDraftId && !locked ? 'Saved. Update the invoice so it matches.' : 'Saved'); onCreated(out.deal); return }
+      toast.success(`${out.deal.runs[0]?.number || 'Bulk order'} created`)
       onCreated(out.deal)
     } catch (err) { toast.error((err as Error).message) } finally { setBusy(false) }
   }
@@ -104,8 +129,22 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
   return (
     <div className="fixed inset-0 z-50 bg-off-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <form onSubmit={submit} onClick={e => e.stopPropagation()} className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-full overflow-y-auto p-6 space-y-4">
-        <div className="flex items-center justify-between"><h3 className="text-base font-semibold">{deal ? `Edit ${deal.number}` : 'New bulk order'}</h3><button type="button" onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button></div>
+        <div className="flex items-center justify-between"><h3 className="text-base font-semibold">{deal ? `Edit ${deal.runs[0]?.number || 'bulk order'}` : 'New bulk order'}</h3><button type="button" onClick={onClose} className={btnGhost}><X className="w-4 h-4" /></button></div>
 
+        {!deal && past.length > 0 && (
+          <label className="block">{label('Start from an earlier bulk order (optional)')}
+            <select defaultValue="" onChange={e => { const p = past[Number(e.target.value)]; if (p) applyPast(p) }} className={`${inputBase} w-full`}>
+              <option value="">New organization</option>
+              {past.map((p, i) => <option key={i} value={i}>{p.partnerName}{p.contactName ? ` · ${p.contactName}` : ''}</option>)}
+            </select>
+          </label>
+        )}
+        {locked && <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">The invoice has gone out, so only the fulfillment date and the notes change here.</p>}
+
+        {/* When it ships: typed in, since an order can be for gifts long after the race. */}
+        <label className="block max-w-xs">{label('Fulfillment date (when the prints ship)')}<input type="date" required value={due} onChange={e => setDue(e.target.value)} className={`${inputBase} w-full`} /></label>
+
+        {!locked && <>
         {/* Who */}
         <div className="grid grid-cols-2 gap-2">
           <label className="col-span-2 block">{label('Organization')}<input required value={f.partnerName} onChange={set('partnerName')} placeholder="American Heart Association, Philadelphia" className={`${inputBase} w-full`} /></label>
@@ -128,7 +167,7 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
         </div>
 
         <div>
-          <div className="flex items-center justify-between">{label(`Races · ${units} print${units === 1 ? '' : 's'}`)}</div>
+          <div className="flex items-center justify-between">{label(`Race · ${units} print${units === 1 ? '' : 's'}`)}</div>
           <div className="space-y-1.5">
             <div className={`${LINE_GRID} text-[11px] font-semibold text-off-black/45 uppercase tracking-wider`}>
               <span>Race</span><span>Year</span><span>Qty</span><span>Size</span><span>Frame</span><span title="Internal: which events were sold. The lookup finds the race each runner ran.">Events (note)</span><span />
@@ -142,11 +181,10 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
                 <select value={l.productSize} onChange={e => setLine(i, 'productSize', e.target.value)} className={inputBase} aria-label="Size">{opts.sizes.map(o => <option key={o}>{o}</option>)}</select>
                 <select value={l.frameType} onChange={e => setLine(i, 'frameType', e.target.value)} className={inputBase} aria-label="Frame">{opts.frames.map(o => <option key={o}>{o}</option>)}</select>
                 <input value={l.eventNote} onChange={e => setLine(i, 'eventNote', e.target.value)} placeholder="Full 5, Half 5, 10K 3" className={inputBase} aria-label="Events (internal note)" />
-                <button type="button" onClick={() => setLines(ls => ls.length === 1 ? ls : ls.filter((_, j) => j !== i))} disabled={lines.length === 1} className={`${btnGhost} disabled:opacity-30`} title="Remove line"><Trash2 className="w-3.5 h-3.5" /></button>
+                <span />
               </div>
             ))}
           </div>
-          <button type="button" onClick={() => setLines(ls => [...ls, blankLine(ls[ls.length - 1])])} className={`${btnGhost} mt-1.5`}><Plus className="w-3.5 h-3.5" /> Add a race</button>
         </div>
 
         {/* The deal */}
@@ -178,6 +216,8 @@ export function DealModal({ deal, onClose, onCreated }: { deal?: Deal; onClose: 
             </div>
           )}
         </div>
+
+        </>}
 
         <label className="block">{label('Notes (internal)')}<textarea value={f.notes} onChange={set('notes')} rows={2} placeholder="Other markets interested for next year" className={`${inputBase} w-full`} /></label>
 
@@ -238,7 +278,7 @@ export function DealCard({ dealId, currentRunId, onOpenRun, onChanged }: { dealI
         isAdmin ? apiFetch(`${API_BASE}/api/bulk/deals?id=${encodeURIComponent(dealId)}&quote=1`).then(r => r.ok ? r.json() : null).catch(() => null) : null,
       ])
       setDeal(d.deal || null); setQuote(q)
-    } catch { toast.error('Could not load the deal') }
+    } catch { toast.error('Could not load the customer and invoice') }
   }, [dealId, isAdmin])
   useEffect(() => { load() }, [load])
 
@@ -261,20 +301,20 @@ export function DealCard({ dealId, currentRunId, onOpenRun, onChanged }: { dealI
     } catch (err) { toast.error((err as Error).message) } finally { setBusy(null) }
   }
 
-  if (!deal) return <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4 text-xs text-off-black/45 inline-flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Loading the deal…</div>
+  if (!deal) return <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4 text-xs text-off-black/45 inline-flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Loading…</div>
   const discount = deal.discountKind === 'percent' ? `${deal.discountPercent}% off` : deal.discountKind === 'amount' ? `${money(deal.discountCents || 0)} off` : 'No discount'
 
   return (
     <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">Bulk deal {deal.number}</div>
+          <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">Customer &amp; invoice</div>
           <div className="text-lg font-bold text-off-black leading-tight">{deal.partnerName}</div>
           <div className="text-xs text-off-black/60 mt-0.5">
             {[deal.contactName, deal.contactEmail].filter(Boolean).join(' · ') || 'No contact yet'}
           </div>
-          {/* Changes until the invoice goes out; after that the customer has a price. */}
-          {!deal.invoiceSentAt && !deal.paidAt && (
+          {/* Everything until the invoice goes out; after that, the fulfillment date and notes. */}
+          {(
             <button onClick={() => setEditing(true)} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2"><Pencil className="w-3 h-3" /> Edit order</button>
           )}
         </div>
@@ -285,8 +325,8 @@ export function DealCard({ dealId, currentRunId, onOpenRun, onChanged }: { dealI
         </div>
       </div>
 
-      {/* The lines: each is a run with its own list; open one to work it. */}
-      <table className="w-full text-sm">
+      {/* One race per order now; an older order with more than one shows its runs. */}
+      {deal.runs.length > 1 && <table className="w-full text-sm">
         <thead className="text-[11px] uppercase tracking-wider text-off-black/45"><tr><th className="text-left font-semibold py-1">Line</th><th className="text-left font-semibold">Print</th><th className="text-right font-semibold">Names</th>{isAdmin && <th className="text-right font-semibold">Price</th>}</tr></thead>
         <tbody>
           {deal.runs.map(r => {
@@ -305,13 +345,13 @@ export function DealCard({ dealId, currentRunId, onOpenRun, onChanged }: { dealI
             )
           })}
         </tbody>
-      </table>
+      </table>}
 
       {deal.printKind === 'cobranded' && (
         <div className="border-t border-border-gray pt-3 space-y-1.5">
-          <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">Co-branded production files</div>
-          <p className="text-[11px] text-off-black/50">One Illustrator file per line, built like a race template (same layers and artboards). The render worker checks it, then makes every runner's print from it.</p>
-          {deal.runs.map(r => <LineTemplate key={r.id} run={r} onChanged={load} />)}
+          <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">Co-branded production file</div>
+          <p className="text-[11px] text-off-black/50">The Illustrator file, built like a race template (same layers and artboards). The render worker checks it, then makes every runner's print from it.</p>
+          {deal.runs.filter(r => deal.runs.length === 1 || r.id === currentRunId).map(r => <LineTemplate key={r.id} run={r} onChanged={load} />)}
         </div>
       )}
 

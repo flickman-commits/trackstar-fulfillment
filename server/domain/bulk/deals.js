@@ -97,11 +97,30 @@ function dealFields(input) {
   }
 }
 
-/** Create the deal and one run per line. */
+/**
+ * When the prints ship, typed in by us: an order can be for a race day, or for
+ * Christmas gifts months later (Grandma's sponsors), so it is not worked out
+ * from the race date. "YYYY-MM-DD" -> noon UTC, so it reads as that day anywhere.
+ */
+function fulfillmentDate(raw, { required = false } = {}) {
+  const v = String(raw || '').trim()
+  if (!v) { if (required) throw new DealError('When should the prints ship? Set the fulfillment date'); return null }
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
+  const d = m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12)) : new Date(v)
+  if (Number.isNaN(d.getTime())) throw new DealError('The fulfillment date does not look right')
+  return d
+}
+
+/**
+ * Create a bulk order: its billing record (BulkDeal; never shown as a deal,
+ * one per order) and its run (BulkOrder), one race and year.
+ */
 export async function createDeal(input, actor) {
   const fields = dealFields(input)
   const lines = oneLinePerPrint((Array.isArray(input?.lines) ? input.lines : []).map(cleanLine))
-  if (!lines.length) throw new DealError('Add at least one race')
+  if (!lines.length) throw new DealError('Which race is it for?')
+  const due = fulfillmentDate(input?.fulfillmentDate, { required: true })
+  for (const l of lines) l.dueDate = due
   const lastDeal = await prisma.bulkDeal.findFirst({ orderBy: { createdAt: 'desc' }, select: { number: true } })
   const deal = await prisma.bulkDeal.create({ data: { ...fields, number: nextDealNumber(lastDeal?.number), createdById: actor?.id || null } })
   const assigneeId = await defaultAssigneeFor('bulk')
@@ -116,7 +135,7 @@ async function createRun(dealId, partnerName, l, assigneeId) {
     data: {
       number: nextNumber(last?.number), dealId, partnerName,
       raceName: l.raceName, raceYear: l.raceYear, eventType: null, notes: l.eventNote, quantity: l.quantity,
-      frameType: l.frameType, productSize: l.productSize, raceDate, dueDate: dueDateFor(raceDate), assigneeId,
+      frameType: l.frameType, productSize: l.productSize, raceDate, dueDate: l.dueDate || dueDateFor(raceDate), assigneeId,
     },
   })
 }
@@ -145,7 +164,7 @@ async function replaceLines(deal, input, partnerName) {
       data: {
         raceName: l.raceName, raceYear: l.raceYear, eventType: null, notes: l.eventNote, quantity: l.quantity,
         frameType: l.frameType, productSize: l.productSize,
-        ...(moved ? { raceDate, dueDate: dueDateFor(raceDate) } : {}),
+        ...(moved ? { raceDate } : {}),
       },
     })
   }
@@ -158,9 +177,14 @@ async function replaceLines(deal, input, partnerName) {
  */
 export async function updateDeal(id, input) {
   const deal = await prisma.bulkDeal.findUnique({ where: { id: String(id || '') } })
-  if (!deal) throw new DealError('Deal not found', 404)
-  if (deal.paidAt) throw new DealError('This deal is paid; it can no longer be edited')
-  if (deal.invoiceSentAt) throw new DealError('The invoice has been sent; it can no longer be edited here')
+  if (!deal) throw new DealError('Bulk order not found', 404)
+  // The fulfillment date and the notes can move at any time; what is on the invoice cannot once it is out.
+  const due = fulfillmentDate(input?.fulfillmentDate)
+  if (due) await prisma.bulkOrder.updateMany({ where: { dealId: deal.id }, data: { dueDate: due } })
+  if (deal.paidAt || deal.invoiceSentAt) {
+    if (input?.notes !== undefined) await prisma.bulkDeal.update({ where: { id: deal.id }, data: { notes: String(input.notes || '').trim() || null } })
+    return loadDeal(deal.id)
+  }
   const fields = dealFields({ ...deal, discountDollars: deal.discountCents != null ? deal.discountCents / 100 : undefined, ...input })
   if (Array.isArray(input?.lines)) await replaceLines(deal, input.lines, fields.partnerName)
   await prisma.bulkDeal.update({ where: { id: deal.id }, data: fields })
@@ -171,9 +195,9 @@ export async function updateDeal(id, input) {
 export async function loadDeal(id) {
   const deal = await prisma.bulkDeal.findUnique({
     where: { id: String(id || '') },
-    include: { runs: { orderBy: { number: 'asc' }, select: { id: true, number: true, raceName: true, raceYear: true, eventType: true, notes: true, quantity: true, productSize: true, frameType: true, paidAt: true, status: true, _count: { select: { runners: true } } } } },
+    include: { runs: { orderBy: { number: 'asc' }, select: { id: true, number: true, raceName: true, raceYear: true, eventType: true, notes: true, dueDate: true, raceDate: true, quantity: true, productSize: true, frameType: true, paidAt: true, status: true, _count: { select: { runners: true } } } } },
   })
-  if (!deal) throw new DealError('Deal not found', 404)
+  if (!deal) throw new DealError('Bulk order not found', 404)
   // Where to see the invoice ourselves: the draft (or the paid order) in Shopify admin. invoiceUrl is the customer's checkout.
   deal.adminUrl = deal.shopifyOrderId ? shopifyAdminUrl(String(deal.shopifyOrderId).split('/').pop()) : shopifyDraftAdminUrl(deal.shopifyDraftId)
   if (deal.printKind !== 'cobranded') return deal
@@ -187,6 +211,41 @@ export async function loadDeal(id) {
       return { ...r, template: t ? { uploadedAt: t.fileVersion, checkedAt: t.lastCheckAt, ok: t.lastCheckOk, problems: t.lastCheckReport?.problems || [] } : null }
     }),
   }
+}
+
+/**
+ * A billing record for a bulk order made without one (from a Shopify order,
+ * or before every order had one): the organization, co-branded, paid when the
+ * run is. scripts/backfill-bulk-billing.js did the same for the old ones.
+ */
+export async function attachBilling(run) {
+  if (!run || run.dealId) return run
+  const last = await prisma.bulkDeal.findFirst({ orderBy: { createdAt: 'desc' }, select: { number: true } })
+  const deal = await prisma.bulkDeal.create({
+    data: { number: nextDealNumber(last?.number), partnerName: run.partnerName, printKind: 'cobranded', shipping: 'runner', paidAt: run.paidAt || null },
+  })
+  return prisma.bulkOrder.update({ where: { id: run.id }, data: { dealId: deal.id } })
+}
+
+/**
+ * Earlier bulk orders' details, newest per organization, to start a new one
+ * from: contact, billing, shipping, print kind and (for admins) the discount.
+ */
+export async function pastDetails() {
+  const deals = await prisma.bulkDeal.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })
+  const seen = new Set()
+  const out = []
+  for (const d of deals) {
+    const k = d.partnerName.trim().toLowerCase()
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push({
+      partnerName: d.partnerName, contactName: d.contactName, contactEmail: d.contactEmail, contactPhone: d.contactPhone,
+      billingAddress: d.billingAddress, printKind: d.printKind, shipping: d.shipping, shipToAddress: d.shipToAddress,
+      discountKind: d.discountKind, discountPercent: d.discountPercent, discountCents: d.discountCents, discountNote: d.discountNote,
+    })
+  }
+  return out
 }
 
 /** A co-branded line's production file: a signed upload link, then record it as the line's template. */
@@ -283,7 +342,7 @@ export function draftInput(q) {
 export async function buildInvoice(id) {
   const q = await quoteDeal(id)
   if (q.missing.length) throw new DealError(`Cannot invoice yet: ${q.missing.join('; ')}`)
-  if (q.deal.paidAt) throw new DealError('This deal is paid; its invoice is final')
+  if (q.deal.paidAt) throw new DealError('This order is paid; its invoice is final')
   const input = draftInput(q)
   const fields = 'draftOrder { id name invoiceUrl status totalPriceSet { shopMoney { amount } } } userErrors { field message }'
   const d = q.deal.shopifyDraftId
