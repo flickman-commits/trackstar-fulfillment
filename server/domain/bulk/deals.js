@@ -372,6 +372,53 @@ export async function sendInvoice(id, { message } = {}) {
 }
 
 /** Shopify says the deal's order is paid: the deal and every run are paid. */
+/**
+ * Where the invoice stands, from the order's billing record:
+ * not_sent (no invoice out yet), sent (emailed, waiting on them), paid.
+ */
+export function paymentStatus(run, deal) {
+  if (run?.paidAt || deal?.paidAt) return 'paid'
+  return deal?.invoiceSentAt ? 'sent' : 'not_sent'
+}
+
+/**
+ * Read the draft order back from Shopify so the status follows it: emailed
+ * from Shopify itself counts as sent, and a paid order marks the bulk order
+ * paid without waiting for the import. Quiet on any Shopify error.
+ */
+export async function syncDraftStatus(dealId) {
+  const deal = await prisma.bulkDeal.findUnique({ where: { id: String(dealId || '') } })
+  if (!deal?.shopifyDraftId || deal.paidAt) return deal
+  try {
+    const d = await shopifyGraphQL(`query($id: ID!) { draftOrder(id: $id) { status invoiceSentAt order { legacyResourceId name displayFinancialStatus } } }`, { id: deal.shopifyDraftId })
+    const draft = (d.data || d).draftOrder
+    if (!draft) return deal
+    if (draft.invoiceSentAt && !deal.invoiceSentAt) await prisma.bulkDeal.update({ where: { id: deal.id }, data: { invoiceSentAt: new Date(draft.invoiceSentAt) } })
+    const order = draft.order
+    if (order && ['PAID', 'PARTIALLY_REFUNDED'].includes(order.displayFinancialStatus)) {
+      await markDealPaid(deal.number, { shopifyOrderId: String(order.legacyResourceId), shopifyOrderName: order.name })
+    }
+  } catch (e) { console.warn('[bulk] draft status sync failed:', e.message) }
+  return prisma.bulkDeal.findUnique({ where: { id: deal.id } })
+}
+
+/**
+ * Set by hand (the status pill): not sent clears the sent date and paid,
+ * sent marks it emailed, paid marks the order and its runs paid.
+ */
+export async function setPaymentStatus(dealId, status) {
+  const deal = await prisma.bulkDeal.findUnique({ where: { id: String(dealId || '') } })
+  if (!deal) throw new DealError('Bulk order not found', 404)
+  const now = new Date()
+  if (status === 'paid') {
+    await prisma.bulkDeal.update({ where: { id: deal.id }, data: { paidAt: deal.paidAt || now, invoiceSentAt: deal.invoiceSentAt || now } })
+    await prisma.bulkOrder.updateMany({ where: { dealId: deal.id, paidAt: null }, data: { paidAt: now } })
+  } else if (status === 'sent' || status === 'not_sent') {
+    await prisma.bulkDeal.update({ where: { id: deal.id }, data: { paidAt: null, invoiceSentAt: status === 'sent' ? (deal.invoiceSentAt || now) : null } })
+    await prisma.bulkOrder.updateMany({ where: { dealId: deal.id }, data: { paidAt: null } })
+  } else throw new DealError('Pick not sent, sent or paid')
+}
+
 export async function markDealPaid(dealNumber, { shopifyOrderId, shopifyOrderName }) {
   const deal = await prisma.bulkDeal.findUnique({ where: { number: dealNumber } })
   if (!deal) return null

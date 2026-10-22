@@ -17,6 +17,7 @@
  *     delete      { id }                     admins only; removes the runners too
  */
 import { syncShopifyBulkOrders } from '../../server/domain/bulk/shopifyBulk.js'
+import { paymentStatus, syncDraftStatus, setPaymentStatus, attachBilling } from '../../server/domain/bulk/deals.js'
 import { shopifyAdminUrl } from '../../server/lib/links.js'
 import prisma from '../_lib/prisma.js'
 import { setCors, requireAdmin } from '../_lib/auth.js'
@@ -57,12 +58,13 @@ function shapeRunner(r) {
 }
 
 async function loadOne(id) {
-  const bulk = await prisma.bulkOrder.findUnique({ where: { id }, include: { deal: { select: { id: true, number: true, printKind: true } } } })
+  const bulk = await prisma.bulkOrder.findUnique({ where: { id }, include: { deal: { select: { id: true, number: true, printKind: true, invoiceSentAt: true, paidAt: true } } } })
   if (!bulk) return null
   const runners = await prisma.order.findMany({ where: { bulkOrderId: id }, orderBy: { lineItemIndex: 'asc' }, select: RUNNER_SELECT })
   const ready = await readiness(bulk, runners)
   return {
     ...bulk,
+    paymentStatus: paymentStatus(bulk, bulk.deal),
     shopifyOrderUrl: shopifyAdminUrl(bulk.shopifyOrderId),
     runners: runners.map(shapeRunner),
     readiness: ready,
@@ -99,6 +101,9 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       if (req.query?.options) return res.status(200).json({ frames: FRAME_OPTIONS, sizes: SIZE_OPTIONS })
       if (req.query?.id) {
+        // The invoice's state, read back from Shopify each time the order is opened.
+        const run = await prisma.bulkOrder.findUnique({ where: { id: String(req.query.id) }, select: { dealId: true } })
+        if (run?.dealId) await syncDraftStatus(run.dealId)
         const one = await loadOne(String(req.query.id))
         if (!one) return res.status(404).json({ error: 'Bulk order not found' })
         return res.status(200).json({ bulkOrder: one })
@@ -111,13 +116,13 @@ export default async function handler(req, res) {
       }
       // One round trip for the list and one for every runner, then group in
       // memory. A query per order is what exhausts the pool on a busy morning.
-      const list = await prisma.bulkOrder.findMany({ orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }], include: { deal: { select: { id: true, number: true, printKind: true } } } })
+      const list = await prisma.bulkOrder.findMany({ orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }], include: { deal: { select: { id: true, number: true, printKind: true, invoiceSentAt: true, paidAt: true } } } })
       const all = list.length
         ? await prisma.order.findMany({ where: { bulkOrderId: { in: list.map(b => b.id) } }, select: { bulkOrderId: true, shippingAddress: true, researchedAt: true, productionFileUrl: true, status: true, runnerResearch: { select: { researchStatus: true }, take: 1, orderBy: { createdAt: 'desc' } } } })
         : []
       const byBulk = new Map()
       for (const r of all) { if (!byBulk.has(r.bulkOrderId)) byBulk.set(r.bulkOrderId, []); byBulk.get(r.bulkOrderId).push(r) }
-      return res.status(200).json({ bulkOrders: list.map(b => ({ ...b, shopifyOrderUrl: shopifyAdminUrl(b.shopifyOrderId), progress: progressOf(byBulk.get(b.id) || []) })) })
+      return res.status(200).json({ bulkOrders: list.map(b => ({ ...b, paymentStatus: paymentStatus(b, b.deal), shopifyOrderUrl: shopifyAdminUrl(b.shopifyOrderId), progress: progressOf(byBulk.get(b.id) || []) })) })
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -188,6 +193,15 @@ export default async function handler(req, res) {
       if (Object.keys(follow).length) await prisma.order.updateMany({ where: { bulkOrderId: bulk.id }, data: follow })
       await audit(`Edited bulk order ${bulk.number} (${Object.keys(data).join(', ') || 'nothing'})`, { fields: Object.keys(data) })
       return res.status(200).json({ bulkOrder: await loadOne(updated.id) })
+    }
+
+    // Invoice not sent / sent / paid. Shopify moves it on its own (syncDraftStatus, the import); this is the hand override.
+    if (action === 'payment') {
+      if (!(await requireAdminRole(req, res, actor))) return
+      if (!bulk.dealId) bulk.dealId = (await attachBilling(bulk)).dealId
+      await setPaymentStatus(bulk.dealId, String(body.status || ''))
+      await audit(`Set bulk order ${bulk.number} payment to ${body.status}`)
+      return res.status(200).json({ bulkOrder: await loadOne(bulk.id) })
     }
 
     if (action === 'paid') {

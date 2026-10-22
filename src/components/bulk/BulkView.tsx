@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Plus, Loader2, Check, X, Upload, Download, Link2, Copy, ExternalLink, RefreshCw, FlaskConical,
-  CheckCircle2, ChevronLeft, ChevronDown, ChevronUp, Trash2, FileText,
+  CheckCircle2, ChevronLeft, ChevronDown, ChevronUp, Trash2, FileText, Pencil,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 import { btnPrimary, btnSecondary, btnGhost, inputBase } from '@/lib/ui'
 import AssigneePicker, { Avatar, type Teammate } from '@/components/AssigneePicker'
-import { DealModal, DealCard } from '@/components/bulk/DealPanels'
+import { DealModal, InvoiceCard, LineTemplate, type Deal } from '@/components/bulk/DealPanels'
+import StatusPill from '@/components/orders/StatusPill'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -66,7 +67,9 @@ export interface BulkOrder {
   partnerOrderId: string | null
   /** The deal it is one line of (DealPanels), and the event at the race. */
   dealId?: string | null
-  deal?: { id: string; number: string; printKind: 'standard' | 'cobranded' } | null
+  deal?: { id: string; number: string; printKind: 'standard' | 'cobranded'; invoiceSentAt?: string | null; paidAt?: string | null } | null
+  /** not_sent / sent / paid (deals.js paymentStatus). */
+  paymentStatus?: 'not_sent' | 'sent' | 'paid'
   eventType?: string | null
   /** Who runs it; new ones go to the bulk default in Order Assignment. */
   assigneeId: string | null
@@ -88,10 +91,16 @@ const STATUS_LABEL: Record<string, string> = {
   submitted: 'Sent to Artelo',
 }
 /** Same treatment as the order modal's design status: an icon, a tint, and the stages above it. */
-const STATUS_STYLE: Record<string, { icon: string; color: string; bg: string; border: string }> = {
-  collecting: { icon: '⚪', color: 'text-off-black/70', bg: 'bg-subtle-gray', border: 'border-border-gray' },
-  fulfillment: { icon: '🔵', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
-  submitted: { icon: '🟢', color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+const STATUS_STYLE: Record<string, { dot: string; color: string; bg: string; border: string }> = {
+  collecting: { dot: 'bg-off-black/30', color: 'text-off-black/70', bg: 'bg-off-black/5', border: 'border-border-gray' },
+  fulfillment: { dot: 'bg-blue-500', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+  submitted: { dot: 'bg-emerald-500', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+}
+// Where the invoice stands (server/domain/bulk/deals.js paymentStatus); Shopify moves it on its own.
+const PAYMENT: Record<string, { label: string; dot: string; color: string; bg: string }> = {
+  not_sent: { label: 'Invoice not sent', dot: 'bg-off-black/30', color: 'text-off-black/70', bg: 'bg-off-black/5' },
+  sent: { label: 'Invoice sent', dot: 'bg-amber-500', color: 'text-amber-700', bg: 'bg-amber-50' },
+  paid: { label: 'Paid', dot: 'bg-emerald-500', color: 'text-emerald-700', bg: 'bg-emerald-50' },
 }
 const STAGES: { key: string; label: string }[] = [
   { key: 'collecting', label: 'Collecting Info' },
@@ -172,7 +181,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
   }
 
   return (
-    <div className="bg-white border border-border-gray rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+    <div className="bg-white border border-border-gray rounded-md overflow-hidden flex-1 flex flex-col min-h-0">
       {toolbar}
       <div className="flex-1 overflow-y-auto">
         {list === null ? (
@@ -210,7 +219,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
                     </td>
                     <td className="px-3 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        {b.paidAt ? <Chip tone="green">Paid</Chip> : <Chip tone="amber">Unpaid</Chip>}
+                        {(() => { const p = PAYMENT[b.paymentStatus || (b.paidAt ? 'paid' : 'not_sent')]; return <StatusPill size="xs" label={p.label} dot={p.dot} color={p.color} bg={p.bg} /> })()}
                         {b.shopifyOrderName && <span className="text-[11px] text-off-black/45">{b.shopifyOrderName}</span>}
                       </span>
                     </td>
@@ -220,7 +229,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
                         ? <span className="inline-flex items-center gap-1.5 text-sm text-off-black whitespace-nowrap"><Avatar user={u} size={20} />{u.firstName}</span>
                         : <span className="text-sm text-off-black/40">Unassigned</span>
                     })()}</td>
-                    <td className="px-3 py-3"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap ${st.bg} ${st.color} ${st.border}`}>{st.icon} {STATUS_LABEL[b.status] || b.status}</span></td>
+                    <td className="px-3 py-3"><StatusPill size="xs" label={STATUS_LABEL[b.status] || b.status} dot={st.dot} color={st.color} bg={st.bg} /></td>
                   </tr>
                 )
               })}
@@ -235,7 +244,7 @@ export default function BulkView({ onOpenRunner, refreshRunners, onCount, toolba
 
 // ─── Detail ────────────────────────────────────────────────────────────────
 
-function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team, meId }: { id: string; onBack: () => void; onOpenRun: (runId: string) => void; onOpenRunner: (n: string) => void; refreshRunners: () => void; team: Teammate[]; meId?: string | null }) {
+function BulkDetail({ id, onBack, onOpenRunner, refreshRunners, team, meId }: { id: string; onBack: () => void; onOpenRun: (runId: string) => void; onOpenRunner: (n: string) => void; refreshRunners: () => void; team: Teammate[]; meId?: string | null }) {
   const [b, setB] = useState<BulkOrder | null>(null)
   const [intakeText, setIntakeText] = useState('')
   const [intakeOpen, setIntakeOpen] = useState(false)
@@ -248,12 +257,19 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
   const [editing, setEditing] = useState<string | null>(null)
   const [intakeLinkOpen, setIntakeLinkOpen] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  // The order's billing record: customer, terms, invoice, and a co-branded file's check.
+  const [deal, setDeal] = useState<Deal | null>(null)
+  const [editingOrder, setEditingOrder] = useState(false)
 
   const load = useCallback(async () => {
     const res = await apiFetch(`${API_BASE}/api/bulk?id=${id}`)
     const data = await res.json()
     if (!res.ok) { toast.error(data.error || 'Not found'); onBack(); return }
     setB(data.bulkOrder)
+    if (data.bulkOrder?.deal?.id) {
+      const d = await apiFetch(`${API_BASE}/api/bulk/deals?id=${encodeURIComponent(data.bulkOrder.deal.id)}`).then(r => r.json()).catch(() => null)
+      setDeal(d?.deal || null)
+    }
   }, [id, onBack])
   useEffect(() => { load() }, [load])
 
@@ -356,7 +372,6 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
   const runners = b.runners || []
   const d = daysUntil(b.dueDate)
   const st = STATUS_STYLE[b.status] || STATUS_STYLE.collecting
-  const at = Math.max(0, STAGES.findIndex(x => x.key === b.status))
   const canResearch = r.paid && runners.length > 0 && r.scraper.ok
   const allResearched = runners.length > 0 && runners.every(x => x.researched)
   const problems = b.sheetProblems || []
@@ -366,7 +381,7 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
 
   // ── Cards, so the status decides the order rather than the markup ──
   const intakeCard = (
-    <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4">
+    <div className="bg-white border border-border-gray rounded-md p-4">
       {!collecting && (
         <button onClick={() => setIntakeLinkOpen(o => !o)} className="w-full flex items-center justify-between text-left -my-1">
           <span className="text-xs font-semibold uppercase tracking-tight text-off-black/60">Partner intake link</span>
@@ -400,7 +415,7 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
   // co-branded order from its uploaded file, is approved in their order, and
   // its PDF becomes that runner's file for the Artelo sheet.
   const standardCard = (
-    <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4">
+    <div className="bg-white border border-border-gray rounded-md p-4">
       <div className="text-[11px] font-semibold text-off-black/50 uppercase tracking-wider">{b.deal?.printKind === 'cobranded' ? 'Co-branded prints' : 'Standard prints'}</div>
       <div className="text-lg font-bold text-off-black leading-tight mt-0.5">{b.raceName} {b.raceYear}{b.eventType && b.eventType !== 'Marathon' ? ` · ${b.eventType}` : ''}</div>
       <p className="text-xs text-off-black/60 mt-1">Each runner's print renders from {b.deal?.printKind === 'cobranded' ? 'the uploaded co-branded file' : 'the race design'} once they are researched. Open a runner to approve their design; approved prints attach to the Artelo sheet on their own ({b.progress.files} of {runners.length} so far).</p>
@@ -413,7 +428,7 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
 
   const productionCard = standardCard
   const runnersCard = (
-    <div className="bg-white border border-border-gray rounded-lg shadow-sm">
+    <div className="bg-white border border-border-gray rounded-md">
       <div className="p-3 md:p-4 border-b border-border-gray flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-semibold uppercase tracking-tight">Runners</h3>
@@ -482,7 +497,7 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
   )
 
   const filesCard = (
-    <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4 space-y-3">
+    <div className="bg-white border border-border-gray rounded-md p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-tight">Print files</h3>
@@ -510,7 +525,7 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
   )
 
   const arteloCard = (
-    <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4 space-y-3">
+    <div className="bg-white border border-border-gray rounded-md p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-tight">Artelo bulk upload</h3>
@@ -534,95 +549,105 @@ function BulkDetail({ id, onBack, onOpenRun, onOpenRunner, refreshRunners, team,
     </div>
   )
 
+  const pay = PAYMENT[b.paymentStatus || (r.paid ? 'paid' : 'not_sent')]
+  const myRun = deal?.runs.find(x => x.id === b.id) || null
+  const label = 'text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5'
+  const link = 'self-start inline-flex items-center gap-1.5 text-xs font-medium text-[#4600D6] hover:underline underline-offset-2 disabled:opacity-50'
+  // A status you can change from the pill itself, as on the order view.
+  const pill = (p: { label: string; dot: string; color: string; bg: string }, value: string, options: [string, string][], onPick: (v: string) => void, title: string) => (
+    <label className={`relative shrink-0 inline-flex items-center gap-1.5 pl-2 pr-1.5 py-0.5 rounded-full border border-border-gray text-xs font-medium whitespace-nowrap cursor-pointer ${p.bg} ${p.color}`} title={title}>
+      <span className={`w-2 h-2 rounded-full ${p.dot}`} aria-hidden />{p.label}<ChevronDown className="w-3 h-3 opacity-60" />
+      <select value={value} onChange={e => onPick(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" aria-label={title}>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </label>
+  )
+
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pb-6">
-      {/* Header: the same shape as the order modal. Name, the stages, the
-          status you can change in place, and the facts as chips. */}
-      <div className="bg-white border border-border-gray rounded-lg shadow-sm p-4 space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <button onClick={onBack} className={`${btnGhost} -ml-2 mb-1`}><ChevronLeft className="w-4 h-4" /> All bulk orders</button>
-            <div className="flex items-center gap-2.5">
-              <span className="text-2xl leading-none">{st.icon}</span>
-              <h2 className="text-xl font-bold text-off-black">{b.partnerName}</h2>
-              {team.length > 0 && <AssigneePicker team={team} value={b.assigneeId} meId={meId} onChange={assigneeId => update({ assigneeId })} />}
-            </div>
-            <div className="text-sm text-off-black/60 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-mono text-[12px]">{b.number}</span>
-              <span>{b.raceName} {b.raceYear}{b.eventType ? ` · ${b.eventType}` : ''}</span>
-              {b.quantity ? <span>{b.quantity} units</span> : null}
-            </div>
+    <div className="flex-1 min-h-0 overflow-y-auto pb-6">
+      <div className="bg-white border border-border-gray rounded-md">
+      {/* Header, as on an order: back, the two statuses, the organization, who has it. */}
+      <div className="sticky top-0 z-30 px-4 md:px-6 py-3 md:py-4 bg-white/95 backdrop-blur border-b border-border-gray rounded-t-md flex flex-wrap items-center gap-2 md:gap-3">
+        <button onClick={onBack} title="Back to bulk orders" className="inline-flex items-center gap-1 -ml-1 px-1.5 py-1 text-off-black/60 hover:text-off-black hover:bg-off-black/5 rounded transition-colors">
+          <ChevronLeft className="w-4 h-4" /><span className="text-sm hidden md:inline">Bulk orders</span>
+        </button>
+        {pill({ label: STATUS_LABEL[b.status] || b.status, ...st }, b.status, STAGES.map(x => [x.key, STATUS_LABEL[x.key]]), v => update({ status: v }), 'Production status')}
+        {pill(pay, b.paymentStatus || 'not_sent', [['not_sent', 'Invoice not sent'], ['sent', 'Invoice sent'], ['paid', 'Paid']], v => act({ action: 'payment', status: v }, 'Payment updated'), 'Invoice and payment. Shopify updates it on its own.')}
+        <h3 className="text-lg md:text-heading-md text-off-black leading-tight min-w-0 truncate">{b.partnerName}</h3>
+        {team.length > 0 && <span className="hidden md:inline"><AssigneePicker team={team} value={b.assigneeId} meId={meId} onChange={assigneeId => update({ assigneeId })} /></span>}
+      </div>
+
+      <div className="p-4 md:p-6 flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_340px] md:gap-6 md:items-start">
+      <aside className="order-2 md:order-none md:col-start-2 md:row-start-1 md:sticky md:top-20 space-y-4 mt-6 md:mt-0">
+        {/* What is being made, and when it ships. */}
+        <div className="bg-subtle-gray border border-border-gray rounded-md p-3">
+          <div className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-0.5">Order Details</div>
+          <h3 className="text-lg font-bold text-off-black leading-tight">
+            {b.raceName}{' '}<span className="inline-flex items-center px-2 py-0.5 border rounded text-xs font-semibold align-middle bg-white border-border-gray text-off-black">{b.raceYear}</span>
+          </h3>
+          <div className="text-xs text-off-black/55 mt-0.5 font-mono">{b.number}</div>
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            {b.quantity ? <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.quantity} prints</span> : null}
+            <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.productSize}</span>
+            <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.frameType}</span>
+            <span className="inline-flex items-center px-2 py-1 bg-white border border-border-gray rounded text-xs font-semibold text-off-black">{b.deal?.printKind === 'standard' ? 'Standard' : 'Co-branded'}</span>
           </div>
-          <div className="text-right">
-            <div className="text-[11px] font-semibold text-off-black/45 uppercase tracking-wider">Fulfillment date</div>
-            <div className={`text-lg font-bold ${d !== null && d < 0 ? 'text-red-600' : d !== null && d <= 3 ? 'text-amber-700' : 'text-off-black'}`}>{b.dueDate ? fmtDate(b.dueDate) : 'Not set'}</div>
+          {myRun?.notes && <div className="text-xs text-off-black/60 mt-2">Events: {myRun.notes}</div>}
+          <div className="mt-3 pt-2 border-t border-border-gray">
+            <div className="text-[11px] text-off-black/50">Fulfillment date</div>
+            <div className={`text-sm font-bold ${d !== null && d < 0 ? 'text-red-600' : d !== null && d <= 3 ? 'text-amber-700' : 'text-off-black'}`}>{b.dueDate ? fmtDate(b.dueDate) : 'Not set'}{d !== null && d < 0 ? ` · ${-d}d late` : ''}</div>
             {b.raceDate && <div className="text-[11px] text-off-black/45">Race day {fmtDate(b.raceDate)}</div>}
           </div>
         </div>
 
-        <div className="flex items-center">
-          {STAGES.map((stg, i) => (
-            <div key={stg.key} className="flex items-center flex-1 last:flex-none">
-              <button onClick={() => update({ status: stg.key })} className={`flex items-center gap-1.5 text-xs ${i <= at ? 'text-off-black font-medium' : 'text-off-black/40'}`} title={`Set to ${STATUS_LABEL[stg.key]}`}>
-                <span className={`w-2.5 h-2.5 rounded-full ${i <= at ? 'bg-off-black' : 'bg-off-black/20'}`} />
-                {stg.label}
-              </button>
-              {i < STAGES.length - 1 && <div className={`flex-1 h-px mx-2 ${i < at ? 'bg-off-black/40' : 'bg-border-gray'}`} />}
-            </div>
-          ))}
-        </div>
-
-        {/* Production and payment side by side, each a tinted select. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs text-off-black/60 mb-1">Production</label>
-            <div className="relative">
-              <select value={b.status} onChange={e => update({ status: e.target.value })} className={`w-full appearance-none px-4 py-3 pr-8 rounded-md text-sm font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-off-black/20 ${st.bg} ${st.color} ${st.border}`}>
-                {STAGES.map(stg => <option key={stg.key} value={stg.key}>{STATUS_STYLE[stg.key].icon} {STATUS_LABEL[stg.key]}</option>)}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-              </div>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs text-off-black/60 mb-1">Payment</label>
-            <div className="relative">
-              <select value={r.paid ? 'paid' : 'unpaid'} onChange={e => act({ action: 'paid', paid: e.target.value === 'paid' }, e.target.value === 'paid' ? 'Marked paid' : 'Marked unpaid')} className={`w-full appearance-none px-4 py-3 pr-8 rounded-md text-sm font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-off-black/20 ${r.paid ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                <option value="unpaid">Not paid</option>
-                <option value="paid">Paid</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <svg className="h-4 w-4 text-off-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-              </div>
-            </div>
-            {/* Billed through Shopify: the paid order, or how to tag the draft so it links here. */}
-            {b.shopifyOrderName ? (
-              <a href={b.shopifyOrderUrl || undefined} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-off-black/55 hover:text-off-black">
-                <img src="/shopify-icon.png" alt="" className="w-3 h-3" /> Shopify order {b.shopifyOrderName}
-              </a>
-            ) : (
-              <p className="mt-1.5 text-[11px] text-off-black/50 leading-snug">
-                Invoiced from Customer &amp; invoice below; it turns paid here on its own once they pay.
-              </p>
-            )}
-          </div>
-        </div>
-
         {/* The facts, read only. */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Chip tone={r.scraper.ok ? 'green' : 'red'} title={r.scraper.health ? `Probed ${fmtDate(r.scraper.health.checkedAt)}${r.scraper.health.detail ? `: ${r.scraper.health.detail}` : ''}` : undefined}>
-            {!r.scraper.configured ? 'No scraper for this race' : !r.scraper.yearConfigured ? `Scraper: ${b.raceYear} not configured` : r.scraper.health?.status === 'not_run_yet' ? 'Scraper ready · race not run yet' : r.scraper.health ? `Scraper ${r.scraper.health.status}` : 'Scraper ready'}
-          </Chip>
-          {b.partnerOrderId && <Chip tone={r.design.ok ? 'green' : 'amber'}>{r.design.ok ? 'Design approved' : `Design ${(r.design.status || 'not started').replace(/_/g, ' ')}`}</Chip>}
-          <Chip tone={r.runners.ok ? 'green' : r.runners.total ? 'amber' : 'gray'}>{r.runners.total ? `${r.runners.withAddress} of ${r.runners.total} with address` : 'No runners yet'}</Chip>
+        <div>
+          <h4 className={label}>Tags</h4>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Chip tone={r.scraper.ok ? 'green' : 'red'} title={r.scraper.health ? `Probed ${fmtDate(r.scraper.health.checkedAt)}${r.scraper.health.detail ? `: ${r.scraper.health.detail}` : ''}` : undefined}>
+              {!r.scraper.configured ? 'No scraper for this race' : !r.scraper.yearConfigured ? `Scraper: ${b.raceYear} not configured` : r.scraper.health?.status === 'not_run_yet' ? 'Scraper ready · race not run yet' : r.scraper.health ? `Scraper ${r.scraper.health.status}` : 'Scraper ready'}
+            </Chip>
+            {b.partnerOrderId && <Chip tone={r.design.ok ? 'green' : 'amber'}>{r.design.ok ? 'Design approved' : `Design ${(r.design.status || 'not started').replace(/_/g, ' ')}`}</Chip>}
+            <Chip tone={r.runners.ok ? 'green' : r.runners.total ? 'amber' : 'gray'}>{r.runners.total ? `${r.runners.withAddress} of ${r.runners.total} with address` : 'No runners yet'}</Chip>
+            {deal && <Chip tone="gray">{deal.shipping === 'organization' ? 'Ships to them' : 'Ships to each runner'}</Chip>}
+          </div>
         </div>
-      </div>
 
-      {b.deal && <DealCard dealId={b.deal.id} currentRunId={b.id} onOpenRun={onOpenRun} onChanged={load} />}
-      {collecting && <>{intakeCard}{runnersCard}</>}
-      {fulfilling && <>{productionCard}{runnersCard}{filesCard}{arteloCard}{intakeCard}</>}
-      {submitted && <>{arteloCard}{productionCard}{runnersCard}</>}
+        {deal && <InvoiceCard deal={deal} onChanged={load} />}
+
+        {/* Smaller things you can do to the order. */}
+        <div>
+          <h4 className={label}>Actions</h4>
+          <div className="flex flex-col items-stretch gap-1.5">
+            {deal && <button onClick={() => setEditingOrder(true)} className={link}><Pencil className="w-3.5 h-3.5" /> Edit order</button>}
+            {!submitted && <button onClick={() => setIntakeOpen(o => !o)} className={link}><Plus className="w-3.5 h-3.5" /> Add runners</button>}
+            {fulfilling && (
+              <button onClick={researchAll} disabled={!canResearch || researching || allResearched} className={link} title={!r.paid ? 'Mark paid first' : !r.scraper.ok ? 'Scraper is not ready' : allResearched ? 'Everyone is researched' : 'Research every runner without results'}>
+                {researching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />} Research all runners
+              </button>
+            )}
+            {!collecting && <button onClick={() => downloadSheet(false)} disabled={runners.length === 0} className={link}><Download className="w-3.5 h-3.5" /> Download the Artelo sheet</button>}
+            {fulfilling && <button onClick={() => { if (confirm('Mark this order as uploaded to Artelo?')) update({ status: 'submitted' }) }} className={link}><FileText className="w-3.5 h-3.5" /> Mark uploaded to Artelo</button>}
+          </div>
+        </div>
+      </aside>
+
+      {/* The work, in the order the stage needs it. */}
+      <div className="order-1 md:order-none md:col-start-1 md:row-start-1 min-w-0 flex flex-col gap-4">
+        {deal?.printKind === 'cobranded' && myRun && !submitted && (
+          <div className="border border-border-gray rounded-md p-4 space-y-1.5">
+            <div className={label}>Co-branded production file</div>
+            <p className="text-[11px] text-off-black/50">The Illustrator file, built like a race template (same layers and artboards). The render worker checks it, then makes every runner's print from it.</p>
+            <LineTemplate run={myRun} onChanged={load} />
+          </div>
+        )}
+        {collecting && <>{intakeCard}{runnersCard}</>}
+        {fulfilling && <>{productionCard}{runnersCard}{filesCard}{arteloCard}{intakeCard}</>}
+        {submitted && <>{arteloCard}{productionCard}{runnersCard}</>}
+      </div>
+      </div>
+      </div>
+      {editingOrder && deal && <DealModal deal={deal} onClose={() => setEditingOrder(false)} onCreated={() => { setEditingOrder(false); load() }} />}
     </div>
   )
 }
