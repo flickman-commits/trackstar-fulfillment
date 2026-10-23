@@ -1133,7 +1133,7 @@ export default function Dashboard() {
         {/* Orders to Personalize Section. While an order is open, its header
             stays and the order takes the table's place (inlineDetail). */}
         {!isLoading && (
-        <section className={inlineDetail ? 'flex-shrink-0 flex flex-col' : 'flex-1 flex flex-col min-h-0 pb-4'}>
+        <section className={inlineDetail ? 'flex-shrink-0 flex flex-col' : `flex-1 flex flex-col min-h-0 pb-4 ${activeView === 'race_partner' && completedOrders.length > 0 ? '' : 'md:pb-6'}`}>
           {/* Section Header */}
           <div className={`items-center justify-between mb-3 md:mb-4 flex-shrink-0 hidden md:flex`}>
             <div>
@@ -1797,12 +1797,12 @@ export default function Dashboard() {
         </section>
         )}
 
-        {/* Bottom bar: Completed Orders Toggle + Settings */}
-        {!isLoading && !inlineDetail && (
+        {/* Bottom bar: Partners' completed orders. Standard and custom show
+            theirs in the list, so they have no bar and the table runs to the bottom. */}
+        {!isLoading && !inlineDetail && activeView === 'race_partner' && completedOrders.length > 0 && (
           <div className="flex-shrink-0 py-1.5 md:py-4 md:mt-2 mb-2 md:mb-8 md:border-t border-border-gray/50">
             <div className="flex items-center justify-center gap-3">
-              {/* Standard and custom show completed orders in the list itself (All). */}
-              {activeView === 'race_partner' && completedOrders.length > 0 && (
+              {(
                 <button
                   onClick={() => setShowCompleted(true)}
                   className="inline-flex items-center gap-2 px-3 md:px-4 py-1 md:py-2 md:bg-white md:border border-border-gray rounded-full md:shadow-sm text-xs md:text-sm text-off-black/60 md:text-off-black/70 hover:bg-subtle-gray transition-colors"
