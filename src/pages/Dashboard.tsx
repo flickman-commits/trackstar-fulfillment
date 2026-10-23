@@ -64,17 +64,37 @@ function getGreeting(): string {
   return 'Good evening'
 }
 
-/** Share of standard orders out within 2 days over the past week, against a goal of 100%. */
-function OnTimeStat({ pct, n }: { pct: number; n: number }) {
+type OnTime = { pct: number; due: number; onTime: number; lateNow: number; oldestLateDays: number | null; lateOrders: string[] }
+
+/**
+ * The pulse on getting orders out: of the standard orders whose two-day
+ * deadline came up in the past week, the share out before it (open ones count
+ * as late), and beside it the open orders already past their deadline, which
+ * filters the list to them. See server/domain/orders/onTime.js.
+ */
+function OnTimeStat({ stat, lateActive, onLate }: { stat: OnTime; lateActive: boolean; onLate: () => void }) {
+  const { pct } = stat
   const color = pct >= 90 ? 'bg-green-500' : pct >= 75 ? 'bg-amber-400' : 'bg-red-400'
   return (
-    <div className="ml-5 flex flex-col gap-1" title={`Past 7 days: ${pct}% of ${n} standard orders were completed within 2 days of the order (or race day).`}>
-      <span className="text-xs text-off-black/60 whitespace-nowrap">% of orders fulfilled in 2 days or less</span>
-      <div className="flex items-center gap-2.5">
-        <div className="w-32 h-2 rounded-full bg-off-black/10 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>
-        <span className="text-sm font-semibold text-off-black tabular-nums">{pct}%</span>
+    <div className="ml-5 flex items-end gap-5">
+      <div className="flex flex-col gap-1" title={`Past 7 days: ${stat.onTime} of the ${stat.due} standard orders whose 2-day deadline came up went out in time. The clock starts at the order, or race day if it was ordered before the race, and pauses while results are not up yet (up to 3 days) and while we wait on the customer's reply.`}>
+        <span className="text-xs text-off-black/60 whitespace-nowrap">Out within 2 days</span>
+        <div className="flex items-center gap-2.5">
+          <div className="w-32 h-2 rounded-full bg-off-black/10 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>
+          <span className="text-sm font-semibold text-off-black tabular-nums">{pct}%</span>
+        </div>
+        <span className="text-[11px] text-off-black/45 whitespace-nowrap">Goal is 100% (past 7d)</span>
       </div>
-      <span className="text-[11px] text-off-black/45 whitespace-nowrap">Goal is 100% (past 7d)</span>
+      <button
+        onClick={onLate}
+        disabled={!stat.lateNow}
+        title={stat.lateNow ? (lateActive ? 'Show every order again' : 'Show only the open orders past their 2-day deadline') : 'Nothing is past its deadline'}
+        className={`flex flex-col items-start gap-0.5 rounded-md px-2 py-1 -mb-1 text-left transition-colors ${lateActive ? 'bg-red-50 ring-1 ring-red-200' : 'hover:bg-off-black/5'} disabled:cursor-default disabled:hover:bg-transparent`}
+      >
+        <span className="text-xs text-off-black/60 whitespace-nowrap">Late now</span>
+        <span className={`text-sm font-semibold tabular-nums ${stat.lateNow ? 'text-red-600' : 'text-off-black'}`}>{stat.lateNow}</span>
+        <span className="text-[11px] text-off-black/45 whitespace-nowrap">{stat.lateNow && stat.oldestLateDays != null ? `oldest ${stat.oldestLateDays === 1 ? '1 day' : `${stat.oldestLateDays} days`}` : 'past deadline'}</span>
+      </button>
     </div>
   )
 }
@@ -110,35 +130,22 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
-  // Cmd+K (Ctrl+K elsewhere) jumps to the order search from anywhere on the page.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        setSelectedOrder(null)
-        setShowCompleted(false)
-        // From an open order the search box is not on screen yet; focus once the table is back.
-        setTimeout(() => { searchInputRef.current?.focus(); searchInputRef.current?.select() }, 0)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  // Cmd+K opens the search over every order (CommandSearch, in AppShell).
   // The race and queue filters live in the address (?race=...&queue=review),
   // so a reload or a shared link keeps the view. Changing one replaces the
   // history entry; the back button is for orders, not filter clicks.
-  type StageFilter = '' | 'review' | 'attach' | 'action' | 'waiting' | 'not_run'
+  type StageFilter = '' | 'review' | 'attach' | 'action' | 'waiting' | 'not_run' | 'late'
   const setUrlParam = useCallback((key: string, value: string) => {
     setSearchParams(prev => { const next = new URLSearchParams(prev); if (value) next.set(key, value); else next.delete(key); return next }, { replace: true })
   }, [setSearchParams])
   const raceFilter = searchParams.get('race') || ''  // empty = show all races
   const setRaceFilter = useCallback((v: string) => setUrlParam('race', v), [setUrlParam])
   // Standard orders: the queue to work. '' is everything open.
-  const stageFilter: StageFilter = (['review', 'attach', 'action', 'waiting', 'not_run'] as const).find(k => k === searchParams.get('queue')) || ''
+  const stageFilter: StageFilter = (['review', 'attach', 'action', 'waiting', 'not_run', 'late'] as const).find(k => k === searchParams.get('queue')) || ''
   const setStageFilter = useCallback((v: StageFilter) => setUrlParam('queue', v), [setUrlParam])
   const [showCompleted, setShowCompleted] = useState(false)
-  // Header stat: share of standard orders out within 2 days, past 7 days (goal 100%).
-  const [onTime, setOnTime] = useState<{ pct: number; n: number } | null>(null)
+  // Header stat: share of standard orders out by their 2-day deadline, past 7 days (goal 100%), and the ones late now.
+  const [onTime, setOnTime] = useState<OnTime | null>(null)
   // And standard orders sent to production in the last 24 hours. Read again
   // every five minutes while the tab is visible.
   const [sentToday, setSentToday] = useState<{ count: number; byPerson: { name: string; count: number }[] } | null>(null)
@@ -146,7 +153,7 @@ export default function Dashboard() {
     if (!can('settings.stats')) return
     const read = () => apiFetch('/api/admin/stats?range=7d&only=fulfillment').then(r => r.ok ? r.json() : null)
       .then(d => {
-        const s = d?.fulfillment?.standard; if (s?.count) setOnTime({ pct: s.withinGoalPct, n: s.count })
+        const t = d?.onTime; if (t?.due) setOnTime({ pct: t.onTimePct, due: t.due, onTime: t.onTime, lateNow: t.lateNow, oldestLateDays: t.oldestLateDays, lateOrders: t.lateOrders || [] })
         if (typeof d?.sentToday?.count === 'number') setSentToday({ count: d.sentToday.count, byPerson: d.sentToday.byPerson || [] })
       }).catch(() => {})
     read()
@@ -719,7 +726,10 @@ export default function Dashboard() {
     if (raceFilter && activeView === 'standard') {
       base = base.filter(o => (o.effectiveRaceName || o.raceName) === raceFilter)
     }
-    if (stageFilter && activeView === 'standard') {
+    if (stageFilter === 'late' && activeView === 'standard') {
+      const late = new Set(onTime?.lateOrders || [])
+      base = base.filter(o => late.has(o.orderNumber))
+    } else if (stageFilter && activeView === 'standard') {
       base = base.filter(o => stageFilter === 'not_run' ? isNotRun(o)
         : stageFilter === 'waiting' ? ((o.pipeline?.stage === 'waiting' || o.pipeline?.stage === 'needs_research' || !!o.waitingOnCustomerSince) && !isNotRun(o))
         : o.pipeline?.stage === stageFilter)
@@ -730,7 +740,7 @@ export default function Dashboard() {
     if (!searchQuery) return base
     const query = searchQuery.trim().toLowerCase()
     return base.filter(o => matchesSearch(o, query))
-  }, [ordersToFulfill, raceFilter, stageFilter, searchQuery, matchesSearch, activeView])
+  }, [ordersToFulfill, raceFilter, stageFilter, searchQuery, matchesSearch, activeView, onTime])
 
   const filteredCompletedOrders = useMemo(() => {
     let base = completedOrders
@@ -864,7 +874,7 @@ export default function Dashboard() {
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search by order #, runner, bib, race or customer email... (⌘K)"
+            placeholder="Search this view by order #, runner, bib, race or customer email (⌘K searches every order)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -1015,7 +1025,7 @@ export default function Dashboard() {
                 </span>
               </h2>
               {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-off-black/30" />}
-              {activeView === 'standard' && onTime && <OnTimeStat pct={onTime.pct} n={onTime.n} />}
+              {activeView === 'standard' && onTime && <OnTimeStat stat={onTime} lateActive={stageFilter === 'late'} onLate={() => setStageFilter(stageFilter === 'late' ? '' : 'late')} />}
             </div>
             {lastImportedAt && (
               <button

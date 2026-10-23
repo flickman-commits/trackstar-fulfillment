@@ -155,7 +155,7 @@ async function computeFulfillmentTimeFresh({ since, until }) {
  * message we sent in Support to their next one (or now). Keyed by the
  * lower-cased email.
  */
-async function customerWaits(emails) {
+export async function customerWaits(emails) {
   const list = [...new Set(emails.map(e => String(e || '').trim().toLowerCase()).filter(Boolean))]
   const out = new Map()
   if (!list.length) return out
@@ -175,7 +175,7 @@ async function customerWaits(emails) {
 }
 
 /** Milliseconds between start and end that the customer spent with our question unanswered. */
-function waitedWithin(waits, email, start, end) {
+export function waitedWithin(waits, email, start, end) {
   let ms = 0
   for (const w of waits.get(String(email || '').trim().toLowerCase()) || []) {
     ms += Math.max(0, Math.min(end.getTime(), (w.to || end).getTime()) - Math.max(start.getTime(), w.from.getTime()))

@@ -8,6 +8,7 @@
 import { setCors } from '../_lib/auth.js'
 import { computeStats, RANGES, rangeWindow } from '../../server/services/shopifyStats.js'
 import { computeFulfillmentTime, sentToProductionToday } from '../../server/domain/orders/fulfillmentTime.js'
+import { computeOnTime } from '../../server/domain/orders/onTime.js'
 import { requireCapability } from '../_lib/users.js'
 import { sendPublicError } from '../../server/lib/publicError.js'
 
@@ -23,8 +24,8 @@ export default async function handler(req, res) {
     }
     // ?only=fulfillment: just our handling time (the header stat), without the slow Shopify read.
     if (req.query?.only === 'fulfillment') {
-      const [fulfillment, sentToday] = await Promise.all([computeFulfillmentTime(rangeWindow(range)), sentToProductionToday()])
-      return res.status(200).json({ fulfillment, sentToday })
+      const [fulfillment, sentToday, onTime] = await Promise.all([computeFulfillmentTime(rangeWindow(range)), sentToProductionToday(), computeOnTime({ days: 7 })])
+      return res.status(200).json({ fulfillment, sentToday, onTime })
     }
     // Our own handling time sits beside the Shopify numbers; a failure there does not blank the page.
     const [stats, fulfillment] = await Promise.all([computeStats(range), computeFulfillmentTime(rangeWindow(range)).catch(e => { console.error('[stats] fulfillment time', e); return null })])

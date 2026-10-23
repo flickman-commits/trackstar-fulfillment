@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth'
 import AppSidebar, { MobileToolBar } from '@/components/AppSidebar'
 import CustomTools from '@/components/CustomTools'
 import StandardTools from '@/components/StandardTools'
+import CommandSearch from '@/components/CommandSearch'
 
 /**
  * Everything that has to outlive a page change.
@@ -79,6 +80,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       />
       <CustomTools open={railPanel === 'pace'} onClose={() => setRailPanel(null)} />
       <StandardTools open={railPanel === 'discounts'} onClose={() => setRailPanel(null)} />
+      <CommandSearch can={can} onOpenSettings={openSettings} />
       {children}
     </div>
   )
