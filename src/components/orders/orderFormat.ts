@@ -19,10 +19,12 @@ export const getDaysDiff = (dateStr: string): number => {
   return Math.round((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-export const formatDueDate = (dateStr?: string): string => {
+// live = false: the date alone, no "(overdue)" or countdown (see dueIsLive).
+export const formatDueDate = (dateStr?: string, live = true): string => {
   if (!dateStr) return 'N/A'
   const diffDays = getDaysDiff(dateStr)
   const formatted = new Date(dateStr).toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric', year: 'numeric' })
+  if (!live) return formatted
   if (diffDays < 0) return `${formatted} (overdue)`
   if (diffDays === 0) return `${formatted} (today)`
   if (diffDays === 1) return `${formatted} (in 1 day)`
@@ -31,10 +33,19 @@ export const formatDueDate = (dateStr?: string): string => {
 }
 
 // Check if due date is urgent
-export const isDueDateUrgent = (dateStr?: string): boolean => {
-  if (!dateStr) return false
+export const isDueDateUrgent = (dateStr?: string, live = true): boolean => {
+  if (!dateStr || !live) return false
   return getDaysDiff(dateStr) <= 3
 }
+
+/**
+ * A custom order's due date is the date its first designs (v1) are owed.
+ * Once they have gone to the customer (Awaiting Review and on) the date
+ * still shows, but is not overdue or counting down: revisions run on the
+ * customer's time. Standard orders are always live.
+ */
+export const dueIsLive = (o: Pick<Order, 'trackstarOrderType' | 'designStatus'>): boolean =>
+  o.trackstarOrderType !== 'custom' || !o.designStatus || o.designStatus === 'not_started' || o.designStatus === 'in_progress'
 
 // How long an order has been workable: since it was placed, or since race
 // day for an order placed before its race. Gray up to 2 days, orange 3 to 5,

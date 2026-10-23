@@ -1,15 +1,22 @@
 /**
- * GET /api/orders/search?q=5038 | jane@example.com | Jane Smith
+ * GET /api/search?q=5038 | jane@example.com | Jane Smith
  *
- * The ⌘K search: standard, custom and partner orders in one list, open or
- * completed, so an order number or a customer's email finds the order
- * whatever view it lives in. Bulk runners are left out; they live in their
- * bulk order. Each hit carries the ref the order view opens at
- * (/orders/5038, or 5038-2 for a later line item).
+ * The ⌘K search, one box over what the person's role lets them see:
+ *   orders   standard, custom and partner orders, open or completed, so an
+ *            order number or a customer's email finds the order whatever view
+ *            it lives in. Bulk runners are left out; they live in their bulk
+ *            order. Each hit carries the ref the order view opens at
+ *            (/orders/5038, or 5038-2 for a later line item). Every signed-in
+ *            role works the order list, so every role searches it.
+ *   support  conversations, by the customer's email, name, Instagram handle
+ *            or subject. Only for roles with Support.
+ * The role is read from the database on each call (requireCapability's rule).
  */
-import prisma from '../_lib/prisma.js'
-import { setCors, requireAdmin } from '../_lib/auth.js'
-import { sendPublicError } from '../../server/lib/publicError.js'
+import prisma from './_lib/prisma.js'
+import { setCors, requireAdmin } from './_lib/auth.js'
+import { loadActiveUser } from './_lib/users.js'
+import { can } from './_lib/roles.js'
+import { sendPublicError } from '../server/lib/publicError.js'
 
 const LIMIT = 12
 
@@ -17,11 +24,13 @@ export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, OPTIONS' })) return
   const actor = await requireAdmin(req, res)
   if (!actor) return
+  const user = await loadActiveUser(actor)
+  if (!user) return res.status(401).json({ error: 'Your account is no longer active. Sign in again.' })
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
     const q = String(req.query.q || '').trim().replace(/^#/, '').slice(0, 100)
-    if (q.length < 2) return res.status(200).json({ results: [] })
+    if (q.length < 2) return res.status(200).json({ results: [], threads: [] })
     const text = { contains: q, mode: 'insensitive' }
     const or = [
       { customerEmail: text },
@@ -67,9 +76,29 @@ export default async function handler(req, res) {
         createdAt: o.createdAt,
       }
     })
-    return res.status(200).json({ results })
+    const threads = await can(user.role, 'support') ? await searchThreads(q) : []
+    return res.status(200).json({ results, threads })
   } catch (error) {
-    console.error('[API /orders/search] Error:', error)
+    console.error('[API /search] Error:', error)
     return sendPublicError(res, error)
   }
+}
+
+async function searchThreads(q) {
+  const text = { contains: q, mode: 'insensitive' }
+  const rows = await prisma.supportThread.findMany({
+    where: { mergedIntoId: null, OR: [{ customerEmail: text }, { customerName: text }, { igUsername: text }, { subject: text }] },
+    orderBy: [{ lastMessageAt: 'desc' }],
+    take: 8,
+    select: { id: true, channel: true, subject: true, customerEmail: true, customerName: true, igUsername: true, status: true, filtered: true, lastMessageAt: true },
+  })
+  return rows.map(t => ({
+    id: t.id,
+    channel: t.channel,
+    who: t.customerName || (t.igUsername ? `@${t.igUsername}` : '') || t.customerEmail || null,
+    email: t.customerEmail || null,
+    subject: t.subject || null,
+    status: t.filtered ? 'filtered' : t.status,
+    lastMessageAt: t.lastMessageAt,
+  }))
 }

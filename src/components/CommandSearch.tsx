@@ -7,11 +7,14 @@ import type { Capability } from '@/lib/roles'
 /**
  * ⌘K from anywhere: one box that finds an order by number, customer email,
  * customer or runner name, or bib, whether it is standard, custom or a
- * partner order, open or done, and opens it in the right view. The order
- * view routes by /orders/<ref> and switches to the order's type on its own.
- * Typing a page name ("support", "sales") jumps there too.
+ * partner order, open or done, and opens it in the right view (the order
+ * view routes by /orders/<ref> and switches to the order's type on its own).
+ * For people whose role has Support it finds conversations too, opened at
+ * /support?thread=<id>; the server decides that (api/search.js). Typing a
+ * page name ("support", "sales") jumps there.
  */
 type Hit = { ref: string; number: string; type: string; done: boolean; runner: string | null; customer: string | null; email: string | null; race: string | null }
+type Thread = { id: string; channel: string; who: string | null; email: string | null; subject: string | null; status: string }
 type Row = { key: string; title: string; detail: string; tag: string; go: () => void }
 
 const TYPE_LABEL: Record<string, string> = { standard: 'Standard', custom: 'Custom', race_partner: 'Partner' }
@@ -21,6 +24,7 @@ export default function CommandSearch({ can, onOpenSettings }: { can: (c: Capabi
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<Hit[]>([])
+  const [threads, setThreads] = useState<Thread[]>([])
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -37,19 +41,19 @@ export default function CommandSearch({ can, onOpenSettings }: { can: (c: Capabi
   }, [])
   useEffect(() => {
     if (!open) return
-    setQ(''); setHits([]); setActive(0)
+    setQ(''); setHits([]); setThreads([]); setActive(0)
     setTimeout(() => inputRef.current?.focus(), 0)
   }, [open])
 
   // Orders, read as you type (a short pause first so each key is not a request).
   useEffect(() => {
     const term = q.trim()
-    if (!open || term.replace(/^#/, '').length < 2) { setHits([]); setLoading(false); return }
+    if (!open || term.replace(/^#/, '').length < 2) { setHits([]); setThreads([]); setLoading(false); return }
     setLoading(true)
     let stale = false
     const t = setTimeout(() => {
-      apiFetch(`/api/orders/search?q=${encodeURIComponent(term)}`).then(r => r.ok ? r.json() : null)
-        .then(d => { if (!stale) { setHits(d?.results || []); setActive(0) } })
+      apiFetch(`/api/search?q=${encodeURIComponent(term)}`).then(r => r.ok ? r.json() : null)
+        .then(d => { if (!stale) { setHits(d?.results || []); setThreads(d?.threads || []); setActive(0) } })
         .catch(() => {})
         .finally(() => { if (!stale) setLoading(false) })
     }, 180)
@@ -81,8 +85,15 @@ export default function CommandSearch({ can, onOpenSettings }: { can: (c: Capabi
       tag: `${TYPE_LABEL[h.type] || h.type}${h.done ? ' · Done' : ''}`,
       go: () => navigate(`/orders/${h.ref}`),
     }))
-    return [...orderRows, ...pageRows]
-  }, [q, hits, pages, navigate, onOpenSettings])
+    const threadRows = threads.map(t => ({
+      key: `thread:${t.id}`,
+      title: t.who || 'Unknown sender',
+      detail: [t.subject, t.email && t.email !== t.who ? t.email : null].filter(Boolean).join(' · '),
+      tag: `${t.channel === 'instagram' ? 'Instagram' : 'Support'}${t.status === 'closed' ? ' · Closed' : t.status === 'filtered' ? ' · Filtered' : ''}`,
+      go: () => navigate(`/support?thread=${encodeURIComponent(t.id)}`),
+    }))
+    return [...orderRows, ...threadRows, ...pageRows]
+  }, [q, hits, threads, pages, navigate, onOpenSettings])
 
   if (!open) return null
   const choose = (r: Row | undefined) => { if (!r) return; close(); r.go() }
@@ -102,7 +113,7 @@ export default function CommandSearch({ can, onOpenSettings }: { can: (c: Capabi
               else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(0, a - 1)) }
               else if (e.key === 'Enter') { e.preventDefault(); choose(rows[active]) }
             }}
-            placeholder="Order #, customer email, name or bib"
+            placeholder={can('support') ? 'Order #, email, name, bib or conversation' : 'Order #, customer email, name or bib'}
             className="w-full pl-11 pr-10 py-4 text-base text-off-black placeholder:text-off-black/35 focus:outline-none"
           />
           {loading && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-off-black/30" />}
@@ -128,7 +139,7 @@ export default function CommandSearch({ can, onOpenSettings }: { can: (c: Capabi
           </ul>
         ) : (
           <div className="px-4 py-5 text-sm text-off-black/45">
-            {q.trim().replace(/^#/, '').length < 2 ? 'Search every order: standard, custom and partners, open or done.' : loading ? 'Searching…' : 'Nothing matches.'}
+            {q.trim().replace(/^#/, '').length < 2 ? (can('support') ? 'Search every order (standard, custom, partners, open or done) and support conversations.' : 'Search every order: standard, custom and partners, open or done.') : loading ? 'Searching…' : 'Nothing matches.'}
           </div>
         )}
         <div className="px-4 py-2 border-t border-border-gray text-[11px] text-off-black/40 flex gap-4">

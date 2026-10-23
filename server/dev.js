@@ -51,7 +51,7 @@ const routes = [
   { method: 'post', path: '/api/feature-requests',            handler: '../api/feature-requests.js' },
   { method: 'post', path: '/api/render/needs',               handler: '../api/render/needs.js' },
   { method: 'post', path: '/api/orders/rush',                handler: '../api/orders/rush.js' },
-  { method: 'get',  path: '/api/orders/search',              handler: '../api/orders/search.js' },
+  { method: 'get',  path: '/api/search',                     handler: '../api/search.js' },
   { method: 'get',  path: '/api/orders/final-pdf',           handler: '../api/orders/final-pdf.js' },
   { method: 'post', path: '/api/orders/final-pdf',           handler: '../api/orders/final-pdf.js' },
   { method: 'get',  path: '/api/orders/artelo-send',         handler: '../api/orders/artelo-send.js' },

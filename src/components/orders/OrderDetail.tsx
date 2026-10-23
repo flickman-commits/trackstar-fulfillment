@@ -26,7 +26,7 @@ import {
   DESIGN_STATUS_CONFIG, designLabel, selectableDesignStatuses, mapOrder,
 } from '@/components/orders/orderModel'
 import {
-  TZ, formatDueDate, isDueDateUrgent, orderAge, formatOrderPlacedAt, getStatusDisplay,
+  TZ, formatDueDate, isDueDateUrgent, dueIsLive, orderAge, formatOrderPlacedAt, getStatusDisplay,
   generateFilename as filenameFor, orderItemCount, orderItemPosition,
 } from '@/components/orders/orderFormat'
 import {
@@ -1349,9 +1349,9 @@ Thank you!`
                     <div>
                       <h4 className="text-[10px] font-semibold text-off-black/40 uppercase tracking-wider mb-1.5">Tags</h4>
                       <div className="flex flex-wrap items-center gap-1.5">
-                      {!isProductionStage && <span className={`inline-flex items-center gap-1 px-2.5 py-1 bg-white border rounded text-sm ${isDueDateUrgent(selectedOrder.dueDate) ? 'border-red-200 text-red-600 font-medium' : 'border-border-gray text-off-black/70'}`}>
+                      {!isProductionStage && <span className={`inline-flex items-center gap-1 px-2.5 py-1 bg-white border rounded text-sm ${isDueDateUrgent(selectedOrder.dueDate, dueIsLive(selectedOrder)) ? 'border-red-200 text-red-600 font-medium' : 'border-border-gray text-off-black/70'}`}>
                         <span>⏳</span>
-                        <span>Due {formatDueDate(selectedOrder.dueDate)}</span>
+                        <span>Due {formatDueDate(selectedOrder.dueDate, dueIsLive(selectedOrder))}</span>
                       </span>}
                       {selectedOrder.orderPlacedAt && (
                         <span

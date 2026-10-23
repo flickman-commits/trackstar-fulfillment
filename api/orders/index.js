@@ -188,11 +188,19 @@ export default async function handler(req, res) {
       completedCount = await prisma.order.count({ where: { ...whereClause, status: 'completed' } })
       whereClause.status = { not: 'completed' }
     }
+    // ?scope=completed&skip=100: completed orders a page at a time, newest
+    // first, for the bottom of the standard queue's All (loaded as you scroll).
+    const completedPage = req.query.scope === 'completed' && !number
+    if (completedPage) whereClause.status = 'completed'
+    const page = completedPage
+      ? { take: Math.min(200, Math.max(1, Number(req.query.take) || 100)), skip: Math.max(0, Number(req.query.skip) || 0) }
+      : {}
 
     // Fetch orders with their research data and race info
     const orders = await prisma.order.findMany({
       where: whereClause,
       orderBy: [{ createdAt: 'desc' }],
+      ...page,
       include: {
         runnerResearch: {
           include: {

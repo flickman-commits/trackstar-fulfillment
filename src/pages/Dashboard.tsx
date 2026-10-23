@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import Toast, { type ToastMessage } from '@/components/orders/Toast'
-import { Search, Plus, Loader2, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText } from 'lucide-react'
+import { Search, Plus, Loader2, ChevronDown as ChevronDownIcon, ImagePlus, MessageSquareText, SlidersHorizontal } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { segment, segmentGroup } from '@/lib/ui'
 import BulkView from '@/components/bulk/BulkView'
@@ -20,7 +20,7 @@ import {
   DESIGN_STATUS_CONFIG, designLabel, mapOrder, orderRefOf,
 } from '@/components/orders/orderModel'
 import {
-  formatDueDate, isDueDateUrgent, workableSince, orderAge, getStatusDisplay,
+  formatDueDate, isDueDateUrgent, dueIsLive, workableSince, orderAge, getStatusDisplay,
   orderItemCount, orderItemPosition,
 } from '@/components/orders/orderFormat'
 
@@ -62,6 +62,27 @@ function getGreeting(): string {
   if (hour < 12) return 'Good morning'
   if (hour < 18) return 'Good afternoon'
   return 'Good evening'
+}
+
+/** The bottom of a list that loads more as it scrolls into view (a button too, in case it never does). */
+function LoadMore({ loading, onMore }: { loading: boolean; onMore: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const more = useRef(onMore)
+  more.current = onMore
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const io = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) more.current() }, { rootMargin: '400px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+  return (
+    <div ref={ref} className="py-4 text-center">
+      <button onClick={onMore} disabled={loading} className="inline-flex items-center gap-1.5 text-xs text-off-black/45 hover:text-off-black/70">
+        {loading && <Loader2 className="w-3 h-3 animate-spin" />}{loading ? 'Loading completed orders…' : 'Load more completed orders'}
+      </button>
+    </div>
+  )
 }
 
 type OnTime = { pct: number; due: number; onTime: number; lateNow: number; oldestLateDays: number | null; lateOrders: string[] }
@@ -143,6 +164,11 @@ export default function Dashboard() {
   // Standard orders: the queue to work. '' is everything open.
   const stageFilter: StageFilter = (['review', 'attach', 'action', 'waiting', 'not_run', 'late'] as const).find(k => k === searchParams.get('queue')) || ''
   const setStageFilter = useCallback((v: StageFilter) => setUrlParam('queue', v), [setUrlParam])
+  // Custom orders: open ones by due date (the default), or every custom order, completed too.
+  const customAll = searchParams.get('show') === 'all'
+  const setCustomAll = useCallback((all: boolean) => setUrlParam('show', all ? 'all' : ''), [setUrlParam])
+  // Team member and race pickers sit behind a Filters toggle, closed by default.
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   // Header stat: share of standard orders out by their 2-day deadline, past 7 days (goal 100%), and the ones late now.
   const [onTime, setOnTime] = useState<OnTime | null>(null)
@@ -209,7 +235,7 @@ export default function Dashboard() {
   // Fetch orders from database (filtered by activeView type)
   // Completed standard orders are fetched only while someone is looking at them.
   const [completedCount, setCompletedCount] = useState<number | null>(null)
-  const includeCompleted = showCompleted || searchQuery.trim().length > 0
+  const includeCompleted = (showCompleted && activeView !== 'standard') || searchQuery.trim().length > 0
   const fetchOrders = useCallback(async () => {
     try {
       // Standard orders: completed ones load only when the completed list or a search needs them.
@@ -266,6 +292,45 @@ export default function Dashboard() {
       setIsLoading(false)
     }
   }, [activeView, includeCompleted, loadTeam])
+
+  // Completed standard orders, newest first, a page at a time: they sit at the
+  // bottom of the queue's All and load as you scroll down to them. The open
+  // list stays its own request (it refreshes every minute; this does not).
+  const [completedPage, setCompletedPage] = useState<Order[]>([])
+  const [completedLoading, setCompletedLoading] = useState(false)
+  const completedBusy = useRef(false)
+  const loadCompleted = useCallback(async (reset: boolean) => {
+    if (completedBusy.current) return
+    completedBusy.current = true
+    setCompletedLoading(true)
+    try {
+      const skip = reset ? 0 : completedPage.length
+      const r = await apiFetch(`/api/orders?type=standard&scope=completed&take=100&skip=${skip}`)
+      if (!r.ok) return
+      const d = await r.json()
+      const rows: Order[] = (d.orders || []).map((o: Record<string, unknown>) => mapOrder(o))
+      setCompletedPage(prev => {
+        if (!reset) return [...prev, ...rows.filter(o => !prev.some(p => p.id === o.id))]
+        // A refresh: the newest page again, with whatever was loaded below it kept.
+        const ids = new Set(rows.map(o => o.id))
+        return [...rows, ...prev.filter(o => !ids.has(o.id)).slice(Math.max(0, prev.length - rows.length))]
+      })
+    } catch { /* the next scroll or refresh tries again */ } finally {
+      completedBusy.current = false
+      setCompletedLoading(false)
+    }
+  }, [completedPage.length])
+  const showStandardDone = activeView === 'standard' && stageFilter === '' && !searchQuery.trim()
+  useEffect(() => { if (showStandardDone && !completedPage.length) loadCompleted(true) }, [showStandardDone]) // eslint-disable-line react-hooks/exhaustive-deps
+  // An order left the open list (completed here or by someone else): read the newest completed page again.
+  const openIds = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (activeView !== 'standard' || searchQuery.trim()) return
+    const now = new Set(orders.filter(o => o.status !== 'completed').map(o => o.id))
+    const left = [...openIds.current].some(id => !now.has(id))
+    openIds.current = now
+    if (left && completedPage.length) loadCompleted(true)
+  }, [orders]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Order Assignment changed who has what (help added or ended, the order
   // list spread): reload the list and Current Team so nobody has to refresh.
@@ -649,8 +714,13 @@ export default function Dashboard() {
     if (activeView === 'custom') {
       return typeFiltered.filter(o => o.designStatus === 'sent_to_production')
     }
-    return typeFiltered.filter(o => o.status === 'completed')
-  }, [orders, activeView, byPerson])
+    // Standard: the search loads every order; otherwise the completed pages.
+    const done = typeFiltered.filter(o => o.status === 'completed')
+    if (searchQuery.trim()) return done
+    // Just completed here (still in the open list until the refresh) goes on top.
+    const paged = completedPage.filter(o => (o.trackstarOrderType || 'standard') === 'standard').filter(byPerson)
+    return [...done.filter(o => !paged.some(p => p.id === o.id)), ...paged]
+  }, [orders, activeView, byPerson, completedPage, searchQuery])
 
   const matchesSearch = useCallback((o: Order, query: string) =>
     o.orderNumber.toLowerCase().includes(query) ||
@@ -751,6 +821,11 @@ export default function Dashboard() {
     const query = searchQuery.trim().toLowerCase()
     return base.filter(o => matchesSearch(o, query))
   }, [completedOrders, raceFilter, searchQuery, matchesSearch, activeView])
+
+  // Completed orders show under the open ones, in the same table: in a search,
+  // in the standard queue's All, and in custom's All.
+  const showDoneInline = !!searchQuery || showStandardDone || (activeView === 'custom' && customAll)
+  const doneHasMore = showStandardDone && completedCount != null && completedPage.length < completedCount
 
   // --- Bulk research ---
   // Orders eligible for batch research from the *currently visible* queue.
@@ -890,38 +965,37 @@ export default function Dashboard() {
             className="w-full pl-9 md:pl-11 pr-4 py-2 md:py-3 bg-subtle-gray border border-border-gray rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors"
           />
         </div>
-        {/* Whose orders. Clicking a person in Current Team does the same. */}
-        {/* On the phone the person and race pickers share one row, with no labels. */}
-        <div className="grid grid-cols-2 gap-2 md:contents">
+        {/* Team member and race, folded away until wanted. A dot counts the ones in use. */}
         {scoped && (
-          <div className={`md:w-52 ${activeView === 'standard' ? '' : 'col-span-2'}`}>
-            <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Team Member</div>
-            <PersonFilter team={team} value={person} meId={myId} onChange={setPersonFilter} />
-          </div>
-        )}
-        {activeView === 'standard' && (
-        <div className={`md:w-64 ${scoped ? '' : 'col-span-2'}`}>
-          <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Race</div>
-          <div className="relative">
-          <select
-            value={raceFilter}
-            onChange={(e) => setRaceFilter(e.target.value)}
-            className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors cursor-pointer ${
-              raceFilter
-                ? 'bg-dark-fill text-white border-dark-fill'
-                : 'bg-subtle-gray border-border-gray text-off-black'
-            }`}
+          <button
+            onClick={() => setFiltersOpen(o => !o)}
+            className={`self-start md:self-auto inline-flex items-center gap-1.5 px-3 py-2 md:py-3 rounded-md text-sm whitespace-nowrap transition-colors ${filtersOpen ? 'bg-subtle-gray text-off-black' : 'text-off-black/55 hover:text-off-black hover:bg-subtle-gray'}`}
+            aria-expanded={filtersOpen}
           >
-            <option value="" className="bg-white text-off-black">All races ({raceFilterOptions.reduce((s, [, c]) => s + c, 0)})</option>
-            {raceFilterOptions.map(([name, count]) => (
-              <option key={name} value={name} className="bg-white text-off-black">{name} ({count})</option>
+            <SlidersHorizontal className="w-4 h-4" />
+            Filters
+            {((scoped && person ? 1 : 0) + (activeView === 'standard' && raceFilter ? 1 : 0)) > 0 && <span className="px-1.5 py-0.5 rounded-full bg-dark-fill text-white text-[10px] font-semibold tabular-nums leading-none">{(scoped && person ? 1 : 0) + (activeView === 'standard' && raceFilter ? 1 : 0)}</span>}
+            <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+        {activeView === 'custom' && (
+        <div>
+          <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Show</div>
+          <div className="flex md:inline-flex w-full md:w-auto rounded-md border border-border-gray bg-subtle-gray p-0.5">
+            {([[false, 'Open', ordersToFulfill.length], [true, 'All', ordersToFulfill.length + completedOrders.length]] as const).map(([all, label, n]) => (
+              <button
+                key={label}
+                onClick={() => setCustomAll(all)}
+                title={all ? 'Every custom order: open ones by due date, then completed' : 'Open custom orders, due soonest first'}
+                className={`flex-1 md:flex-none px-2 md:px-3 py-1.5 md:py-2.5 rounded text-xs md:text-sm font-medium whitespace-nowrap transition-colors inline-flex items-center justify-center gap-1 md:gap-1.5 ${customAll === all ? 'bg-white text-off-black shadow-sm' : 'text-off-black/55 hover:text-off-black'}`}
+              >
+                {label}
+                <span className={`text-[11px] tabular-nums ${customAll === all ? 'text-off-black/50' : 'text-off-black/35'}`}>{n}</span>
+              </button>
             ))}
-          </select>
-          <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${raceFilter ? 'text-white' : 'text-off-black/40'}`} />
           </div>
         </div>
         )}
-        </div>
         {activeView === 'standard' && (
         <div>
           <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Queue</div>
@@ -957,6 +1031,42 @@ export default function Dashboard() {
           </button>
         )}
       </div>
+      {filtersOpen && scoped && (
+      <div className="mt-2 md:mt-3">
+        {/* Whose orders. Clicking a person in Current Team does the same. */}
+        {/* On the phone the person and race pickers share one row, with no labels. */}
+        <div className="grid grid-cols-2 gap-2 md:flex md:gap-3">
+        {scoped && (
+          <div className={`md:w-52 ${activeView === 'standard' ? '' : 'col-span-2'}`}>
+            <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Team Member</div>
+            <PersonFilter team={team} value={person} meId={myId} onChange={setPersonFilter} />
+          </div>
+        )}
+        {activeView === 'standard' && (
+        <div className={`md:w-64 ${scoped ? '' : 'col-span-2'}`}>
+          <div className="hidden md:block text-[10px] font-semibold uppercase tracking-wider text-off-black/40 mb-1">Race</div>
+          <div className="relative">
+          <select
+            value={raceFilter}
+            onChange={(e) => setRaceFilter(e.target.value)}
+            className={`w-full appearance-none pl-3 md:pl-4 pr-9 py-2 md:py-3 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-off-black/10 focus:border-off-black/30 transition-colors cursor-pointer ${
+              raceFilter
+                ? 'bg-dark-fill text-white border-dark-fill'
+                : 'bg-subtle-gray border-border-gray text-off-black'
+            }`}
+          >
+            <option value="" className="bg-white text-off-black">All races ({raceFilterOptions.reduce((s, [, c]) => s + c, 0)})</option>
+            {raceFilterOptions.map(([name, count]) => (
+              <option key={name} value={name} className="bg-white text-off-black">{name} ({count})</option>
+            ))}
+          </select>
+          <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${raceFilter ? 'text-white' : 'text-off-black/40'}`} />
+          </div>
+        </div>
+        )}
+        </div>
+      </div>
+      )}
     </div>
   )
 
@@ -1150,7 +1260,7 @@ export default function Dashboard() {
                       )
                     })}
                     {/* Completed orders in search (mobile) */}
-                    {searchQuery && filteredCompletedOrders.length > 0 && (
+                    {showDoneInline && filteredCompletedOrders.length > 0 && (
                       <>
                         <div className="px-4 py-2.5 bg-subtle-gray/50">
                           <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">{doneHeading}</span>
@@ -1249,13 +1359,13 @@ export default function Dashboard() {
                               </>
                             ) : (
                               <>
-                                <span className={`text-xs flex items-center gap-1.5 ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black/40'}`}>
+                                <span className={`text-xs flex items-center gap-1.5 ${isDueDateUrgent(order.dueDate, dueIsLive(order)) ? 'text-red-600 font-medium' : 'text-off-black/40'}`}>
                                   {order.isRushOrder && (
                                     <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800" title="Customer paid to skip the line: 4-day turnaround">
                                       ⚡ Rush
                                     </span>
                                   )}
-                                  <span>Due: {formatDueDate(order.dueDate)}</span>
+                                  <span>Due: {formatDueDate(order.dueDate, dueIsLive(order))}</span>
                                 </span>
                                 <span className="text-xs text-off-black/40 truncate text-right max-w-[50%]">
                                   {order.effectiveRaceName || order.raceName || '-'}
@@ -1267,7 +1377,7 @@ export default function Dashboard() {
                       )
                     })}
                     {/* Completed orders in search (custom mobile) */}
-                    {searchQuery && filteredCompletedOrders.length > 0 && (
+                    {showDoneInline && filteredCompletedOrders.length > 0 && (
                       <>
                         <div className="px-4 py-2.5 bg-subtle-gray/50">
                           <span className="text-xs font-semibold text-off-black/40 uppercase tracking-wider">{doneHeading}</span>
@@ -1400,7 +1510,7 @@ export default function Dashboard() {
                         )
                       })}
                       {/* Completed orders inline when searching (standard view) */}
-                      {searchQuery && filteredCompletedOrders.length > 0 && (
+                      {showDoneInline && filteredCompletedOrders.length > 0 && (
                         <>
                           <tr className="bg-subtle-gray/50">
                             <td colSpan={6} className="px-6 py-3">
@@ -1517,8 +1627,8 @@ export default function Dashboard() {
                     <thead className="bg-subtle-gray border-b border-border-gray sticky top-0 z-10">
                       <tr>
                         <th className="text-center pl-6 pr-2 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-12">Src</th>
-                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-44">Design Status</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-48">Order #</th>
+                        <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-44">Design Status</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-40">Due Date</th>
                         <th className="text-left px-3 py-4 text-xs font-semibold text-off-black/60 uppercase tracking-wider w-52">
                           <div className="flex items-center gap-2 leading-none">
@@ -1548,12 +1658,6 @@ export default function Dashboard() {
                               />
                             </td>
                             <td className="px-3 py-4">
-                              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
-                                <span className={`w-2 h-2 rounded-full shrink-0 ${designConfig.dot}`} aria-hidden />
-                                {designLabel(order.designStatus, order.trackstarOrderType)}
-                              </span>
-                            </td>
-                            <td className="px-3 py-4">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                 {itemCount > 1 && (
@@ -1565,6 +1669,12 @@ export default function Dashboard() {
                                   <HoverTip text="Has notes or comments"><MessageSquareText className="w-3.5 h-3.5 text-amber-500 cursor-help" /></HoverTip>
                                 )}
                               </div>
+                            </td>
+                            <td className="px-3 py-4">
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${designConfig.dot}`} aria-hidden />
+                                {designLabel(order.designStatus, order.trackstarOrderType)}
+                              </span>
                             </td>
                             <td className="px-3 py-4">
                               {/* The rush chip sits with the due date, not with
@@ -1580,8 +1690,8 @@ export default function Dashboard() {
                                     ⚡ Rush
                                   </span>
                                 )}
-                                <span className={`text-sm ${isDueDateUrgent(order.dueDate) ? 'text-red-600 font-medium' : 'text-off-black'}`}>
-                                  {formatDueDate(order.dueDate)}
+                                <span className={`text-sm ${isDueDateUrgent(order.dueDate, dueIsLive(order)) ? 'text-red-600 font-medium' : 'text-off-black'}`}>
+                                  {formatDueDate(order.dueDate, dueIsLive(order))}
                                 </span>
                               </div>
                             </td>
@@ -1596,7 +1706,7 @@ export default function Dashboard() {
                         )
                       })}
                       {/* Completed orders inline when searching (custom view) */}
-                      {searchQuery && filteredCompletedOrders.length > 0 && (
+                      {showDoneInline && filteredCompletedOrders.length > 0 && (
                         <>
                           <tr className="bg-subtle-gray/50">
                             <td colSpan={7} className="px-6 py-3">
@@ -1621,12 +1731,6 @@ export default function Dashboard() {
                                   />
                                 </td>
                                 <td className="px-3 py-4">
-                                  <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
-                                    <span className={`w-2 h-2 rounded-full shrink-0 ${designConfig.dot}`} aria-hidden />
-                                    {designLabel(order.designStatus, order.trackstarOrderType)}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-4">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-off-black">{order.displayOrderNumber}</span>
                                     {itemCount > 1 && (
@@ -1637,7 +1741,13 @@ export default function Dashboard() {
                                   </div>
                                 </td>
                                 <td className="px-3 py-4">
-                                  <span className="text-sm text-off-black/40">-</span>
+                                  <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${designConfig.bgColor} ${designConfig.color}`}>
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${designConfig.dot}`} aria-hidden />
+                                    {designLabel(order.designStatus, order.trackstarOrderType)}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-4">
+                                  <span className="text-sm text-off-black/40">{order.dueDate ? formatDueDate(order.dueDate, false) : '-'}</span>
                                 </td>
                                 <td className="px-3 py-4">{assigneeCell(order)}</td>
                                 <td className="px-3 py-4 hidden md:table-cell">
@@ -1667,6 +1777,7 @@ export default function Dashboard() {
                   No matching orders found
                 </div>
               )}
+              {doneHasMore && <LoadMore loading={completedLoading} onMore={() => loadCompleted(false)} />}
             </div>
           </div>
           )}
@@ -1677,7 +1788,8 @@ export default function Dashboard() {
         {!isLoading && !inlineDetail && (
           <div className="flex-shrink-0 py-1.5 md:py-4 md:mt-2 mb-2 md:mb-8 md:border-t border-border-gray/50">
             <div className="flex items-center justify-center gap-3">
-              {(completedOrders.length > 0 || (completedCount ?? 0) > 0) && (
+              {/* Standard and custom show completed orders in the list itself (All). */}
+              {activeView === 'race_partner' && completedOrders.length > 0 && (
                 <button
                   onClick={() => setShowCompleted(true)}
                   className="inline-flex items-center gap-2 px-3 md:px-4 py-1 md:py-2 md:bg-white md:border border-border-gray rounded-full md:shadow-sm text-xs md:text-sm text-off-black/60 md:text-off-black/70 hover:bg-subtle-gray transition-colors"
