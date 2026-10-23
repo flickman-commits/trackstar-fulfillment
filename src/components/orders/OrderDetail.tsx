@@ -30,7 +30,7 @@ import {
   generateFilename as filenameFor, orderItemCount, orderItemPosition,
 } from '@/components/orders/orderFormat'
 import {
-  CollapsibleSection, CopyableField, PartnerInfoFields, PendingField,
+  CollapsibleSection, CopyableField, PartnerInfoFields, CustomDetailsFields, PendingField,
   MissingDateField, NotAvailableField, ApprovalEmailField,
 } from '@/components/orders/fields'
 
@@ -1714,17 +1714,17 @@ Thank you!`
                             }}
                           />
                         ) : (
-                          <>
-                            <CopyableField label="Runner" value={selectedOrder.effectiveRunnerName || selectedOrder.runnerName || 'Unknown'} />
-                            <CopyableField label="Race" value={selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Custom'} />
-                            <CopyableField label="Year" value={String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'N/A')} />
-                            {selectedOrder.bibNumberCustomer && (
-                              <CopyableField label="Bib #" value={selectedOrder.bibNumberCustomer} />
-                            )}
-                            {selectedOrder.timeCustomer && (
-                              <CopyableField label="Time" value={selectedOrder.timeCustomer} />
-                            )}
-                          </>
+                          <CustomDetailsFields
+                            key={selectedOrder.orderNumber}
+                            order={selectedOrder}
+                            onToast={setToast}
+                            onSaved={async () => {
+                              await fetchOrders()
+                              const refreshed = await apiFetch(`/api/orders?number=${encodeURIComponent(selectedOrder.parentOrderNumber)}`).then(r => r.json())
+                              const updated = refreshed.orders?.find((o: { orderNumber: string }) => o.orderNumber === selectedOrder.orderNumber)
+                              if (updated) setSelectedOrder(prev => prev ? mapOrder(updated) : prev)
+                            }}
+                          />
                         )}
                       </div>
                     </div>

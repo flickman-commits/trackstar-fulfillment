@@ -35,7 +35,10 @@ export default async function handler(req, res) {
       partnerName, partnerContactName, partnerEmail,
       // A custom order's approval email: where the proof links go (the buyer
       // may want them sent to the runner, or used a typo'd address).
-      approvalEmail } = req.body
+      approvalEmail,
+      // A custom order's details, filled in by hand when the order came in
+      // empty and the customer sent them by email afterwards.
+      customBib, customTime, creativeDirection } = req.body
     // Race ids are integers; a string here used to surface as a Prisma error.
     const raceId = rawRaceId == null || rawRaceId === '' ? rawRaceId : Number(rawRaceId)
     if (raceId != null && raceId !== '' && !Number.isInteger(raceId)) return res.status(400).json({ error: 'raceId must be a number' })
@@ -120,6 +123,16 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Order not found' })
     }
 
+    if (customBib !== undefined || customTime !== undefined || creativeDirection !== undefined) {
+      if (existingOrder.trackstarOrderType !== 'custom') {
+        return res.status(400).json({ error: 'Bib, time and creative direction are edited this way on custom orders only' })
+      }
+      const clean = (v, max) => { const t = String(v ?? '').trim().slice(0, max); return t || null }
+      if (customBib !== undefined) updateData.bibNumberCustomer = clean(customBib, 20)
+      if (customTime !== undefined) updateData.timeCustomer = clean(customTime, 20)
+      if (creativeDirection !== undefined) updateData.creativeDirection = clean(creativeDirection, 4000)
+    }
+
     if (approvalEmail !== undefined) {
       if (existingOrder.trackstarOrderType !== 'custom') {
         return res.status(400).json({ error: 'The approval email can only be changed on a custom order' })
@@ -174,7 +187,12 @@ export default async function handler(req, res) {
     // closed, and the order goes back to pending for research on the new year.
     const oldYear = existingOrder.yearOverride ?? existingOrder.raceYear
     const newYear = updateData.yearOverride === undefined ? undefined : (updateData.yearOverride ?? existingOrder.raceYear)
-    if (newYear !== undefined && newYear !== oldYear) {
+    if (newYear !== undefined && newYear !== oldYear && existingOrder.trackstarOrderType === 'custom') {
+      const now = new Date().getFullYear()
+      if (!Number.isInteger(newYear) || newYear < 1900 || newYear > now + 1) {
+        return res.status(400).json({ error: `The year should be between 1900 and ${now + 1}` })
+      }
+    } else if (newYear !== undefined && newYear !== oldYear) {
       const now = new Date().getFullYear()
       if (!Number.isInteger(newYear) || newYear < 1970 || newYear > now + 1) {
         return res.status(400).json({ error: `The year should be between 1970 and ${now + 1}` })
@@ -288,6 +306,12 @@ export default async function handler(req, res) {
     }
 
     // Update the order
+    if (existingOrder.trackstarOrderType === 'custom') {
+      const LABEL = { runnerNameOverride: 'runner', raceNameOverride: 'race', yearOverride: 'year', bibNumberCustomer: 'bib', timeCustomer: 'time', creativeDirection: 'creative direction' }
+      const changed = Object.keys(LABEL).filter(k => k in updateData && updateData[k] !== existingOrder[k])
+      if (changed.length) await recordAudit({ action: 'order.custom-details', summary: `Order ${existingOrder.orderNumber}: ${changed.map(k => LABEL[k]).join(', ')} edited by hand`, detail: { orderNumber: existingOrder.orderNumber, before: Object.fromEntries(changed.map(k => [k, existingOrder[k]])), after: Object.fromEntries(changed.map(k => [k, updateData[k]])) }, actor })
+    }
+
     const order = await prisma.order.update({
       where: { id: existingOrder.id },
       data: updateData

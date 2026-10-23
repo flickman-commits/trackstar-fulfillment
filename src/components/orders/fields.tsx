@@ -303,20 +303,122 @@ export function ApprovalEmailField({ order, onSaved }: { order: Order; onSaved: 
       </div>
     )
   }
+  // Label above, the field full width and the buttons under it: the sidebar is
+  // too narrow for all three on one line.
+  const cancel = () => { setEditing(false); setValue(order.customerEmail || '') }
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between items-center gap-3">
-        <span className="text-body-sm text-off-black/60">Approval email</span>
-        <span className="inline-flex items-center gap-2">
-          <input type="email" autoFocus value={value} onChange={e => setValue(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setEditing(false); setValue(order.customerEmail || '') } }}
-            placeholder="name@example.com" className="w-64 px-2 py-1 text-sm text-right border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20" />
+    <div className="space-y-1.5">
+      <span className="block text-body-sm text-off-black/60">Approval email</span>
+      <input type="email" autoFocus value={value} onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel() }}
+        placeholder="name@example.com" className="w-full min-w-0 px-2 py-1.5 text-sm border border-border-gray rounded bg-white focus:outline-none focus:ring-1 focus:ring-off-black/20" />
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] text-off-black/45">Proof and approval emails go here from now on. The Shopify order is not changed.</p>
+        <span className="inline-flex items-center gap-3 shrink-0">
+          <button type="button" onClick={cancel} className="text-xs text-off-black/50 hover:text-off-black">Cancel</button>
           <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-1 text-xs font-medium text-green-700 disabled:opacity-40"><Check className="w-3.5 h-3.5" /> Save</button>
-          <button type="button" onClick={() => { setEditing(false); setValue(order.customerEmail || '') }} className="text-xs text-off-black/50">Cancel</button>
         </span>
       </div>
-      {err && <p className="text-xs text-red-600 text-right">{err}</p>}
-      <p className="text-[11px] text-off-black/45 text-right">Proof and approval emails go here from now on. The Shopify order is not changed.</p>
+    </div>
+  )
+}
+
+/**
+ * A custom order's design details (runner, race, year, bib, time, creative
+ * direction), editable by hand: orders sometimes come in empty and the
+ * customer sends the details by email afterwards. Runner, race and year are
+ * overrides; the order's own values stay underneath.
+ */
+export function CustomDetailsFields({ order, onSaved, onToast }: {
+  order: Order
+  onSaved: () => Promise<void>
+  onToast: (t: { message: string; type: 'success' | 'error' }) => void
+}) {
+  const initial = () => ({
+    runner: order.effectiveRunnerName || order.runnerName || '',
+    race: order.effectiveRaceName || order.raceName || '',
+    year: String(order.effectiveRaceYear || order.raceYear || ''),
+    bib: order.bibNumberCustomer || '',
+    time: order.timeCustomer || '',
+    direction: order.creativeDirection || '',
+  })
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [values, setValues] = useState(initial)
+  useEffect(() => { setEditing(false) }, [order.id])
+  const set = (k: keyof ReturnType<typeof initial>) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setValues(v => ({ ...v, [k]: e.target.value }))
+
+  const save = async () => {
+    const was = initial()
+    const body: Record<string, string | number | null> = { orderNumber: order.orderNumber }
+    if (values.runner.trim() !== was.runner) body.runnerNameOverride = values.runner.trim() || null
+    if (values.race.trim() !== was.race) body.raceNameOverride = values.race.trim() || null
+    if (values.year.trim() !== was.year) {
+      const y = Number(values.year.trim())
+      if (!Number.isInteger(y) || y < 1900 || y > new Date().getFullYear() + 1) { onToast({ message: 'Enter a four-digit year', type: 'error' }); return }
+      body.yearOverride = y
+    }
+    if (values.bib.trim() !== was.bib) body.customBib = values.bib.trim()
+    if (values.time.trim() !== was.time) body.customTime = values.time.trim()
+    if (values.direction.trim() !== was.direction.trim()) body.creativeDirection = values.direction.trim()
+    if (Object.keys(body).length === 1) { setEditing(false); return }
+    setSaving(true)
+    try {
+      const res = await apiFetch('/api/orders/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Could not save the details') }
+      onToast({ message: 'Details saved', type: 'success' })
+      setEditing(false)
+      await onSaved()
+    } catch (e) {
+      onToast({ message: e instanceof Error ? e.message : 'Could not save the details', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <>
+        <CopyableField label="Runner" value={order.effectiveRunnerName || order.runnerName || 'Unknown'} />
+        <CopyableField label="Race" value={order.effectiveRaceName || order.raceName || 'Custom'} />
+        <CopyableField label="Year" value={String(order.effectiveRaceYear || order.raceYear || 'N/A')} />
+        {order.bibNumberCustomer && <CopyableField label="Bib #" value={order.bibNumberCustomer} />}
+        {order.timeCustomer && <CopyableField label="Time" value={order.timeCustomer} />}
+        <div className="pt-1 flex justify-end">
+          <button onClick={() => { setValues(initial()); setEditing(true) }} className="flex items-center gap-1.5 text-xs font-medium text-off-black/60 hover:text-off-black transition-colors">
+            <Pencil className="w-3 h-3" />
+            Edit details
+          </button>
+        </div>
+      </>
+    )
+  }
+
+  const input = 'w-full min-w-0 px-2 py-1.5 border border-border-gray rounded bg-white text-body-sm focus:outline-none focus:ring-2 focus:ring-off-black/20'
+  const row = (label: string, el: React.ReactNode) => (
+    <label className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3">
+      <span className="text-body-sm text-off-black/60">{label}</span>
+      {el}
+    </label>
+  )
+  return (
+    <div className="space-y-2">
+      {row('Runner', <input autoFocus value={values.runner} onChange={set('runner')} placeholder="Name on the print" className={input} />)}
+      {row('Race', <input value={values.race} onChange={set('race')} placeholder="e.g. Wattuppa Trail Race 50K" className={input} />)}
+      {row('Year', <input value={values.year} onChange={set('year')} inputMode="numeric" maxLength={4} placeholder="2025" className={input} />)}
+      {row('Bib #', <input value={values.bib} onChange={set('bib')} placeholder="Optional" className={input} />)}
+      {row('Time', <input value={values.time} onChange={set('time')} placeholder="e.g. 5:02:05" className={input} />)}
+      <label className="block">
+        <span className="block text-body-sm text-off-black/60 mb-1">Creative direction</span>
+        <textarea value={values.direction} onChange={set('direction')} rows={3} placeholder="What the customer asked for" className={`${input} resize-y`} />
+      </label>
+      <div className="pt-1 flex justify-end gap-2">
+        <button onClick={() => { setValues(initial()); setEditing(false) }} disabled={saving} className="px-3 py-1 text-xs font-medium text-off-black/60 hover:text-off-black disabled:opacity-40">Cancel</button>
+        <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-dark-fill text-white rounded hover:opacity-90 disabled:opacity-50">
+          <Check className="w-3 h-3" />{saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
     </div>
   )
 }
