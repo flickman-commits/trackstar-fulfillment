@@ -6,7 +6,7 @@ import { HelpCircle } from 'lucide-react'
  */
 const ROWS: [string, string][] = [
   ['bg-green-500', 'Ready for review: approve or reject the design'],
-  ['bg-[#4600D6]', 'Attach in Artelo: approved and in the library, attach it to the order item'],
+  ['bg-[#4600D6]', 'Approved: sending to production, held, or waiting to be sent or attached in Artelo'],
   ['bg-red-500', 'Needs action: the script is stuck, the label says why'],
   ['bg-off-black/25', 'Waiting: research, race day, results, a worker or a payment'],
 ]

@@ -10,6 +10,7 @@ import { deliverApproved } from './deliver.js'
 import { markRacePrinted } from '../races/verification.js'
 import { needFromRejection } from './designNeeds.js'
 import { publishBulkPrint } from '../bulk/bulkRender.js'
+import { queueSend } from './arteloSend.js'
 
 /** Copy an approved print to the Drive Orders folder, then upload it to the Artelo library. Never throws. */
 export async function deliverEverywhere(job) {
@@ -25,8 +26,9 @@ export async function deliverEverywhere(job) {
  * locked (printed), other renders of the order waiting for review are closed,
  * and `delivery` is the Drive + Artelo upload, already started, for the caller
  * to keep alive (inBackground) or await. A failed delivery shows on the order
- * and is retried by the import. The order is not completed here: the file
- * still has to be attached to the item in Artelo by hand.
+ * and is retried by the import. Unless `send` is false (Approve only), the
+ * print is queued to go to production after a short hold (arteloSend.js),
+ * which also completes the order.
  * @returns {Promise<{ job: object, delivery: Promise|null }>}
  */
 /**
@@ -34,8 +36,8 @@ export async function deliverEverywhere(job) {
  * file, not in the order's data, so it goes on the designer's list
  * (designNeeds.js). A wrong bib or time stays off it.
  */
-export async function reviewRender({ jobId, decision, note, user, designNeed = false }) {
-  const job = await reviewJob({ jobId, decision, note, reviewerId: user?.id || null })
+export async function reviewRender({ jobId, decision, note, user, designNeed = false, send = true }) {
+  let job = await reviewJob({ jobId, decision, note, reviewerId: user?.id || null })
   if (job.review === 'rejected' && designNeed) {
     const order = await prisma.order.findUnique({ where: { id: job.orderId }, select: { id: true, orderNumber: true, parentOrderNumber: true, lineItemIndex: true, shopifyOrderData: true } })
     await needFromRejection({ job, order: order ? { ...order, name: order.shopifyOrderData?.name || null } : null, note: job.reviewNote || note, actor: user })
@@ -43,12 +45,13 @@ export async function reviewRender({ jobId, decision, note, user, designNeed = f
   let delivery = null
   if (job.review === 'approved') {
     if (job.spec?.raceId) await markRacePrinted(job.spec.raceId)
+    if (send) job = await queueSend(job)
     delivery = deliverEverywhere(job)
     // A bulk runner's approved print is their file on the Artelo bulk sheet.
     const published = publishBulkPrint(job).catch(e => console.error('[render/review] bulk print', job.id, e.message))
     delivery = Promise.all([delivery, published]).then(([d]) => d)
     await prisma.renderJob.updateMany({ where: { orderId: job.orderId, review: 'pending', id: { not: job.id } }, data: { review: 'closed', reviewNote: 'Another version was approved', reviewedAt: new Date() } })
   }
-  await recordAudit({ action: `render.${job.review}`, summary: `${job.review === 'approved' ? 'Approved' : 'Rejected'} the render of ${job.spec?.file || job.orderId} (v${job.version})${job.reviewNote ? `: ${job.reviewNote}` : ''}`, detail: { jobId: job.id, orderId: job.orderId }, actor: user })
+  await recordAudit({ action: `render.${job.review}`, summary: `${job.review === 'approved' ? (job.sendAfter ? 'Approved and queued for production' : 'Approved') : 'Rejected'} the render of ${job.spec?.file || job.orderId} (v${job.version})${job.reviewNote ? `: ${job.reviewNote}` : ''}`, detail: { jobId: job.id, orderId: job.orderId }, actor: user })
   return { job, delivery }
 }

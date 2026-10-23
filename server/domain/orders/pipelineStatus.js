@@ -42,7 +42,7 @@ export async function pipelinesFor(ids) {
       where: { id: { in: ids }, trackstarOrderType: 'standard' },
       include: {
         runnerResearch: { include: { race: true }, orderBy: { createdAt: 'desc' } },
-        renderJobs: { orderBy: { version: 'desc' }, take: 1, select: { status: true, review: true, error: true, reviewNote: true } },
+        renderJobs: { orderBy: { version: 'desc' }, take: 1, select: { status: true, review: true, error: true, reviewNote: true, sendAfter: true, sendHeldAt: true, sendHeldBy: true, sendError: true, arteloSentAt: true } },
       },
       omit: { shopifyOrderData: true, etsyOrderData: true, arteloOrderData: true },
     }),

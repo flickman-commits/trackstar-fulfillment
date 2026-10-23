@@ -6,7 +6,9 @@
  *
  * Five stages, in the order a person cares about them:
  *   review          a design is waiting for a yes or no
- *   attach          approved and in the Artelo library; a person attaches it to the Artelo order item, then marks done
+ *   attach          approved: on its way to Artelo production (arteloSend.js), held, or approved
+ *                   without sending, for a person to send or attach by hand. One Artelo would
+ *                   not take is under action, with Artelo's reason.
  *   action          the script is stuck and a person has to do something (reason says what)
  *   needs_research  no result yet and nothing stops the lookup (brief; the import does it)
  *   waiting         nothing to do until something outside happens (race day, results, a worker, a payment)
@@ -19,6 +21,7 @@
 import { printBlockers } from '../races/verification.js'
 import { isTriathlon, triathlonMissing } from './triathlon.js'
 import { resolveTemplate, SIZES } from '../render/spec.js'
+import { sendStateOf } from '../render/sendState.js'
 
 const RESULT_STATES = new Set(['found'])
 // The oldest race year anyone builds a scraper for (Matt, 2026-10-21).
@@ -41,6 +44,16 @@ function raceRun(race, year) {
  * @param {boolean} p.photoUnpaid
  * @param {boolean} p.workerOnline
  */
+/** An approved print: where it is on the way to production (server/domain/render/sendState.js). */
+function approvedStage(render, stage) {
+  const s = sendStateOf({ ...render, review: 'approved' })
+  if (s?.state === 'held') return stage('attach', 'Held', { fix: `Approved, and held from production${s.by ? ` by ${s.by}` : ''}. Send it to production when it is ready, or attach it in Artelo by hand.` })
+  if (s?.state === 'waiting') return stage('attach', 'Waiting on the other prints', { fix: 'Attached in Artelo. The Artelo order goes to production once every print on it is approved.' })
+  if (s?.state === 'blocked') return stage('action', 'Artelo would not take it', { kind: 'artelo', fix: `${s.reason.replace(/\.$/, '')}. ${s.next ? 'The tool tries again on its own.' : 'Sort it out in Artelo, then Send to production.'}` })
+  if (s?.state === 'queued') return stage('attach', 'Sending to production', { fix: 'Approved. It is attached in Artelo and sent to production in a few minutes, unless someone holds it.' })
+  return stage('attach', 'Attach in Artelo', { fix: 'The print is approved and in the Artelo library (Orders folder), but was not sent. Send it to production, or attach it in Artelo by hand and mark the order done.' })
+}
+
 export function pipelineFor({ order, research, race, render, hasScraper, templates, noTimeGaps, photoUnpaid, workerOnline }) {
   const raceName = order.raceNameOverride ?? order.raceName
   const year = order.yearOverride ?? order.raceYear
@@ -55,7 +68,7 @@ export function pipelineFor({ order, research, race, render, hasScraper, templat
   // A design with no photo window cannot take the customer's photo: that is a hand job, not a failure to retry.
   if (render?.status === 'failed' && /no photo window/i.test(render.error || '')) return stage('action', 'Make by hand', { kind: 'setup', fix: 'This design has no photo window, and the order has a customer photo. Make this design by hand.' })
   if (render?.status === 'failed') return stage('action', 'Render failed', { kind: 'render', fix: `The render failed: ${render.error || 'unknown error'}. Fix the cause; it renders again on its own once the order's data changes, or use Re-render.` })
-  if (render?.status === 'done' && render.review === 'approved') return stage('attach', 'Attach in Artelo', { fix: 'The print is approved and in the Artelo library (Orders folder). Open the Artelo order, attach the file to the item, then mark the order done here.' })
+  if (render?.status === 'done' && render.review === 'approved') return approvedStage(render, stage)
   if (render?.status === 'done' && render.review === 'rejected') return stage('action', 'Design rejected', { kind: 'data', fix: `The design was rejected: ${render.reviewNote || 'no note'}. Fix the data; a new design renders on the next import.` })
 
   // Race and setup problems: things only a person (or a developer) can change.

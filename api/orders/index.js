@@ -203,7 +203,7 @@ export default async function handler(req, res) {
         _count: { select: { comments: true, proofs: true } },
         assignee: { select: { id: true, firstName: true, lastName: true } },
         // The newest render, for the pipeline status.
-        renderJobs: { orderBy: { version: 'desc' }, take: 1, select: { status: true, review: true, error: true, reviewNote: true } },
+        renderJobs: { orderBy: { version: 'desc' }, take: 1, select: { status: true, review: true, error: true, reviewNote: true, sendAfter: true, sendHeldAt: true, sendHeldBy: true, sendError: true, arteloSentAt: true } },
       },
       // The raw Shopify, Etsy and Artelo payloads are about 20MB across all
       // orders and the list reads a handful of keys from them. Pulling them

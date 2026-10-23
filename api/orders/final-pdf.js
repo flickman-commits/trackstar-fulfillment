@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     if (body.action === 'upload-url') return res.status(200).json(await finalPdfUploadUrl({ orderId: body.orderId }))
 
     if (body.action === 'record') {
-      const out = await recordFinalPdf({ orderId: body.orderId, path: body.path, fileName: body.fileName, actor })
+      const out = await recordFinalPdf({ orderId: body.orderId, path: body.path, fileName: body.fileName, actor, send: body.send !== false })
       const order = await prisma.order.findUnique({ where: { id: String(body.orderId) }, select: { orderNumber: true } })
       await recordAudit({
         action: 'order.final-pdf',

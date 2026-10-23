@@ -4,10 +4,10 @@
  * approved RenderJob (spec.kind 'custom_final'), so the Drive Orders folder
  * save (deliver.js) and the Artelo library upload (artelo.js) are the same
  * code, with the same retries on every auto-import. The order then reads
- * Final PDF uploaded and Matt is pinged on Slack: he attaches it to the
- * Artelo order item (designers have no Artelo login), sends it to production
- * and marks the order done (sent_to_production). Nothing completes on its
- * own. Once Artelo has an attach endpoint, that step can be automatic.
+ * Final PDF uploaded and, after a short hold, is attached to its Artelo
+ * order item and sent to production, which completes it (sent_to_production;
+ * server/domain/render/arteloSend.js). With sending switched off, Matt is
+ * pinged on Slack to attach it by hand, as before.
  *
  * The file goes to the private production-files bucket, put there by the
  * browser through a signed upload URL (Vercel caps a request body at 4.5 MB).
@@ -20,6 +20,7 @@ import { setDesignStatus } from './designStatus.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 import { postSlack, slackText } from '../../lib/slack.js'
 import { arteloOrderUrl } from '../../lib/links.js'
+import { queueSend, sendState } from '../render/arteloSend.js'
 
 export class FinalPdfError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; this.expose = true }
@@ -60,7 +61,7 @@ export async function finalPdfUploadUrl({ orderId }) {
  * to Drive and the Artelo library. A second upload supersedes the first (the
  * newest approved version is the one Drive and Artelo keep).
  */
-export async function recordFinalPdf({ orderId, path, fileName, actor = null }) {
+export async function recordFinalPdf({ orderId, path, fileName, actor = null, send = true }) {
   const order = await loadOrder(orderId)
   if (!READY.includes(order.designStatus)) throw new FinalPdfError('Upload the final PDF once the customer has approved the design')
   const p = String(path || '')
@@ -75,7 +76,7 @@ export async function recordFinalPdf({ orderId, path, fileName, actor = null }) 
 
   const last = await prisma.renderJob.findFirst({ where: { orderId: order.id }, orderBy: { version: 'desc' }, select: { version: true } })
   const now = new Date()
-  const job = await prisma.renderJob.create({
+  let job = await prisma.renderJob.create({
     data: {
       orderId: order.id,
       version: (last?.version || 0) + 1,
@@ -93,8 +94,9 @@ export async function recordFinalPdf({ orderId, path, fileName, actor = null }) 
   if (order.designStatus !== 'final_pdf_uploaded') await setDesignStatus(order, 'final_pdf_uploaded', null, actor)
 
   await deliverEverywhere(job)
+  if (send) job = await queueSend(job, { orderType: order.trackstarOrderType })
   const status = await finalPdfStatus(order.id)
-  await pingToAttach(order, status.finalPdf, actor)
+  if (!job.sendAfter) await pingToAttach(order, status.finalPdf, actor)
   return status
 }
 
@@ -135,6 +137,7 @@ export async function finalPdfStatus(orderId) {
       driveError: job.deliveredAt ? null : job.deliveryError || null,
       inArtelo: Boolean(job.arteloUploadedAt),
       arteloError: job.arteloUploadedAt ? null : job.arteloError || null,
+      send: sendState(job),
     },
   }
 }

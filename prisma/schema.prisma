@@ -1074,6 +1074,18 @@ model RenderJob {
   arteloUrl        String?
   arteloUploadedAt DateTime?
   arteloError      String?
+  // Approve sends the print to production (server/domain/render/arteloSend.js):
+  // it waits until sendAfter (a few minutes, so a wrong click can be held),
+  // then is attached to its Artelo order item and the order is sent.
+  // sendError is why Artelo would not take it; sendAfter is then the next try, or null.
+  sendAfter        DateTime?
+  sendHeldAt       DateTime?
+  sendHeldBy       String?
+  arteloItemId     String?
+  arteloAttachedAt DateTime?
+  arteloSentAt     DateTime?
+  sendError        String?
+  sendCheckedAt    DateTime?
   deliveryError String?
   // Set when the race's date or weather changed after this render was made: it needs re-rendering.
   staleReason   String?
@@ -1083,6 +1095,7 @@ model RenderJob {
 
   @@index([orderId, createdAt])
   @@index([status, createdAt])
+  @@index([sendAfter])
 }
 
 /** A render worker that has checked in. Online means seen in the last minute. */

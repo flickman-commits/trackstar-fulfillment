@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowUpRight, Check, ExternalLink, Loader2, RotateCw, Upload, X } from 'lucide-react'
+import { ArrowUpRight, Check, ExternalLink, Loader2, Pause, RotateCw, Send, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 import { btnGhost } from '@/lib/ui'
@@ -7,17 +7,20 @@ import { btnGhost } from '@/lib/ui'
 /**
  * The end of a custom order. Once the customer approves, the designer uploads
  * the final PDF here; the server saves it to the Drive Orders folder and the
- * Artelo library and pings Matt on Slack (server/domain/orders/customFinal.js).
- * Designers have no Artelo login, so the designer's part ends there. An admin
- * then sees Attach in Artelo: open the Artelo order, check the order number,
- * attach the file, send it to production, and mark it complete. Mark complete
- * shows once Attach has been opened, because the attaching is the one step
- * the tool cannot do (until Artelo has an attach endpoint).
+ * Artelo library (server/domain/orders/customFinal.js), and a few minutes
+ * later attaches it to the Artelo order and sends it to production, which
+ * completes the order (server/domain/render/arteloSend.js). Until then anyone
+ * can Hold it. Held, refused by Artelo, or with sending switched off, an
+ * admin sends it from here or attaches it in Artelo by hand and marks it
+ * complete; Mark complete shows once Attach has been opened.
  */
+type Send = { state: 'queued' | 'held' | 'waiting' | 'blocked' | 'sent'; at?: string | null; by?: string | null; reason?: string; next?: string | null }
 type FinalPdf = {
   id: string; fileName: string; uploadedAt: string; pdfUrl: string | null
   driveUrl: string | null; driveError: string | null; inArtelo: boolean; arteloError: string | null
+  send: Send | null
 }
+const clock = (t?: string | null) => t ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''
 
 const openedKey = (id: string) => `custom-final-attach:${id}`
 function readOpened(id: string) { try { return localStorage.getItem(openedKey(id)) === '1' } catch { return false } }
@@ -36,7 +39,7 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
   onComplete: () => void
 }) {
   const [finalPdf, setFinalPdf] = useState<FinalPdf | null | undefined>(undefined)
-  const [busy, setBusy] = useState<'upload' | 'retry' | null>(null)
+  const [busy, setBusy] = useState<'upload' | 'retry' | 'send' | null>(null)
   const [replacing, setReplacing] = useState(false)
   const [opened, setOpened] = useState(false)
   const input = useRef<HTMLInputElement>(null)
@@ -51,6 +54,28 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
     } catch (e) { setFinalPdf(null); toast.error((e as Error).message) }
   }, [orderId])
   useEffect(() => { load() }, [load])
+  // On its way to production: look again every 15 seconds, and refresh the order once it is sent.
+  const sendState = finalPdf?.send?.state
+  useEffect(() => {
+    if (sendState !== 'queued' && sendState !== 'waiting') return
+    const t = setInterval(load, 15000)
+    return () => clearInterval(t)
+  }, [sendState, load])
+  const wasSending = useRef(false)
+  useEffect(() => {
+    if (sendState === 'sent' && wasSending.current) onUploaded()
+    wasSending.current = sendState === 'queued' || sendState === 'waiting'
+  }, [sendState])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sendAction = async (action: 'hold' | 'send-now') => {
+    setBusy('send')
+    try {
+      const res = await apiFetch('/api/orders/artelo-send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, orderId }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'That did not work')
+      await load()
+    } catch (e) { toast.error((e as Error).message) } finally { setBusy(null) }
+  }
   useEffect(() => { setOpened(finalPdf ? readOpened(finalPdf.id) : false) }, [finalPdf?.id])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const post = async (body: Record<string, unknown>) => {
@@ -71,7 +96,8 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
       setFinalPdf(data.finalPdf)
       setReplacing(false)
       const fp = data.finalPdf as FinalPdf | null
-      if (fp?.driveUrl && fp.inArtelo) toast.success('Saved to Drive and the Artelo library. Matt has been pinged to send it to production.')
+      if (fp?.send?.state === 'queued') toast.success(`Saved. It goes to Artelo production at ${clock(fp.send.at)} unless someone holds it.`)
+      else if (fp?.driveUrl && fp.inArtelo) toast.success('Saved to Drive and the Artelo library. Matt has been pinged to send it to production.')
       else toast.warning('Uploaded, but not everywhere yet. See below.')
       onUploaded()
     } catch (e) { toast.error((e as Error).message) } finally {
@@ -135,6 +161,45 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
     </div>
   )
 
+  // On its way: queued (Hold), attached and waiting on the order's other prints, or sent.
+  const send = finalPdf.send
+  if (send && ['queued', 'waiting', 'sent'].includes(send.state)) {
+    return (
+      <div className="space-y-2">
+        {picker}
+        <div className={`rounded-md border px-3 py-2.5 text-[13px] leading-snug text-off-black space-y-2 ${send.state === 'sent' ? 'border-green-200 bg-green-50' : 'border-[#4600D6]/30 bg-[#4600D6]/[0.04]'}`}>
+          <div className="flex items-center gap-3">
+            <p className="flex-1">
+              <span className={`font-semibold mr-1.5 ${send.state === 'sent' ? 'text-green-700' : 'text-[#4600D6]'}`}>
+                {send.state === 'sent' ? `Sent to production ${clock(send.at)}.` : send.state === 'waiting' ? 'Attached in Artelo.' : `Sending to production at ${clock(send.at)}.`}
+              </span>
+              {send.state === 'sent' ? 'Artelo has it as Received.' : send.state === 'waiting' ? 'The Artelo order goes once every print on it is ready.' : <><span className="font-mono">{finalPdf.fileName}</span> is attached to the Artelo order and sent. Hold it if something is wrong.</>}
+            </p>
+            {send.state === 'queued' && (
+              <button onClick={() => sendAction('hold')} disabled={busy !== null} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-white border-2 border-[#4600D6]/30 text-[#4600D6] font-semibold hover:bg-[#4600D6]/[0.04] disabled:opacity-50">
+                {busy === 'send' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />} Hold
+              </button>
+            )}
+          </div>
+          {where}
+        </div>
+        {send.state === 'queued' && <button onClick={() => setReplacing(true)} disabled={busy !== null} className={`${btnGhost} w-full justify-center`}>Upload a different PDF</button>}
+      </div>
+    )
+  }
+  // Held, or Artelo would not take it: say so, and (for whoever can) Send to production.
+  const sendBar = send && (
+    <div className="space-y-2">
+      <div className={`rounded-md border px-3 py-2.5 text-[13px] leading-snug ${send.state === 'blocked' ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+        <span className="font-semibold mr-1.5">{send.state === 'blocked' ? 'Artelo would not take it.' : 'Held.'}</span>
+        {send.state === 'blocked' ? `${send.reason}.${send.next ? ' The tool tries again on its own.' : ''}` : `Held${send.by ? ` by ${send.by}` : ''} ${clock(send.at)}. It does not go to production until someone sends it.`}
+      </div>
+      <button onClick={() => sendAction('send-now')} disabled={busy !== null} className="w-full inline-flex items-center justify-center gap-2 py-4 text-base rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors">
+        {busy === 'send' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />} {send.state === 'blocked' ? 'Try sending again' : 'Send to production'}
+      </button>
+    </div>
+  )
+
   // A designer's part is done: Matt attaches it in Artelo and sends it through.
   if (!canAttach) {
     return (
@@ -143,10 +208,11 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] leading-snug text-off-black space-y-2">
           <p>
             <span className="font-semibold text-emerald-700 mr-1.5">Final PDF uploaded.</span>
-            Matt has been pinged on Slack. He attaches <span className="font-mono">{finalPdf.fileName}</span> to the Artelo order and sends it to production. Nothing else to do here.
+            {send ? 'It has not gone to production yet; see below.' : <>Matt has been pinged on Slack. He attaches <span className="font-mono">{finalPdf.fileName}</span> to the Artelo order and sends it to production. Nothing else to do here.</>}
           </p>
           {where}
         </div>
+        {sendBar}
         <button onClick={() => setReplacing(true)} disabled={busy !== null} className={`${btnGhost} w-full justify-center`}>Upload a different PDF</button>
       </div>
     )
@@ -163,6 +229,12 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
         </p>
         {where}
       </div>
+      {sendBar || (
+        // Uploaded before Approve sent things, or with sending off: send it from here.
+        <button onClick={() => sendAction('send-now')} disabled={busy !== null} className="w-full inline-flex items-center justify-center gap-2 py-4 text-base rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors">
+          {busy === 'send' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />} Send to production
+        </button>
+      )}
 
       <div className={`grid gap-3 ${opened || !arteloOrderUrl ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
         {arteloOrderUrl ? (

@@ -38,6 +38,40 @@ function StateChip({ c }: { c: Connection }) {
   return <span className={`${chip} ${chipTone.teal}`}><CheckCircle2 className="w-3 h-3" />On</span>
 }
 
+/**
+ * Under Artelo: whether Approve sends prints to production
+ * (server/domain/render/arteloSend.js). Off, Approve only uploads to the
+ * library and a person attaches and sends in Artelo, as before.
+ */
+function ArteloAutoSend() {
+  const [on, setOn] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    apiFetch('/api/orders/artelo-send').then(r => r.json()).then(d => setOn(d.on !== false)).catch(() => setOn(null))
+  }, [])
+  if (on === null) return null
+  const flip = async () => {
+    const next = !on
+    if (!next && !window.confirm('Stop sending approved prints to production? Approve will only upload to the Artelo library, and prints waiting to send stay where they are until this is back on.')) return
+    setBusy(true)
+    try {
+      const res = await apiFetch('/api/orders/artelo-send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'setting', on: next }) })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || 'That did not work')
+      setOn(d.on); toast.success(d.on ? 'Approve sends to production' : 'Approve no longer sends to production')
+    } catch (e) { toast.error((e as Error).message) } finally { setBusy(false) }
+  }
+  return (
+    <div className="mt-2 flex items-center gap-2 text-xs text-off-black/70">
+      <button role="switch" aria-checked={on} aria-label="Approve sends to production" disabled={busy} onClick={flip}
+        className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors disabled:opacity-50 ${on ? 'bg-dark-fill' : 'bg-off-black/20'}`}>
+        <span className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[14px]' : 'translate-x-0.5'}`} />
+      </button>
+      Approve sends to production {on ? '(attaches the print and sends the order after a few minutes)' : '(off: attach and send in Artelo by hand)'}
+    </div>
+  )
+}
+
 export default function ConnectionsPanel() {
   const [rows, setRows] = useState<Connection[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -111,6 +145,7 @@ export default function ConnectionsPanel() {
                   {c.note && <> · {c.note}</>}
                   {c.missing.length > 0 && <> · Missing in Vercel: <span className="font-mono">{c.missing.join(', ')}</span></>}
                 </p>
+                {c.id === 'artelo' && c.on && <ArteloAutoSend />}
                 {t && (
                   <p className={`text-[11px] mt-1 ${t.ok ? 'text-teal-700' : 'text-red-600'}`}>
                     {t.ok ? 'Test passed' : 'Test failed'}: {t.detail}{t.ms != null ? ` (${t.ms} ms)` : ''}

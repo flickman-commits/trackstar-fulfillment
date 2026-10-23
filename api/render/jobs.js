@@ -5,7 +5,8 @@
  *
  *   GET  ?orderId=                 can this order be rendered, the latest job, signed file links
  *   POST { action: 'create', orderId }                     queue a render
- *   POST { action: 'review', jobId, decision, note }       approve or reject a finished render
+ *   POST { action: 'review', jobId, decision, note, send }  approve or reject a finished render;
+ *                                                          an approval goes to production unless send is false
  *
  * The rendering itself happens on a Mac with Illustrator (worker/), which
  * talks to api/render/worker.js.
@@ -15,6 +16,7 @@ import { requireCapability, recordAudit, loadActiveUser } from '../_lib/users.js
 import { checkOrder, createJob, latestJob, signedFiles, onlineWorkers } from '../../server/domain/render/jobs.js'
 import { reviewRender, deliverEverywhere } from '../../server/domain/render/review.js'
 import { inBackground } from '../../server/lib/background.js'
+import { autoSendOn, sendState } from '../../server/domain/render/arteloSend.js'
 
 export default async function handler(req, res) {
   if (setCors(req, res, { methods: 'GET, POST, OPTIONS' })) return
@@ -26,7 +28,7 @@ export default async function handler(req, res) {
       if (!(await loadActiveUser(actor))) return res.status(401).json({ error: 'Your account is no longer active. Sign in again.' })
       const orderId = String(req.query?.orderId || '')
       if (!orderId) return res.status(400).json({ error: 'orderId is required' })
-      let [{ ok, reasons }, job, workers] = await Promise.all([checkOrder(orderId), latestJob(orderId), onlineWorkers()])
+      let [{ ok, reasons }, job, workers, autoSend] = await Promise.all([checkOrder(orderId), latestJob(orderId), onlineWorkers(), autoSendOn()])
       // An approved render that did not reach Drive or Artelo is retried on
       // sight, in the background so opening the order never waits on it. The
       // first two minutes after an approval belong to that approval's own
@@ -34,7 +36,7 @@ export default async function handler(req, res) {
       const missing = job && job.review === 'approved' && (!job.deliveredAt || !job.arteloUploadedAt)
       if (missing && (!job.reviewedAt || Date.now() - new Date(job.reviewedAt).getTime() > 120000)) inBackground(deliverEverywhere(job))
       const files = job ? await signedFiles(job) : { pdfUrl: null, previewUrl: null }
-      return res.status(200).json({ eligible: ok, reasons, job: job ? present(job, files) : null, workersOnline: workers.map(w => w.name) })
+      return res.status(200).json({ eligible: ok, reasons, job: job ? present(job, files) : null, workersOnline: workers.map(w => w.name), autoSend })
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -51,7 +53,8 @@ export default async function handler(req, res) {
     if (body.action === 'review') {
       // Drive and the Artelo library take several seconds; the person
       // reviewing does not wait for them (server/domain/render/review.js).
-      const { job, delivery } = await reviewRender({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, user, designNeed: body.designNeed === true })
+      // send: false is Approve only; otherwise an approval goes to production after the hold.
+      const { job, delivery } = await reviewRender({ jobId: String(body.jobId || ''), decision: String(body.decision || ''), note: body.note, user, designNeed: body.designNeed === true, send: body.send !== false })
       if (delivery) inBackground(delivery)
       const files = await signedFiles(job)
       return res.status(200).json({ job: present(job, files) })
@@ -70,6 +73,7 @@ function present(job, files) {
     spec: job.spec, notes: job.notes, error: job.error, createdAt: job.createdAt, finishedAt: job.finishedAt,
     review: job.review, reviewNote: job.reviewNote, reviewedAt: job.reviewedAt, deliveredAt: job.deliveredAt, deliveredPath: job.deliveredPath, deliveryError: job.deliveryError, arteloUploadedAt: job.arteloUploadedAt, arteloUrl: job.arteloUrl, arteloError: job.arteloError, output: job.output || null,
     reviewer: job.reviewer ? `${job.reviewer.firstName} ${job.reviewer.lastName}`.trim() : null,
+    send: sendState(job),
     ...files,
   }
 }

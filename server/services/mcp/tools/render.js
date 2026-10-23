@@ -85,18 +85,25 @@ export const renderTools = [
   {
     name: 'approve_design',
     title: 'Approve design',
-    description: 'Approve the newest render of a standard order. It is copied to Drive and the Artelo library in the background; the order then waits for the file to be attached in Artelo. Does not complete the order.',
+    description: 'Approve the newest render of a standard order, the same as Approve in the order view: it is copied to Drive and the Artelo library, and a few minutes later attached to the Artelo order and SENT TO PRODUCTION (printed and shipped), which completes the order. Pass send: false to approve without sending (the order waits at Attach). Sending can be held from the order view until it goes.',
     scope: 'write',
     cap: 'orders.render',
     readOnly: false,
-    input: { orderNumber: z.string().max(40), item: ITEM, version: VERSION },
-    async handler({ orderNumber, item, version }, { principal }) {
+    input: { orderNumber: z.string().max(40), item: ITEM, version: VERSION, send: z.boolean().optional().describe('False approves without sending to production. Default true.') },
+    async handler({ orderNumber, item, version, send }, { principal }) {
       const { n, job } = await itemAndJob(orderNumber, item)
       reviewable(job, n, version)
-      const { job: done, delivery } = await reviewRender({ jobId: job.id, decision: 'approved', user: principal.user })
+      const { job: done, delivery } = await reviewRender({ jobId: job.id, decision: 'approved', user: principal.user, send: send !== false })
       // Same as the order panel: Drive and Artelo finish after the answer (waitUntil on Vercel).
       if (delivery) inBackground(delivery)
-      return { summary: `Approved the design of ${n} (v${done.version})`, orderNumber: n, version: done.version, review: 'approved', delivery: 'started in the background (Drive, then the Artelo library)', next: 'Attach the file to the item in Artelo, then mark the order done.' }
+      const queued = Boolean(done.sendAfter)
+      return {
+        summary: `Approved the design of ${n} (v${done.version})${queued ? ', queued for production' : ''}`,
+        orderNumber: n, version: done.version, review: 'approved',
+        delivery: 'started in the background (Drive, then the Artelo library)',
+        production: queued ? `goes to Artelo production at ${done.sendAfter.toISOString()} unless held` : 'not sent',
+        next: queued ? 'Nothing; it completes once Artelo has it.' : 'Send it to production from the order view, or attach the file in Artelo and mark the order done.',
+      }
     },
   },
   {

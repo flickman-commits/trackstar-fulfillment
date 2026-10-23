@@ -269,22 +269,26 @@ export default function Dashboard() {
   }, [fetchOrders, loadTeam])
 
   // A review decision changes the order's status ("Ready for review" becomes
-  // "Design rejected" or "Attach in Artelo"). Flip the header at once, then let
-  // the list refresh confirm it from the server.
-  const reviewKey = design.job ? `${design.job.id}:${design.job.review}` : null
+  // "Design rejected" or "Sending to production"), and so do Hold and Send now.
+  // Flip the header at once, then let the list refresh confirm it from the server.
+  const reviewKey = design.job ? `${design.job.id}:${design.job.review}:${design.job.send?.state || ''}` : null
   const prevReviewKey = useRef<string | null>(reviewKey)
   const reviewedOrderId = selectedOrder?.id ?? null  // the design hook follows the open order
   useEffect(() => {
     const prev = prevReviewKey.current
     prevReviewKey.current = reviewKey
     if (!prev || !reviewKey || prev === reviewKey || prev.split(':')[0] !== reviewKey.split(':')[0]) return
-    const review = reviewKey.split(':')[1]
+    const [, review, send] = reviewKey.split(':')
     const note = design.job?.reviewNote
     const pipeline: Order['pipeline'] = review === 'rejected'
       ? { stage: 'action', reason: 'Design rejected', kind: 'data', fix: `The design was rejected: ${note || 'no note'}. Fix the data; a new design renders on the next import.` }
-      : review === 'approved'
-        ? { stage: 'attach', reason: 'Attach in Artelo', fix: 'The print is approved and in the Artelo library (Orders folder). Open the Artelo order, attach the file to the item, then mark the order done here.' }
-        : undefined
+      : review !== 'approved' ? undefined
+      : send === 'sent' ? { stage: 'done', reason: 'Completed' }
+      : send === 'queued' ? { stage: 'attach', reason: 'Sending to production', fix: 'Approved. It is attached in Artelo and sent to production in a few minutes, unless someone holds it.' }
+      : send === 'held' ? { stage: 'attach', reason: 'Held', fix: 'Approved, and held from production. Send it to production when it is ready, or attach it in Artelo by hand.' }
+      : send === 'waiting' ? { stage: 'attach', reason: 'Waiting on the other prints', fix: 'Attached in Artelo. The Artelo order goes to production once every print on it is approved.' }
+      : send === 'blocked' ? { stage: 'action', reason: 'Artelo would not take it', kind: 'artelo', fix: design.job?.send?.reason || 'Artelo refused it.' }
+      : { stage: 'attach', reason: 'Attach in Artelo', fix: 'The print is approved and in the Artelo library (Orders folder), but was not sent. Send it to production, or attach it in Artelo by hand and mark the order done.' }
     if (pipeline) {
       setSelectedOrder(prev => prev && prev.id === reviewedOrderId ? { ...prev, pipeline } : prev)
       setOrders(prev => prev.map(o => o.id === reviewedOrderId ? { ...o, pipeline } : o))

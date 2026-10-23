@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Sparkles, Download, Check, X, RefreshCw, ArrowUpRight } from 'lucide-react'
+import { Loader2, Sparkles, Download, Check, X, RefreshCw, ArrowUpRight, Send, Pause } from 'lucide-react'
 import type { Design } from '@/lib/useDesign'
 import { btnPrimary, btnGhost, inputBase } from '@/lib/ui'
 
@@ -11,6 +11,8 @@ import { btnPrimary, btnGhost, inputBase } from '@/lib/ui'
  * (useDesign) holds the state all three read. "Create Design" queues a
  * render; a Mac with Illustrator (worker/) fills the race template and
  * uploads the PDF; nothing goes to Artelo without a person's approval.
+ * Approve sends the print to production after a short hold
+ * (server/domain/render/arteloSend.js); Approve only leaves it at Attach.
  */
 
 function WorkerDot({ d }: { d: Design }) {
@@ -109,12 +111,50 @@ function looksLikeFileProblem(note: string) {
   return FILE_WORDS.test(note) && !DATA_WORDS.test(note)
 }
 
+// For the first week Approve sends things to production, the first approval
+// of the day in this browser asks once. Storage can be unavailable; then it asks every visit.
+const CONFIRM_UNTIL = '2026-10-31'
+const confirmKey = () => `trackstar:send-confirmed:${new Date().toLocaleDateString('en-CA')}`
+function needsConfirm() {
+  if (new Date().toLocaleDateString('en-CA') > CONFIRM_UNTIL) return false
+  try { return localStorage.getItem(confirmKey()) !== '1' } catch { return true }
+}
+function rememberConfirm() { try { localStorage.setItem(confirmKey(), '1') } catch { /* asks again next visit */ } }
+
+const clock = (t?: string | null) => t ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''
+
+/** An approved print on its way to production: queued (Hold), waiting on the order's other prints, or sent. */
+function SendStatus({ d, compact }: { d: Design; compact: boolean }) {
+  const s = d.job?.send
+  if (!s || !['queued', 'waiting', 'sent'].includes(s.state)) return null
+  const pad = compact ? 'py-3 text-[15px]' : 'py-3.5 text-base'
+  return (
+    <div className={`rounded-md border px-4 ${compact ? 'py-2.5' : 'py-3'} flex items-center gap-3 ${s.state === 'sent' ? 'border-green-200 bg-green-50' : 'border-[#4600D6]/25 bg-[#4600D6]/[0.04]'}`}>
+      {s.state === 'sent' ? <Check className="w-5 h-5 text-green-700 shrink-0" /> : <Send className="w-5 h-5 text-[#4600D6] shrink-0" />}
+      <div className="flex-1 min-w-0">
+        <p className={`font-semibold ${s.state === 'sent' ? 'text-green-800' : 'text-[#4600D6]'}`}>
+          {s.state === 'sent' ? `Sent to production ${clock(s.at)}` : s.state === 'waiting' ? 'Attached in Artelo' : `Sending to production at ${clock(s.at)}`}
+        </p>
+        <p className="text-xs text-off-black/60">
+          {s.state === 'sent' ? 'Artelo has it as Received.' : s.state === 'waiting' ? 'The Artelo order goes once every print on it is approved.' : 'Attached to the Artelo order and sent. Hold it if something is wrong.'}
+        </p>
+      </div>
+      {s.state === 'queued' && d.canManage && (
+        <button onClick={() => { void d.sendAction('hold') }} disabled={d.busy} className={`inline-flex items-center gap-1.5 px-4 ${pad} rounded-md bg-white border-2 border-[#4600D6]/30 text-[#4600D6] font-semibold hover:bg-[#4600D6]/[0.04] disabled:opacity-50`}>
+          {d.busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />} Hold
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = false }: { d: Design; arteloOrderUrl?: string | null; onComplete?: () => void; compact?: boolean }) {
   // compact: the phone's bottom bar, shorter buttons in the same order.
   const pad = compact ? 'py-3 text-[15px]' : 'py-4 text-base'
   const [rejecting, setRejecting] = useState(false)
   const [note, setNote] = useState('')
   const [fileProblem, setFileProblem] = useState<boolean | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const job = d.job
   const [opened, setOpened] = useState(false)
   useEffect(() => { setOpened(job ? readOpened(job.id) : false) }, [job?.id])  // eslint-disable-line react-hooks/exhaustive-deps
@@ -140,7 +180,8 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
   }, [reviewable, compact, d.busy])
   // Once approved, A opens the Artelo order to attach the file (F then marks it
   // complete, from the order view: Dashboard.tsx).
-  const attachable = Boolean(d.visible && job?.status === 'done' && job.review === 'approved' && arteloOrderUrl)
+  const onTheWay = ['queued', 'waiting', 'sent'].includes(job?.send?.state || '')
+  const attachable = Boolean(d.visible && job?.status === 'done' && job.review === 'approved' && arteloOrderUrl && !onTheWay)
   const openArtelo = () => {
     if (!job || !arteloOrderUrl) return
     writeOpened(job.id); setOpened(true)
@@ -162,11 +203,24 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [attachable, arteloOrderUrl, compact])
-  // Approved, and the order is still open: attach the file in Artelo. Mark as
-  // complete appears beside it only once Attach has been clicked, and Attach
-  // stays, because a click is not proof the attaching got done.
+  // Approved and on its way to production: its status, and Hold.
+  if (d.visible && job?.status === 'done' && job.review === 'approved' && onTheWay) return <SendStatus d={d} compact={compact} />
+  // Approved and not sent (Approve only, held, or Artelo would not take it):
+  // Send to production, or attach the file in Artelo by hand. Mark as
+  // complete appears beside Attach only once Attach has been clicked, and
+  // Attach stays, because a click is not proof the attaching got done.
   if (d.visible && job?.status === 'done' && job.review === 'approved' && arteloOrderUrl) {
+    const held = job.send?.state === 'held'
     return (
+      <div className="space-y-2">
+      {d.canManage && d.autoSend && (
+        <>
+          {held && <p className="text-xs text-amber-700">Held{job.send?.by ? ` by ${job.send.by}` : ''} {clock(job.send?.at)}. It stays approved until someone sends it.</p>}
+          <button onClick={() => { void d.sendAction('send-now') }} disabled={d.busy} className={`w-full inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors`}>
+            {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />} {job.send?.state === 'blocked' ? 'Try sending again' : 'Send to production'}
+          </button>
+        </>
+      )}
       <div className={`grid gap-3 ${opened && onComplete ? (compact ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2') : 'grid-cols-1'}`}>
         <a href={arteloOrderUrl} target="_blank" rel="noopener noreferrer" onClick={openArtelo}
           className={`flex items-center justify-center gap-2 ${pad} rounded-md font-semibold transition-opacity ${opened ? 'bg-white border-2 border-[#4600D6]/30 text-[#4600D6] hover:bg-[#4600D6]/[0.04]' : 'bg-[#4600D6] text-white hover:opacity-90'}`}>
@@ -179,6 +233,7 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
             {!compact && <kbd className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">F</kbd>}
           </button>
         )}
+      </div>
       </div>
     )
   }
@@ -204,13 +259,30 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
     )
   }
   // Approve records the decision; the Drive and Artelo uploads run after it on
-  // the server. Nothing opens: the Attach in Artelo button that replaces this
-  // one is the way over, when the person is ready.
-  const approveAndOpen = () => { void d.review('approved') }
-  approveRef.current = approveAndOpen
+  // the server, and a few minutes later the print goes to production (Hold
+  // stops it). Approve only leaves it at Attach, for an order that needs work by hand.
+  const approveAndSend = () => {
+    if (d.autoSend && needsConfirm()) { setConfirming(true); return }
+    void d.review('approved')
+  }
+  approveRef.current = confirming ? () => { rememberConfirm(); setConfirming(false); void d.review('approved') } : approveAndSend
+  if (confirming) {
+    return (
+      <div className="rounded-md border-2 border-green-600/30 bg-green-50 p-4 space-y-3">
+        <p className="text-sm text-green-900"><span className="font-semibold">New: Approve sends this print to production.</span> It is attached to the Artelo order and sent in a few minutes, and the order completes. You can Hold it until then.</p>
+        <div className="flex flex-wrap gap-2">
+          <button autoFocus onClick={() => { rememberConfirm(); setConfirming(false); void d.review('approved') }} disabled={d.busy} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50">
+            <Send className="w-4 h-4" /> Approve &amp; send
+          </button>
+          <button onClick={() => { setConfirming(false); void d.review('approved', undefined, false, false) }} disabled={d.busy} className={btnGhost}>Approve only, don't send</button>
+          <button onClick={() => setConfirming(false)} className={btnGhost}>Cancel</button>
+        </div>
+      </div>
+    )
+  }
   const approve = (
-    <button key="a" onClick={approveAndOpen} disabled={d.busy} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors`}>
-      {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} Approve
+    <button key="a" onClick={approveAndSend} disabled={d.busy} className={`inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors`}>
+      {d.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} {d.autoSend ? (compact ? 'Approve & send' : 'Approve & send to production') : 'Approve'}
       {!compact && <kbd className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-medium opacity-70 font-sans">A</kbd>}
     </button>
   )
@@ -222,8 +294,16 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
   )
   // On a phone Approve is the wide button on the right, under the thumb.
   return (
-    <div className={`grid gap-3 ${compact ? 'grid-cols-[1fr,2fr]' : 'grid-cols-1 sm:grid-cols-2'}`}>
-      {compact ? [reject, approve] : [approve, reject]}
+    <div className="space-y-1.5">
+      <div className={`grid gap-3 ${compact ? 'grid-cols-[1fr,2fr]' : 'grid-cols-1 sm:grid-cols-2'}`}>
+        {compact ? [reject, approve] : [approve, reject]}
+      </div>
+      {d.autoSend && (
+        <p className="text-[11px] text-off-black/50">
+          Goes to Artelo production in a few minutes; you can Hold it until then.{' '}
+          <button onClick={() => { void d.review('approved', undefined, false, false) }} disabled={d.busy} className="underline decoration-dotted underline-offset-2 hover:text-off-black disabled:opacity-40">Approve only, don't send</button>
+        </p>
+      )}
     </div>
   )
 }
