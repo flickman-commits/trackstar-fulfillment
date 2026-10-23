@@ -85,6 +85,10 @@ function LoadMore({ loading, onMore }: { loading: boolean; onMore: () => void })
   )
 }
 
+// 90, not 100: some orders wait on things that are not ours (a customer who
+// does not answer, results not up), and the pauses do not catch all of them.
+const GOAL_PCT = 90
+
 type OnTime = { pct: number; due: number; onTime: number; lateNow: number; oldestLateDays: number | null; lateOrders: string[] }
 
 /**
@@ -95,16 +99,25 @@ type OnTime = { pct: number; due: number; onTime: number; lateNow: number; oldes
  */
 function OnTimeStat({ stat, lateActive, onLate }: { stat: OnTime; lateActive: boolean; onLate: () => void }) {
   const { pct } = stat
-  const color = pct >= 90 ? 'bg-green-500' : pct >= 75 ? 'bg-amber-400' : 'bg-red-400'
+  const color = pct >= GOAL_PCT ? 'bg-green-500' : pct >= 75 ? 'bg-amber-400' : 'bg-red-400'
   return (
     <div className="ml-5 flex items-end gap-5">
       <div className="flex flex-col gap-1" title={`Past 7 days: ${stat.onTime} of the ${stat.due} standard orders whose 2-day deadline came up went out in time. The clock starts at the order, or race day if it was ordered before the race, and pauses while results are not up yet (up to 3 days) and while we wait on the customer's reply.`}>
         <span className="text-xs text-off-black/60 whitespace-nowrap">Out within 2 days</span>
-        <div className="flex items-center gap-2.5">
-          <div className="w-32 h-2 rounded-full bg-off-black/10 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>
-          <span className="text-sm font-semibold text-off-black tabular-nums">{pct}%</span>
+        <div className="flex items-start gap-2.5">
+          <div className="flex flex-col gap-1 pt-1.5">
+            <div className="relative w-32 h-2 rounded-full bg-off-black/10 overflow-hidden">
+              <div className={`h-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} />
+              {/* The goal, marked on the bar. */}
+              <div className="absolute top-0 bottom-0 w-px bg-off-black/40" style={{ left: `${GOAL_PCT}%` }} />
+            </div>
+            <span className="text-[11px] text-off-black/45 whitespace-nowrap">Goal is {GOAL_PCT}%</span>
+          </div>
+          <div className="flex flex-col items-start leading-tight">
+            <span className="text-sm font-semibold text-off-black tabular-nums">{pct}%</span>
+            <span className="text-[11px] text-off-black/45 whitespace-nowrap">past 7d</span>
+          </div>
         </div>
-        <span className="text-[11px] text-off-black/45 whitespace-nowrap">Goal is 100% (past 7d)</span>
       </div>
       <button
         onClick={onLate}
@@ -170,7 +183,7 @@ export default function Dashboard() {
   // Team member and race pickers sit behind a Filters toggle, closed by default.
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
-  // Header stat: share of standard orders out by their 2-day deadline, past 7 days (goal 100%), and the ones late now.
+  // Header stat: share of standard orders out by their 2-day deadline, past 7 days (goal 90%), and the ones late now.
   const [onTime, setOnTime] = useState<OnTime | null>(null)
   // And standard orders sent to production in the last 24 hours. Read again
   // every five minutes while the tab is visible.

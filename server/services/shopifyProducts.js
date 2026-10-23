@@ -12,7 +12,7 @@ import { fetchWithTimeout } from '../lib/fetchWithTimeout.js'
 
 const API_VERSION = '2024-10'
 
-async function shopifyGraphql(query, variables) {
+export async function shopifyGraphql(query, variables) {
   const store = process.env.SHOPIFY_STORE
   if (!store) throw new Error('Missing SHOPIFY_STORE')
   const token = await getShopifyToken()

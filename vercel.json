@@ -33,9 +33,16 @@
     {
       "path": "/api/cron/artelo-send",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/fulfillment-check",
+      "schedule": "7 * * * *"
     }
   ],
   "functions": {
+    "api/cron/fulfillment-check.js": {
+      "maxDuration": 120
+    },
     "api/admin/**/*.js": {
       "maxDuration": 300
     },

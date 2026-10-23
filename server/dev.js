@@ -135,6 +135,7 @@ const routes = [
   { method: 'post',   path: '/api/admin/connections',      handler: '../api/admin/connections.js' },
   { method: 'get',    path: '/api/cron/retention',         handler: '../api/cron/retention.js' },
   { method: 'get',    path: '/api/cron/artelo-send',       handler: '../api/cron/artelo-send.js' },
+  { method: 'get',    path: '/api/cron/fulfillment-check', handler: '../api/cron/fulfillment-check.js' },
   { method: 'get',    path: '/api/public/creator',         handler: '../api/public/creator.js' },
   { method: 'post',   path: '/api/public/creator',         handler: '../api/public/creator.js' },
   { method: 'get',    path: '/api/public/bulk-intake',     handler: '../api/public/bulk-intake.js' },
