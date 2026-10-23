@@ -1064,7 +1064,8 @@ export async function processOrders(options = {}) {
                     }
                   }
 
-                  if (extracted.needsAttention && existing.status === 'pending' && !isCustomOrder(extracted.productTitle)) {
+                  // A year a person set (the year chip) answers it; the order text never will.
+                  if (extracted.needsAttention && existing.status === 'pending' && existing.yearOverride == null && !isCustomOrder(extracted.productTitle)) {
                     updateData.status = 'missing_year'
                     results.needsAttention++
                   }
@@ -1111,7 +1112,8 @@ export async function processOrders(options = {}) {
                     }
                   }
 
-                  if (extracted.needsAttention && existing.status === 'pending' && !isCustomOrder(extracted.productTitle)) {
+                  // A year a person set (the year chip) answers it; the order text never will.
+                  if (extracted.needsAttention && existing.status === 'pending' && existing.yearOverride == null && !isCustomOrder(extracted.productTitle)) {
                     updateData.status = 'missing_year'
                     results.needsAttention++
                   }

@@ -167,6 +167,36 @@ export default async function handler(req, res) {
       updateData.status = 'pending'
     }
 
+    // A new race year (the year chip in the order view). The results, date
+    // and weather all belong to a race year, so what was found for the old
+    // year no longer describes this order: its research rows for other years
+    // are removed (kept in the Activity Log), open designs made from them are
+    // closed, and the order goes back to pending for research on the new year.
+    const oldYear = existingOrder.yearOverride ?? existingOrder.raceYear
+    const newYear = updateData.yearOverride === undefined ? undefined : (updateData.yearOverride ?? existingOrder.raceYear)
+    if (newYear !== undefined && newYear !== oldYear) {
+      const now = new Date().getFullYear()
+      if (!Number.isInteger(newYear) || newYear < 1970 || newYear > now + 1) {
+        return res.status(400).json({ error: `The year should be between 1970 and ${now + 1}` })
+      }
+      if (existingOrder.status === 'completed') {
+        return res.status(400).json({ error: 'This order is completed. A new year on a printed order is a reprint: ask Matt.' })
+      }
+      const sent = await prisma.renderJob.findFirst({ where: { orderId: existingOrder.id, arteloSentAt: { not: null } }, select: { id: true } })
+      if (sent) return res.status(400).json({ error: 'A print of this order has gone to Artelo production already. A new year is a reprint: ask Matt.' })
+      const stale = await prisma.runnerResearch.findMany({
+        where: { orderId: existingOrder.id, race: { year: { not: newYear } } },
+        select: { id: true, bibNumber: true, officialTime: true, officialPace: true, researchStatus: true, source: true, race: { select: { raceName: true, year: true } } },
+      })
+      if (stale.length) await prisma.runnerResearch.deleteMany({ where: { id: { in: stale.map(r => r.id) } } })
+      const closed = await prisma.renderJob.updateMany({ where: { orderId: existingOrder.id, review: { in: ['pending', 'approved'] } }, data: { review: 'closed', reviewNote: `Race year changed to ${newYear}`, reviewedAt: new Date(), sendAfter: null } })
+      if (['ready', 'flagged', 'missing_year'].includes(existingOrder.status)) updateData.status = 'pending'
+      const person = actor?.id ? await prisma.user.findUnique({ where: { id: actor.id }, select: { firstName: true, lastName: true } }) : null
+      const who = [person?.firstName, person?.lastName].filter(Boolean).join(' ') || actor?.email || 'Someone'
+      await prisma.orderComment.create({ data: { orderId: existingOrder.id, text: `Race year changed from ${oldYear || 'none'} to ${newYear}. Research runs again for ${newYear}.`, authorId: actor?.id || null, authorName: who } })
+      await recordAudit({ action: 'order.year', summary: `Order ${existingOrder.orderNumber}: race year ${oldYear || 'none'} to ${newYear}${stale.length ? `, ${stale.length} old result${stale.length === 1 ? '' : 's'} cleared` : ''}${closed.count ? `, ${closed.count} design${closed.count === 1 ? '' : 's'} closed` : ''}`, detail: { orderNumber: existingOrder.orderNumber, before: oldYear, after: newYear, clearedResearch: stale, closedRenders: closed.count }, actor })
+    }
+
     // Update race-level data (weather, date) on the Race record if provided.
     // Edits made from inside the order detail panel write through to the Race
     // table so every order for that race picks up the corrected value.

@@ -99,6 +99,10 @@ export default function OrderDetail({
   const getOrderItemPosition = (o: Order) => orderItemPosition(orders, o)
 
   const [isResearching, setIsResearching] = useState(false)
+  // The race year, set by hand from the Order Details card (a missing or wrong year).
+  const [yearDraft, setYearDraft] = useState<string | null>(null)
+  const [savingYear, setSavingYear] = useState(false)
+  useEffect(() => { setYearDraft(null) }, [selectedOrder?.id])
 
   // Personalization photo: opened on demand, never held as a durable link.
   const [photoError, setPhotoError] = useState<string | null>(null)
@@ -755,6 +759,32 @@ export default function OrderDetail({
   // The inline order view scrolls on its own; each order starts at the top.
   const detailScrollRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => { detailScrollRef.current?.scrollTo(0, 0) }, [selectedOrder?.id])
+
+  // A new race year: the server clears the old year's results and closes
+  // designs made from them, then research runs again for the new year.
+  const saveYear = async () => {
+    if (!selectedOrder || yearDraft == null) return
+    const year = Number(yearDraft)
+    const now = new Date().getFullYear()
+    if (!Number.isInteger(year) || year < 1970 || year > now + 1) { setToast({ message: `Enter a year between 1970 and ${now + 1}`, type: 'error' }); return }
+    // The same year is still worth saving on a "Year missing" order: it confirms it.
+    if (year === Number(selectedOrder.effectiveRaceYear || selectedOrder.raceYear) && selectedOrder.status !== 'missing_year') { setYearDraft(null); return }
+    setSavingYear(true)
+    try {
+      const r = await apiFetch('/api/orders/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderNumber: selectedOrder.orderNumber, yearOverride: year }) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Could not change the year')
+      setYearDraft(null)
+      setSelectedOrder(prev => prev ? { ...prev, effectiveRaceYear: year, status: prev.status === 'completed' ? prev.status : 'pending', bibNumber: undefined, officialTime: undefined, officialPace: undefined, researchStatus: undefined } : prev)
+      setToast({ message: `Year set to ${year}. Researching ${year}…`, type: 'success' })
+      await fetchOrders()
+      await researchOrder(selectedOrder.orderNumber)
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : 'Could not change the year', type: 'error' })
+    } finally {
+      setSavingYear(false)
+    }
+  }
 
   // Research a single order
   const researchOrder = async (orderNumber: string) => {
@@ -1835,13 +1865,39 @@ Thank you!`
                     {/* Race leads as the headline, year rides inline after its last word. */}
                     <h3 className="text-lg font-bold text-off-black leading-tight min-w-0">
                       {selectedOrder.effectiveRaceName || selectedOrder.raceName || 'Unknown Race'}{' '}
-                      <span className={`inline-flex items-center px-2 py-0.5 border rounded text-xs font-semibold align-middle whitespace-nowrap ${
-                        (selectedOrder.effectiveRaceYear || selectedOrder.raceYear)
-                          ? 'bg-white border-border-gray text-off-black'
-                          : 'bg-amber-50 border-amber-200 text-warning-amber'
-                      }`}>
-                        {selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'Year?'}
-                      </span>
+                      {yearDraft != null ? (
+                        <span className="inline-flex items-center gap-1 align-middle">
+                          <input
+                            autoFocus
+                            type="number"
+                            inputMode="numeric"
+                            value={yearDraft}
+                            onChange={e => setYearDraft(e.target.value.slice(0, 4))}
+                            onKeyDown={e => { if (e.key === 'Enter') saveYear(); if (e.key === 'Escape') setYearDraft(null) }}
+                            disabled={savingYear}
+                            className="w-[4.5rem] px-1.5 py-0.5 border border-off-black/30 rounded text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-off-black/10"
+                            aria-label="Race year"
+                          />
+                          <button onClick={saveYear} disabled={savingYear} title="Save the year and research again" className="p-1 rounded text-green-700 hover:bg-green-50 disabled:opacity-50">
+                            {savingYear ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                          </button>
+                          <button onClick={() => setYearDraft(null)} disabled={savingYear} title="Cancel" className="p-1 rounded text-off-black/45 hover:bg-off-black/5"><X className="w-3.5 h-3.5" /></button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setYearDraft(String(selectedOrder.effectiveRaceYear || selectedOrder.raceYear || new Date().getFullYear()))}
+                          disabled={selectedOrder.status === 'completed'}
+                          title={selectedOrder.status === 'completed' ? 'Completed orders keep their year' : 'Change the race year. The old year\'s results are cleared and research runs again.'}
+                          className={`group inline-flex items-center gap-1 px-2 py-0.5 border rounded text-xs font-semibold align-middle whitespace-nowrap transition-colors disabled:cursor-default ${
+                            (selectedOrder.effectiveRaceYear || selectedOrder.raceYear)
+                              ? 'bg-white border-border-gray text-off-black enabled:hover:border-off-black/40'
+                              : 'bg-amber-50 border-amber-200 text-warning-amber enabled:hover:border-amber-400'
+                          }`}
+                        >
+                          {selectedOrder.effectiveRaceYear || selectedOrder.raceYear || 'Set year'}
+                          {selectedOrder.status !== 'completed' && <Pencil className="w-3 h-3 opacity-40 group-hover:opacity-80" />}
+                        </button>
+                      )}
                     </h3>
                     {/* A Shopify product the catalog does not know yet. */}
                     {selectedOrder.productInfo?.catalogRequired && !selectedOrder.productInfo.inCatalog && (

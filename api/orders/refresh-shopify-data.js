@@ -88,7 +88,8 @@ async function refreshOrderFromShopify(shopifyOrderId) {
         hadNoTime: lineItemData.hadNoTime || false,
         notes: notes || existing.notes,
         shopifyOrderData: shopifyOrder,
-        status: lineItemData.needsAttention ? 'missing_year' : existing.status === 'missing_year' ? 'pending' : existing.status,
+        // A year a person set answers the missing year; the order text never will.
+        status: lineItemData.needsAttention && existing.yearOverride == null ? 'missing_year' : existing.status === 'missing_year' ? 'pending' : existing.status,
         // Widget / Easify parity fields
         customerBib: lineItemData.customerBib,
         customerFinishTime: lineItemData.customerFinishTime,
