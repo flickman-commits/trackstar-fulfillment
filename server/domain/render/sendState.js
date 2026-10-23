@@ -7,10 +7,13 @@
  *   held     a person held it
  *   waiting  attached; the Artelo order has other prints still to come
  *   blocked  Artelo would not take it; under Action with the reason
+ *   manual   expedited shipping: the API only sends Standard, so a person
+ *            attaches it and picks the faster shipping in Artelo
  *   sent     Artelo has it
  *   null     approved without sending (Approve only, or before Approve sent things)
  */
 export const WAITING = 'Waiting on the other prints'
+export const EXPEDITED = 'Expedited shipping'
 
 // Waits that clear on their own within minutes: still "Sending to production", not a problem.
 const PASSING = /^(Artelo is still processing|Artelo has not imported this order yet|The print is not in the Artelo library yet|Could not reach Artelo: (?!.*\b40[13]\b))/
@@ -20,6 +23,7 @@ export function sendStateOf(job) {
   if (!job || job.review !== 'approved') return null
   if (job.arteloSentAt) return { state: 'sent', at: job.arteloSentAt }
   if (job.sendHeldAt) return { state: 'held', at: job.sendHeldAt, by: job.sendHeldBy || null }
+  if (job.sendError && job.sendError.startsWith(EXPEDITED)) return { state: 'manual', reason: job.sendError }
   if (job.sendError && job.sendError.startsWith(WAITING)) return { state: 'waiting', reason: job.sendError, next: job.sendAfter }
   if (job.sendError && job.sendAfter && PASSING.test(job.sendError)) return { state: 'queued', at: job.sendAfter, reason: job.sendError }
   if (job.sendError) return { state: 'blocked', reason: job.sendError, next: job.sendAfter }

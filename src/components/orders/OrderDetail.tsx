@@ -2134,8 +2134,9 @@ Thank you!`
               {commentsCallout()}
 
               {/* Expedited shipping steps. The tag says it is expedited; this
-                  block is the instructions. Artelo lets us choose the label on
-                  the order now, under $40 (what the customer pays for it). */}
+                  block is the instructions. Artelo's API only sends Standard,
+                  so the sender skips these (arteloSend.js) and a person picks
+                  the label in Artelo, under $40 (what the customer pays). */}
               {selectedOrder.isExpedited && (
                 <div className="bg-red-50 border-2 border-red-300 rounded-md p-4 mb-3">
                   <div className="flex items-center gap-2 mb-2">
@@ -2146,11 +2147,12 @@ Thank you!`
                     <p>The customer paid for <strong>{selectedOrder.shippingMethod || 'expedited'}</strong> shipping.</p>
                     <ol className="list-decimal list-inside space-y-1 pl-1">
                       <li>Double-check that all personalization fields are filled in correctly.</li>
-                      <li>Send it to production right away. No need to wait for Matt's approval.</li>
+                      <li>Approve the design right away. No need to wait for Matt. The tool does not send expedited orders on its own: Artelo only sends Standard shipping from here.</li>
                       <li>
-                        In the Artelo order, under <strong>Shipping</strong>, click <strong>Change shipping method</strong> and pick <strong>UPS Next Day Air Saver</strong>, as long as it is <strong>under $40</strong> (what the customer paid).
+                        <strong>Manually attach and add expedited shipping to this order</strong> in Artelo: attach the print, then under <strong>Shipping</strong> click <strong>Change shipping method</strong> and pick <strong>UPS Next Day Air Saver</strong>, as long as it is <strong>under $40</strong> (what the customer paid).
                         If it is $40 or more, pick the fastest option under $40, and tell Matt if there is none.
                       </li>
+                      <li>Send it to production in Artelo, then mark it complete here.</li>
                     </ol>
                   </div>
                 </div>

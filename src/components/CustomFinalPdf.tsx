@@ -14,7 +14,7 @@ import { btnGhost } from '@/lib/ui'
  * admin sends it from here or attaches it in Artelo by hand and marks it
  * complete; Mark complete shows once Attach has been opened.
  */
-type Send = { state: 'queued' | 'held' | 'waiting' | 'blocked' | 'sent'; at?: string | null; by?: string | null; reason?: string; next?: string | null }
+type Send = { state: 'queued' | 'held' | 'waiting' | 'blocked' | 'manual' | 'sent'; at?: string | null; by?: string | null; reason?: string; next?: string | null }
 type FinalPdf = {
   id: string; fileName: string; uploadedAt: string; pdfUrl: string | null
   driveUrl: string | null; driveError: string | null; inArtelo: boolean; arteloError: string | null
@@ -188,7 +188,12 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
     )
   }
   // Held, or Artelo would not take it: say so, and (for whoever can) Send to production.
-  const sendBar = send && (
+  const sendBar = send && (send.state === 'manual' ? (
+    <div className="rounded-md border-2 border-red-300 bg-red-50 px-3 py-2.5 text-[13px] leading-snug text-red-800">
+      <span className="font-semibold mr-1.5">Manually attach and add expedited shipping to this order.</span>
+      It was not sent: Artelo only sends Standard shipping from here. Attach it in Artelo, change the shipping method, send it to production, then mark it complete.
+    </div>
+  ) : (
     <div className="space-y-2">
       <div className={`rounded-md border px-3 py-2.5 text-[13px] leading-snug ${send.state === 'blocked' ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
         <span className="font-semibold mr-1.5">{send.state === 'blocked' ? 'Artelo would not take it.' : 'Held.'}</span>
@@ -198,7 +203,7 @@ export default function CustomFinalPdf({ orderId, displayOrderNumber, fileName, 
         {busy === 'send' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />} {send.state === 'blocked' ? 'Try sending again' : 'Send to production'}
       </button>
     </div>
-  )
+  ))
 
   // A designer's part is done: Matt attaches it in Artelo and sends it through.
   if (!canAttach) {

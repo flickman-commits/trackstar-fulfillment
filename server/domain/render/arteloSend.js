@@ -21,6 +21,11 @@
  * processing, the order not imported yet, a payment) are tried again later;
  * the rest wait for a person, who can Send now once it is fixed.
  *
+ * Expedited orders are not sent either: send-to-production always ships
+ * Standard and the API has no way to pick a faster service, so the file goes
+ * to the library and the order waits for a person to attach it and change the
+ * shipping in Artelo (shown as "manual", under Action).
+ *
  * Bulk and partner orders are not sent this way. Sending can be switched off
  * (Settings > Connections > Artelo, auto-send); approving then only uploads
  * to the library, as before.
@@ -33,7 +38,8 @@ import { setDesignStatus } from '../orders/designStatus.js'
 import { unpaidPhotoRows } from '../orders/photoPayment.js'
 import { postSlack, slackText } from '../../lib/slack.js'
 import { arteloOrderUrl } from '../../lib/links.js'
-import { sendStateOf, WAITING } from './sendState.js'
+import { sendStateOf, WAITING, EXPEDITED } from './sendState.js'
+import { isExpeditedShipping } from '../../lib/shipping.js'
 
 export const SEND_TYPES = ['standard', 'custom']
 const OFF_KEY = 'artelo_auto_send_off'
@@ -217,6 +223,9 @@ export async function sendOne(job) {
     const upload = await call('uploads/files/get-by-id', { query: { id: job.arteloUploadId } })
     if (upload?.status === 'Pending') return outcome(job, { error: 'Artelo is still processing the file', retryIn: 1 })
     if (upload?.status === 'Deleted') return outcome(job, { error: 'Artelo rejected the file in its library', notify: true })
+
+    // Artelo's API only sends Standard shipping: a person attaches it and picks the faster service.
+    if (isExpeditedShipping(order.shopifyOrderData)) return outcome(job, { error: `${EXPEDITED}: manually attach and add expedited shipping to this order in Artelo, then mark it complete`, notify: true })
 
     const arteloId = order.arteloOrderData?.id
     if (!arteloId) return outcome(job, { error: 'Artelo has not imported this order yet', retryIn: 10 })

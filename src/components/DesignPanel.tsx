@@ -211,9 +211,17 @@ export function DesignReview({ d, arteloOrderUrl = null, onComplete, compact = f
   // Attach stays, because a click is not proof the attaching got done.
   if (d.visible && job?.status === 'done' && job.review === 'approved' && arteloOrderUrl) {
     const held = job.send?.state === 'held'
+    // Expedited: the API only sends Standard shipping, so this one is attached by hand.
+    const manual = job.send?.state === 'manual'
     return (
       <div className="space-y-2">
-      {d.canManage && d.autoSend && (
+      {manual && (
+        <div className="rounded-md border-2 border-red-300 bg-red-50 px-3 py-2.5 text-[13px] leading-snug text-red-800">
+          <span className="font-semibold mr-1.5">Manually attach and add expedited shipping to this order.</span>
+          It was not sent: Artelo only sends Standard shipping from here. Attach it in Artelo, change the shipping method, send it to production, then mark it complete.
+        </div>
+      )}
+      {d.canManage && d.autoSend && !manual && (
         <>
           {held && <p className="text-xs text-amber-700">Held{job.send?.by ? ` by ${job.send.by}` : ''} {clock(job.send?.at)}. It stays approved until someone sends it.</p>}
           <button onClick={() => { void d.sendAction('send-now') }} disabled={d.busy} className={`w-full inline-flex items-center justify-center gap-2 ${pad} rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors`}>
