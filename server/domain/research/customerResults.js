@@ -15,6 +15,7 @@
  */
 import prisma from '../../db.js'
 import { ResearchService } from '../../services/ResearchService.js'
+import { paceFromTypedTime } from './customerPace.js'
 
 export async function ordersMissingCustomerResult(limit = 500) {
   return prisma.order.findMany({
@@ -53,6 +54,33 @@ export async function applyCustomerResults({ dryRun = false, limit = 500, log = 
       out.rows.push({ ...row, result: `failed: ${e.message}` })
       log(`FAILED ${o.orderNumber}: ${e.message}`)
     }
+  }
+  return out
+}
+
+/**
+ * A result the customer typed, saved before its pace could be worked out
+ * ("2:47" with no seconds, "3:28:17.1"): fill the pace in from their time
+ * (customerPace.js), so the order can render. Their time is not touched.
+ * Runs on every auto-import; the backfill script runs it by hand.
+ * @param {{ dryRun?: boolean, limit?: number, log?: (s: string) => void }} opts
+ */
+export async function fillCustomerPace({ dryRun = false, limit = 500, log = () => {} } = {}) {
+  const rows = await prisma.runnerResearch.findMany({
+    where: { source: { in: ['customer_supplied', 'customer_verified'] }, researchStatus: 'found', officialPace: null, officialTime: { not: null } },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+    select: { id: true, officialTime: true, eventType: true, researchNotes: true, order: { select: { orderNumber: true, customerEventType: true } } },
+  })
+  const out = { checked: rows.length, filled: 0, rows: [] }
+  for (const r of rows) {
+    const pace = paceFromTypedTime(r.officialTime, r.eventType || r.order?.customerEventType)
+    if (!pace) continue
+    out.rows.push({ orderNumber: r.order?.orderNumber, time: r.officialTime, pace })
+    log(`${dryRun ? 'would fill' : 'filled'} ${r.order?.orderNumber}: ${r.officialTime} -> ${pace}/mi`)
+    if (dryRun) continue
+    await prisma.runnerResearch.update({ where: { id: r.id }, data: { officialPace: pace, researchNotes: `${r.researchNotes ? `${r.researchNotes} ` : ''}Pace ${pace} calculated from their time.` } })
+    out.filled++
   }
   return out
 }

@@ -12,7 +12,7 @@ import { isCronRequest } from '../_lib/auth.js'
 import { processOrders } from '../../server/processOrders.js'
 import { runLockedImport } from '../../server/lib/importStamp.js'
 import { syncShopifyBulkOrders } from '../../server/domain/bulk/shopifyBulk.js'
-import { applyCustomerResults } from '../../server/domain/research/customerResults.js'
+import { applyCustomerResults, fillCustomerPace } from '../../server/domain/research/customerResults.js'
 import { autoResearchNew, autoResearchAfterRace } from '../../server/domain/research/autoResearch.js'
 import { autoQueueRenders } from '../../server/domain/render/jobs.js'
 import { deliverPending } from '../../server/domain/render/deliver.js'
@@ -31,6 +31,8 @@ export default async function handler(req, res) {
       if (imported.imported) console.log(`[orders.auto-import] imported ${imported.imported}, updated ${imported.updated || 0}`)
       const applied = await applyCustomerResults({ limit: 100 }).catch(err => { console.error('[orders.auto-import] customer results failed:', err.message); return null })
       if (applied?.found) console.log(`[orders.auto-import] customer results: ${applied.applied} recorded, ${applied.failed} failed`)
+      const paced = await fillCustomerPace({ limit: 100 }).catch(err => { console.error('[orders.auto-import] customer pace failed:', err.message); return null })
+      if (paced?.filled) console.log(`[orders.auto-import] customer pace filled for ${paced.filled}`)
       const researched = await autoResearchNew({ since: started }).catch(err => { console.error('[orders.auto-import] auto research failed:', err.message); return null })
       if (researched?.researched || researched?.failed) console.log(`[orders.auto-import] researched ${researched.researched} (${researched.found} found), ${researched.failed} errors: ${researched.orders.join(', ')}`)
       // Orders that came in before their race, now that results should be posted.

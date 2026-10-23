@@ -9,7 +9,7 @@
  *   - Bib number, finish time, pace
  *   - Stored in RunnerResearch table
  */
-import { BaseScraper } from '../scrapers/BaseScraper.js'
+import { paceFromTypedTime } from '../domain/research/customerPace.js'
 import prisma from '../db.js'
 import { getScraperForRace, hasScraperForRace, getCanonicalRaceName, namedEventsFor } from '../scrapers/index.js'
 import { ensureOverridesLoaded } from '../scrapers/scraperOverrides.js'
@@ -312,22 +312,9 @@ export class ResearchService {
     }
 
     // A customer who typed a time but no pace gets the pace worked out from
-    // their time and the event's distance, the same math as the pace tool and
-    // the scrapers (time / distance, rounded to the second). Their time is used
-    // exactly as given; only the missing pace is filled in.
-    const EVENT_MILES = { marathon: 26.2, 'half marathon': 13.1, half: 13.1, '10 mile': 10, '10 miler': 10, '10k': 6.2137, '8k': 4.9710, '5k': 3.1069 }
-    const eventMiles = EVENT_MILES[String(order.customerEventType || 'marathon').trim().toLowerCase()] || null
-    // Only a full H:MM:SS time, and only a pace a person could run (4:00 to
-    // 20:00 a mile): "5:35" is ambiguous and 1:18:46 for a marathon is a typo
-    // or a half, so those stay blank for a person to look at.
-    const typed = String(order.customerFinishTime || '').trim()
-    let derivedPace = !order.customerPace && /^\d{1,2}:\d{2}:\d{2}$/.test(typed) && eventMiles
-      ? BaseScraper.prototype.calculatePace.call(null, typed, eventMiles)
-      : null
-    if (derivedPace) {
-      const [m, sec] = derivedPace.split(':').map(Number)
-      if (m * 60 + sec < 240 || m * 60 + sec > 1200) derivedPace = null
-    }
+    // their time and the event's distance (customerPace.js). Their time is
+    // used exactly as given; only the missing pace is filled in.
+    const derivedPace = order.customerPace ? null : paceFromTypedTime(order.customerFinishTime, order.customerEventType)
 
     // TIER 2 (replaced): write the customer-confirmed result.
     const researchData = {
