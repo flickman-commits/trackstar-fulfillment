@@ -2858,15 +2858,6 @@ Thank you!`
 
               {/* Main action */}
               <div>
-              {/* The one step the tool cannot do: attaching the file to the item in Artelo. */}
-              {selectedOrder.pipeline?.stage === 'attach' && (
-                <div className="rounded-md border border-[#4600D6]/30 bg-[#4600D6]/[0.04] px-3 py-2.5 text-[13px] leading-snug text-off-black">
-                  <span className="font-semibold text-[#4600D6] mr-1.5">Attach in Artelo.</span>
-                  The approved print is in the Artelo library under Orders as <span className="font-mono">{generateFilename(selectedOrder)}</span>.
-                  Attach it to the item in the Artelo order, then mark the order complete.
-                </div>
-              )}
-
               {/* Actions */}
               <div className="flex gap-3 pt-3">
                 {/* Mark as Completed is always available (except for already-
