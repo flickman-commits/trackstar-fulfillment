@@ -17,7 +17,7 @@
  * the panel links straight to the right Shopify page for them.
  */
 import prisma from '../../db.js'
-import { shopifyGraphQL, shopifyFetch } from '../../services/shopifyAuth.js'
+import { shopifyGraphQL } from '../../services/shopifyAuth.js'
 import { appBaseUrl, arteloOrderUrl } from '../../lib/links.js'
 import { setStatus } from './threads.js'
 import { UserError } from './errors.js'
@@ -167,7 +167,16 @@ export async function fixPersonalization({ thread, orderId, runnerName, year, ac
  * reads orders and manages uploads only), so the address is handed back
  * formatted for pasting, with the Artelo order's link, and the thread says
  * plainly that Artelo still needs it until someone confirms it there.
+ *
+ * Since API version 2026-10 Shopify recalculates an unfulfilled order's tax
+ * when its ship-to changes (a new state can mean a new rate), so a paid order
+ * can come out owing a little or owed a little. The balance is read before
+ * and after, and any change is told to the rep and written on the thread.
+ * Nothing moves money here: settling it is the rep's call, through Refund or
+ * a note to the customer.
  */
+const ORDER_BALANCE = `query($id: ID!) { order(id: $id) { name displayFulfillmentStatus totalOutstandingSet { shopMoney { amount } } totalTaxSet { shopMoney { amount } } } }`
+const ADDRESS_VERSION = '2026-10'
 const ADDRESS_FIELDS = ['name', 'address1', 'address2', 'city', 'province', 'zip', 'country', 'phone']
 export function formatAddress(a) {
   return [a.name, a.address1, a.address2, [a.city, a.province, a.zip].filter(Boolean).join(' '), a.country].filter(Boolean).join('\n')
@@ -184,16 +193,24 @@ export async function shippingAddress({ thread, shopifyOrderId, address, actor }
   const rows = await prisma.order.findMany({ where: { source: 'shopify', parentOrderNumber: id }, select: { id: true, status: true, designStatus: true, trackingNumber: true, arteloOrderData: true, shopifyOrderData: true } })
   if (rows.some(r => r.trackingNumber)) throw new UserError('That order has shipped. Ask Matt; it is a reship now, not an address change.')
 
-  const { order } = await shopifyFetch(`/orders/${id}.json?fields=id,name,fulfillment_status`)
-  if (order.fulfillment_status === 'fulfilled') throw new UserError('Shopify says that order is fulfilled already. Ask Matt; it is a reship now.')
+  const gid = `gid://shopify/Order/${id}`
+  const before = (await shopifyGraphQL(ORDER_BALANCE, { id: gid }, { version: ADDRESS_VERSION }))?.order
+  if (!before) throw new UserError('Shopify has no such order')
+  if (before.displayFulfillmentStatus === 'FULFILLED') throw new UserError('Shopify says that order is fulfilled already. Ask Matt; it is a reship now.')
   const [first, ...last] = a.name.split(/\s+/)
-  await shopifyFetch(`/orders/${id}.json`, {
-    method: 'PUT',
-    body: JSON.stringify({ order: { id: Number(id), shipping_address: {
-      first_name: first, last_name: last.join(' '), address1: a.address1, address2: a.address2 || null, city: a.city,
-      province_code: a.province || null, zip: a.zip, country_code: a.country, phone: a.phone || null,
-    } } }),
-  })
+  const updated = await shopifyGraphQL(`mutation($input: OrderInput!) { orderUpdate(input: $input) { order { id } userErrors { field message } } }`, { input: { id: gid, shippingAddress: {
+    firstName: first, lastName: last.join(' '), address1: a.address1, address2: a.address2 || null, city: a.city,
+    provinceCode: a.province || null, zip: a.zip, countryCode: a.country, phone: a.phone || null,
+  } } }, { version: ADDRESS_VERSION })
+  const errors = updated?.orderUpdate?.userErrors || []
+  if (errors.length) throw new UserError(`Shopify would not take that address: ${errors.map(e => e.message).join('; ')}`)
+  const order = { name: before.name }
+  const after = (await shopifyGraphQL(ORDER_BALANCE, { id: gid }, { version: ADDRESS_VERSION }).catch(() => null))?.order
+  // Positive: the customer owes us; negative: we owe them.
+  const owedCents = after ? toCents(after.totalOutstandingSet.shopMoney.amount) - toCents(before.totalOutstandingSet.shopMoney.amount) : 0
+  const taxNote = !owedCents ? null
+    : owedCents > 0 ? `Shopify recalculated tax for the new address: the customer now owes ${money(owedCents)}. Decide whether to let it go or ask for it.`
+    : `Shopify recalculated tax for the new address: the customer is owed ${money(-owedCents)}. Refund it from Refund below.`
 
   const ours = { name: a.name, line1: a.address1, line2: a.address2, city: a.city, state: a.province, zip: a.zip, country: a.country, phone: a.phone }
   const number = String(order.name || rows[0]?.shopifyOrderData?.name || id).replace(/^#/, '')
@@ -202,8 +219,8 @@ export async function shippingAddress({ thread, shopifyOrderId, address, actor }
     await prisma.order.updateMany({ where: { id: { in: rows.map(r => r.id) } }, data: { shippingAddress: ours } })
     await prisma.orderComment.createMany({ data: rows.map(r => ({ orderId: r.id, text: `Ship-to changed by support to: ${pasted.replace(/\n/g, ', ')}. Change it in Artelo too.`, authorId: actor?.id || null, authorName: actorName(actor) })) })
   }
-  await event(thread.id, `${actorName(actor)} changed #${number}'s ship-to in Shopify to ${pasted.replace(/\n/g, ', ')}. Artelo still needs it.`, actor)
-  return { number, address: a, pasted, arteloUrl: arteloOrderUrl(rows[0]?.arteloOrderData?.id) || null }
+  await event(thread.id, `${actorName(actor)} changed #${number}'s ship-to in Shopify to ${pasted.replace(/\n/g, ', ')}. Artelo still needs it.${taxNote ? ` ${taxNote}` : ''}`, actor)
+  return { number, address: a, pasted, taxNote, arteloUrl: arteloOrderUrl(rows[0]?.arteloOrderData?.id) || null }
 }
 
 // ---------------------------------------------------------------------------

@@ -10,18 +10,17 @@
  * the best seller, sold nothing for three days. Who does it is not known yet
  * (not this app: it has no inventory scopes; Artelo is the likeliest writer).
  *
- * Two ways to look, whichever the Shopify app's scopes allow:
- *   exact       with read_inventory + read_locations: every variant with a SKU
- *               on an active product must be active at the Artelo location.
- *               This is the failure itself.
- *   storefront  without them: every variant on the public product feed
- *               (/products/<handle>.js) must read available. The symptom; it
- *               only sees active, published products.
+ * The check: every variant with a SKU on an active product must be active at
+ * the Artelo location. That is the failure itself; the storefront does not
+ * show it (a disconnected variant still reads available there). Reading
+ * assignments needs read_inventory and read_locations on the Shopify app;
+ * without them the run fails and says so, rather than passing as clean.
  * Variants with no SKU (Photo Add-On, gift cards, fees) are not prints and are
  * skipped. A variant sold elsewhere on purpose goes in IGNORE_SKUS.
  */
 import prisma from '../../db.js'
 import { shopifyGraphql } from '../../services/shopifyProducts.js'
+import { clearTokenCache } from '../../services/shopifyAuth.js'
 import { isConnectionOn } from '../../lib/connections.js'
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout.js'
 
@@ -60,34 +59,6 @@ async function exactCheck() {
   }
 }
 
-/** Variants the storefront shows as sold out, on active products. */
-async function storefrontCheck() {
-  const handles = []
-  let cursor = null
-  for (;;) {
-    const data = await shopifyGraphql(`query($cursor: String) {
-      products(first: 100, after: $cursor, query: "status:active") { pageInfo { hasNextPage endCursor } nodes { title handle } }
-    }`, { cursor })
-    handles.push(...data.products.nodes)
-    if (!data.products.pageInfo.hasNextPage) break
-    cursor = data.products.pageInfo.endCursor
-  }
-  const out = []
-  out.checked = 0
-  for (const p of handles) {
-    const res = await fetchWithTimeout(`https://${process.env.SHOPIFY_STORE}/products/${p.handle}.js`, {}, 15000).catch(() => null)
-    if (!res?.ok) continue  // unpublished from the online store, or a blip: nothing to say
-    const j = await res.json().catch(() => null)
-    for (const v of j?.variants || []) {
-      if (!v.sku || IGNORE_SKUS.has(v.sku)) continue
-      out.checked++
-      if (v.available) continue
-      out.push({ id: `gid://shopify/ProductVariant/${v.id}`, sku: v.sku, product: p.title, variant: v.title, handle: p.handle, detail: 'shows sold out on the storefront' })
-    }
-  }
-  return out
-}
-
 async function post(text) {
   const url = process.env.SLACK_PROOF_WEBHOOK_URL
   if (!url || !(await isConnectionOn('slack'))) { console.log('[fulfillment-hookup]', text); return }
@@ -99,11 +70,14 @@ async function post(text) {
  * @param {{ notify?: boolean }} [opts]  notify: false to look without posting (a dry run)
  */
 export async function checkFulfillmentHookup({ notify = true } = {}) {
-  const have = await scopes()
-  const mode = have.has('read_inventory') && have.has('read_locations') ? 'exact' : 'storefront'
-  const unhooked = mode === 'exact' ? await exactCheck() : await storefrontCheck()
+  let have = await scopes()
+  // A token cached from before the scopes were granted does not carry them: get a new one once.
+  if (!have.has('read_inventory') || !have.has('read_locations')) { clearTokenCache(); have = await scopes() }
+  const missing = ['read_inventory', 'read_locations'].filter(s => !have.has(s))
+  if (missing.length) throw new Error(`The Shopify app needs ${missing.join(' and ')} to check which location each variant is on`)
+  const unhooked = await exactCheck()
   // Nothing looked at is a broken check, not a healthy catalog.
-  if (!unhooked.checked) throw new Error(`Fulfillment check (${mode}) found no print variants to check`)
+  if (!unhooked.checked) throw new Error('Fulfillment check found no print variants to check')
 
   const row = await prisma.systemConfig.findUnique({ where: { key: STATE_KEY } })
   let before = []
@@ -116,9 +90,7 @@ export async function checkFulfillmentHookup({ notify = true } = {}) {
     if (fresh.length) {
       const lines = fresh.slice(0, 15).map(v => `• ${v.product} · ${v.variant} (\`${v.sku}\`): ${v.detail}`)
       if (fresh.length > 15) lines.push(`• and ${fresh.length - 15} more`)
-      const fix = mode === 'exact'
-        ? 'In Shopify: the product > the variant > Inventory, turn the "Artelo" location back on. Leave Artelo Kentucky Fulfillment on and tracking off.'
-        : 'Check the variant in Shopify: if the "Artelo" location is off for it, turn it back on (leave Kentucky on, tracking off).'
+      const fix = 'In Shopify: the product > the variant > Inventory, turn the "Artelo" location back on. Leave Artelo Kentucky Fulfillment on and tracking off. Orders placed meanwhile went to Kentucky and never reached Artelo: check them.'
       await post(`:warning: *${fresh.length === 1 ? 'A print came' : `${fresh.length} prints came`} unhooked from Artelo* and will not sell until fixed:\n${lines.join('\n')}\n${fix}`)
     }
     if (back.length) {
@@ -129,5 +101,5 @@ export async function checkFulfillmentHookup({ notify = true } = {}) {
     const value = JSON.stringify(unhooked.map(({ id, sku, product, variant }) => ({ id, sku, product, variant })))
     await prisma.systemConfig.upsert({ where: { key: STATE_KEY }, update: { value }, create: { key: STATE_KEY, value } })
   }
-  return { mode, checked: unhooked.checked, unhooked: unhooked.length, newlyUnhooked: fresh.length, reconnected: back.length, list: unhooked }
+  return { checked: unhooked.checked, unhooked: unhooked.length, newlyUnhooked: fresh.length, reconnected: back.length, list: unhooked }
 }

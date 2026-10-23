@@ -58,12 +58,12 @@ function AddressForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread
   const start: Address = o.shipTo || o.arteloAddress || { name: thread.customerName || '', address1: '', address2: '', city: '', province: '', zip: '', country: 'US', phone: '' }
   const [a, setA] = useState<Address>(start)
   const [busy, setBusy] = useState(false)
-  const [saved, setSaved] = useState<{ pasted: string; arteloUrl: string | null } | null>(null)
+  const [saved, setSaved] = useState<{ pasted: string; arteloUrl: string | null; taxNote?: string | null } | null>(null)
   const set = (k: keyof Address) => (e: React.ChangeEvent<HTMLInputElement>) => setA({ ...a, [k]: e.target.value })
   const save = async () => {
     setBusy(true)
     try {
-      const out = await supportApi.action<{ pasted: string; arteloUrl: string | null }>('shippingAddress', { id: thread.id, shopifyOrderId: o.shopifyOrderId, address: a })
+      const out = await supportApi.action<{ pasted: string; arteloUrl: string | null; taxNote?: string | null }>('shippingAddress', { id: thread.id, shopifyOrderId: o.shopifyOrderId, address: a })
       try { await navigator.clipboard.writeText(out.pasted) } catch { /* the button below copies too */ }
       setSaved(out)
       toast.success(`#${o.number} updated in Shopify. Address copied for Artelo.`)
@@ -76,6 +76,7 @@ function AddressForm({ o, thread, onDone, onCancel }: { o: CustomerOrder; thread
       <div className="w-full bg-subtle-gray border border-border-gray rounded-md p-2.5 space-y-1.5 text-xs">
         <div className="inline-flex items-center gap-1.5 text-emerald-700 font-medium"><Check className="w-3.5 h-3.5" />Changed in Shopify. Now paste it into Artelo:</div>
         <pre className="whitespace-pre-wrap font-sans text-off-black/75 bg-white border border-border-gray rounded p-2">{saved.pasted}</pre>
+        {saved.taxNote && <div className="text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">{saved.taxNote}</div>}
         <div className="flex items-center gap-3">
           <button onClick={() => { navigator.clipboard.writeText(saved.pasted).then(() => toast.success('Copied')).catch(() => {}) }} className={linkCls}><Copy className="w-3.5 h-3.5" />Copy again</button>
           {saved.arteloUrl && <a href={saved.arteloUrl} target="_blank" rel="noopener noreferrer" className={linkCls}><img src="/artelo-icon.png" alt="" className="w-3.5 h-3.5 rounded-[3px]" />Open in Artelo</a>}
